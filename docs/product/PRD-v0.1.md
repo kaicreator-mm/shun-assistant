@@ -357,9 +357,10 @@ The next evidence must come from real execution: target completion, semantic ver
 Initial execution evidence covers 13 cross-platform deterministic component tasks:
 
 - 9 full PASS;
-- 3 scale-smoke PASS;
+- 2 scale-smoke PASS;
 - 1 partial PASS caused by the absence of a 7-Zip Provider on that host;
-- all 13 executed without UI interaction.
+- 1 INCOMPLETE_SEMANTIC_VERIFICATION: B-010 executed successfully but its original run did not measure the explicit video-quality constraint;
+- all 13 execution paths were UI-free, but UI-free execution is not PASS evidence when semantic verification is incomplete.
 
 This evidence applies only to the tested subset. It does not validate Windows-specific Store, driver, OneDrive, device, or RunX behavior.
 
@@ -388,8 +389,10 @@ Canonical Product/L1 authority for this candidate is the exact GitHub commit und
 - `docs/product/product-decisions.md`
 - `docs/product/provider-resolver-v0.1.md`
 - `docs/product/mvp-capability-map.md`
+- `docs/product/capability-contracts-v0.1.md`
 - `docs/validation/benchmark-v0.1.md`
 - `docs/validation/benchmark-results-v0.1.md`
 - `docs/review/prd-v0.1-adversarial-review-pack.md`
+- `docs/research/source-evidence-manifest-v0.1.tsv`
 
 The detailed Google Drive workbook is a supporting research archive, not Product authority.
