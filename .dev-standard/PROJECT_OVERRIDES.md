@@ -41,7 +41,7 @@ Rationale: the project is at Product/L1 and uses GitHub durable facts, exact-SHA
 
 - North Star: **make systems and software easier to use**.
 - The product is not defined as a universal Computer Use / arbitrary-UI agent.
-- Primary abstraction: `Goal -> Capability -> Provider -> Environment -> Execute -> Verify -> Recipe/Lifecycle State`.
+- Primary abstraction: `Goal -> Capability -> Provider×Environment Binding -> Execute -> Verify -> Lifecycle State -> optional Recipe`.
 - Capability is the task boundary; applications are Providers.
 - Agent-friendly Provider selection precedes UI automation.
 - UI-last means UI is a fallback/collaboration surface, not forbidden.
