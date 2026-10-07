@@ -49,12 +49,16 @@ Rationale: the project is at Product/L1 and uses GitHub durable facts, exact-SHA
 - Outcome verification is mandatory where an outcome contract is available.
 - Risk/safety gates are independent from Provider ranking.
 - RunX is an execution-environment abstraction and is P1 for v0.1; local P0 flows must stand alone.
+- P0 collection follows data minimization: exclude credentials/tokens/private keys/session secrets and unrelated content by default; external disclosure is distinct from local collection and is constrained by user/policy requirements.
+- Provider trust is fail-closed by default: unknown provenance cannot be converted to trusted by user confirmation alone.
 
 ## P0 MVP closure loops
 
 1. **Process an object** — file/document/media -> verified result.
 2. **Acquire and use capability** — resolve Provider -> trusted acquire/configure -> execute -> verify -> retain/remove.
 3. **Make the system understandable** — observe -> evidence-backed diagnosis -> safe bounded action -> verify.
+
+The first executable MVP proof requires one end-to-end reference vertical per loop plus the shared Capability/Provider core. Other P0 capability families are staged expansion coverage and must not create independent foundational architectures before the reference proof passes.
 
 P0 software lifecycle is narrow: trusted acquisition, provenance, basic repair/reset, safe uninstall, residue classification, retain/remove. Driver/firmware changes, aggressive registry cleanup, and broad system repair are not P0 lifecycle scope.
 
