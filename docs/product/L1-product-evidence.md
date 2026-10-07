@@ -4,6 +4,8 @@
 
 This document is the canonical summary of Product/L1 evidence used to justify the PRD candidate. The raw research workbook is an external supporting archive; it is not Product authority.
 
+For exact-SHA auditability, `docs/research/source-evidence-manifest-v0.1.tsv` materializes all 500 DirectNeed/source-record units used by R1–R5 with round, source-record ID, coded summary, capability/domain coding, and source URL. This manifest is part of the GitHub candidate authority for provenance/traceability; the external workbook remains supporting raw research.
+
 - Pilot: **134 coded evidence atoms**
 - R1–R4: **2,000 coded evidence atoms**
 - R5 software-review round: **500 coded evidence atoms**
