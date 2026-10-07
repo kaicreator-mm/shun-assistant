@@ -1,0 +1,167 @@
+{
+  "environment": {
+    "build": "10.0.26200.9457",
+    "isElevatedLauncher": false,
+    "uacSecureDesktop": 1,
+    "user": "NILAR\\15549",
+    "displayVersion": "25H2",
+    "uacEnableLUA": 1,
+    "uacConsentPrompt": 5
+  },
+  "scenarios": [
+    {
+      "scenario": "D2",
+      "cases": [
+        {
+          "id": "D2-a",
+          "description": "planHash-bound approval -> elevated one-shot helper -> structured receipt -> post-state verified (HKLM fixture; write requires elevation on this host)",
+          "planHash": "5545c6c15bf8b41064c117df568e846a9c8887b0d001dfa2531dee0943a84385",
+          "launch": {
+            "launched": true,
+            "timedOut": false,
+            "relay": {
+              "exitCode": 0,
+              "childPid": 36120,
+              "kind": "RAN"
+            },
+            "stdout": "",
+            "stderr": "",
+            "startedAt": "2026-10-07T13:52:11.412Z",
+            "finishedAt": "2026-10-07T13:52:16.160Z"
+          },
+          "receipt": {
+            "terminal": "OK",
+            "elevated": true,
+            "sideEffectEvidence": [
+              {
+                "step": 0,
+                "op": "proc.elevated-context-check",
+                "result": {
+                  "actualElevated": true,
+                  "expectElevated": true
+                }
+              },
+              {
+                "step": 1,
+                "op": "reg.create",
+                "result": {
+                  "key": "HKLM:\\SOFTWARE\\ShunU06Demo"
+                }
+              },
+              {
+                "step": 2,
+                "op": "reg.set",
+                "result": {
+                  "key": "HKLM:\\SOFTWARE\\ShunU06Demo",
+                  "name": "planHash",
+                  "value": "5545c6c15bf8b41064c117df568e846a9c8887b0d001dfa2531dee0943a84385"
+                }
+              },
+              {
+                "step": 3,
+                "op": "reg.set",
+                "result": {
+                  "key": "HKLM:\\SOFTWARE\\ShunU06Demo",
+                  "name": "approvedBy",
+                  "value": "local-windows-agent (issue #5 demo operator)"
+                }
+              },
+              {
+                "step": 4,
+                "op": "reg.set",
+                "result": {
+                  "key": "HKLM:\\SOFTWARE\\ShunU06Demo",
+                  "name": "executedAt",
+                  "value": "2026-10-07T13:52:11.411Z"
+                }
+              },
+              {
+                "step": 5,
+                "op": "reg.verify",
+                "result": {
+                  "key": "HKLM:\\SOFTWARE\\ShunU06Demo",
+                  "checks": {
+                    "planHash": {
+                      "expected": "5545c6c15bf8b41064c117df568e846a9c8887b0d001dfa2531dee0943a84385",
+                      "match": true,
+                      "actual": "5545c6c15bf8b41064c117df568e846a9c8887b0d001dfa2531dee0943a84385"
+                    },
+                    "approvedBy": {
+                      "expected": "local-windows-agent (issue #5 demo operator)",
+                      "match": true,
+                      "actual": "local-windows-agent (issue #5 demo operator)"
+                    }
+                  }
+                }
+              },
+              {
+                "step": 6,
+                "op": "reg.delete",
+                "result": {
+                  "key": "HKLM:\\SOFTWARE\\ShunU06Demo"
+                }
+              },
+              {
+                "step": 7,
+                "op": "reg.verify",
+                "result": {
+                  "key": "HKLM:\\SOFTWARE\\ShunU06Demo",
+                  "checks": {
+                    "__keyExists": {
+                      "expected": false,
+                      "match": true,
+                      "actual": false
+                    }
+                  }
+                }
+              }
+            ]
+          },
+          "postState": {
+            "keyExists": false,
+            "pass": true
+          },
+          "classification": {
+            "outcome": "COMPLETED_VERIFIED",
+            "basis": "receipt OK + post-state verification pass",
+            "postState": {
+              "keyExists": false,
+              "pass": true
+            },
+            "journalPhases": [
+              "RECEIVED",
+              "VALIDATED",
+              "PLANHASH_OK",
+              "APPROVAL_OK",
+              "SCOPE_OK",
+              "ELEVATION_OK",
+              "EXEC_BEGIN",
+              "EXEC_START",
+              "EXEC_DONE",
+              "EXEC_START",
+              "EXEC_DONE",
+              "EXEC_START",
+              "EXEC_DONE",
+              "EXEC_START",
+              "EXEC_DONE",
+              "EXEC_START",
+              "EXEC_DONE",
+              "EXEC_START",
+              "EXEC_DONE",
+              "EXEC_START",
+              "EXEC_DONE",
+              "EXEC_START",
+              "EXEC_DONE",
+              "RECEIPT_WRITTEN"
+            ]
+          },
+          "expectedNote": "COMPLETED_VERIFIED with elevated=true",
+          "verdict": "PASS"
+        }
+      ]
+    }
+  ],
+  "totalCases": 1,
+  "pass": 1,
+  "fail": 0
+}

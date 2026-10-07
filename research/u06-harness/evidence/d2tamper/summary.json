@@ -1,0 +1,66 @@
+{
+  "environment": {
+    "build": "10.0.26200.9457",
+    "isElevatedLauncher": false,
+    "uacSecureDesktop": 1,
+    "user": "NILAR\\15549",
+    "displayVersion": "25H2",
+    "uacEnableLUA": 1,
+    "uacConsentPrompt": 5
+  },
+  "scenarios": [
+    {
+      "scenario": "D2-tamper",
+      "cases": [
+        {
+          "id": "D2-b",
+          "description": "destructive/elevated plan mutated after approval -> authorization invalidated, helper refuses inside privileged boundary",
+          "precheck": {
+            "ok": false,
+            "problems": [
+              "plan hash mismatch (plan tampered)"
+            ]
+          },
+          "launch": {
+            "launched": true,
+            "timedOut": false,
+            "relay": {
+              "exitCode": 2,
+              "childPid": 15332,
+              "kind": "RAN"
+            },
+            "stdout": "",
+            "stderr": "",
+            "startedAt": "2026-10-07T13:53:10.154Z",
+            "finishedAt": "2026-10-07T13:53:13.605Z"
+          },
+          "receipt": {
+            "terminal": "REFUSED",
+            "reason": "plan hash mismatch - plan does not match the authorized hash"
+          },
+          "postState": {
+            "keyExists": false
+          },
+          "classification": {
+            "outcome": "REFUSED",
+            "basis": "helper terminal: plan hash mismatch - plan does not match the authorized hash",
+            "postState": {
+              "keyExists": false
+            },
+            "journalPhases": [
+              "RECEIVED",
+              "VALIDATED",
+              "REFUSED",
+              "RECEIPT_WRITTEN"
+            ]
+          },
+          "expectedNote": "REFUSED + key absent",
+          "verdict": "PASS"
+        }
+      ]
+    }
+  ],
+  "totalCases": 1,
+  "pass": 1,
+  "fail": 0
+}

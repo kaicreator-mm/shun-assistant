@@ -1,0 +1,46 @@
+{
+  "environment": {
+    "build": "10.0.26200.9457",
+    "isElevatedLauncher": false,
+    "uacSecureDesktop": 1,
+    "user": "NILAR\\15549",
+    "displayVersion": "25H2",
+    "uacEnableLUA": 1,
+    "uacConsentPrompt": 5
+  },
+  "scenarios": [
+    {
+      "scenario": "D4-elevated",
+      "cases": [
+        {
+          "id": "D4-7",
+          "description": "UAC refused/cancelled -> helper never runs, structured UAC_DECLINED (user was asked to click NO or ignore)",
+          "launch": {
+            "launched": true,
+            "timedOut": false,
+            "relay": {
+              "error": "由于出现以下错误，无法运行此命令: 操作已被用户取消。。",
+              "hresult": "0x80131509",
+              "kind": "UAC_DECLINED"
+            },
+            "stdout": "",
+            "stderr": "",
+            "startedAt": "2026-10-07T13:39:21.168Z",
+            "finishedAt": "2026-10-07T13:41:25.036Z"
+          },
+          "receipt": null,
+          "classification": {
+            "outcome": "UAC_DECLINED",
+            "basis": "elevation launch refused/cancelled before helper start",
+            "journalPhases": []
+          },
+          "expectedNote": "UAC_DECLINED (or RAN harmless if consent was given)",
+          "verdict": "PASS"
+        }
+      ]
+    }
+  ],
+  "totalCases": 1,
+  "pass": 1,
+  "fail": 0
+}

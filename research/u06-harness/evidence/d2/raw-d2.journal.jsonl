@@ -1,0 +1,24 @@
+{"ts":"2026-10-07T21:52:14.7003967+08:00","pid":36120,"phase":"RECEIVED","detail":{"helperPid":36120,"envelopeFile":"C:\\xDev\\kAiCreator\\_tmp\\u06-demo\\run-d2-4\\procs\\d2-elevated-1791381131410\\d2-elevated.envelope.json"}}
+{"ts":"2026-10-07T21:52:14.8547448+08:00","pid":36120,"phase":"VALIDATED","detail":{"steps":8}}
+{"ts":"2026-10-07T21:52:14.9552893+08:00","pid":36120,"phase":"PLANHASH_OK","detail":{"planHash":"5545c6c15bf8b41064c117df568e846a9c8887b0d001dfa2531dee0943a84385"}}
+{"ts":"2026-10-07T21:52:14.9774232+08:00","pid":36120,"phase":"APPROVAL_OK","detail":{"approvalId":"appr-6a2df3076c55","authorizationKind":"explicit-approval"}}
+{"ts":"2026-10-07T21:52:14.9930753+08:00","pid":36120,"phase":"SCOPE_OK","detail":{}}
+{"ts":"2026-10-07T21:52:14.9985579+08:00","pid":36120,"phase":"ELEVATION_OK","detail":{"isElevated":true,"integrity":"high (admin, elevated token)"}}
+{"ts":"2026-10-07T21:52:15.0005566+08:00","pid":36120,"phase":"EXEC_BEGIN","detail":{"totalSteps":8}}
+{"ts":"2026-10-07T21:52:15.0258300+08:00","pid":36120,"phase":"EXEC_START","detail":{"op":"proc.elevated-context-check","step":0}}
+{"ts":"2026-10-07T21:52:15.0373660+08:00","pid":36120,"phase":"EXEC_DONE","detail":{"op":"proc.elevated-context-check","step":0}}
+{"ts":"2026-10-07T21:52:15.0468783+08:00","pid":36120,"phase":"EXEC_START","detail":{"op":"reg.create","step":1}}
+{"ts":"2026-10-07T21:52:15.0932415+08:00","pid":36120,"phase":"EXEC_DONE","detail":{"op":"reg.create","step":1}}
+{"ts":"2026-10-07T21:52:15.0953717+08:00","pid":36120,"phase":"EXEC_START","detail":{"op":"reg.set","step":2}}
+{"ts":"2026-10-07T21:52:15.1039670+08:00","pid":36120,"phase":"EXEC_DONE","detail":{"op":"reg.set","step":2}}
+{"ts":"2026-10-07T21:52:15.1059674+08:00","pid":36120,"phase":"EXEC_START","detail":{"op":"reg.set","step":3}}
+{"ts":"2026-10-07T21:52:15.1084892+08:00","pid":36120,"phase":"EXEC_DONE","detail":{"op":"reg.set","step":3}}
+{"ts":"2026-10-07T21:52:15.1104895+08:00","pid":36120,"phase":"EXEC_START","detail":{"op":"reg.set","step":4}}
+{"ts":"2026-10-07T21:52:15.1136250+08:00","pid":36120,"phase":"EXEC_DONE","detail":{"op":"reg.set","step":4}}
+{"ts":"2026-10-07T21:52:15.1159173+08:00","pid":36120,"phase":"EXEC_START","detail":{"op":"reg.verify","step":5}}
+{"ts":"2026-10-07T21:52:15.1433566+08:00","pid":36120,"phase":"EXEC_DONE","detail":{"op":"reg.verify","step":5}}
+{"ts":"2026-10-07T21:52:15.1443554+08:00","pid":36120,"phase":"EXEC_START","detail":{"op":"reg.delete","step":6}}
+{"ts":"2026-10-07T21:52:15.1531298+08:00","pid":36120,"phase":"EXEC_DONE","detail":{"op":"reg.delete","step":6}}
+{"ts":"2026-10-07T21:52:15.1568900+08:00","pid":36120,"phase":"EXEC_START","detail":{"op":"reg.verify","step":7}}
+{"ts":"2026-10-07T21:52:15.1679087+08:00","pid":36120,"phase":"EXEC_DONE","detail":{"op":"reg.verify","step":7}}
+{"ts":"2026-10-07T21:52:15.1891861+08:00","pid":36120,"phase":"RECEIPT_WRITTEN","detail":{"terminal":"OK","receiptFile":"C:\\xDev\\kAiCreator\\_tmp\\u06-demo\\run-d2-4\\procs\\d2-elevated-1791381131410\\d2-elevated.receipt.json"}}

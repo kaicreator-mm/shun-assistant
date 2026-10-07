@@ -1,0 +1,18 @@
+{
+    "schemaVersion":  "u06-demo/1",
+    "actionId":  "act-70e6ef956b75",
+    "environmentId":  "local-windows/NILAR",
+    "providerId":  "u06.one-shot-helper",
+    "providerVersion":  "0.1.0-demo",
+    "startedAt":  "2026-10-07T21:33:30.1143056+08:00",
+    "finishedAt":  "2026-10-07T21:33:30.4231043+08:00",
+    "terminal":  "REFUSED",
+    "reason":  "plan hash mismatch - plan does not match the authorized hash",
+    "exitCode":  2,
+    "elevated":  false,
+    "planHash":  "5ea62fa6b1e9b6e7dd5d7444a9b57d6dce35a289a191ed308f25697019922c7d",
+    "approvalId":  "appr-c11b028d0421",
+    "sideEffectEvidence":  [
+
+                           ]
+}

@@ -1,0 +1,9 @@
+{"ts":"2026-10-07T21:33:40.6261340+08:00","pid":9908,"phase":"RECEIVED","detail":{"helperPid":9908,"envelopeFile":"C:\\xDev\\kAiCreator\\_tmp\\u06-demo\\run-local-final\\procs\\d5-1791380016615\\D5-c.envelope.json"}}
+{"ts":"2026-10-07T21:33:40.7406329+08:00","pid":9908,"phase":"VALIDATED","detail":{"steps":2}}
+{"ts":"2026-10-07T21:33:40.8357673+08:00","pid":9908,"phase":"PLANHASH_OK","detail":{"planHash":"be9de2a692e15461772397282e2810732f260bb5f2ee2b04b7203fd942d65a2b"}}
+{"ts":"2026-10-07T21:33:40.8588623+08:00","pid":9908,"phase":"APPROVAL_OK","detail":{"approvalId":"appr-b1ec4d644f80","authorizationKind":"explicit-approval"}}
+{"ts":"2026-10-07T21:33:40.8881239+08:00","pid":9908,"phase":"SCOPE_OK","detail":{}}
+{"ts":"2026-10-07T21:33:40.8922921+08:00","pid":9908,"phase":"ELEVATION_OK","detail":{"isElevated":false,"integrity":"medium (filtered token)"}}
+{"ts":"2026-10-07T21:33:40.8942485+08:00","pid":9908,"phase":"EXEC_BEGIN","detail":{"totalSteps":2}}
+{"ts":"2026-10-07T21:33:40.9321459+08:00","pid":9908,"phase":"EXEC_START","detail":{"op":"fs.write","step":0}}
+{"ts":"torn","phase":"EXEC_DO{"ts":"2026-10-07T21:33:40.9560664+08:00","pid":9908,"phase":"SIMULATED_CRASH","detail":{"at":"afterStep","step":0}}

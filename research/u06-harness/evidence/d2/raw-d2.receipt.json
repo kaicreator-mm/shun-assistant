@@ -1,0 +1,99 @@
+{
+    "schemaVersion":  "u06-demo/1",
+    "actionId":  "act-b345b76aff6b",
+    "environmentId":  "local-windows/NILAR",
+    "providerId":  "u06.one-shot-helper",
+    "providerVersion":  "0.1.0-demo",
+    "startedAt":  "2026-10-07T21:52:14.6925070+08:00",
+    "finishedAt":  "2026-10-07T21:52:15.1780567+08:00",
+    "terminal":  "OK",
+    "reason":  "all steps completed",
+    "exitCode":  0,
+    "elevated":  true,
+    "planHash":  "5545c6c15bf8b41064c117df568e846a9c8887b0d001dfa2531dee0943a84385",
+    "approvalId":  "appr-6a2df3076c55",
+    "sideEffectEvidence":  [
+                               {
+                                   "step":  0,
+                                   "op":  "proc.elevated-context-check",
+                                   "result":  {
+                                                  "actualElevated":  true,
+                                                  "expectElevated":  true
+                                              }
+                               },
+                               {
+                                   "step":  1,
+                                   "op":  "reg.create",
+                                   "result":  {
+                                                  "key":  "HKLM:\\SOFTWARE\\ShunU06Demo"
+                                              }
+                               },
+                               {
+                                   "step":  2,
+                                   "op":  "reg.set",
+                                   "result":  {
+                                                  "key":  "HKLM:\\SOFTWARE\\ShunU06Demo",
+                                                  "name":  "planHash",
+                                                  "value":  "5545c6c15bf8b41064c117df568e846a9c8887b0d001dfa2531dee0943a84385"
+                                              }
+                               },
+                               {
+                                   "step":  3,
+                                   "op":  "reg.set",
+                                   "result":  {
+                                                  "key":  "HKLM:\\SOFTWARE\\ShunU06Demo",
+                                                  "name":  "approvedBy",
+                                                  "value":  "local-windows-agent (issue #5 demo operator)"
+                                              }
+                               },
+                               {
+                                   "step":  4,
+                                   "op":  "reg.set",
+                                   "result":  {
+                                                  "key":  "HKLM:\\SOFTWARE\\ShunU06Demo",
+                                                  "name":  "executedAt",
+                                                  "value":  "2026-10-07T13:52:11.411Z"
+                                              }
+                               },
+                               {
+                                   "step":  5,
+                                   "op":  "reg.verify",
+                                   "result":  {
+                                                  "key":  "HKLM:\\SOFTWARE\\ShunU06Demo",
+                                                  "checks":  {
+                                                                 "planHash":  {
+                                                                                  "expected":  "5545c6c15bf8b41064c117df568e846a9c8887b0d001dfa2531dee0943a84385",
+                                                                                  "match":  true,
+                                                                                  "actual":  "5545c6c15bf8b41064c117df568e846a9c8887b0d001dfa2531dee0943a84385"
+                                                                              },
+                                                                 "approvedBy":  {
+                                                                                    "expected":  "local-windows-agent (issue #5 demo operator)",
+                                                                                    "match":  true,
+                                                                                    "actual":  "local-windows-agent (issue #5 demo operator)"
+                                                                                }
+                                                             }
+                                              }
+                               },
+                               {
+                                   "step":  6,
+                                   "op":  "reg.delete",
+                                   "result":  {
+                                                  "key":  "HKLM:\\SOFTWARE\\ShunU06Demo"
+                                              }
+                               },
+                               {
+                                   "step":  7,
+                                   "op":  "reg.verify",
+                                   "result":  {
+                                                  "key":  "HKLM:\\SOFTWARE\\ShunU06Demo",
+                                                  "checks":  {
+                                                                 "__keyExists":  {
+                                                                                     "expected":  false,
+                                                                                     "match":  true,
+                                                                                     "actual":  false
+                                                                                 }
+                                                             }
+                                              }
+                               }
+                           ]
+}

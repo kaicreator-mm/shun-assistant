@@ -1,0 +1,598 @@
+{
+  "environment": {
+    "build": "10.0.26200.9457",
+    "isElevatedLauncher": false,
+    "uacSecureDesktop": 1,
+    "user": "NILAR\\15549",
+    "displayVersion": "25H2",
+    "uacEnableLUA": 1,
+    "uacConsentPrompt": 5
+  },
+  "scenarios": [
+    {
+      "scenario": "D1",
+      "cases": [
+        {
+          "id": "D1-a",
+          "description": "structured OS/build observation (typed argv, JSON stdout)",
+          "launch": {
+            "exitCode": 0,
+            "timedOut": false,
+            "stderrEmpty": true
+          },
+          "stdout": {
+            "query": "os.build",
+            "cancelled": false,
+            "target": "",
+            "os": {
+              "ubr": 9457,
+              "displayVersion": "25H2",
+              "productName": "Windows 10 Pro",
+              "currentBuild": "26200",
+              "buildString": "10.0.26200.9457"
+            }
+          },
+          "rawStdout": "{\"query\":\"os.build\",\"cancelled\":false,\"target\":\"\",\"os\":{\"ubr\":9457,\"displayVersion\":\"25H2\",\"productName\":\"Windows 10 Pro\",\"currentBuild\":\"26200\",\"buildString\":\"10.0.26200.9457\"}}\r\n",
+          "classification": {
+            "outcome": "OK_STRUCTURED"
+          },
+          "verdict": "PASS"
+        },
+        {
+          "id": "D1-b",
+          "description": "service query with typed target",
+          "launch": {
+            "exitCode": 0,
+            "stderrEmpty": true
+          },
+          "stdout": {
+            "query": "service.query",
+            "cancelled": false,
+            "target": "wuauserv",
+            "service": {
+              "startType": "Manual",
+              "status": "Running",
+              "name": "wuauserv",
+              "displayName": "Windows ����"
+            }
+          },
+          "classification": {
+            "outcome": "OK_STRUCTURED"
+          },
+          "verdict": "PASS"
+        },
+        {
+          "id": "D1-c",
+          "description": "package inventory query (registry uninstall keys)",
+          "launch": {
+            "exitCode": 0
+          },
+          "stdout": {
+            "matchCount": 4,
+            "sampleSize": 4
+          },
+          "classification": {
+            "outcome": "OK_STRUCTURED"
+          },
+          "verdict": "PASS"
+        },
+        {
+          "id": "D1-d",
+          "description": "stdout/stderr separation + terminal classification on helper error",
+          "launch": {
+            "exitCode": 3,
+            "stderr": "simulated helper diagnostic: observation channel failure",
+            "stdoutEmpty": true
+          },
+          "classification": {
+            "outcome": "FAILED_STDERR_SEPARATE"
+          },
+          "verdict": "PASS"
+        },
+        {
+          "id": "D1-e",
+          "description": "timeout -> launcher kills child, terminal classified TIMED_OUT",
+          "launch": {
+            "exitCode": 1,
+            "timedOut": true
+          },
+          "classification": {
+            "outcome": "TIMED_OUT"
+          },
+          "verdict": "PASS"
+        },
+        {
+          "id": "D1-f",
+          "description": "cooperative cancellation via cancel sentinel -> structured CANCELLED",
+          "launch": {
+            "exitCode": 5
+          },
+          "stdout": {
+            "query": "os.build",
+            "cancelled": true,
+            "delayMs": 8000,
+            "observedBeforeCancel": true
+          },
+          "classification": {
+            "outcome": "CANCELLED"
+          },
+          "verdict": "PASS"
+        }
+      ]
+    },
+    {
+      "scenario": "D4-local",
+      "cases": [
+        {
+          "id": "D4-1",
+          "description": "unknown op rejected (no arbitrary shell endpoint)",
+          "precheck": {
+            "ok": false,
+            "problems": [
+              "unknown op: shell.exec"
+            ]
+          },
+          "launch": {
+            "exitCode": 2
+          },
+          "receipt": {
+            "terminal": "REFUSED",
+            "reason": "unknown op 'shell.exec' - no arbitrary shell endpoint"
+          },
+          "classification": {
+            "outcome": "REFUSED",
+            "basis": "helper terminal: unknown op 'shell.exec' - no arbitrary shell endpoint",
+            "postState": null,
+            "journalPhases": [
+              "RECEIVED",
+              "REFUSED",
+              "RECEIPT_WRITTEN"
+            ]
+          },
+          "expectedNote": "REFUSED",
+          "verdict": "PASS"
+        },
+        {
+          "id": "D4-2",
+          "description": "plan mutated after approval -> hash mismatch -> refused, no side effect",
+          "precheck": {
+            "ok": false,
+            "problems": [
+              "plan hash mismatch (plan tampered)"
+            ]
+          },
+          "launch": {
+            "exitCode": 2
+          },
+          "receipt": {
+            "terminal": "REFUSED",
+            "reason": "plan hash mismatch - plan does not match the authorized hash"
+          },
+          "postState": {
+            "evilMarkerExists": false
+          },
+          "classification": {
+            "outcome": "REFUSED",
+            "basis": "helper terminal: plan hash mismatch - plan does not match the authorized hash",
+            "postState": {
+              "evilMarkerExists": false
+            },
+            "journalPhases": [
+              "RECEIVED",
+              "VALIDATED",
+              "REFUSED",
+              "RECEIPT_WRITTEN"
+            ]
+          },
+          "expectedNote": "REFUSED + fixture absent",
+          "verdict": "PASS"
+        },
+        {
+          "id": "D4-3",
+          "description": "path outside declared scope -> refused before execution",
+          "precheck": {
+            "ok": true,
+            "problems": []
+          },
+          "launch": {
+            "exitCode": 2
+          },
+          "receipt": {
+            "terminal": "REFUSED",
+            "reason": "filesystem path outside declared scope: C:\\Windows\\out-of-scope.txt"
+          },
+          "postState": {
+            "outOfScopeFileExists": false
+          },
+          "classification": {
+            "outcome": "REFUSED",
+            "basis": "helper terminal: filesystem path outside declared scope: C:\\Windows\\out-of-scope.txt",
+            "postState": {
+              "outOfScopeFileExists": false
+            },
+            "journalPhases": [
+              "RECEIVED",
+              "VALIDATED",
+              "PLANHASH_OK",
+              "APPROVAL_OK",
+              "REFUSED",
+              "RECEIPT_WRITTEN"
+            ]
+          },
+          "expectedNote": "REFUSED + fixture absent",
+          "verdict": "PASS"
+        },
+        {
+          "id": "D4-4",
+          "description": "shell metacharacters in filename/content pass through literally (typed envelope, no shell)",
+          "precheck": {
+            "ok": true,
+            "problems": []
+          },
+          "launch": {
+            "exitCode": 0
+          },
+          "receipt": {
+            "terminal": "OK"
+          },
+          "postState": {
+            "fileExists": true,
+            "contentMatches": true,
+            "pass": true
+          },
+          "classification": {
+            "outcome": "COMPLETED_VERIFIED",
+            "basis": "receipt OK + post-state verification pass",
+            "postState": {
+              "fileExists": true,
+              "contentMatches": true,
+              "pass": true
+            },
+            "journalPhases": [
+              "RECEIVED",
+              "VALIDATED",
+              "PLANHASH_OK",
+              "APPROVAL_OK",
+              "SCOPE_OK",
+              "ELEVATION_OK",
+              "EXEC_BEGIN",
+              "EXEC_START",
+              "EXEC_DONE",
+              "EXEC_START",
+              "EXEC_DONE",
+              "RECEIPT_WRITTEN"
+            ]
+          },
+          "expectedNote": "COMPLETED_VERIFIED with metachar fixture intact",
+          "verdict": "PASS"
+        },
+        {
+          "id": "D4-4b",
+          "description": "filesystem-illegal characters in typed path -> fail-closed structured REFUSED (no crash, no side effect)",
+          "precheck": {
+            "ok": true,
+            "problems": []
+          },
+          "launch": {
+            "exitCode": 2
+          },
+          "receipt": {
+            "terminal": "REFUSED",
+            "reason": "scope validation error: 使用“1”个参数调用“GetFullPath”时发生异常:“路径中具有非法字符。”"
+          },
+          "classification": {
+            "outcome": "REFUSED",
+            "basis": "helper terminal: scope validation error: 使用“1”个参数调用“GetFullPath”时发生异常:“路径中具有非法字符。”",
+            "postState": null,
+            "journalPhases": [
+              "RECEIVED",
+              "VALIDATED",
+              "PLANHASH_OK",
+              "APPROVAL_OK",
+              "REFUSED",
+              "RECEIPT_WRITTEN"
+            ]
+          },
+          "expectedNote": "REFUSED",
+          "verdict": "PASS"
+        },
+        {
+          "id": "D4-5",
+          "description": "expired approval -> refused, no side effect",
+          "precheck": {
+            "ok": true,
+            "problems": []
+          },
+          "launch": {
+            "exitCode": 2
+          },
+          "receipt": {
+            "terminal": "REFUSED",
+            "reason": "approval expired"
+          },
+          "postState": {
+            "fixtureExists": false
+          },
+          "classification": {
+            "outcome": "REFUSED",
+            "basis": "helper terminal: approval expired",
+            "postState": {
+              "fixtureExists": false
+            },
+            "journalPhases": [
+              "RECEIVED",
+              "VALIDATED",
+              "PLANHASH_OK",
+              "REFUSED",
+              "RECEIPT_WRITTEN"
+            ]
+          },
+          "expectedNote": "REFUSED",
+          "verdict": "PASS"
+        },
+        {
+          "id": "D4-6",
+          "description": "authorizationRef pointing at a forged approvalId -> refused",
+          "precheck": {
+            "ok": false,
+            "problems": [
+              "authorizationRef mismatch"
+            ]
+          },
+          "launch": {
+            "exitCode": 2
+          },
+          "receipt": {
+            "terminal": "REFUSED",
+            "reason": "authorizationRef does not match approval"
+          },
+          "postState": {
+            "fixtureExists": false
+          },
+          "classification": {
+            "outcome": "REFUSED",
+            "basis": "helper terminal: authorizationRef does not match approval",
+            "postState": {
+              "fixtureExists": false
+            },
+            "journalPhases": [
+              "RECEIVED",
+              "VALIDATED",
+              "PLANHASH_OK",
+              "REFUSED",
+              "RECEIPT_WRITTEN"
+            ]
+          },
+          "expectedNote": "REFUSED",
+          "verdict": "PASS"
+        }
+      ]
+    },
+    {
+      "scenario": "D5",
+      "cases": [
+        {
+          "id": "D5-a",
+          "description": "hard crash after EXEC_START but before side effect",
+          "launch": {
+            "exitCode": 1
+          },
+          "journalPhases": [
+            "RECEIVED",
+            "VALIDATED",
+            "PLANHASH_OK",
+            "APPROVAL_OK",
+            "SCOPE_OK",
+            "ELEVATION_OK",
+            "EXEC_BEGIN",
+            "EXEC_START",
+            "SIMULATED_CRASH"
+          ],
+          "receipt": null,
+          "postState": {
+            "aExists": false,
+            "bExists": false
+          },
+          "classification": {
+            "outcome": "EXECUTED_PARTIALLY_RESOLVED_BY_VERIFICATION",
+            "basis": "crash inside side-effect window (EXEC_START without EXEC_DONE)",
+            "postState": {
+              "aExists": false,
+              "bExists": false
+            },
+            "journalPhases": [
+              "RECEIVED",
+              "VALIDATED",
+              "PLANHASH_OK",
+              "APPROVAL_OK",
+              "SCOPE_OK",
+              "ELEVATION_OK",
+              "EXEC_BEGIN",
+              "EXEC_START",
+              "SIMULATED_CRASH"
+            ]
+          },
+          "expectedNote": "EXECUTED_PARTIALLY_RESOLVED_BY_VERIFICATION",
+          "verdict": "PASS"
+        },
+        {
+          "id": "D5-b",
+          "description": "hard crash after step 0 side effect, before step 1 and receipt",
+          "launch": {
+            "exitCode": 1
+          },
+          "journalPhases": [
+            "RECEIVED",
+            "VALIDATED",
+            "PLANHASH_OK",
+            "APPROVAL_OK",
+            "SCOPE_OK",
+            "ELEVATION_OK",
+            "EXEC_BEGIN",
+            "EXEC_START",
+            "SIMULATED_CRASH"
+          ],
+          "receipt": null,
+          "postState": {
+            "aExists": true,
+            "bExists": false
+          },
+          "classification": {
+            "outcome": "EXECUTED_PARTIALLY_RESOLVED_BY_VERIFICATION",
+            "basis": "crash inside side-effect window (EXEC_START without EXEC_DONE)",
+            "postState": {
+              "aExists": true,
+              "bExists": false
+            },
+            "journalPhases": [
+              "RECEIVED",
+              "VALIDATED",
+              "PLANHASH_OK",
+              "APPROVAL_OK",
+              "SCOPE_OK",
+              "ELEVATION_OK",
+              "EXEC_BEGIN",
+              "EXEC_START",
+              "SIMULATED_CRASH"
+            ]
+          },
+          "expectedNote": "EXECUTED_PARTIALLY_RESOLVED_BY_VERIFICATION",
+          "verdict": "PASS"
+        },
+        {
+          "id": "D5-c",
+          "description": "crash with torn journal append (JSONL tolerance)",
+          "launch": {
+            "exitCode": 1
+          },
+          "journalPhases": [
+            "RECEIVED",
+            "VALIDATED",
+            "PLANHASH_OK",
+            "APPROVAL_OK",
+            "SCOPE_OK",
+            "ELEVATION_OK",
+            "EXEC_BEGIN",
+            "EXEC_START",
+            "TORN_LINE"
+          ],
+          "receipt": null,
+          "postState": {
+            "aExists": true,
+            "bExists": false
+          },
+          "classification": {
+            "outcome": "EXECUTED_PARTIALLY_RESOLVED_BY_VERIFICATION",
+            "basis": "crash inside side-effect window (EXEC_START without EXEC_DONE)",
+            "postState": {
+              "aExists": true,
+              "bExists": false
+            },
+            "journalPhases": [
+              "RECEIVED",
+              "VALIDATED",
+              "PLANHASH_OK",
+              "APPROVAL_OK",
+              "SCOPE_OK",
+              "ELEVATION_OK",
+              "EXEC_BEGIN",
+              "EXEC_START",
+              "TORN_LINE"
+            ]
+          },
+          "expectedNote": "EXECUTED_PARTIALLY_RESOLVED_BY_VERIFICATION",
+          "verdict": "PASS"
+        },
+        {
+          "id": "D5-d",
+          "description": "same crash WITHOUT post-state verification -> honest UNCERTAIN",
+          "launch": {
+            "exitCode": 1
+          },
+          "journalPhases": [
+            "RECEIVED",
+            "VALIDATED",
+            "PLANHASH_OK",
+            "APPROVAL_OK",
+            "SCOPE_OK",
+            "ELEVATION_OK",
+            "EXEC_BEGIN",
+            "EXEC_START",
+            "SIMULATED_CRASH"
+          ],
+          "receipt": null,
+          "postState": null,
+          "classification": {
+            "outcome": "MAY_HAVE_EXECUTED_UNCERTAIN",
+            "basis": "crash inside side-effect window (EXEC_START without EXEC_DONE)",
+            "postState": null,
+            "journalPhases": [
+              "RECEIVED",
+              "VALIDATED",
+              "PLANHASH_OK",
+              "APPROVAL_OK",
+              "SCOPE_OK",
+              "ELEVATION_OK",
+              "EXEC_BEGIN",
+              "EXEC_START",
+              "SIMULATED_CRASH"
+            ]
+          },
+          "expectedNote": "MAY_HAVE_EXECUTED_UNCERTAIN",
+          "verdict": "PASS"
+        },
+        {
+          "id": "D5-e",
+          "description": "crash after last EXEC_DONE, before receipt -> receipt lost, post-state resolves",
+          "launch": {
+            "exitCode": 1
+          },
+          "journalPhases": [
+            "RECEIVED",
+            "VALIDATED",
+            "PLANHASH_OK",
+            "APPROVAL_OK",
+            "SCOPE_OK",
+            "ELEVATION_OK",
+            "EXEC_BEGIN",
+            "EXEC_START",
+            "EXEC_DONE",
+            "EXEC_START",
+            "SIMULATED_CRASH"
+          ],
+          "receipt": null,
+          "postState": {
+            "aExists": true,
+            "bExists": true
+          },
+          "classification": {
+            "outcome": "EXECUTED_RECEIPT_LOST",
+            "basis": "EXEC_DONE present but receipt channel lost",
+            "postState": {
+              "aExists": true,
+              "bExists": true
+            },
+            "journalPhases": [
+              "RECEIVED",
+              "VALIDATED",
+              "PLANHASH_OK",
+              "APPROVAL_OK",
+              "SCOPE_OK",
+              "ELEVATION_OK",
+              "EXEC_BEGIN",
+              "EXEC_START",
+              "EXEC_DONE",
+              "EXEC_START",
+              "SIMULATED_CRASH"
+            ]
+          },
+          "expectedNote": "EXECUTED_PARTIALLY_RESOLVED_BY_VERIFICATION|EXECUTED_RECEIPT_LOST",
+          "verdict": "PASS"
+        }
+      ]
+    }
+  ],
+  "totalCases": 18,
+  "pass": 18,
+  "fail": 0
+}

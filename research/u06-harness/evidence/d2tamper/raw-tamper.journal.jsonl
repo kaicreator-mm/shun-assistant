@@ -1,0 +1,4 @@
+{"ts":"2026-10-07T21:53:12.9580608+08:00","pid":15332,"phase":"RECEIVED","detail":{"helperPid":15332,"envelopeFile":"C:\\xDev\\kAiCreator\\_tmp\\u06-demo\\run-d2tamper\\procs\\d2-tamper-1791381190152\\d2-tamper.envelope.json"}}
+{"ts":"2026-10-07T21:53:13.0533170+08:00","pid":15332,"phase":"VALIDATED","detail":{"steps":1}}
+{"ts":"2026-10-07T21:53:13.1196838+08:00","pid":15332,"phase":"REFUSED","detail":{"expected":"352f4985165461dd951c8d70fb03c24bf1538bf16dbc34acfc260fe2165eaa9b","why":"planHash mismatch","recomputed":"10c0a6c12fa1c4f02a7e2d5b5723d623a87f3fd6637fac4ed8b5d716bdd75d86"}}
+{"ts":"2026-10-07T21:53:13.1613279+08:00","pid":15332,"phase":"RECEIPT_WRITTEN","detail":{"terminal":"REFUSED","receiptFile":"C:\\xDev\\kAiCreator\\_tmp\\u06-demo\\run-d2tamper\\procs\\d2-tamper-1791381190152\\d2-tamper.receipt.json"}}

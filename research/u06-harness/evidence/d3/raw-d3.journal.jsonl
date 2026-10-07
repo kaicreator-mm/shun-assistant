@@ -1,0 +1,20 @@
+{"ts":"2026-10-07T22:07:31.4936312+08:00","pid":17204,"phase":"RECEIVED","detail":{"helperPid":17204,"envelopeFile":"C:\\xDev\\kAiCreator\\_tmp\\u06-demo\\run-d3-6\\procs\\d3-winget-1791382048231\\d3-winget.envelope.json"}}
+{"ts":"2026-10-07T22:07:31.6548963+08:00","pid":17204,"phase":"VALIDATED","detail":{"steps":6}}
+{"ts":"2026-10-07T22:07:31.7625244+08:00","pid":17204,"phase":"PLANHASH_OK","detail":{"planHash":"b8941683fe9919f85a2a8230802ee10f867b9ab46b64048f84a1efce03401383"}}
+{"ts":"2026-10-07T22:07:31.7820349+08:00","pid":17204,"phase":"APPROVAL_OK","detail":{"approvalId":"appr-8a5440f94801","authorizationKind":"explicit-approval"}}
+{"ts":"2026-10-07T22:07:31.7989187+08:00","pid":17204,"phase":"SCOPE_OK","detail":{}}
+{"ts":"2026-10-07T22:07:31.8039545+08:00","pid":17204,"phase":"ELEVATION_OK","detail":{"isElevated":true,"integrity":"high (admin, elevated token)"}}
+{"ts":"2026-10-07T22:07:31.8107142+08:00","pid":17204,"phase":"EXEC_BEGIN","detail":{"totalSteps":6}}
+{"ts":"2026-10-07T22:07:31.8461650+08:00","pid":17204,"phase":"EXEC_START","detail":{"op":"proc.elevated-context-check","step":0}}
+{"ts":"2026-10-07T22:07:31.8580082+08:00","pid":17204,"phase":"EXEC_DONE","detail":{"op":"proc.elevated-context-check","step":0}}
+{"ts":"2026-10-07T22:07:31.8688493+08:00","pid":17204,"phase":"EXEC_START","detail":{"op":"winget.inventory","step":1}}
+{"ts":"2026-10-07T22:07:33.4307461+08:00","pid":17204,"phase":"EXEC_DONE","detail":{"op":"winget.inventory","step":1}}
+{"ts":"2026-10-07T22:07:33.4329509+08:00","pid":17204,"phase":"EXEC_START","detail":{"op":"winget.install","step":2}}
+{"ts":"2026-10-07T22:07:56.2107691+08:00","pid":17204,"phase":"EXEC_DONE","detail":{"op":"winget.install","step":2}}
+{"ts":"2026-10-07T22:07:56.2208812+08:00","pid":17204,"phase":"EXEC_START","detail":{"op":"winget.verify","step":3}}
+{"ts":"2026-10-07T22:08:02.4875430+08:00","pid":17204,"phase":"EXEC_DONE","detail":{"op":"winget.verify","step":3}}
+{"ts":"2026-10-07T22:08:02.4918254+08:00","pid":17204,"phase":"EXEC_START","detail":{"op":"winget.uninstall","step":4}}
+{"ts":"2026-10-07T22:08:08.8484105+08:00","pid":17204,"phase":"EXEC_DONE","detail":{"op":"winget.uninstall","step":4}}
+{"ts":"2026-10-07T22:08:08.8514104+08:00","pid":17204,"phase":"EXEC_START","detail":{"op":"winget.verify","step":5}}
+{"ts":"2026-10-07T22:08:10.6982056+08:00","pid":17204,"phase":"EXEC_DONE","detail":{"op":"winget.verify","step":5}}
+{"ts":"2026-10-07T22:08:10.7241003+08:00","pid":17204,"phase":"RECEIPT_WRITTEN","detail":{"terminal":"OK","receiptFile":"C:\\xDev\\kAiCreator\\_tmp\\u06-demo\\run-d3-6\\procs\\d3-winget-1791382048231\\d3-winget.receipt.json"}}

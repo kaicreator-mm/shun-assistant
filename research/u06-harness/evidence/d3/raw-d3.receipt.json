@@ -1,0 +1,116 @@
+{
+    "schemaVersion":  "u06-demo/1",
+    "actionId":  "act-9eee97aaf87c",
+    "environmentId":  "local-windows/NILAR",
+    "providerId":  "u06.one-shot-helper",
+    "providerVersion":  "0.1.0-demo",
+    "startedAt":  "2026-10-07T22:07:31.4854851+08:00",
+    "finishedAt":  "2026-10-07T22:08:10.7083043+08:00",
+    "terminal":  "OK",
+    "reason":  "all steps completed",
+    "exitCode":  0,
+    "elevated":  true,
+    "planHash":  "b8941683fe9919f85a2a8230802ee10f867b9ab46b64048f84a1efce03401383",
+    "approvalId":  "appr-8a5440f94801",
+    "sideEffectEvidence":  [
+                               {
+                                   "step":  0,
+                                   "op":  "proc.elevated-context-check",
+                                   "result":  {
+                                                  "actualElevated":  true,
+                                                  "expectElevated":  true
+                                              }
+                               },
+                               {
+                                   "step":  1,
+                                   "op":  "winget.inventory",
+                                   "result":  {
+                                                  "outputSample":  [
+                                                                       "Name                                                         Id                                                                                    Version            Available   Source",
+                                                                       "----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------",
+                                                                       "Android Studio                                               ARP\\Machine\\X64\\Android Studio                                                        2026.1                         ",
+                                                                       "App Installer                                                Microsoft.AppInstaller                                                                1.29.379.0         1.29.380    winget",
+                                                                       "AV1 Video Extension                                          MSIX\\Microsoft.AV1VideoExtension_2.0.35.0_x64__8wekyb3d8bbwe                          2.0.35.0                       ",
+                                                                       "AVC 缂栫爜鍣ㄨ棰戞墿灞?                                          MSIX\\Microsoft.AVCEncoderVideoExtension_1.1.47.0_x64__8wekyb3d8bbwe                   1.1.47.0                       ",
+                                                                       "CC Switch                                                    farion1231.CC-Switch                                                                  3.20.1             3.20.4      winget",
+                                                                       "ChatGPT                                                      MSIX\\OpenAI.Codex_26.930.7945.0_x64__2p2nqsd0c76g0                                    26.930.7945.0                  ",
+                                                                       "Claude                                                       Anthropic.Claude                                                                      2.26454.0.0                    winget",
+                                                                       "Docker Desktop                                               Docker.DockerDesktop                                                                  4.89.0             4.94.0      winget",
+                                                                       "Everything 1.5.0.1423b (x64)                                 voidtools.Everything                                                                  1.5.0.1423                     winget",
+                                                                       "Fast Node Manager                                            Schniz.fnm                                                                            1.39.0                         winget"
+                                                                   ],
+                                                  "exitCode":  0,
+                                                  "timedOut":  false
+                                              }
+                               },
+                               {
+                                   "step":  2,
+                                   "op":  "winget.install",
+                                   "result":  {
+                                                  "exitCode":  0,
+                                                  "stderr":  "",
+                                                  "outputTail":  [
+                                                                     "This application is licensed to you by its owner.",
+                                                                     "Microsoft is not responsible for, nor does it grant any licenses to, third-party packages.",
+                                                                     "Downloading https://www.7-zip.org/a/7z2604-x64.msi",
+                                                                     "Successfully verified installer hash",
+                                                                     "Starting package install...",
+                                                                     "Successfully installed"
+                                                                 ],
+                                                  "timedOut":  false
+                                              }
+                               },
+                               {
+                                   "step":  3,
+                                   "op":  "winget.verify",
+                                   "result":  {
+                                                  "id":  "7zip.7zip",
+                                                  "wingetListTail":  [
+                                                                         "Name                      Id        Version    Source",
+                                                                         "------------------------------------------------------",
+                                                                         "7-Zip 26.04 (x64 edition) 7zip.7zip 26.04.00.0 winget"
+                                                                     ],
+                                                  "expectInstalled":  true,
+                                                  "wingetListExit":  0,
+                                                  "registryEvidence":  [
+                                                                           {
+                                                                               "publisher":  "Igor Pavlov",
+                                                                               "displayVersion":  "26.04.00.0",
+                                                                               "key":  "{23170F69-40C1-2702-2604-000001000000}",
+                                                                               "displayName":  "7-Zip 26.04 (x64 edition)",
+                                                                               "installDate":  "20261007"
+                                                                           }
+                                                                       ],
+                                                  "installed":  true
+                                              }
+                               },
+                               {
+                                   "step":  4,
+                                   "op":  "winget.uninstall",
+                                   "result":  {
+                                                  "exitCode":  0,
+                                                  "stderr":  "",
+                                                  "outputTail":  [
+                                                                     "Found 7-Zip 26.04 (x64 edition) [7zip.7zip]",
+                                                                     "Starting package uninstall...",
+                                                                     "Successfully uninstalled"
+                                                                 ],
+                                                  "timedOut":  false
+                                              }
+                               },
+                               {
+                                   "step":  5,
+                                   "op":  "winget.verify",
+                                   "result":  {
+                                                  "id":  "7zip.7zip",
+                                                  "wingetListTail":  "No installed package found matching input criteria.",
+                                                  "expectInstalled":  false,
+                                                  "wingetListExit":  -1978335212,
+                                                  "registryEvidence":  [
+
+                                                                       ],
+                                                  "installed":  false
+                                              }
+                               }
+                           ]
+}
