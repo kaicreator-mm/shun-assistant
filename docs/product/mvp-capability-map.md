@@ -6,6 +6,18 @@ MVP acceptance is organized around three closed loops:
 2. **Acquire and use capability** — resolve Provider → trusted acquire/configure → execute → verify → retain/remove.
 3. **Make the system understandable** — observe → evidence-backed diagnosis → safe bounded action → verify.
 
+## First executable MVP proof
+
+The first executable MVP proof is deliberately smaller than the complete P0 coverage map. It MUST prove:
+
+- shared core: Capability Resolver + Provider Registry;
+- Loop A reference vertical: one real object-processing capability with Provider selection and semantic verification;
+- Loop B reference vertical: trusted JIT acquisition → use → lifecycle-state capture → retain/remove for one real Provider;
+- Loop C reference vertical: storage/context observation → diagnosis → previewed safe bounded action → recovery verification;
+- data minimization/redaction for collected system context.
+
+The other P0 rows below are **v0.1 expansion coverage** after these reference verticals work. They do not each justify a separate foundational architecture before the reference proof passes.
+
 | Priority | Capability_Area | Representative_Intents | Why_Now | Preferred_Providers_or_Path | Environment | Risk | MVP_Success_Criterion | UI_Last_Target | Evidence | Out_of_Scope_v0 | Status |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
 | P0 | Capability Resolver + Provider Registry | “我想做 X，用什么最合适？” | 整个产品核心；R2/R5 最强差异化 | Registry + Provider metadata + score v0.1 | Local metadata | Low | Top-1 Provider 在 benchmark 中满足 contract 且理由可解释 | 100% no visual UI for resolution | R2/R5 | 自动适配所有软件 | MVP |
