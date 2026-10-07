@@ -126,6 +126,8 @@ Every MVP capability must expose a compact contract containing:
 
 This contract allows different Providers and execution environments to remain interchangeable.
 
+For the first executable MVP proof, the minimum authoritative contracts are materialized in `docs/product/capability-contracts-v0.1.md` for the shared resolver surface and the three reference verticals. L2 may refine implementation schemas but may not weaken their user-observable semantics without returning to Product/L1 review.
+
 ## 6. MVP Scope
 
 MVP acceptance is organized around **three closed user loops**, not nine independent feature projects.
@@ -205,7 +207,7 @@ Initial score dimensions:
 - Trust — 15%
 - Environment Compatibility — 10%
 - Performance / Resource Cost — 5%
-- Human Friction — 5%
+- Human Usability — 5% (100 = lower human interaction friction)
 
 Interaction Complexity and Lifecycle Cost are penalties.
 
