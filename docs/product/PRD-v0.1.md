@@ -15,12 +15,15 @@ Shun is **not** defined by its ability to click arbitrary interfaces. Its prefer
 ```text
 User Goal / Object / Constraints
   → Capability Resolver
-  → Provider Resolver
-  → Environment Resolver
+  → Discover Provider Candidates
+  → Resolve Provider × Environment Bindings
+  → Apply Hard Gates
+  → Rank Feasible Bindings
   → Acquire / Configure
   → Execute
   → Verify
-  → Persist Recipe / Lifecycle State
+  → Persist Lifecycle State
+  → Optionally Promote a Reusable Recipe
 ```
 
 ## 2. User Problem
@@ -127,6 +130,8 @@ This contract allows different Providers and execution environments to remain in
 
 MVP acceptance is organized around **three closed user loops**, not nine independent feature projects.
 
+For the **first executable MVP proof**, each loop requires one representative end-to-end reference vertical. Other P0 capability families remain in v0.1 product scope but are expansion coverage after the three reference verticals prove the shared contracts. They must not force separate foundational architectures before the reference loops work.
+
 ### Loop A — Process an object
 
 Select files/documents/media → resolve capability/provider → execute → obtain a verified result without learning an application.
@@ -181,12 +186,14 @@ Provider selection has two stages.
 
 ### 7.1 Hard gates
 
-A Provider is not ranked if it fails:
+A **Provider × Environment binding** is not ranked if it fails:
 
 - Capability Fit;
 - Trust / Supply Chain;
-- Environment Compatibility;
+- Binding Feasibility for the selected environment;
 - User / Policy / Safety constraints.
+
+Unknown or unverifiable provenance is fail-closed for normal host acquisition/execution. A user preference alone does not convert unknown provenance into trusted provenance. Any explicitly authorized exception must remain labeled UNKNOWN/UNTRUSTED, be policy-bounded, and use an isolated environment when the risk profile requires it.
 
 ### 7.2 Experimental ranking
 
@@ -214,17 +221,27 @@ Destructive or difficult-to-reverse operations require the appropriate combinati
 
 ## 8. Environment Resolution
 
-Provider and environment resolution are orthogonal.
+Provider and environment are orthogonal dimensions, but feasibility is evaluated on their **binding**, not by rejecting a Provider before its possible environment is known.
 
-The same capability may be satisfied by different Providers in different environments.
+The resolution order is:
 
-A failed local compatibility check should trigger environment resolution rather than automatically failing the task.
+```text
+Capability
+→ discover Provider candidates
+→ derive each Provider's environment requirements
+→ resolve feasible environment candidates
+→ create Provider × Environment bindings
+→ apply hard gates
+→ rank feasible bindings
+```
 
-P0 must remain independently useful on local execution. RunX integration is P1 for v0.1.
+For P0, the environment resolver only needs to prove local feasibility and choose among local-compatible Providers. A local incompatibility may therefore cause selection of another local Provider rather than task failure.
+
+RunX-backed remote/legacy/sandbox placement is P1. When enabled, it expands the environment candidates rather than changing the Provider contract.
 
 ## 9. Software Lifecycle State
 
-For managed software, Shun should retain:
+For managed software, Shun should retain lifecycle state:
 
 - why it was acquired;
 - source and provenance;
@@ -244,6 +261,8 @@ Need → Acquire → Use → Verify → Retain / Remove
 ```
 
 A Provider should not remain installed indefinitely merely because it was needed once.
+
+Reusable Recipe promotion is separate from mandatory lifecycle-state persistence. Recipe promotion is P1 in v0.1 and must re-check Provider/version currentness and re-run semantic verification on replay.
 
 ## 10. Interaction Modes
 
@@ -269,6 +288,20 @@ High-risk classes include:
 Shun must distinguish user assets from software residue and system data before destructive action.
 
 High-risk operations require risk-appropriate preview, checkpoint/backup, approval, and outcome verification.
+
+### 11.1 Data and privacy boundary
+
+P0 system-context collection and file inspection are subject to data minimization:
+
+- collect only fields required by the active capability/diagnosis;
+- exclude credentials, tokens, private keys, browser/session secrets, and unrelated document contents by default;
+- preserve the distinction between **local collection** and **external model/provider disclosure**;
+- do not send collected system/file context to a remote model or service when user/policy constraints require local-only handling;
+- redact or summarize sensitive paths/identifiers when full fidelity is unnecessary;
+- make any required external disclosure explicit in the execution plan and subject to policy/approval;
+- never treat consent as proof that a source or Provider is trusted.
+
+The Product contract must remain implementable with local-only execution for P0 reference loops where their selected Providers support it.
 
 ## 12. Non-Goals for MVP
 
@@ -299,7 +332,7 @@ For repeated tasks, planning/tool-call cost should decrease after a validated Re
 
 ## 14. Validation Plan
 
-The current benchmark contains 36 tasks spanning:
+The benchmark contains component tasks plus three required end-to-end reference journeys spanning:
 
 - files;
 - documents/OCR;
@@ -319,7 +352,7 @@ Exploratory research supports the product direction but does not prove a populat
 
 The next evidence must come from real execution: target completion, semantic verification, user-confirmation count, Provider-ranking correctness, failure recovery, and controlled failure injection.
 
-Initial execution evidence covers 13 cross-platform deterministic benchmark tasks:
+Initial execution evidence covers 13 cross-platform deterministic component tasks:
 
 - 9 full PASS;
 - 3 scale-smoke PASS;
@@ -336,7 +369,7 @@ PRD v0.1 may freeze only when:
 2. Fresh Independent Adversarial Review is performed against that exact SHA;
 3. no unresolved P0 product contradiction remains;
 4. required P1 product contradictions are closed;
-5. the benchmark plan covers each P0 MVP loop with explicit inputs, verification, risk gates, and failure cases;
+5. the benchmark plan contains one end-to-end reference journey for each P0 MVP loop, with explicit inputs, resolution decisions, verification, risk gates, and failure cases;
 6. any changed successor SHA receives affected re-review;
 7. a durable terminal records `PRODUCT_FREEZE_ELIGIBLE=YES` and the exact candidate identity.
 
