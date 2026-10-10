@@ -3,11 +3,17 @@ import {
   type AuthorizationGrant,
   assertGrantPresentation,
   type CurrentAuthorityState,
+  type GrantIntegrityVerifier,
   type GrantValidationInput,
   pathWithin,
   validateGrantPresentation,
 } from '../src/authorization.ts';
-import { type ActionPlan, type AuthorizedAction, computePlanHash } from '../src/plan.ts';
+import {
+  type ActionPlan,
+  type AuthorizedAction,
+  computePlanHash,
+  type PlanAction,
+} from '../src/plan.ts';
 import {
   parseActionPlan,
   parseAuthorizationGrant,
@@ -31,8 +37,22 @@ const CURRENT: CurrentAuthorityState = {
   revokedGrantIds: [],
 };
 
+/**
+ * Stand-in trusted substrate (P1-02): accepts the presented envelope. Tests
+ * model substrate-side verification failure by overriding it.
+ */
+const VERIFIER_ACCEPTS: GrantIntegrityVerifier = () => true;
+
 function input(overrides: Partial<GrantValidationInput> = {}): GrantValidationInput {
-  return { grant, plan, action, currentAuthority: CURRENT, now: NOW, ...overrides };
+  return {
+    grant,
+    plan,
+    action,
+    currentAuthority: CURRENT,
+    now: NOW,
+    verifyIntegrity: VERIFIER_ACCEPTS,
+    ...overrides,
+  };
 }
 
 function expectOk(overrides: Partial<GrantValidationInput> = {}): void {
@@ -66,6 +86,16 @@ describe('grant presentation: structural forgery and malformation fail closed', 
     expectReject('GRANT_NOT_AUTHENTIC', { grant: forged });
   });
 
+  it('refuses an envelope that is present but fails trusted verification — presence is not verification', () => {
+    const result = validateGrantPresentation(input({ verifyIntegrity: () => false }));
+    expect(result.ok).toBe(false);
+    if (!result.ok) {
+      expect(result.code).toBe('GRANT_NOT_AUTHENTIC');
+      expect(result.detail).toMatch(/present/);
+      expect(result.detail).toMatch(/verif/);
+    }
+  });
+
   it('refuses grants that do not parse as AuthorizationGrant', () => {
     expectReject('GRANT_MALFORMED', { grant: { ...grant, grantId: undefined } });
     expectReject('GRANT_MALFORMED', { grant: { hello: 'world' } });
@@ -80,6 +110,21 @@ describe('grant presentation: structural forgery and malformation fail closed', 
   it('refuses an action whose authorizationRef does not identify the presented grant', () => {
     expectReject('GRANT_MALFORMED', {
       action: { ...action, authorizationRef: 'grant-someone-else' },
+    });
+  });
+
+  it('refuses an action whose top-level actionId does not match its embedded action surface', () => {
+    // Scope is widened so only the consistency rule can reject.
+    const widenedGrant: AuthorizationGrant = {
+      ...grant,
+      actionScope: {
+        ...grant.actionScope,
+        actionIds: [...grant.actionScope.actionIds, 'action-999'],
+      },
+    };
+    expectReject('GRANT_MALFORMED', {
+      grant: widenedGrant,
+      action: { ...action, actionId: 'action-999' },
     });
   });
 });
@@ -158,7 +203,12 @@ describe('grant binding: exact plan identity re-derived by the privileged bounda
 
 describe('grant scope: actionId, privilege, filesystem, network containment', () => {
   it('refuses an actionId outside the granted scope', () => {
-    expectReject('GRANT_SCOPE_MISMATCH', { action: { ...action, actionId: 'action-999' } });
+    const outside: AuthorizedAction = {
+      ...action,
+      actionId: 'action-999',
+      action: { ...action.action, actionId: 'action-999' },
+    };
+    expectReject('GRANT_SCOPE_MISMATCH', { action: outside });
   });
 
   it('refuses privilege escalation beyond the granted level', () => {
@@ -191,14 +241,29 @@ describe('grant scope: actionId, privilege, filesystem, network containment', ()
   });
 
   it('accepts writes inside the granted prefixes with windows casing and separator variations', () => {
-    const inside: AuthorizedAction = {
-      ...action,
-      action: {
-        ...action.action,
-        filesystemScope: { read: [], write: ['c:/FIXTURES/out/sub/x.PNG'] },
-      },
+    // The presented action surface must be exactly the hashed plan action
+    // (P1-01), so the case/separator variant path is committed to by the plan
+    // itself; scope containment then proves its case-insensitivity end to end.
+    const first = plan.actions.at(0);
+    if (!first) throw new Error('fixture plan must contain an action');
+    const variantWrite = 'c:/FIXTURES/out/sub/x.PNG';
+    const variantSurface: PlanAction = {
+      ...first,
+      filesystemScope: { read: [], write: [variantWrite] },
     };
-    expectOk({ action: inside });
+    const actions = [variantSurface];
+    const variantPlan: ActionPlan = {
+      ...plan,
+      actions,
+      planHash: computePlanHash({ ...plan, actions }),
+    };
+    const variantGrant: AuthorizationGrant = { ...grant, planHash: variantPlan.planHash };
+    const variantAction: AuthorizedAction = {
+      ...action,
+      planHash: variantPlan.planHash,
+      action: variantSurface,
+    };
+    expectOk({ grant: variantGrant, plan: variantPlan, action: variantAction });
   });
 
   it('refuses undeclared network access', () => {
@@ -235,5 +300,18 @@ describe('path containment semantics', () => {
     expect(pathWithin('C:\\fixtures\\outputs', 'C:\\fixtures\\out')).toBe(false);
     expect(pathWithin('C:\\fixtures\\other\\a.png', 'C:\\fixtures\\out')).toBe(false);
     expect(pathWithin('C:\\fixtures\\out-traversal', 'C:\\fixtures\\out')).toBe(false);
+    expect(pathWithin('C:\\Users\\a', 'C:\\Users\\ab')).toBe(false);
+  });
+
+  it('fails closed on `..` segments: lexical containment cannot establish the real location', () => {
+    // Win32-normalizes to C:\fixtures\protected\sensitive.txt — outside the prefix.
+    expect(pathWithin('C:\\fixtures\\out\\..\\protected\\sensitive.txt', 'C:\\fixtures\\out')).toBe(
+      false,
+    );
+    expect(pathWithin('..\\escape.png', 'C:\\fixtures\\out')).toBe(false);
+  });
+
+  it('fails closed when the `..` segment is on the prefix side', () => {
+    expect(pathWithin('C:\\fixtures\\out\\a.png', 'C:\\fixtures\\out\\..\\out')).toBe(false);
   });
 });
