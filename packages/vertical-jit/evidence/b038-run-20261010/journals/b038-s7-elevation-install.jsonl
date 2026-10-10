@@ -1,0 +1,5 @@
+{"seq":0,"ts":"2026-10-10T14:13:39.577Z","phase":"RECEIVED","actionId":"b038-s7-elevation-install"}
+{"seq":1,"ts":"2026-10-10T14:13:39.579Z","phase":"VALIDATED","actionId":"b038-s7-elevation-install","detail":"grant grant-0001"}
+{"seq":3,"ts":"2026-10-10T14:13:39.580Z","phase":"EXEC_START","actionId":"b038-s7-elevation-install"}
+{"seq":4,"ts":"2026-10-10T14:13:39.852Z","phase":"EXEC_DONE","actionId":"b038-s7-elevation-install","detail":"winget exit 2316632107 :: Found an existing package already installed. Trying to upgrade the installed package... No available upgrade found. No newer package versions are available from the configured sources. already-installed treated as present"}
+{"seq":5,"ts":"2026-10-10T14:13:39.857Z","phase":"RECEIPT_WRITTEN","actionId":"b038-s7-elevation-install"}

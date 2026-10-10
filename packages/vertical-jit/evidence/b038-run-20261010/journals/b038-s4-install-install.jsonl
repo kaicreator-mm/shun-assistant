@@ -1,0 +1,5 @@
+{"seq":0,"ts":"2026-10-10T14:12:54.978Z","phase":"RECEIVED","actionId":"b038-s4-install-install"}
+{"seq":1,"ts":"2026-10-10T14:12:54.980Z","phase":"VALIDATED","actionId":"b038-s4-install-install","detail":"grant grant-0001"}
+{"seq":3,"ts":"2026-10-10T14:12:54.981Z","phase":"EXEC_START","actionId":"b038-s4-install-install"}
+{"seq":4,"ts":"2026-10-10T14:13:35.706Z","phase":"EXEC_DONE","actionId":"b038-s4-install-install","detail":"winget exit 0 :: Found RipGrep MSVC [BurntSushi.ripgrep.MSVC] Version 15.2.0 This application is licensed to you by its owner. Microsoft is not responsible for, nor does it grant any licenses to, third-party packages. Downloading https://github.com/BurntSus"}
+{"seq":5,"ts":"2026-10-10T14:13:35.707Z","phase":"RECEIPT_WRITTEN","actionId":"b038-s4-install-install"}
