@@ -13,7 +13,14 @@
 // with CANCELLED / TIMED_OUT markers emitted at the point of observation.
 
 import { createHash } from 'node:crypto';
-import { appendFileSync, readFileSync } from 'node:fs';
+import {
+  appendFileSync,
+  closeSync,
+  fsyncSync,
+  openSync,
+  readFileSync,
+  writeSync,
+} from 'node:fs';
 import { z } from 'zod';
 
 export const JOURNAL_SCHEMA_VERSION = 'shun.executor-windows.journal/1';
@@ -85,19 +92,48 @@ export class JournalWriter {
       ...(fields?.op !== undefined ? { op: fields.op } : {}),
       ...(fields?.detail ? { detail: fields.detail } : {}),
     };
-    appendFileSyncTolerant(this.file, `${JSON.stringify(event)}\n`);
+    appendFileSyncDurable(this.file, `${JSON.stringify(event)}\n`);
   }
 
-  /** Deliberately torn half-append: crash-simulation support for recovery tests. */
+  /**
+   * Deliberately torn half-append: crash-simulation support for recovery
+   * tests. Raw append, NO fsync barrier — it simulates a write that died
+   * mid-flight, so claiming durability would defeat the simulation.
+   */
   appendTornForTest(text: string): void {
-    appendFileSyncTolerant(this.file, text);
+    appendFileSync(this.file, text, { encoding: 'utf8' });
   }
 }
 
-function appendFileSyncTolerant(file: string, text: string): void {
-  // appendFileSync creates the file on first write; encoding UTF-8 without
-  // BOM keeps strict JSONL parsers happy.
-  appendFileSync(file, text, { encoding: 'utf8' });
+/**
+ * Append `text` to `file` behind a durable barrier (C17): open, write, fsync,
+ * close. The journal is the §9.4 recovery authority — every event must survive
+ * a process crash AND a power loss before the next phase begins, otherwise
+ * the classification derived from "the journal proves…" is built on cache.
+ */
+export function appendFileSyncDurable(file: string, text: string): void {
+  const fd = openSync(file, 'a');
+  try {
+    writeSync(fd, text, null, 'utf8');
+    fsyncSync(fd);
+  } finally {
+    closeSync(fd);
+  }
+}
+
+/**
+ * Write a complete file behind a durable barrier (fsync before close). Used
+ * for the helper's receipt tmp file so the subsequent atomic rename cannot
+ * publish content that exists only in the page cache.
+ */
+export function durableWriteFileSync(file: string, text: string): void {
+  const fd = openSync(file, 'w');
+  try {
+    writeSync(fd, text, null, 'utf8');
+    fsyncSync(fd);
+  } finally {
+    closeSync(fd);
+  }
 }
 
 /**

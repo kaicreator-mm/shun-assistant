@@ -20,7 +20,7 @@
 // identity → op allowlist + typed surface + declared scope → privilege
 // consistency → execute → structured receipt.
 import { execFile } from 'node:child_process';
-import { renameSync, writeFileSync } from 'node:fs';
+import { renameSync } from 'node:fs';
 import { hostname } from 'node:os';
 import { join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -47,7 +47,7 @@ import {
   type InterpreterScope,
   runStep,
 } from '../interpreter.ts';
-import { JournalWriter } from '../journal.ts';
+import { durableWriteFileSync, JournalWriter } from '../journal.ts';
 import { preflightScope } from '../scope-preflight.ts';
 import { systemWhoamiExe } from '../system-exe.ts';
 import {
@@ -378,7 +378,7 @@ class Helper {
     };
     const parsed = HelperReceiptFileSchema.parse(payload);
     const tmp = `${this.receiptFile}.tmp`;
-    writeFileSync(tmp, `${JSON.stringify(parsed, null, 2)}\n`, 'utf8');
+    durableWriteFileSync(tmp, `${JSON.stringify(parsed, null, 2)}\n`);
     renameSync(tmp, this.receiptFile);
     this.journal.append('RECEIPT_WRITTEN', {
       detail: { terminal: input.terminal, receiptFile: this.receiptFile },
