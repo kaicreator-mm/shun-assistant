@@ -37,6 +37,8 @@ export const CONTROL_ERROR_CODES = [
   'EVIDENCE_REF_INVALID',
   'EVIDENCE_NOT_FOUND',
   'LOCAL_ONLY_VIOLATION',
+  // cross-site request protection on mutations
+  'CSRF_REFUSED',
 ] as const;
 
 export type ControlErrorCode = (typeof CONTROL_ERROR_CODES)[number];
@@ -58,6 +60,7 @@ export function httpStatusForCode(code: ControlErrorCode): number {
     case 'METHOD_NOT_ALLOWED':
       return 405;
     case 'LOCAL_ONLY_VIOLATION':
+    case 'CSRF_REFUSED':
       return 403;
     case 'APPROVAL_EXPIRED':
     case 'POLICY_EXPIRED':

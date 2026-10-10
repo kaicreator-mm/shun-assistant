@@ -18,8 +18,16 @@ export interface TestHarness {
   setNow(instant: string): void;
   get(path: string): Promise<ApiResponse>;
   post(path: string, body?: unknown): Promise<ApiResponse>;
-  /** Raw request with arbitrary headers (e.g. a forged non-loopback Host). */
-  raw(path: string, headers: Record<string, string>): Promise<ApiResponse>;
+  /**
+   * Raw request with arbitrary headers (e.g. a forged non-loopback Host or a
+   * hostile cross-site Origin). `options.method`/`options.body` let CSRF
+   * negative controls send exactly what an attacker's page would send.
+   */
+  raw(
+    path: string,
+    headers: Record<string, string>,
+    options?: { method?: string; body?: string },
+  ): Promise<ApiResponse>;
   close(): Promise<void>;
 }
 
@@ -62,23 +70,27 @@ export async function startHarness(options: HarnessOptions = {}): Promise<TestHa
     },
     get: (path) => call('GET', path),
     post: (path, body) => call('POST', path, body ?? {}),
-    raw: (path, headers) =>
+    raw: (path, headers, options) =>
       new Promise((resolveRaw, rejectRaw) => {
-        const req = httpRequest({ host: '127.0.0.1', port, path, headers }, (res) => {
-          const chunks: Buffer[] = [];
-          res.on('data', (chunk: Buffer) => chunks.push(chunk));
-          res.on('end', () => {
-            const text = Buffer.concat(chunks).toString('utf8');
-            let body: unknown = text;
-            try {
-              body = text ? JSON.parse(text) : undefined;
-            } catch {
-              // non-JSON responses (e.g. static HTML) are passed through
-            }
-            resolveRaw({ status: res.statusCode ?? 0, body });
-          });
-        });
+        const req = httpRequest(
+          { host: '127.0.0.1', port, path, headers, method: options?.method ?? 'GET' },
+          (res) => {
+            const chunks: Buffer[] = [];
+            res.on('data', (chunk: Buffer) => chunks.push(chunk));
+            res.on('end', () => {
+              const text = Buffer.concat(chunks).toString('utf8');
+              let body: unknown = text;
+              try {
+                body = text ? JSON.parse(text) : undefined;
+              } catch {
+                // non-JSON responses (e.g. static HTML) are passed through
+              }
+              resolveRaw({ status: res.statusCode ?? 0, body });
+            });
+          },
+        );
         req.on('error', rejectRaw);
+        if (options?.body !== undefined) req.write(options.body);
         req.end();
       }),
     close: () => server.close(),

@@ -114,6 +114,35 @@ interface RouteContext {
   maxBodyBytes: number;
 }
 
+/**
+ * Same-origin + JSON gate for mutating requests (CSRF_REFUSED, fail closed):
+ * anything that is not this server's own http origin, and any content type a
+ * plain HTML form can send (urlencoded / multipart / text/plain), is refused
+ * before a route can act on it. Non-browser clients that omit Origin entirely
+ * (curl, tests) still pass the Origin arm — the content-type arm holds.
+ */
+function assertSameOriginJsonMutation(req: IncomingMessage): void {
+  const origin = req.headers.origin;
+  if (origin !== undefined) {
+    const own = `http://${(req.headers.host ?? '').toLowerCase()}`;
+    if (origin.toLowerCase() !== own) {
+      throw new ControlError(
+        'CSRF_REFUSED',
+        `Cross-site mutation from “${origin}” is refused; the control surface only accepts ` +
+          'mutations from its own loopback origin.',
+      );
+    }
+  }
+  const mediaType = (req.headers['content-type'] ?? '').split(';')[0]?.trim().toLowerCase() ?? '';
+  if (mediaType !== 'application/json') {
+    throw new ControlError(
+      'CSRF_REFUSED',
+      'Mutating requests must declare a JSON body (content-type: application/json); ' +
+        'form-encodable content types are refused (cross-site request protection).',
+    );
+  }
+}
+
 async function handle(
   backend: ControlBackend,
   req: IncomingMessage,
@@ -134,6 +163,18 @@ async function handle(
       'LOCAL_ONLY_VIOLATION',
       `Non-loopback Host “${req.headers.host}” is refused.`,
     );
+  }
+
+  // CSRF protection for the loopback control surface (Issue #41, VC-P1-04).
+  // A loopback bind alone is not CSRF protection: cross-site form posts and
+  // no-cors fetches are CORS "simple requests" that reach this server without
+  // any preflight, and a hostile web page can aim them at 127.0.0.1. Every
+  // mutation must therefore (a) come from this server's own origin — browsers
+  // attach Origin to every cross-site request, and sandboxed frames send
+  // "null" — and (b) declare a JSON body, which no form-encodable content
+  // type can. GET/HEAD stay open: they never mutate.
+  if (method !== 'GET' && method !== 'HEAD') {
+    assertSameOriginJsonMutation(req);
   }
 
   if (!url.pathname.startsWith('/api/')) {

@@ -42,6 +42,8 @@ export const FALLBACK_MESSAGES = {
   EVIDENCE_NOT_FOUND: 'That evidence record does not exist.',
   LOCAL_ONLY_VIOLATION:
     'The control surface is local-only and refused a request that did not come from this computer.',
+  CSRF_REFUSED:
+    'The control surface refused a request that did not come from this page (cross-site request protection). Nothing was changed.',
 };
 
 /** Fallback text for an error code; unknown codes still get a predictable sentence. */
