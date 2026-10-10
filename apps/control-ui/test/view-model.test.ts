@@ -81,6 +81,12 @@ describe('predictable fallback: every typed error code has a human sentence', ()
     const message = fallbackFor('SOME_FUTURE_CODE');
     expect(message).toContain('Nothing was changed');
   });
+
+  it('explains policy revision drift as a refusal that cannot be overridden (VC-P1-02)', () => {
+    const message = fallbackFor('POLICY_REVISION_DRIFT');
+    expect(message).toContain('refused');
+    expect(message).toContain('cannot be overridden');
+  });
 });
 
 describe('task state rendering', () => {

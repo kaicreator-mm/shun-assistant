@@ -25,6 +25,7 @@ export const CONTROL_ERROR_CODES = [
   'APPROVAL_EXPIRED',
   'PLAN_HASH_MISMATCH',
   'POLICY_EXPIRED',
+  'POLICY_REVISION_DRIFT',
   'POLICY_STATE_UNKNOWN',
   'TRUST_BLOCKED',
   // cancellation / recovery
@@ -67,6 +68,7 @@ export function httpStatusForCode(code: ControlErrorCode): number {
     case 'PREVIEW_NOT_AVAILABLE':
     case 'APPROVAL_ALREADY_DECIDED':
     case 'PLAN_HASH_MISMATCH':
+    case 'POLICY_REVISION_DRIFT':
     case 'CANCEL_UNSUPPORTED':
     case 'CANCEL_INVALID_STATE':
     case 'RECOVERY_NOT_APPLICABLE':

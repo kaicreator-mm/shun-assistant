@@ -507,6 +507,25 @@ export class DemoShunBackend implements ControlBackend {
         detail: `The policy snapshot expired at ${policy.expiredAt}. Approval is refused until Shun re-resolves under a current snapshot — this cannot be overridden here.`,
       };
     }
+    if (
+      policy.kind === 'ACTIVE' &&
+      input.approved &&
+      policy.revision !== task.plan?.policySnapshotRevision
+    ) {
+      // Active-policy revision drift (Issue #41, VC-P1-02): the plan — and the
+      // approval bound to its hash — was resolved under a different policy
+      // snapshot than the one now active. Approving would authorize the plan
+      // against a policy the user never reviewed, so the decision is refused
+      // and nothing is recorded. Declining stays available (it grants nothing).
+      return {
+        ok: false,
+        code: 'POLICY_REVISION_DRIFT',
+        detail:
+          `The active policy snapshot is “${policy.revision}”, but this plan was resolved under ` +
+          `“${task.plan?.policySnapshotRevision ?? 'unknown'}”. Approval is refused; ask Shun to ` +
+          're-resolve the plan under the current snapshot — this cannot be overridden here.',
+      };
+    }
 
     if (input.seenPlanHash !== approval.planHash) {
       return {

@@ -27,6 +27,8 @@ export const FALLBACK_MESSAGES = {
     'The plan changed after the preview you saw. Nothing was recorded — review the fresh preview and decide again.',
   POLICY_EXPIRED:
     'The policy snapshot has expired, so approval is refused until Shun re-resolves policy. This cannot be overridden here.',
+  POLICY_REVISION_DRIFT:
+    'The active policy snapshot changed since this plan was resolved, so approval is refused. Ask Shun to re-plan under the current policy — this cannot be overridden here.',
   POLICY_STATE_UNKNOWN:
     'The current policy cannot be established, so approval is refused. This cannot be overridden here.',
   TRUST_BLOCKED:
