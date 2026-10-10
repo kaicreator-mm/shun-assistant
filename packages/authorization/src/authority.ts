@@ -30,6 +30,7 @@ import {
   type GrantIntegritySecret,
   signGrantIntegrity,
 } from './integrity.ts';
+import { type IssuanceProof, verifyIssuanceProof } from './issuance-proof.ts';
 import {
   type AuthorityRecord,
   AuthorityRecordSchema,
@@ -65,6 +66,12 @@ export interface AuthorizationAuthorityConfig {
   grants: GrantRecordStore;
   /** HMAC secret of the reference substrate; lives in trusted local configuration. */
   integritySecret: GrantIntegritySecret;
+  /**
+   * HMAC secret of the controller-issuance proof channel (P1-04); shared only
+   * with the trusted Action Controller through trusted local configuration.
+   * Issuance without a proof minted under this secret is refused.
+   */
+  issuanceSecret: GrantIntegritySecret;
   /** ISO 8601 UTC clock; injected so issuance stays deterministic in tests. */
   clock: () => string;
   grantTtlMs?: number;
@@ -89,6 +96,9 @@ export class AuthorizationAuthority implements AuthorizationPort {
     if (config.integritySecret.length === 0) {
       throw new TypeError('AuthorizationAuthority requires a non-empty integritySecret');
     }
+    if (config.issuanceSecret.length === 0) {
+      throw new TypeError('AuthorizationAuthority requires a non-empty issuanceSecret');
+    }
     this.#config = config;
     this.#grantTtlMs = config.grantTtlMs ?? DEFAULT_GRANT_TTL_MS;
     this.#newGrantId = config.newGrantId ?? (() => randomUUID());
@@ -100,13 +110,21 @@ export class AuthorizationAuthority implements AuthorizationPort {
   }
 
   /**
-   * Issue one grant. Fails closed on: unresolvable currentness, non-ACTIVE
-   * policy, request classified under a stale policy revision, malformed
-   * request, missing approval reference for explicit-approval grants, or an
-   * unreadable validation clock. The envelope is applied here from trusted
-   * configuration — a caller-supplied envelope cannot exist on this path.
+   * Issue one grant. Fails closed on: a missing/invalid controller issuance
+   * proof, unresolvable currentness, non-ACTIVE policy, a request classified
+   * under a stale policy revision, a malformed request, missing approval
+   * reference for explicit-approval grants, or an unreadable validation clock.
+   * The envelope is applied here from trusted configuration — a
+   * caller-supplied envelope cannot exist on this path.
+   *
+   * P1-04: the port is protected. `proof` must be an issuance proof minted by
+   * the Action Controller for THIS exact request under the shared trusted
+   * secret (a second optional parameter keeps the class assignable to the
+   * frozen `AuthorizationPort` seam). Direct issuance with no plan intake, no
+   * durable-policy rule and no approval evidence is refused with a structured
+   * error.
    */
-  async issue(request: GrantIssueRequest): Promise<AuthorizationGrant> {
+  async issue(request: GrantIssueRequest, proof?: IssuanceProof): Promise<AuthorizationGrant> {
     const current = await this.currentAuthority();
     if (current.kind === 'UNRESOLVABLE') {
       issueFailure('GRANT_CURRENTNESS_UNRESOLVABLE', `refusing issuance: ${current.reason}`);
@@ -125,6 +143,12 @@ export class AuthorizationAuthority implements AuthorizationPort {
       issueFailure('SCHEMA_VIOLATION', 'grant issue request is not a valid GrantIssueRequest');
     }
     const req = parsed.data;
+    if (!verifyIssuanceProof(this.#config.issuanceSecret, req, proof)) {
+      issueFailure(
+        'GRANT_NOT_AUTHENTIC',
+        'issuance refused: caller presented no valid controller issuance proof; grants are issued only through the Action Controller',
+      );
+    }
     if (req.policySnapshotRevision !== current.policySnapshotRevision) {
       issueFailure(
         'GRANT_POLICY_STALE',
@@ -191,6 +215,15 @@ export class AuthorizationAuthority implements AuthorizationPort {
    * the CURRENT AUTHORITY RECORD — not to a coherence-checked state — because
    * adoption is exactly the act that restores coherence after a rotation
    * (rotation alone leaves currentness deliberately UNRESOLVABLE).
+   *
+   * P1-02: policy revisions are globally non-reusable. Re-adopting a revision
+   * — the currently active one or any superseded one — would reset its
+   * revocation list and re-activate every grant still bound to it (revoked
+   * grants resurrect); adoption is therefore refused for every revision in
+   * the durable lineage. Each adoption carries the predecessor's revision
+   * history and revocations forward, so revocation stays durable across
+   * successor revisions. A corrupt predecessor refuses fail-closed; an absent
+   * one is the first-ever bootstrap adoption.
    */
   async adoptPolicy(snapshot: {
     policySnapshotRevision: string;
@@ -198,12 +231,35 @@ export class AuthorizationAuthority implements AuthorizationPort {
     riskGuards?: PolicySnapshotRecord['riskGuards'];
   }): Promise<void> {
     const authorityRecord = await this.#loadAuthorityOrThrow();
+    const rawPrior = await this.#config.state.loadCurrentPolicy();
+    let prior: PolicySnapshotRecord | undefined;
+    if (rawPrior !== null && rawPrior !== undefined) {
+      const parsedPrior = PolicySnapshotRecordSchema.safeParse(rawPrior);
+      if (!parsedPrior.success) {
+        issueFailure(
+          'GRANT_CURRENTNESS_UNRESOLVABLE',
+          'current policy record is corrupt; refusing to adopt a new revision over unreadable state',
+        );
+      }
+      prior = parsedPrior.data;
+    }
+    const usedRevisions = new Set([
+      ...(prior?.priorRevisions ?? []),
+      ...(prior ? [prior.policySnapshotRevision] : []),
+    ]);
+    if (usedRevisions.has(snapshot.policySnapshotRevision)) {
+      issueFailure(
+        'GRANT_POLICY_STALE',
+        `policy revision ${snapshot.policySnapshotRevision} was already used; policy revisions are non-reusable — adopt a fresh revision (revocations and staleness stay durable)`,
+      );
+    }
     const snapshotRecord: PolicySnapshotRecord = {
       policySnapshotRevision: snapshot.policySnapshotRevision,
       status: 'ACTIVE',
       authorityId: authorityRecord.authorityId,
       authorityRevision: authorityRecord.authorityRevision,
-      revokedGrantIds: [],
+      revokedGrantIds: prior ? [...prior.revokedGrantIds] : [],
+      priorRevisions: prior ? [...(prior.priorRevisions ?? []), prior.policySnapshotRevision] : [],
       rules: snapshot.rules,
       riskGuards: snapshot.riskGuards ?? [],
       updatedAt: requireInstant(this.#config.clock),

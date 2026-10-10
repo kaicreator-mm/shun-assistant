@@ -6,15 +6,21 @@ import type { ApprovalPort } from '@shun/contracts';
 import { describe, expect, it } from 'vitest';
 import { AuthorizationAuthority } from '../src/authority.ts';
 import { ActionController } from '../src/controller.ts';
-import { type DurablePolicyRule, DurablePolicyRuleSchema } from '../src/policy.ts';
+import {
+  type DurablePolicyRule,
+  DurablePolicyRuleSchema,
+  type PolicyStateStore,
+} from '../src/policy.ts';
 import {
   AUTHORITY,
   activePolicy,
   approvingSurface,
   buildPlan,
   fixedClock,
+  ISSUANCE_SECRET,
   memoryGrantStore,
   memoryPolicyState,
+  secondPolicyReadReturns,
 } from './helpers.ts';
 
 const SECRET = 'controller-test-secret';
@@ -22,17 +28,21 @@ const SECRET = 'controller-test-secret';
 function makeWorld(options?: {
   policy?: ReturnType<typeof activePolicy>;
   approvals?: ApprovalPort;
+  /** Wrap the shared policy state (both authority and controller see the wrapper). */
+  stateWrapper?: (base: PolicyStateStore) => PolicyStateStore;
 }) {
-  const state = memoryPolicyState({
+  const base = memoryPolicyState({
     authority: AUTHORITY,
     policy: options?.policy ?? activePolicy(),
   });
+  const state = options?.stateWrapper ? options.stateWrapper(base) : base;
   const grants = memoryGrantStore();
   const clock = fixedClock();
   const authority = new AuthorizationAuthority({
     state,
     grants,
     integritySecret: SECRET,
+    issuanceSecret: ISSUANCE_SECRET,
     clock: clock.now,
   });
   const approvals = approvingSurface();
@@ -40,9 +50,20 @@ function makeWorld(options?: {
     authority,
     policyState: state,
     approvals: options?.approvals ?? approvals.surface,
+    issuanceSecret: ISSUANCE_SECRET,
     clock: clock.now,
   });
-  return { state, grants, clock, authority, approvals, controller };
+  return {
+    /** The store both the authority and the controller see (possibly wrapped). */
+    state,
+    /** The underlying memory store, for direct slot injection in tests. */
+    base,
+    grants,
+    clock,
+    authority,
+    approvals,
+    controller,
+  };
 }
 
 /** Rule authorizing the default plan action (image.resize @ NONE, R≤1, same paths). */
@@ -81,7 +102,7 @@ describe('intake validation', () => {
 
   it('refuses to authorize under unresolvable or non-ACTIVE current policy', async () => {
     const unresolved = makeWorld({ policy: activePolicy() });
-    unresolved.state.policySlot = undefined;
+    unresolved.base.policySlot = undefined;
     const plan = buildPlan();
     expect(await unresolved.controller.authorizePlan({ plan })).toMatchObject({
       ok: false,
@@ -388,12 +409,14 @@ describe('grant-backed AuthorizedActions', () => {
       state,
       grants,
       integritySecret: SECRET,
+      issuanceSecret: ISSUANCE_SECRET,
       clock: () => (broken ? 'not-a-date' : flakyClock.now()),
     });
     const flakyController = new ActionController({
       authority,
       policyState: state,
       approvals: approvingSurface().surface,
+      issuanceSecret: ISSUANCE_SECRET,
       clock: flakyClock.now,
     });
     const before = await flakyController.authorizePlan({ plan: buildPlan() });
@@ -401,5 +424,224 @@ describe('grant-backed AuthorizedActions', () => {
     broken = true;
     const after = await flakyController.authorizePlan({ plan: buildPlan() });
     expect(after).toMatchObject({ ok: false, code: 'GRANT_MALFORMED' });
+  });
+
+  it('issues every grant through the protected issuance port with a per-request controller proof', async () => {
+    const { controller, grants } = makeWorld({ policy: activePolicy({ rules: [defaultRule()] }) });
+    const result = await controller.authorizePlan({ plan: buildPlan() });
+    expect(result).toMatchObject({ ok: true });
+    // The grant exists and carries the authority's own envelope (integration
+    // evidence that the controller proof path issues exactly as before).
+    expect(grants.snapshot()).toHaveLength(1);
+    expect(grants.snapshot()[0]?.grant.integrity.scheme).toBe('HMAC_SHA256');
+  });
+});
+
+describe('approval provenance — only explicit human approval completes the approval route (P1-01)', () => {
+  it('an R3 plan whose approval decision records DURABLE_POLICY origin is refused — durable policy is not explicit approval', async () => {
+    const { controller, grants } = makeWorld({
+      approvals: approvingSurface({ approvedBy: 'DURABLE_POLICY' }).surface,
+    });
+    const plan = buildPlan({ actions: [{ op: 'disk.wipe_free_space', sideEffectClass: 'R3' }] });
+    const result = await controller.authorizePlan({ plan });
+    expect(result).toMatchObject({
+      ok: false,
+      code: 'APPROVAL_INVALID',
+      detail: expect.stringContaining('USER_APPROVAL'),
+    });
+    expect(grants.snapshot()).toHaveLength(0);
+  });
+
+  it('the provenance requirement is not R3-specific: an approval-requiring R1 with DURABLE_POLICY origin is refused too', async () => {
+    const { controller, grants } = makeWorld({
+      approvals: approvingSurface({ approvedBy: 'DURABLE_POLICY' }).surface,
+    });
+    const result = await controller.authorizePlan({ plan: buildPlan() });
+    expect(result).toMatchObject({ ok: false, code: 'APPROVAL_INVALID' });
+    expect(grants.snapshot()).toHaveLength(0);
+  });
+
+  it('a matching-hash, matching-task R3 decision of USER_APPROVAL origin still authorizes (positive control)', async () => {
+    const { controller, grants } = makeWorld({
+      approvals: approvingSurface({ approvedBy: 'USER_APPROVAL' }).surface,
+    });
+    const plan = buildPlan({ actions: [{ op: 'disk.wipe_free_space', sideEffectClass: 'R3' }] });
+    const result = await controller.authorizePlan({ plan });
+    expect(result).toMatchObject({
+      ok: true,
+      authorization: { disposition: { kind: 'EXPLICIT_APPROVAL' } },
+    });
+    expect(grants.snapshot()).toHaveLength(1);
+  });
+});
+
+describe('network domain bounds — automatic policy never covers a domain-unbounded action (P1-03)', () => {
+  const networkRule = (overrides?: Partial<DurablePolicyRule>): DurablePolicyRule =>
+    defaultRule({
+      ruleId: 'rule-image-fetch-r1',
+      op: 'image.fetch',
+      network: { allowed: true, domains: ['cdn.example.com'] },
+      ...overrides,
+    });
+
+  it('an action declaring network access with an OMITTED domain list is not covered by a domain-limited rule — approval fallback', async () => {
+    const { controller, approvals, grants } = makeWorld({
+      policy: activePolicy({ rules: [networkRule()] }),
+    });
+    const plan = buildPlan({
+      actions: [{ op: 'image.fetch', networkScope: { allowed: true } }],
+    });
+    const result = await controller.authorizePlan({ plan });
+    expect(result).toMatchObject({
+      ok: true,
+      authorization: { disposition: { kind: 'EXPLICIT_APPROVAL' } },
+    });
+    expect(approvals.requests).toHaveLength(1);
+    // Explicit approval keeps the presented (unbounded) representation; the
+    // automatic-policy route is what may never cover it.
+    expect(grants.snapshot()[0]?.grant.actionScope.network).toEqual({ allowed: true, domains: [] });
+  });
+
+  it('an action declaring an EMPTY domain list is domain-unbounded too and is not covered', async () => {
+    const { controller, approvals } = makeWorld({
+      policy: activePolicy({ rules: [networkRule()] }),
+    });
+    const plan = buildPlan({
+      actions: [{ op: 'image.fetch', networkScope: { allowed: true, domains: [] } }],
+    });
+    const result = await controller.authorizePlan({ plan });
+    expect(result).toMatchObject({
+      ok: true,
+      authorization: { disposition: { kind: 'EXPLICIT_APPROVAL' } },
+    });
+    expect(approvals.requests).toHaveLength(1);
+  });
+
+  it('a rule WITHOUT a domain allowlist cannot authorize any network action (its own bounds are unbounded)', async () => {
+    const { controller, approvals } = makeWorld({
+      policy: activePolicy({
+        rules: [
+          networkRule({
+            network: { allowed: true },
+          }),
+        ],
+      }),
+    });
+    const plan = buildPlan({
+      actions: [
+        { op: 'image.fetch', networkScope: { allowed: true, domains: ['cdn.example.com'] } },
+      ],
+    });
+    const result = await controller.authorizePlan({ plan });
+    expect(result).toMatchObject({
+      ok: true,
+      authorization: { disposition: { kind: 'EXPLICIT_APPROVAL' } },
+    });
+    expect(approvals.requests).toHaveLength(1);
+  });
+
+  it('a mixed domain list (one inside, one outside the rule) is not covered', async () => {
+    const { controller, approvals } = makeWorld({
+      policy: activePolicy({ rules: [networkRule()] }),
+    });
+    const plan = buildPlan({
+      actions: [
+        {
+          op: 'image.fetch',
+          networkScope: { allowed: true, domains: ['cdn.example.com', 'evil.example.com'] },
+        },
+      ],
+    });
+    const result = await controller.authorizePlan({ plan });
+    expect(result).toMatchObject({
+      ok: true,
+      authorization: { disposition: { kind: 'EXPLICIT_APPROVAL' } },
+    });
+    expect(approvals.requests).toHaveLength(1);
+  });
+
+  it('an R0 network action outside explicit rule bounds is default-denied (POLICY_BLOCKED), never automatic', async () => {
+    const { controller } = makeWorld({
+      policy: activePolicy({ rules: [networkRule()] }),
+    });
+    const plan = buildPlan({
+      actions: [
+        {
+          op: 'image.fetch',
+          sideEffectClass: 'R0',
+          networkScope: { allowed: true },
+        },
+      ],
+    });
+    const result = await controller.authorizePlan({ plan });
+    expect(result).toMatchObject({
+      ok: false,
+      code: 'POLICY_BLOCKED',
+      actionIds: ['action-001'],
+    });
+  });
+
+  it('a fully bounded network action inside the rule domains remains DURABLE_POLICY with an explicit grant domain list (positive control)', async () => {
+    const { controller, approvals, grants } = makeWorld({
+      policy: activePolicy({ rules: [networkRule()] }),
+    });
+    const plan = buildPlan({
+      actions: [
+        {
+          op: 'image.fetch',
+          networkScope: { allowed: true, domains: ['cdn.example.com'] },
+        },
+      ],
+    });
+    const result = await controller.authorizePlan({ plan });
+    expect(result).toMatchObject({
+      ok: true,
+      authorization: { disposition: { kind: 'DURABLE_POLICY', ruleIds: ['rule-image-fetch-r1'] } },
+    });
+    expect(approvals.requests).toHaveLength(0);
+    expect(grants.snapshot()[0]?.grant.actionScope.network).toEqual({
+      allowed: true,
+      domains: ['cdn.example.com'],
+    });
+  });
+});
+
+describe('second policy read fails closed (P2-01 — race/coherence between the two reads)', () => {
+  it('a failing second policy read is a structured refusal, never a thrown error', async () => {
+    const { controller } = makeWorld({
+      stateWrapper: (base) =>
+        secondPolicyReadReturns(base, () => {
+          throw new Error('simulated racing policy read failure');
+        }),
+    });
+    const result = await controller.authorizePlan({ plan: buildPlan() });
+    expect(result).toMatchObject({
+      ok: false,
+      code: 'AUTHORIZATION_STATE_UNRESOLVABLE',
+      detail: expect.stringContaining('racing policy read failure'),
+    });
+  });
+
+  it('a corrupt successor snapshot on the second read is a structured refusal', async () => {
+    const { controller } = makeWorld({
+      stateWrapper: (base) => secondPolicyReadReturns(base, () => ({ garbage: true })),
+    });
+    const result = await controller.authorizePlan({ plan: buildPlan() });
+    expect(result).toMatchObject({ ok: false, code: 'AUTHORIZATION_STATE_UNRESOLVABLE' });
+  });
+
+  it('a successor policy revision read between the two reads refuses the plan as incoherent state (no authorization under a phantom snapshot)', async () => {
+    const { controller, grants } = makeWorld({
+      stateWrapper: (base) =>
+        secondPolicyReadReturns(base, () => activePolicy({ policySnapshotRevision: 'pol-snap-2' })),
+    });
+    const plan = buildPlan({ policySnapshotRevision: 'pol-snap-1' });
+    const result = await controller.authorizePlan({ plan });
+    expect(result).toMatchObject({
+      ok: false,
+      code: 'AUTHORIZATION_STATE_UNRESOLVABLE',
+      detail: expect.stringContaining('moved between reads'),
+    });
+    expect(grants.snapshot()).toHaveLength(0);
   });
 });

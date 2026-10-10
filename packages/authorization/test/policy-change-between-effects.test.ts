@@ -15,6 +15,7 @@ import {
   approvingSurface,
   buildPlan,
   fixedClock,
+  ISSUANCE_SECRET,
   memoryGrantStore,
   memoryPolicyState,
 } from './helpers.ts';
@@ -30,12 +31,14 @@ async function makeAuthorizedWorld() {
     state,
     grants,
     integritySecret: SECRET,
+    issuanceSecret: ISSUANCE_SECRET,
     clock: clock.now,
   });
   const controller = new ActionController({
     authority,
     policyState: state,
     approvals: approvingSurface().surface,
+    issuanceSecret: ISSUANCE_SECRET,
     clock: clock.now,
   });
   const plan = buildPlan({

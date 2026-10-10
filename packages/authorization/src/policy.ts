@@ -120,6 +120,14 @@ export const PolicySnapshotRecordSchema = z.strictObject({
   authorityRevision: z.string().min(1),
   /** Grant ids revoked under this policy revision; checked before every effect. */
   revokedGrantIds: z.array(z.string().min(1)),
+  /**
+   * Revisions superseded by this snapshot's lineage (P1-02): every revision id
+   * ever adopted before the current one, carried forward by each adoption.
+   * This is what keeps revocation and staleness durable — a revision can never
+   * be re-adopted, so its revocation list can never be reset and grants bound
+   * to it can never be re-activated.
+   */
+  priorRevisions: z.array(z.string().min(1)).optional(),
   rules: z.array(DurablePolicyRuleSchema),
   riskGuards: z.array(PolicyRiskGuardSchema),
   updatedAt: IsoDateTimeSchema,
@@ -211,9 +219,17 @@ export function ruleCoversScope(
   if (!covered(declaredRead, ruleRead)) return false;
   if (scope.network?.allowed) {
     if (!rule.network?.allowed) return false;
-    const domains = scope.network.domains ?? [];
+    // P1-03: automatic policy covers network actions only within the rule's
+    // EXPLICIT domain allowlist. Omitted or empty declared domains mean
+    // "domain-unbounded", never "no domains" — `[].every(...)` on an empty
+    // list would otherwise let a domain-limited rule authorize an unbounded
+    // network action. A rule without its own allowlist is equally unbounded
+    // and covers nothing. Both refuse here and fall back to explicit approval.
     const allowed = rule.network.domains;
-    if (allowed !== undefined && !domains.every((d) => allowed.includes(d))) return false;
+    if (allowed === undefined || allowed.length === 0) return false;
+    const declared = scope.network.domains ?? [];
+    if (declared.length === 0) return false;
+    if (!declared.every((d) => allowed.includes(d))) return false;
   }
   const registryWrite = scope.registry?.write ?? [];
   if (!covered(registryWrite, rule.registry?.write)) return false;
