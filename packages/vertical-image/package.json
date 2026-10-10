@@ -1,0 +1,24 @@
+{
+  "name": "@shun/vertical-image",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "lint": "biome check .",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "b037": "node scripts/run-b037.ts"
+  },
+  "dependencies": {
+    "@shun/contracts": "workspace:*",
+    "sharp": "^0.35.5",
+    "ssim.js": "^3.5.0",
+    "zod": "^4.1.13"
+  },
+  "devDependencies": {
+    "@biomejs/biome": "^2.3.8",
+    "@types/node": "^24.7.0",
+    "typescript": "^5.9.3",
+    "vitest": "^3.2.4"
+  }
+}
