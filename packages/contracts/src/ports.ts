@@ -1,11 +1,22 @@
 // Typed ports around planning, durable workflow coordination, environment
-// execution and recipe resolution (L2 §5.2, §6.1, §6.9, §8.1).
+// execution and recipe resolution (L2 §5.2, §6.1, §6.9, §8.1), plus the
+// remaining frozen seams: ShunStore (§5.4/§11.1), approval control surface
+// (§12), authorization authority (§4.6.1), privileged execution broker
+// (§9.1/§9.3), semantic verifier (§4.7/§13) and the provider-registry read
+// model (§7.1).
 //
 // These are interface-only contracts. Implementations/adapters live in their
 // own packages (resolver, workflow, executor-windows, vertical-*); none of
 // them may bypass the Capability → binding → trust/policy → risk →
 // authorization → semantic verification chain (L2 §3.1 authority rule).
 import { z } from 'zod';
+import {
+  ActionScopeSchema,
+  type AuthorizationGrant,
+  type CurrentAuthorityState,
+  type GrantIntegrity,
+} from './authorization.ts';
+import type { CapabilityDefinition } from './capability.ts';
 import type {
   EnvironmentFacts,
   EnvironmentRequirements,
@@ -16,12 +27,19 @@ import { EnvironmentRequirementsSchema } from './environment.ts';
 import type { GoalContract, GoalRequest } from './goal.ts';
 import { GoalContractSchema } from './goal.ts';
 import { type AuthorizedAction, RecoveryPlanSchema, VerificationPlanSchema } from './plan.ts';
+import type { ProviderCapabilityBinding, ProviderDefinition } from './provider.ts';
 import { CapabilityRevisionRangeSchema } from './provider.ts';
-import type { ExecutionReceipt } from './receipts.ts';
 import {
+  type ExecutionReceipt,
+  ExecutionReceiptSchema,
+  type VerificationReceipt,
+} from './receipts.ts';
+import {
+  AuthorizationKindSchema,
   RecipeCurrentnessSchema,
   RecipeLifecycleStateSchema,
   RiskClassSchema,
+  Sha256HexSchema,
   TaskStateSchema,
 } from './taxonomy.ts';
 
@@ -184,4 +202,162 @@ export interface RecipeResolverPort {
     parameters: Record<string, unknown>,
     currentFacts: Record<string, unknown>,
   ): Promise<ActionPlanProposal>;
+}
+
+// ---- ShunStore seam (L2 §5.4 store separation, §11.1 persistence model). ----
+// Business/product authority records live in ShunStore; the DomainHarness
+// RuntimeStore owns orchestration mechanics only. Every workflow-triggered
+// mutation goes through the idempotent application-effect protocol: a stable
+// effectId is persisted with the authoritative result, and retrying the same
+// effectId returns the recorded result instead of re-applying.
+
+export const ShunStoreRecordKindSchema = z.enum([
+  'task',
+  'goal_contract',
+  'capability_resolution',
+  'provider_environment_binding',
+  'policy_snapshot',
+  'action_plan',
+  'approval',
+  'execution_receipt',
+  'verification_receipt',
+  'provider_installation',
+  'provider_provenance',
+  'lifecycle_record',
+  'provider_outcome_evidence',
+  'recipe_definition',
+  'recipe_promotion_evidence',
+  'recipe_replay_evidence',
+]);
+export type ShunStoreRecordKind = z.infer<typeof ShunStoreRecordKindSchema>;
+
+/** One intended business-record mutation, addressed by its stable effectId (L2 §5.4). */
+export const ShunStoreMutationSchema = z.strictObject({
+  recordKind: ShunStoreRecordKindSchema,
+  recordId: z.string().min(1),
+  /** Record payload; the concrete shape is owned by the ShunStore schema set. */
+  payload: z.record(z.string(), z.unknown()),
+});
+export type ShunStoreMutation = z.infer<typeof ShunStoreMutationSchema>;
+
+export const StoreApplicationReceiptSchema = z.strictObject({
+  effectId: z.string().min(1),
+  /** true = applied now; false = a recorded result for this effectId was returned (idempotent replay, L2 §5.4). */
+  applied: z.boolean(),
+  /** Durable application receipt reference. */
+  receiptRef: z.string().min(1),
+});
+export type StoreApplicationReceipt = z.infer<typeof StoreApplicationReceiptSchema>;
+
+/** Durable business-authority store seam (L2 §5.4/§11.1). Interface only. */
+export interface StorePort {
+  apply(effectId: string, mutation: ShunStoreMutation): Promise<StoreApplicationReceipt>;
+}
+
+// ---- Approval control-surface seam (L2 §12, §9.1, §4.6). ----
+// Explicit approvals are durable ShunStore records; explicit-approval grants
+// reference them via approvalRef, and a rejected/expired approval is owned by
+// the Action Controller (L2 §13).
+
+export const ApprovalRequestSchema = z.strictObject({
+  taskId: z.string().min(1),
+  /** Exact approved plan identity — approval is bound to the plan hash (L2 §4.6). */
+  planHash: Sha256HexSchema,
+  /** Human-comprehensible plan/preview and risk summary (L2 §12); detailed evidence on demand. */
+  summary: z.string().min(1),
+  evidenceRefs: z.array(z.string().min(1)),
+});
+export type ApprovalRequest = z.infer<typeof ApprovalRequestSchema>;
+
+export const ApprovalDecisionSchema = z.strictObject({
+  approvalId: z.string().min(1),
+  taskId: z.string().min(1),
+  planHash: Sha256HexSchema,
+  approved: z.boolean(),
+  approvedBy: z.enum(['USER_APPROVAL', 'DURABLE_POLICY']),
+  reason: z.string().min(1).optional(),
+});
+export type ApprovalDecision = z.infer<typeof ApprovalDecisionSchema>;
+
+/**
+ * Approval seam between the plan/preview checkpoint and grant issuance
+ * (L2 §9.1 approval/durable-policy step, §12 approve/reject interaction).
+ * Interface only — the durable approval record itself lives in ShunStore.
+ */
+export interface ApprovalPort {
+  requestApproval(request: ApprovalRequest): Promise<ApprovalDecision>;
+}
+
+// ---- Authorization authority seam (L2 §4.6.1). ----
+// The authority issues durable, integrity-protected AuthorizationGrant records
+// in ShunStore; the privileged boundary validates presentations independently
+// (validateGrantPresentation) against the CURRENT authority/policy state.
+
+/** Everything the authority needs to issue one grant; integrity is applied by the authority, never by callers. */
+export const GrantIssueRequestSchema = z.strictObject({
+  taskId: z.string().min(1),
+  planHash: Sha256HexSchema,
+  policySnapshotRevision: z.string().min(1),
+  actionScope: ActionScopeSchema,
+  authorizationKind: AuthorizationKindSchema,
+  /** Required for EXPLICIT_APPROVAL grants — the durable approval record reference (L2 §4.6). */
+  approvalRef: z.string().min(1).optional(),
+});
+export type GrantIssueRequest = z.infer<typeof GrantIssueRequestSchema>;
+
+export interface AuthorizationPort {
+  issue(request: GrantIssueRequest): Promise<AuthorizationGrant>;
+  /** Current authority/policy state as seen by the privileged boundary (L2 §4.6.1); UNRESOLVABLE fails closed. */
+  currentAuthority(): Promise<CurrentAuthorityState>;
+}
+
+// ---- Privileged execution seam (L2 §9.1 ExecutionBroker, §9.3 privilege
+// boundary). ----
+// Distinct from EnvironmentBackend (§8.1, unprivileged capability execution):
+// the privileged backend receives only an AuthorizedAction together with its
+// grant presentation and MUST re-verify the presentation itself (§4.6.1) —
+// never on the caller's say-so — before any side effect.
+
+export interface ExecutionBackend {
+  execute(
+    action: AuthorizedAction,
+    grant: AuthorizationGrantPresentationInput,
+  ): Promise<ExecutionReceipt>;
+}
+
+/** Presented (untrusted) grant shape at the privileged boundary: integrity envelope optional. */
+export type AuthorizationGrantPresentationInput = Omit<AuthorizationGrant, 'integrity'> & {
+  integrity?: GrantIntegrity;
+};
+
+// ---- Semantic verifier seam (L2 §4.7, §13). ----
+// Execution success without required semantic verification can never become
+// Task PASS; a failed verification is owned by the Verifier and degrades task
+// outcome (and, for recipes, the recipe evidence).
+
+export const VerificationInputSchema = z.strictObject({
+  taskId: z.string().min(1),
+  verificationPlan: VerificationPlanSchema,
+  executionReceipt: ExecutionReceiptSchema,
+  /** Additional post-state inputs beyond the execution receipt (oracle inputs, evidence refs). */
+  oracleInputs: z.record(z.string(), z.unknown()).optional(),
+});
+export type VerificationInput = z.infer<typeof VerificationInputSchema>;
+
+export interface VerifierPort {
+  verify(input: VerificationInput): Promise<VerificationReceipt>;
+}
+
+// ---- Provider registry read model (L2 §7.1). ----
+// Read-only view over the registry fact classes consumed by the resolver.
+// Hard gates and ranking live behind the resolver, not in the registry; the
+// registry never writes outcome evidence back through this port.
+
+export interface RegistryReadModelPort {
+  listCapabilities(): Promise<CapabilityDefinition[]>;
+  listProviders(): Promise<ProviderDefinition[]>;
+  providerCapabilityBindings(capabilityId: string): Promise<ProviderCapabilityBinding[]>;
+  providerEnvironmentBindings(providerId: string): Promise<ProviderEnvironmentBinding[]>;
+  /** Observed machine facts feed feasibility/currentness checks (L2 §7.1 fact class 2). */
+  observedFacts(): Promise<EnvironmentFacts>;
 }
