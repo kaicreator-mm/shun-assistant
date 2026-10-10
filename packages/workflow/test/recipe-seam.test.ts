@@ -8,10 +8,9 @@ describe('FailClosedRecipeResolver', () => {
   const resolver = new FailClosedRecipeResolver();
 
   it('refuses match with a typed error (escalates upward, never silently empty)', async () => {
-    await expect(resolver.match({ objective: 'x', objects: [], constraints: {} })).rejects.toHaveProperty(
-      'code',
-      'RECIPE_SEAM_UNAVAILABLE',
-    );
+    await expect(
+      resolver.match({ objective: 'x', objects: [], constraints: {} }),
+    ).rejects.toHaveProperty('code', 'RECIPE_SEAM_UNAVAILABLE');
   });
 
   it('refuses checkCurrentness with a typed error', async () => {

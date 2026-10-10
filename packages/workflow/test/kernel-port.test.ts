@@ -3,11 +3,11 @@
 // idempotent disposition, subscription and restart persistence.
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
+  DurableWorkflowKernel,
   KernelInvalidTransitionError,
   KernelMessageConflictError,
   KernelUnknownTaskError,
 } from '../src/index.ts';
-import { DurableWorkflowKernel } from '../src/index.ts';
 import { CountingStore, goalContract, tempDir } from './helpers.ts';
 
 let dir: string;
@@ -92,7 +92,11 @@ describe('subscribe', () => {
     expect(listener).toHaveBeenCalledWith({ taskId: 'task-1', state: 'RECEIVED', revision: 0 });
 
     await kernel.transition('task-1', 'INTERPRETING');
-    expect(listener).toHaveBeenLastCalledWith({ taskId: 'task-1', state: 'INTERPRETING', revision: 1 });
+    expect(listener).toHaveBeenLastCalledWith({
+      taskId: 'task-1',
+      state: 'INTERPRETING',
+      revision: 1,
+    });
 
     unsubscribe();
     await kernel.transition('task-1', 'RESOLVING');
@@ -204,7 +208,9 @@ describe('restart persistence', () => {
       });
       await expect(reopened.pendingMessages('task-1')).resolves.toHaveLength(1);
       // Duplicate open after restart stays idempotent (goal identity persisted).
-      await expect(reopened.open({ taskId: 'task-1', goal: goalContract() })).resolves.toBe('task-1');
+      await expect(reopened.open({ taskId: 'task-1', goal: goalContract() })).resolves.toBe(
+        'task-1',
+      );
       // The revision keeps counting across restarts.
       const state = await reopened.transition('task-1', 'PLANNED');
       expect(state.revision).toBe(3);

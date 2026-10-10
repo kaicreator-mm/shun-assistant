@@ -5,9 +5,9 @@
 import { mkdtempSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { KernelEffectUncertainError, ShunStore } from '../src/index.ts';
-import { DurableWorkflowKernel } from '../src/index.ts';
+import { ShunStore } from '@shun/store';
+import { beforeEach, describe, expect, it } from 'vitest';
+import { DurableWorkflowKernel, KernelEffectUncertainError } from '../src/index.ts';
 import { CountingStore, goalContract, mutation, tempDir } from './helpers.ts';
 
 let dir: string;
@@ -39,9 +39,9 @@ describe('applyStoreEffect', () => {
     const kernel = new DurableWorkflowKernel({ dataDir: dir, store });
     await kernel.open({ taskId: 'task-1', goal: goalContract() });
 
-    await expect(kernel.applyStoreEffect('task-1', 'effect-1', mutation('r1', { a: 1 }))).rejects.toBeInstanceOf(
-      KernelEffectUncertainError,
-    );
+    await expect(
+      kernel.applyStoreEffect('task-1', 'effect-1', mutation('r1', { a: 1 })),
+    ).rejects.toBeInstanceOf(KernelEffectUncertainError);
     // The store provably never applied (it threw before any effect).
     expect(store.appliedEffects).toEqual([]);
 
@@ -56,7 +56,9 @@ describe('applyStoreEffect', () => {
 
   it('surfaces an effect identity conflict as an intervention, never a silent overwrite', async () => {
     // The store has recorded effect-1 with DIFFERENT content than the journal intent.
-      const realStore = new ShunStore({ file: join(mkdtempSync(join(tmpdir(), 'shun-store-')), 'shunstore.db') });
+    const realStore = new ShunStore({
+      file: join(mkdtempSync(join(tmpdir(), 'shun-store-')), 'shunstore.db'),
+    });
     try {
       await realStore.apply('effect-1', mutation('r1', { a: 999 }));
       const kernel = new DurableWorkflowKernel({ dataDir: dir, store: realStore });
@@ -86,7 +88,8 @@ describe('applyStoreEffect', () => {
     ).rejects.toBeInstanceOf(KernelEffectUncertainError);
     await kernel.close();
 
-    // Hard restart: fresh kernel over the same dataDir and store.
+    // Hard restart: fresh kernel over the same dataDir and store, now healed.
+    store.failing.delete('effect-1');
     const reopened = new DurableWorkflowKernel({ dataDir: dir, store });
     try {
       const report = await reopened.reconcile('task-1');

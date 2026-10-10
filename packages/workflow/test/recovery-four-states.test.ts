@@ -9,9 +9,9 @@ import { existsSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import {
+  type DestructiveReconcileProbe,
   DurableWorkflowKernel,
   KernelUnresolvedDestructiveActionError,
-  type DestructiveReconcileProbe,
 } from '../src/index.ts';
 import { CountingStore, executionReceipt, goalContract, tempDir } from './helpers.ts';
 
@@ -238,7 +238,9 @@ describe('uncertain destructive actions are never blindly retried', () => {
     const report = await kernel.reconcile('task-1', { destructiveProbe: probe });
     expect(report.unresolvedActionIds).toEqual(['action-1']);
     expect(report.interventionReason).toContain('action-1');
-    expect(report.actionRecoveries[0]).toMatchObject({ classification: 'MAY_HAVE_EXECUTED_UNCERTAIN' });
+    expect(report.actionRecoveries[0]).toMatchObject({
+      classification: 'MAY_HAVE_EXECUTED_UNCERTAIN',
+    });
   });
 
   it('a non-destructive uncertain action surfaces for same-actionId resume without forcing intervention', async () => {
