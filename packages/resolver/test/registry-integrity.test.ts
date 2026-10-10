@@ -1,10 +1,18 @@
 // Registry integrity: identity uniqueness and trusted snapshot currentness.
 // One stable identity must designate exactly one fact (P1-05), and the
 // resolver only resolves over a currentness-verifiable snapshot (P1-06).
-import { ShunContractError } from '@shun/contracts';
+import { type RegistryReadModelPort, ShunContractError } from '@shun/contracts';
 import { describe, expect, it } from 'vitest';
-import { ShunRegistry } from '../src/registry.ts';
-import { bindingDef, capabilityDef, ENV_LOCAL, providerDef } from './scenarios.ts';
+import { type RegistrySnapshot, ShunRegistry, sealRegistrySnapshot } from '../src/registry.ts';
+import { resolveGoal } from '../src/resolve.ts';
+import {
+  bindingDef,
+  capabilityDef,
+  ENV_LOCAL,
+  goalRequest,
+  providerDef,
+  requirements,
+} from './scenarios.ts';
 
 function baseSnapshot() {
   const capability = capabilityDef({ capabilityId: 'image.batch_process' });
@@ -13,6 +21,9 @@ function baseSnapshot() {
     bindingId: 'b-im',
     providerId: provider.providerId,
     capabilityId: 'image.batch_process',
+    // Scenario policy is local-only/FORBIDDEN — declare the no-network
+    // posture explicitly (P1-02 disclosure evidence).
+    environmentRequirements: requirements({ networkAccess: 'FORBIDDEN' }),
   });
   return {
     capabilities: [capability],
@@ -97,5 +108,94 @@ describe('registry identity uniqueness fails closed (P1-05)', () => {
       }),
     );
     expect(() => ShunRegistry.fromSnapshot(snapshot)).not.toThrow();
+  });
+});
+
+function portOf(snapshot: RegistrySnapshot): RegistryReadModelPort {
+  return {
+    listCapabilities: async () => [...snapshot.capabilities],
+    listProviders: async () => [...snapshot.providers],
+    providerCapabilityBindings: async (capabilityId) =>
+      snapshot.bindings.filter((binding) => binding.capabilityId === capabilityId),
+    providerEnvironmentBindings: async () => [],
+    observedFacts: async () => snapshot.environment,
+  };
+}
+
+function resolvingRequest() {
+  const request = goalRequest({ goal: 'image.batch_process: batch resize my photos offline' });
+  request.constraints.other = { offline: true };
+  return request;
+}
+
+describe('trusted snapshot currentness seam (P1-06)', () => {
+  it('a registry collected via sequential async reads without a snapshot seal fails closed at resolution', async () => {
+    const registry = await ShunRegistry.fromPort(portOf(baseSnapshot()));
+    expect(registry.currentnessAttested).toBe(false);
+    const result = resolveGoal({
+      request: resolvingRequest(),
+      registry,
+      objectExists: () => true,
+    });
+    expect(result.stage).toBe('RESOLUTION');
+    if (result.stage !== 'RESOLUTION') return;
+    expect(result.record.selectedBindingId).toBeNull();
+    expect(result.record.failureDisposition?.failureCode).toBe('REGISTRY_CURRENTNESS_INSUFFICIENT');
+    expect(result.record.failureDisposition?.detail).toContain('snapshot seal');
+  });
+
+  it('a port-built registry with a matching snapshot seal is currentness-attested and resolves', async () => {
+    const snapshot = baseSnapshot();
+    const registry = await ShunRegistry.fromPort(portOf(snapshot), {
+      snapshotSeal: sealRegistrySnapshot(snapshot),
+    });
+    expect(registry.currentnessAttested).toBe(true);
+    const result = resolveGoal({
+      request: resolvingRequest(),
+      registry,
+      objectExists: () => true,
+    });
+    expect(result.stage).toBe('RESOLUTION');
+    if (result.stage !== 'RESOLUTION') return;
+    expect(result.record.selectedBindingId).toBe('b-im');
+  });
+
+  it('reads-between-changed: a seal that does not bind to the collected facts is rejected at construction', async () => {
+    // The collector sealed an atomic read of snapshot A; the port then served
+    // facts in which the environment changed mid-collection (snapshot B).
+    const sealed = baseSnapshot();
+    const served = baseSnapshot();
+    served.environment = { ...served.environment, observationRevision: 'obs-0043' };
+    await expect(
+      ShunRegistry.fromPort(portOf(served), { snapshotSeal: sealRegistrySnapshot(sealed) }),
+    ).rejects.toThrow(/stale or altered|does not bind/);
+  });
+
+  it('stale snapshot: facts mutated after sealing are rejected by fromSnapshot', () => {
+    const snapshot = baseSnapshot();
+    const seal = sealRegistrySnapshot(snapshot);
+    snapshot.environment = { ...snapshot.environment, networkPolicy: 'OPEN' };
+    expect(() => ShunRegistry.fromSnapshot(snapshot, { snapshotSeal: seal })).toThrow(
+      ShunContractError,
+    );
+    expect(() => ShunRegistry.fromSnapshot(snapshot, { snapshotSeal: seal })).toThrow(
+      /stale or was altered/,
+    );
+  });
+
+  it('a matching fromSnapshot seal verifies and resolution proceeds over the attested snapshot', () => {
+    const snapshot = baseSnapshot();
+    const registry = ShunRegistry.fromSnapshot(snapshot, {
+      snapshotSeal: sealRegistrySnapshot(snapshot),
+    });
+    expect(registry.currentnessAttested).toBe(true);
+    const result = resolveGoal({
+      request: resolvingRequest(),
+      registry,
+      objectExists: () => true,
+    });
+    expect(result.stage).toBe('RESOLUTION');
+    if (result.stage !== 'RESOLUTION') return;
+    expect(result.record.selectedBindingId).toBe('b-im');
   });
 });

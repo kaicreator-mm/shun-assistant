@@ -5,8 +5,10 @@
 // part of the P0 resolver input). Snapshot entries are re-parsed with the
 // frozen contract parsers, so malformed registry data fails closed at
 // construction instead of leaking into resolution.
+import { createHash } from 'node:crypto';
 import {
   type CapabilityDefinition,
+  canonicalJson,
   type EnvironmentFacts,
   type ProviderCapabilityBinding,
   type ProviderDefinition,
@@ -21,6 +23,44 @@ import { matchCapabilityIds, OBJECTIVE_MATCHERS, type ObjectiveMatcherTable } fr
 
 /** Identity of the resolver implementation itself (durable identity input, L2 §11.2). */
 export const RESOLVER_REVISION = 'shun.resolver/0.1';
+
+/**
+ * Prefix of a verifiable snapshot seal revision (P1-06): the suffix is a
+ * SHA-256 content digest over the exact sealed facts, computed by
+ * sealRegistrySnapshot — the seal binds to the facts, it is not a label a
+ * caller can assert independently.
+ */
+export const REGISTRY_SNAPSHOT_SEAL_REVISION_PREFIX = 'shun.registry-snapshot/1:sha256:';
+
+/**
+ * Trusted currentness seam for registry snapshots (P1-06). The frozen
+ * RegistryReadModelPort collects its fact classes through separate async
+ * calls and cannot express an atomic read, so the resolver requires an
+ * explicit seal whose revision verifiably binds to the collected facts.
+ */
+export interface RegistrySnapshotSeal {
+  readonly snapshotRevision: string;
+}
+
+function snapshotFactsRevision(snapshot: RegistrySnapshot): string {
+  const digest = createHash('sha256')
+    .update(
+      canonicalJson({
+        capabilities: snapshot.capabilities,
+        providers: snapshot.providers,
+        bindings: snapshot.bindings,
+        environment: snapshot.environment,
+      }),
+      'utf8',
+    )
+    .digest('hex');
+  return `${REGISTRY_SNAPSHOT_SEAL_REVISION_PREFIX}${digest}`;
+}
+
+/** Seal a collected snapshot: the returned revision binds to these exact facts. */
+export function sealRegistrySnapshot(snapshot: RegistrySnapshot): RegistrySnapshotSeal {
+  return { snapshotRevision: snapshotFactsRevision(snapshot) };
+}
 
 export type { ObjectiveMatcherTable };
 
@@ -39,7 +79,15 @@ export interface RegistryOptions {
    * capabilities). Entries extend, never silently replace, the built-ins.
    */
   additionalObjectiveMatchers?: ObjectiveMatcherTable;
+  /**
+   * Optional trusted snapshot seal (P1-06). When provided it is verified
+   * against the snapshot facts; a mismatch means the snapshot is stale or was
+   * altered after sealing and construction fails closed.
+   */
+  snapshotSeal?: RegistrySnapshotSeal;
 }
+
+export interface RegistryFromPortOptions extends RegistryOptions {}
 
 export class ShunRegistry {
   private readonly matchers: ObjectiveMatcherTable;
@@ -50,12 +98,31 @@ export class ShunRegistry {
     private readonly bindingsByCapability: ReadonlyMap<string, ProviderCapabilityBinding[]>,
     private readonly environment: EnvironmentFacts,
     matchers: ObjectiveMatcherTable,
+    /**
+     * True when the snapshot's currentness is verifiably attested: either the
+     * synchronous in-memory path (atomic by construction) or an async port
+     * collection bound by a verified snapshot seal (P1-06). Resolution over
+     * an unattested registry fails closed in resolveGoal.
+     */
+    private readonly attested: boolean,
   ) {
     this.matchers = { ...matchers };
   }
 
+  /**
+   * Whether this registry's snapshot currentness is verifiably attested
+   * (P1-06). Unattested registries (sequential async reads without a
+   * snapshot seal) fail closed at resolution.
+   */
+  get currentnessAttested(): boolean {
+    return this.attested;
+  }
+
   /** Build from the async T00 read model port (the async boundary of resolution). */
-  static async fromPort(port: RegistryReadModelPort): Promise<ShunRegistry> {
+  static async fromPort(
+    port: RegistryReadModelPort,
+    options?: RegistryFromPortOptions,
+  ): Promise<ShunRegistry> {
     const capabilities = await port.listCapabilities();
     const [providers, bindings, environment] = await Promise.all([
       port.listProviders(),
@@ -64,11 +131,35 @@ export class ShunRegistry {
       ).then((lists) => lists.flat()),
       port.observedFacts(),
     ]);
-    return ShunRegistry.fromSnapshot({ capabilities, providers, bindings, environment });
+    return ShunRegistry.fromSnapshot(
+      { capabilities, providers, bindings, environment },
+      {
+        additionalObjectiveMatchers: options?.additionalObjectiveMatchers,
+        snapshotSeal: options?.snapshotSeal,
+        // Sequential async reads are only currentness-attested when a
+        // verifiable snapshot seal binds the collected facts (P1-06).
+        asyncCollectionAttested: options?.snapshotSeal !== undefined,
+      },
+    );
   }
 
   /** Synchronous construction from already-collected facts (tests, callers holding a snapshot). */
-  static fromSnapshot(snapshot: RegistrySnapshot, options?: RegistryOptions): ShunRegistry {
+  static fromSnapshot(
+    snapshot: RegistrySnapshot,
+    options?: RegistryOptions & { asyncCollectionAttested?: boolean },
+  ): ShunRegistry {
+    // Seal verification binds the trusted currentness facts (P1-06): a seal
+    // whose revision does not bind to THESE facts means the snapshot is stale
+    // or was altered after sealing — fail closed at construction.
+    if (options?.snapshotSeal !== undefined) {
+      const expected = snapshotFactsRevision(snapshot);
+      if (options.snapshotSeal.snapshotRevision !== expected) {
+        throw new ShunContractError(
+          'SCHEMA_VIOLATION',
+          `registry snapshot seal does not bind to the provided facts (seal ${options.snapshotSeal.snapshotRevision}, expected ${expected}) — the snapshot is stale or was altered after sealing; fail closed`,
+        );
+      }
+    }
     // Identity uniqueness fails closed (P1-05): one stable identity must
     // designate exactly one fact. A duplicate capabilityId/providerId would
     // silently overwrite its predecessor here, and a duplicate bindingId
@@ -120,7 +211,17 @@ export class ShunRegistry {
     )) {
       matchers[capabilityId] = [...(matchers[capabilityId] ?? []), ...patterns];
     }
-    return new ShunRegistry(capabilities, providers, bindingsByCapability, environment, matchers);
+    return new ShunRegistry(
+      capabilities,
+      providers,
+      bindingsByCapability,
+      environment,
+      matchers,
+      // Synchronous construction over an in-memory snapshot is atomic by
+      // construction (attested by default); the async port path overrides
+      // this with its seal-based attestation.
+      options?.asyncCollectionAttested ?? true,
+    );
   }
 
   capability(capabilityId: string): CapabilityDefinition | undefined {
