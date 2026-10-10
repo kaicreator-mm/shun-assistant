@@ -1,0 +1,9 @@
+{
+  "taskId": "task-bad-008",
+  "inputFiles": [{ "path": "C:\\fixtures\\images\\img-001.jpg", "format": "JPG" }],
+  "operation": { "kind": "RESIZE", "maxLongEdgePx": 1600 },
+  "metadataPolicy": { "preserveCaptureDate": true },
+  "outputDirectory": "C:\\fixtures\\out",
+  "qualityPolicy": { "oracle": "NO_OBVIOUS_DEGRADATION_V1", "ssimThreshold": 0.8 },
+  "networkUsage": "LOCAL_ONLY"
+}

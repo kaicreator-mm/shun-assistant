@@ -1,0 +1,287 @@
+// Regenerates the committed public JSON Schema artifacts in src/schema/ from
+// the Zod contract registry. The committed files are the public contract surface;
+// a drift test guarantees they stay byte-identical to this emission.
+//
+// Safety-invariant overlays: Zod `.superRefine` refinements do not survive JSON
+// Schema emission, so every safety invariant expressible in draft 2020-12 is
+// re-declared here as a declarative patch (if/then/const/enum/required). The
+// overlay is part of the emission, which keeps the drift test byte-exact while
+// making the committed artifacts themselves reject unsafe records — standalone
+// Ajv consumers get the same rejections as the Zod parsers. The few invariants
+// draft 2020-12 cannot express (array membership, cross-element identity) are
+// enforced by the shared semantic validators each artifact names in its
+// `x-semantic-validation` annotation.
+import { mkdirSync, readdirSync, realpathSync, unlinkSync, writeFileSync } from 'node:fs';
+import { join } from 'node:path';
+import { pathToFileURL } from 'node:url';
+import { z } from 'zod';
+import { NEVER_AUTO_DELETE_CLASSIFICATIONS } from '../src/capabilities/c002.ts';
+import { R2_GATE_PHASES } from '../src/plan.ts';
+import { CONTRACTS } from '../src/registry.ts';
+import { CONTRACTS_REVISION, schemaId } from '../src/version.ts';
+
+type EmittedSchema = Record<string, unknown>;
+
+/** Draft 2020-12 conditional-evaluation vocabulary. */
+function ifThen(ifCondition: EmittedSchema, thenConsequent: EmittedSchema): EmittedSchema {
+  return {
+    if: ifCondition,
+    // biome-ignore lint/suspicious/noThenProperty: JSON Schema conditional keyword, not a thenable
+    then: thenConsequent,
+  };
+}
+
+function propertiesOf(schema: EmittedSchema): EmittedSchema {
+  return (schema.properties ?? {}) as EmittedSchema;
+}
+
+/** Appends one conditional branch to the schema's root `allOf`. */
+function withRootAllOf(schema: EmittedSchema, branch: EmittedSchema): EmittedSchema {
+  const allOf = Array.isArray(schema.allOf) ? [...(schema.allOf as EmittedSchema[])] : [];
+  allOf.push(branch);
+  return { ...schema, allOf };
+}
+
+/** `phases` must be exactly the complete ordered observable gate sequence. */
+function requireCompleteGateSequence(gate: EmittedSchema): EmittedSchema {
+  return {
+    ...gate,
+    properties: { ...propertiesOf(gate), phases: { const: [...R2_GATE_PHASES] } },
+  };
+}
+
+/** c000: exactly one of selectedBindingId / failureDisposition is set (both fields are required). */
+function overlayResolutionRecord(record: EmittedSchema): EmittedSchema {
+  const annotated: EmittedSchema = {
+    ...record,
+    'x-semantic-validation': ['validateResolutionRecordSemantics'],
+  };
+  return withRootAllOf(
+    withRootAllOf(
+      withRootAllOf(
+        annotated,
+        ifThen(
+          {
+            properties: { selectedBindingId: { type: 'string' } },
+            required: ['selectedBindingId'],
+          },
+          { properties: { failureDisposition: { type: 'null' } } },
+        ),
+      ),
+      ifThen(
+        {
+          properties: { failureDisposition: { type: 'object' } },
+          required: ['failureDisposition'],
+        },
+        { properties: { selectedBindingId: { type: 'null' } } },
+      ),
+    ),
+    // At least one disposition is always present (both fields are required, so a
+    // property-condition anyOf is an exact "not both null" test).
+    {
+      anyOf: [
+        { properties: { selectedBindingId: { type: 'string' } } },
+        { properties: { failureDisposition: { type: 'object' } } },
+      ],
+    },
+  );
+}
+
+/** c001: per-record status/field pairing (WRITTEN → outputPath, REJECTED → rejectionCode). */
+function overlayImageBatchProcessOutput(output: EmittedSchema): EmittedSchema {
+  const props = propertiesOf(output);
+  return {
+    ...output,
+    properties: {
+      ...props,
+      records: {
+        ...(props.records as EmittedSchema),
+        items: {
+          ...((props.records as EmittedSchema).items as EmittedSchema),
+          allOf: [
+            ifThen(
+              { properties: { status: { const: 'WRITTEN' } }, required: ['status'] },
+              { required: ['outputPath'] },
+            ),
+            ifThen(
+              { properties: { status: { const: 'REJECTED' } }, required: ['status'] },
+              { required: ['rejectionCode'] },
+            ),
+          ],
+        },
+      },
+    },
+  };
+}
+
+/** c002: gate-backed removal and fail-closed residue disposition. */
+function overlayJitLifecycleOutput(output: EmittedSchema): EmittedSchema {
+  const props = propertiesOf(output);
+  const residue = props.residueReport as EmittedSchema;
+  const residueProps = propertiesOf(residue);
+  const candidates = residueProps.candidates as EmittedSchema;
+  return withRootAllOf(
+    withRootAllOf(
+      {
+        ...output,
+        properties: {
+          ...props,
+          // A REMOVED final state requires the completed R2 gate record.
+          r2Gate: requireCompleteGateSequence(props.r2Gate as EmittedSchema),
+          residueReport: {
+            ...residue,
+            properties: {
+              ...residueProps,
+              // USER_CREATED_UNKNOWN/PROTECTED candidates are never auto-deleted (fail-closed).
+              candidates: {
+                ...candidates,
+                items: {
+                  ...(candidates.items as EmittedSchema),
+                  allOf: [
+                    ifThen(
+                      {
+                        properties: {
+                          classification: { enum: [...NEVER_AUTO_DELETE_CLASSIFICATIONS] },
+                        },
+                        required: ['classification'],
+                      },
+                      { properties: { disposition: { const: 'RETAIN' } } },
+                    ),
+                  ],
+                },
+              },
+            },
+          },
+        },
+      },
+      // A REMOVED final state requires the completed R2 gate record and a
+      // lifecycleState that agrees (state REMOVED).
+      ifThen(
+        { properties: { finalState: { const: 'REMOVED' } }, required: ['finalState'] },
+        {
+          required: ['r2Gate'],
+          properties: {
+            lifecycleState: { properties: { state: { const: 'REMOVED' } } },
+          },
+        },
+      ),
+    ),
+    // A REMOVED lifecycleState is an observable removal in its own right: it
+    // requires the completed R2 gate record and a finalState that agrees
+    // (REMOVED). Frozen C-002 — any removal is R2, whichever field records it
+    // (review 5478548765 R2-01).
+    ifThen(
+      {
+        properties: {
+          lifecycleState: { properties: { state: { const: 'REMOVED' } }, required: ['state'] },
+        },
+        required: ['lifecycleState'],
+      },
+      {
+        required: ['r2Gate'],
+        properties: { finalState: { const: 'REMOVED' } },
+      },
+    ),
+  );
+}
+
+/** c003: executed cleanup evidence, disposable-only targets, and the gate sequence. */
+function overlayStorageDiagnoseOutput(output: EmittedSchema): EmittedSchema {
+  const props = propertiesOf(output);
+  const cleanupPlan = props.cleanupPlan as EmittedSchema;
+  // cleanupPlan is anyOf[object, null] — patch the object branch only.
+  const branches = (cleanupPlan.anyOf as EmittedSchema[]).map((branch) => {
+    const branchProps = branch.properties as EmittedSchema | undefined;
+    if (!branchProps) return branch;
+    return {
+      ...branch,
+      properties: {
+        ...branchProps,
+        r2Gate: requireCompleteGateSequence(branchProps.r2Gate as EmittedSchema),
+      },
+    };
+  });
+  return withRootAllOf(
+    withRootAllOf(
+      {
+        ...output,
+        properties: { ...props, cleanupPlan: { ...cleanupPlan, anyOf: branches } },
+        'x-semantic-validation': ['validateC003OutputSemantics'],
+      },
+      // A non-null cleanup plan is an executed bounded action: evidence,
+      // reclaim measurement, and at least one protected-asset verification are
+      // required (frozen C-003 — protected assets are verified after any
+      // bounded action; review 5478548765 R2-03).
+      ifThen(
+        { properties: { cleanupPlan: { type: 'object' } }, required: ['cleanupPlan'] },
+        {
+          required: ['executionEvidence', 'reclaimed'],
+          properties: { protectedAssetVerification: { minItems: 1 } },
+        },
+      ),
+    ),
+    // executionEvidence is present only after the bounded action executed
+    // (field contract): a record carrying the receipt cannot dodge the
+    // executed-cleanup branch above by claiming cleanupPlan null
+    // (review 5478735287 R3-01). cleanupPlan is top-level required, so the
+    // type constraint alone makes null fail.
+    ifThen(
+      { required: ['executionEvidence'] },
+      { properties: { cleanupPlan: { type: 'object' } } },
+    ),
+  );
+}
+
+/** Declarative safety-invariant patches keyed by public schema name. */
+const SAFETY_INVARIANT_OVERLAYS: Record<string, (schema: EmittedSchema) => EmittedSchema> = {
+  'action-plan': (plan) => ({ ...plan, 'x-semantic-validation': ['validateActionPlanSemantics'] }),
+  'c000-resolution-record': overlayResolutionRecord,
+  'c001-image-batch-process-output': overlayImageBatchProcessOutput,
+  'c002-jit-lifecycle-output': overlayJitLifecycleOutput,
+  'c003-storage-diagnose-output': overlayStorageDiagnoseOutput,
+};
+
+/** The full public emission for one contract: identity header + Zod emission + safety overlay. */
+export function emitPublicJsonSchema(name: string, schema: z.ZodType): EmittedSchema {
+  const overlay = SAFETY_INVARIANT_OVERLAYS[name];
+  const json = overlay
+    ? overlay(z.toJSONSchema(schema) as EmittedSchema)
+    : (z.toJSONSchema(schema) as EmittedSchema);
+  return {
+    $schema: 'https://json-schema.org/draft/2020-12/schema',
+    $id: schemaId(name),
+    title: name,
+    'x-contracts-revision': CONTRACTS_REVISION,
+    ...json,
+  };
+}
+
+function main(): void {
+  const outDir = join(import.meta.dirname, '../src/schema');
+  mkdirSync(outDir, { recursive: true });
+
+  const keep = new Set<string>();
+  for (const contract of CONTRACTS) {
+    const json = emitPublicJsonSchema(contract.name, contract.schema);
+    const file = join(outDir, `${contract.name}.schema.json`);
+    writeFileSync(file, `${JSON.stringify(json, null, 2)}\n`, 'utf8');
+    keep.add(`${contract.name}.schema.json`);
+    console.log(`emitted ${contract.name}.schema.json`);
+  }
+
+  for (const name of readdirSync(outDir)) {
+    if (!keep.has(name)) {
+      unlinkSync(join(outDir, name));
+      console.log(`removed stale ${name}`);
+    }
+  }
+}
+
+// Run the emission only when invoked directly (`pnpm emit:schemas`); importing
+// modules (drift/parity tests) must not perform filesystem writes.
+const invoked = process.argv[1]
+  ? import.meta.url === pathToFileURL(realpathSync(process.argv[1])).href
+  : false;
+if (invoked) {
+  main();
+}

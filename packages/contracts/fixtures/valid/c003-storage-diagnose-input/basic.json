@@ -1,0 +1,8 @@
+{
+  "taskId": "task-2026-10-10-003",
+  "targetVolume": "C:",
+  "protectedAssets": [
+    { "path": "C:\\fixtures\\protected\\photos" }
+  ],
+  "cleanupPolicy": { "eligibleCategories": ["CACHE"] }
+}

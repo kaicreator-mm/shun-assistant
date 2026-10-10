@@ -1,0 +1,10 @@
+{
+  "taskId": "task-bad-013",
+  "attribution": { "growthSourcePath": "C:\\cache", "classifiedAs": "CACHE", "evidenceRefs": ["evidence://x"] },
+  "cleanupPlan": {
+    "bounded": false,
+    "targets": [{ "path": "C:\\", "classification": "CACHE", "expectedReclaimBytes": 0 }],
+    "r2Gate": { "phases": ["PLAN", "PREVIEW", "CHECKPOINT", "APPROVAL", "EXECUTE", "VERIFY"], "approvedBy": "USER_APPROVAL" }
+  },
+  "protectedAssetVerification": []
+}

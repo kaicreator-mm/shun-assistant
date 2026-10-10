@@ -1,0 +1,28 @@
+{
+  "taskId": "task-bad-015",
+  "selectedBindingId": "binding-bad",
+  "provenance": { "source": "winget:ExampleSoftware.PdfTool", "official": true, "version": "2.4.1", "licenseDisposition": "MIT" },
+  "taskResult": {
+    "status": "SUCCEEDED",
+    "verification": {
+      "taskId": "task-bad-015",
+      "verifierId": "v",
+      "verifierRevision": "r1",
+      "status": "PASS",
+      "checks": [{ "checkId": "c", "status": "PASS" }],
+      "oracleInputs": {},
+      "evidenceRefs": []
+    }
+  },
+  "lifecycleState": { "providerId": "tool.pdftool", "version": "2.4.1", "state": "REMOVED" },
+  "residueReport": {
+    "candidates": [
+      { "path": "C:\\Program Files\\ExampleSoftware\\PdfTool\\bin", "classification": "PROGRAM_OWNED", "disposition": "DELETE" }
+    ],
+    "unknownOrProtectedDeleted": false
+  },
+  "r2Gate": {
+    "phases": ["PLAN", "PREVIEW", "CHECKPOINT", "APPROVAL", "EXECUTE", "VERIFY"]
+  },
+  "finalState": "REMOVED"
+}

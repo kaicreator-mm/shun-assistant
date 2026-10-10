@@ -1,0 +1,116 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:shun:contracts:0.1:capability-definition",
+  "title": "capability-definition",
+  "x-contracts-revision": "shun.contracts/0.1",
+  "type": "object",
+  "properties": {
+    "capabilityId": {
+      "type": "string",
+      "minLength": 1
+    },
+    "revision": {
+      "type": "string",
+      "minLength": 1
+    },
+    "inputSchema": {
+      "type": "object",
+      "propertyNames": {
+        "type": "string"
+      },
+      "additionalProperties": {}
+    },
+    "outputSchema": {
+      "type": "object",
+      "propertyNames": {
+        "type": "string"
+      },
+      "additionalProperties": {}
+    },
+    "sideEffectClass": {
+      "type": "string",
+      "enum": [
+        "R0",
+        "R1",
+        "R2",
+        "R3"
+      ]
+    },
+    "allowedInterfaceClasses": {
+      "minItems": 1,
+      "type": "array",
+      "items": {
+        "type": "string",
+        "enum": [
+          "I0",
+          "I1",
+          "I2",
+          "I3",
+          "I4"
+        ]
+      }
+    },
+    "verificationContract": {
+      "type": "object",
+      "properties": {
+        "verifierId": {
+          "type": "string",
+          "minLength": 1
+        },
+        "verifierRevision": {
+          "type": "string",
+          "minLength": 1
+        },
+        "checks": {
+          "minItems": 1,
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "checkId": {
+                "type": "string",
+                "minLength": 1
+              },
+              "description": {
+                "type": "string",
+                "minLength": 1
+              },
+              "required": {
+                "type": "boolean"
+              }
+            },
+            "required": [
+              "checkId",
+              "required"
+            ],
+            "additionalProperties": false
+          }
+        }
+      },
+      "required": [
+        "verifierId",
+        "verifierRevision",
+        "checks"
+      ],
+      "additionalProperties": false
+    },
+    "requiredPolicyFacts": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "minLength": 1
+      }
+    }
+  },
+  "required": [
+    "capabilityId",
+    "revision",
+    "inputSchema",
+    "outputSchema",
+    "sideEffectClass",
+    "allowedInterfaceClasses",
+    "verificationContract",
+    "requiredPolicyFacts"
+  ],
+  "additionalProperties": false
+}

@@ -1,0 +1,61 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:shun:contracts:0.1:c003-storage-diagnose-input",
+  "title": "c003-storage-diagnose-input",
+  "x-contracts-revision": "shun.contracts/0.1",
+  "type": "object",
+  "properties": {
+    "taskId": {
+      "type": "string",
+      "minLength": 1
+    },
+    "targetVolume": {
+      "type": "string",
+      "minLength": 1
+    },
+    "protectedAssets": {
+      "minItems": 1,
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "path": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "required": [
+          "path"
+        ],
+        "additionalProperties": false
+      }
+    },
+    "cleanupPolicy": {
+      "type": "object",
+      "properties": {
+        "eligibleCategories": {
+          "minItems": 1,
+          "type": "array",
+          "items": {
+            "type": "string",
+            "enum": [
+              "CACHE",
+              "TEMP"
+            ]
+          }
+        }
+      },
+      "required": [
+        "eligibleCategories"
+      ],
+      "additionalProperties": false
+    }
+  },
+  "required": [
+    "taskId",
+    "targetVolume",
+    "protectedAssets",
+    "cleanupPolicy"
+  ],
+  "additionalProperties": false
+}

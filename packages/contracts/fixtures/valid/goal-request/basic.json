@@ -1,0 +1,19 @@
+{
+  "taskId": "task-2026-10-10-001",
+  "goal": "Resize my vacation photos so the longest edge is at most 1600px and keep everything on this machine.",
+  "objects": [
+    { "kind": "DIRECTORY", "ref": "C:\\fixtures\\images" }
+  ],
+  "constraints": {
+    "format": "JPG",
+    "privacy": "keep on device",
+    "other": { "maxFiles": 200 }
+  },
+  "policyContext": {
+    "privacyPolicy": { "localOnly": true, "externalDisclosure": "FORBIDDEN" },
+    "environmentPolicy": { "allowedBackendKinds": ["LOCAL_WINDOWS"], "allowElevation": false }
+  },
+  "verificationIntent": {
+    "successConditions": ["every output decodes", "longest edge <= 1600px", "capture date preserved"]
+  }
+}

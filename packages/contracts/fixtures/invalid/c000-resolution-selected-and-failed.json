@@ -1,0 +1,16 @@
+{
+  "taskId": "task-bad-014",
+  "resolvedCapabilityId": "image.batch_process",
+  "capabilityRevision": "r1",
+  "normalizedConstraints": {},
+  "candidates": [],
+  "feasibleBindings": [],
+  "hardGateDispositions": [],
+  "selectedBindingId": "binding-something",
+  "selectionReasons": [],
+  "riskClass": "R1",
+  "executionPlanClass": "KNOWN_CAPABILITY_DETERMINISTIC",
+  "verificationPlan": { "verifierId": "v", "verifierRevision": "r1", "checks": [{ "checkId": "c" }] },
+  "privacyDisclosurePlan": { "externalDisclosure": "FORBIDDEN", "notes": [] },
+  "failureDisposition": { "failureCode": "NO_FEASIBLE_BINDING", "detail": "contradictory record" }
+}

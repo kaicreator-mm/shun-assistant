@@ -1,0 +1,107 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:shun:contracts:0.1:environment-facts",
+  "title": "environment-facts",
+  "x-contracts-revision": "shun.contracts/0.1",
+  "type": "object",
+  "properties": {
+    "environmentId": {
+      "type": "string",
+      "minLength": 1
+    },
+    "backendKind": {
+      "type": "string",
+      "enum": [
+        "LOCAL_WINDOWS",
+        "LOCAL_POSIX",
+        "REMOTE_ECF"
+      ]
+    },
+    "os": {
+      "type": "string",
+      "minLength": 1
+    },
+    "arch": {
+      "type": "string",
+      "minLength": 1
+    },
+    "observationRevision": {
+      "type": "string",
+      "minLength": 1
+    },
+    "runtimeCapabilities": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "minLength": 1
+      }
+    },
+    "privilegeMode": {
+      "type": "string",
+      "enum": [
+        "STANDARD_USER",
+        "FILTERED_ADMIN",
+        "ELEVATED_ADMIN",
+        "SERVICE"
+      ]
+    },
+    "guiSession": {
+      "type": "boolean"
+    },
+    "filesystemCapabilities": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "minLength": 1
+      }
+    },
+    "networkPolicy": {
+      "type": "string",
+      "enum": [
+        "OFFLINE",
+        "POLICY_CONTROLLED",
+        "OPEN"
+      ]
+    },
+    "resources": {
+      "type": "object",
+      "properties": {
+        "cpuCores": {
+          "type": "integer",
+          "exclusiveMinimum": 0,
+          "maximum": 9007199254740991
+        },
+        "memoryMb": {
+          "type": "integer",
+          "exclusiveMinimum": 0,
+          "maximum": 9007199254740991
+        },
+        "freeDiskMb": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 9007199254740991
+        }
+      },
+      "required": [
+        "cpuCores",
+        "memoryMb",
+        "freeDiskMb"
+      ],
+      "additionalProperties": false
+    }
+  },
+  "required": [
+    "environmentId",
+    "backendKind",
+    "os",
+    "arch",
+    "observationRevision",
+    "runtimeCapabilities",
+    "privilegeMode",
+    "guiSession",
+    "filesystemCapabilities",
+    "networkPolicy",
+    "resources"
+  ],
+  "additionalProperties": false
+}

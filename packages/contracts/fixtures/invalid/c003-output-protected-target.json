@@ -1,0 +1,36 @@
+{
+  "taskId": "task-bad-016",
+  "attribution": {
+    "growthSourcePath": "C:\\ProgramData\\ExampleApp\\cache\\tmp",
+    "classifiedAs": "CACHE",
+    "evidenceRefs": ["evidence://x"]
+  },
+  "cleanupPlan": {
+    "bounded": true,
+    "targets": [
+      {
+        "path": "C:\\Users\\dev\\Documents\\projects",
+        "classification": "PROTECTED",
+        "expectedReclaimBytes": 1048576
+      }
+    ],
+    "r2Gate": { "phases": ["PLAN", "PREVIEW", "CHECKPOINT", "APPROVAL", "EXECUTE", "VERIFY"], "approvedBy": "USER_APPROVAL" }
+  },
+  "executionEvidence": {
+    "actionId": "action-bad-016",
+    "environmentId": "env-local-windows-01",
+    "providerId": "storage.cleaner",
+    "providerVersion": "0.3.0",
+    "startedAt": "2026-10-10T10:00:00.000Z",
+    "finishedAt": "2026-10-10T10:01:00.000Z",
+    "terminal": "SUCCEEDED",
+    "outputRefs": ["evidence://x"],
+    "sideEffectEvidence": {
+      "sideEffectClass": "R2",
+      "recoveryClassification": "COMPLETED_VERIFIED",
+      "postStateVerified": true
+    }
+  },
+  "reclaimed": { "grossBytes": 1048576, "postActionStateBytes": 1048576 },
+  "protectedAssetVerification": [{ "path": "C:\\Users\\dev\\Documents\\projects", "unchanged": false }]
+}

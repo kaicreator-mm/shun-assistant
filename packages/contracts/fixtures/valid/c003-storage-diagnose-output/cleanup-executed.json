@@ -1,0 +1,42 @@
+{
+  "taskId": "task-2026-10-10-003",
+  "attribution": {
+    "growthSourcePath": "C:\\ProgramData\\ExampleApp\\cache\\tmp",
+    "classifiedAs": "CACHE",
+    "evidenceRefs": ["evidence://task-2026-10-10-003/mft-scan.json"]
+  },
+  "cleanupPlan": {
+    "bounded": true,
+    "targets": [
+      {
+        "path": "C:\\ProgramData\\ExampleApp\\cache\\tmp",
+        "classification": "CACHE",
+        "expectedReclaimBytes": 734003200
+      }
+    ],
+    "r2Gate": {
+      "phases": ["PLAN", "PREVIEW", "CHECKPOINT", "APPROVAL", "EXECUTE", "VERIFY"],
+      "approvedBy": "USER_APPROVAL"
+    }
+  },
+  "executionEvidence": {
+    "actionId": "action-101",
+    "environmentId": "env-local-windows-01",
+    "providerId": "storage.cleaner",
+    "providerVersion": "0.3.0",
+    "startedAt": "2026-10-10T10:00:00.000Z",
+    "finishedAt": "2026-10-10T10:01:00.000Z",
+    "terminal": "SUCCEEDED",
+    "outputRefs": ["evidence://task-2026-10-10-003/reclaim.json"],
+    "sideEffectEvidence": {
+      "sideEffectClass": "R2",
+      "recoveryClassification": "COMPLETED_VERIFIED",
+      "postStateVerified": true,
+      "journalRef": "journal://action-101/phases"
+    }
+  },
+  "reclaimed": { "grossBytes": 734003200, "postActionStateBytes": 10485760 },
+  "protectedAssetVerification": [
+    { "path": "C:\\fixtures\\protected\\photos", "unchanged": true }
+  ]
+}

@@ -1,0 +1,22 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:shun:contracts:0.1:authorization-authority",
+  "title": "authorization-authority",
+  "x-contracts-revision": "shun.contracts/0.1",
+  "type": "object",
+  "properties": {
+    "authorityId": {
+      "type": "string",
+      "minLength": 1
+    },
+    "authorityRevision": {
+      "type": "string",
+      "minLength": 1
+    }
+  },
+  "required": [
+    "authorityId",
+    "authorityRevision"
+  ],
+  "additionalProperties": false
+}

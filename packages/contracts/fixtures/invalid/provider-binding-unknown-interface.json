@@ -1,0 +1,10 @@
+{
+  "bindingId": "binding-bad",
+  "providerId": "provider.bad",
+  "capabilityId": "cap.bad",
+  "capabilityRevisionRange": { "min": "r1" },
+  "adapterId": "adapter.bad",
+  "interfaceClass": "I9",
+  "environmentRequirements": { "backendKind": "LOCAL_WINDOWS" },
+  "verifierId": "verifier.bad"
+}

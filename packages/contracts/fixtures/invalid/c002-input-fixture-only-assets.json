@@ -1,0 +1,15 @@
+{
+  "taskId": "task-bad-017",
+  "capabilityRequirement": { "capabilityId": "pdf.convert", "revision": "r1" },
+  "providerConstraints": {
+    "trustedProvenanceRequired": true,
+    "supportedPlatform": "WINDOWS"
+  },
+  "lifecyclePolicy": { "retention": "JIT_REMOVE_AFTER_VERIFIED_USE" },
+  "targetTask": {
+    "fixtureRef": "fixture://pdf-convert/sample-invoice"
+  },
+  "preExistingUserAssets": [
+    { "path": "C:\\fixtures\\user-assets\\notes.txt" }
+  ]
+}

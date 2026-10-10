@@ -1,0 +1,13 @@
+{
+  "environmentId": "env-local-windows-01",
+  "backendKind": "LOCAL_WINDOWS",
+  "os": "WINDOWS",
+  "arch": "X64",
+  "observationRevision": "obs-0042",
+  "runtimeCapabilities": ["node-24", "powershell-7", "winget"],
+  "privilegeMode": "FILTERED_ADMIN",
+  "guiSession": true,
+  "filesystemCapabilities": ["user-profile-read", "user-profile-write", "temp-write"],
+  "networkPolicy": "POLICY_CONTROLLED",
+  "resources": { "cpuCores": 16, "memoryMb": 32768, "freeDiskMb": 204800 }
+}

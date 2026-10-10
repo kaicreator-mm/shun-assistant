@@ -1,0 +1,20 @@
+{
+  "taskId": "task-bad-005",
+  "capabilityId": "image.batch_process",
+  "bindingRefs": ["binding-real"],
+  "rankingPolicyRevision": "rank-pol-v3",
+  "policySnapshotRevision": "pol-snap-2026-10-10-a",
+  "actions": [
+    {
+      "actionId": "action-bad",
+      "bindingRef": "binding-real",
+      "op": "image.resize",
+      "parameters": {},
+      "sideEffectClass": "R1",
+      "requiredPrivilege": "NONE"
+    }
+  ],
+  "verificationPlan": { "verifierId": "verifier.image-ssim", "verifierRevision": "r2", "checks": [{ "checkId": "x" }] },
+  "recoveryPlan": { "classificationStrategy": "JOURNAL_AND_POST_STATE", "reconcileBeforeRetry": true, "retryAllowedWhen": "PROVEN_NOT_EXECUTED" },
+  "planHash": "DEADBEEF"
+}

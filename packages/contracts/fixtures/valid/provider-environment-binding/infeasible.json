@@ -1,0 +1,8 @@
+{
+  "providerBindingId": "binding-imagemagick-elevated",
+  "environmentId": "env-local-windows-01",
+  "feasibility": {
+    "feasible": false,
+    "rejectionReasons": ["PRIVILEGE_INSUFFICIENT", "NETWORK_POLICY_FORBIDDEN"]
+  }
+}

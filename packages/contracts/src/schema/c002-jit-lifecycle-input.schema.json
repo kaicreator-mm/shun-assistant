@@ -1,0 +1,93 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:shun:contracts:0.1:c002-jit-lifecycle-input",
+  "title": "c002-jit-lifecycle-input",
+  "x-contracts-revision": "shun.contracts/0.1",
+  "type": "object",
+  "properties": {
+    "taskId": {
+      "type": "string",
+      "minLength": 1
+    },
+    "capabilityRequirement": {
+      "type": "object",
+      "properties": {
+        "capabilityId": {
+          "type": "string",
+          "minLength": 1
+        },
+        "revision": {
+          "type": "string",
+          "minLength": 1
+        }
+      },
+      "required": [
+        "capabilityId"
+      ],
+      "additionalProperties": false
+    },
+    "providerConstraints": {
+      "type": "object",
+      "properties": {
+        "trustedProvenanceRequired": {
+          "type": "boolean",
+          "const": true
+        },
+        "supportedPlatform": {
+          "type": "string",
+          "const": "WINDOWS"
+        },
+        "licensing": {
+          "type": "string",
+          "minLength": 1
+        }
+      },
+      "required": [
+        "trustedProvenanceRequired",
+        "supportedPlatform"
+      ],
+      "additionalProperties": false
+    },
+    "lifecyclePolicy": {
+      "type": "object",
+      "properties": {
+        "retention": {
+          "type": "string",
+          "enum": [
+            "RETAIN",
+            "JIT_REMOVE_AFTER_VERIFIED_USE"
+          ]
+        }
+      },
+      "required": [
+        "retention"
+      ],
+      "additionalProperties": false
+    },
+    "targetTask": {
+      "type": "object",
+      "properties": {
+        "fixtureRef": {
+          "type": "string",
+          "minLength": 1
+        },
+        "parameters": {
+          "type": "object",
+          "propertyNames": {
+            "type": "string"
+          },
+          "additionalProperties": {}
+        }
+      },
+      "additionalProperties": false
+    }
+  },
+  "required": [
+    "taskId",
+    "capabilityRequirement",
+    "providerConstraints",
+    "lifecyclePolicy",
+    "targetTask"
+  ],
+  "additionalProperties": false
+}

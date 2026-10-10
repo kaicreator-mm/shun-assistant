@@ -1,0 +1,14 @@
+{
+  "environmentId": "env-bad",
+  "backendKind": "LOCAL_WINDOWS",
+  "os": "WINDOWS",
+  "arch": "X64",
+  "observationRevision": "obs-1",
+  "runtimeCapabilities": [],
+  "privilegeMode": "FILTERED_ADMIN",
+  "guiSession": true,
+  "filesystemCapabilities": [],
+  "networkPolicy": "OFFLINE",
+  "resources": { "cpuCores": 8, "memoryMb": 16384, "freeDiskMb": 1024 },
+  "hostname": "should-not-be-here"
+}

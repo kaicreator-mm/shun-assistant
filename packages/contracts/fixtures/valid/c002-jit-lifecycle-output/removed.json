@@ -1,0 +1,43 @@
+{
+  "taskId": "task-2026-10-10-002",
+  "selectedBindingId": "binding-pdftool-localwin",
+  "provenance": {
+    "source": "winget:ExampleSoftware.PdfTool",
+    "official": true,
+    "version": "2.4.1",
+    "hash": "b2c3d4e5f60718293a4b5c6d7e8f90a1b2c3d4e5f60718293a4b5c6d7e8f90a1",
+    "signature": "authenticode:ExampleSoftware",
+    "licenseDisposition": "MIT accepted for task use"
+  },
+  "taskResult": {
+    "status": "SUCCEEDED",
+    "verification": {
+      "taskId": "task-2026-10-10-002",
+      "verifierId": "verifier.pdf-convert",
+      "verifierRevision": "r1",
+      "status": "PASS",
+      "checks": [{ "checkId": "output-decodes", "status": "PASS" }],
+      "oracleInputs": { "expectedPages": 3 },
+      "evidenceRefs": ["evidence://task-2026-10-10-002/out.pdf"]
+    }
+  },
+  "lifecycleState": {
+    "providerId": "tool.pdftool",
+    "version": "2.4.1",
+    "state": "REMOVED"
+  },
+  "residueReport": {
+    "candidates": [
+      { "path": "C:\\Program Files\\ExampleSoftware\\PdfTool\\bin", "classification": "PROGRAM_OWNED", "disposition": "DELETE" },
+      { "path": "C:\\ProgramData\\ExampleSoftware\\PdfTool\\cache", "classification": "CACHE", "disposition": "DELETE" },
+      { "path": "C:\\Users\\dev\\AppData\\Roaming\\ExampleSoftware\\settings.json", "classification": "CONFIGURATION", "disposition": "RETAIN" },
+      { "path": "C:\\fixtures\\user-assets\\notes.txt", "classification": "USER_CREATED_UNKNOWN", "disposition": "RETAIN" }
+    ],
+    "unknownOrProtectedDeleted": false
+  },
+  "r2Gate": {
+    "phases": ["PLAN", "PREVIEW", "CHECKPOINT", "APPROVAL", "EXECUTE", "VERIFY"],
+    "approvedBy": "DURABLE_POLICY"
+  },
+  "finalState": "REMOVED"
+}

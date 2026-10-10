@@ -1,0 +1,25 @@
+{
+  "taskId": "task-2026-10-10-001",
+  "records": [
+    { "inputPath": "C:\\fixtures\\images\\img-001.jpg", "status": "WRITTEN", "outputPath": "C:\\fixtures\\out\\img-001.jpg" },
+    { "inputPath": "C:\\fixtures\\images\\img-002.jpg", "status": "REJECTED", "rejectionCode": "DECODE_FAILED" },
+    { "inputPath": "C:\\fixtures\\images\\img-003.png", "status": "WRITTEN", "outputPath": "C:\\fixtures\\out\\img-003.png" }
+  ],
+  "selectedBindingId": "binding-imagemagick-localwin",
+  "rankingEvidence": {
+    "rankingPolicyRevision": "rank-pol-v3",
+    "reasons": ["single trusted I1 binding", "no I0 provider available for this revision"]
+  },
+  "verification": {
+    "taskId": "task-2026-10-10-001",
+    "verifierId": "verifier.image-ssim",
+    "verifierRevision": "r2",
+    "status": "PASS",
+    "checks": [
+      { "checkId": "count-conservation", "status": "PASS" },
+      { "checkId": "ssim-oracle", "status": "PASS" }
+    ],
+    "oracleInputs": { "metric": "SSIM", "threshold": 0.95 },
+    "evidenceRefs": ["evidence://task-2026-10-10-001/out/manifest.json"]
+  }
+}

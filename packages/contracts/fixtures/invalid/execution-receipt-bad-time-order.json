@@ -1,0 +1,11 @@
+{
+  "actionId": "action-bad",
+  "environmentId": "env-bad",
+  "providerId": "provider.bad",
+  "providerVersion": "1.0.0",
+  "startedAt": "2026-10-10T10:05:00.000Z",
+  "finishedAt": "2026-10-10T10:00:00.000Z",
+  "terminal": "FAILED",
+  "outputRefs": [],
+  "sideEffectEvidence": { "sideEffectClass": "R1", "recoveryClassification": "FAILED_BEFORE_EFFECT", "postStateVerified": false }
+}

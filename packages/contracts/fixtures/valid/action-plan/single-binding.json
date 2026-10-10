@@ -1,0 +1,46 @@
+{
+  "taskId": "task-2026-10-10-001",
+  "capabilityId": "image.batch_process",
+  "bindingRefs": ["binding-imagemagick-localwin"],
+  "rankingPolicyRevision": "rank-pol-v3",
+  "policySnapshotRevision": "pol-snap-2026-10-10-a",
+  "actions": [
+    {
+      "actionId": "action-001",
+      "bindingRef": "binding-imagemagick-localwin",
+      "op": "image.resize",
+      "parameters": { "format": "JPG", "maxLongEdgePx": 1600 },
+      "sideEffectClass": "R1",
+      "requiredPrivilege": "NONE",
+      "filesystemScope": {
+        "read": ["C:\\fixtures\\images"],
+        "write": ["C:\\fixtures\\out"]
+      },
+      "networkScope": { "allowed": false },
+      "timeoutMs": 600000,
+      "cancellation": { "supported": true, "mode": "COOPERATIVE" },
+      "expectedState": { "count": 12, "outputsDecode": true }
+    }
+  ],
+  "verificationPlan": {
+    "verifierId": "verifier.image-ssim",
+    "verifierRevision": "r2",
+    "checks": [
+      { "checkId": "count-conservation" },
+      { "checkId": "decode-all" },
+      { "checkId": "edge-bound" },
+      { "checkId": "capture-date-preserved" },
+      { "checkId": "ssim-oracle" }
+    ],
+    "oracle": {
+      "precommitted": true,
+      "spec": { "metric": "SSIM", "threshold": 0.95, "sampleStrategy": "ASC_SHA256_FIRST_20" }
+    }
+  },
+  "recoveryPlan": {
+    "classificationStrategy": "JOURNAL_AND_POST_STATE",
+    "reconcileBeforeRetry": true,
+    "retryAllowedWhen": "PROVEN_NOT_EXECUTED"
+  },
+  "planHash": "94024d16440b2ec90a36dbbc102852cd9ff9ea41bbf0a5894a79ad0e9b36452c"
+}

@@ -1,0 +1,18 @@
+{
+  "taskId": "task-2026-10-10-001",
+  "objective": "Resize vacation photos to max long edge 1600px, JPG, local only",
+  "objects": [
+    { "kind": "DIRECTORY", "ref": "C:\\fixtures\\images" }
+  ],
+  "constraints": {
+    "format": "JPG",
+    "privacy": "keep on device",
+    "other": { "maxFiles": 200 }
+  },
+  "privacyPolicy": { "localOnly": true, "externalDisclosure": "FORBIDDEN" },
+  "environmentPolicy": { "allowedBackendKinds": ["LOCAL_WINDOWS"], "allowElevation": false },
+  "verificationIntent": {
+    "successConditions": ["every output decodes", "longest edge <= 1600px", "capture date preserved"]
+  },
+  "ambiguityDisposition": "READY"
+}

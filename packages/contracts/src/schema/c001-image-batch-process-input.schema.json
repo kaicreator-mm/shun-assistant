@@ -1,0 +1,107 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:shun:contracts:0.1:c001-image-batch-process-input",
+  "title": "c001-image-batch-process-input",
+  "x-contracts-revision": "shun.contracts/0.1",
+  "type": "object",
+  "properties": {
+    "taskId": {
+      "type": "string",
+      "minLength": 1
+    },
+    "inputFiles": {
+      "minItems": 1,
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "path": {
+            "type": "string",
+            "minLength": 1
+          },
+          "format": {
+            "type": "string",
+            "enum": [
+              "JPG",
+              "PNG"
+            ]
+          }
+        },
+        "required": [
+          "path",
+          "format"
+        ],
+        "additionalProperties": false
+      }
+    },
+    "operation": {
+      "type": "object",
+      "properties": {
+        "kind": {
+          "type": "string",
+          "const": "RESIZE"
+        },
+        "maxLongEdgePx": {
+          "type": "integer",
+          "exclusiveMinimum": 0,
+          "maximum": 9007199254740991
+        }
+      },
+      "required": [
+        "kind",
+        "maxLongEdgePx"
+      ],
+      "additionalProperties": false
+    },
+    "metadataPolicy": {
+      "type": "object",
+      "properties": {
+        "preserveCaptureDate": {
+          "type": "boolean",
+          "const": true
+        }
+      },
+      "required": [
+        "preserveCaptureDate"
+      ],
+      "additionalProperties": false
+    },
+    "outputDirectory": {
+      "type": "string",
+      "minLength": 1
+    },
+    "qualityPolicy": {
+      "type": "object",
+      "properties": {
+        "oracle": {
+          "type": "string",
+          "const": "NO_OBVIOUS_DEGRADATION_V1"
+        },
+        "ssimThreshold": {
+          "type": "number",
+          "minimum": 0.95,
+          "maximum": 1
+        }
+      },
+      "required": [
+        "oracle",
+        "ssimThreshold"
+      ],
+      "additionalProperties": false
+    },
+    "networkUsage": {
+      "type": "string",
+      "const": "LOCAL_ONLY"
+    }
+  },
+  "required": [
+    "taskId",
+    "inputFiles",
+    "operation",
+    "metadataPolicy",
+    "outputDirectory",
+    "qualityPolicy",
+    "networkUsage"
+  ],
+  "additionalProperties": false
+}

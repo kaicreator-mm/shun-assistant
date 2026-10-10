@@ -1,0 +1,20 @@
+{
+  "taskId": "task-bad-011",
+  "selectedBindingId": "binding-bad",
+  "provenance": { "source": "somewhere", "official": true, "version": "1.0", "licenseDisposition": "MIT" },
+  "taskResult": {
+    "status": "SUCCEEDED",
+    "verification": {
+      "taskId": "task-bad-011",
+      "verifierId": "v",
+      "verifierRevision": "r1",
+      "status": "PASS",
+      "checks": [{ "checkId": "c", "status": "PASS" }],
+      "oracleInputs": {},
+      "evidenceRefs": []
+    }
+  },
+  "lifecycleState": { "providerId": "tool.bad", "version": "1.0", "state": "REMOVED" },
+  "residueReport": { "candidates": [], "unknownOrProtectedDeleted": false },
+  "finalState": "REMOVED"
+}
