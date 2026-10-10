@@ -3,7 +3,7 @@
 
 import type { GoalProposal, GoalRequest, PlannerPort } from '@shun/contracts';
 import { describe, expect, it } from 'vitest';
-import { interpretGoalViaPlanner } from '../src/planner-seam.ts';
+import { type InterpretGoalViaPlannerInput, interpretGoalViaPlanner } from '../src/planner-seam.ts';
 import { ShunRegistry } from '../src/registry.ts';
 import { bindingDef, capabilityDef, goalRequest, providerDef } from './scenarios.ts';
 
@@ -117,6 +117,8 @@ describe('PlannerPort seam stays proposal-only and policy-bounded', () => {
       request: input,
       registry: registry(),
       planner: spyPlanner(proposal),
+      transport: 'LOCAL',
+      objectExists: () => true,
     });
     expect(result.status).toBe('PROPOSAL_ACCEPTED');
     if (result.status !== 'PROPOSAL_ACCEPTED') return;
@@ -134,6 +136,7 @@ describe('PlannerPort seam stays proposal-only and policy-bounded', () => {
       request: input,
       registry: registry(),
       planner: spyPlanner(proposal),
+      transport: 'LOCAL',
     });
     expect(result).toMatchObject({
       status: 'PROPOSAL_REJECTED',
@@ -149,6 +152,7 @@ describe('PlannerPort seam stays proposal-only and policy-bounded', () => {
       request: input,
       registry: registry(),
       planner: spyPlanner(proposal),
+      transport: 'LOCAL',
     });
     expect(result).toMatchObject({
       status: 'PROPOSAL_REJECTED',
@@ -184,6 +188,7 @@ describe('PlannerPort seam stays proposal-only and policy-bounded', () => {
       request: input,
       registry: registry(),
       planner: spyPlanner(malformed),
+      transport: 'LOCAL',
     });
     expect(result).toMatchObject({
       status: 'PROPOSAL_REJECTED',
@@ -202,10 +207,46 @@ describe('PlannerPort seam stays proposal-only and policy-bounded', () => {
       request: input,
       registry: registry(),
       planner: failing,
+      transport: 'LOCAL',
     });
     expect(result).toMatchObject({
       status: 'PROPOSAL_REJECTED',
       reason: expect.stringContaining('model backend exploded'),
     });
+  });
+
+  it('a remote-backed adapter that omits transport fails closed and is never invoked (P1-01)', async () => {
+    const planner = spyPlanner(validProposal(request()));
+    // Simulates the untyped / misconfigured caller the type signature now
+    // forbids: a planner is configured but its transport provenance is absent.
+    // It must NOT default to LOCAL and must NOT reach the adapter.
+    const omitted = {
+      request: request(),
+      registry: registry(),
+      planner,
+      transport: undefined,
+    } as unknown as InterpretGoalViaPlannerInput;
+    const result = await interpretGoalViaPlanner(omitted);
+    expect(result).toMatchObject({
+      status: 'PLANNER_UNAVAILABLE',
+      reason: expect.stringContaining('transport'),
+    });
+    expect(planner.calls).toBe(0);
+  });
+
+  it('an unknown transport value fails closed instead of being treated as LOCAL (P1-01)', async () => {
+    const planner = spyPlanner(validProposal(request()));
+    const unknown = {
+      request: request(),
+      registry: registry(),
+      planner,
+      transport: 'UNVERIFIED_REMOTE_GATEWAY',
+    } as unknown as InterpretGoalViaPlannerInput;
+    const result = await interpretGoalViaPlanner(unknown);
+    expect(result).toMatchObject({
+      status: 'PLANNER_UNAVAILABLE',
+      reason: expect.stringContaining('transport'),
+    });
+    expect(planner.calls).toBe(0);
   });
 });
