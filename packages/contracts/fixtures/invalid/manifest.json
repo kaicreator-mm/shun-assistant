@@ -6,6 +6,7 @@
   "provider-binding-unknown-interface.json": { "schema": "provider-capability-binding", "code": "SCHEMA_VIOLATION" },
   "environment-facts-extra-key.json": { "schema": "environment-facts", "code": "SCHEMA_VIOLATION" },
   "action-plan-dangling-bindingref.json": { "schema": "action-plan", "code": "SCHEMA_VIOLATION" },
+  "action-plan-duplicate-action-id.json": { "schema": "action-plan", "code": "SCHEMA_VIOLATION" },
   "action-plan-bad-hash-format.json": { "schema": "action-plan", "code": "SCHEMA_VIOLATION" },
   "authorized-action-missing-grant-ref.json": { "schema": "authorized-action", "code": "SCHEMA_VIOLATION" },
   "execution-receipt-bad-time-order.json": { "schema": "execution-receipt", "code": "SCHEMA_VIOLATION" },

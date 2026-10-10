@@ -66,6 +66,7 @@ function requiredElement<T>(items: T[], why: string): T {
  */
 const AJV_INEXPRESSIBLE = new Set([
   'action-plan-dangling-bindingref.json',
+  'action-plan-duplicate-action-id.json',
   'execution-receipt-bad-time-order.json',
 ]);
 
@@ -342,6 +343,16 @@ describe('overlay invariants are enforced by the artifact itself', () => {
 describe('x-semantic-validation annotations close the inexpressible gap', () => {
   it('action-plan: dangling bindingRef passes the artifact but the annotated validator rejects it', () => {
     const raw = loadFixture('invalid/action-plan-dangling-bindingref.json');
+    expect(artifactValidator('action-plan')(raw)).toBe(true);
+    expect(zodSchemaFor('action-plan').safeParse(raw).success).toBe(false);
+    expect(validateActionPlanSemantics(raw as ActionPlan).length).toBeGreaterThan(0);
+  });
+
+  it('action-plan (R2-02, review 5478548765): duplicate actionId passes the artifact but the annotated validator rejects it', () => {
+    const raw = loadFixture('invalid/action-plan-duplicate-action-id.json');
+    // Array-element identity is not expressible in draft 2020-12, so the
+    // artifact alone accepts the ambiguous plan; the annotation names
+    // validateActionPlanSemantics and the Zod parser enforces it.
     expect(artifactValidator('action-plan')(raw)).toBe(true);
     expect(zodSchemaFor('action-plan').safeParse(raw).success).toBe(false);
     expect(validateActionPlanSemantics(raw as ActionPlan).length).toBeGreaterThan(0);

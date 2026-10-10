@@ -115,11 +115,14 @@ export const PlanActionSchema = z.strictObject({
 export type PlanAction = z.infer<typeof PlanActionSchema>;
 
 /**
- * Semantic invariant the committed JSON Schema artifact cannot express (array
- * membership across two properties): every action's bindingRef must be declared
- * in bindingRefs. Exported so consumers of the artifact — which names this
- * function in its `x-semantic-validation` annotation — run the same check the
- * Zod parser enforces.
+ * Semantic invariants the committed JSON Schema artifact cannot express
+ * (cross-element array identity): every action's bindingRef must be declared
+ * in bindingRefs, and actionIds must be unique — one stable identity
+ * designates exactly one side effect (L2 §9.4). A duplicate actionId makes
+ * every authorization, receipt and recovery interpretation of that identity
+ * ambiguous, so the plan as a whole is refused. Exported so consumers of the
+ * artifact — which names this function in its `x-semantic-validation`
+ * annotation — run the same check the Zod parser enforces.
  */
 export function validateActionPlanSemantics(plan: ActionPlan): string[] {
   const known = new Set(plan.bindingRefs);
@@ -131,7 +134,30 @@ export function validateActionPlanSemantics(plan: ActionPlan): string[] {
       );
     }
   });
+  const seenActionIds = new Set<string>();
+  plan.actions.forEach((action, index) => {
+    if (seenActionIds.has(action.actionId)) {
+      issues.push(
+        `actions[${index}] duplicate actionId "${action.actionId}" — one stable identity must designate exactly one side effect (L2 §9.4)`,
+      );
+    }
+    seenActionIds.add(action.actionId);
+  });
   return issues;
+}
+
+/**
+ * Receipt/recovery seam (L2 §9.4): the single way to interpret an actionId —
+ * from an execution receipt, a recovery step or an authorization lookup —
+ * against a plan. Fail-closed on ambiguity: when actions share an actionId
+ * the identity designates no unique side effect, so resolution refuses
+ * (undefined) instead of silently returning the first match. Callers must
+ * treat the ambiguous case exactly like "not present in the plan".
+ */
+export function resolvePlanAction(plan: ActionPlan, actionId: string): PlanAction | undefined {
+  const matches = plan.actions.filter((action) => action.actionId === actionId);
+  const [only] = matches;
+  return matches.length === 1 ? only : undefined;
 }
 
 export const ActionPlanSchema = z

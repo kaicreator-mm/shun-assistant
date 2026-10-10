@@ -374,11 +374,26 @@ export function validateGrantPresentation(input: GrantValidationInput): GrantVal
       'action actionId does not match the actionId of its embedded action surface',
     );
   }
-  const planAction = plan.data.actions.find((candidate) => candidate.actionId === a.actionId);
+  // Resolve by unique identity, never "first match" (R2-02, review
+  // 5478548765): ActionPlanSchema already refuses plans with duplicate
+  // actionIds, so this explicit ambiguity guard is defense in depth — it
+  // fires only if the schema-level uniqueness were ever relaxed, and in that
+  // event refuses the presentation instead of executing an arbitrary shadow
+  // of the ambiguous identity.
+  const planActionMatches = plan.data.actions.filter(
+    (candidate) => candidate.actionId === a.actionId,
+  );
+  const planAction = planActionMatches[0];
   if (!planAction) {
     return reject(
       'GRANT_PLAN_MISMATCH',
       `actionId ${a.actionId} is not present in the hashed plan`,
+    );
+  }
+  if (planActionMatches.length > 1) {
+    return reject(
+      'GRANT_PLAN_MISMATCH',
+      `actionId ${a.actionId} is ambiguous: ${planActionMatches.length} actions of the hashed plan share this identity (L2 §9.4 stable identity)`,
     );
   }
   // Canonical-form deep equality: representation differences (key order) are
