@@ -253,8 +253,18 @@ async function main(): Promise<number> {
   }
 
   // ---- Main journey: no provider preselected; the vertical ranks and selects.
-  const outDir = join(corpusDir, '..', 'b037-output');
-  await rm(outDir, { recursive: true, force: true });
+  const scratch = resolve(corpusDir, '..');
+  for (const stale of [
+    'b037-output',
+    'b037-neg-missing',
+    'b037-neg-corpus',
+    'b037-neg-corrupt-output',
+    'b037-neg-lie',
+    'b037-neg-lie-output',
+  ]) {
+    await rm(join(scratch, stale), { recursive: true, force: true });
+  }
+  const outDir = join(scratch, 'b037-output');
   const tRun0 = Date.now();
   const mainResult = await runImageBatchProcess(c001Input('b037-main', corpusDir, specs, outDir), {
     facts: localWindowsFacts(),
@@ -295,7 +305,7 @@ async function main(): Promise<number> {
   );
 
   // ---- Negative: missing Provider (nothing registered) must fail closed.
-  const negOutMissing = join(corpusDir, '..', 'b037-neg-missing');
+  const negOutMissing = join(scratch, 'b037-neg-missing');
   const missingResult = await runImageBatchProcess(
     c001Input('b037-neg-missing', corpusDir, specs.slice(0, 4), negOutMissing),
     { facts: localWindowsFacts(), providers: [] },
@@ -307,7 +317,7 @@ async function main(): Promise<number> {
 
   // ---- Negative: corrupt input rejects per-record; the rest still verifies.
   const negCorruptSpecs = specs.slice(0, 5);
-  const negCorruptDir = join(corpusDir, '..', 'b037-neg-corpus');
+  const negCorruptDir = join(scratch, 'b037-neg-corpus');
   await rm(negCorruptDir, { recursive: true, force: true });
   await mkdir(negCorruptDir, { recursive: true });
   for (const spec of negCorruptSpecs) {
@@ -316,7 +326,7 @@ async function main(): Promise<number> {
   const corruptTarget = join(negCorruptDir, pick(negCorruptSpecs, 1).name);
   const corruptSize = (await readFile(corruptTarget)).length;
   await truncate(corruptTarget, Math.floor(corruptSize / 3));
-  const negCorruptOut = join(corpusDir, '..', 'b037-neg-corrupt-output');
+  const negCorruptOut = join(scratch, 'b037-neg-corrupt-output');
   const corruptResult = await runImageBatchProcess(
     c001Input('b037-neg-corrupt', negCorruptDir, negCorruptSpecs, negCorruptOut),
     { facts: localWindowsFacts(), providers: [makeSharpImageProvider()] },
@@ -332,7 +342,7 @@ async function main(): Promise<number> {
 
   // ---- Negative: PNG bytes declared as JPG are UNSUPPORTED_INPUT.
   const lieSpec = { name: 'liar.jpg', format: 'JPG' as const };
-  const negLieDir = join(corpusDir, '..', 'b037-neg-lie');
+  const negLieDir = join(scratch, 'b037-neg-lie');
   await rm(negLieDir, { recursive: true, force: true });
   await mkdir(negLieDir, { recursive: true });
   const firstPng = specs.find((s) => s.format === 'PNG');
@@ -341,7 +351,7 @@ async function main(): Promise<number> {
   }
   const realPng = await readFile(join(corpusDir, firstPng.name));
   await writeFile(join(negLieDir, 'liar.jpg'), realPng, { flag: 'wx' });
-  const negLieOut = join(corpusDir, '..', 'b037-neg-lie-output');
+  const negLieOut = join(scratch, 'b037-neg-lie-output');
   const lieResult = await runImageBatchProcess(
     c001Input('b037-neg-lie', negLieDir, [lieSpec], negLieOut),
     { facts: localWindowsFacts(), providers: [makeSharpImageProvider()] },
