@@ -67,6 +67,40 @@ export function readSafetyProfile(provider: ProviderDefinition): SafetyProfileRe
   };
 }
 
+/**
+ * Bounded curated format facts (P1-04): the frozen binding/capability
+ * contracts carry no per-binding output-format metadata, so the resolver
+ * reads an opt-in `formatSupport: string[]` fact from provider.provenanceFacts
+ * (the one unconstrained curated record in the frozen ProviderDefinition).
+ * ABSENT = no curated fact (constraints cannot be gate-evaluated and are
+ * explicitly deferred); MALFORMED = a present fact that does not parse fails
+ * closed like any other curated fact.
+ */
+export type FormatSupportRead =
+  | { status: 'ABSENT' }
+  | { status: 'VALID'; formats: readonly string[] }
+  | { status: 'MALFORMED'; reason: string };
+
+export function readFormatSupport(provider: ProviderDefinition): FormatSupportRead {
+  const fact = provider.provenanceFacts.formatSupport;
+  if (fact === undefined) {
+    return { status: 'ABSENT' };
+  }
+  if (!Array.isArray(fact) || fact.length === 0) {
+    return {
+      status: 'MALFORMED',
+      reason: 'curated formatSupport must be a non-empty array of format tokens',
+    };
+  }
+  if (!fact.every((entry) => typeof entry === 'string' && entry.trim().length > 0)) {
+    return {
+      status: 'MALFORMED',
+      reason: 'curated formatSupport entries must be non-empty strings',
+    };
+  }
+  return { status: 'VALID', formats: fact as string[] };
+}
+
 export interface BindingGateOutcome {
   binding: ProviderCapabilityBinding;
   /** Dispositions for the gates actually evaluated, in frozen gate order. */
@@ -233,6 +267,61 @@ export function runHardGates(
   ) {
     policyProblems.push('goal policy disallows elevated execution');
   }
+
+  // Capability-required policy facts (P1-04): requiredPolicyFacts are keys
+  // that must be current in the goal constraints before side-effecting
+  // execution. A key absent from constraints.other cannot be proven current —
+  // fail closed instead of ranking a binding whose required policy facts are
+  // unevaluated.
+  for (const factKey of context.capability.requiredPolicyFacts) {
+    if (context.constraints.other?.[factKey] === undefined) {
+      policyProblems.push(
+        `capability requires policy fact "${factKey}" to be current; it is missing from the goal constraints — fail closed`,
+      );
+    }
+  }
+
+  // Licensing constraint (P1-04): when the goal declares a licensing
+  // constraint, it is enforced deterministically as an exact, case-insensitive
+  // license identity match against provider.licenseFacts.license. Anything the
+  // provider license facts do not satisfy verbatim is rejected — a forbidden
+  // or merely different license can no longer pass the gates and win ranking.
+  const licensing = context.constraints.licensing;
+  if (licensing !== undefined) {
+    const requested = licensing.trim().toLowerCase();
+    const provided = provider.licenseFacts.license.trim().toLowerCase();
+    if (requested !== provided) {
+      policyProblems.push(
+        `provider license "${provider.licenseFacts.license}" does not satisfy the requested licensing constraint "${licensing}" (exact license identity required — fail closed)`,
+      );
+    }
+  }
+
+  // Format constraint (P1-04): evaluated only against explicit curated
+  // formatSupport facts. A covered-but-different requested format is a REJECT;
+  // with no curated facts the constraint is not silently certified — the PASS
+  // reason records the explicit deferral to downstream verification.
+  const formatDeferredNotes: string[] = [];
+  const format = context.constraints.format;
+  if (format !== undefined) {
+    const formatSupport = readFormatSupport(provider);
+    if (formatSupport.status === 'MALFORMED') {
+      policyProblems.push(`malformed curated format facts — fail closed: ${formatSupport.reason}`);
+    } else if (formatSupport.status === 'ABSENT') {
+      formatDeferredNotes.push(
+        `requested format "${format}" is not gate-evaluable for this binding (no curated format facts on the provider); deferred to downstream verification`,
+      );
+    } else if (
+      !formatSupport.formats.some(
+        (entry) => entry.trim().toLowerCase() === format.trim().toLowerCase(),
+      )
+    ) {
+      policyProblems.push(
+        `provider does not declare support for the requested format "${format}" (curated format facts: ${formatSupport.formats.join(', ')})`,
+      );
+    }
+  }
+
   if (policyProblems.length > 0) {
     dispositions.push(
       disposition('USER_ORG_POLICY', binding.bindingId, 'REJECT', policyProblems.join('; ')),
@@ -240,7 +329,14 @@ export function runHardGates(
     return { binding, dispositions, passed: false };
   }
   dispositions.push(
-    disposition('USER_ORG_POLICY', binding.bindingId, 'PASS', 'no user/org policy violation'),
+    disposition(
+      'USER_ORG_POLICY',
+      binding.bindingId,
+      'PASS',
+      formatDeferredNotes.length > 0
+        ? `no user/org policy violation; ${formatDeferredNotes.join('; ')}`
+        : 'no user/org policy violation',
+    ),
   );
 
   // Gate 5 — Required safety constraints: curated escalation posture is

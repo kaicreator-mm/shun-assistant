@@ -23,23 +23,26 @@ function gateScenario(opts: {
     allowedBackendKinds: ('LOCAL_WINDOWS' | 'LOCAL_POSIX' | 'REMOTE_ECF')[];
     allowElevation: boolean;
   };
+  capability?: ReturnType<typeof capabilityDef>;
+  constraints?: ReturnType<typeof goalRequest>['constraints'];
 }) {
+  const gateCapability = opts.capability ?? capability;
   const provider = providerDef({ providerId: 'imageProvider.imagemagick', ...opts.provider });
   const binding = bindingDef({
     bindingId: 'b-1',
     providerId: provider.providerId,
-    capabilityId: capability.capabilityId,
+    capabilityId: gateCapability.capabilityId,
     // The scenario policy is local-only/FORBIDDEN, so the default binding
     // declares its no-network posture explicitly (P1-02 disclosure evidence).
     environmentRequirements: requirements({ networkAccess: 'FORBIDDEN' }),
     ...opts.binding,
   });
   return runHardGates(binding, provider, {
-    capability,
+    capability: gateCapability,
     environment: opts.env ?? ENV_LOCAL,
     privacyPolicy: request.policyContext.privacyPolicy,
     environmentPolicy: opts.envPolicy ?? request.policyContext.environmentPolicy,
-    constraints: request.constraints,
+    constraints: opts.constraints ?? request.constraints,
   });
 }
 
@@ -252,6 +255,108 @@ describe('hard gates execute before ranking, in frozen order', () => {
       outcome: 'REJECT',
       reason: expect.stringContaining('aggressive residue cleanup'),
     });
+  });
+
+  it('policy: requested format not covered by curated provider format facts is rejected (P1-04)', () => {
+    const outcome = gateScenario({
+      provider: {
+        provenanceFacts: { trustState: 'TRUSTED', formatSupport: ['PNG', 'WEBP'] },
+      },
+    });
+    expect(outcome.passed).toBe(false);
+    const last = outcome.dispositions[outcome.dispositions.length - 1];
+    expect(last).toMatchObject({
+      gate: 'USER_ORG_POLICY',
+      outcome: 'REJECT',
+      reason: expect.stringContaining('format'),
+    });
+  });
+
+  it('policy: requested format covered by curated format facts passes (P1-04)', () => {
+    const outcome = gateScenario({
+      provider: {
+        provenanceFacts: { trustState: 'TRUSTED', formatSupport: ['jpg', 'PNG'] },
+      },
+    });
+    expect(outcome.passed).toBe(true);
+    const policyRow = outcome.dispositions.find((entry) => entry.gate === 'USER_ORG_POLICY');
+    expect(policyRow).toMatchObject({ outcome: 'PASS' });
+  });
+
+  it('policy: a requested format with no curated format facts is explicitly deferred, never silently certified (P1-04)', () => {
+    const outcome = gateScenario({});
+    expect(outcome.passed).toBe(true);
+    const policyRow = outcome.dispositions.find((entry) => entry.gate === 'USER_ORG_POLICY');
+    expect(policyRow?.outcome).toBe('PASS');
+    expect(policyRow?.reason).toContain('not gate-evaluable');
+    expect(policyRow?.reason).toContain('deferred');
+  });
+
+  it('policy: a malformed curated formatSupport fact fails closed (P1-04)', () => {
+    const outcome = gateScenario({
+      provider: {
+        provenanceFacts: {
+          trustState: 'TRUSTED',
+          formatSupport: ['JPG', 42],
+        } as unknown as Record<string, unknown>,
+      },
+    });
+    expect(outcome.passed).toBe(false);
+    const last = outcome.dispositions[outcome.dispositions.length - 1];
+    expect(last).toMatchObject({
+      gate: 'USER_ORG_POLICY',
+      outcome: 'REJECT',
+      reason: expect.stringContaining('formatSupport'),
+    });
+  });
+
+  it('policy: a requested licensing identity that the provider license facts do not satisfy is rejected (P1-04)', () => {
+    const outcome = gateScenario({
+      constraints: { format: 'JPG', licensing: 'Apache-2.0' },
+    });
+    expect(outcome.passed).toBe(false);
+    const last = outcome.dispositions[outcome.dispositions.length - 1];
+    expect(last).toMatchObject({
+      gate: 'USER_ORG_POLICY',
+      outcome: 'REJECT',
+      reason: expect.stringContaining('Apache-2.0'),
+    });
+  });
+
+  it('policy: a requested licensing identity matching the provider license facts passes case-insensitively (P1-04)', () => {
+    const outcome = gateScenario({
+      constraints: { format: 'JPG', licensing: '  mit ' },
+    });
+    expect(outcome.passed).toBe(true);
+  });
+
+  it('policy: a capability-required policy fact missing from goal constraints fails closed (P1-04)', () => {
+    const outcome = gateScenario({
+      capability: capabilityDef({
+        capabilityId: 'image.batch_process',
+        requiredPolicyFacts: ['maxDeleteBytesPerRun'],
+      }),
+    });
+    expect(outcome.passed).toBe(false);
+    const last = outcome.dispositions[outcome.dispositions.length - 1];
+    expect(last).toMatchObject({
+      gate: 'USER_ORG_POLICY',
+      outcome: 'REJECT',
+      reason: expect.stringContaining('maxDeleteBytesPerRun'),
+    });
+  });
+
+  it('policy: capability-required policy facts present in goal constraints pass (P1-04)', () => {
+    const requestWithFact = goalRequest({ goal: 'image.batch_process: resize photos' });
+    requestWithFact.constraints.other = { maxDeleteBytesPerRun: 1_000_000 };
+    const outcome = gateScenario({
+      capability: capabilityDef({
+        capabilityId: 'image.batch_process',
+        requiredPolicyFacts: ['maxDeleteBytesPerRun'],
+      }),
+      constraints: requestWithFact.constraints,
+    });
+    expect(outcome.passed).toBe(true);
   });
 
   it('safety: a present but malformed safetyProfile fails closed instead of counting as safety PASS (P1-03)', () => {

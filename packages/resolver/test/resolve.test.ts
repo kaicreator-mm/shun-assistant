@@ -611,6 +611,40 @@ describe('resolution records over scenario registries', () => {
     expect(result.record.failureDisposition?.failureCode).toBe('POLICY_BLOCKED');
   });
 
+  it('a requested format the provider format facts do not cover is policy-blocked with dispositions kept (P1-04)', () => {
+    const capability = capabilityDef({ capabilityId: 'image.batch_process' });
+    const pngOnly = providerDef({
+      providerId: 'imageProvider.pngonly',
+      provenanceFacts: { trustState: 'TRUSTED', formatSupport: ['PNG'] },
+    });
+    const registry = registryOf({
+      capabilities: [capability],
+      providers: [pngOnly],
+      bindings: [
+        bindingDef({
+          bindingId: 'b-pngonly',
+          providerId: pngOnly.providerId,
+          capabilityId: 'image.batch_process',
+          environmentRequirements: requirements({ networkAccess: 'FORBIDDEN' }),
+        }),
+      ],
+    });
+    const result = resolve(registry); // scenario goal requests format 'JPG'
+    expect(result.stage).toBe('RESOLUTION');
+    if (result.stage !== 'RESOLUTION') return;
+    const record = result.record;
+    expect(record.selectedBindingId).toBeNull();
+    expect(record.feasibleBindings).toEqual([]);
+    expect(record.failureDisposition?.failureCode).toBe('POLICY_BLOCKED');
+    const formatRow = record.hardGateDispositions.find(
+      (entry) => entry.bindingId === 'b-pngonly' && entry.gate === 'USER_ORG_POLICY',
+    );
+    expect(formatRow).toMatchObject({
+      outcome: 'REJECT',
+      reason: expect.stringContaining('JPG'),
+    });
+  });
+
   it('resolution is deterministic: identical input produces an identical record', () => {
     const once = resolve(b033Registry(), B033_FACTS);
     const twice = resolve(b033Registry(), B033_FACTS);
