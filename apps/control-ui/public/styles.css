@@ -1,0 +1,205 @@
+:root {
+  --bg: #f7f7f8;
+  --panel: #ffffff;
+  --ink: #1c1d21;
+  --muted: #6b6f76;
+  --line: #d9dbe0;
+  --ok: #1a7f4b;
+  --warn: #9a6700;
+  --bad: #b3261e;
+  --accent: #2451b3;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0 auto;
+  max-width: 56rem;
+  padding: 1.5rem;
+  font-family: 'Segoe UI', system-ui, sans-serif;
+  background: var(--bg);
+  color: var(--ink);
+  line-height: 1.45;
+}
+
+header h1 {
+  margin: 0 0 0.25rem;
+  font-size: 1.5rem;
+}
+
+main section {
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 1rem 1.25rem;
+  margin-block: 1rem;
+}
+
+h2 {
+  font-size: 1.05rem;
+  margin: 0 0 0.6rem;
+}
+
+h4 {
+  margin: 0.9rem 0 0.3rem;
+}
+
+button {
+  font: inherit;
+  padding: 0.35rem 0.8rem;
+  border: 1px solid var(--accent);
+  border-radius: 6px;
+  background: var(--accent);
+  color: #fff;
+  cursor: pointer;
+  margin-block: 0.25rem;
+}
+
+button:hover:enabled {
+  filter: brightness(1.1);
+}
+
+button:disabled {
+  border-color: var(--line);
+  background: var(--line);
+  color: var(--muted);
+  cursor: not-allowed;
+}
+
+input {
+  font: inherit;
+  padding: 0.4rem 0.6rem;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  width: min(28rem, 100%);
+}
+
+ul {
+  padding-left: 1.2rem;
+}
+
+li {
+  margin-block: 0.25rem;
+}
+
+.badge {
+  display: inline-block;
+  padding: 0.1rem 0.55rem;
+  border-radius: 999px;
+  font-size: 0.8rem;
+  border: 1px solid var(--line);
+  background: #eef0f3;
+}
+
+.badge.tone-ok {
+  border-color: var(--ok);
+  color: var(--ok);
+}
+
+.badge.tone-warn {
+  border-color: var(--warn);
+  color: var(--warn);
+}
+
+.badge.tone-bad {
+  border-color: var(--bad);
+  color: var(--bad);
+}
+
+.badge.tone-muted {
+  color: var(--muted);
+}
+
+.task-card {
+  display: block;
+  width: 100%;
+  text-align: left;
+  background: var(--panel);
+  color: var(--ink);
+  border: 1px solid var(--line);
+}
+
+.task-card.selected {
+  border-color: var(--accent);
+  outline: 2px solid color-mix(in srgb, var(--accent) 35%, transparent);
+}
+
+.task-card strong {
+  display: block;
+}
+
+.task-card .detail {
+  color: var(--muted);
+  font-size: 0.85rem;
+}
+
+.callout {
+  padding: 0.6rem 0.8rem;
+  border-radius: 6px;
+  border: 1px solid var(--line);
+  background: #f2f4f7;
+}
+
+.callout.warn {
+  border-color: var(--warn);
+  background: #fff7e0;
+}
+
+.callout.bad {
+  border-color: var(--bad);
+  background: #fdecea;
+}
+
+.callout.ok {
+  border-color: var(--ok);
+  background: #e8f5ee;
+}
+
+.fallback {
+  padding: 0.6rem 0.8rem;
+  border-radius: 6px;
+  border: 1px solid var(--bad);
+  background: #fdecea;
+  color: var(--bad);
+}
+
+.muted {
+  color: var(--muted);
+}
+
+.ok {
+  color: var(--ok);
+}
+
+.progress {
+  font-size: 0.9rem;
+}
+
+pre {
+  background: #f2f4f7;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  padding: 0.6rem;
+  overflow: auto;
+  font-size: 0.85rem;
+}
+
+button.link {
+  background: none;
+  border: none;
+  color: var(--accent);
+  padding: 0;
+  text-decoration: underline;
+  font-size: 0.85rem;
+}
+
+.actions {
+  margin-top: 0.8rem;
+}
+
+footer {
+  margin-block: 1.5rem;
+  font-size: 0.85rem;
+}
