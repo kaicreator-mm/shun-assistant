@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest';
 // the control-api's closed error taxonomy, and this test enforces it.
 import { CONTROL_ERROR_CODES } from '../../control-api/src/errors.ts';
 import {
+  approvalDecisionState,
   decisionGuard,
   FALLBACK_MESSAGES,
   failureLines,
@@ -203,6 +204,31 @@ describe('progress and residue readability', () => {
     expect(lines[0]).toContain('6 leftover items');
     expect(lines.some((line) => line.includes('never touched'))).toBe(true);
     expect(lines.some((line) => line.includes('~65.0 MB'))).toBe(true);
+  });
+});
+
+describe('approval decision gating on the actual DTO status (VC-P1-01)', () => {
+  it('is decidable only when the approval DTO is explicitly PENDING', () => {
+    const decidable = approvalDecisionState({ status: 'PENDING' });
+    expect(decidable.decidable).toBe(true);
+    expect(decidable.reason).toBe('');
+
+    const decided = approvalDecisionState({ status: 'APPROVED' });
+    expect(decided.decidable).toBe(false);
+    expect(decided.reason).toContain('already approved');
+  });
+
+  it('fails closed with an explicit unknown when the DTO carries no status', () => {
+    // The merged defect: the inbox DTO had no status field, so the UI silently
+    // rendered no decision UI at all. A missing status must surface as an
+    // explicit unknown-state refusal, never as buttons and never as silence.
+    const noStatus = approvalDecisionState({ summary: 'Shun wants to delete files.' });
+    expect(noStatus.decidable).toBe(false);
+    expect(noStatus.reason).toContain('unknown');
+
+    const undefinedApproval = approvalDecisionState(undefined);
+    expect(undefinedApproval.decidable).toBe(false);
+    expect(undefinedApproval.reason).toContain('No approval');
   });
 });
 

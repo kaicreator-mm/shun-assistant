@@ -186,6 +186,36 @@ export function decisionGuard({ previewPlanHash, approvalPlanHash, enteredPlanHa
   return { allowed: true, reason: '' };
 }
 
+/**
+ * Decision gating on the approval DTO's ACTUAL status (Issue #41, VC-P1-01):
+ * decision buttons render only from an explicit `status: 'PENDING'`. A DTO
+ * without a status is an explicit unknown (no buttons, visible refusal) —
+ * it must never degrade into silent buttons-or-nothing rendering.
+ */
+/**
+ * @param {{ status?: unknown } & Record<string, unknown> | undefined} approval
+ * @returns {{ decidable: boolean, reason: string }}
+ */
+export function approvalDecisionState(approval) {
+  if (!approval) {
+    return { decidable: false, reason: 'No approval is attached to this task.' };
+  }
+  if (approval.status === 'PENDING') {
+    return { decidable: true, reason: '' };
+  }
+  if (typeof approval.status !== 'string' || approval.status === '') {
+    return {
+      decidable: false,
+      reason:
+        'Approval status is unknown, so deciding is disabled. Reload the approval inbox before deciding.',
+    };
+  }
+  return {
+    decidable: false,
+    reason: `This approval was already ${String(approval.status).toLowerCase()}. Nothing more to decide.`,
+  };
+}
+
 /** Progress history as readable lines. */
 /**
  * @param {SnapshotLike} snapshot
