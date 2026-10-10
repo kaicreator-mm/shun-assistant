@@ -202,6 +202,47 @@ const OVERLAY_MUTATIONS: {
     },
   },
   {
+    name: 'c002 (R2-01, review 5478548765): reviewer counterexample — finalState RETAINED, lifecycleState REMOVED, no r2Gate is rejected',
+    schema: 'c002-jit-lifecycle-output',
+    fixture: 'valid/c002-jit-lifecycle-output/removed.json',
+    mutate: (value) => {
+      value.finalState = 'RETAINED';
+      delete value.r2Gate;
+    },
+  },
+  {
+    name: 'c002 (R2-01): finalState RETAINED with lifecycleState REMOVED is rejected even with a gate record',
+    schema: 'c002-jit-lifecycle-output',
+    fixture: 'valid/c002-jit-lifecycle-output/removed.json',
+    mutate: (value) => {
+      value.finalState = 'RETAINED';
+    },
+  },
+  {
+    name: 'c002 (R2-01): finalState REMOVED with lifecycleState INSTALLED is rejected',
+    schema: 'c002-jit-lifecycle-output',
+    fixture: 'valid/c002-jit-lifecycle-output/removed.json',
+    mutate: (value) => {
+      (value.lifecycleState as Record<string, unknown>).state = 'INSTALLED';
+    },
+  },
+  {
+    name: 'c002 (R2-01): finalState REMOVED with lifecycleState RETAINED is rejected',
+    schema: 'c002-jit-lifecycle-output',
+    fixture: 'valid/c002-jit-lifecycle-output/removed.json',
+    mutate: (value) => {
+      (value.lifecycleState as Record<string, unknown>).state = 'RETAINED';
+    },
+  },
+  {
+    name: 'c002 (R2-01): finalState REMOVED with lifecycleState REMOVE_FAILED is rejected',
+    schema: 'c002-jit-lifecycle-output',
+    fixture: 'valid/c002-jit-lifecycle-output/removed.json',
+    mutate: (value) => {
+      (value.lifecycleState as Record<string, unknown>).state = 'REMOVE_FAILED';
+    },
+  },
+  {
     name: 'c002: USER_CREATED_UNKNOWN residue with disposition DELETE is rejected',
     schema: 'c002-jit-lifecycle-output',
     fixture: 'valid/c002-jit-lifecycle-output/removed.json',

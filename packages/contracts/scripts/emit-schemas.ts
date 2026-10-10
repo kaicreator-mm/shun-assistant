@@ -121,42 +121,66 @@ function overlayJitLifecycleOutput(output: EmittedSchema): EmittedSchema {
   const residueProps = propertiesOf(residue);
   const candidates = residueProps.candidates as EmittedSchema;
   return withRootAllOf(
-    {
-      ...output,
-      properties: {
-        ...props,
-        // A REMOVED final state requires the completed R2 gate record.
-        r2Gate: requireCompleteGateSequence(props.r2Gate as EmittedSchema),
-        residueReport: {
-          ...residue,
-          properties: {
-            ...residueProps,
-            // USER_CREATED_UNKNOWN/PROTECTED candidates are never auto-deleted (fail-closed).
-            candidates: {
-              ...candidates,
-              items: {
-                ...(candidates.items as EmittedSchema),
-                allOf: [
-                  ifThen(
-                    {
-                      properties: {
-                        classification: { enum: [...NEVER_AUTO_DELETE_CLASSIFICATIONS] },
+    withRootAllOf(
+      {
+        ...output,
+        properties: {
+          ...props,
+          // A REMOVED final state requires the completed R2 gate record.
+          r2Gate: requireCompleteGateSequence(props.r2Gate as EmittedSchema),
+          residueReport: {
+            ...residue,
+            properties: {
+              ...residueProps,
+              // USER_CREATED_UNKNOWN/PROTECTED candidates are never auto-deleted (fail-closed).
+              candidates: {
+                ...candidates,
+                items: {
+                  ...(candidates.items as EmittedSchema),
+                  allOf: [
+                    ifThen(
+                      {
+                        properties: {
+                          classification: { enum: [...NEVER_AUTO_DELETE_CLASSIFICATIONS] },
+                        },
+                        required: ['classification'],
                       },
-                      required: ['classification'],
-                    },
-                    { properties: { disposition: { const: 'RETAIN' } } },
-                  ),
-                ],
+                      { properties: { disposition: { const: 'RETAIN' } } },
+                    ),
+                  ],
+                },
               },
             },
           },
         },
       },
-    },
-    // A REMOVED final state requires the completed R2 gate record.
+      // A REMOVED final state requires the completed R2 gate record and a
+      // lifecycleState that agrees (state REMOVED).
+      ifThen(
+        { properties: { finalState: { const: 'REMOVED' } }, required: ['finalState'] },
+        {
+          required: ['r2Gate'],
+          properties: {
+            lifecycleState: { properties: { state: { const: 'REMOVED' } } },
+          },
+        },
+      ),
+    ),
+    // A REMOVED lifecycleState is an observable removal in its own right: it
+    // requires the completed R2 gate record and a finalState that agrees
+    // (REMOVED). Frozen C-002 — any removal is R2, whichever field records it
+    // (review 5478548765 R2-01).
     ifThen(
-      { properties: { finalState: { const: 'REMOVED' } }, required: ['finalState'] },
-      { required: ['r2Gate'] },
+      {
+        properties: {
+          lifecycleState: { properties: { state: { const: 'REMOVED' } }, required: ['state'] },
+        },
+        required: ['lifecycleState'],
+      },
+      {
+        required: ['r2Gate'],
+        properties: { finalState: { const: 'REMOVED' } },
+      },
     ),
   );
 }

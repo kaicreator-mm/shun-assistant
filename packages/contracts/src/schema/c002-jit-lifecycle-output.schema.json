@@ -306,7 +306,45 @@
       "then": {
         "required": [
           "r2Gate"
+        ],
+        "properties": {
+          "lifecycleState": {
+            "properties": {
+              "state": {
+                "const": "REMOVED"
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "lifecycleState": {
+            "properties": {
+              "state": {
+                "const": "REMOVED"
+              }
+            },
+            "required": [
+              "state"
+            ]
+          }
+        },
+        "required": [
+          "lifecycleState"
         ]
+      },
+      "then": {
+        "required": [
+          "r2Gate"
+        ],
+        "properties": {
+          "finalState": {
+            "const": "REMOVED"
+          }
+        }
       }
     }
   ]

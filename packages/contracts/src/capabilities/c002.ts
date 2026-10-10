@@ -89,7 +89,7 @@ export const JitLifecycleOutputSchema = z
       /** Frozen fail-closed invariant: unknown/user-created/protected data is never auto-deleted. */
       unknownOrProtectedDeleted: z.literal(false),
     }),
-    /** Required when lifecycle policy was JIT_REMOVE_AFTER_VERIFIED_USE and removal was gated. */
+    /** Required whenever the record denotes removal — finalState REMOVED or lifecycleState.state REMOVED (any removal is R2). */
     r2Gate: R2GateRecordSchema.optional(),
     finalState: z.enum(['RETAINED', 'REMOVED']),
   })
@@ -98,6 +98,25 @@ export const JitLifecycleOutputSchema = z
       ctx.addIssue({
         code: 'custom',
         message: 'REMOVED finalState requires the completed R2 gate record',
+      });
+    }
+    // Frozen C-002: ANY removal is R2, so the completed gate record is also
+    // required when only lifecycleState denotes the removal — a REMOVED
+    // lifecycle state cannot hide behind a RETAINED finalState (R2-01).
+    if (output.lifecycleState.state === 'REMOVED' && !output.r2Gate) {
+      ctx.addIssue({
+        code: 'custom',
+        message: 'REMOVED lifecycleState requires the completed R2 gate record',
+      });
+    }
+    // Coherent terminal record: the two observable fields must agree. A
+    // removal is recorded exactly when lifecycleState.state is REMOVED;
+    // INSTALLED/RETAINED/REMOVE_FAILED are non-removal terminal states and
+    // pair with finalState RETAINED (R2-01).
+    if ((output.finalState === 'REMOVED') !== (output.lifecycleState.state === 'REMOVED')) {
+      ctx.addIssue({
+        code: 'custom',
+        message: `contradictory terminal record: finalState ${output.finalState} with lifecycleState.state ${output.lifecycleState.state}`,
       });
     }
     const neverAutoDelete: readonly ResidueClassification[] = NEVER_AUTO_DELETE_CLASSIFICATIONS;
