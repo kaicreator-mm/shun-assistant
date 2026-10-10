@@ -1,0 +1,507 @@
+{
+  "benchmark": "B-037",
+  "task": "T05",
+  "capability": "image.batch_process (C-001)",
+  "executedAt": "2026-10-10T14:09:29.980Z",
+  "finishedAt": "2026-10-10T14:12:06.195Z",
+  "codeCommit": "7cd712cb6835d66b1dcebb40abc2724ec827c3cc",
+  "toolchain": {
+    "node": "v24.21.0",
+    "platform": "win32 x64",
+    "sharpBinding": {
+      "bindingId": "binding-image-sharp-i0-local",
+      "providerId": "provider.image.sharp",
+      "providerVersion": "sharp@0.35.5+libvips-8.18.7",
+      "adapterId": "adapter.sharp-i0",
+      "interfaceClass": "I0",
+      "verifierId": "verifier.image-c001",
+      "environmentRequirements": {
+        "backendKind": "LOCAL_WINDOWS"
+      },
+      "unsupportedFormats": []
+    },
+    "jpegQuality": 94,
+    "metric": "ssim.js original SSIM, 11x11 Gaussian window, K1 0.01, K2 0.03, no downsampling"
+  },
+  "corpus": {
+    "seed": 20261010,
+    "count": 200,
+    "jpg": 120,
+    "png": 80,
+    "withCaptureDate": 113,
+    "longEdgeRange": {
+      "JPG": [1800, 3600],
+      "PNG": [1800, 2400]
+    },
+    "fingerprint": "37aecdd35c073e7734bab364e4edfe141c4a0ad8c222c06bff00b7c3647db119",
+    "generatorRevision": "gen-corpus-v1 (seeded soft scenes, deterministic)"
+  },
+  "mainRun": {
+    "taskId": "b037-main",
+    "maxLongEdgePx": 1600,
+    "ssimThreshold": 0.95,
+    "written": 200,
+    "rejected": 0,
+    "selectedBindingId": "binding-image-sharp-i0-local",
+    "rankingEvidence": {
+      "rankingPolicyRevision": "rank-pol-t05-v0.1",
+      "reasons": [
+        "policy rank-pol-t05-v0.1: I0>I1>I2 preference, bindingId tiebreak",
+        "selected binding-image-sharp-i0-local: best-ranked feasible candidate"
+      ]
+    },
+    "verification": {
+      "taskId": "b037-main",
+      "verifierId": "verifier.image-c001",
+      "verifierRevision": "v0.1",
+      "status": "PASS",
+      "checks": [
+        {
+          "checkId": "count-conservation",
+          "status": "PASS",
+          "detail": "200 records vs 200 inputs"
+        },
+        {
+          "checkId": "outputs-decodable",
+          "status": "PASS",
+          "detail": "200 output(s) decoded"
+        },
+        {
+          "checkId": "long-edge-bound",
+          "status": "PASS",
+          "detail": "bound 1600px held for 200 output(s)"
+        },
+        {
+          "checkId": "capture-date-preserved",
+          "status": "PASS",
+          "detail": "capture dates preserved where present"
+        },
+        {
+          "checkId": "ssim-oracle",
+          "status": "PASS",
+          "detail": "min SSIM 0.96254 >= 0.95 over 20 sample(s)"
+        },
+        {
+          "checkId": "sources-unchanged",
+          "status": "PASS",
+          "detail": "200 source(s) byte-identical"
+        }
+      ],
+      "oracleInputs": {
+        "oracle": {
+          "oracleRevision": "oracle-c001-v0.1",
+          "metric": "SSIM",
+          "ssimOptions": {
+            "windowSize": 11,
+            "k1": 0.01,
+            "k2": 0.03,
+            "ssim": "original",
+            "downsample": false,
+            "rgb2grayVersion": "original",
+            "bitDepth": 8
+          },
+          "ssimThreshold": 0.95,
+          "maxSamples": 20,
+          "samples": [
+            {
+              "inputPath": "C:\\xDev\\kAiCreator\\_tmp\\i16-b037\\corpus\\img-0135.png",
+              "sourceSha256": "00b967747d7c467230b32ef953eb7f4134f0244da6ea87547672d9b518906cdb",
+              "eligible": true,
+              "referencePath": "C:\\Users\\15549\\AppData\\Local\\Temp\\shun-image-oracle-CjjfIy\\reference-0.png",
+              "referenceSha256": "513310fd6a5dcef3905fe1241984302f001fe8d1dd7a25146e345a70e42ae061",
+              "referenceWidth": 1600,
+              "referenceHeight": 1067
+            },
+            {
+              "inputPath": "C:\\xDev\\kAiCreator\\_tmp\\i16-b037\\corpus\\img-0038.jpg",
+              "sourceSha256": "01896a117dec489d1a42474f26e5ae46bdf5a8569db361ad9fbaa1d5ee114faf",
+              "eligible": true,
+              "referencePath": "C:\\Users\\15549\\AppData\\Local\\Temp\\shun-image-oracle-CjjfIy\\reference-1.png",
+              "referenceSha256": "49acf29407c3a2f503f0e7c5294c34634bfcebbdbc4c5d20228b74bc100658de",
+              "referenceWidth": 1600,
+              "referenceHeight": 1067
+            },
+            {
+              "inputPath": "C:\\xDev\\kAiCreator\\_tmp\\i16-b037\\corpus\\img-0183.png",
+              "sourceSha256": "01c22aafd73ee890ca4c50c1d2fd78858c38a690d1f5a78dfae253a759580b29",
+              "eligible": true,
+              "referencePath": "C:\\Users\\15549\\AppData\\Local\\Temp\\shun-image-oracle-CjjfIy\\reference-2.png",
+              "referenceSha256": "2072173e21685f6193d50d63059fabf458ea16f34452020b042a25ebe5376b52",
+              "referenceWidth": 1600,
+              "referenceHeight": 900
+            },
+            {
+              "inputPath": "C:\\xDev\\kAiCreator\\_tmp\\i16-b037\\corpus\\img-0141.png",
+              "sourceSha256": "0241170c447dba9b82c642c0978384001d8ccc0752d8b29da933e514243c091f",
+              "eligible": true,
+              "referencePath": "C:\\Users\\15549\\AppData\\Local\\Temp\\shun-image-oracle-CjjfIy\\reference-3.png",
+              "referenceSha256": "de9f9869019d7b908579c50ce4d197e5dccff893e7a00764001c69a4ad4ca668",
+              "referenceWidth": 1600,
+              "referenceHeight": 1200
+            },
+            {
+              "inputPath": "C:\\xDev\\kAiCreator\\_tmp\\i16-b037\\corpus\\img-0110.jpg",
+              "sourceSha256": "03e5884a963021129ecb0c6ff952c08fbf90f34164aa3ee4609f989487cc494a",
+              "eligible": true,
+              "referencePath": "C:\\Users\\15549\\AppData\\Local\\Temp\\shun-image-oracle-CjjfIy\\reference-4.png",
+              "referenceSha256": "a2ee4991cc48d089e12e5f644a212eddf7c207a6636b935a1a7653ce41ca3b77",
+              "referenceWidth": 1600,
+              "referenceHeight": 1600
+            },
+            {
+              "inputPath": "C:\\xDev\\kAiCreator\\_tmp\\i16-b037\\corpus\\img-0017.jpg",
+              "sourceSha256": "04168de7b3077f4d92119598ac4eac1c64014ab8e37c49f931b971312bd5ea6b",
+              "eligible": true,
+              "referencePath": "C:\\Users\\15549\\AppData\\Local\\Temp\\shun-image-oracle-CjjfIy\\reference-5.png",
+              "referenceSha256": "695e38ead6565ea10406d35db639bfec7f3b65e081a3a6c1e24652c701f08082",
+              "referenceWidth": 1200,
+              "referenceHeight": 1600
+            },
+            {
+              "inputPath": "C:\\xDev\\kAiCreator\\_tmp\\i16-b037\\corpus\\img-0065.jpg",
+              "sourceSha256": "058bd6ba51c90186592b3ece26c478ff7f21e69cedd7a71729214be9b430bb28",
+              "eligible": true,
+              "referencePath": "C:\\Users\\15549\\AppData\\Local\\Temp\\shun-image-oracle-CjjfIy\\reference-6.png",
+              "referenceSha256": "5effb1bf5b71c4fc5ff8e487efa83be5d4859f34b118c10c563eeeb6362934c6",
+              "referenceWidth": 1200,
+              "referenceHeight": 1600
+            },
+            {
+              "inputPath": "C:\\xDev\\kAiCreator\\_tmp\\i16-b037\\corpus\\img-0178.png",
+              "sourceSha256": "062ebddfd179f1171505ebdf1a8c328d30f6bd6caf40f2f3ba5c238ce76796e4",
+              "eligible": true,
+              "referencePath": "C:\\Users\\15549\\AppData\\Local\\Temp\\shun-image-oracle-CjjfIy\\reference-7.png",
+              "referenceSha256": "3fece1c85408aaf827689051655ca6b188a3d30bd234dc51eccadafa602719ed",
+              "referenceWidth": 1066,
+              "referenceHeight": 1600
+            },
+            {
+              "inputPath": "C:\\xDev\\kAiCreator\\_tmp\\i16-b037\\corpus\\img-0024.jpg",
+              "sourceSha256": "0710242af96ea7f56dcc0a0b00d8f2782748909afc221fddd6e34efccdcdee30",
+              "eligible": true,
+              "referencePath": "C:\\Users\\15549\\AppData\\Local\\Temp\\shun-image-oracle-CjjfIy\\reference-8.png",
+              "referenceSha256": "bea5e9a8f18aed6b566c808f288b2fe9eda40e9ebb58926d1177e2e016d4c1be",
+              "referenceWidth": 1067,
+              "referenceHeight": 1600
+            },
+            {
+              "inputPath": "C:\\xDev\\kAiCreator\\_tmp\\i16-b037\\corpus\\img-0199.png",
+              "sourceSha256": "08fdc693c559ff7a512a38e0c6525dd0271956b6dc899be7001766939c9bbf90",
+              "eligible": true,
+              "referencePath": "C:\\Users\\15549\\AppData\\Local\\Temp\\shun-image-oracle-CjjfIy\\reference-9.png",
+              "referenceSha256": "02ed60917b55c9e2111ff6c58a0f3a1becc5b244f19ad93fb4d19d111980fc87",
+              "referenceWidth": 1600,
+              "referenceHeight": 1600
+            },
+            {
+              "inputPath": "C:\\xDev\\kAiCreator\\_tmp\\i16-b037\\corpus\\img-0151.png",
+              "sourceSha256": "092a54c27df12acafa6a40aa64adfb1e09ae01bcd3d6c5b43a33b2154944a03c",
+              "eligible": true,
+              "referencePath": "C:\\Users\\15549\\AppData\\Local\\Temp\\shun-image-oracle-CjjfIy\\reference-10.png",
+              "referenceSha256": "26e2d525491abff150f43b8cbd7f32c294da91b0132acc0486713c91f18801ea",
+              "referenceWidth": 1600,
+              "referenceHeight": 1600
+            },
+            {
+              "inputPath": "C:\\xDev\\kAiCreator\\_tmp\\i16-b037\\corpus\\img-0186.png",
+              "sourceSha256": "0ac8045685aaf17f57e77e193fa3c744c7755b197bc08025a6c43986baee2956",
+              "eligible": true,
+              "referencePath": "C:\\Users\\15549\\AppData\\Local\\Temp\\shun-image-oracle-CjjfIy\\reference-11.png",
+              "referenceSha256": "2c5071d6956dcca537b28722e9ef0ab5a32f217db3f5c62981fe235b363dd327",
+              "referenceWidth": 1600,
+              "referenceHeight": 1600
+            },
+            {
+              "inputPath": "C:\\xDev\\kAiCreator\\_tmp\\i16-b037\\corpus\\img-0028.jpg",
+              "sourceSha256": "0c1c64310910dd377c79974e3f2e3e9b3ae658468615a0fd3ab539fc6b7d5102",
+              "eligible": true,
+              "referencePath": "C:\\Users\\15549\\AppData\\Local\\Temp\\shun-image-oracle-CjjfIy\\reference-12.png",
+              "referenceSha256": "ba3d82bdd4f46601ea34b3d5210c24634c1e62d49c529ef3d6f54cd918acdd32",
+              "referenceWidth": 1600,
+              "referenceHeight": 1067
+            },
+            {
+              "inputPath": "C:\\xDev\\kAiCreator\\_tmp\\i16-b037\\corpus\\img-0140.png",
+              "sourceSha256": "0ecb18cc99c81972df0aef04ffcefdaac5d6e2f56f99dca0f141039f195bd614",
+              "eligible": true,
+              "referencePath": "C:\\Users\\15549\\AppData\\Local\\Temp\\shun-image-oracle-CjjfIy\\reference-13.png",
+              "referenceSha256": "a0073ecc042e346a9e636333cb56d4a2679840f4abf5316fa40a58b8b048104e",
+              "referenceWidth": 1600,
+              "referenceHeight": 1066
+            },
+            {
+              "inputPath": "C:\\xDev\\kAiCreator\\_tmp\\i16-b037\\corpus\\img-0195.png",
+              "sourceSha256": "12407c56b37105ad9c44a3ce2e731c69f427b737edf349e80fd2e049c1259f31",
+              "eligible": true,
+              "referencePath": "C:\\Users\\15549\\AppData\\Local\\Temp\\shun-image-oracle-CjjfIy\\reference-14.png",
+              "referenceSha256": "eca481b6e5fb2160dbbb46607a30f13d9651aa17a70835848f689a2aa32c8eec",
+              "referenceWidth": 1600,
+              "referenceHeight": 900
+            },
+            {
+              "inputPath": "C:\\xDev\\kAiCreator\\_tmp\\i16-b037\\corpus\\img-0124.png",
+              "sourceSha256": "12fdbd9d1478b7aefaf9ce3d09cf07a65f23ab08b336b58dd76e166f734a5a68",
+              "eligible": true,
+              "referencePath": "C:\\Users\\15549\\AppData\\Local\\Temp\\shun-image-oracle-CjjfIy\\reference-15.png",
+              "referenceSha256": "fe3a3469ab05b3bf8c45a2aa7dfdd990e1747ca4d3cfea169b63ac7b286a73a1",
+              "referenceWidth": 1067,
+              "referenceHeight": 1600
+            },
+            {
+              "inputPath": "C:\\xDev\\kAiCreator\\_tmp\\i16-b037\\corpus\\img-0060.jpg",
+              "sourceSha256": "13de61b7d825cce25473c6b2b81f9a3c3601d931b7037168fb2443c5732ebc19",
+              "eligible": true,
+              "referencePath": "C:\\Users\\15549\\AppData\\Local\\Temp\\shun-image-oracle-CjjfIy\\reference-16.png",
+              "referenceSha256": "68cce037f1506c260eb131f827a2d253147c0956dae6288e7c65650ea8a971ce",
+              "referenceWidth": 1600,
+              "referenceHeight": 900
+            },
+            {
+              "inputPath": "C:\\xDev\\kAiCreator\\_tmp\\i16-b037\\corpus\\img-0153.png",
+              "sourceSha256": "14deb3525840fff0a3fe457d37b35153837bd9720ffcb619b0c31a89a2a61f1d",
+              "eligible": true,
+              "referencePath": "C:\\Users\\15549\\AppData\\Local\\Temp\\shun-image-oracle-CjjfIy\\reference-17.png",
+              "referenceSha256": "9205455dc819c8a9d77952452523fa0aa8967b1e0408201a9a686da6aadba267",
+              "referenceWidth": 1200,
+              "referenceHeight": 1600
+            },
+            {
+              "inputPath": "C:\\xDev\\kAiCreator\\_tmp\\i16-b037\\corpus\\img-0158.png",
+              "sourceSha256": "169829eef062793bbd341b5372dd066120f36a48d79e086b7daaddc7e57c614f",
+              "eligible": true,
+              "referencePath": "C:\\Users\\15549\\AppData\\Local\\Temp\\shun-image-oracle-CjjfIy\\reference-18.png",
+              "referenceSha256": "8a9fb8b19a4cbf1f949cb7b693e83ef65412ee98f2eabe1a2fa5f1fe87b20e5a",
+              "referenceWidth": 1600,
+              "referenceHeight": 1200
+            },
+            {
+              "inputPath": "C:\\xDev\\kAiCreator\\_tmp\\i16-b037\\corpus\\img-0091.jpg",
+              "sourceSha256": "16bcfe4c5437bcc1d716c68c3d2eeebf859fb27a9436e861841abb7c88106946",
+              "eligible": true,
+              "referencePath": "C:\\Users\\15549\\AppData\\Local\\Temp\\shun-image-oracle-CjjfIy\\reference-19.png",
+              "referenceSha256": "4bf7bd71932613a9e3f76920427033c1fcfbf75af186814d0da67b27d4750dfd",
+              "referenceWidth": 1600,
+              "referenceHeight": 1200
+            }
+          ]
+        },
+        "ssimResults": [
+          {
+            "inputPath": "C:\\xDev\\kAiCreator\\_tmp\\i16-b037\\corpus\\img-0135.png",
+            "status": "PASS",
+            "ssim": 1
+          },
+          {
+            "inputPath": "C:\\xDev\\kAiCreator\\_tmp\\i16-b037\\corpus\\img-0038.jpg",
+            "status": "PASS",
+            "ssim": 0.9862611616994019
+          },
+          {
+            "inputPath": "C:\\xDev\\kAiCreator\\_tmp\\i16-b037\\corpus\\img-0183.png",
+            "status": "PASS",
+            "ssim": 1
+          },
+          {
+            "inputPath": "C:\\xDev\\kAiCreator\\_tmp\\i16-b037\\corpus\\img-0141.png",
+            "status": "PASS",
+            "ssim": 1
+          },
+          {
+            "inputPath": "C:\\xDev\\kAiCreator\\_tmp\\i16-b037\\corpus\\img-0110.jpg",
+            "status": "PASS",
+            "ssim": 0.9821346148154663
+          },
+          {
+            "inputPath": "C:\\xDev\\kAiCreator\\_tmp\\i16-b037\\corpus\\img-0017.jpg",
+            "status": "PASS",
+            "ssim": 0.9689474450374124
+          },
+          {
+            "inputPath": "C:\\xDev\\kAiCreator\\_tmp\\i16-b037\\corpus\\img-0065.jpg",
+            "status": "PASS",
+            "ssim": 0.9625449226721408
+          },
+          {
+            "inputPath": "C:\\xDev\\kAiCreator\\_tmp\\i16-b037\\corpus\\img-0178.png",
+            "status": "PASS",
+            "ssim": 1
+          },
+          {
+            "inputPath": "C:\\xDev\\kAiCreator\\_tmp\\i16-b037\\corpus\\img-0024.jpg",
+            "status": "PASS",
+            "ssim": 0.9761317925947156
+          },
+          {
+            "inputPath": "C:\\xDev\\kAiCreator\\_tmp\\i16-b037\\corpus\\img-0199.png",
+            "status": "PASS",
+            "ssim": 1
+          },
+          {
+            "inputPath": "C:\\xDev\\kAiCreator\\_tmp\\i16-b037\\corpus\\img-0151.png",
+            "status": "PASS",
+            "ssim": 1
+          },
+          {
+            "inputPath": "C:\\xDev\\kAiCreator\\_tmp\\i16-b037\\corpus\\img-0186.png",
+            "status": "PASS",
+            "ssim": 1
+          },
+          {
+            "inputPath": "C:\\xDev\\kAiCreator\\_tmp\\i16-b037\\corpus\\img-0028.jpg",
+            "status": "PASS",
+            "ssim": 0.9641224102704125
+          },
+          {
+            "inputPath": "C:\\xDev\\kAiCreator\\_tmp\\i16-b037\\corpus\\img-0140.png",
+            "status": "PASS",
+            "ssim": 1
+          },
+          {
+            "inputPath": "C:\\xDev\\kAiCreator\\_tmp\\i16-b037\\corpus\\img-0195.png",
+            "status": "PASS",
+            "ssim": 1
+          },
+          {
+            "inputPath": "C:\\xDev\\kAiCreator\\_tmp\\i16-b037\\corpus\\img-0124.png",
+            "status": "PASS",
+            "ssim": 1
+          },
+          {
+            "inputPath": "C:\\xDev\\kAiCreator\\_tmp\\i16-b037\\corpus\\img-0060.jpg",
+            "status": "PASS",
+            "ssim": 0.9767029875436166
+          },
+          {
+            "inputPath": "C:\\xDev\\kAiCreator\\_tmp\\i16-b037\\corpus\\img-0153.png",
+            "status": "PASS",
+            "ssim": 1
+          },
+          {
+            "inputPath": "C:\\xDev\\kAiCreator\\_tmp\\i16-b037\\corpus\\img-0158.png",
+            "status": "PASS",
+            "ssim": 1
+          },
+          {
+            "inputPath": "C:\\xDev\\kAiCreator\\_tmp\\i16-b037\\corpus\\img-0091.jpg",
+            "status": "PASS",
+            "ssim": 0.9868898101863842
+          }
+        ],
+        "metricIdentity": "ssim.js@3.5.0 original/11x11/gauss",
+        "metricAvailable": true
+      },
+      "evidenceRefs": ["oracle://b037-main/committed-oracle", "oracle://b037-main/ssim-results"]
+    },
+    "durationMs": 72850,
+    "corpusGenerationMs": 72347
+  },
+  "ssimSamples": [
+    {
+      "inputPath": "img-0135.png",
+      "ssim": 1
+    },
+    {
+      "inputPath": "img-0038.jpg",
+      "ssim": 0.9862611616994019
+    },
+    {
+      "inputPath": "img-0183.png",
+      "ssim": 1
+    },
+    {
+      "inputPath": "img-0141.png",
+      "ssim": 1
+    },
+    {
+      "inputPath": "img-0110.jpg",
+      "ssim": 0.9821346148154663
+    },
+    {
+      "inputPath": "img-0017.jpg",
+      "ssim": 0.9689474450374124
+    },
+    {
+      "inputPath": "img-0065.jpg",
+      "ssim": 0.9625449226721408
+    },
+    {
+      "inputPath": "img-0178.png",
+      "ssim": 1
+    },
+    {
+      "inputPath": "img-0024.jpg",
+      "ssim": 0.9761317925947156
+    },
+    {
+      "inputPath": "img-0199.png",
+      "ssim": 1
+    },
+    {
+      "inputPath": "img-0151.png",
+      "ssim": 1
+    },
+    {
+      "inputPath": "img-0186.png",
+      "ssim": 1
+    },
+    {
+      "inputPath": "img-0028.jpg",
+      "ssim": 0.9641224102704125
+    },
+    {
+      "inputPath": "img-0140.png",
+      "ssim": 1
+    },
+    {
+      "inputPath": "img-0195.png",
+      "ssim": 1
+    },
+    {
+      "inputPath": "img-0124.png",
+      "ssim": 1
+    },
+    {
+      "inputPath": "img-0060.jpg",
+      "ssim": 0.9767029875436166
+    },
+    {
+      "inputPath": "img-0153.png",
+      "ssim": 1
+    },
+    {
+      "inputPath": "img-0158.png",
+      "ssim": 1
+    },
+    {
+      "inputPath": "img-0091.jpg",
+      "ssim": 0.9868898101863842
+    }
+  ],
+  "sourcePreservation": {
+    "verified": true,
+    "changed": []
+  },
+  "negatives": {
+    "missingProvider": {
+      "outcome": "NO_TRUSTED_PROVIDER",
+      "detail": "policy rank-pol-t05-v0.1: I0>I1>I2 preference, bindingId tiebreak; no provider candidate registered for this capability",
+      "outputDirEmpty": true
+    },
+    "corruptInput": {
+      "rejectionCodes": ["DECODE_FAILED"],
+      "verification": "PASS"
+    },
+    "unsupportedDeclared": {
+      "rejectionCode": "UNSUPPORTED_INPUT"
+    }
+  },
+  "verdict": {
+    "mainRunPass": true,
+    "sourcesPreserved": true,
+    "missingProviderFailClosed": true,
+    "corruptInputPerRecordReject": true,
+    "unsupportedDeclaredReject": true
+  },
+  "allPass": true,
+  "note": "B-037 journey stages goal-parse and shared resolution are upstream concerns (T01/T08); this vertical covers discovery-input, feasible-binding selection, execution, precommitted SSIM oracle verification and the required fallbacks. Multi-provider ranking is exercised with binding doubles in the unit suite; exactly one real I0 provider (sharp) is registered on this machine."
+}

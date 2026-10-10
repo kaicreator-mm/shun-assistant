@@ -1,0 +1,5 @@
+{"seq":0,"ts":"2026-10-10T14:11:40.883Z","phase":"RECEIVED","actionId":"b038-s1b-remove-uninstall"}
+{"seq":1,"ts":"2026-10-10T14:11:40.885Z","phase":"VALIDATED","actionId":"b038-s1b-remove-uninstall","detail":"grant grant-0005"}
+{"seq":3,"ts":"2026-10-10T14:11:40.886Z","phase":"EXEC_START","actionId":"b038-s1b-remove-uninstall"}
+{"seq":4,"ts":"2026-10-10T14:11:42.650Z","phase":"EXEC_DONE","actionId":"b038-s1b-remove-uninstall","detail":"winget exit 0 :: Found jq [jqlang.jq] Starting package uninstall... Successfully uninstalled"}
+{"seq":5,"ts":"2026-10-10T14:11:42.651Z","phase":"RECEIPT_WRITTEN","actionId":"b038-s1b-remove-uninstall"}

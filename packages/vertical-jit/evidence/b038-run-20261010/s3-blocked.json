@@ -1,0 +1,4 @@
+{
+  "code": "USER_ASSET_AT_RISK",
+  "detail": "removal blocked: user-created/protected paths inside the deletion scope must be resolved by a human first: C:\\Users\\15549\\AppData\\Local\\Microsoft\\WinGet\\Packages\\BurntSushi.ripgrep.MSVC_Microsoft.Winget.Source_8wekyb3d8bbwe\\b038-user-canary.txt, C:\\Users\\15549\\AppData\\Local\\Microsoft\\WinGet\\Packages\\BurntSushi.ripgrep.MSVC_Microsoft.Winget.Source_8wekyb3d8bbwe\\BurntSushi.ripgrep.MSVC_Microsoft.Winget.Source_8wekyb3d8bbwe.db"
+}

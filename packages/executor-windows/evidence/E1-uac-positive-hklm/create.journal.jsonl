@@ -1,0 +1,10 @@
+{"schemaVersion":"shun.executor-windows.journal/1","ts":"2026-10-10T14:06:48.545Z","pid":22656,"phase":"RECEIVED","detail":{"envelopeFile":"C:\\Users\\15549\\AppData\\Local\\Temp\\shun-ev-C7tPHz\\workspace\\executions\\e1-hklm-create-1791641205251-5b535b8e\\envelope.json","helperPid":22656}}
+{"schemaVersion":"shun.executor-windows.journal/1","ts":"2026-10-10T14:06:48.588Z","pid":22656,"phase":"VALIDATED","detail":{"actionId":"e1-hklm-create"}}
+{"schemaVersion":"shun.executor-windows.journal/1","ts":"2026-10-10T14:06:48.591Z","pid":22656,"phase":"PLAN_IDENTITY_OK","detail":{"planHash":"89d10b8080c1786af328e6444d3ba6d75d095800d45a3446c50b29eb888cd226"}}
+{"schemaVersion":"shun.executor-windows.journal/1","ts":"2026-10-10T14:06:48.591Z","pid":22656,"phase":"GRANT_OK","detail":{"grantId":"grant-b1a5c1a0","authorityRevision":"auth-rev-1"}}
+{"schemaVersion":"shun.executor-windows.journal/1","ts":"2026-10-10T14:06:48.593Z","pid":22656,"phase":"SCOPE_OK","detail":{"actionId":"e1-hklm-create"}}
+{"schemaVersion":"shun.executor-windows.journal/1","ts":"2026-10-10T14:06:48.593Z","pid":22656,"phase":"PRIVILEGE_OK","detail":{"isElevated":true}}
+{"schemaVersion":"shun.executor-windows.journal/1","ts":"2026-10-10T14:06:48.593Z","pid":22656,"phase":"EXEC_BEGIN","detail":{"totalSteps":1}}
+{"schemaVersion":"shun.executor-windows.journal/1","ts":"2026-10-10T14:06:48.593Z","pid":22656,"phase":"EXEC_START","step":0,"op":"windows.registry.setValue"}
+{"schemaVersion":"shun.executor-windows.journal/1","ts":"2026-10-10T14:06:48.622Z","pid":22656,"phase":"EXEC_DONE","step":0,"op":"windows.registry.setValue","detail":{"key":"HKLM\\SOFTWARE\\ShunT04Evidence\\probe","valueName":"InstalledBy","type":"REG_SZ","data":"shun-executor-windows T04 evidence"}}
+{"schemaVersion":"shun.executor-windows.journal/1","ts":"2026-10-10T14:06:48.627Z","pid":22656,"phase":"RECEIPT_WRITTEN","detail":{"terminal":"SUCCEEDED","receiptFile":"C:\\Users\\15549\\AppData\\Local\\Temp\\shun-ev-C7tPHz\\workspace\\executions\\e1-hklm-create-1791641205251-5b535b8e\\receipt.json"}}

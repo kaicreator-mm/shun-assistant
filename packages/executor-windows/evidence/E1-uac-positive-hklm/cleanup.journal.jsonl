@@ -1,0 +1,10 @@
+{"schemaVersion":"shun.executor-windows.journal/1","ts":"2026-10-10T14:06:51.255Z","pid":22864,"phase":"RECEIVED","detail":{"envelopeFile":"C:\\Users\\15549\\AppData\\Local\\Temp\\shun-ev-C7tPHz\\workspace\\executions\\e1-hklm-delete-1791641209511-7897f38f\\envelope.json","helperPid":22864}}
+{"schemaVersion":"shun.executor-windows.journal/1","ts":"2026-10-10T14:06:51.299Z","pid":22864,"phase":"VALIDATED","detail":{"actionId":"e1-hklm-delete"}}
+{"schemaVersion":"shun.executor-windows.journal/1","ts":"2026-10-10T14:06:51.302Z","pid":22864,"phase":"PLAN_IDENTITY_OK","detail":{"planHash":"43c57d5df6b173db66e5046858dc8920584fc506126861aa9613d75e0ee690a4"}}
+{"schemaVersion":"shun.executor-windows.journal/1","ts":"2026-10-10T14:06:51.302Z","pid":22864,"phase":"GRANT_OK","detail":{"grantId":"grant-3cc1efb1","authorityRevision":"auth-rev-1"}}
+{"schemaVersion":"shun.executor-windows.journal/1","ts":"2026-10-10T14:06:51.303Z","pid":22864,"phase":"SCOPE_OK","detail":{"actionId":"e1-hklm-delete"}}
+{"schemaVersion":"shun.executor-windows.journal/1","ts":"2026-10-10T14:06:51.303Z","pid":22864,"phase":"PRIVILEGE_OK","detail":{"isElevated":true}}
+{"schemaVersion":"shun.executor-windows.journal/1","ts":"2026-10-10T14:06:51.304Z","pid":22864,"phase":"EXEC_BEGIN","detail":{"totalSteps":1}}
+{"schemaVersion":"shun.executor-windows.journal/1","ts":"2026-10-10T14:06:51.304Z","pid":22864,"phase":"EXEC_START","step":0,"op":"windows.registry.deleteKey"}
+{"schemaVersion":"shun.executor-windows.journal/1","ts":"2026-10-10T14:06:51.331Z","pid":22864,"phase":"EXEC_DONE","step":0,"op":"windows.registry.deleteKey","detail":{"key":"HKLM\\SOFTWARE\\ShunT04Evidence"}}
+{"schemaVersion":"shun.executor-windows.journal/1","ts":"2026-10-10T14:06:51.337Z","pid":22864,"phase":"RECEIPT_WRITTEN","detail":{"terminal":"SUCCEEDED","receiptFile":"C:\\Users\\15549\\AppData\\Local\\Temp\\shun-ev-C7tPHz\\workspace\\executions\\e1-hklm-delete-1791641209511-7897f38f\\receipt.json"}}

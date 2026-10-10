@@ -1,0 +1,10 @@
+{"schemaVersion":"shun.executor-windows.journal/1","ts":"2026-10-10T14:06:32.890Z","pid":736,"phase":"RECEIVED","detail":{"envelopeFile":"C:\\Users\\15549\\AppData\\Local\\Temp\\shun-ev-GAuavz\\workspace\\executions\\e5-metachars-1791641190618-3b994346\\envelope.json","helperPid":736}}
+{"schemaVersion":"shun.executor-windows.journal/1","ts":"2026-10-10T14:06:32.935Z","pid":736,"phase":"VALIDATED","detail":{"actionId":"e5-metachars"}}
+{"schemaVersion":"shun.executor-windows.journal/1","ts":"2026-10-10T14:06:32.937Z","pid":736,"phase":"PLAN_IDENTITY_OK","detail":{"planHash":"c95b904e2cfbbf3fa5ea2682544fc15a9e3bcf1a55ddcee8a93a61e0065176d7"}}
+{"schemaVersion":"shun.executor-windows.journal/1","ts":"2026-10-10T14:06:32.938Z","pid":736,"phase":"GRANT_OK","detail":{"grantId":"grant-81df1ef4","authorityRevision":"auth-rev-1"}}
+{"schemaVersion":"shun.executor-windows.journal/1","ts":"2026-10-10T14:06:32.940Z","pid":736,"phase":"SCOPE_OK","detail":{"actionId":"e5-metachars"}}
+{"schemaVersion":"shun.executor-windows.journal/1","ts":"2026-10-10T14:06:32.940Z","pid":736,"phase":"PRIVILEGE_OK","detail":{"isElevated":true}}
+{"schemaVersion":"shun.executor-windows.journal/1","ts":"2026-10-10T14:06:32.940Z","pid":736,"phase":"EXEC_BEGIN","detail":{"totalSteps":1}}
+{"schemaVersion":"shun.executor-windows.journal/1","ts":"2026-10-10T14:06:32.940Z","pid":736,"phase":"EXEC_START","step":0,"op":"windows.fs.write"}
+{"schemaVersion":"shun.executor-windows.journal/1","ts":"2026-10-10T14:06:32.942Z","pid":736,"phase":"EXEC_DONE","step":0,"op":"windows.fs.write","detail":{"path":"C:\\Users\\15549\\AppData\\Local\\Temp\\shun-ev-GAuavz\\workspace\\e5\\e5 & ; %PX%.txt","bytes":68,"sha256":"9f8e5f0363daecd402c40163a38a2840c68b4e0ad5f91c70f13757b36ebcbd09"}}
+{"schemaVersion":"shun.executor-windows.journal/1","ts":"2026-10-10T14:06:32.948Z","pid":736,"phase":"RECEIPT_WRITTEN","detail":{"terminal":"SUCCEEDED","receiptFile":"C:\\Users\\15549\\AppData\\Local\\Temp\\shun-ev-GAuavz\\workspace\\executions\\e5-metachars-1791641190618-3b994346\\receipt.json"}}
