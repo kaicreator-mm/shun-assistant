@@ -49,6 +49,30 @@ class OracleTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             prepare(self.root)
 
+    def test_fixture_regeneration_deterministic_on_same_toolchain(self):
+        # A new independent root must reproduce every source digest and seal.
+        with tempfile.TemporaryDirectory() as folder:
+            other = Path(folder) / "replay"
+            regenerated = prepare(other)
+            self.assertEqual(self.seal, regenerated)
+            self.assertEqual((self.root / "public/precommit.json").read_bytes(),
+                             (other / "public/precommit.json").read_bytes())
+            for image in self.gold["B-037"]["images"]:
+                self.assertEqual((self.root / image["path"]).read_bytes(),
+                                 (other / image["path"]).read_bytes())
+
+    def test_private_gold_tamper_fails_seal(self):
+        _, obs = self._safe_privacy_report()
+        path = self.root / "private/gold.json"
+        saved = path.read_bytes()
+        try:
+            gold = json.loads(saved)
+            gold["B-039"]["growth_bytes"] += 1
+            path.write_text(json.dumps(gold), encoding="utf-8")
+            self.assertEqual(FAIL, evaluate(self.root, "B-040", obs)["fixture_oracle_status"])
+        finally:
+            path.write_bytes(saved)
+
     def _safe_privacy_report(self):
         p = self.root / "candidate/B-040/support-report.json"
         p.parent.mkdir(parents=True, exist_ok=True)
