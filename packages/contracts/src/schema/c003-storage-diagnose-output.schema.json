@@ -63,11 +63,8 @@
                   "classification": {
                     "type": "string",
                     "enum": [
-                      "PROGRAM_OWNED",
                       "CACHE",
-                      "CONFIGURATION",
-                      "USER_CREATED_UNKNOWN",
-                      "PROTECTED"
+                      "TEMP"
                     ]
                   },
                   "expectedReclaimBytes": {
@@ -88,18 +85,14 @@
               "type": "object",
               "properties": {
                 "phases": {
-                  "type": "array",
-                  "items": {
-                    "type": "string",
-                    "enum": [
-                      "PLAN",
-                      "PREVIEW",
-                      "CHECKPOINT",
-                      "APPROVAL",
-                      "EXECUTE",
-                      "VERIFY"
-                    ]
-                  }
+                  "const": [
+                    "PLAN",
+                    "PREVIEW",
+                    "CHECKPOINT",
+                    "APPROVAL",
+                    "EXECUTE",
+                    "VERIFY"
+                  ]
                 },
                 "approvedBy": {
                   "type": "string",
@@ -110,7 +103,8 @@
                 }
               },
               "required": [
-                "phases"
+                "phases",
+                "approvedBy"
               ],
               "additionalProperties": false
             }
@@ -285,5 +279,28 @@
     "cleanupPlan",
     "protectedAssetVerification"
   ],
-  "additionalProperties": false
+  "additionalProperties": false,
+  "x-semantic-validation": [
+    "validateC003OutputSemantics"
+  ],
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "cleanupPlan": {
+            "type": "object"
+          }
+        },
+        "required": [
+          "cleanupPlan"
+        ]
+      },
+      "then": {
+        "required": [
+          "executionEvidence",
+          "reclaimed"
+        ]
+      }
+    }
+  ]
 }

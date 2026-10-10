@@ -208,7 +208,31 @@
               "classification",
               "disposition"
             ],
-            "additionalProperties": false
+            "additionalProperties": false,
+            "allOf": [
+              {
+                "if": {
+                  "properties": {
+                    "classification": {
+                      "enum": [
+                        "USER_CREATED_UNKNOWN",
+                        "PROTECTED"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "classification"
+                  ]
+                },
+                "then": {
+                  "properties": {
+                    "disposition": {
+                      "const": "RETAIN"
+                    }
+                  }
+                }
+              }
+            ]
           }
         },
         "unknownOrProtectedDeleted": {
@@ -226,18 +250,14 @@
       "type": "object",
       "properties": {
         "phases": {
-          "type": "array",
-          "items": {
-            "type": "string",
-            "enum": [
-              "PLAN",
-              "PREVIEW",
-              "CHECKPOINT",
-              "APPROVAL",
-              "EXECUTE",
-              "VERIFY"
-            ]
-          }
+          "const": [
+            "PLAN",
+            "PREVIEW",
+            "CHECKPOINT",
+            "APPROVAL",
+            "EXECUTE",
+            "VERIFY"
+          ]
         },
         "approvedBy": {
           "type": "string",
@@ -248,7 +268,8 @@
         }
       },
       "required": [
-        "phases"
+        "phases",
+        "approvedBy"
       ],
       "additionalProperties": false
     },
@@ -269,5 +290,24 @@
     "residueReport",
     "finalState"
   ],
-  "additionalProperties": false
+  "additionalProperties": false,
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "finalState": {
+            "const": "REMOVED"
+          }
+        },
+        "required": [
+          "finalState"
+        ]
+      },
+      "then": {
+        "required": [
+          "r2Gate"
+        ]
+      }
+    }
+  ]
 }

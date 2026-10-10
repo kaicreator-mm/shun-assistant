@@ -45,7 +45,43 @@
           "inputPath",
           "status"
         ],
-        "additionalProperties": false
+        "additionalProperties": false,
+        "allOf": [
+          {
+            "if": {
+              "properties": {
+                "status": {
+                  "const": "WRITTEN"
+                }
+              },
+              "required": [
+                "status"
+              ]
+            },
+            "then": {
+              "required": [
+                "outputPath"
+              ]
+            }
+          },
+          {
+            "if": {
+              "properties": {
+                "status": {
+                  "const": "REJECTED"
+                }
+              },
+              "required": [
+                "status"
+              ]
+            },
+            "then": {
+              "required": [
+                "rejectionCode"
+              ]
+            }
+          }
+        ]
       }
     },
     "selectedBindingId": {
