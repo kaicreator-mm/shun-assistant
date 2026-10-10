@@ -14,7 +14,12 @@ import {
   truncateSync,
   writeSync,
 } from 'node:fs';
-import { type ShunStoreMutation, ShunStoreMutationSchema } from '@shun/contracts';
+import {
+  ExecutionReceiptSchema,
+  RiskClassSchema,
+  type ShunStoreMutation,
+  ShunStoreMutationSchema,
+} from '@shun/contracts';
 import { JournalIntegrityError } from './errors.ts';
 
 export const JOURNAL_EVENT_KINDS = [
@@ -165,6 +170,66 @@ export class WorkflowEffectJournal {
       throw new JournalIntegrityError(
         `journal event ${expectedSeq} has an invalid effect mutation`,
       );
+    }
+    // C04 — action rows are a semantic authority boundary, not just syntax:
+    // a malformed receipt or reconciliation verdict must be REJECTED at
+    // replay, never silently accepted into the recovery classification.
+    if (event.kind === 'ACTION_INTENT') {
+      const intent = payload as { planHash?: unknown; riskClass?: unknown };
+      if (typeof intent.planHash !== 'string' || intent.planHash.length < 1) {
+        throw new JournalIntegrityError(
+          `journal event ${expectedSeq} has an invalid action intent planHash`,
+        );
+      }
+      // A forged riskClass (e.g. downgrading a destructive R2/R3 intent to R0)
+      // would disarm the reconcile-first guard — replay refuses it.
+      if (!RiskClassSchema.safeParse(intent.riskClass).success) {
+        throw new JournalIntegrityError(
+          `journal event ${expectedSeq} has an invalid action intent riskClass`,
+        );
+      }
+    }
+    if (event.kind === 'ACTION_RECEIPTED') {
+      if (typeof event.actionId !== 'string' || event.actionId.length < 1) {
+        throw new JournalIntegrityError(
+          `journal event ${expectedSeq} ACTION_RECEIPTED has no actionId`,
+        );
+      }
+      const parsedReceipt = ExecutionReceiptSchema.safeParse(
+        (payload as { receipt?: unknown }).receipt,
+      );
+      if (!parsedReceipt.success) {
+        throw new JournalIntegrityError(
+          `journal event ${expectedSeq} has an invalid action receipt`,
+        );
+      }
+      if (parsedReceipt.data.actionId !== event.actionId) {
+        throw new JournalIntegrityError(
+          `journal event ${expectedSeq} receipt carries a foreign actionId`,
+        );
+      }
+    }
+    if (event.kind === 'ACTION_RECONCILED') {
+      if (typeof event.actionId !== 'string' || event.actionId.length < 1) {
+        throw new JournalIntegrityError(
+          `journal event ${expectedSeq} ACTION_RECONCILED has no actionId`,
+        );
+      }
+      const classification = (payload as { classification?: unknown }).classification;
+      // The kernel is the only writer and only ever closes a reconciliation
+      // as FAILED_BEFORE_EFFECT or COMPLETED_VERIFIED; anything else (e.g. a
+      // forged NOT_STARTED marking a destructive action resumable) fails closed.
+      if (classification !== 'FAILED_BEFORE_EFFECT' && classification !== 'COMPLETED_VERIFIED') {
+        throw new JournalIntegrityError(
+          `journal event ${expectedSeq} has an invalid reconciliation classification`,
+        );
+      }
+      const evidence = (payload as { evidence?: unknown }).evidence;
+      if (typeof evidence !== 'object' || evidence === null || Array.isArray(evidence)) {
+        throw new JournalIntegrityError(
+          `journal event ${expectedSeq} has invalid reconciliation evidence`,
+        );
+      }
     }
     return {
       seq: expectedSeq,
