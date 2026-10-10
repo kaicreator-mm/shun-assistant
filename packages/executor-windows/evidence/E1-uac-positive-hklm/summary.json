@@ -1,0 +1,17 @@
+{
+  "case": "E1-uac-positive-hklm",
+  "create": {
+    "terminal": "SUCCEEDED",
+    "classification": "COMPLETED_VERIFIED",
+    "postStateVerified": true
+  },
+  "cleanup": {
+    "terminal": "SUCCEEDED",
+    "classification": "COMPLETED_VERIFIED"
+  },
+  "uacPolicy": {
+    "EnableLUA": 1,
+    "ConsentPromptBehaviorAdmin": 5,
+    "PromptOnSecureDesktop": 1
+  }
+}

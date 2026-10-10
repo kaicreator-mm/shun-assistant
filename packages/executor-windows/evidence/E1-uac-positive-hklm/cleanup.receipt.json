@@ -1,0 +1,33 @@
+{
+  "actionId": "e1-hklm-delete",
+  "environmentId": "local-windows/Nilar",
+  "providerId": "shun.executor-windows",
+  "providerVersion": "0.1.0",
+  "startedAt": "2026-10-10T14:06:49.511Z",
+  "finishedAt": "2026-10-10T14:06:52.195Z",
+  "terminal": "SUCCEEDED",
+  "exitCode": 0,
+  "outputRefs": [
+    "C:\\Users\\15549\\AppData\\Local\\Temp\\shun-ev-C7tPHz\\workspace\\executions\\e1-hklm-delete-1791641209511-7897f38f\\journal.jsonl",
+    "C:\\Users\\15549\\AppData\\Local\\Temp\\shun-ev-C7tPHz\\workspace\\executions\\e1-hklm-delete-1791641209511-7897f38f\\receipt.json",
+    "C:\\Users\\15549\\AppData\\Local\\Temp\\shun-ev-C7tPHz\\workspace\\executions\\e1-hklm-delete-1791641209511-7897f38f\\journal.jsonl",
+    "C:\\Users\\15549\\AppData\\Local\\Temp\\shun-ev-C7tPHz\\workspace\\executions\\e1-hklm-delete-1791641209511-7897f38f\\receipt.json"
+  ],
+  "sideEffectEvidence": {
+    "sideEffectClass": "R2",
+    "recoveryClassification": "COMPLETED_VERIFIED",
+    "postStateVerified": true,
+    "journalRef": "C:\\Users\\15549\\AppData\\Local\\Temp\\shun-ev-C7tPHz\\workspace\\executions\\e1-hklm-delete-1791641209511-7897f38f\\journal.jsonl"
+  },
+  "launcherDetail": {
+    "reason": "step completed",
+    "classificationBasis": "RECEIPT_WRITTEN + independent post-state verification pass (reconcile-first verified expected state via windows.registry.verify)",
+    "resolvedByPostState": false,
+    "relay": {
+      "kind": "RAN",
+      "exitCode": 0,
+      "childPid": 22864
+    },
+    "journalDigest": "483bda33252754551f752705a69644a8da821a97635b5bff58d0c3673b4496e1"
+  }
+}

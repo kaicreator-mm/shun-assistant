@@ -1,0 +1,8 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "incremental": true,
+    "tsBuildInfoFile": "node_modules/.cache/executor-windows.tsbuildinfo"
+  },
+  "include": ["src", "test", "scripts", "vitest.config.ts", "vitest.evidence.config.ts"]
+}

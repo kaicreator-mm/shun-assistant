@@ -1,0 +1,30 @@
+{
+  "actionId": "e2-uac-refused",
+  "environmentId": "local-windows/Nilar",
+  "providerId": "shun.executor-windows",
+  "providerVersion": "0.1.0",
+  "startedAt": "2026-10-10T14:11:09.436Z",
+  "finishedAt": "2026-10-10T14:11:11.954Z",
+  "terminal": "UAC_DECLINED",
+  "outputRefs": [
+    "C:\\Users\\15549\\AppData\\Local\\Temp\\shun-ev-16nVWJ\\workspace\\executions\\e2-uac-refused-1791641469435-c8e1e71e\\journal.jsonl",
+    "C:\\Users\\15549\\AppData\\Local\\Temp\\shun-ev-16nVWJ\\workspace\\executions\\e2-uac-refused-1791641469435-c8e1e71e\\receipt.json"
+  ],
+  "sideEffectEvidence": {
+    "sideEffectClass": "R2",
+    "recoveryClassification": "NOT_STARTED",
+    "postStateVerified": false,
+    "journalRef": "C:\\Users\\15549\\AppData\\Local\\Temp\\shun-ev-16nVWJ\\workspace\\executions\\e2-uac-refused-1791641469435-c8e1e71e\\journal.jsonl"
+  },
+  "launcherDetail": {
+    "reason": "UAC declined (0x80131509)",
+    "classificationBasis": "UAC consent refused/timed out; empty journal — helper provably never started",
+    "resolvedByPostState": false,
+    "relay": {
+      "kind": "UAC_DECLINED",
+      "hresult": "0x80131509",
+      "error": "由于出现以下错误，无法运行此命令: 操作已被用户取消。。"
+    },
+    "journalDigest": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  }
+}
