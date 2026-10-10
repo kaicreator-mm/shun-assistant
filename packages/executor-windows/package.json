@@ -1,0 +1,27 @@
+{
+  "name": "@shun/executor-windows",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "lint": "biome check .",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "build:helper": "node scripts/build-helper.ts",
+    "test:evidence": "vitest run --config vitest.evidence.config.ts"
+  },
+  "dependencies": {
+    "@shun/contracts": "workspace:*",
+    "zod": "^4.1.13"
+  },
+  "devDependencies": {
+    "@biomejs/biome": "^2.3.8",
+    "@types/node": "^24.7.0",
+    "esbuild": "^0.25.0",
+    "typescript": "^5.9.3",
+    "vitest": "^3.2.4"
+  }
+}

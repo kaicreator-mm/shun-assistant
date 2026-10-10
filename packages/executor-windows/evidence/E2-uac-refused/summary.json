@@ -1,0 +1,15 @@
+{
+  "case": "E2-uac-refused",
+  "terminal": "UAC_DECLINED",
+  "recoveryClassification": "NOT_STARTED",
+  "journalEmpty": true,
+  "uacPolicy": {
+    "EnableLUA": 1,
+    "ConsentPromptBehaviorAdmin": 5,
+    "PromptOnSecureDesktop": 1
+  },
+  "host": {
+    "hostname": "Nilar",
+    "filteredToken": true
+  }
+}
