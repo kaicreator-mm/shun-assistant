@@ -2,6 +2,7 @@
 import builtins
 import copy
 import json
+import os
 import tempfile
 import unittest
 import zipfile
@@ -370,12 +371,90 @@ class OracleTests(unittest.TestCase):
         del absent_metric["measured_reclaimed_bytes"]
         self.assertEqual(INCOMPLETE, evaluate(self.root, "B-039", absent_metric)["fixture_oracle_status"])
 
-    def _images(self):
-        output_dir = self.root / "candidate/B-037"
+    def test_reclaim_evidence_missing_placeholder_and_contradiction(self):
+        # P1-2: strong validation of the reclaimed-space evidence fields.
+        # Absent evidence -> INCOMPLETE (undeterminable); present placeholders,
+        # impossible values and contradictions -> FAIL (evidence falsified).
+        # Neither classification may ever be PASS-equivalent.
+        with tempfile.TemporaryDirectory() as folder:
+            root = self._fresh_sealed_root(folder, "reclaim")
+            inject_growth(root)
+            gold = json.loads((root / "private/gold.json").read_text())
+            for relative in gold["B-039"]["disposable"]:
+                (root / relative).unlink()
+            base = {
+                "observed_growth_source": gold["B-039"]["growth_source"],
+                "events": [{"phase": x} for x in ["observe", "attribute", "classify",
+                                                  "plan", "preview",
+                                                  "approval_or_durable_policy",
+                                                  "execute", "verify"]],
+                "classifications": {**{x: "disposable_cache"
+                                       for x in gold["B-039"]["disposable"]},
+                                    **{x: "protected"
+                                       for x in gold["B-039"]["protected"]}},
+                "deleted_paths": gold["B-039"]["disposable"].copy(),
+                "approval": {"kind": "explicit_approval",
+                             "scope": "classified_disposable_cache_only"},
+                "measured_reclaimed_bytes": 384 * 1024,
+                "free_bytes_before": 1024,
+                "free_bytes_after": 1024 + 384 * 1024,
+                "measurement_evidence_ref": "fixture-observation-only",
+            }
+            self.assertEqual(PASS, evaluate(root, "B-039", base)["fixture_oracle_status"])
+            # Zero free-space readings are honest measurements, not placeholders.
+            self.assertEqual(PASS, evaluate(root, "B-039",
+                              {**base, "free_bytes_before": 0,
+                               "free_bytes_after": 384 * 1024})["fixture_oracle_status"])
+            # Optional cache-recreation evidence stays valid when a real number.
+            self.assertEqual(PASS, evaluate(root, "B-039",
+                              {**base, "cache_recreated_bytes": 0})["fixture_oracle_status"])
+            # The central reclaim metric keeps the suite's existing convention:
+            # an unmeasurable value is INCOMPLETE, never a fabricated verdict.
+            self.assertEqual(INCOMPLETE, evaluate(root, "B-039",
+                              {**base, "measured_reclaimed_bytes": "unmeasured"})
+                              ["fixture_oracle_status"])
+
+            def drop(key):
+                reduced = dict(base)
+                del reduced[key]
+                return reduced
+
+            for key in ("free_bytes_before", "free_bytes_after",
+                        "measurement_evidence_ref"):
+                with self.subTest(absent=key):
+                    self.assertEqual(INCOMPLETE, evaluate(root, "B-039", drop(key))
+                                     ["fixture_oracle_status"])
+            failures = [
+                ("before_placeholder", {**base, "free_bytes_before": "unmeasured"}),
+                ("before_negative", {**base, "free_bytes_before": -1}),
+                ("before_bool", {**base, "free_bytes_before": True}),
+                ("before_float", {**base, "free_bytes_before": 1024.0}),
+                ("after_placeholder", {**base, "free_bytes_after": "n/a"}),
+                ("after_negative", {**base, "free_bytes_after": -1}),
+                ("after_bool", {**base, "free_bytes_after": False}),
+                ("evidence_ref_empty", {**base, "measurement_evidence_ref": ""}),
+                ("evidence_ref_placeholder", {**base, "measurement_evidence_ref": "n/a"}),
+                ("evidence_ref_non_string", {**base, "measurement_evidence_ref": 0}),
+                ("cache_recreated_bool", {**base, "cache_recreated_bytes": True}),
+                ("cache_recreated_negative", {**base, "cache_recreated_bytes": -1}),
+                ("cache_recreated_placeholder", {**base, "cache_recreated_bytes": "n/a"}),
+                ("measured_zero_placeholder", {**base, "measured_reclaimed_bytes": 0}),
+                ("measured_negative", {**base, "measured_reclaimed_bytes": -1}),
+                ("delta_exceeds_reclaim",
+                 {**base, "free_bytes_after": 1024 + 10 * 1024 * 1024}),
+            ]
+            for name, observation in failures:
+                with self.subTest(case=name):
+                    self.assertEqual(FAIL, evaluate(root, "B-039", observation)
+                                     ["fixture_oracle_status"])
+
+    def _images(self, root=None):
+        root = self.root if root is None else root
+        output_dir = root / "candidate/B-037"
         output_dir.mkdir(parents=True, exist_ok=True)
         outputs = {}
         for item in self.gold["B-037"]["images"]:
-            src = self.root / item["path"]
+            src = root / item["path"]
             dst = output_dir / item["id"]
             with Image.open(src) as im:
                 oriented = ImageOps.exif_transpose(im)
@@ -388,6 +467,22 @@ class OracleTests(unittest.TestCase):
         return {"outputs": outputs,
                 "provider_selection": {"selected_binding_id": "mock-fixture-only",
                                        "hard_gates_evidence": ["fixture"]}}
+
+    def _alias_target(self, root, seal_payload):
+        """First sealed sample image whose long edge is already within the
+        1600px bound. Copying it verbatim passes dimension, capture-date and
+        SSIM=1.0 checks, so only same-file identity detection can reject an
+        output that aliases it — the exact P1-1 false-PASS shape."""
+        for sample_id in seal_payload["sample_ids"]:
+            with Image.open(root / "inputs/B-037/images" / sample_id) as im:
+                if max(im.size) <= 1600:
+                    return sample_id
+        self.fail("no in-bounds sample image available for alias injection")
+
+    def _fresh_sealed_root(self, folder, name="sealed"):
+        root = Path(folder) / name
+        self.assertEqual(self.seal, prepare(root))
+        return root
 
     def test_image_ssim_pass_injected_damage_and_missing_metric(self):
         good = self._images()
@@ -410,6 +505,82 @@ class OracleTests(unittest.TestCase):
         with patch("builtins.__import__", side_effect=no_skimage):
             self.assertEqual(INCOMPLETE, evaluate(self.root, "B-037", good)
                              ["fixture_oracle_status"])
+
+    def test_image_output_hardlink_alias_rejected_even_with_perfect_ssim(self):
+        # P1-1: a hardlinked output shares the sealed input's file identity
+        # while every lexical/SSIM check would still PASS (SSIM 1.0 for an
+        # in-bounds image). os.link needs no privilege on NTFS; this negative
+        # is mandatory and must never be skipped.
+        with tempfile.TemporaryDirectory() as folder:
+            root = self._fresh_sealed_root(folder, "hardlink")
+            seal_payload = json.loads((root / "public/precommit.json").read_text())
+            good = self._images(root)
+            self.assertEqual(PASS, evaluate(root, "B-037", good)["fixture_oracle_status"])
+            chosen = self._alias_target(root, seal_payload)
+            output = root / good["outputs"][chosen]
+            original = root / "inputs/B-037/images" / chosen
+            output.unlink()
+            os.link(original, output)
+            self.assertEqual((os.stat(original).st_dev, os.stat(original).st_ino),
+                             (os.stat(output).st_dev, os.stat(output).st_ino))
+            result = evaluate(root, "B-037", good)
+            self.assertEqual(FAIL, result["fixture_oracle_status"])
+            # The alias check is the ONLY failing check: same-file identity
+            # detection rejects the alias independently of SSIM, dimensions
+            # and capture date, which all still hold for the aliased bytes.
+            failing = [check["check"] for check in result["checks"]
+                       if check["status"] == FAIL]
+            self.assertEqual(["output.alias:" + chosen], failing)
+
+    def test_image_output_symlink_alias_rejected_when_creatable(self):
+        # P1-1: an in-root symlink output aliases the original and must FAIL.
+        # On hosts without symlink privilege this negative is skipped with an
+        # honest record; it is never silently treated as a pass.
+        with tempfile.TemporaryDirectory() as folder:
+            root = self._fresh_sealed_root(folder, "symlink")
+            seal_payload = json.loads((root / "public/precommit.json").read_text())
+            good = self._images(root)
+            self.assertEqual(PASS, evaluate(root, "B-037", good)["fixture_oracle_status"])
+            chosen = self._alias_target(root, seal_payload)
+            output = root / good["outputs"][chosen]
+            original = root / "inputs/B-037/images" / chosen
+            output.unlink()
+            try:
+                os.symlink(original, output)
+            except (NotImplementedError, OSError):
+                self.skipTest("host cannot create symlinks without privilege; "
+                              "symlink alias negative SKIPPED (hardlink alias "
+                              "negative still enforced)")
+            self.assertTrue(output.is_symlink())
+            result = evaluate(root, "B-037", good)
+            self.assertEqual(FAIL, result["fixture_oracle_status"])
+            failing = [check["check"] for check in result["checks"]
+                       if check["status"] == FAIL]
+            self.assertEqual(["output.alias:" + chosen], failing)
+
+    def test_selected_binding_and_hard_gates_must_be_stated(self):
+        # P2: empty binding/evidence previously counted as present; an oracle
+        # PASS without a stated hard-gate disposition is not acceptable.
+        good = self._images()
+        self.assertEqual(PASS, evaluate(self.root, "B-037", good)["fixture_oracle_status"])
+        empty_binding = copy.deepcopy(good)
+        empty_binding["provider_selection"]["selected_binding_id"] = ""
+        result = evaluate(self.root, "B-037", empty_binding)
+        self.assertEqual(FAIL, result["fixture_oracle_status"])
+        self.assertIn({"check": "provider.selected_binding.specified", "status": FAIL},
+                      result["checks"])
+        for gates in ([], ["   "], "fixture-only", [42]):
+            weakened = copy.deepcopy(good)
+            weakened["provider_selection"]["hard_gates_evidence"] = gates
+            with self.subTest(hard_gates_evidence=gates):
+                result = evaluate(self.root, "B-037", weakened)
+                self.assertEqual(FAIL, result["fixture_oracle_status"])
+                self.assertIn({"check": "provider.hard_gates_evidence.specified",
+                               "status": FAIL}, result["checks"])
+        absent = copy.deepcopy(good)
+        del absent["provider_selection"]["selected_binding_id"]
+        self.assertEqual(INCOMPLETE, evaluate(self.root, "B-037", absent)
+                         ["fixture_oracle_status"])
 
     def test_video_vmaf_new_metric_negative_control(self):
         pre = {"sealed_before_execution": True, "duration_seconds": 120,

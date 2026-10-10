@@ -6,6 +6,7 @@ Candidate output is untrusted. Private gold stays local to this process.
 import hashlib
 import json
 import math
+import os
 import zipfile
 from pathlib import Path
 
@@ -32,6 +33,36 @@ def _safe_path(root, relative):
     if not resolved.is_relative_to(root.resolve()):
         raise ValueError("path escapes fixture root")
     return resolved
+
+
+def _file_identity(path):
+    """Same-file identity via os.stat, independent of any lexical path.
+
+    Returns (st_dev, st_ino) — the volume serial plus NTFS/POSIX file ID that
+    every hardlink of a file shares and that os.stat of a symlink reports for
+    its target — or None when the filesystem does not expose file IDs
+    (st_ino == 0) or the stat fails. st_nlink counts how many directory
+    entries share an identity, but a freshly written output also has
+    st_nlink == 1, so only an identity *match against a sealed input* proves
+    aliasing; the link count alone can neither prove nor exclude it.
+    """
+    try:
+        info = os.stat(path)
+    except OSError:
+        return None
+    if info.st_ino == 0:
+        return None
+    return info.st_dev, info.st_ino
+
+
+def _placeholder_text(value):
+    """Evidence literals that claim a citation while citing nothing."""
+    if not isinstance(value, str):
+        return True
+    return value.strip().lower() in {
+        "", "n/a", "na", "none", "null", "-", "--", "tbd", "todo",
+        "unknown", "unmeasured", "not measured", "not_measured", "placeholder",
+    }
 
 
 class Verdict:
@@ -125,19 +156,38 @@ def _image_oracle(root, observation, gold, seal, verdict):
                   seal.get("sample_ids") == [r["id"] for r in fixed_order]
                   and seal.get("sample_size") == 20 and seal.get("min_ssim") == 0.95
                   and seal.get("max_long_edge_px") == 1600)
+    input_identities = set()
     for row in image_gold:
         path = _safe_path(root, row["path"])
         verdict.check("original.sha256:" + row["id"],
                       path.is_file() and _hash_file(path) == row["sha256"]
                       and seal.get("image_sha256", {}).get(row["id"]) == row["sha256"])
+        identity = _file_identity(path)
+        if identity is not None:
+            input_identities.add(identity)
     if not verdict.require("provider.selection", observation.get("provider_selection")):
         return
     selection = observation["provider_selection"]
     if not isinstance(selection, dict):
         verdict.check("provider.selection.object", False)
         return
-    verdict.require("provider.selected_binding", selection.get("selected_binding_id"))
-    verdict.require("provider.hard_gates_evidence", selection.get("hard_gates_evidence"))
+    # P2: an unstated binding or an empty/malformed hard-gates record must not
+    # PASS. Absent evidence stays INCOMPLETE; present-but-empty evidence is a
+    # falsified claim and FAILs. The oracle only requires the disposition to be
+    # stated; it does not authenticate production Provider trust (T10 owns that).
+    binding = selection.get("selected_binding_id")
+    if binding is None:
+        verdict.require("provider.selected_binding", None)
+    else:
+        verdict.check("provider.selected_binding.specified",
+                      isinstance(binding, str) and binding.strip() != "")
+    gates = selection.get("hard_gates_evidence")
+    if gates is None:
+        verdict.require("provider.hard_gates_evidence", None)
+    else:
+        verdict.check("provider.hard_gates_evidence.specified",
+                      isinstance(gates, list) and len(gates) > 0
+                      and all(isinstance(entry, str) and entry.strip() for entry in gates))
     if not verdict.require("output.manifest", observation.get("outputs")):
         return
     outputs = observation["outputs"]
@@ -162,6 +212,15 @@ def _image_oracle(root, observation, gold, seal, verdict):
             # Prevent a candidate from "passing" by pointing output to original.
             if not rel.startswith("candidate/B-037/") or not path.is_file():
                 verdict.check("output.separate:" + ident, False)
+                continue
+            # P1-1: a lexically separate candidate path can still alias the
+            # sealed input. A symlink output, or a hardlink sharing any
+            # input's file identity, must FAIL independently of the lexical
+            # path — even when the alias would measure SSIM 1.0.
+            aliased = ((root / rel).is_symlink()
+                       or _file_identity(path) in input_identities)
+            verdict.check("output.alias:" + ident, not aliased)
+            if aliased:
                 continue
             with Image.open(_safe_path(root, row["path"])) as orig_image, Image.open(path) as output_image:
                 source = ImageOps.exif_transpose(orig_image)
@@ -299,18 +358,44 @@ def _storage_oracle(root, observation, gold, verdict):
                   in ("explicit_approval", "pre_existing_durable_policy")
                   and policy.get("scope") == "classified_disposable_cache_only")
     measured = observation.get("measured_reclaimed_bytes")
-    if isinstance(measured, int) and not isinstance(measured, bool):
+    measured_ok = isinstance(measured, int) and not isinstance(measured, bool)
+    if measured_ok:
         verdict.check("reclaim.positive", measured > 0)
         # A claimed reclaimed value exceeding the synthetic inputs is implausible.
         verdict.check("reclaim.bounded", measured <= 128 * 1024 + fixture["growth_bytes"])
     else:
         verdict.require("reclaim.measurement", None)
-    for field in ("free_bytes_before", "free_bytes_after", "measurement_evidence_ref"):
-        verdict.require("reclaim." + field, observation.get(field))
+    # P1-2: the reclaim account must be evidenced, not asserted. Absent
+    # evidence stays INCOMPLETE (undeterminable); present-but-invalid evidence
+    # (placeholder text, bool, non-integer, negative) is a claim that is
+    # falsified on its face and FAILs. Neither may ever be PASS-equivalent.
+    bounds = {}
+    for field in ("free_bytes_before", "free_bytes_after"):
+        value = observation.get(field)
+        if value is None:
+            verdict.require("reclaim." + field, None)
+            continue
+        valid = (isinstance(value, int) and not isinstance(value, bool)
+                 and value >= 0)
+        verdict.check("reclaim." + field + ".measured_nonnegative_int", valid)
+        if valid:
+            bounds[field] = value
+    reference = observation.get("measurement_evidence_ref")
+    if reference is None:
+        verdict.require("reclaim.measurement_evidence_ref", None)
+    else:
+        verdict.check("reclaim.measurement_evidence_ref.cited",
+                      not _placeholder_text(reference))
+    if measured_ok and "free_bytes_before" in bounds and "free_bytes_after" in bounds:
+        # Concurrent writes may shrink the observed free-space gain, but the
+        # account cannot credit more growth than the attributable reclaim.
+        verdict.check("reclaim.free_delta_coherent",
+                      bounds["free_bytes_after"] - bounds["free_bytes_before"] <= measured)
     if "cache_recreated_bytes" in observation:
+        recreated = observation["cache_recreated_bytes"]
         verdict.check("reclaim.recreation_nonnegative",
-                      isinstance(observation["cache_recreated_bytes"], int)
-                      and observation["cache_recreated_bytes"] >= 0)
+                      isinstance(recreated, int) and not isinstance(recreated, bool)
+                      and recreated >= 0)
 
 
 def _decoded_json_strings(value):
