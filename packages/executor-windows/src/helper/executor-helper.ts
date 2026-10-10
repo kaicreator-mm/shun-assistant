@@ -231,6 +231,23 @@ class Helper {
     }
     this.journal.append('SCOPE_OK', { detail: { actionId } });
 
+    // C08: the one-shot helper IS the elevated execution surface. A USER/NONE
+    // grant executed here would run a user-level action with admin rights —
+    // a privilege gain across the boundary. The unprivileged in-process
+    // backend owns NONE/USER actions; this surface accepts ELEVATED only.
+    const grantLevel = verdict.grant.actionScope.privilegeLevel;
+    if (grantLevel !== 'ELEVATED') {
+      this.journal.append('REFUSED', {
+        detail: {
+          why: 'privilege',
+          detail: `grant privilegeLevel ${grantLevel} presented to the privileged helper`,
+        },
+      });
+      return this.refuse(
+        `privileged helper refuses ${grantLevel} grants — USER/NONE actions must run on the unprivileged surface`,
+      );
+    }
+
     // Privilege consistency: ELEVATED action on a filtered token is a
     // structured refusal (also the direct-launch negative evidence path).
     if (this.envelope.action.action.requiredPrivilege === 'ELEVATED' && !this.isElevated) {

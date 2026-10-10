@@ -93,7 +93,10 @@ d('EVIDENCE — real Windows 11 / UAC (Issue #15 required set)', () => {
         args: ['-e', 'setInterval(()=>{},60000)'],
         expectExitCode: 0,
       },
-      requiredPrivilege: 'USER',
+      // T04 C08: the helper accepts ELEVATED grants only; the kill evidence
+      // runs the helper DIRECTLY, so the operator host shell must carry an
+      // elevated token for the action to reach the effect window.
+      requiredPrivilege: 'ELEVATED',
       sideEffectClass: 'R1',
       timeoutMs: 120000,
     });
@@ -184,7 +187,9 @@ d('EVIDENCE — real Windows 11 / UAC (Issue #15 required set)', () => {
         ],
         expectExitCode: 0,
       },
-      requiredPrivilege: 'USER',
+      // T04 C08: ELEVATED-only helper surface; direct spawn requires an
+      // elevated operator host shell for the action to reach the window.
+      requiredPrivilege: 'ELEVATED',
       sideEffectClass: 'R2',
       timeoutMs: 120000,
       // declared verifiable expected state must be verifiable within the

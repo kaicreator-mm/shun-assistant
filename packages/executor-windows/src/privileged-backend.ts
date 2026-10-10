@@ -134,6 +134,17 @@ export class PrivilegedWindowsExecutionBackend implements ExecutionBackend {
     };
 
     try {
+      // C08: this backend is the ELEVATED surface. USER/NONE actions belong
+      // to the unprivileged in-process backend; launching them through the
+      // UAC-relayed helper would execute user-level actions with admin
+      // rights. Refuse before any pin read, envelope write or relay spawn.
+      if (action.action.requiredPrivilege !== 'ELEVATED') {
+        return await launchRefused(
+          `privileged backend only accepts ELEVATED actions; ${action.action.requiredPrivilege} actions must run on the unprivileged surface`,
+          'PRIVILEGE_LEVEL_MISMATCH',
+        );
+      }
+
       // ---- launch-side pin verification (the helper re-checks its own). ----
       const pin = readHelperPin(this.options.authorityDir);
       const identity = verifyPinnedHelper(this.helperBundlePath(), this.relayScriptPath(), pin);
