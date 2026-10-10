@@ -98,7 +98,14 @@ describe('failure and recovery state model (L2 §9.4)', () => {
   });
 
   it('an uncertain interruption blocks retry until reconciliation (reconcile-first)', async () => {
-    const taskId = await submit('cleanup with interrupt mid-run');
+    // Modified for Issue #41 / VC-P1-03: the merged test drove the default
+    // interrupt path and expected reconciliation to conclude
+    // FAILED_BEFORE_EFFECT unconditionally — i.e. it pinned the laundering of
+    // honest uncertainty into "provably safe". The demo may only prove
+    // non-execution from an explicitly scripted post-state inspection
+    // ('proven-absent'); the default path now stays MAY_HAVE_EXECUTED_UNCERTAIN
+    // (see recovery-honesty.test.ts).
+    const taskId = await submit('cleanup with interrupt mid-run and a proven-absent post-state');
     const snapshot = (await h.get(`/api/tasks/${taskId}`)).body as TaskSnapshot;
     expect(snapshot.state).toBe('AWAITING_AUTHORIZATION');
     const approvalId = snapshot.approval!.approvalId;

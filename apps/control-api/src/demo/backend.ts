@@ -86,6 +86,14 @@ interface DemoTask {
   script: {
     /** 'interrupt' leaves an uncertain journal window; 'fail-verify' fails semantic verification. */
     interruption?: 'UNCERTAIN';
+    /**
+     * What the demo's modeled post-state inspection finds during reconciliation
+     * (Issue #41, VC-P1-03): the demo executes nothing real, so it may only
+     * conclude "provably not executed" when a post-state proof is explicitly
+     * scripted. Default is UNDETERMINED — fail-closed, the uncertain
+     * classification stands and retry stays blocked.
+     */
+    reconcilePostState?: 'PROVEN_ABSENT' | 'UNDETERMINED';
     verifyFail?: boolean;
     trustBlocked?: boolean;
   };
@@ -187,6 +195,9 @@ export class DemoShunBackend implements ControlBackend {
       progress: [],
       script: {
         interruption: request.goal.toLowerCase().includes('interrupt') ? 'UNCERTAIN' : undefined,
+        reconcilePostState: request.goal.toLowerCase().includes('proven-absent')
+          ? 'PROVEN_ABSENT'
+          : 'UNDETERMINED',
         verifyFail: request.goal.toLowerCase().includes('fail-verify'),
         trustBlocked: request.goal.toLowerCase().includes('untrusted-provider'),
       },
@@ -667,23 +678,43 @@ export class DemoShunBackend implements ControlBackend {
         detail: 'There is no uncertain side effect to reconcile for this task.',
       };
     }
-    // Reconcile from journal + post-state only (L2 §9.4). The demo post-state
-    // check finds the declared expected outputs absent → the step provably
-    // never completed its effect.
+    // Reconcile from journal + post-state only (L2 §9.4) — and honestly. The
+    // journal shows EXEC_START inside the execution window, so the journal
+    // alone cannot prove the step never ran; only an explicit post-state
+    // inspection that finds the plan's declared expected state absent may
+    // reclassify to FAILED_BEFORE_EFFECT (Issue #41, VC-P1-03). Without that
+    // proof the uncertain classification STANDS: it must never be laundered
+    // into a "provably safe" retry.
+    if (task.script.reconcilePostState === 'PROVEN_ABSENT') {
+      task.recovery = {
+        classification: 'FAILED_BEFORE_EFFECT',
+        detail:
+          'Reconciliation compared the journal (stopped inside the execution window) and the actual state ' +
+          'against the plan’s declared expected state: the declared outputs are provably absent, so the ' +
+          'step never took effect. A retry is now provably safe.',
+        reconciled: true,
+      };
+      task.execution = {
+        terminal: 'FAILED',
+        startedAt: task.execution?.startedAt,
+        finishedAt: now,
+      };
+      task.failure = {
+        code: 'EXECUTION_INTERRUPTED',
+        message:
+          'Execution was interrupted. Reconciliation proved the step did not take effect; the task can be retried safely.',
+      };
+      this.transition(task, 'FAILED', now, task.recovery.detail);
+      return { ok: true, value: { classification: task.recovery.classification } };
+    }
     task.recovery = {
-      classification: 'FAILED_BEFORE_EFFECT',
+      classification: 'MAY_HAVE_EXECUTED_UNCERTAIN',
       detail:
-        'Reconciliation compared the journal and the actual state against the plan’s declared expected state: ' +
-        'the step never took effect. A retry is now provably safe.',
-      reconciled: true,
+        'Reconciliation compared the journal (stopped inside the execution window) and the actual state, ' +
+        'but it could not prove whether the step took effect. The uncertain classification stands and ' +
+        'retry stays blocked until a post-state inspection proves the step never ran.',
+      reconciled: false,
     };
-    task.execution = { terminal: 'FAILED', startedAt: task.execution?.startedAt, finishedAt: now };
-    task.failure = {
-      code: 'EXECUTION_INTERRUPTED',
-      message:
-        'Execution was interrupted. Reconciliation proved the step did not take effect; the task can be retried safely.',
-    };
-    this.transition(task, 'FAILED', now, task.recovery.detail);
     return { ok: true, value: { classification: task.recovery.classification } };
   }
 
