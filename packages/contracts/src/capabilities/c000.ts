@@ -45,6 +45,24 @@ export const ExecutionPlanClassSchema = z.enum([
 export type ExecutionPlanClass = z.infer<typeof ExecutionPlanClassSchema>;
 
 /**
+ * Semantic invariant the committed JSON Schema artifact cannot express (array
+ * membership across two properties): a selected binding must be among the
+ * feasible bindings. Exported so consumers of the artifact — which names this
+ * function in its `x-semantic-validation` annotation — run the same check the
+ * Zod parser enforces.
+ */
+export function validateResolutionRecordSemantics(record: ResolutionRecord): string[] {
+  const issues: string[] = [];
+  if (
+    record.selectedBindingId !== null &&
+    !record.feasibleBindings.includes(record.selectedBindingId)
+  ) {
+    issues.push('selectedBindingId must be among feasibleBindings');
+  }
+  return issues;
+}
+
+/**
  * C-000 structured resolution record: candidate providers, feasible bindings,
  * per-binding hard-gate dispositions, selected binding with reasons, risk
  * class, verification plan and privacy/disclosure plan — or an explicit
@@ -87,8 +105,8 @@ export const ResolutionRecordSchema = z
         message: 'exactly one of selectedBindingId / failureDisposition must be set',
       });
     }
-    if (selected && !record.feasibleBindings.includes(record.selectedBindingId as string)) {
-      ctx.addIssue({ code: 'custom', message: 'selectedBindingId must be among feasibleBindings' });
+    for (const message of validateResolutionRecordSemantics(record)) {
+      ctx.addIssue({ code: 'custom', message });
     }
   });
 export type ResolutionRecord = z.infer<typeof ResolutionRecordSchema>;

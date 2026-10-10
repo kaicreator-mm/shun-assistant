@@ -80,22 +80,6 @@
         }
       },
       "additionalProperties": false
-    },
-    "preExistingUserAssets": {
-      "type": "array",
-      "items": {
-        "type": "object",
-        "properties": {
-          "path": {
-            "type": "string",
-            "minLength": 1
-          }
-        },
-        "required": [
-          "path"
-        ],
-        "additionalProperties": false
-      }
     }
   },
   "required": [
@@ -103,8 +87,7 @@
     "capabilityRequirement",
     "providerConstraints",
     "lifecyclePolicy",
-    "targetTask",
-    "preExistingUserAssets"
+    "targetTask"
   ],
   "additionalProperties": false
 }

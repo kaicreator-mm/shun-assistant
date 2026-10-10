@@ -19,10 +19,15 @@ export const R2_GATE_PHASES = [
 ] as const;
 export type R2GatePhase = (typeof R2_GATE_PHASES)[number];
 
+/**
+ * A completed observable R2 gate. The record only exists once the gate has run
+ * (plan → preview → checkpoint → approval → execute → verify), so the approval
+ * disposition is mandatory: a gate record without an approver is not a gate.
+ */
 export const R2GateRecordSchema = z
   .strictObject({
     phases: z.array(z.enum(R2_GATE_PHASES)),
-    approvedBy: z.enum(['USER_APPROVAL', 'DURABLE_POLICY']).optional(),
+    approvedBy: z.enum(['USER_APPROVAL', 'DURABLE_POLICY']),
   })
   .superRefine((gate, ctx) => {
     const expected = R2_GATE_PHASES.join('>');
@@ -109,6 +114,26 @@ export const PlanActionSchema = z.strictObject({
 });
 export type PlanAction = z.infer<typeof PlanActionSchema>;
 
+/**
+ * Semantic invariant the committed JSON Schema artifact cannot express (array
+ * membership across two properties): every action's bindingRef must be declared
+ * in bindingRefs. Exported so consumers of the artifact — which names this
+ * function in its `x-semantic-validation` annotation — run the same check the
+ * Zod parser enforces.
+ */
+export function validateActionPlanSemantics(plan: ActionPlan): string[] {
+  const known = new Set(plan.bindingRefs);
+  const issues: string[] = [];
+  plan.actions.forEach((action, index) => {
+    if (!known.has(action.bindingRef)) {
+      issues.push(
+        `actions[${index}] bindingRef "${action.bindingRef}" is not declared in bindingRefs`,
+      );
+    }
+  });
+  return issues;
+}
+
 export const ActionPlanSchema = z
   .strictObject({
     taskId: z.string().min(1),
@@ -124,15 +149,9 @@ export const ActionPlanSchema = z
     planHash: Sha256HexSchema,
   })
   .superRefine((plan, ctx) => {
-    const known = new Set(plan.bindingRefs);
-    plan.actions.forEach((action, index) => {
-      if (!known.has(action.bindingRef)) {
-        ctx.addIssue({
-          code: 'custom',
-          message: `actions[${index}] bindingRef "${action.bindingRef}" is not declared in bindingRefs`,
-        });
-      }
-    });
+    for (const message of validateActionPlanSemantics(plan)) {
+      ctx.addIssue({ code: 'custom', message });
+    }
   });
 export type ActionPlan = z.infer<typeof ActionPlanSchema>;
 

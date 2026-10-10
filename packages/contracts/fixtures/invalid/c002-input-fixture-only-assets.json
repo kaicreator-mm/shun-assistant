@@ -1,5 +1,5 @@
 {
-  "taskId": "task-2026-10-10-002",
+  "taskId": "task-bad-017",
   "capabilityRequirement": { "capabilityId": "pdf.convert", "revision": "r1" },
   "providerConstraints": {
     "trustedProvenanceRequired": true,
@@ -7,7 +7,9 @@
   },
   "lifecyclePolicy": { "retention": "JIT_REMOVE_AFTER_VERIFIED_USE" },
   "targetTask": {
-    "fixtureRef": "fixture://pdf-convert/sample-invoice",
-    "parameters": { "outputFormat": "PDF/A" }
-  }
+    "fixtureRef": "fixture://pdf-convert/sample-invoice"
+  },
+  "preExistingUserAssets": [
+    { "path": "C:\\fixtures\\user-assets\\notes.txt" }
+  ]
 }

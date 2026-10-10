@@ -292,5 +292,8 @@
     "recoveryPlan",
     "planHash"
   ],
-  "additionalProperties": false
+  "additionalProperties": false,
+  "x-semantic-validation": [
+    "validateActionPlanSemantics"
+  ]
 }

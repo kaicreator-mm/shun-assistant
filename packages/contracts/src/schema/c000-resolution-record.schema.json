@@ -317,5 +317,66 @@
     "privacyDisclosurePlan",
     "failureDisposition"
   ],
-  "additionalProperties": false
+  "additionalProperties": false,
+  "x-semantic-validation": [
+    "validateResolutionRecordSemantics"
+  ],
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "selectedBindingId": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "selectedBindingId"
+        ]
+      },
+      "then": {
+        "properties": {
+          "failureDisposition": {
+            "type": "null"
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "failureDisposition": {
+            "type": "object"
+          }
+        },
+        "required": [
+          "failureDisposition"
+        ]
+      },
+      "then": {
+        "properties": {
+          "selectedBindingId": {
+            "type": "null"
+          }
+        }
+      }
+    },
+    {
+      "anyOf": [
+        {
+          "properties": {
+            "selectedBindingId": {
+              "type": "string"
+            }
+          }
+        },
+        {
+          "properties": {
+            "failureDisposition": {
+              "type": "object"
+            }
+          }
+        }
+      ]
+    }
+  ]
 }

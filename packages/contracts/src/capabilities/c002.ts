@@ -18,6 +18,10 @@ export const RESIDUE_CLASSIFICATIONS = [
 export type ResidueClassification = (typeof RESIDUE_CLASSIFICATIONS)[number];
 export const ResidueClassificationSchema = z.enum(RESIDUE_CLASSIFICATIONS);
 
+/** Fail-closed classifications: never eligible for automatic deletion (Product C-002 gate step 3). */
+export const NEVER_AUTO_DELETE_CLASSIFICATIONS = ['USER_CREATED_UNKNOWN', 'PROTECTED'] as const;
+
+/** Production input (L2 §4.2): Product semantic fields only. */
 export const JitLifecycleInputSchema = z.strictObject({
   taskId: z.string().min(1),
   capabilityRequirement: z.strictObject({
@@ -38,10 +42,20 @@ export const JitLifecycleInputSchema = z.strictObject({
     fixtureRef: z.string().min(1).optional(),
     parameters: z.record(z.string(), z.unknown()).optional(),
   }),
-  /** User assets placed where residue classification could discover them. */
-  preExistingUserAssets: z.array(z.strictObject({ path: z.string().min(1) })),
 });
 export type JitLifecycleInput = z.infer<typeof JitLifecycleInputSchema>;
+
+/**
+ * Benchmark-only envelope (L2 §4.2): pre-existing user-asset canaries are
+ * hidden harness truth and MUST NOT be required production inputs. The
+ * benchmark harness plants them through this envelope before the lifecycle
+ * runs; production consumes JitLifecycleInputSchema.
+ */
+export const JitBenchmarkInputSchema = JitLifecycleInputSchema.extend({
+  /** User assets placed where residue classification could discover them. */
+  preExistingUserAssets: z.array(z.strictObject({ path: z.string().min(1) })).min(1),
+});
+export type JitBenchmarkInput = z.infer<typeof JitBenchmarkInputSchema>;
 
 export const JitLifecycleOutputSchema = z
   .strictObject({
@@ -86,5 +100,17 @@ export const JitLifecycleOutputSchema = z
         message: 'REMOVED finalState requires the completed R2 gate record',
       });
     }
+    const neverAutoDelete: readonly ResidueClassification[] = NEVER_AUTO_DELETE_CLASSIFICATIONS;
+    output.residueReport.candidates.forEach((candidate, index) => {
+      if (
+        neverAutoDelete.includes(candidate.classification) &&
+        candidate.disposition === 'DELETE'
+      ) {
+        ctx.addIssue({
+          code: 'custom',
+          message: `residueReport.candidates[${index}] ${candidate.classification} must be RETAIN (fail-closed)`,
+        });
+      }
+    });
   });
 export type JitLifecycleOutput = z.infer<typeof JitLifecycleOutputSchema>;

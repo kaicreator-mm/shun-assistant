@@ -9,30 +9,64 @@ import { ExecutionReceiptSchema } from '../receipts.ts';
 import { Sha256HexSchema } from '../taxonomy.ts';
 import { ResidueClassificationSchema } from './c002.ts';
 
-/** Growth fixtures are known to the benchmark harness and hidden from the resolver/diagnoser (Product C-003 precondition). */
+/** Policy-eligible disposable categories — the only classes a cleanup may ever target. */
+const CLEANUP_ELIGIBLE_CATEGORIES = ['CACHE', 'TEMP'] as const;
+
+/** Production input (L2 §4.2): Product semantic fields only. */
 export const StorageDiagnoseInputSchema = z.strictObject({
   taskId: z.string().min(1),
   targetVolume: z.string().min(1),
+  /** Protected assets declared up front; integrity is verified after any bounded action. */
+  protectedAssets: z.array(z.strictObject({ path: z.string().min(1) })).min(1),
+  /** Only policy-eligible disposable categories may be removed automatically. */
+  cleanupPolicy: z.strictObject({
+    eligibleCategories: z.array(z.enum(CLEANUP_ELIGIBLE_CATEGORIES)).min(1),
+  }),
+});
+export type StorageDiagnoseInput = z.infer<typeof StorageDiagnoseInputSchema>;
+
+/**
+ * Benchmark-only envelope (L2 §4.2): the synthetic growth injector and the
+ * precommitted protected-asset baseline hashes are hidden harness truth and
+ * MUST NOT be required production inputs. The benchmark harness supplies them
+ * through this envelope; production consumes StorageDiagnoseInputSchema.
+ */
+export const StorageBenchmarkInputSchema = StorageDiagnoseInputSchema.extend({
   growthFixture: z.strictObject({
     kind: z.enum(['SYNTHETIC', 'REPRODUCIBLE']),
     /** Harness-side reference; never interpreted by the diagnoser. */
     injectorRef: z.string().min(1).optional(),
   }),
-  /** Protected baseline: integrity is verified after any bounded action. */
   protectedAssets: z
     .array(
       z.strictObject({
         path: z.string().min(1),
+        /** Precommitted canary baseline: integrity is verified against it after any bounded action. */
         baselineSha256: Sha256HexSchema,
       }),
     )
     .min(1),
-  /** Only policy-eligible disposable categories may be removed automatically. */
-  cleanupPolicy: z.strictObject({
-    eligibleCategories: z.array(z.enum(['CACHE', 'TEMP'])).min(1),
-  }),
 });
-export type StorageDiagnoseInput = z.infer<typeof StorageDiagnoseInputSchema>;
+export type StorageBenchmarkInput = z.infer<typeof StorageBenchmarkInputSchema>;
+
+/**
+ * Semantic invariant the committed JSON Schema artifact cannot express
+ * (identity/uniqueness across array elements): each protected asset is
+ * verified at most once. Exported so consumers of the artifact — which names
+ * this function in its `x-semantic-validation` annotation — run the same
+ * check the Zod parser enforces.
+ */
+export function validateC003OutputSemantics(output: StorageDiagnoseOutput): string[] {
+  const issues: string[] = [];
+  const seen = new Set<string>();
+  for (const asset of output.protectedAssetVerification) {
+    if (seen.has(asset.path)) {
+      issues.push(`duplicate protected asset verification for ${asset.path}`);
+    }
+    seen.add(asset.path);
+  }
+  return issues;
+}
 
 export const StorageDiagnoseOutputSchema = z
   .strictObject({
@@ -49,7 +83,8 @@ export const StorageDiagnoseOutputSchema = z
         targets: z.array(
           z.strictObject({
             path: z.string().min(1),
-            classification: ResidueClassificationSchema,
+            /** Only policy-eligible disposable data; user-created/unknown/protected is fail-closed. */
+            classification: z.enum(CLEANUP_ELIGIBLE_CATEGORIES),
             expectedReclaimBytes: z.number().int().nonnegative(),
           }),
         ),
@@ -86,15 +121,8 @@ export const StorageDiagnoseOutputSchema = z
         message: 'an executed cleanup plan requires reclaimed measurement',
       });
     }
-    const protectedPaths = new Set<string>();
-    for (const asset of output.protectedAssetVerification) {
-      if (protectedPaths.has(asset.path)) {
-        ctx.addIssue({
-          code: 'custom',
-          message: `duplicate protected asset verification for ${asset.path}`,
-        });
-      }
-      protectedPaths.add(asset.path);
+    for (const message of validateC003OutputSemantics(output)) {
+      ctx.addIssue({ code: 'custom', message });
     }
   });
 export type StorageDiagnoseOutput = z.infer<typeof StorageDiagnoseOutputSchema>;
