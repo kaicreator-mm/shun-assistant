@@ -1,0 +1,27 @@
+name: vertical-storage
+
+on:
+  pull_request:
+    paths:
+      - 'packages/vertical-storage/**'
+      - '.github/workflows/vertical-storage.yml'
+  push:
+    branches: [main]
+
+jobs:
+  windows:
+    # T07 required platform: LOCAL_WINDOWS_BUILD_HOST (frozen DAG). The
+    # vertical's evidence — real filesystem bounded cleanup, ACL denial,
+    # junction handling, journal recovery — is only meaningful on Windows.
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .node-version
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm --filter @shun/vertical-storage lint
+      - run: pnpm --filter @shun/vertical-storage typecheck
+      - run: pnpm --filter @shun/vertical-storage test
