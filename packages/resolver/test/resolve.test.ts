@@ -447,6 +447,78 @@ describe('resolution records over scenario registries', () => {
     expect(normalization.detail).toContain('observed-object proof source');
   });
 
+  it('an early capability-fit failure is classified NO_FEASIBLE_BINDING, not NO_TRUSTED_PROVIDER (P2-02)', () => {
+    const capability = capabilityDef({ capabilityId: 'image.batch_process', revision: 'r2' });
+    const provider = providerDef({ providerId: 'imageProvider.stale' });
+    const registry = registryOf({
+      capabilities: [capability],
+      providers: [provider],
+      bindings: [
+        bindingDef({
+          bindingId: 'b-stale-range',
+          providerId: provider.providerId,
+          capabilityId: 'image.batch_process',
+          capabilityRevisionRange: { min: 'r1', max: 'r1' },
+          environmentRequirements: requirements({ networkAccess: 'FORBIDDEN' }),
+        }),
+      ],
+    });
+    const result = resolve(registry);
+    expect(result.stage).toBe('RESOLUTION');
+    if (result.stage !== 'RESOLUTION') return;
+    const record = result.record;
+    expect(record.selectedBindingId).toBeNull();
+    expect(record.failureDisposition?.failureCode).toBe('NO_FEASIBLE_BINDING');
+    // The trust gate never ran for these candidates — the failure must not
+    // claim a trust/supply-chain verdict.
+    expect(record.failureDisposition?.detail).not.toContain('trust');
+    expect(record.candidates).toHaveLength(1);
+    const fitRow = record.hardGateDispositions.find(
+      (entry) => entry.bindingId === 'b-stale-range' && entry.gate === 'CAPABILITY_FIT',
+    );
+    expect(fitRow).toMatchObject({
+      outcome: 'REJECT',
+      reason: expect.stringContaining('outside supported range'),
+    });
+  });
+
+  it('mixed terminal gates are classified deterministically with an accurate terminal summary (P2-02)', () => {
+    const capability = capabilityDef({ capabilityId: 'image.batch_process', revision: 'r2' });
+    const trusted = providerDef({ providerId: 'imageProvider.stale-trusted' });
+    const shady = providerDef({
+      providerId: 'imageProvider.shady',
+      provenanceFacts: { trustState: 'UNKNOWN' },
+    });
+    const registry = registryOf({
+      capabilities: [capability],
+      providers: [trusted, shady],
+      bindings: [
+        bindingDef({
+          bindingId: 'b-fit-fail',
+          providerId: trusted.providerId,
+          capabilityId: 'image.batch_process',
+          capabilityRevisionRange: { min: 'r1', max: 'r1' },
+          environmentRequirements: requirements({ networkAccess: 'FORBIDDEN' }),
+        }),
+        bindingDef({
+          bindingId: 'b-trust-fail',
+          providerId: shady.providerId,
+          capabilityId: 'image.batch_process',
+          environmentRequirements: requirements({ networkAccess: 'FORBIDDEN' }),
+        }),
+      ],
+    });
+    const result = resolve(registry);
+    expect(result.stage).toBe('RESOLUTION');
+    if (result.stage !== 'RESOLUTION') return;
+    // A candidate that reached and failed the trust gate exists, so
+    // NO_TRUSTED_PROVIDER is factually true — and the detail names every
+    // terminal gate so the classification is auditable.
+    expect(result.record.failureDisposition?.failureCode).toBe('NO_TRUSTED_PROVIDER');
+    expect(result.record.failureDisposition?.detail).toContain('CAPABILITY_FIT');
+    expect(result.record.failureDisposition?.detail).toContain('TRUST_SUPPLY_CHAIN');
+  });
+
   it('an ambiguous goal surfaces the typed normalization outcome, never a record', () => {
     const registry = registryOf({
       capabilities: [
