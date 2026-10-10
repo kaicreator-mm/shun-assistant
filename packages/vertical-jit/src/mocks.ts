@@ -110,7 +110,15 @@ export class MemoryFilesystem implements FilesystemPort {
   // ---- privileged mutation (effect executors only; never via the port) ----
 
   #key(path: string): string {
-    return path.replaceAll('\\', '/').replace(/\/+$/, '').toLowerCase();
+    // Canonical: `/` separators, no leading or trailing slashes, lowercase.
+    // Stripping the leading slash keeps absolute POSIX paths (`/home/...`)
+    // consistent with how #mkdir derives ancestor keys and how #display
+    // stores spellings, so lookups agree on every platform (Windows paths
+    // have no leading slash and are unaffected).
+    return path
+      .replaceAll('\\', '/')
+      .replace(/^\/+|\/+$/g, '')
+      .toLowerCase();
   }
 
   #putFile(path: string, content: string): void {
@@ -128,15 +136,16 @@ export class MemoryFilesystem implements FilesystemPort {
   #mkdir(path: string): void {
     // Creating a directory implies its ancestors (real filesystem semantics);
     // every level keeps the caller's spelling, matching is case-insensitive.
-    const key = this.#key(path);
-    const segments = key.split('/');
+    // Ancestor keys are derived through #key so absolute POSIX paths
+    // (`/home/...`) resolve identically to Windows paths (`C:\...`).
     const given = path.split(/[\\/]+/).filter((segment) => segment.length > 0);
     let partial = '';
-    for (const [index, segment] of segments.entries()) {
+    for (const segment of given) {
       partial = partial ? `${partial}/${segment}` : segment;
-      if (!this.#nodes.has(partial)) {
-        this.#nodes.set(partial, { kind: 'dir' });
-        this.#display.set(partial, given.slice(0, index + 1).join('/'));
+      const key = this.#key(partial);
+      if (!this.#nodes.has(key)) {
+        this.#nodes.set(key, { kind: 'dir' });
+        this.#display.set(key, partial);
       }
     }
   }
