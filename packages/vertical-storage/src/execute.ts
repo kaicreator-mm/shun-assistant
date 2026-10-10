@@ -56,6 +56,21 @@ export interface ExecuteCleanupInput {
   environmentId: string;
   providerId: string;
   providerVersion: string;
+  /**
+   * Deterministic race-injection seam for tests only: invoked synchronously
+   * around effect-time filesystem operations so Windows-native TOCTOU swaps
+   * (junction/reparse-point replacement mid-delete) can be reproduced
+   * repeatably. Never set in production wiring.
+   */
+  testHooks?: DeleteTestHooks;
+}
+
+/** Test-only seams around effect-time operations (see ExecuteCleanupInput.testHooks). */
+export interface DeleteTestHooks {
+  /** Runs immediately before a file's effect-time target re-check and deletion. */
+  beforeFileDelete?: (filePath: string) => void | Promise<void>;
+  /** Runs immediately before descending into a subdirectory of the target. */
+  beforeDirDescend?: (dirPath: string) => void | Promise<void>;
 }
 
 /**

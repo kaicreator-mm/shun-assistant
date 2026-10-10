@@ -8,6 +8,7 @@ import { createHash } from 'node:crypto';
 import { promises as fsp } from 'node:fs';
 import * as path from 'node:path';
 import {
+  type ExecutionReceipt,
   type StorageDiagnoseInput,
   type StorageDiagnoseOutput,
   type VerificationInput,
@@ -137,6 +138,12 @@ export interface StorageVerificationContext {
   /** Post-action measurement of the attributed growth source (regrowth honesty). */
   postActionStateBytes: number;
   deps: StorageVerifierDeps;
+  /**
+   * Every execution receipt for this task's actions, in dispatch order. The
+   * verifier must see all of them: a failed/refused/partial receipt on ANY
+   * target can never verify PASS, no matter what the primary receipt claims.
+   */
+  receipts?: readonly ExecutionReceipt[];
 }
 
 export interface StorageVerificationOutcome {
