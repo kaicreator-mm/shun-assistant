@@ -172,8 +172,31 @@ export function runHardGates(
   // Gate 4 — User / organization policy: user constraints precede ranking.
   const requirements = binding.environmentRequirements;
   const policyProblems: string[] = [];
-  if (context.privacyPolicy.localOnly && requirements.networkAccess === 'REQUIRED') {
-    policyProblems.push('local-only privacy policy forbids network-transferring bindings');
+
+  // Disclosure dimension (P1-02): a no-disclosure privacy policy (localOnly,
+  // or externalDisclosure FORBIDDEN) admits only bindings whose requirements
+  // explicitly declare networkAccess FORBIDDEN — that declaration is the only
+  // machine-checkable disclosure-compatibility evidence in the frozen binding
+  // contract. REQUIRED is an unconditional network-transfer posture, OPTIONAL
+  // is an unproven posture (no proven no-disclosure execution mode), and an
+  // absent declaration is an unknown posture; all three fail closed instead
+  // of silently passing a disclosure-forbidding policy.
+  const noDisclosurePolicy =
+    context.privacyPolicy.localOnly || context.privacyPolicy.externalDisclosure === 'FORBIDDEN';
+  if (noDisclosurePolicy && requirements.networkAccess !== 'FORBIDDEN') {
+    if (requirements.networkAccess === 'REQUIRED') {
+      policyProblems.push(
+        'local-only / no-disclosure privacy policy forbids network-transferring bindings',
+      );
+    } else if (requirements.networkAccess === 'OPTIONAL') {
+      policyProblems.push(
+        'local-only / no-disclosure privacy policy rejects networkAccess OPTIONAL — optional network use is not a proven no-disclosure execution mode',
+      );
+    } else {
+      policyProblems.push(
+        'binding declares no network-access posture; an unknown transport posture fails closed under a local-only / no-disclosure privacy policy',
+      );
+    }
   }
   if (context.constraints.other?.offline === true && requirements.networkAccess === 'REQUIRED') {
     policyProblems.push('offline constraint forbids network access');

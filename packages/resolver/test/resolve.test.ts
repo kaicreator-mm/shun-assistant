@@ -186,11 +186,13 @@ function b034Registry() {
       bindingId: 'b-safer',
       providerId: safer.providerId,
       capabilityId: 'software.uninstall_safe',
+      environmentRequirements: requirements({ networkAccess: 'FORBIDDEN' }),
     }),
     bindingDef({
       bindingId: 'b-aggressive',
       providerId: aggressive.providerId,
       capabilityId: 'software.uninstall_safe',
+      environmentRequirements: requirements({ networkAccess: 'FORBIDDEN' }),
     }),
   ];
   return registryOf({
@@ -338,13 +340,17 @@ describe('resolution records over scenario registries', () => {
           bindingId: 'b-cli',
           providerId: cli.providerId,
           capabilityId: 'image.batch_process',
+          environmentRequirements: requirements({ networkAccess: 'FORBIDDEN' }),
         }),
         bindingDef({
           bindingId: 'b-pretty',
           providerId: pretty.providerId,
           capabilityId: 'image.batch_process',
           interfaceClass: 'I3',
-          environmentRequirements: requirements({ guiSessionRequired: true }),
+          environmentRequirements: requirements({
+            networkAccess: 'FORBIDDEN',
+            guiSessionRequired: true,
+          }),
         }),
       ],
     });
@@ -531,11 +537,13 @@ describe('resolution records over scenario registries', () => {
           bindingId: 'b-trusted',
           providerId: trusted.providerId,
           capabilityId: 'image.batch_process',
+          environmentRequirements: requirements({ networkAccess: 'FORBIDDEN' }),
         }),
         bindingDef({
           bindingId: 'b-untrusted',
           providerId: untrusted.providerId,
           capabilityId: 'image.batch_process',
+          environmentRequirements: requirements({ networkAccess: 'FORBIDDEN' }),
         }),
       ],
     });

@@ -29,6 +29,9 @@ function gateScenario(opts: {
     bindingId: 'b-1',
     providerId: provider.providerId,
     capabilityId: capability.capabilityId,
+    // The scenario policy is local-only/FORBIDDEN, so the default binding
+    // declares its no-network posture explicitly (P1-02 disclosure evidence).
+    environmentRequirements: requirements({ networkAccess: 'FORBIDDEN' }),
     ...opts.binding,
   });
   return runHardGates(binding, provider, {
@@ -136,6 +139,86 @@ describe('hard gates execute before ranking, in frozen order', () => {
     });
   });
 
+  it('policy: externalDisclosure FORBIDDEN rejects network-transferring bindings even when localOnly is false (P1-02)', () => {
+    const openRequest = goalRequest({ goal: 'image.batch_process: resize photos' });
+    openRequest.policyContext.privacyPolicy = {
+      localOnly: false,
+      externalDisclosure: 'FORBIDDEN',
+    };
+    const provider = providerDef({ providerId: 'imageProvider.imagemagick' });
+    const binding = bindingDef({
+      bindingId: 'b-1',
+      providerId: provider.providerId,
+      capabilityId: capability.capabilityId,
+      environmentRequirements: requirements({ networkAccess: 'REQUIRED' }),
+    });
+    const outcome = runHardGates(binding, provider, {
+      capability,
+      environment: envFacts({ networkPolicy: 'POLICY_CONTROLLED' }),
+      privacyPolicy: openRequest.policyContext.privacyPolicy,
+      environmentPolicy: openRequest.policyContext.environmentPolicy,
+      constraints: openRequest.constraints,
+    });
+    expect(outcome.passed).toBe(false);
+    const last = outcome.dispositions[outcome.dispositions.length - 1];
+    expect(last).toMatchObject({
+      gate: 'USER_ORG_POLICY',
+      outcome: 'REJECT',
+      reason: expect.stringContaining('disclosure'),
+    });
+  });
+
+  it('policy: networkAccess OPTIONAL is not a proven no-disclosure posture under a no-disclosure policy (P1-02)', () => {
+    const outcome = gateScenario({
+      binding: { environmentRequirements: requirements({ networkAccess: 'OPTIONAL' }) },
+    });
+    expect(outcome.passed).toBe(false);
+    const last = outcome.dispositions[outcome.dispositions.length - 1];
+    expect(last).toMatchObject({
+      gate: 'USER_ORG_POLICY',
+      outcome: 'REJECT',
+      reason: expect.stringContaining('OPTIONAL'),
+    });
+  });
+
+  it('policy: a binding that declares no network-access posture fails closed under a no-disclosure policy (P1-02)', () => {
+    const outcome = gateScenario({
+      binding: { environmentRequirements: requirements({}) },
+    });
+    expect(outcome.passed).toBe(false);
+    const last = outcome.dispositions[outcome.dispositions.length - 1];
+    expect(last).toMatchObject({
+      gate: 'USER_ORG_POLICY',
+      outcome: 'REJECT',
+      reason: expect.stringContaining('no network-access posture'),
+    });
+  });
+
+  it('policy: an explicitly no-network binding is the disclosure evidence a no-disclosure policy accepts (P1-02)', () => {
+    const openRequest = goalRequest({ goal: 'image.batch_process: resize photos' });
+    openRequest.policyContext.privacyPolicy = {
+      localOnly: false,
+      externalDisclosure: 'FORBIDDEN',
+    };
+    const provider = providerDef({ providerId: 'imageProvider.imagemagick' });
+    const binding = bindingDef({
+      bindingId: 'b-1',
+      providerId: provider.providerId,
+      capabilityId: capability.capabilityId,
+      environmentRequirements: requirements({ networkAccess: 'FORBIDDEN' }),
+    });
+    const outcome = runHardGates(binding, provider, {
+      capability,
+      environment: ENV_LOCAL,
+      privacyPolicy: openRequest.policyContext.privacyPolicy,
+      environmentPolicy: openRequest.policyContext.environmentPolicy,
+      constraints: openRequest.constraints,
+    });
+    expect(outcome.passed).toBe(true);
+    const policyRow = outcome.dispositions.find((entry) => entry.gate === 'USER_ORG_POLICY');
+    expect(policyRow).toMatchObject({ outcome: 'PASS' });
+  });
+
   it('policy: elevation forbidden by goal policy is a policy rejection, not a feasibility fact', () => {
     const outcome = gateScenario({
       binding: { environmentRequirements: requirements({ privilegeMode: 'ELEVATED_ADMIN' }) },
@@ -188,6 +271,7 @@ describe('hard gates execute before ranking, in frozen order', () => {
       bindingId: 'b-1',
       providerId: provider.providerId,
       capabilityId: capability.capabilityId,
+      environmentRequirements: requirements({ networkAccess: 'FORBIDDEN' }),
     });
     const outcome = runHardGates(binding, provider, {
       capability,
