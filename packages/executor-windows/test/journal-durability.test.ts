@@ -7,7 +7,7 @@ import { mkdtempSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { describe, expect, it, vi } from 'vitest';
-import { JournalWriter, durableWriteFileSync, readJournal } from '../src/journal.ts';
+import { durableWriteFileSync, JournalWriter, readJournal } from '../src/journal.ts';
 
 const { fsyncMock } = vi.hoisted(() => ({ fsyncMock: vi.fn() }));
 

@@ -305,10 +305,18 @@ export class LocalWindowsBackend implements EnvironmentBackend {
         allStepsSettled: true,
         postState,
       });
+      // C11: a completed step is only SUCCEEDED when the recovery
+      // classification is COMPLETED_VERIFIED; without independent post-state
+      // evidence the honest terminal is UNCERTAIN — never a dangling success.
+      const terminal: ExecutionReceipt['terminal'] = outcome.ok
+        ? classification.recoveryClassification === 'COMPLETED_VERIFIED'
+          ? 'SUCCEEDED'
+          : 'UNCERTAIN'
+        : 'FAILED';
 
       return this.finalize({
         action: action.actionId,
-        terminal: outcome.ok ? 'SUCCEEDED' : 'FAILED',
+        terminal,
         exitCode: typeof outcome.result.exitCode === 'number' ? outcome.result.exitCode : undefined,
         startedAt,
         reason: outcome.ok ? 'step completed' : outcome.reason,

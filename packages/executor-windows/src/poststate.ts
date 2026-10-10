@@ -119,15 +119,50 @@ export async function reconcileExpectedState(
     { op: synthesized.op, args: synthesized.args } as Parameters<typeof runStep>[0],
     ctx,
   );
-  return outcome.ok
-    ? {
-        verified: true,
-        holds: true,
-        basis: `reconcile-first verified expected state via ${synthesized.op}`,
-      }
-    : {
-        verified: true,
-        holds: false,
-        basis: `reconcile-first proved expected state absent via ${synthesized.op}: ${outcome.reason}`,
-      };
+  // Effect-liveness semantics (C09/C10): for a FAILED or interrupted action
+  // the reconcile outcome is evidence about whether the EFFECT landed, and
+  // `holds` below means "effect landed", not "the verify step passed":
+  //   - delete-family ops: success state is ABSENCE — a passing verify means
+  //     the effect landed;
+  //   - other ops: an exists:false expectation is a no-effect proof — a
+  //     passing verify means the expected artifact is absent, i.e. the effect
+  //     did NOT land.
+  const absenceIsSuccess = op === 'windows.fs.delete' || op === 'windows.registry.deleteKey';
+  const expectAbsence =
+    synthesized.op === 'windows.fs.verify'
+      ? synthesized.args.expectExists === false
+      : synthesized.args.expectKeyExists === false;
+  if (outcome.ok) {
+    const landed = absenceIsSuccess ? true : !expectAbsence;
+    return {
+      verified: true,
+      holds: landed,
+      ...(!landed ? { provesAbsence: true } : {}),
+      basis: `reconcile-first: expected state ${landed ? 'holds — effect landed' : 'verified absent — effect provably did not land'} via ${synthesized.op}`,
+    };
+  }
+  const existenceDimensionFailed =
+    typeof outcome.result.existenceOk === 'boolean' && outcome.result.existenceOk === false;
+  if (existenceDimensionFailed) {
+    // The existence assertion failed, so reality is on the OPPOSITE side of
+    // the expectation — and that is definitive (existence is two-valued).
+    const actuallyExists = expectAbsence;
+    const landed = absenceIsSuccess ? !actuallyExists : actuallyExists;
+    return {
+      verified: true,
+      holds: landed,
+      ...(!landed ? { provesAbsence: true } : {}),
+      basis: landed
+        ? `reconcile-first: existence dimension proves the effect landed (${outcome.reason})`
+        : `reconcile-first: existence dimension proves the effect absent — retry-safe no-effect proof (${outcome.reason})`,
+    };
+  }
+  // Content/value mismatch (existence satisfied) or no observation at all
+  // (e.g. scope refusal): a partial effect is possible — verified, not
+  // holding, and NOT proving absence (C10).
+  return {
+    verified: true,
+    holds: false,
+    basis: `reconcile-first: post-state mismatch without absence proof via ${synthesized.op}: ${outcome.reason}`,
+  };
 }

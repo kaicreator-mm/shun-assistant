@@ -274,19 +274,22 @@ export class PrivilegedWindowsExecutionBackend implements ExecutionBackend {
       return receipt;
     };
 
-    // UAC refusal: relay exception, helper provably never started — verify
-    // the empty journal is REALLY empty before classifying NOT_STARTED.
+    // UAC refusal: only "helper provably never started" when the EMPTY
+    // journal agrees (C15). A non-empty journal contradicting the relay
+    // verdict fails closed via classifyRecovery (execStart → UNCERTAIN,
+    // received-only → FAILED_BEFORE_EFFECT).
     if (relayResult.kind === 'UAC_DECLINED') {
-      const clean = journal.length === 0;
+      const classification = classifyRecovery({
+        journal,
+        relay: { kind: 'UAC_DECLINED', hresult: relayResult.hresult },
+      });
+      const terminal: ExecutionReceipt['terminal'] =
+        classification.recoveryClassification === 'NOT_STARTED'
+          ? 'UAC_DECLINED'
+          : terminalForClassification(classification);
       return mint({
-        terminal: 'UAC_DECLINED',
-        classification: {
-          recoveryClassification: clean ? 'NOT_STARTED' : 'MAY_HAVE_EXECUTED_UNCERTAIN',
-          resolvedByPostState: false,
-          basis: clean
-            ? 'UAC consent refused/timed out; empty journal — helper provably never started'
-            : 'UAC relay reported decline but the journal is non-empty — fail-closed to uncertain',
-        },
+        terminal,
+        classification,
         postStateVerified: false,
         reason: `UAC declined (${relayResult.hresult ?? 'n/a'})`,
       });

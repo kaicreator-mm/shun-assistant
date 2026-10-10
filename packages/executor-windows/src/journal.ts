@@ -13,14 +13,7 @@
 // with CANCELLED / TIMED_OUT markers emitted at the point of observation.
 
 import { createHash } from 'node:crypto';
-import {
-  appendFileSync,
-  closeSync,
-  fsyncSync,
-  openSync,
-  readFileSync,
-  writeSync,
-} from 'node:fs';
+import { appendFileSync, closeSync, fsyncSync, openSync, readFileSync, writeSync } from 'node:fs';
 import { z } from 'zod';
 
 export const JOURNAL_SCHEMA_VERSION = 'shun.executor-windows.journal/1';
@@ -175,7 +168,7 @@ export function readJournal(file: string): ReplayEvent[] {
   const endsWithNewline = raw.endsWith('\n');
   for (let i = 0; i < lines.length; i++) {
     const line = lines[i];
-    if (line.trim().length === 0) continue;
+    if (line === undefined || line.trim().length === 0) continue;
     try {
       events.push(JournalEventSchema.parse(JSON.parse(line)));
     } catch {
@@ -196,9 +189,7 @@ export function readJournal(file: string): ReplayEvent[] {
 }
 
 export function journalPhases(events: readonly ReplayEvent[]): JournalPhase[] {
-  return events
-    .filter((e): e is JournalEvent => !isTorn(e) && !isCorrupt(e))
-    .map((e) => e.phase);
+  return events.filter((e): e is JournalEvent => !isTorn(e) && !isCorrupt(e)).map((e) => e.phase);
 }
 
 /** True once the journal proves the helper began validation (first durable record). */

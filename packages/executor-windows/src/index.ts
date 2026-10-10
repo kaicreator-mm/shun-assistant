@@ -44,13 +44,13 @@ export {
   isTorn,
   JOURNAL_PHASES,
   JOURNAL_SCHEMA_VERSION,
+  JournalWriter,
   journalDigest,
   journalHasCorrupt,
   journalHasExecStart,
   journalHasReceived,
   journalPhases,
   journalStepResults,
-  JournalWriter,
   readJournal,
 } from './journal.ts';
 export type { ExecutorOp, ExecutorStep } from './ops.ts';

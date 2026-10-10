@@ -6,19 +6,30 @@
 //
 // Classification rules implemented here (in order):
 //   NOT_STARTED                  — the journal proves the helper never began
-//                                  (absent/empty journal, UAC_DECLINED);
+//                                  (absent/empty journal, UAC_DECLINED with
+//                                  an empty journal ONLY — a decline verdict
+//                                  contradicting a non-empty journal fails
+//                                  closed, C15);
 //   FAILED_BEFORE_EFFECT         — journal stops before the first EXEC_START
 //                                  (all validation phases precede any side
 //                                  effect): structured refusal, cancelled
 //                                  before effects, or a crash before effects;
+//                                  OR an interruption/settled failure whose
+//                                  independent post-state check proves the
+//                                  effect ABSENT on the existence dimension
+//                                  (C10: a content/value mismatch proves
+//                                  nothing about effect-liveness);
 //   MAY_HAVE_EXECUTED_UNCERTAIN  — interruption inside a step's
-//                                  [EXEC_START, EXEC_DONE) window; resolved
-//                                  to a concrete outcome ONLY when the
-//                                  interrupted step's plan declares
-//                                  verifiable expected state (reconcile-
-//                                  first), otherwise honestly UNCERTAIN;
+//                                  [EXEC_START, EXEC_DONE) window; an
+//                                  effect window that opened and closed with
+//                                  the receipt lost and no absence proof
+//                                  (C09: EXEC_DONE + no receipt must NOT be
+//                                  read as "no effect"); a SUCCEEDED receipt
+//                                  with no independent post-state evidence
+//                                  (C11); any post-state mismatch that is not
+//                                  an existence-dimension absence proof;
 //   COMPLETED_VERIFIED           — RECEIPT_WRITTEN (or full EXEC_DONE set) +
-//                                  independent post-state verification.
+//                                  independent post-state verification pass.
 import type { ExecutionTerminal, RecoveryClassification } from '@shun/contracts';
 import type { JournalEvent, ReplayEvent } from './journal.ts';
 import {
@@ -29,10 +40,18 @@ import {
   journalPhases,
   journalStepResults,
 } from './journal.ts';
+import { READONLY_OPS } from './ops.ts';
 
-/** Post-state outcome of a reconcile-first verification run. */
+/**
+ * Post-state outcome of a reconcile-first verification run.
+ * `provesAbsence` (C10): true ONLY when the check failed on the EXISTENCE
+ * dimension (expected file/key provably absent, or expected-absent file/key
+ * provably present) — the only outcome that licenses a "no effect" claim and
+ * therefore a PROVEN_NOT_EXECUTED retry. A content/value mismatch leaves a
+ * partial effect possible and must stay honestly UNCERTAIN.
+ */
 export type PostStateOutcome =
-  | { verified: true; holds: boolean; basis: string }
+  | { verified: true; holds: boolean; basis: string; provesAbsence?: boolean }
   | { verified: false; basis: string };
 
 export interface ClassificationInput {
@@ -76,14 +95,39 @@ export function classifyRecovery(input: ClassificationInput): ClassificationResu
   const received = journalHasReceived(input.journal);
   const execStart = journalHasExecStart(input.journal);
 
-  if (input.relay?.kind === 'UAC_DECLINED' || (!received && !execStart)) {
+  // C15: a UAC decline verdict may only mean "helper provably never started"
+  // when the journal is EMPTY. A non-empty journal contradicting the relay
+  // verdict (helper actually ran — worst case an effect window opened) fails
+  // closed: never NOT_STARTED.
+  if (input.relay?.kind === 'UAC_DECLINED') {
+    if (execStart) {
+      return {
+        recoveryClassification: 'MAY_HAVE_EXECUTED_UNCERTAIN',
+        resolvedByPostState: false,
+        basis:
+          'UAC relay reported decline but the journal proves an EXEC_START — the verdict contradicts the durable record; fail closed to uncertain',
+      };
+    }
+    if (received) {
+      return {
+        recoveryClassification: 'FAILED_BEFORE_EFFECT',
+        resolvedByPostState: false,
+        basis:
+          'UAC relay reported decline but the journal is non-empty pre-effects — the helper began; no effect window opened',
+      };
+    }
     return {
       recoveryClassification: 'NOT_STARTED',
       resolvedByPostState: false,
-      basis:
-        input.relay?.kind === 'UAC_DECLINED'
-          ? 'UAC consent refused/timed out; empty journal — helper provably never started'
-          : 'no RECEIVED in journal — helper provably never began; no side effect possible',
+      basis: 'UAC consent refused/timed out; empty journal — helper provably never started',
+    };
+  }
+
+  if (!received && !execStart) {
+    return {
+      recoveryClassification: 'NOT_STARTED',
+      resolvedByPostState: false,
+      basis: 'no RECEIVED in journal — helper provably never began; no side effect possible',
     };
   }
 
@@ -116,28 +160,58 @@ export function classifyRecovery(input: ClassificationInput): ClassificationResu
         basis: `receipt SUCCEEDED but independent post-state verification conflicts: ${input.postState.basis}`,
       };
     }
-    // Structured SUCCEEDED receipt with no declared verifiable post-state:
-    // the journal proves the effect window closed cleanly (U-06 frozen
-    // contract). Honest residual: nothing INDEPENDENT was checked — recorded
-    // in the basis and postStateVerified=false.
+    // C11: a structured SUCCEEDED receipt with NO independent post-state
+    // evidence is transport optimism, never COMPLETED_VERIFIED. The journal
+    // proves the effect window closed cleanly; the honest value for what
+    // landed on disk is UNCERTAIN.
     return {
-      recoveryClassification: 'COMPLETED_VERIFIED',
+      recoveryClassification: 'MAY_HAVE_EXECUTED_UNCERTAIN',
       resolvedByPostState: false,
       basis:
-        'structured SUCCEEDED receipt, all steps settled; action declares no independent post-state check',
+        'structured SUCCEEDED receipt and all steps settled, but no independent post-state evidence — never transport optimism',
     };
   }
 
-  // All steps settled on a non-SUCCEEDED receipt (FAILED/CANCELLED/…): the
-  // failure is structured, its point is journaled, and no window is open.
+  // All steps settled on a FAILED/CANCELLED/TIMED_OUT/ABSENT receipt. The
+  // effect window opened and closed; without post-state proof nothing here
+  // may claim "no effect".
+  if (input.postState?.verified && input.postState.holds) {
+    return {
+      recoveryClassification: 'COMPLETED_VERIFIED',
+      resolvedByPostState: false,
+      basis: `independent post-state verification passes despite receipt '${input.receipt?.terminal ?? 'ABSENT'}' — the declared expected state holds (${input.postState.basis})`,
+    };
+  }
+  if (input.postState?.verified && !input.postState.holds) {
+    if (input.postState.provesAbsence) {
+      return {
+        recoveryClassification: 'FAILED_BEFORE_EFFECT',
+        resolvedByPostState: true,
+        basis: `independent post-state proves the effect absent (existence dimension): ${input.postState.basis}`,
+      };
+    }
+    // C10: a content/value mismatch cannot prove the effect did not land.
+    return {
+      recoveryClassification: 'MAY_HAVE_EXECUTED_UNCERTAIN',
+      resolvedByPostState: false,
+      basis: `post-state mismatch without absence proof — a partial effect is possible: ${input.postState.basis}`,
+    };
+  }
+  // C09: receipt lost (or a bare structured failure) with no verifiable
+  // expected state. For read-only ops the effect window cannot have mutated
+  // anything, so FAILED_BEFORE_EFFECT stays sound; for mutating ops the
+  // journal proves an effect window ran and nothing proves absence.
+  if (onlyReadOnlyEffectWindowOps(input.journal)) {
+    return {
+      recoveryClassification: 'FAILED_BEFORE_EFFECT',
+      resolvedByPostState: false,
+      basis: `helper terminal '${input.receipt?.terminal ?? 'ABSENT'}'; every effect-window step is a read-only op — no mutation possible`,
+    };
+  }
   return {
-    recoveryClassification: input.postState?.verified
-      ? input.postState.holds
-        ? 'COMPLETED_VERIFIED'
-        : 'FAILED_BEFORE_EFFECT'
-      : 'FAILED_BEFORE_EFFECT',
+    recoveryClassification: 'MAY_HAVE_EXECUTED_UNCERTAIN',
     resolvedByPostState: false,
-    basis: `helper terminal '${input.receipt?.terminal ?? 'ABSENT'}' with all steps settled — failure is structured and located`,
+    basis: `helper terminal '${input.receipt?.terminal ?? 'ABSENT'}' with no independent post-state evidence — the journal proves an effect window opened; no absence claim is possible`,
   };
 }
 
@@ -173,10 +247,19 @@ function reconcileInterrupted(input: ClassificationInput): ClassificationResult 
         basis: `interrupted inside an effect window; expected state verified present (${input.postState.basis})`,
       };
     }
+    if (input.postState.provesAbsence) {
+      return {
+        recoveryClassification: 'FAILED_BEFORE_EFFECT',
+        resolvedByPostState: true,
+        basis: `interrupted inside an effect window; expected state proven absent on the existence dimension — effect provably did not land (${input.postState.basis})`,
+      };
+    }
+    // C10: content/value mismatch — a partial effect is possible, so the
+    // honest value stays UNCERTAIN (and no blind PROVEN_NOT_EXECUTED retry).
     return {
-      recoveryClassification: 'FAILED_BEFORE_EFFECT',
-      resolvedByPostState: true,
-      basis: `interrupted inside an effect window; expected state verified absent — effect provably did not land (${input.postState.basis})`,
+      recoveryClassification: 'MAY_HAVE_EXECUTED_UNCERTAIN',
+      resolvedByPostState: false,
+      basis: `interrupted inside an effect window; post-state mismatch without absence proof (${input.postState.basis})`,
     };
   }
   return {
@@ -185,6 +268,30 @@ function reconcileInterrupted(input: ClassificationInput): ClassificationResult 
     basis:
       'crash/interruption inside a step [EXEC_START, EXEC_DONE) window and no verifiable expected state resolves it',
   };
+}
+
+/**
+ * True when every step that entered an effect window (EXEC_START /
+ * EXEC_DONE / EXEC_STEP_FAILED) is a read-only op — read-only steps cannot
+ * mutate state, so a settled failure on them licenses FAILED_BEFORE_EFFECT
+ * without post-state evidence.
+ */
+function onlyReadOnlyEffectWindowOps(journal: readonly ReplayEvent[]): boolean {
+  const events = journal.filter((e): e is JournalEvent => !isTorn(e) && !isCorrupt(e));
+  const ops = new Set<string>();
+  for (const e of events) {
+    if (
+      (e.phase === 'EXEC_START' || e.phase === 'EXEC_DONE' || e.phase === 'EXEC_STEP_FAILED') &&
+      typeof e.op === 'string'
+    ) {
+      ops.add(e.op);
+    }
+  }
+  if (ops.size === 0) return false;
+  for (const op of ops) {
+    if (!(READONLY_OPS as readonly string[]).includes(op)) return false;
+  }
+  return true;
 }
 
 function allStepsSettled(journal: readonly ReplayEvent[]): boolean {

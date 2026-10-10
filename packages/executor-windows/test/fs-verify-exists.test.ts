@@ -34,13 +34,19 @@ describe.skipIf(!ON_WINDOWS)('windows.fs.verify expectExists semantics (C14)', (
 
   it('expectExists=false PASSES when the file is absent (negative control for C14)', async () => {
     expect(existsSync(absent)).toBe(false);
-    const r = await runStep({ op: 'windows.fs.verify', args: { path: absent, expectExists: false } }, ctx);
+    const r = await runStep(
+      { op: 'windows.fs.verify', args: { path: absent, expectExists: false } },
+      ctx,
+    );
     expect(r.ok, JSON.stringify(r)).toBe(true);
   });
 
   it('expectExists=false FAILS when the file is present', async () => {
     writeFileSync(present, 'data', 'utf8');
-    const r = await runStep({ op: 'windows.fs.verify', args: { path: present, expectExists: false } }, ctx);
+    const r = await runStep(
+      { op: 'windows.fs.verify', args: { path: present, expectExists: false } },
+      ctx,
+    );
     expect(r.ok).toBe(false);
     if (!r.ok) {
       expect(r.reason).toContain('expected file present');
@@ -49,9 +55,15 @@ describe.skipIf(!ON_WINDOWS)('windows.fs.verify expectExists semantics (C14)', (
   });
 
   it('expectExists=true still passes when the file is present and fails when absent', async () => {
-    const okR = await runStep({ op: 'windows.fs.verify', args: { path: present, expectExists: true } }, ctx);
+    const okR = await runStep(
+      { op: 'windows.fs.verify', args: { path: present, expectExists: true } },
+      ctx,
+    );
     expect(okR.ok).toBe(true);
-    const badR = await runStep({ op: 'windows.fs.verify', args: { path: absent, expectExists: true } }, ctx);
+    const badR = await runStep(
+      { op: 'windows.fs.verify', args: { path: absent, expectExists: true } },
+      ctx,
+    );
     expect(badR.ok).toBe(false);
     if (!badR.ok) {
       expect(badR.reason).toContain('expected file absent');
@@ -63,7 +75,10 @@ describe.skipIf(!ON_WINDOWS)('windows.fs.verify expectExists semantics (C14)', (
 
   it('content dimension failure is reported distinctly from existence failure', async () => {
     const r = await runStep(
-      { op: 'windows.fs.verify', args: { path: present, expectExists: true, expectContent: 'other' } },
+      {
+        op: 'windows.fs.verify',
+        args: { path: present, expectExists: true, expectContent: 'other' },
+      },
       ctx,
     );
     expect(r.ok).toBe(false);

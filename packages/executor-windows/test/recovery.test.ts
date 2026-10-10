@@ -79,14 +79,19 @@ describe('classifyRecovery — §9.4 matrix', () => {
     expect(r.resolvedByPostState).toBe(true);
   });
 
-  it('reconcile-first: interrupted window + expected state ABSENT resolves to FAILED_BEFORE_EFFECT', () => {
+  it('reconcile-first: interrupted window + expected state proven ABSENT (existence dimension) resolves to FAILED_BEFORE_EFFECT', () => {
     const j = journalWith((w) => {
       w.append('RECEIVED');
       w.append('EXEC_START', { step: 0, op: 'windows.fs.write' });
     });
     const r = classifyRecovery({
       journal: j,
-      postState: { verified: true, holds: false, basis: 'expected file provably absent' },
+      postState: {
+        verified: true,
+        holds: false,
+        provesAbsence: true,
+        basis: 'expected file provably absent',
+      },
     });
     expect(r.recoveryClassification).toBe('FAILED_BEFORE_EFFECT');
     expect(r.resolvedByPostState).toBe(true);
@@ -125,7 +130,11 @@ describe('classifyRecovery — §9.4 matrix', () => {
     expect(r.recoveryClassification).toBe('MAY_HAVE_EXECUTED_UNCERTAIN');
   });
 
-  it('SUCCEEDED receipt without declared verify → COMPLETED_VERIFIED, honest basis, no claimed independence', () => {
+  it('SUCCEEDED receipt without independent post-state evidence → honestly UNCERTAIN (C11: no false verified)', () => {
+    // Encoded defect, corrected for T04 C11: the old assertion claimed
+    // COMPLETED_VERIFIED from transport optimism alone. The four-state
+    // model's COMPLETED_VERIFIED requires INDEPENDENT post-state evidence;
+    // without it the honest value is MAY_HAVE_EXECUTED_UNCERTAIN.
     const j = journalWith((w) => {
       w.append('RECEIVED');
       w.append('EXEC_START', { step: 0, op: 'windows.fs.write' });
@@ -137,10 +146,15 @@ describe('classifyRecovery — §9.4 matrix', () => {
       receipt: { terminal: 'SUCCEEDED' },
       allStepsSettled: true,
     });
-    expect(r.recoveryClassification).toBe('COMPLETED_VERIFIED');
+    expect(r.recoveryClassification).toBe('MAY_HAVE_EXECUTED_UNCERTAIN');
   });
 
-  it('mutating step structured failure after EXEC_START stays in the uncertain bucket (reconcile-first upstream)', () => {
+  it('mutating step structured failure after EXEC_START stays honestly UNCERTAIN without an absence proof (C09/C10)', () => {
+    // Encoded defect, corrected for T04 C09/C10: the old assertion claimed
+    // FAILED_BEFORE_EFFECT ("no effect") for a MUTATING op from the
+    // structured receipt alone. reg.exe-style partial effects are possible
+    // inside an effect window, so without post-state absence proof the
+    // honest value is UNCERTAIN.
     const j = journalWith((w) => {
       w.append('RECEIVED');
       w.append('EXEC_START', { step: 0, op: 'windows.registry.setValue' });
@@ -156,14 +170,34 @@ describe('classifyRecovery — §9.4 matrix', () => {
       receipt: { terminal: 'FAILED' },
       allStepsSettled: true,
     });
-    expect(r.recoveryClassification).toBe('FAILED_BEFORE_EFFECT');
-    const reconciled = classifyRecovery({
+    expect(r.recoveryClassification).toBe('MAY_HAVE_EXECUTED_UNCERTAIN');
+    // A mismatch WITHOUT an existence-dimension absence proof is equally
+    // not a "no effect" claim (C10).
+    const mismatched = classifyRecovery({
       journal: j,
       receipt: { terminal: 'FAILED' },
       allStepsSettled: true,
-      postState: { verified: true, holds: false, basis: 'value provably not set' },
+      postState: {
+        verified: true,
+        holds: false,
+        provesAbsence: false,
+        basis: 'value differs — partial write possible',
+      },
     });
-    expect(reconciled.recoveryClassification).toBe('FAILED_BEFORE_EFFECT');
+    expect(mismatched.recoveryClassification).toBe('MAY_HAVE_EXECUTED_UNCERTAIN');
+    // An existence-dimension absence proof DOES resolve to FAILED_BEFORE_EFFECT.
+    const provenAbsent = classifyRecovery({
+      journal: j,
+      receipt: { terminal: 'FAILED' },
+      allStepsSettled: true,
+      postState: {
+        verified: true,
+        holds: false,
+        provesAbsence: true,
+        basis: 'value provably absent',
+      },
+    });
+    expect(provenAbsent.recoveryClassification).toBe('FAILED_BEFORE_EFFECT');
   });
 
   it('torn final append never upgrades a classification', () => {

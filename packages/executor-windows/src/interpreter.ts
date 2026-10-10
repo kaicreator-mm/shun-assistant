@@ -230,20 +230,34 @@ async function runParsedStep(step: ExecutorStep, ctx: InterpreterContext): Promi
       const query = await execCaptured(REG_EXE, ['query', step.args.key], ctx, 30000);
       const exists = query.exitCode === 0;
       const values = exists ? parseRegQueryOutput(query.stdout) : {};
-      let ok = true;
+      // Dimension reporting (C10 input): existence and value mismatches must
+      // be distinguishable — only the former proves absence of the effect.
+      let existenceOk = true;
+      let valuesOk = true;
       if (step.args.expectKeyExists !== undefined && exists !== step.args.expectKeyExists)
-        ok = false;
+        existenceOk = false;
       for (const [name, expected] of Object.entries(step.args.expectValues ?? {})) {
-        if (values[name.toLowerCase()] !== expected) ok = false;
+        if (values[name.toLowerCase()] !== expected) valuesOk = false;
       }
+      const ok = existenceOk && valuesOk;
       const result = {
         key: step.args.key,
         exists,
+        existenceOk,
+        valuesOk,
         observedValues: values,
         expectKeyExists: step.args.expectKeyExists,
         expectValues: step.args.expectValues ?? {},
       };
-      if (!ok) return { ok: false, reason: 'registry post-state mismatch', result };
+      if (!ok) {
+        return {
+          ok: false,
+          reason: existenceOk
+            ? 'registry post-state value mismatch'
+            : 'registry post-state key mismatch',
+          result,
+        };
+      }
       return { ok: true, result };
     }
     case 'windows.proc.exec': {
