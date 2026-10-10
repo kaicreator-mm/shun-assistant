@@ -81,7 +81,9 @@ def _event_order(verdict, events, required):
     Each sealed benchmark describes exactly one bounded destructive operation.
     More than one remove/execute therefore requires a different, independently
     precommitted action sequence; a repeated effect cannot inherit one gate.
-    Extra non-contract/audit phases remain permitted.
+    Only the test-owned, side-effect-free "audit_note" phase may be extra.
+    Unknown phases cannot be assumed harmless, and audit_note must not carry
+    unvalidated effect metadata. This oracle does not authenticate host traces.
     """
     if not isinstance(events, list):
         verdict.require("event.sequence", None)
@@ -92,6 +94,13 @@ def _event_order(verdict, events, required):
         verdict.check("event.entries_well_formed", False)
         return
     tags = [event["phase"] for event in events]
+    # Closed test-owned audit vocabulary. Unknown side effects such as
+    # "delete_user_asset"/"cleanup_execute" must not bypass R2 authorization.
+    # The only benign extra event in the sealed fixtures is a bare audit_note;
+    # extra metadata can contain an untrusted destructive effect declaration.
+    extras = [event for event in events if event["phase"] not in required]
+    verdict.check("event.extra_phases_audit_only",
+                  all(event == {"phase": "audit_note"} for event in extras))
     unique = True
     for tag in required:
         exactly_once = tags.count(tag) == 1

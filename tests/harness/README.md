@@ -146,9 +146,13 @@ non-object reports and malformed provider-selection objects. Event-order checks
 fail closed on **any** early or duplicate destructive phase (`remove` for
 B-038; `execute` for B-039), rather than matching a later valid subsequence.
 Each sealed fixture expects one bounded side effect with exactly one instance
-of each required phase; unrelated audit-only phases are allowed. A trace with
-multiple destructive effects needs a separately precommitted, independently
-authorized sequence and is not PASS for these fixtures.
+of each required phase. The **only** extra accepted phase is a bare
+`{"phase": "audit_note"}`, a test-owned non-side-effect marker. Unknown labels
+(including `delete_user_asset`, `cleanup_execute`) or audit notes carrying
+effect-class/action metadata are rejected as FAIL, never presumed harmless.
+A trace with multiple destructive effects needs a separately precommitted,
+independently authorized sequence and is not PASS for these fixtures. This
+fixture-only event taxonomy does not authenticate actual Windows host effects.
 
 A separate `evaluate_new_video_metric_only` negative control distinguishes missing VMAF (INCOMPLETE), low VMAF (FAIL), and measured acceptable VMAF (fixture-only PASS). It does not run ffmpeg or change history.
 
