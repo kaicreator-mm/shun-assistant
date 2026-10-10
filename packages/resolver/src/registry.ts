@@ -15,6 +15,7 @@ import {
   parseProviderCapabilityBinding,
   parseProviderDefinition,
   type RegistryReadModelPort,
+  ShunContractError,
 } from '@shun/contracts';
 import { matchCapabilityIds, OBJECTIVE_MATCHERS, type ObjectiveMatcherTable } from './matchers.ts';
 
@@ -68,19 +69,46 @@ export class ShunRegistry {
 
   /** Synchronous construction from already-collected facts (tests, callers holding a snapshot). */
   static fromSnapshot(snapshot: RegistrySnapshot, options?: RegistryOptions): ShunRegistry {
+    // Identity uniqueness fails closed (P1-05): one stable identity must
+    // designate exactly one fact. A duplicate capabilityId/providerId would
+    // silently overwrite its predecessor here, and a duplicate bindingId
+    // would make selectedBindingId designate two different Provider/adapter
+    // bindings — ambiguous selection is refused at construction instead.
     const capabilities = new Map<string, CapabilityDefinition>();
     for (const capability of snapshot.capabilities) {
       const parsed = parseCapabilityDefinition(capability);
+      const existing = capabilities.get(parsed.capabilityId);
+      if (existing !== undefined) {
+        throw new ShunContractError(
+          'SCHEMA_VIOLATION',
+          `duplicate capabilityId "${parsed.capabilityId}" in registry snapshot (existing revision ${existing.revision}, duplicate revision ${parsed.revision}) — one stable identity must designate exactly one capability; fail closed`,
+        );
+      }
       capabilities.set(parsed.capabilityId, parsed);
     }
     const providers = new Map<string, ProviderDefinition>();
     for (const provider of snapshot.providers) {
       const parsed = parseProviderDefinition(provider);
+      const existing = providers.get(parsed.providerId);
+      if (existing !== undefined) {
+        throw new ShunContractError(
+          'SCHEMA_VIOLATION',
+          `duplicate providerId "${parsed.providerId}" in registry snapshot (existing revision ${existing.revision}, duplicate revision ${parsed.revision}) — a repeated identity with a conflicting revision must not be silently accepted; fail closed`,
+        );
+      }
       providers.set(parsed.providerId, parsed);
     }
     const bindingsByCapability = new Map<string, ProviderCapabilityBinding[]>();
+    const seenBindingIds = new Set<string>();
     for (const binding of snapshot.bindings) {
       const parsed = parseProviderCapabilityBinding(binding);
+      if (seenBindingIds.has(parsed.bindingId)) {
+        throw new ShunContractError(
+          'SCHEMA_VIOLATION',
+          `duplicate bindingId "${parsed.bindingId}" in registry snapshot (provider ${parsed.providerId}, capability ${parsed.capabilityId}) — one binding identity must designate exactly one Provider/adapter binding or selection becomes ambiguous; fail closed`,
+        );
+      }
+      seenBindingIds.add(parsed.bindingId);
       const list = bindingsByCapability.get(parsed.capabilityId) ?? [];
       list.push(parsed);
       bindingsByCapability.set(parsed.capabilityId, list);
