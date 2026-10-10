@@ -49,6 +49,46 @@ class OracleTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             prepare(self.root)
 
+    def test_fixed_toolchain_fixture_lock_fail_closed(self):
+        # Overrides test lock logic only. Local must run CLI against real versions.
+        from tests.fixtures.lock import LOCK_PATH, FixtureLockError, check_fixture_lock
+        record = json.loads(LOCK_PATH.read_text(encoding="utf-8"))
+        with tempfile.TemporaryDirectory() as folder:
+            fresh = Path(folder) / "fresh"
+            prepare(fresh)
+            result = check_fixture_lock(fresh, installed=record["toolchain"])
+            self.assertEqual("PASS", result["fixture_lock_status"])
+            self.assertEqual("NOT_RUN", result["real_host_validation"])
+            self.assertEqual(208, result["generated_file_count"])
+            self.assertEqual(self.seal, result["seal_sha256"])
+
+            wrong_versions = {**record["toolchain"], "pillow": "unverified"}
+            with self.assertRaisesRegex(FixtureLockError, "TOOLCHAIN_MISMATCH"):
+                check_fixture_lock(fresh, installed=wrong_versions)
+            wrong_seal = {**record, "precommit_seal_sha256": "0" * 64}
+            with self.assertRaisesRegex(FixtureLockError, "LOCK_SEAL_MISMATCH"):
+                check_fixture_lock(fresh, record=wrong_seal, installed=record["toolchain"])
+            wrong_count = {**record, "generated_file_count": 209}
+            with self.assertRaisesRegex(FixtureLockError, "FILE_SET"):
+                check_fixture_lock(fresh, record=wrong_count, installed=record["toolchain"])
+
+            precommit = fresh / "public/precommit.json"
+            saved = precommit.read_bytes()
+            try:
+                payload = json.loads(saved)
+                payload["min_ssim"] = 0.01
+                precommit.write_text(json.dumps(payload), encoding="utf-8")
+                with self.assertRaisesRegex(FixtureLockError, "PRECOMMIT_TAMPER"):
+                    check_fixture_lock(fresh, installed=record["toolchain"])
+            finally:
+                precommit.write_bytes(saved)
+
+            protected = fresh / "inputs/B-039/workspace/protected/precious.bin"
+            with protected.open("r+b") as handle:
+                handle.write(b"tampered")
+            with self.assertRaisesRegex(FixtureLockError, "PROTECTED_HASH"):
+                check_fixture_lock(fresh, installed=record["toolchain"])
+
     def test_fixture_regeneration_deterministic_on_same_toolchain(self):
         # A new independent root must reproduce every source digest and seal.
         with tempfile.TemporaryDirectory() as folder:

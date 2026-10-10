@@ -4,6 +4,39 @@ Authority: Issue #20; frozen Product `19d19b5`; frozen L2 `7273095`;
 DAG checkpoint `00fce240`. This slice has **no runtime schema import** and
 does not pre-select a Provider. The only output claim is `FIXTURE_ORACLE_ONLY`.
 
+## Fixed-toolchain Fixture Lock and checked-in seed/seal evidence
+
+The test-only lock at `tests/fixtures/fixture-lock-v0.1.json` records seed **37040**,
+Python **3.14.7**, Pillow **12.3.0**, numpy **2.5.3**, scikit-image **0.26.0**,
+the exact generator Git blob SHA, **200 images + 8 other fixture files**, and
+the independent Local Validator's precommit seal:
+`57f768973b1562e5d995fed350749db95a8a98a22619fac23766118b6e8a1649`.
+This reference was observed on PR #23 at `df01aef0d906d697e3ee59f5188306f4003fe1a5`.
+The seal covers 200 image SHA-256 hashes, protected/user asset hashes and
+the canonical private gold digest; it is **not** an invented full 208-file hash list.
+
+Use Python **3.14.7** and exact test-only dependency versions on a fresh root:
+
+```shell
+python -m pip install "Pillow==12.3.0" "numpy==2.5.3" "scikit-image==0.26.0"
+python -m tests.fixtures.generate prepare --root ./t09-run
+python -m tests.fixtures.lock verify --root ./t09-run
+```
+
+`verify` must exit 0 before any candidate execution or B-039 injection. It checks
+the **actual** interpreter/dependency versions, generator Git blob, seed,
+file set, independently recorded seal, gold and precommit integrity, source
+hashes, sample ordering, protected-asset integrity and blind input separation.
+Do not regenerate/reseal the locked reference to force a PASS, and do not
+claim portability to other Pillow/JPEG encoders or Python versions.
+The command only validates the **pre-execution** 208-file root; injection or
+candidate outputs change that set. Unit tests use injected version values
+to test failure semantics; only the strict CLI verifies the real host toolchain.
+
+All outputs are `FIXTURE_LOCK_ONLY`, not Windows E2E, CI, integration or release
+PASS. The historical B-010 VMAF result remains INCOMPLETE. Publish a new
+exact-successor-SHA Local validation terminal after this change.
+
 ## Prepare and precommit before invoking the candidate
 
 Use a disposable directory on the same real host as the eventual test. Python

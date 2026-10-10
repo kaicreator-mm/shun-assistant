@@ -1,0 +1,31 @@
+{
+  "schema": "shun.t09.fixture-lock.v1",
+  "scope": "FIXTURE_ORACLE_ONLY",
+  "reproducibility": "SAME_TOOLCHAIN_ONLY; not portable across unvalidated image encoders",
+  "evidence": "Local independent validator Issue #20 comment 6095900014, commit df01aef",
+  "validated_parent_head": "df01aef0d906d697e3ee59f5188306f4003fe1a5",
+  "seed": 37040,
+  "generator_path": "tests/fixtures/generate.py",
+  "generator_git_blob_sha": "ec1df8ee4345f4ec25c8b78a6d5a1b6c767ca974",
+  "toolchain": {
+    "python": "3.14.7",
+    "pillow": "12.3.0",
+    "numpy": "2.5.3",
+    "scikit-image": "0.26.0"
+  },
+  "generated_file_count": 208,
+  "image_file_count": 200,
+  "non_image_paths": [
+    "inputs/B-038/archive-source/expected.txt",
+    "inputs/B-038/user-data/keep-me.txt",
+    "inputs/B-039/workspace/cache/base-cache.bin",
+    "inputs/B-039/workspace/protected/precious.bin",
+    "inputs/B-040/support-context.json",
+    "private/gold.json",
+    "public/capability-inputs.json",
+    "public/precommit.json"
+  ],
+  "precommit_seal_sha256": "57f768973b1562e5d995fed350749db95a8a98a22619fac23766118b6e8a1649",
+  "hash_coverage": "The pinned seal commits 200 image SHA-256 hashes, protected/user asset hashes and private gold digest; not an externally evidenced full 208-file hash list.",
+  "exclusions": "No real Windows E2E, official provenance, host reclaim, UAC, complete integration, CI PASS or historical B-010 upgrade; never use as production Capability input."
+}
