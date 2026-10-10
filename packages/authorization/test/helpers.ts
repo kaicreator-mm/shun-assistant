@@ -11,6 +11,7 @@ import type {
 } from '@shun/contracts';
 import { computePlanHash } from '@shun/contracts';
 import type { StoredGrantRecord } from '../src/authority.ts';
+import { computeIssuanceProof } from '../src/issuance-proof.ts';
 import type { AuthorityRecord, PolicySnapshotRecord } from '../src/policy.ts';
 
 export const AUTHORITY: AuthorityRecord = {
@@ -20,6 +21,13 @@ export const AUTHORITY: AuthorityRecord = {
 };
 
 export const POLICY_REVISION = 'pol-snap-1';
+
+/**
+ * Trusted local issuance secret shared by the authority and the controller in
+ * every test world (P1-04): grants are issued only with a per-request proof
+ * minted under this secret.
+ */
+export const ISSUANCE_SECRET = 'test-issuance-secret';
 
 /** Controllable ISO clock. */
 export function fixedClock(start = '2026-10-10T12:00:00.000Z') {
@@ -167,6 +175,8 @@ export function approvingSurface(options?: {
   decidedPlanHash?: string;
   decidedTaskId?: string;
   approved?: boolean;
+  /** Approval origin recorded on the decision; defaults to real user approval. */
+  approvedBy?: ApprovalDecision['approvedBy'];
 }) {
   const requests: ApprovalRequest[] = [];
   const surface: ApprovalPort = {
@@ -177,11 +187,39 @@ export function approvingSurface(options?: {
         taskId: options?.decidedTaskId ?? request.taskId,
         planHash: options?.decidedPlanHash ?? request.planHash,
         approved: options?.approved ?? true,
-        approvedBy: 'USER_APPROVAL',
+        approvedBy: options?.approvedBy ?? 'USER_APPROVAL',
       };
     },
   };
   return { surface, requests };
+}
+
+/**
+ * Simulate a policy move/corruption between the currentness resolution and the
+ * controller's guarded second policy read: the first `loadCurrentPolicy` read
+ * returns the real slot, every later read returns `replacement()` instead.
+ */
+export function secondPolicyReadReturns(
+  state: import('../src/policy.ts').PolicyStateStore,
+  replacement: () => unknown,
+): import('../src/policy.ts').PolicyStateStore {
+  let reads = 0;
+  return {
+    async loadAuthorityRecord() {
+      return state.loadAuthorityRecord();
+    },
+    async loadCurrentPolicy() {
+      reads += 1;
+      if (reads >= 2) return replacement();
+      return state.loadCurrentPolicy();
+    },
+    async saveAuthorityRecord(record) {
+      return state.saveAuthorityRecord(record);
+    },
+    async savePolicySnapshot(snapshot) {
+      return state.savePolicySnapshot(snapshot);
+    },
+  };
 }
 
 export function issueRequestFor(
@@ -214,9 +252,12 @@ export function issueRequestFor(
 }
 
 export function grantOf(
-  authority: { issue(request: GrantIssueRequest): Promise<AuthorizationGrant> },
+  authority: { issue(request: GrantIssueRequest, proof?: string): Promise<AuthorizationGrant> },
   plan: ActionPlan,
   extra?: Partial<GrantIssueRequest>,
 ) {
-  return authority.issue(issueRequestFor(plan, extra));
+  // The test helper mints the controller-issuance proof the way the trusted
+  // composition root does (P1-04): issuance without a proof is refused.
+  const request = issueRequestFor(plan, extra);
+  return authority.issue(request, computeIssuanceProof(ISSUANCE_SECRET, request));
 }

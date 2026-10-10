@@ -39,6 +39,7 @@ import {
   type AuthorizedAction,
   AuthorizedActionSchema,
   computePlanHash,
+  type GrantIssueRequest,
   type GrantValidationResult,
   type PrivilegeLevel,
   pathWithin,
@@ -48,6 +49,7 @@ import {
 } from '@shun/contracts';
 import type { AuthorizationAuthority } from './authority.ts';
 import type { ControllerRefusal, RefusalCode } from './failures.ts';
+import { computeIssuanceProof } from './issuance-proof.ts';
 import {
   type DurablePolicyRule,
   maxRiskClass,
@@ -67,6 +69,13 @@ export interface ActionControllerConfig {
   policyState: PolicyStateStore;
   /** Control-surface approval seam (L2 §12); the durable approval record lives in ShunStore. */
   approvals: ApprovalPort;
+  /**
+   * HMAC secret of the controller-issuance proof channel (P1-04); shared only
+   * with the trusted AuthorizationAuthority through trusted local
+   * configuration. Every issuance request the controller sends carries a
+   * per-request proof minted under this secret.
+   */
+  issuanceSecret: string;
   clock: () => string;
   actionTtlMs?: number;
 }
@@ -160,9 +169,52 @@ export class ActionController {
         `plan was formed under policy ${plan.policySnapshotRevision} but current policy is ${current.policySnapshotRevision}; re-plan under current policy`,
       );
     }
-    const policy = PolicySnapshotRecordSchema.parse(
-      await this.#config.policyState.loadCurrentPolicy(),
-    );
+    // P2-01: this second policy read is guarded like every other currentness
+    // input. A read that throws, a corrupt snapshot, or a snapshot that is
+    // not exactly the one the currentness resolution established (successor
+    // revision moved in between the two reads, different authority binding,
+    // in-place status flip) is incoherent state and refuses as a typed
+    // AUTHORIZATION_STATE_UNRESOLVABLE — never a thrown error, never
+    // authorization under a phantom snapshot.
+    let policy: PolicySnapshotRecord;
+    try {
+      const parsedPolicy = PolicySnapshotRecordSchema.safeParse(
+        await this.#config.policyState.loadCurrentPolicy(),
+      );
+      if (!parsedPolicy.success) {
+        return refusal(
+          'AUTHORIZATION_STATE_UNRESOLVABLE',
+          'current policy record became missing or corrupt between the currentness check and the policy read',
+        );
+      }
+      policy = parsedPolicy.data;
+    } catch (error) {
+      return refusal(
+        'AUTHORIZATION_STATE_UNRESOLVABLE',
+        `current policy read failed: ${(error as Error).message}`,
+      );
+    }
+    if (policy.policySnapshotRevision !== current.policySnapshotRevision) {
+      return refusal(
+        'AUTHORIZATION_STATE_UNRESOLVABLE',
+        `policy snapshot moved between reads: resolved ${current.policySnapshotRevision} but re-read ${policy.policySnapshotRevision}; re-authorize under the successor revision`,
+      );
+    }
+    if (
+      policy.authorityId !== current.authorityId ||
+      policy.authorityRevision !== current.authorityRevision
+    ) {
+      return refusal(
+        'AUTHORIZATION_STATE_UNRESOLVABLE',
+        're-read policy snapshot is bound to a different authority than the resolved currentness',
+      );
+    }
+    if (policy.status !== current.policyStatus || policy.status !== 'ACTIVE') {
+      return refusal(
+        'AUTHORIZATION_STATE_UNRESOLVABLE',
+        `policy status changed between reads: resolved ${current.policyStatus} but re-read ${policy.status}`,
+      );
+    }
 
     // 3+4. Effective risk and per-action routing.
     const routings: ActionRouting[] = plan.actions.map((action) => {
@@ -223,6 +275,18 @@ export class ActionController {
           `approval decision ${decision.approvalId} does not bind the exact plan/task presented (plan ${plan.planHash}, task ${plan.taskId})`,
         );
       }
+      // P1-01: only a USER_APPROVAL decision is explicit human approval. A
+      // DURABLE_POLICY origin is not explicit approval — the controller only
+      // reaches this route when durable policy did NOT cover the plan, so a
+      // policy-origin "approval" is incoherent and fails closed. R3 (and any
+      // other approval-requiring route) can never complete without real user
+      // approval provenance (L2 §9.2).
+      if (decision.approvedBy !== 'USER_APPROVAL') {
+        return refusal(
+          'APPROVAL_INVALID',
+          `approval decision ${decision.approvalId} records ${decision.approvedBy} origin; this plan requires explicit approval with USER_APPROVAL provenance`,
+        );
+      }
       disposition = { kind: 'EXPLICIT_APPROVAL', ruleIds: [], approvalRef: decision.approvalId };
     } else {
       const ruleIds = [
@@ -236,12 +300,14 @@ export class ActionController {
     }
 
     // 6. One grant per distinct required privilege level; the grant scope is
-    // the union of the group's declared scopes.
+    // the union of the group's declared scopes. Every issuance request carries
+    // a per-request controller-approval proof (P1-04): the authority refuses
+    // any issuance that did not pass this controller route.
     const groups = this.#groupByPrivilege(plan);
     const grants: AuthorizationGrant[] = [];
     for (const group of groups) {
       try {
-        const grant = await this.#config.authority.issue({
+        const request: GrantIssueRequest = {
           taskId: plan.taskId,
           planHash: plan.planHash,
           policySnapshotRevision: current.policySnapshotRevision,
@@ -254,7 +320,11 @@ export class ActionController {
           },
           authorizationKind: disposition.kind,
           ...(disposition.approvalRef ? { approvalRef: disposition.approvalRef } : {}),
-        });
+        };
+        const grant = await this.#config.authority.issue(
+          request,
+          computeIssuanceProof(this.#config.issuanceSecret, request),
+        );
         grants.push(grant);
         group.grant = grant;
       } catch (error) {
