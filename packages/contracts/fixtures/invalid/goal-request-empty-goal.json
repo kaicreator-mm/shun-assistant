@@ -1,0 +1,10 @@
+{
+  "taskId": "task-bad-003",
+  "goal": "",
+  "objects": [],
+  "constraints": {},
+  "policyContext": {
+    "privacyPolicy": { "localOnly": true, "externalDisclosure": "FORBIDDEN" },
+    "environmentPolicy": { "allowedBackendKinds": ["LOCAL_WINDOWS"], "allowElevation": false }
+  }
+}

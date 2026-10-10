@@ -1,0 +1,10 @@
+{
+  "capabilityId": "cap.bad",
+  "revision": "r1",
+  "inputSchema": { "type": "object" },
+  "outputSchema": { "type": "object" },
+  "sideEffectClass": "R9",
+  "allowedInterfaceClasses": ["I0"],
+  "verificationContract": { "verifierId": "v", "verifierRevision": "r1", "checks": [{ "checkId": "c", "required": true }] },
+  "requiredPolicyFacts": []
+}

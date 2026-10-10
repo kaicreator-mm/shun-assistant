@@ -1,0 +1,9 @@
+{
+  "taskId": "task-2026-10-10-009",
+  "objective": "Make that file smaller somehow",
+  "objects": [],
+  "constraints": {},
+  "privacyPolicy": { "localOnly": true, "externalDisclosure": "POLICY_CONTROLLED" },
+  "environmentPolicy": { "allowedBackendKinds": ["LOCAL_WINDOWS", "LOCAL_POSIX"], "allowElevation": false },
+  "ambiguityDisposition": "NEEDS_CLARIFICATION"
+}

@@ -1,0 +1,5 @@
+{
+  "providerBindingId": "binding-imagemagick-localwin",
+  "environmentId": "env-local-windows-01",
+  "feasibility": { "feasible": true, "rejectionReasons": [] }
+}

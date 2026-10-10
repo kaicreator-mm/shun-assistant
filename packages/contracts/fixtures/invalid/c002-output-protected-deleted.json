@@ -1,0 +1,23 @@
+{
+  "taskId": "task-bad-010",
+  "selectedBindingId": "binding-bad",
+  "provenance": { "source": "somewhere", "official": false, "version": "1.0", "licenseDisposition": "unknown" },
+  "taskResult": {
+    "status": "SUCCEEDED",
+    "verification": {
+      "taskId": "task-bad-010",
+      "verifierId": "v",
+      "verifierRevision": "r1",
+      "status": "PASS",
+      "checks": [{ "checkId": "c", "status": "PASS" }],
+      "oracleInputs": {},
+      "evidenceRefs": []
+    }
+  },
+  "lifecycleState": { "providerId": "tool.bad", "version": "1.0", "state": "REMOVED" },
+  "residueReport": {
+    "candidates": [{ "path": "C:\\users\\dev\\notes.txt", "classification": "USER_CREATED_UNKNOWN", "disposition": "DELETE" }],
+    "unknownOrProtectedDeleted": true
+  },
+  "finalState": "RETAINED"
+}

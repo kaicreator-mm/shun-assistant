@@ -1,0 +1,16 @@
+{
+  "taskId": "task-bad-006",
+  "actionId": "action-bad",
+  "planHash": "1111111111111111111111111111111111111111111111111111111111111111",
+  "policySnapshotRevision": "pol-snap-2026-10-10-a",
+  "authorizationKind": "AUTOMATIC",
+  "authorizationRef": "",
+  "action": {
+    "actionId": "action-bad",
+    "bindingRef": "binding-real",
+    "op": "image.resize",
+    "parameters": {},
+    "sideEffectClass": "R1",
+    "requiredPrivilege": "NONE"
+  }
+}

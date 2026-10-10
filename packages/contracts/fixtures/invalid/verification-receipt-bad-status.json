@@ -1,0 +1,9 @@
+{
+  "taskId": "task-bad-007",
+  "verifierId": "verifier.image-ssim",
+  "verifierRevision": "r2",
+  "status": "MAYBE",
+  "checks": [{ "checkId": "x", "status": "PASS" }],
+  "oracleInputs": {},
+  "evidenceRefs": []
+}

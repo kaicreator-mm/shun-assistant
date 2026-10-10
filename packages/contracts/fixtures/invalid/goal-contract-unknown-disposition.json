@@ -1,0 +1,9 @@
+{
+  "taskId": "task-bad-001",
+  "objective": "do something",
+  "objects": [],
+  "constraints": {},
+  "privacyPolicy": { "localOnly": true, "externalDisclosure": "FORBIDDEN" },
+  "environmentPolicy": { "allowedBackendKinds": ["LOCAL_WINDOWS"], "allowElevation": false },
+  "ambiguityDisposition": "MAYBE_LATER"
+}

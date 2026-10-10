@@ -1,0 +1,17 @@
+{
+  "bindingId": "binding-imagemagick-localwin",
+  "providerId": "imageProvider.imagemagick",
+  "capabilityId": "image.batch_process",
+  "capabilityRevisionRange": { "min": "r1" },
+  "adapterId": "adapter.imagemagick-cli",
+  "interfaceClass": "I1",
+  "environmentRequirements": {
+    "backendKind": "LOCAL_WINDOWS",
+    "os": "WINDOWS",
+    "arch": "X64",
+    "privilegeMode": "STANDARD_USER",
+    "networkAccess": "FORBIDDEN",
+    "minFreeDiskMb": 512
+  },
+  "verifierId": "verifier.image-ssim"
+}

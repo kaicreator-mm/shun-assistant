@@ -1,0 +1,30 @@
+{
+  "taskId": "task-2026-10-10-004",
+  "resolvedCapabilityId": "video.transcode",
+  "capabilityRevision": "r2",
+  "normalizedConstraints": {},
+  "candidates": [
+    {
+      "bindingId": "binding-ffmpeg-localwin",
+      "providerId": "videoProvider.ffmpeg",
+      "environmentId": "env-local-windows-01",
+      "interfaceClass": "I1"
+    }
+  ],
+  "feasibleBindings": [],
+  "hardGateDispositions": [
+    { "gate": "CAPABILITY_FIT", "bindingId": "binding-ffmpeg-localwin", "outcome": "PASS", "reason": "binding supports video.transcode r2" },
+    { "gate": "TRUST_SUPPLY_CHAIN", "bindingId": "binding-ffmpeg-localwin", "outcome": "REJECT", "reason": "provenance UNKNOWN for candidate build" }
+  ],
+  "selectedBindingId": null,
+  "selectionReasons": [],
+  "riskClass": "R1",
+  "executionPlanClass": "PLANNER_INTERPRETED",
+  "verificationPlan": {
+    "verifierId": "verifier.transcode",
+    "verifierRevision": "r1",
+    "checks": [{ "checkId": "decode-output" }]
+  },
+  "privacyDisclosurePlan": { "externalDisclosure": "FORBIDDEN", "notes": [] },
+  "failureDisposition": { "failureCode": "NO_TRUSTED_PROVIDER", "detail": "only candidate provider has unknown provenance" }
+}

@@ -1,0 +1,26 @@
+{
+  "capabilityId": "image.batch_process",
+  "revision": "r1",
+  "inputSchema": {
+    "type": "object",
+    "required": ["taskId", "inputFiles", "operation", "metadataPolicy", "outputDirectory", "qualityPolicy", "networkUsage"]
+  },
+  "outputSchema": {
+    "type": "object",
+    "required": ["taskId", "records", "selectedBindingId", "rankingEvidence", "verification"]
+  },
+  "sideEffectClass": "R1",
+  "allowedInterfaceClasses": ["I0", "I1", "I2"],
+  "verificationContract": {
+    "verifierId": "verifier.image-ssim",
+    "verifierRevision": "r2",
+    "checks": [
+      { "checkId": "count-conservation", "required": true },
+      { "checkId": "decode-all", "required": true },
+      { "checkId": "edge-bound", "required": true },
+      { "checkId": "capture-date-preserved", "required": true },
+      { "checkId": "ssim-oracle", "required": true }
+    ]
+  },
+  "requiredPolicyFacts": ["provider.trust.current", "network.local_only"]
+}

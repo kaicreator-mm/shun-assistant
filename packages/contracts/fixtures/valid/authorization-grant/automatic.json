@@ -1,0 +1,22 @@
+{
+  "grantId": "grant-2026-10-10-001",
+  "issuer": { "authorityId": "shun.action-controller", "authorityRevision": "auth-r5" },
+  "taskId": "task-2026-10-10-001",
+  "planHash": "94024d16440b2ec90a36dbbc102852cd9ff9ea41bbf0a5894a79ad0e9b36452c",
+  "policySnapshotRevision": "pol-snap-2026-10-10-a",
+  "actionScope": {
+    "actionIds": ["action-001"],
+    "privilegeLevel": "NONE",
+    "filesystem": {
+      "read": ["C:\\fixtures\\images"],
+      "write": ["C:\\fixtures\\out"]
+    },
+    "network": { "allowed": false }
+  },
+  "issuedAt": "2026-10-10T08:00:00.000Z",
+  "expiresAt": "2026-10-10T08:30:00.000Z",
+  "integrity": {
+    "scheme": "HMAC_SHA256",
+    "value": "fixture-integrity-envelope-not-a-real-mac"
+  }
+}

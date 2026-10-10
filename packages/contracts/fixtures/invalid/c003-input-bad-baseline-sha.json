@@ -1,0 +1,7 @@
+{
+  "taskId": "task-bad-012",
+  "targetVolume": "C:",
+  "growthFixture": { "kind": "SYNTHETIC" },
+  "protectedAssets": [{ "path": "C:\\fixtures\\protected", "baselineSha256": "not-a-hash" }],
+  "cleanupPolicy": { "eligibleCategories": ["CACHE"] }
+}

@@ -1,0 +1,18 @@
+{
+  "actionId": "action-001",
+  "environmentId": "env-local-windows-01",
+  "providerId": "imageProvider.imagemagick",
+  "providerVersion": "7.1.2",
+  "startedAt": "2026-10-10T08:10:00.000Z",
+  "finishedAt": "2026-10-10T08:12:30.000Z",
+  "terminal": "SUCCEEDED",
+  "exitCode": 0,
+  "outputRefs": ["evidence://task-2026-10-10-001/out/manifest.json"],
+  "stdoutRef": "evidence://task-2026-10-10-001/stdout.log",
+  "sideEffectEvidence": {
+    "sideEffectClass": "R1",
+    "recoveryClassification": "COMPLETED_VERIFIED",
+    "postStateVerified": true,
+    "journalRef": "journal://action-001/phases"
+  }
+}

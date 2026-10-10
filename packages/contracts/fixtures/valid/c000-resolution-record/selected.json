@@ -1,0 +1,43 @@
+{
+  "taskId": "task-2026-10-10-001",
+  "resolvedCapabilityId": "image.batch_process",
+  "capabilityRevision": "r1",
+  "normalizedConstraints": { "format": "JPG" },
+  "candidates": [
+    {
+      "bindingId": "binding-imagemagick-localwin",
+      "providerId": "imageProvider.imagemagick",
+      "environmentId": "env-local-windows-01",
+      "interfaceClass": "I1"
+    }
+  ],
+  "feasibleBindings": ["binding-imagemagick-localwin"],
+  "hardGateDispositions": [
+    { "gate": "CAPABILITY_FIT", "bindingId": "binding-imagemagick-localwin", "outcome": "PASS", "reason": "binding supports image.batch_process r1" },
+    { "gate": "TRUST_SUPPLY_CHAIN", "bindingId": "binding-imagemagick-localwin", "outcome": "PASS", "reason": "official provenance recorded" },
+    { "gate": "PROVIDER_ENVIRONMENT_FEASIBILITY", "bindingId": "binding-imagemagick-localwin", "outcome": "PASS", "reason": "local Windows facts satisfy requirements" },
+    { "gate": "USER_ORG_POLICY", "bindingId": "binding-imagemagick-localwin", "outcome": "PASS", "reason": "local-only policy satisfied" },
+    { "gate": "SAFETY_CONSTRAINTS", "bindingId": "binding-imagemagick-localwin", "outcome": "PASS", "reason": "R1 reversible bounded write" }
+  ],
+  "selectedBindingId": "binding-imagemagick-localwin",
+  "selectionReasons": ["single trusted binding", "I1 structured CLI preferred over I3/I4 fallback"],
+  "riskClass": "R1",
+  "executionPlanClass": "KNOWN_CAPABILITY_DETERMINISTIC",
+  "verificationPlan": {
+    "verifierId": "verifier.image-ssim",
+    "verifierRevision": "r2",
+    "checks": [
+      { "checkId": "count-conservation" },
+      { "checkId": "decode-all" },
+      { "checkId": "edge-bound" },
+      { "checkId": "capture-date-preserved" },
+      { "checkId": "ssim-oracle" }
+    ],
+    "oracle": {
+      "precommitted": true,
+      "spec": { "metric": "SSIM", "threshold": 0.95, "sampleStrategy": "ASC_SHA256_FIRST_20" }
+    }
+  },
+  "privacyDisclosurePlan": { "externalDisclosure": "FORBIDDEN", "notes": ["local-only policy in effect"] },
+  "failureDisposition": null
+}
