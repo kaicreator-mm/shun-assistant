@@ -140,6 +140,16 @@ metric, 20-sample image corruption and unavailable SSIM metric. Missing required
 metric/evidence is `INCOMPLETE_SEMANTIC_VERIFICATION`; an observed violation is
 `FAIL`. Original image and user/protected-asset hash mismatches always fail.
 
+Additional adversarial tests reject JSON Unicode-escaped planted tokens, encoded
+multi-line fake private keys and leaks in decoded JSON keys, plus top-level
+non-object reports and malformed provider-selection objects. Event-order checks
+fail closed on **any** early or duplicate destructive phase (`remove` for
+B-038; `execute` for B-039), rather than matching a later valid subsequence.
+Each sealed fixture expects one bounded side effect with exactly one instance
+of each required phase; unrelated audit-only phases are allowed. A trace with
+multiple destructive effects needs a separately precommitted, independently
+authorized sequence and is not PASS for these fixtures.
+
 A separate `evaluate_new_video_metric_only` negative control distinguishes missing VMAF (INCOMPLETE), low VMAF (FAIL), and measured acceptable VMAF (fixture-only PASS). It does not run ffmpeg or change history.
 
 B-010 historical video evidence remains **INCOMPLETE_SEMANTIC_VERIFICATION**.
