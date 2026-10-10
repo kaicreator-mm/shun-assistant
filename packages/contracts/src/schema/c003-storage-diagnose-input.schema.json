@@ -1,0 +1,87 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:shun:contracts:0.1:c003-storage-diagnose-input",
+  "title": "c003-storage-diagnose-input",
+  "x-contracts-revision": "shun.contracts/0.1",
+  "type": "object",
+  "properties": {
+    "taskId": {
+      "type": "string",
+      "minLength": 1
+    },
+    "targetVolume": {
+      "type": "string",
+      "minLength": 1
+    },
+    "growthFixture": {
+      "type": "object",
+      "properties": {
+        "kind": {
+          "type": "string",
+          "enum": [
+            "SYNTHETIC",
+            "REPRODUCIBLE"
+          ]
+        },
+        "injectorRef": {
+          "type": "string",
+          "minLength": 1
+        }
+      },
+      "required": [
+        "kind"
+      ],
+      "additionalProperties": false
+    },
+    "protectedAssets": {
+      "minItems": 1,
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "path": {
+            "type": "string",
+            "minLength": 1
+          },
+          "baselineSha256": {
+            "type": "string",
+            "pattern": "^[0-9a-f]{64}$"
+          }
+        },
+        "required": [
+          "path",
+          "baselineSha256"
+        ],
+        "additionalProperties": false
+      }
+    },
+    "cleanupPolicy": {
+      "type": "object",
+      "properties": {
+        "eligibleCategories": {
+          "minItems": 1,
+          "type": "array",
+          "items": {
+            "type": "string",
+            "enum": [
+              "CACHE",
+              "TEMP"
+            ]
+          }
+        }
+      },
+      "required": [
+        "eligibleCategories"
+      ],
+      "additionalProperties": false
+    }
+  },
+  "required": [
+    "taskId",
+    "targetVolume",
+    "growthFixture",
+    "protectedAssets",
+    "cleanupPolicy"
+  ],
+  "additionalProperties": false
+}

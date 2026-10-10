@@ -1,0 +1,296 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:shun:contracts:0.1:action-plan",
+  "title": "action-plan",
+  "x-contracts-revision": "shun.contracts/0.1",
+  "type": "object",
+  "properties": {
+    "taskId": {
+      "type": "string",
+      "minLength": 1
+    },
+    "capabilityId": {
+      "type": "string",
+      "minLength": 1
+    },
+    "bindingRefs": {
+      "minItems": 1,
+      "type": "array",
+      "items": {
+        "type": "string",
+        "minLength": 1
+      }
+    },
+    "recipeRef": {
+      "type": "string",
+      "minLength": 1
+    },
+    "rankingPolicyRevision": {
+      "type": "string",
+      "minLength": 1
+    },
+    "policySnapshotRevision": {
+      "type": "string",
+      "minLength": 1
+    },
+    "actions": {
+      "minItems": 1,
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "actionId": {
+            "type": "string",
+            "minLength": 1
+          },
+          "bindingRef": {
+            "type": "string",
+            "minLength": 1
+          },
+          "op": {
+            "type": "string",
+            "minLength": 1
+          },
+          "parameters": {
+            "type": "object",
+            "propertyNames": {
+              "type": "string"
+            },
+            "additionalProperties": {}
+          },
+          "sideEffectClass": {
+            "type": "string",
+            "enum": [
+              "R0",
+              "R1",
+              "R2",
+              "R3"
+            ]
+          },
+          "requiredPrivilege": {
+            "type": "string",
+            "enum": [
+              "NONE",
+              "USER",
+              "ELEVATED"
+            ]
+          },
+          "filesystemScope": {
+            "type": "object",
+            "properties": {
+              "read": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "minLength": 1
+                }
+              },
+              "write": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "minLength": 1
+                }
+              }
+            },
+            "required": [
+              "read",
+              "write"
+            ],
+            "additionalProperties": false
+          },
+          "networkScope": {
+            "type": "object",
+            "properties": {
+              "allowed": {
+                "type": "boolean"
+              },
+              "domains": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "minLength": 1
+                }
+              }
+            },
+            "required": [
+              "allowed"
+            ],
+            "additionalProperties": false
+          },
+          "registryScope": {
+            "type": "object",
+            "properties": {
+              "write": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "minLength": 1
+                }
+              }
+            },
+            "required": [
+              "write"
+            ],
+            "additionalProperties": false
+          },
+          "secretRefs": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1
+            }
+          },
+          "timeoutMs": {
+            "type": "integer",
+            "exclusiveMinimum": 0,
+            "maximum": 9007199254740991
+          },
+          "cancellation": {
+            "type": "object",
+            "properties": {
+              "supported": {
+                "type": "boolean"
+              },
+              "mode": {
+                "type": "string",
+                "enum": [
+                  "COOPERATIVE",
+                  "FORCED"
+                ]
+              }
+            },
+            "required": [
+              "supported",
+              "mode"
+            ],
+            "additionalProperties": false
+          },
+          "expectedState": {
+            "type": "object",
+            "propertyNames": {
+              "type": "string"
+            },
+            "additionalProperties": {}
+          }
+        },
+        "required": [
+          "actionId",
+          "bindingRef",
+          "op",
+          "parameters",
+          "sideEffectClass",
+          "requiredPrivilege"
+        ],
+        "additionalProperties": false
+      }
+    },
+    "verificationPlan": {
+      "type": "object",
+      "properties": {
+        "verifierId": {
+          "type": "string",
+          "minLength": 1
+        },
+        "verifierRevision": {
+          "type": "string",
+          "minLength": 1
+        },
+        "checks": {
+          "minItems": 1,
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "checkId": {
+                "type": "string",
+                "minLength": 1
+              },
+              "description": {
+                "type": "string",
+                "minLength": 1
+              }
+            },
+            "required": [
+              "checkId"
+            ],
+            "additionalProperties": false
+          }
+        },
+        "oracle": {
+          "type": "object",
+          "properties": {
+            "precommitted": {
+              "type": "boolean",
+              "const": true
+            },
+            "spec": {
+              "type": "object",
+              "propertyNames": {
+                "type": "string"
+              },
+              "additionalProperties": {}
+            }
+          },
+          "required": [
+            "precommitted",
+            "spec"
+          ],
+          "additionalProperties": false
+        }
+      },
+      "required": [
+        "verifierId",
+        "verifierRevision",
+        "checks"
+      ],
+      "additionalProperties": false
+    },
+    "recoveryPlan": {
+      "type": "object",
+      "properties": {
+        "classificationStrategy": {
+          "type": "string",
+          "const": "JOURNAL_AND_POST_STATE"
+        },
+        "reconcileBeforeRetry": {
+          "type": "boolean",
+          "const": true
+        },
+        "retryAllowedWhen": {
+          "type": "string",
+          "enum": [
+            "PROVEN_NOT_EXECUTED",
+            "DECLARED_IDEMPOTENT"
+          ]
+        },
+        "checkpointRef": {
+          "type": "string",
+          "minLength": 1
+        }
+      },
+      "required": [
+        "classificationStrategy",
+        "reconcileBeforeRetry",
+        "retryAllowedWhen"
+      ],
+      "additionalProperties": false
+    },
+    "planHash": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    }
+  },
+  "required": [
+    "taskId",
+    "capabilityId",
+    "bindingRefs",
+    "rankingPolicyRevision",
+    "policySnapshotRevision",
+    "actions",
+    "verificationPlan",
+    "recoveryPlan",
+    "planHash"
+  ],
+  "additionalProperties": false
+}

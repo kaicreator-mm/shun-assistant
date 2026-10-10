@@ -1,0 +1,179 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:shun:contracts:0.1:provider-definition",
+  "title": "provider-definition",
+  "x-contracts-revision": "shun.contracts/0.1",
+  "type": "object",
+  "properties": {
+    "providerId": {
+      "type": "string",
+      "minLength": 1
+    },
+    "revision": {
+      "type": "string",
+      "minLength": 1
+    },
+    "acquisition": {
+      "type": "object",
+      "properties": {
+        "mechanism": {
+          "type": "string",
+          "enum": [
+            "PREINSTALLED",
+            "WINGET",
+            "PACKAGE_MANAGER",
+            "DIRECT_DOWNLOAD",
+            "OTHER"
+          ]
+        },
+        "source": {
+          "type": "string",
+          "minLength": 1
+        },
+        "official": {
+          "type": "boolean"
+        },
+        "version": {
+          "type": "string",
+          "minLength": 1
+        },
+        "hash": {
+          "type": "string",
+          "minLength": 1
+        },
+        "signature": {
+          "type": "string",
+          "minLength": 1
+        }
+      },
+      "required": [
+        "mechanism",
+        "source",
+        "official",
+        "version"
+      ],
+      "additionalProperties": false
+    },
+    "provenanceFacts": {
+      "type": "object",
+      "propertyNames": {
+        "type": "string"
+      },
+      "additionalProperties": {}
+    },
+    "licenseFacts": {
+      "type": "object",
+      "properties": {
+        "license": {
+          "type": "string",
+          "minLength": 1
+        },
+        "redistributionAllowed": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "license"
+      ],
+      "additionalProperties": false
+    },
+    "supportedPlatforms": {
+      "minItems": 1,
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "os": {
+            "type": "string",
+            "enum": [
+              "WINDOWS",
+              "LINUX",
+              "MACOS"
+            ]
+          },
+          "arch": {
+            "type": "string",
+            "enum": [
+              "X64",
+              "ARM64"
+            ]
+          },
+          "minVersion": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "required": [
+          "os"
+        ],
+        "additionalProperties": false
+      }
+    },
+    "lifecycle": {
+      "type": "object",
+      "properties": {
+        "supportedOperations": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "enum": [
+              "ACQUIRE",
+              "CONFIGURE",
+              "REPAIR",
+              "RESET",
+              "UNINSTALL"
+            ]
+          }
+        }
+      },
+      "required": [
+        "supportedOperations"
+      ],
+      "additionalProperties": false
+    },
+    "interfaces": {
+      "minItems": 1,
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "interfaceId": {
+            "type": "string",
+            "minLength": 1
+          },
+          "interfaceClass": {
+            "type": "string",
+            "enum": [
+              "I0",
+              "I1",
+              "I2",
+              "I3",
+              "I4"
+            ]
+          },
+          "invocation": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "required": [
+          "interfaceId",
+          "interfaceClass",
+          "invocation"
+        ],
+        "additionalProperties": false
+      }
+    }
+  },
+  "required": [
+    "providerId",
+    "revision",
+    "acquisition",
+    "provenanceFacts",
+    "licenseFacts",
+    "supportedPlatforms",
+    "lifecycle",
+    "interfaces"
+  ],
+  "additionalProperties": false
+}

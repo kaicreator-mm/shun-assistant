@@ -1,0 +1,52 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:shun:contracts:0.1:provider-environment-binding",
+  "title": "provider-environment-binding",
+  "x-contracts-revision": "shun.contracts/0.1",
+  "type": "object",
+  "properties": {
+    "providerBindingId": {
+      "type": "string",
+      "minLength": 1
+    },
+    "environmentId": {
+      "type": "string",
+      "minLength": 1
+    },
+    "feasibility": {
+      "type": "object",
+      "properties": {
+        "feasible": {
+          "type": "boolean"
+        },
+        "rejectionReasons": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "enum": [
+              "PLATFORM_UNSUPPORTED",
+              "ARCH_UNSUPPORTED",
+              "PRIVILEGE_INSUFFICIENT",
+              "GUI_SESSION_UNAVAILABLE",
+              "NETWORK_POLICY_FORBIDDEN",
+              "RESOURCE_INSUFFICIENT",
+              "RUNTIME_CAPABILITY_MISSING",
+              "BACKEND_KIND_INELIGIBLE"
+            ]
+          }
+        }
+      },
+      "required": [
+        "feasible",
+        "rejectionReasons"
+      ],
+      "additionalProperties": false
+    }
+  },
+  "required": [
+    "providerBindingId",
+    "environmentId",
+    "feasibility"
+  ],
+  "additionalProperties": false
+}

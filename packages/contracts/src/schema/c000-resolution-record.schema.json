@@ -1,0 +1,321 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:shun:contracts:0.1:c000-resolution-record",
+  "title": "c000-resolution-record",
+  "x-contracts-revision": "shun.contracts/0.1",
+  "type": "object",
+  "properties": {
+    "taskId": {
+      "type": "string",
+      "minLength": 1
+    },
+    "resolvedCapabilityId": {
+      "type": "string",
+      "minLength": 1
+    },
+    "capabilityRevision": {
+      "type": "string",
+      "minLength": 1
+    },
+    "normalizedConstraints": {
+      "type": "object",
+      "properties": {
+        "format": {
+          "type": "string",
+          "minLength": 1
+        },
+        "privacy": {
+          "type": "string",
+          "minLength": 1
+        },
+        "executionEnvironment": {
+          "type": "string",
+          "minLength": 1
+        },
+        "resourceLimits": {
+          "type": "string",
+          "minLength": 1
+        },
+        "licensing": {
+          "type": "string",
+          "minLength": 1
+        },
+        "retainRemove": {
+          "type": "string",
+          "minLength": 1
+        },
+        "other": {
+          "type": "object",
+          "propertyNames": {
+            "type": "string"
+          },
+          "additionalProperties": {
+            "type": [
+              "string",
+              "number",
+              "boolean"
+            ]
+          }
+        }
+      },
+      "additionalProperties": false
+    },
+    "candidates": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "bindingId": {
+            "type": "string",
+            "minLength": 1
+          },
+          "providerId": {
+            "type": "string",
+            "minLength": 1
+          },
+          "environmentId": {
+            "type": "string",
+            "minLength": 1
+          },
+          "interfaceClass": {
+            "type": "string",
+            "enum": [
+              "I0",
+              "I1",
+              "I2",
+              "I3",
+              "I4"
+            ]
+          }
+        },
+        "required": [
+          "bindingId",
+          "providerId",
+          "environmentId",
+          "interfaceClass"
+        ],
+        "additionalProperties": false
+      }
+    },
+    "feasibleBindings": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "minLength": 1
+      }
+    },
+    "hardGateDispositions": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "gate": {
+            "type": "string",
+            "enum": [
+              "CAPABILITY_FIT",
+              "TRUST_SUPPLY_CHAIN",
+              "PROVIDER_ENVIRONMENT_FEASIBILITY",
+              "USER_ORG_POLICY",
+              "SAFETY_CONSTRAINTS"
+            ]
+          },
+          "bindingId": {
+            "type": "string",
+            "minLength": 1
+          },
+          "outcome": {
+            "type": "string",
+            "enum": [
+              "PASS",
+              "REJECT",
+              "ESCALATION_REQUIRED"
+            ]
+          },
+          "reason": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "required": [
+          "gate",
+          "bindingId",
+          "outcome",
+          "reason"
+        ],
+        "additionalProperties": false
+      }
+    },
+    "selectedBindingId": {
+      "anyOf": [
+        {
+          "type": "string",
+          "minLength": 1
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "selectionReasons": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "minLength": 1
+      }
+    },
+    "riskClass": {
+      "type": "string",
+      "enum": [
+        "R0",
+        "R1",
+        "R2",
+        "R3"
+      ]
+    },
+    "executionPlanClass": {
+      "type": "string",
+      "enum": [
+        "RECIPE_FAST_PATH",
+        "KNOWN_CAPABILITY_DETERMINISTIC",
+        "PLANNER_INTERPRETED"
+      ]
+    },
+    "verificationPlan": {
+      "type": "object",
+      "properties": {
+        "verifierId": {
+          "type": "string",
+          "minLength": 1
+        },
+        "verifierRevision": {
+          "type": "string",
+          "minLength": 1
+        },
+        "checks": {
+          "minItems": 1,
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "checkId": {
+                "type": "string",
+                "minLength": 1
+              },
+              "description": {
+                "type": "string",
+                "minLength": 1
+              }
+            },
+            "required": [
+              "checkId"
+            ],
+            "additionalProperties": false
+          }
+        },
+        "oracle": {
+          "type": "object",
+          "properties": {
+            "precommitted": {
+              "type": "boolean",
+              "const": true
+            },
+            "spec": {
+              "type": "object",
+              "propertyNames": {
+                "type": "string"
+              },
+              "additionalProperties": {}
+            }
+          },
+          "required": [
+            "precommitted",
+            "spec"
+          ],
+          "additionalProperties": false
+        }
+      },
+      "required": [
+        "verifierId",
+        "verifierRevision",
+        "checks"
+      ],
+      "additionalProperties": false
+    },
+    "privacyDisclosurePlan": {
+      "type": "object",
+      "properties": {
+        "externalDisclosure": {
+          "type": "string",
+          "enum": [
+            "ALLOWED",
+            "FORBIDDEN",
+            "POLICY_CONTROLLED"
+          ]
+        },
+        "notes": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        }
+      },
+      "required": [
+        "externalDisclosure",
+        "notes"
+      ],
+      "additionalProperties": false
+    },
+    "failureDisposition": {
+      "anyOf": [
+        {
+          "type": "object",
+          "properties": {
+            "failureCode": {
+              "type": "string",
+              "enum": [
+                "GOAL_AMBIGUOUS",
+                "OBJECT_UNRESOLVED",
+                "CAPABILITY_UNRESOLVED",
+                "NO_TRUSTED_PROVIDER",
+                "NO_FEASIBLE_BINDING",
+                "POLICY_BLOCKED",
+                "VERIFICATION_UNSPECIFIABLE",
+                "REGISTRY_CURRENTNESS_INSUFFICIENT"
+              ]
+            },
+            "detail": {
+              "type": "string",
+              "minLength": 1
+            }
+          },
+          "required": [
+            "failureCode",
+            "detail"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "null"
+        }
+      ]
+    }
+  },
+  "required": [
+    "taskId",
+    "resolvedCapabilityId",
+    "capabilityRevision",
+    "normalizedConstraints",
+    "candidates",
+    "feasibleBindings",
+    "hardGateDispositions",
+    "selectedBindingId",
+    "selectionReasons",
+    "riskClass",
+    "executionPlanClass",
+    "verificationPlan",
+    "privacyDisclosurePlan",
+    "failureDisposition"
+  ],
+  "additionalProperties": false
+}

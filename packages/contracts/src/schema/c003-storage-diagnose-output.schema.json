@@ -1,0 +1,289 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:shun:contracts:0.1:c003-storage-diagnose-output",
+  "title": "c003-storage-diagnose-output",
+  "x-contracts-revision": "shun.contracts/0.1",
+  "type": "object",
+  "properties": {
+    "taskId": {
+      "type": "string",
+      "minLength": 1
+    },
+    "attribution": {
+      "type": "object",
+      "properties": {
+        "growthSourcePath": {
+          "type": "string",
+          "minLength": 1
+        },
+        "classifiedAs": {
+          "type": "string",
+          "enum": [
+            "PROGRAM_OWNED",
+            "CACHE",
+            "CONFIGURATION",
+            "USER_CREATED_UNKNOWN",
+            "PROTECTED"
+          ]
+        },
+        "evidenceRefs": {
+          "minItems": 1,
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        }
+      },
+      "required": [
+        "growthSourcePath",
+        "classifiedAs",
+        "evidenceRefs"
+      ],
+      "additionalProperties": false
+    },
+    "cleanupPlan": {
+      "anyOf": [
+        {
+          "type": "object",
+          "properties": {
+            "bounded": {
+              "type": "boolean",
+              "const": true
+            },
+            "targets": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "path": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "classification": {
+                    "type": "string",
+                    "enum": [
+                      "PROGRAM_OWNED",
+                      "CACHE",
+                      "CONFIGURATION",
+                      "USER_CREATED_UNKNOWN",
+                      "PROTECTED"
+                    ]
+                  },
+                  "expectedReclaimBytes": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 9007199254740991
+                  }
+                },
+                "required": [
+                  "path",
+                  "classification",
+                  "expectedReclaimBytes"
+                ],
+                "additionalProperties": false
+              }
+            },
+            "r2Gate": {
+              "type": "object",
+              "properties": {
+                "phases": {
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "enum": [
+                      "PLAN",
+                      "PREVIEW",
+                      "CHECKPOINT",
+                      "APPROVAL",
+                      "EXECUTE",
+                      "VERIFY"
+                    ]
+                  }
+                },
+                "approvedBy": {
+                  "type": "string",
+                  "enum": [
+                    "USER_APPROVAL",
+                    "DURABLE_POLICY"
+                  ]
+                }
+              },
+              "required": [
+                "phases"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "required": [
+            "bounded",
+            "targets",
+            "r2Gate"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "executionEvidence": {
+      "type": "object",
+      "properties": {
+        "actionId": {
+          "type": "string",
+          "minLength": 1
+        },
+        "environmentId": {
+          "type": "string",
+          "minLength": 1
+        },
+        "providerId": {
+          "type": "string",
+          "minLength": 1
+        },
+        "providerVersion": {
+          "type": "string",
+          "minLength": 1
+        },
+        "startedAt": {
+          "type": "string",
+          "format": "date-time",
+          "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z))$"
+        },
+        "finishedAt": {
+          "type": "string",
+          "format": "date-time",
+          "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z))$"
+        },
+        "terminal": {
+          "type": "string",
+          "enum": [
+            "SUCCEEDED",
+            "FAILED",
+            "REFUSED",
+            "CANCELLED",
+            "TIMED_OUT",
+            "UAC_DECLINED",
+            "UNCERTAIN"
+          ]
+        },
+        "exitCode": {
+          "type": "integer",
+          "minimum": -9007199254740991,
+          "maximum": 9007199254740991
+        },
+        "outputRefs": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "stdoutRef": {
+          "type": "string",
+          "minLength": 1
+        },
+        "stderrRef": {
+          "type": "string",
+          "minLength": 1
+        },
+        "sideEffectEvidence": {
+          "type": "object",
+          "properties": {
+            "sideEffectClass": {
+              "type": "string",
+              "enum": [
+                "R0",
+                "R1",
+                "R2",
+                "R3"
+              ]
+            },
+            "recoveryClassification": {
+              "type": "string",
+              "enum": [
+                "NOT_STARTED",
+                "FAILED_BEFORE_EFFECT",
+                "MAY_HAVE_EXECUTED_UNCERTAIN",
+                "COMPLETED_VERIFIED"
+              ]
+            },
+            "postStateVerified": {
+              "type": "boolean"
+            },
+            "journalRef": {
+              "type": "string",
+              "minLength": 1
+            }
+          },
+          "required": [
+            "sideEffectClass",
+            "recoveryClassification",
+            "postStateVerified"
+          ],
+          "additionalProperties": false
+        }
+      },
+      "required": [
+        "actionId",
+        "environmentId",
+        "providerId",
+        "providerVersion",
+        "startedAt",
+        "finishedAt",
+        "terminal",
+        "outputRefs",
+        "sideEffectEvidence"
+      ],
+      "additionalProperties": false
+    },
+    "reclaimed": {
+      "type": "object",
+      "properties": {
+        "grossBytes": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 9007199254740991
+        },
+        "postActionStateBytes": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 9007199254740991
+        }
+      },
+      "required": [
+        "grossBytes",
+        "postActionStateBytes"
+      ],
+      "additionalProperties": false
+    },
+    "protectedAssetVerification": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "path": {
+            "type": "string",
+            "minLength": 1
+          },
+          "unchanged": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "path",
+          "unchanged"
+        ],
+        "additionalProperties": false
+      }
+    }
+  },
+  "required": [
+    "taskId",
+    "attribution",
+    "cleanupPlan",
+    "protectedAssetVerification"
+  ],
+  "additionalProperties": false
+}

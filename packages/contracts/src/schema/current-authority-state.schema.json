@@ -1,0 +1,71 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:shun:contracts:0.1:current-authority-state",
+  "title": "current-authority-state",
+  "x-contracts-revision": "shun.contracts/0.1",
+  "oneOf": [
+    {
+      "type": "object",
+      "properties": {
+        "kind": {
+          "type": "string",
+          "const": "CURRENT"
+        },
+        "authorityId": {
+          "type": "string",
+          "minLength": 1
+        },
+        "authorityRevision": {
+          "type": "string",
+          "minLength": 1
+        },
+        "policySnapshotRevision": {
+          "type": "string",
+          "minLength": 1
+        },
+        "policyStatus": {
+          "type": "string",
+          "enum": [
+            "ACTIVE",
+            "SUPERSEDED",
+            "REVOKED"
+          ]
+        },
+        "revokedGrantIds": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        }
+      },
+      "required": [
+        "kind",
+        "authorityId",
+        "authorityRevision",
+        "policySnapshotRevision",
+        "policyStatus",
+        "revokedGrantIds"
+      ],
+      "additionalProperties": false
+    },
+    {
+      "type": "object",
+      "properties": {
+        "kind": {
+          "type": "string",
+          "const": "UNRESOLVABLE"
+        },
+        "reason": {
+          "type": "string",
+          "minLength": 1
+        }
+      },
+      "required": [
+        "kind",
+        "reason"
+      ],
+      "additionalProperties": false
+    }
+  ]
+}

@@ -1,0 +1,187 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:shun:contracts:0.1:goal-contract",
+  "title": "goal-contract",
+  "x-contracts-revision": "shun.contracts/0.1",
+  "type": "object",
+  "properties": {
+    "taskId": {
+      "type": "string",
+      "minLength": 1
+    },
+    "objective": {
+      "type": "string",
+      "minLength": 1
+    },
+    "objects": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "kind": {
+            "type": "string",
+            "enum": [
+              "FILE",
+              "DIRECTORY",
+              "DEVICE",
+              "APPLICATION",
+              "SYSTEM_STATE"
+            ]
+          },
+          "ref": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "required": [
+          "kind",
+          "ref"
+        ],
+        "additionalProperties": false
+      }
+    },
+    "constraints": {
+      "type": "object",
+      "properties": {
+        "format": {
+          "type": "string",
+          "minLength": 1
+        },
+        "privacy": {
+          "type": "string",
+          "minLength": 1
+        },
+        "executionEnvironment": {
+          "type": "string",
+          "minLength": 1
+        },
+        "resourceLimits": {
+          "type": "string",
+          "minLength": 1
+        },
+        "licensing": {
+          "type": "string",
+          "minLength": 1
+        },
+        "retainRemove": {
+          "type": "string",
+          "minLength": 1
+        },
+        "other": {
+          "type": "object",
+          "propertyNames": {
+            "type": "string"
+          },
+          "additionalProperties": {
+            "type": [
+              "string",
+              "number",
+              "boolean"
+            ]
+          }
+        }
+      },
+      "additionalProperties": false
+    },
+    "privacyPolicy": {
+      "type": "object",
+      "properties": {
+        "localOnly": {
+          "type": "boolean"
+        },
+        "externalDisclosure": {
+          "type": "string",
+          "enum": [
+            "ALLOWED",
+            "FORBIDDEN",
+            "POLICY_CONTROLLED"
+          ]
+        }
+      },
+      "required": [
+        "localOnly",
+        "externalDisclosure"
+      ],
+      "additionalProperties": false
+    },
+    "environmentPolicy": {
+      "type": "object",
+      "properties": {
+        "allowedBackendKinds": {
+          "minItems": 1,
+          "type": "array",
+          "items": {
+            "type": "string",
+            "enum": [
+              "LOCAL_WINDOWS",
+              "LOCAL_POSIX",
+              "REMOTE_ECF"
+            ]
+          }
+        },
+        "allowElevation": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "allowedBackendKinds",
+        "allowElevation"
+      ],
+      "additionalProperties": false
+    },
+    "lifecyclePolicy": {
+      "type": "object",
+      "properties": {
+        "retention": {
+          "type": "string",
+          "enum": [
+            "RETAIN",
+            "JIT_REMOVE_AFTER_VERIFIED_USE"
+          ]
+        }
+      },
+      "required": [
+        "retention"
+      ],
+      "additionalProperties": false
+    },
+    "verificationIntent": {
+      "type": "object",
+      "properties": {
+        "successConditions": {
+          "minItems": 1,
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        }
+      },
+      "required": [
+        "successConditions"
+      ],
+      "additionalProperties": false
+    },
+    "ambiguityDisposition": {
+      "type": "string",
+      "enum": [
+        "READY",
+        "NEEDS_CLARIFICATION",
+        "UNRESOLVED_OBJECT",
+        "UNRESOLVED_CAPABILITY",
+        "VERIFICATION_UNSPECIFIABLE",
+        "POLICY_BLOCKED"
+      ]
+    }
+  },
+  "required": [
+    "taskId",
+    "objective",
+    "objects",
+    "constraints",
+    "privacyPolicy",
+    "environmentPolicy",
+    "ambiguityDisposition"
+  ],
+  "additionalProperties": false
+}

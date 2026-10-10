@@ -1,0 +1,165 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:shun:contracts:0.1:c001-image-batch-process-output",
+  "title": "c001-image-batch-process-output",
+  "x-contracts-revision": "shun.contracts/0.1",
+  "type": "object",
+  "properties": {
+    "taskId": {
+      "type": "string",
+      "minLength": 1
+    },
+    "records": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "inputPath": {
+            "type": "string",
+            "minLength": 1
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "WRITTEN",
+              "REJECTED"
+            ]
+          },
+          "outputPath": {
+            "type": "string",
+            "minLength": 1
+          },
+          "rejectionCode": {
+            "type": "string",
+            "enum": [
+              "UNSUPPORTED_INPUT",
+              "DECODE_FAILED",
+              "OUTPUT_COLLISION",
+              "METADATA_LOST",
+              "QUALITY_ORACLE_FAILED",
+              "OUTPUT_VERIFY_FAILED"
+            ]
+          }
+        },
+        "required": [
+          "inputPath",
+          "status"
+        ],
+        "additionalProperties": false
+      }
+    },
+    "selectedBindingId": {
+      "type": "string",
+      "minLength": 1
+    },
+    "rankingEvidence": {
+      "type": "object",
+      "properties": {
+        "rankingPolicyRevision": {
+          "type": "string",
+          "minLength": 1
+        },
+        "reasons": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        }
+      },
+      "required": [
+        "rankingPolicyRevision",
+        "reasons"
+      ],
+      "additionalProperties": false
+    },
+    "verification": {
+      "type": "object",
+      "properties": {
+        "taskId": {
+          "type": "string",
+          "minLength": 1
+        },
+        "verifierId": {
+          "type": "string",
+          "minLength": 1
+        },
+        "verifierRevision": {
+          "type": "string",
+          "minLength": 1
+        },
+        "status": {
+          "type": "string",
+          "enum": [
+            "PASS",
+            "FAIL",
+            "INCOMPLETE"
+          ]
+        },
+        "checks": {
+          "minItems": 1,
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "checkId": {
+                "type": "string",
+                "minLength": 1
+              },
+              "status": {
+                "type": "string",
+                "enum": [
+                  "PASS",
+                  "FAIL",
+                  "NOT_RUN",
+                  "SKIPPED"
+                ]
+              },
+              "detail": {
+                "type": "string",
+                "minLength": 1
+              }
+            },
+            "required": [
+              "checkId",
+              "status"
+            ],
+            "additionalProperties": false
+          }
+        },
+        "oracleInputs": {
+          "type": "object",
+          "propertyNames": {
+            "type": "string"
+          },
+          "additionalProperties": {}
+        },
+        "evidenceRefs": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        }
+      },
+      "required": [
+        "taskId",
+        "verifierId",
+        "verifierRevision",
+        "status",
+        "checks",
+        "oracleInputs",
+        "evidenceRefs"
+      ],
+      "additionalProperties": false
+    }
+  },
+  "required": [
+    "taskId",
+    "records",
+    "selectedBindingId",
+    "rankingEvidence",
+    "verification"
+  ],
+  "additionalProperties": false
+}

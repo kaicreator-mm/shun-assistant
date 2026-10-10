@@ -1,0 +1,200 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:shun:contracts:0.1:authorized-action",
+  "title": "authorized-action",
+  "x-contracts-revision": "shun.contracts/0.1",
+  "type": "object",
+  "properties": {
+    "taskId": {
+      "type": "string",
+      "minLength": 1
+    },
+    "actionId": {
+      "type": "string",
+      "minLength": 1
+    },
+    "planHash": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "policySnapshotRevision": {
+      "type": "string",
+      "minLength": 1
+    },
+    "authorizationKind": {
+      "type": "string",
+      "enum": [
+        "AUTOMATIC",
+        "EXPLICIT_APPROVAL",
+        "DURABLE_POLICY"
+      ]
+    },
+    "authorizationRef": {
+      "type": "string",
+      "minLength": 1
+    },
+    "expiresAt": {
+      "type": "string",
+      "format": "date-time",
+      "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z))$"
+    },
+    "action": {
+      "type": "object",
+      "properties": {
+        "actionId": {
+          "type": "string",
+          "minLength": 1
+        },
+        "bindingRef": {
+          "type": "string",
+          "minLength": 1
+        },
+        "op": {
+          "type": "string",
+          "minLength": 1
+        },
+        "parameters": {
+          "type": "object",
+          "propertyNames": {
+            "type": "string"
+          },
+          "additionalProperties": {}
+        },
+        "sideEffectClass": {
+          "type": "string",
+          "enum": [
+            "R0",
+            "R1",
+            "R2",
+            "R3"
+          ]
+        },
+        "requiredPrivilege": {
+          "type": "string",
+          "enum": [
+            "NONE",
+            "USER",
+            "ELEVATED"
+          ]
+        },
+        "filesystemScope": {
+          "type": "object",
+          "properties": {
+            "read": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "minLength": 1
+              }
+            },
+            "write": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "minLength": 1
+              }
+            }
+          },
+          "required": [
+            "read",
+            "write"
+          ],
+          "additionalProperties": false
+        },
+        "networkScope": {
+          "type": "object",
+          "properties": {
+            "allowed": {
+              "type": "boolean"
+            },
+            "domains": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "minLength": 1
+              }
+            }
+          },
+          "required": [
+            "allowed"
+          ],
+          "additionalProperties": false
+        },
+        "registryScope": {
+          "type": "object",
+          "properties": {
+            "write": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "minLength": 1
+              }
+            }
+          },
+          "required": [
+            "write"
+          ],
+          "additionalProperties": false
+        },
+        "secretRefs": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "timeoutMs": {
+          "type": "integer",
+          "exclusiveMinimum": 0,
+          "maximum": 9007199254740991
+        },
+        "cancellation": {
+          "type": "object",
+          "properties": {
+            "supported": {
+              "type": "boolean"
+            },
+            "mode": {
+              "type": "string",
+              "enum": [
+                "COOPERATIVE",
+                "FORCED"
+              ]
+            }
+          },
+          "required": [
+            "supported",
+            "mode"
+          ],
+          "additionalProperties": false
+        },
+        "expectedState": {
+          "type": "object",
+          "propertyNames": {
+            "type": "string"
+          },
+          "additionalProperties": {}
+        }
+      },
+      "required": [
+        "actionId",
+        "bindingRef",
+        "op",
+        "parameters",
+        "sideEffectClass",
+        "requiredPrivilege"
+      ],
+      "additionalProperties": false
+    }
+  },
+  "required": [
+    "taskId",
+    "actionId",
+    "planHash",
+    "policySnapshotRevision",
+    "authorizationKind",
+    "authorizationRef",
+    "action"
+  ],
+  "additionalProperties": false
+}

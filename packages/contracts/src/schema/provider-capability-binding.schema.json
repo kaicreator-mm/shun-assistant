@@ -1,0 +1,131 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:shun:contracts:0.1:provider-capability-binding",
+  "title": "provider-capability-binding",
+  "x-contracts-revision": "shun.contracts/0.1",
+  "type": "object",
+  "properties": {
+    "bindingId": {
+      "type": "string",
+      "minLength": 1
+    },
+    "providerId": {
+      "type": "string",
+      "minLength": 1
+    },
+    "capabilityId": {
+      "type": "string",
+      "minLength": 1
+    },
+    "capabilityRevisionRange": {
+      "type": "object",
+      "properties": {
+        "min": {
+          "type": "string",
+          "minLength": 1
+        },
+        "max": {
+          "type": "string",
+          "minLength": 1
+        }
+      },
+      "required": [
+        "min"
+      ],
+      "additionalProperties": false
+    },
+    "adapterId": {
+      "type": "string",
+      "minLength": 1
+    },
+    "interfaceClass": {
+      "type": "string",
+      "enum": [
+        "I0",
+        "I1",
+        "I2",
+        "I3",
+        "I4"
+      ]
+    },
+    "environmentRequirements": {
+      "type": "object",
+      "properties": {
+        "backendKind": {
+          "type": "string",
+          "enum": [
+            "LOCAL_WINDOWS",
+            "LOCAL_POSIX",
+            "REMOTE_ECF"
+          ]
+        },
+        "os": {
+          "type": "string",
+          "enum": [
+            "WINDOWS",
+            "LINUX",
+            "MACOS"
+          ]
+        },
+        "arch": {
+          "type": "string",
+          "enum": [
+            "X64",
+            "ARM64"
+          ]
+        },
+        "privilegeMode": {
+          "type": "string",
+          "enum": [
+            "STANDARD_USER",
+            "FILTERED_ADMIN",
+            "ELEVATED_ADMIN",
+            "SERVICE"
+          ]
+        },
+        "guiSessionRequired": {
+          "type": "boolean"
+        },
+        "networkAccess": {
+          "type": "string",
+          "enum": [
+            "REQUIRED",
+            "OPTIONAL",
+            "FORBIDDEN"
+          ]
+        },
+        "minFreeDiskMb": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 9007199254740991
+        },
+        "runtimeCapabilities": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        }
+      },
+      "required": [
+        "backendKind"
+      ],
+      "additionalProperties": false
+    },
+    "verifierId": {
+      "type": "string",
+      "minLength": 1
+    }
+  },
+  "required": [
+    "bindingId",
+    "providerId",
+    "capabilityId",
+    "capabilityRevisionRange",
+    "adapterId",
+    "interfaceClass",
+    "environmentRequirements",
+    "verifierId"
+  ],
+  "additionalProperties": false
+}
