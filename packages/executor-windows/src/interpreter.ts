@@ -168,14 +168,33 @@ async function runParsedStep(step: ExecutorStep, ctx: InterpreterContext): Promi
         if (step.args.expectSha256 !== undefined && sha256 !== step.args.expectSha256)
           contentMatches = false;
       }
+      // C14: expectExists is the assertion. Both directions must work —
+      // absence proofs (expectedState { exists: false }) are unreachable
+      // otherwise, and the inverted "file absent ⇒ step failure" made every
+      // delete-style verify fail closed as an error.
+      const existenceOk = step.args.expectExists ? exists : !exists;
       const result = {
         path: within.resolved,
         exists,
+        existenceOk,
         contentMatches,
         ...(sha256 ? { sha256 } : {}),
       };
-      if (!exists || !contentMatches) {
-        return { ok: false, reason: 'post-state verification failed inside executor', result };
+      if (!existenceOk) {
+        return {
+          ok: false,
+          reason: step.args.expectExists
+            ? 'post-state verification failed: expected file absent'
+            : 'post-state verification failed: expected file present',
+          result,
+        };
+      }
+      if (exists && !contentMatches) {
+        return {
+          ok: false,
+          reason: 'post-state verification failed: content mismatch',
+          result,
+        };
       }
       return { ok: true, result };
     }
