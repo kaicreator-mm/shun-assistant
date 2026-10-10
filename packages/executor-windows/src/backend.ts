@@ -24,6 +24,7 @@ import {
   type ProviderEnvironmentBinding,
   validateGrantPresentation,
 } from '@shun/contracts';
+import { assertSafeActionId } from './action-id.ts';
 import { checkStepSurface, resolveActionStep } from './action-surface.ts';
 import { observeEnvironment } from './facts.ts';
 import {
@@ -141,6 +142,10 @@ export class LocalWindowsBackend implements EnvironmentBackend {
 
   /** Unprivileged in-process execution of ONE allowlisted action (L2 §8.1). */
   async execute(action: AuthorizedAction): Promise<ExecutionReceipt> {
+    // actionId is caller-controlled (contracts floor: min length only) and is
+    // spliced into the run directory name below — reject path semantics before
+    // any artifact path is derived from it.
+    assertSafeActionId(action.actionId);
     const runDir = join(
       this.options.workspaceRoot,
       'executions',

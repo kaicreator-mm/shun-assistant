@@ -3,6 +3,7 @@
 // are exported: EnvironmentBackend, ExecutionBackend, and the recovery/
 // journaling machinery the §9.4 classification is built on.
 
+export { ACTION_ID_PATTERN, ActionIdRefusedError, assertSafeActionId } from './action-id.ts';
 export type { LocalWindowsBackendOptions } from './backend.ts';
 export { LocalWindowsBackend, PROVIDER_ID, PROVIDER_VERSION } from './backend.ts';
 export {

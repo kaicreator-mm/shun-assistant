@@ -20,6 +20,7 @@ import {
   type ExecutionReceipt,
   ExecutionReceiptSchema,
 } from '@shun/contracts';
+import { assertSafeActionId } from './action-id.ts';
 import { PROVIDER_ID, PROVIDER_VERSION } from './backend.ts';
 import { type HelperReceiptFile, HelperReceiptFileSchema, writeEnvelopeFile } from './envelope.ts';
 import { verifyPinnedHelper } from './helper-pinning.ts';
@@ -98,6 +99,10 @@ export class PrivilegedWindowsExecutionBackend implements ExecutionBackend {
     action: AuthorizedAction,
     grant: AuthorizationGrantPresentationInput,
   ): Promise<ExecutionReceipt> {
+    // actionId is caller-controlled (contracts floor: min length only) and is
+    // spliced into the run directory name below — reject path semantics before
+    // any artifact path (or the elevated helper's I/O envelope) is derived.
+    assertSafeActionId(action.actionId);
     const runDir = join(
       this.options.workspaceRoot,
       'executions',

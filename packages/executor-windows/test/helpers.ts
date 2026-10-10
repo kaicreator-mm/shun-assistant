@@ -250,6 +250,7 @@ export function runHelperDirectly(
   journalFile: string,
   receiptFile: string,
   timeoutMs = 60000,
+  cwd?: string,
 ): HelperRun {
   let exitCode = -1;
   let stderr = '';
@@ -261,6 +262,7 @@ export function runHelperDirectly(
         timeout: timeoutMs,
         windowsHide: true,
         encoding: 'utf8',
+        ...(cwd ? { cwd } : {}),
       },
     );
     exitCode = 0;

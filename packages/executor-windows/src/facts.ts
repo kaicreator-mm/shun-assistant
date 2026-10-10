@@ -7,6 +7,7 @@ import { createHash } from 'node:crypto';
 import { existsSync, statfsSync } from 'node:fs';
 import { cpus, hostname, version as osVersion, platform, release, totalmem } from 'node:os';
 import { canonicalJson, type EnvironmentFacts, type PrivilegeMode } from '@shun/contracts';
+import { systemWhoamiExe } from './system-exe.ts';
 
 export interface ObserveOptions {
   /** Disk free is reported for this root (the executor workspace). */
@@ -80,8 +81,11 @@ function findOnPath(exe: string): boolean {
 export async function whoamiGroups(): Promise<string> {
   if (process.platform !== 'win32') return '';
   return new Promise((resolvePromise) => {
+    // SystemRoot-anchored, never PATH: whoever calls observeEnvironment can
+    // control PATH, and a planted fake whoami could get a filtered token
+    // judged ELEVATED_ADMIN (same convention as reg.exe/powershell.exe).
     execFile(
-      'whoami.exe',
+      systemWhoamiExe(),
       ['/groups', '/fo', 'csv'],
       { windowsHide: true, timeout: 10000 },
       (err, stdout) => {

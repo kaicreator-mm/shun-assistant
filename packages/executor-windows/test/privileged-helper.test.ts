@@ -7,9 +7,11 @@ import { existsSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { ActionIdRefusedError } from '../src/action-id.ts';
 import { readEnvelopeFile, writeEnvelopeFile } from '../src/envelope.ts';
 import { verifyPinnedHelper } from '../src/helper-pinning.ts';
 import { journalPhases, readJournal } from '../src/journal.ts';
+import { PrivilegedWindowsExecutionBackend } from '../src/privileged-backend.ts';
 import { readHelperPin } from '../src/trusted-store.ts';
 import {
   buildAuthorizedAction,
@@ -368,6 +370,30 @@ describe.skipIf(!ON_WINDOWS)(
       expect(existsSync(journalFile)).toBe(false);
       expect(existsSync(receiptFile)).toBe(false);
       expect(existsSync(join(workspace, 'escape-io.txt'))).toBe(false);
+    });
+
+    it('path-traversal actionId → typed refusal BEFORE pin read, UAC, or any launch artifact', async () => {
+      // The launcher splices actionId into the elevated helper's I/O envelope
+      // paths; a `..\`-shaped id must be rejected before anything is derived.
+      const built = buildAuthorizedAction(authority, {
+        op: 'windows.fs.write',
+        parameters: { path: join(workspace, 'never-traversal.txt'), content: 'x' },
+        requiredPrivilege: 'ELEVATED',
+        sideEffectClass: 'R2',
+        filesystemScope: { read: [], write: [workspace] },
+      });
+      const backend = new PrivilegedWindowsExecutionBackend({
+        authorityDir: authority.authorityDir,
+        workspaceRoot: workspace,
+        // Options below would matter only past the refusal; keep the test
+        // strictly offline (no UAC prompt, no relay, no helper spawn).
+        uacGraceMs: 0,
+      });
+      await expect(
+        backend.execute({ ...built.action, actionId: '..\\..\\pwned' }, built.grant),
+      ).rejects.toBeInstanceOf(ActionIdRefusedError);
+      expect(existsSync(join(workspace, 'never-traversal.txt'))).toBe(false);
+      expect(existsSync(join(workspace, 'executions'))).toBe(false);
     });
 
     it('cancel sentinel present before effects → CANCELLED receipt (exit 5)', () => {

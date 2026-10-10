@@ -21,7 +21,7 @@
 // consistency → execute → structured receipt.
 import { execFile } from 'node:child_process';
 import { renameSync, writeFileSync } from 'node:fs';
-import { homedir, hostname } from 'node:os';
+import { hostname } from 'node:os';
 import { join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import {
@@ -49,27 +49,17 @@ import {
 } from '../interpreter.ts';
 import { JournalWriter } from '../journal.ts';
 import { preflightScope } from '../scope-preflight.ts';
+import { systemWhoamiExe } from '../system-exe.ts';
 import {
   FileCurrentnessSource,
   hmacGrantIntegrityVerifier,
   readHelperPin,
   sha256File,
 } from '../trusted-store.ts';
+import { authorityDirectory } from './authority-dir.ts';
 
 const PROVIDER_ID = 'shun.executor-windows';
 const PROVIDER_VERSION = '0.1.0';
-
-// Build-time constant injected by scripts/build-helper.ts. The trusted
-// authority store location is NEVER taken from argv/env (an attacker-run
-// launcher spawns this helper and controls both); changing it is an explicit
-// authority event (helper rebuild + re-pin, §4.6.1).
-declare const SHUN_EXECUTOR_AUTHORITY_DIR: string | undefined;
-
-function authorityDirectory(): string {
-  const defined: string | undefined =
-    typeof SHUN_EXECUTOR_AUTHORITY_DIR === 'string' ? SHUN_EXECUTOR_AUTHORITY_DIR : undefined;
-  return defined ?? join(homedir(), '.shun', 'authority');
-}
 
 interface ReceiptInput {
   actionId: string;
@@ -400,7 +390,9 @@ class Helper {
 
 async function whoamiGroups(): Promise<string> {
   return new Promise((resolvePromise) => {
-    execFile('whoami.exe', ['/groups', '/fo', 'csv'], { windowsHide: true }, (err, stdout) => {
+    // SystemRoot-anchored, never PATH: the launcher controls PATH, and a
+    // planted fake whoami could get a filtered token judged elevated.
+    execFile(systemWhoamiExe(), ['/groups', '/fo', 'csv'], { windowsHide: true }, (err, stdout) => {
       resolvePromise(err ? '' : String(stdout));
     });
   });

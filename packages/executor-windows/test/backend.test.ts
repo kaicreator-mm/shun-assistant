@@ -5,6 +5,7 @@ import { existsSync, mkdtempSync, readdirSync, rmSync, writeFileSync } from 'nod
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { ActionIdRefusedError } from '../src/action-id.ts';
 import { LocalWindowsBackend } from '../src/backend.ts';
 import { journalPhases, readJournal } from '../src/journal.ts';
 import {
@@ -79,6 +80,38 @@ describe.skipIf(!ON_WINDOWS)('LocalWindowsBackend (real, unprivileged)', () => {
     const receipt = await backend.execute(action);
     expect(receipt.terminal).toBe('REFUSED');
     expect(receipt.sideEffectEvidence.recoveryClassification).toBe('FAILED_BEFORE_EFFECT');
+  });
+
+  it('REFUSES a path-traversal actionId with a typed error BEFORE any artifact path is derived', async () => {
+    // contracts only floor actionId at z.string().min(1); the backend splices
+    // it into run dir names, so a `..\`-shaped id must never reach the join.
+    const { action } = buildAuthorizedAction(authority, {
+      op: 'windows.fs.write',
+      parameters: { path: join(workspace, 'never-traversal.txt'), content: 'x' },
+      requiredPrivilege: 'USER',
+      filesystemScope: { read: [], write: [workspace] },
+    });
+    const beforeTmp = new Set(readdirSync(tmpdir()));
+    const beforeRuns = new Set(
+      existsSync(join(workspace, 'executions')) ? readdirSync(join(workspace, 'executions')) : [],
+    );
+    await expect(
+      backend.execute({ ...action, actionId: '..\\..\\shun-i15-escape-probe' }),
+    ).rejects.toBeInstanceOf(ActionIdRefusedError);
+    await expect(backend.execute({ ...action, actionId: 'sub/dir' })).rejects.toBeInstanceOf(
+      ActionIdRefusedError,
+    );
+    // Nothing materialized anywhere: not in the workspace, not in the run
+    // root, and (the actual bug) nothing escaped two levels up via `..\..\`.
+    expect(existsSync(join(workspace, 'never-traversal.txt'))).toBe(false);
+    const afterRuns = new Set(
+      existsSync(join(workspace, 'executions')) ? readdirSync(join(workspace, 'executions')) : [],
+    );
+    expect([...afterRuns].sort()).toEqual([...beforeRuns].sort());
+    const probeLeak = readdirSync(tmpdir()).filter(
+      (name) => name.startsWith('shun-i15-escape-probe') && !beforeTmp.has(name),
+    );
+    expect(probeLeak).toEqual([]);
   });
 
   it('REFUSES a forged grant reference (no such grant in the authority store)', async () => {
