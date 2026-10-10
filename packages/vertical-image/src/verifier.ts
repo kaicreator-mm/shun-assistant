@@ -189,10 +189,11 @@ export async function verifyBatch(args: VerifyBatchArgs): Promise<VerificationRe
     }
     evaluated += 1;
     try {
-      const [outPx, refPx] = await Promise.all([
-        decodeRgbaBytes(await readFile(record.outputPath)),
-        decodeRgbaBytes(await readFile(sample.referencePath)),
-      ]);
+      // Sequential awaits on purpose: an await inside a Promise.all element
+      // delays handler attachment, which would surface a transient
+      // unhandledRejection when the first decode rejects.
+      const outPx = await decodeRgbaBytes(await readFile(record.outputPath));
+      const refPx = await decodeRgbaBytes(await readFile(sample.referencePath));
       if (outPx.width !== refPx.width || outPx.height !== refPx.height) {
         ssimFailed += 1;
         ssimResults.push({
