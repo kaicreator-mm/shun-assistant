@@ -164,6 +164,67 @@ describe('four-state classification', () => {
       canResume: true,
     });
   });
+
+  it('resume after reconcile that fails again reverts to UNCERTAIN — the stale reconciliation never masks the later dispatch', async () => {
+    await openExecutingTask();
+    await kernel.beginAction('task-1', {
+      actionId: 'action-1',
+      planHash: 'p1',
+      riskClass: 'R2',
+      expectedState: { moved: 200 },
+    });
+    await expect(
+      kernel.dispatchAction('task-1', 'action-1', async () => {
+        throw new Error('first attempt interrupted');
+      }),
+    ).rejects.toHaveProperty('code', 'KERNEL_ACTION_UNCERTAIN');
+
+    // Reconcile proves the first attempt never took effect: resumable.
+    const downgradingProbe: DestructiveReconcileProbe = {
+      verifyExpectedState: async () => ({
+        outcome: 'CONFIRMED_NOT_EXECUTED',
+        evidence: { moved: 0 },
+      }),
+    };
+    const firstReport = await kernel.reconcile('task-1', { destructiveProbe: downgradingProbe });
+    expect(firstReport.actionRecoveries[0]).toMatchObject({
+      classification: 'FAILED_BEFORE_EFFECT',
+      resolved: true,
+      canResume: true,
+    });
+
+    // Same actionId resume — and the resumed execution fails again.
+    await expect(
+      kernel.dispatchAction('task-1', 'action-1', async () => {
+        throw new Error('resumed attempt interrupted');
+      }),
+    ).rejects.toHaveProperty('code', 'KERNEL_ACTION_UNCERTAIN');
+
+    // The stale FAILED_BEFORE_EFFECT verdict must NOT mask the later
+    // dispatch: recovery honestly reports UNCERTAIN, no blind resume.
+    const recoveries = await kernel.listActionRecoveries('task-1');
+    expect(recoveries[0]).toMatchObject({
+      classification: 'MAY_HAVE_EXECUTED_UNCERTAIN',
+      resolved: false,
+      canResume: false,
+    });
+
+    // Reconcile now routes the action through the probe again instead of
+    // skipping it as "already resolved".
+    let probeCalls = 0;
+    const verifyingProbe: DestructiveReconcileProbe = {
+      verifyExpectedState: async () => {
+        probeCalls += 1;
+        return { outcome: 'CONFIRMED_EXECUTED', evidence: { moved: 200 } };
+      },
+    };
+    const secondReport = await kernel.reconcile('task-1', { destructiveProbe: verifyingProbe });
+    expect(probeCalls).toBe(1);
+    expect(secondReport.actionRecoveries[0]).toMatchObject({
+      classification: 'COMPLETED_VERIFIED',
+      resolved: true,
+    });
+  });
 });
 
 describe('uncertain destructive actions are never blindly retried', () => {

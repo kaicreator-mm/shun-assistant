@@ -771,33 +771,41 @@ export class DurableWorkflowKernel implements WorkflowKernelPort {
         expectedState: spec.expectedState,
       };
 
-      const receipted = [...events].reverse().find((event) => event.kind === 'ACTION_RECEIPTED');
-      const reconciled = [...events].reverse().find((event) => event.kind === 'ACTION_RECONCILED');
-      const dispatched = events.some((event) => event.kind === 'ACTION_DISPATCHED');
-
-      if (receipted) {
-        views.push({
-          ...base,
-          classification: 'COMPLETED_VERIFIED',
-          resolved: true,
-          canResume: false,
-          receipt: (receipted.payload as { receipt: ExecutionReceipt }).receipt,
-        });
-        continue;
+      // Positional precedence: only events journaled AFTER the latest
+      // dispatch describe that dispatch's outcome, and the LATEST such
+      // outcome wins. A reconciled or receipted event from an earlier
+      // attempt must never mask a later dispatch (or its uncertainty) —
+      // recovery always reflects the most recent attempt.
+      let lastDispatchIndex = -1;
+      let lastOutcome: WorkflowJournalEvent | undefined;
+      let lastOutcomeIndex = -1;
+      for (const [index, event] of events.entries()) {
+        if (event.kind === 'ACTION_DISPATCHED') {
+          lastDispatchIndex = index;
+        } else if (
+          (event.kind === 'ACTION_RECEIPTED' ||
+            event.kind === 'ACTION_UNCERTAIN' ||
+            event.kind === 'ACTION_RECONCILED') &&
+          index > lastOutcomeIndex
+        ) {
+          lastOutcome = event;
+          lastOutcomeIndex = index;
+        }
       }
-      if (reconciled) {
-        const classification = (reconciled.payload as { classification: RecoveryClassification })
-          .classification;
+
+      if (lastDispatchIndex < 0) {
+        // Intent journaled, dispatch never started: provably safe on the SAME actionId.
         views.push({
           ...base,
-          classification,
+          classification: 'NOT_STARTED',
           resolved: true,
-          canResume: classification === 'FAILED_BEFORE_EFFECT',
+          canResume: true,
           receipt: null,
         });
         continue;
       }
-      if (dispatched) {
+      if (!lastOutcome || lastOutcomeIndex < lastDispatchIndex) {
+        // Dispatched with no journaled outcome yet: inside the execution window.
         views.push({
           ...base,
           classification: 'MAY_HAVE_EXECUTED_UNCERTAIN',
@@ -807,12 +815,33 @@ export class DurableWorkflowKernel implements WorkflowKernelPort {
         });
         continue;
       }
-      // Intent journaled, dispatch never started: provably safe on the SAME actionId.
+      if (lastOutcome.kind === 'ACTION_RECEIPTED') {
+        views.push({
+          ...base,
+          classification: 'COMPLETED_VERIFIED',
+          resolved: true,
+          canResume: false,
+          receipt: (lastOutcome.payload as { receipt: ExecutionReceipt }).receipt,
+        });
+        continue;
+      }
+      if (lastOutcome.kind === 'ACTION_UNCERTAIN') {
+        views.push({
+          ...base,
+          classification: 'MAY_HAVE_EXECUTED_UNCERTAIN',
+          resolved: false,
+          canResume: false,
+          receipt: null,
+        });
+        continue;
+      }
+      const classification = (lastOutcome.payload as { classification: RecoveryClassification })
+        .classification;
       views.push({
         ...base,
-        classification: 'NOT_STARTED',
+        classification,
         resolved: true,
-        canResume: true,
+        canResume: classification === 'FAILED_BEFORE_EFFECT',
         receipt: null,
       });
     }
