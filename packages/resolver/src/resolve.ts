@@ -91,6 +91,39 @@ export function resolveGoal(input: ResolveGoalInput): GoalResolution {
 
   const bindings = registry.bindingsForCapability(capability.capabilityId);
 
+  // Registry currentness before any gate (P1-06): a registry collected via
+  // sequential async reads without a verified snapshot seal has unverifiable
+  // currentness — reads-between-changed cannot be excluded, so resolution
+  // fails closed instead of trusting an unbound snapshot. The
+  // observationRevision string alone is a durable identity input, never
+  // freshness proof.
+  if (!registry.currentnessAttested) {
+    return {
+      stage: 'RESOLUTION',
+      resolverRevision: RESOLVER_REVISION,
+      record: parseResolutionRecord({
+        taskId: request.taskId,
+        resolvedCapabilityId: capability.capabilityId,
+        capabilityRevision: capability.revision,
+        normalizedConstraints: goalContract.constraints,
+        candidates: [],
+        feasibleBindings: [],
+        hardGateDispositions: [],
+        selectedBindingId: null,
+        selectionReasons: [],
+        riskClass: capability.sideEffectClass,
+        executionPlanClass: planClass,
+        verificationPlan,
+        privacyDisclosurePlan,
+        failureDisposition: {
+          failureCode: 'REGISTRY_CURRENTNESS_INSUFFICIENT',
+          detail:
+            'registry currentness unverifiable — the snapshot was collected through sequential async reads without a trusted snapshot seal binding the collected facts (P1-06); reads-between-changed cannot be excluded, fail closed',
+        },
+      }),
+    };
+  }
+
   // Registry currentness before any gate: a binding whose provider fact is
   // missing (or whose verifier binding is unresolvable) means stale/incomplete
   // registry state — fail closed, never silently skip (L2 §13).
@@ -184,30 +217,53 @@ export function resolveGoal(input: ResolveGoalInput): GoalResolution {
         `capability ${capability.capabilityId} has no discovered provider in the registry`,
       );
     }
+    // P2-02: failures are classified by the terminal gate each candidate
+    // actually reached, with the per-binding dispositions preserved in the
+    // record. Capability-fit failures happen BEFORE trust is evaluated, so an
+    // all-fit-failed candidate set is a contract/feasibility failure — never a
+    // trust verdict.
     const trustPassers = outcomes.filter((outcome) =>
       outcome.dispositions.some(
         (entry) => entry.gate === 'TRUST_SUPPLY_CHAIN' && entry.outcome === 'PASS',
       ),
     );
-    if (trustPassers.length === 0) {
+    if (trustPassers.length > 0) {
+      const policyRejectedOnly = trustPassers.every((outcome) => {
+        const terminal = outcome.dispositions[outcome.dispositions.length - 1];
+        return terminal?.gate === 'USER_ORG_POLICY' || terminal?.gate === 'SAFETY_CONSTRAINTS';
+      });
+      if (policyRejectedOnly) {
+        return failWith(
+          'POLICY_BLOCKED',
+          'every trust-passing binding was rejected by user/org policy or unacknowledged safety constraints',
+        );
+      }
       return failWith(
-        'NO_TRUSTED_PROVIDER',
-        `all ${bindings.length} candidate binding(s) failed the trust/supply-chain gate — provenance fail-closed`,
+        'NO_FEASIBLE_BINDING',
+        `no Provider × Environment binding is feasible for capability ${capability.capabilityId} on ${registry.observedEnvironment().environmentId}`,
       );
     }
-    const policyRejectedOnly = trustPassers.every((outcome) => {
+    // No candidate passed trust. Classify by the terminal gates reached:
+    // a candidate that failed capability fit never reached trust, so an
+    // all-fit-failed set must not be reported as a trust failure.
+    const terminalCounts = new Map<string, number>();
+    for (const outcome of outcomes) {
       const terminal = outcome.dispositions[outcome.dispositions.length - 1];
-      return terminal?.gate === 'USER_ORG_POLICY' || terminal?.gate === 'SAFETY_CONSTRAINTS';
-    });
-    if (policyRejectedOnly) {
+      const gate = terminal?.gate ?? 'UNKNOWN';
+      terminalCounts.set(gate, (terminalCounts.get(gate) ?? 0) + 1);
+    }
+    const terminalSummary = [...terminalCounts.entries()]
+      .map(([gate, count]) => `${gate}×${count}`)
+      .join(', ');
+    if (terminalCounts.has('TRUST_SUPPLY_CHAIN')) {
       return failWith(
-        'POLICY_BLOCKED',
-        'every trust-passing binding was rejected by user/org policy or unacknowledged safety constraints',
+        'NO_TRUSTED_PROVIDER',
+        `${bindings.length} candidate binding(s) failed with terminal gates: ${terminalSummary} — a trust/supply-chain terminal is present, provenance fail-closed`,
       );
     }
     return failWith(
       'NO_FEASIBLE_BINDING',
-      `no Provider × Environment binding is feasible for capability ${capability.capabilityId} on ${registry.observedEnvironment().environmentId}`,
+      `no candidate binding satisfies the capability contract for ${capability.capabilityId} on ${registry.observedEnvironment().environmentId} (terminal gates: ${terminalSummary})`,
     );
   }
 

@@ -17,6 +17,32 @@ import type { ShunRegistry } from './registry.ts';
 
 export type PlannerTransport = 'LOCAL' | 'REMOTE';
 
+/**
+ * Input of the planner seam. Transport provenance is a required trusted fact
+ * (P1-01): a configured PlannerPort MUST be declared LOCAL or REMOTE by the
+ * caller. An adapter that omits its transport declaration has unknown
+ * provenance — it is never silently treated as LOCAL, because a remote-backed
+ * adapter without the flag would otherwise bypass local-only /
+ * no-disclosure policy. The discriminated union makes the type system reject
+ * a planner without transport; the seam additionally fails closed at runtime
+ * for untyped callers.
+ */
+export type InterpretGoalViaPlannerInput =
+  | {
+      request: GoalRequest;
+      registry: ShunRegistry;
+      planner: PlannerPort;
+      transport: PlannerTransport;
+      objectExists?: (ref: string) => boolean;
+    }
+  | {
+      request: GoalRequest;
+      registry: ShunRegistry;
+      planner?: undefined;
+      transport?: PlannerTransport;
+      objectExists?: (ref: string) => boolean;
+    };
+
 /** Planning layer used for the resolution record (L2 §6.4 progressive determinization). */
 export const PLANNER_PROPOSAL_PLAN_CLASS = 'PLANNER_INTERPRETED' as const;
 
@@ -35,14 +61,22 @@ function structuralEquals(a: unknown, b: unknown): boolean {
   return JSON.stringify(a) === JSON.stringify(b);
 }
 
-export async function interpretGoalViaPlanner(input: {
-  request: GoalRequest;
-  registry: ShunRegistry;
-  planner?: PlannerPort;
-  transport?: PlannerTransport;
-  objectExists?: (ref: string) => boolean;
-}): Promise<PlannerInterpretation> {
-  const { request, registry, planner, transport = 'LOCAL', objectExists } = input;
+export async function interpretGoalViaPlanner(
+  input: InterpretGoalViaPlannerInput,
+): Promise<PlannerInterpretation> {
+  const { request, registry, planner, objectExists } = input;
+  const transport = input.transport;
+
+  // P1-01 fail-closed provenance check, ahead of any policy evaluation or
+  // adapter invocation: a configured planner without an explicit LOCAL/REMOTE
+  // transport declaration has unknown provenance and is never invoked.
+  if (planner !== undefined && transport !== 'LOCAL' && transport !== 'REMOTE') {
+    return {
+      status: 'PLANNER_UNAVAILABLE',
+      reason:
+        'planner transport provenance is required: a configured PlannerPort must declare LOCAL or REMOTE explicitly; a missing or unknown transport fails closed instead of defaulting to LOCAL',
+    };
+  }
 
   const localOnly =
     request.policyContext.privacyPolicy.localOnly ||

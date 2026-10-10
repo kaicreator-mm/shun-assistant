@@ -1,9 +1,13 @@
 // End-to-end resolution: C-000 ResolutionRecord over scenario registries.
 //
 // Required task evidence mapped to tests:
-// - B-033/034/035 independent gold comparison (gold defined below from hard
-//   requirements ONLY, hidden from the resolver run — never derived from the
-//   score under test, per docs/validation/benchmark-v0.1.md gold procedure);
+// - B-033/034/035 synthetic-agreement checks against the versioned gold
+//   records in evidence/gold-ranking-evidence.ts. The gold dispositions are
+//   derived from the hard requirements of the frozen scenario inputs
+//   (test/benchmark-scenarios.ts) — never from the resolver score under test.
+//   These are unit-level synthetic agreements, NOT independent validation:
+//   observed real execution evidence is deferred to a later Integration gate
+//   (see the limitations on every gold record, Issue #33 / P1-07);
 // - untrusted/missing alternatives (trust fail-closed);
 // - native-only Loop C (single native binding selected directly, no
 //   manufactured competition);
@@ -11,9 +15,18 @@
 // - ambiguous goals (typed normalization outcome, no record);
 // - no feasible binding (explicit failureDisposition).
 import { describe, expect, it } from 'vitest';
+import { goldEvidenceFor } from '../evidence/gold-ranking-evidence.ts';
 import { type BindingScoreFacts, rankFeasibleBindings } from '../src/ranking.ts';
 import { type ObjectiveMatcherTable, ShunRegistry } from '../src/registry.ts';
 import { resolveGoal } from '../src/resolve.ts';
+import {
+  B033_FACTS,
+  B034_ACKNOWLEDGED_FACTS,
+  B035_FACTS,
+  b033Registry,
+  b034Registry,
+  b035Registry,
+} from './benchmark-scenarios.ts';
 import {
   bindingDef,
   capabilityDef,
@@ -45,160 +58,7 @@ function registryOf(parts: {
 function resolve(registry: ShunRegistry, scoreFacts?: BindingScoreFacts[]) {
   const request = goalRequest({ goal: 'image.batch_process: batch resize my photos offline' });
   request.constraints.other = { offline: true };
-  return resolveGoal({ request, registry, scoreFacts });
-}
-
-// ---------------------------------------------------------------------------
-// B-033 scenario: FFmpeg-like CLI vs HandBrake-like batch tool vs GUI
-// converter under batch/low-resource/offline constraints. All three are
-// offline-capable on purpose: this isolates RANKING from policy rejection.
-// ---------------------------------------------------------------------------
-
-function b033Registry() {
-  // The scenario capability permits the I3 fallback class so the GUI converter
-  // is a *feasible ranking candidate* — its loss must come from agent
-  // usability, not from a contract mismatch (B-033 isolates ranking).
-  const capability = capabilityDef({
-    capabilityId: 'image.batch_process',
-    allowedInterfaceClasses: ['I0', 'I1', 'I2', 'I3'],
-  });
-  const ff = providerDef({
-    providerId: 'imageProvider.ffcli',
-    interfaces: [{ interfaceId: 'ffcli', interfaceClass: 'I1', invocation: 'ffcli <typed-args>' }],
-  });
-  const hb = providerDef({
-    providerId: 'imageProvider.hbcli',
-    interfaces: [{ interfaceId: 'hbcli', interfaceClass: 'I1', invocation: 'hbcli <typed-args>' }],
-  });
-  const gui = providerDef({
-    providerId: 'imageProvider.guipad',
-    interfaces: [
-      { interfaceId: 'guipad', interfaceClass: 'I3', invocation: 'guipad-ui <semantics>' },
-    ],
-  });
-  const bindings = [
-    bindingDef({
-      bindingId: 'b-ff',
-      providerId: ff.providerId,
-      capabilityId: 'image.batch_process',
-      interfaceClass: 'I1',
-      environmentRequirements: requirements({ networkAccess: 'FORBIDDEN', minFreeDiskMb: 512 }),
-    }),
-    bindingDef({
-      bindingId: 'b-hb',
-      providerId: hb.providerId,
-      capabilityId: 'image.batch_process',
-      interfaceClass: 'I1',
-      environmentRequirements: requirements({ networkAccess: 'FORBIDDEN', minFreeDiskMb: 1024 }),
-    }),
-    bindingDef({
-      bindingId: 'b-gui',
-      providerId: gui.providerId,
-      capabilityId: 'image.batch_process',
-      interfaceClass: 'I3',
-      environmentRequirements: requirements({
-        networkAccess: 'FORBIDDEN',
-        guiSessionRequired: true,
-        minFreeDiskMb: 2048,
-      }),
-    }),
-  ];
-  return registryOf({ capabilities: [capability], providers: [ff, hb, gui], bindings });
-}
-
-// INDEPENDENT GOLD — derived from hard requirements only (batch automation
-// must be unattended, structured, headless; low resource favors small
-// footprint; offline forbids network). NOT computed with the resolver score:
-//   1. b-ff  — native directory/queue batch, fully headless, best structured
-//              I/O, smallest footprint → satisfies every hard requirement;
-//   2. b-hb  — batch possible but coarser structured I/O and heavier
-//              footprint → partially satisfies automation requirements;
-//   3. b-gui — interactive UI per batch fails unattended automation outright
-//              → last regardless of brand or human usability.
-const B033_GOLD = ['b-ff', 'b-hb', 'b-gui'] as const;
-
-const B033_FACTS: BindingScoreFacts[] = [
-  {
-    bindingId: 'b-ff',
-    components: {
-      capabilityFit: 90,
-      reliability: 85,
-      agentUsability: 92,
-      trust: 90,
-      environmentCompatibility: 85,
-      performance: 80,
-      humanUsability: 60,
-    },
-  },
-  {
-    bindingId: 'b-hb',
-    components: {
-      capabilityFit: 85,
-      reliability: 80,
-      agentUsability: 68,
-      trust: 88,
-      environmentCompatibility: 80,
-      performance: 65,
-      humanUsability: 75,
-    },
-  },
-  {
-    bindingId: 'b-gui',
-    components: {
-      capabilityFit: 80,
-      reliability: 75,
-      agentUsability: 25,
-      trust: 85,
-      environmentCompatibility: 60,
-      performance: 50,
-      humanUsability: 90,
-    },
-  },
-];
-
-// ---------------------------------------------------------------------------
-// B-034 scenario: safer uninstaller vs Revo-like aggressive uninstaller.
-// ---------------------------------------------------------------------------
-
-const UNINSTALL_MATCHERS = {
-  'software.uninstall_safe': [/\bsoftware\.uninstall_safe\b/],
-};
-
-function b034Registry() {
-  const capability = capabilityDef({
-    capabilityId: 'software.uninstall_safe',
-    sideEffectClass: 'R2',
-  });
-  const safer = providerDef({ providerId: 'softwareProvider.safer-uninstaller' });
-  const aggressive = providerDef({
-    providerId: 'softwareProvider.aggressive-uninstaller',
-    provenanceFacts: {
-      trustState: 'TRUSTED',
-      safetyProfile: {
-        riskEscalationRequired: true,
-        escalationReason:
-          'aggressive registry/residue cleanup exceeds the declared uninstall envelope',
-      },
-    },
-  });
-  const bindings = [
-    bindingDef({
-      bindingId: 'b-safer',
-      providerId: safer.providerId,
-      capabilityId: 'software.uninstall_safe',
-    }),
-    bindingDef({
-      bindingId: 'b-aggressive',
-      providerId: aggressive.providerId,
-      capabilityId: 'software.uninstall_safe',
-    }),
-  ];
-  return registryOf({
-    capabilities: [capability],
-    providers: [safer, aggressive],
-    bindings,
-    additionalObjectiveMatchers: UNINSTALL_MATCHERS,
-  });
+  return resolveGoal({ request, registry, scoreFacts, objectExists: () => true });
 }
 
 describe('resolution records over scenario registries', () => {
@@ -234,32 +94,34 @@ describe('resolution records over scenario registries', () => {
     expect(record.selectionReasons.join(' ')).toContain('single trusted binding');
   });
 
-  it('B-033: top-1 matches the independent gold ranking under batch/offline constraints', () => {
+  it('B-033: top-1 matches the gold record ranking under batch/offline constraints (synthetic agreement)', () => {
+    const gold = goldEvidenceFor('B-033');
     const result = resolve(b033Registry(), B033_FACTS);
     expect(result.stage).toBe('RESOLUTION');
     if (result.stage !== 'RESOLUTION') return;
     const record = result.record;
     // All three are feasible — this is a pure ranking comparison, not a policy filter.
     expect(record.feasibleBindings).toEqual(['b-ff', 'b-hb', 'b-gui']);
-    expect(record.selectedBindingId).toBe(B033_GOLD[0]);
+    expect(record.selectedBindingId).toBe(gold.goldRanking[0]);
     expect(record.selectionReasons.join(' ')).toContain('ranked #1 of 3');
   });
 
-  it('B-033: full resolver order agrees with the hidden gold order (top-k agreement)', () => {
+  it('B-033: full resolver order agrees with the gold record order (top-k synthetic agreement)', () => {
     const registry = b033Registry();
+    const gold = goldEvidenceFor('B-033');
     const bindings = registry.bindingsForCapability('image.batch_process');
     const ranked = rankFeasibleBindings({
       bindings: bindings.map((binding) => ({ ...binding })),
       scoreFacts: B033_FACTS,
     });
-    expect(ranked.map((entry) => entry.bindingId)).toEqual([...B033_GOLD]);
+    expect(ranked.map((entry) => entry.bindingId)).toEqual([...gold.goldRanking]);
   });
 
   it('B-034: default policy selects the safer uninstaller and records the explicit escalation reason', () => {
     const request = goalRequest({
       goal: 'software.uninstall_safe: uninstall a normal desktop app',
     });
-    const result = resolveGoal({ request, registry: b034Registry() });
+    const result = resolveGoal({ request, registry: b034Registry(), objectExists: () => true });
     expect(result.stage).toBe('RESOLUTION');
     if (result.stage !== 'RESOLUTION') return;
     const record = result.record;
@@ -281,33 +143,12 @@ describe('resolution records over scenario registries', () => {
       goal: 'software.uninstall_safe: uninstall a normal desktop app',
     });
     request.constraints.other = { riskEscalationAcknowledged: true };
-    const facts: BindingScoreFacts[] = [
-      {
-        bindingId: 'b-safer',
-        components: {
-          capabilityFit: 85,
-          reliability: 85,
-          agentUsability: 60,
-          trust: 90,
-          environmentCompatibility: 85,
-          performance: 70,
-          humanUsability: 80,
-        },
-      },
-      {
-        bindingId: 'b-aggressive',
-        components: {
-          capabilityFit: 95,
-          reliability: 85,
-          agentUsability: 90,
-          trust: 90,
-          environmentCompatibility: 85,
-          performance: 85,
-          humanUsability: 60,
-        },
-      },
-    ];
-    const result = resolveGoal({ request, registry: b034Registry(), scoreFacts: facts });
+    const result = resolveGoal({
+      request,
+      registry: b034Registry(),
+      scoreFacts: B034_ACKNOWLEDGED_FACTS,
+      objectExists: () => true,
+    });
     expect(result.stage).toBe('RESOLUTION');
     if (result.stage !== 'RESOLUTION') return;
     const record = result.record;
@@ -318,69 +159,12 @@ describe('resolution records over scenario registries', () => {
     );
   });
 
-  it('B-035: a structured CLI provider beats a pretty GUI despite the GUI being more human-friendly', () => {
-    const capability = capabilityDef({
-      capabilityId: 'image.batch_process',
-      allowedInterfaceClasses: ['I0', 'I1', 'I2', 'I3'],
-    });
-    const cli = providerDef({ providerId: 'imageProvider.mpvcli' });
-    const pretty = providerDef({
-      providerId: 'imageProvider.prettygui',
-      interfaces: [
-        { interfaceId: 'prettygui-ui', interfaceClass: 'I3', invocation: 'prettygui semantic-ui' },
-      ],
-    });
-    const registry = registryOf({
-      capabilities: [capability],
-      providers: [cli, pretty],
-      bindings: [
-        bindingDef({
-          bindingId: 'b-cli',
-          providerId: cli.providerId,
-          capabilityId: 'image.batch_process',
-        }),
-        bindingDef({
-          bindingId: 'b-pretty',
-          providerId: pretty.providerId,
-          capabilityId: 'image.batch_process',
-          interfaceClass: 'I3',
-          environmentRequirements: requirements({ guiSessionRequired: true }),
-        }),
-      ],
-    });
-    // GUI is the more popular, more human-usable product — the gold rule for
-    // batch automation is agent usability: structured CLI wins (hard
-    // requirement: unattended structured execution).
-    const facts: BindingScoreFacts[] = [
-      {
-        bindingId: 'b-cli',
-        components: {
-          capabilityFit: 88,
-          reliability: 85,
-          agentUsability: 90,
-          trust: 85,
-          environmentCompatibility: 85,
-          performance: 80,
-          humanUsability: 55,
-        },
-      },
-      {
-        bindingId: 'b-pretty',
-        components: {
-          capabilityFit: 88,
-          reliability: 88,
-          agentUsability: 22,
-          trust: 92,
-          environmentCompatibility: 80,
-          performance: 60,
-          humanUsability: 97,
-        },
-      },
-    ];
-    const result = resolve(registry, facts);
+  it('B-035: a structured CLI provider beats a pretty GUI despite the GUI being more human-friendly (synthetic agreement)', () => {
+    const gold = goldEvidenceFor('B-035');
+    const result = resolve(b035Registry(), B035_FACTS);
     expect(result.stage).toBe('RESOLUTION');
     if (result.stage !== 'RESOLUTION') return;
-    expect(result.record.selectedBindingId).toBe('b-cli');
+    expect(result.record.selectedBindingId).toBe(gold.goldRanking[0]);
     expect(result.record.feasibleBindings).toContain('b-pretty');
   });
 
@@ -415,7 +199,7 @@ describe('resolution records over scenario registries', () => {
     const request = goalRequest({
       goal: 'system.storage.diagnose_bounded_action: explain C: usage',
     });
-    const result = resolveGoal({ request, registry });
+    const result = resolveGoal({ request, registry, objectExists: () => true });
     expect(result.stage).toBe('RESOLUTION');
     if (result.stage !== 'RESOLUTION') return;
     const record = result.record;
@@ -531,11 +315,13 @@ describe('resolution records over scenario registries', () => {
           bindingId: 'b-trusted',
           providerId: trusted.providerId,
           capabilityId: 'image.batch_process',
+          environmentRequirements: requirements({ networkAccess: 'FORBIDDEN' }),
         }),
         bindingDef({
           bindingId: 'b-untrusted',
           providerId: untrusted.providerId,
           capabilityId: 'image.batch_process',
+          environmentRequirements: requirements({ networkAccess: 'FORBIDDEN' }),
         }),
       ],
     });
@@ -603,10 +389,134 @@ describe('resolution records over scenario registries', () => {
     expect(result.record.failureDisposition?.failureCode).toBe('POLICY_BLOCKED');
   });
 
+  it('a requested format the provider format facts do not cover is policy-blocked with dispositions kept (P1-04)', () => {
+    const capability = capabilityDef({ capabilityId: 'image.batch_process' });
+    const pngOnly = providerDef({
+      providerId: 'imageProvider.pngonly',
+      provenanceFacts: { trustState: 'TRUSTED', formatSupport: ['PNG'] },
+    });
+    const registry = registryOf({
+      capabilities: [capability],
+      providers: [pngOnly],
+      bindings: [
+        bindingDef({
+          bindingId: 'b-pngonly',
+          providerId: pngOnly.providerId,
+          capabilityId: 'image.batch_process',
+          environmentRequirements: requirements({ networkAccess: 'FORBIDDEN' }),
+        }),
+      ],
+    });
+    const result = resolve(registry); // scenario goal requests format 'JPG'
+    expect(result.stage).toBe('RESOLUTION');
+    if (result.stage !== 'RESOLUTION') return;
+    const record = result.record;
+    expect(record.selectedBindingId).toBeNull();
+    expect(record.feasibleBindings).toEqual([]);
+    expect(record.failureDisposition?.failureCode).toBe('POLICY_BLOCKED');
+    const formatRow = record.hardGateDispositions.find(
+      (entry) => entry.bindingId === 'b-pngonly' && entry.gate === 'USER_ORG_POLICY',
+    );
+    expect(formatRow).toMatchObject({
+      outcome: 'REJECT',
+      reason: expect.stringContaining('JPG'),
+    });
+  });
+
   it('resolution is deterministic: identical input produces an identical record', () => {
     const once = resolve(b033Registry(), B033_FACTS);
     const twice = resolve(b033Registry(), B033_FACTS);
     expect(once).toEqual(twice);
+  });
+
+  it('referenced objects without an observed-object proof source fail closed before resolution (P2-01)', () => {
+    const registry = registryOf({
+      capabilities: [capabilityDef({ capabilityId: 'image.batch_process' })],
+    });
+    const request = goalRequest({ goal: 'image.batch_process: resize photos' });
+    const result = resolveGoal({ request, registry });
+    expect(result.stage).toBe('GOAL_NOT_READY');
+    if (result.stage !== 'GOAL_NOT_READY') return;
+    const normalization = result.normalization;
+    expect(normalization).toMatchObject({
+      status: 'NOT_READY',
+      disposition: 'UNRESOLVED_OBJECT',
+      failureCode: 'OBJECT_UNRESOLVED',
+    });
+    if (normalization.status !== 'NOT_READY') return;
+    expect(normalization.detail).toContain('observed-object proof source');
+  });
+
+  it('an early capability-fit failure is classified NO_FEASIBLE_BINDING, not NO_TRUSTED_PROVIDER (P2-02)', () => {
+    const capability = capabilityDef({ capabilityId: 'image.batch_process', revision: 'r2' });
+    const provider = providerDef({ providerId: 'imageProvider.stale' });
+    const registry = registryOf({
+      capabilities: [capability],
+      providers: [provider],
+      bindings: [
+        bindingDef({
+          bindingId: 'b-stale-range',
+          providerId: provider.providerId,
+          capabilityId: 'image.batch_process',
+          capabilityRevisionRange: { min: 'r1', max: 'r1' },
+          environmentRequirements: requirements({ networkAccess: 'FORBIDDEN' }),
+        }),
+      ],
+    });
+    const result = resolve(registry);
+    expect(result.stage).toBe('RESOLUTION');
+    if (result.stage !== 'RESOLUTION') return;
+    const record = result.record;
+    expect(record.selectedBindingId).toBeNull();
+    expect(record.failureDisposition?.failureCode).toBe('NO_FEASIBLE_BINDING');
+    // The trust gate never ran for these candidates — the failure must not
+    // claim a trust/supply-chain verdict.
+    expect(record.failureDisposition?.detail).not.toContain('trust');
+    expect(record.candidates).toHaveLength(1);
+    const fitRow = record.hardGateDispositions.find(
+      (entry) => entry.bindingId === 'b-stale-range' && entry.gate === 'CAPABILITY_FIT',
+    );
+    expect(fitRow).toMatchObject({
+      outcome: 'REJECT',
+      reason: expect.stringContaining('outside supported range'),
+    });
+  });
+
+  it('mixed terminal gates are classified deterministically with an accurate terminal summary (P2-02)', () => {
+    const capability = capabilityDef({ capabilityId: 'image.batch_process', revision: 'r2' });
+    const trusted = providerDef({ providerId: 'imageProvider.stale-trusted' });
+    const shady = providerDef({
+      providerId: 'imageProvider.shady',
+      provenanceFacts: { trustState: 'UNKNOWN' },
+    });
+    const registry = registryOf({
+      capabilities: [capability],
+      providers: [trusted, shady],
+      bindings: [
+        bindingDef({
+          bindingId: 'b-fit-fail',
+          providerId: trusted.providerId,
+          capabilityId: 'image.batch_process',
+          capabilityRevisionRange: { min: 'r1', max: 'r1' },
+          environmentRequirements: requirements({ networkAccess: 'FORBIDDEN' }),
+        }),
+        bindingDef({
+          bindingId: 'b-trust-fail',
+          providerId: shady.providerId,
+          capabilityId: 'image.batch_process',
+          environmentRequirements: requirements({ networkAccess: 'FORBIDDEN' }),
+        }),
+      ],
+    });
+    const result = resolve(registry);
+    expect(result.stage).toBe('RESOLUTION');
+    if (result.stage !== 'RESOLUTION') return;
+    // A candidate that reached and failed the trust gate exists, so
+    // NO_TRUSTED_PROVIDER is factually true — and the detail names every
+    // terminal gate so the classification is auditable.
+    expect(result.record.failureDisposition?.failureCode).toBe('NO_TRUSTED_PROVIDER');
+    expect(result.record.failureDisposition?.detail).toContain('CAPABILITY_FIT');
+    expect(result.record.failureDisposition?.detail).toContain('TRUST_SUPPLY_CHAIN');
   });
 
   it('an ambiguous goal surfaces the typed normalization outcome, never a record', () => {
@@ -622,7 +532,7 @@ describe('resolution records over scenario registries', () => {
     const request = goalRequest({
       goal: 'image.batch_process and system.storage.diagnose_bounded_action please',
     });
-    const result = resolveGoal({ request, registry });
+    const result = resolveGoal({ request, registry, objectExists: () => true });
     expect(result.stage).toBe('GOAL_NOT_READY');
     if (result.stage !== 'GOAL_NOT_READY') return;
     expect(result.normalization).toEqual({

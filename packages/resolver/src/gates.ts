@@ -25,20 +25,80 @@ export interface SafetyProfile {
   escalationReason: string;
 }
 
-export function readSafetyProfile(provider: ProviderDefinition): SafetyProfile | undefined {
+/**
+ * Strict parse result of a provider's curated safetyProfile (P1-03): ABSENT
+ * means the fact class is not declared (no escalation posture known); VALID
+ * parses into the SafetyProfile shape; MALFORMED means a safetyProfile IS
+ * present but does not parse — it never degrades to "no profile".
+ */
+export type SafetyProfileRead =
+  | { status: 'ABSENT' }
+  | { status: 'VALID'; profile: SafetyProfile }
+  | { status: 'MALFORMED'; reason: string };
+
+export function readSafetyProfile(provider: ProviderDefinition): SafetyProfileRead {
   const profile = provider.provenanceFacts.safetyProfile;
-  if (
-    typeof profile === 'object' &&
-    profile !== null &&
-    (profile as Record<string, unknown>).riskEscalationRequired === true &&
-    typeof (profile as Record<string, unknown>).escalationReason === 'string'
-  ) {
+  if (profile === undefined) {
+    return { status: 'ABSENT' };
+  }
+  if (typeof profile !== 'object' || profile === null || Array.isArray(profile)) {
     return {
-      riskEscalationRequired: true,
-      escalationReason: (profile as Record<string, unknown>).escalationReason as string,
+      status: 'MALFORMED',
+      reason: `safetyProfile must be an object, got ${typeof profile}`,
     };
   }
-  return undefined;
+  const record = profile as Record<string, unknown>;
+  if (record.riskEscalationRequired !== true) {
+    return {
+      status: 'MALFORMED',
+      reason:
+        'safetyProfile.riskEscalationRequired must be the literal true (missing/false is not a parseable safety posture)',
+    };
+  }
+  if (typeof record.escalationReason !== 'string' || record.escalationReason.length === 0) {
+    return {
+      status: 'MALFORMED',
+      reason: 'safetyProfile.escalationReason must be a non-empty string',
+    };
+  }
+  return {
+    status: 'VALID',
+    profile: { riskEscalationRequired: true, escalationReason: record.escalationReason },
+  };
+}
+
+/**
+ * Bounded curated format facts (P1-04): the frozen binding/capability
+ * contracts carry no per-binding output-format metadata, so the resolver
+ * reads an opt-in `formatSupport: string[]` fact from provider.provenanceFacts
+ * (the one unconstrained curated record in the frozen ProviderDefinition).
+ * ABSENT = no curated fact (constraints cannot be gate-evaluated and are
+ * explicitly deferred); MALFORMED = a present fact that does not parse fails
+ * closed like any other curated fact.
+ */
+export type FormatSupportRead =
+  | { status: 'ABSENT' }
+  | { status: 'VALID'; formats: readonly string[] }
+  | { status: 'MALFORMED'; reason: string };
+
+export function readFormatSupport(provider: ProviderDefinition): FormatSupportRead {
+  const fact = provider.provenanceFacts.formatSupport;
+  if (fact === undefined) {
+    return { status: 'ABSENT' };
+  }
+  if (!Array.isArray(fact) || fact.length === 0) {
+    return {
+      status: 'MALFORMED',
+      reason: 'curated formatSupport must be a non-empty array of format tokens',
+    };
+  }
+  if (!fact.every((entry) => typeof entry === 'string' && entry.trim().length > 0)) {
+    return {
+      status: 'MALFORMED',
+      reason: 'curated formatSupport entries must be non-empty strings',
+    };
+  }
+  return { status: 'VALID', formats: fact as string[] };
 }
 
 export interface BindingGateOutcome {
@@ -172,8 +232,31 @@ export function runHardGates(
   // Gate 4 — User / organization policy: user constraints precede ranking.
   const requirements = binding.environmentRequirements;
   const policyProblems: string[] = [];
-  if (context.privacyPolicy.localOnly && requirements.networkAccess === 'REQUIRED') {
-    policyProblems.push('local-only privacy policy forbids network-transferring bindings');
+
+  // Disclosure dimension (P1-02): a no-disclosure privacy policy (localOnly,
+  // or externalDisclosure FORBIDDEN) admits only bindings whose requirements
+  // explicitly declare networkAccess FORBIDDEN — that declaration is the only
+  // machine-checkable disclosure-compatibility evidence in the frozen binding
+  // contract. REQUIRED is an unconditional network-transfer posture, OPTIONAL
+  // is an unproven posture (no proven no-disclosure execution mode), and an
+  // absent declaration is an unknown posture; all three fail closed instead
+  // of silently passing a disclosure-forbidding policy.
+  const noDisclosurePolicy =
+    context.privacyPolicy.localOnly || context.privacyPolicy.externalDisclosure === 'FORBIDDEN';
+  if (noDisclosurePolicy && requirements.networkAccess !== 'FORBIDDEN') {
+    if (requirements.networkAccess === 'REQUIRED') {
+      policyProblems.push(
+        'local-only / no-disclosure privacy policy forbids network-transferring bindings',
+      );
+    } else if (requirements.networkAccess === 'OPTIONAL') {
+      policyProblems.push(
+        'local-only / no-disclosure privacy policy rejects networkAccess OPTIONAL — optional network use is not a proven no-disclosure execution mode',
+      );
+    } else {
+      policyProblems.push(
+        'binding declares no network-access posture; an unknown transport posture fails closed under a local-only / no-disclosure privacy policy',
+      );
+    }
   }
   if (context.constraints.other?.offline === true && requirements.networkAccess === 'REQUIRED') {
     policyProblems.push('offline constraint forbids network access');
@@ -184,6 +267,61 @@ export function runHardGates(
   ) {
     policyProblems.push('goal policy disallows elevated execution');
   }
+
+  // Capability-required policy facts (P1-04): requiredPolicyFacts are keys
+  // that must be current in the goal constraints before side-effecting
+  // execution. A key absent from constraints.other cannot be proven current —
+  // fail closed instead of ranking a binding whose required policy facts are
+  // unevaluated.
+  for (const factKey of context.capability.requiredPolicyFacts) {
+    if (context.constraints.other?.[factKey] === undefined) {
+      policyProblems.push(
+        `capability requires policy fact "${factKey}" to be current; it is missing from the goal constraints — fail closed`,
+      );
+    }
+  }
+
+  // Licensing constraint (P1-04): when the goal declares a licensing
+  // constraint, it is enforced deterministically as an exact, case-insensitive
+  // license identity match against provider.licenseFacts.license. Anything the
+  // provider license facts do not satisfy verbatim is rejected — a forbidden
+  // or merely different license can no longer pass the gates and win ranking.
+  const licensing = context.constraints.licensing;
+  if (licensing !== undefined) {
+    const requested = licensing.trim().toLowerCase();
+    const provided = provider.licenseFacts.license.trim().toLowerCase();
+    if (requested !== provided) {
+      policyProblems.push(
+        `provider license "${provider.licenseFacts.license}" does not satisfy the requested licensing constraint "${licensing}" (exact license identity required — fail closed)`,
+      );
+    }
+  }
+
+  // Format constraint (P1-04): evaluated only against explicit curated
+  // formatSupport facts. A covered-but-different requested format is a REJECT;
+  // with no curated facts the constraint is not silently certified — the PASS
+  // reason records the explicit deferral to downstream verification.
+  const formatDeferredNotes: string[] = [];
+  const format = context.constraints.format;
+  if (format !== undefined) {
+    const formatSupport = readFormatSupport(provider);
+    if (formatSupport.status === 'MALFORMED') {
+      policyProblems.push(`malformed curated format facts — fail closed: ${formatSupport.reason}`);
+    } else if (formatSupport.status === 'ABSENT') {
+      formatDeferredNotes.push(
+        `requested format "${format}" is not gate-evaluable for this binding (no curated format facts on the provider); deferred to downstream verification`,
+      );
+    } else if (
+      !formatSupport.formats.some(
+        (entry) => entry.trim().toLowerCase() === format.trim().toLowerCase(),
+      )
+    ) {
+      policyProblems.push(
+        `provider does not declare support for the requested format "${format}" (curated format facts: ${formatSupport.formats.join(', ')})`,
+      );
+    }
+  }
+
   if (policyProblems.length > 0) {
     dispositions.push(
       disposition('USER_ORG_POLICY', binding.bindingId, 'REJECT', policyProblems.join('; ')),
@@ -191,13 +329,33 @@ export function runHardGates(
     return { binding, dispositions, passed: false };
   }
   dispositions.push(
-    disposition('USER_ORG_POLICY', binding.bindingId, 'PASS', 'no user/org policy violation'),
+    disposition(
+      'USER_ORG_POLICY',
+      binding.bindingId,
+      'PASS',
+      formatDeferredNotes.length > 0
+        ? `no user/org policy violation; ${formatDeferredNotes.join('; ')}`
+        : 'no user/org policy violation',
+    ),
   );
 
   // Gate 5 — Required safety constraints: curated escalation posture is
-  // explicit, never a score component (P2-02).
-  const safetyProfile = readSafetyProfile(provider);
-  if (safetyProfile !== undefined) {
+  // explicit, never a score component (P2-02). A present-but-malformed
+  // safetyProfile fails closed (P1-03) — it is never read as "no profile".
+  const safetyRead = readSafetyProfile(provider);
+  if (safetyRead.status === 'MALFORMED') {
+    dispositions.push(
+      disposition(
+        'SAFETY_CONSTRAINTS',
+        binding.bindingId,
+        'REJECT',
+        `provider safetyProfile is present but malformed — fail closed: ${safetyRead.reason}`,
+      ),
+    );
+    return { binding, dispositions, passed: false };
+  }
+  if (safetyRead.status === 'VALID') {
+    const safetyProfile = safetyRead.profile;
     const acknowledged = context.constraints.other?.riskEscalationAcknowledged === true;
     if (!acknowledged) {
       dispositions.push(
