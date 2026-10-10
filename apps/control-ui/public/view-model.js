@@ -303,3 +303,33 @@ export function localOnlyBadge(snapshot) {
     ? 'Local only — nothing leaves this computer'
     : `External disclosure: ${snapshot.localOnly?.externalDisclosure ?? 'UNKNOWN'}`;
 }
+
+/**
+ * Simulation disclosure (Issue #41, VC-P2-06): the surface must prominently
+ * state when it runs the scripted DemoShunBackend so demo approvals can never
+ * pass as real-world authority. Fail loud on unknown — an API that cannot
+ * answer keeps the banner up instead of looking like a confirmed real backend.
+ */
+/**
+ * @param {{ simulated?: boolean } | undefined} health
+ * @returns {{ visible: boolean, text: string }}
+ */
+export function simulationBanner(health) {
+  if (health?.simulated === true) {
+    return {
+      visible: true,
+      text:
+        'Simulation — this surface runs the scripted DemoShunBackend, not the real Action ' +
+        'Controller. Nothing here touches a real system.',
+    };
+  }
+  if (health?.simulated === false) {
+    return { visible: false, text: '' };
+  }
+  return {
+    visible: true,
+    text:
+      'Simulation status unknown — the control surface has not confirmed whether a real backend ' +
+      'is connected. Treat everything shown here as simulated.',
+  };
+}

@@ -162,7 +162,13 @@ export type DecisionOutcome = Outcome<{ decision: ApprovalDecision; taskState: T
  * those land. Implementations own all authority; this interface exposes none.
  */
 export interface ControlBackend {
-  meta(): { policy: PolicyState; localOnly: true };
+  /**
+   * Surface posture. `simulated` must state honestly whether this backend is
+   * a scripted demo double (Issue #41, VC-P2-06): the UI renders a prominent
+   * simulation banner from it, so a demo can never pass as the real
+   * Action Controller — and a real backend must declare `simulated: false`.
+   */
+  meta(): { policy: PolicyState; localOnly: true; simulated: boolean };
   submitGoal(request: GoalRequest): Promise<{ taskId: string }>;
   listTasks(): Promise<TaskSnapshot[]>;
   taskSnapshot(taskId: string): Promise<TaskSnapshot | undefined>;

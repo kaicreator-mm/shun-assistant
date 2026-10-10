@@ -189,11 +189,16 @@ async function handle(
   const action = segments[3];
 
   if (method === 'GET' && url.pathname === '/api/health') {
+    const meta = backend.meta();
     return respondJson(res, 200, {
       ok: true,
       api: CONTROL_API_REVISION,
       localOnly: true,
-      policy: backend.meta().policy,
+      // Simulation disclosure (Issue #41, VC-P2-06): the UI renders a
+      // prominent banner from this so the demo backend cannot pass as the
+      // real Action Controller.
+      simulated: meta.simulated,
+      policy: meta.policy,
     });
   }
 

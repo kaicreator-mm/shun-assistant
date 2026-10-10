@@ -137,8 +137,8 @@ export class DemoShunBackend implements ControlBackend {
     this.policy = options.policy ?? { kind: 'ACTIVE', revision: 'pol-snap-2026-10-10-a' };
   }
 
-  meta(): { policy: PolicyState; localOnly: true } {
-    return { policy: this.policy, localOnly: true };
+  meta(): { policy: PolicyState; localOnly: true; simulated: true } {
+    return { policy: this.policy, localOnly: true, simulated: true };
   }
 
   /** Test/demo hook: pin the clock so expiry/decision timing is deterministic. */

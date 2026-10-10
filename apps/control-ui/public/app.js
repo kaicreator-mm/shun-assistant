@@ -13,6 +13,7 @@ import {
   progressLines,
   recoveryLines,
   residueLines,
+  simulationBanner,
   stateLabel,
   stateTone,
   taskCard,
@@ -363,11 +364,22 @@ async function refresh() {
   renderTasks();
   renderApprovals();
   renderDetail();
+  // Simulation banner (VC-P2-06): rendered from the backend's own disclosure;
+  // it stays visible while the API is unreachable or silent.
+  const banner = el('simulation-banner');
+  const sim = simulationBanner(undefined);
+  banner.textContent = sim.text;
+  banner.hidden = !sim.visible;
+  banner.className = 'sim-banner';
   const health = el('health');
   api('/health')
     .then((info) => {
       health.textContent = `Local only · policy ${info.policy?.kind ?? 'UNKNOWN'} · ${info.api ?? ''}`;
       health.className = 'muted';
+      const label = simulationBanner(info);
+      banner.textContent = label.text;
+      banner.hidden = !label.visible;
+      banner.className = label.visible ? 'sim-banner' : 'muted';
     })
     .catch(() => {
       health.textContent = 'Control API unreachable.';

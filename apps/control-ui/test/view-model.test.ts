@@ -14,6 +14,7 @@ import {
   recoveryLines,
   residueLines,
   STATE_LABELS,
+  simulationBanner,
   stateLabel,
   stateTone,
   taskCard,
@@ -235,6 +236,29 @@ describe('approval decision gating on the actual DTO status (VC-P1-01)', () => {
     const undefinedApproval = approvalDecisionState(undefined);
     expect(undefinedApproval.decidable).toBe(false);
     expect(undefinedApproval.reason).toContain('No approval');
+  });
+});
+
+describe('simulation banner (VC-P2-06)', () => {
+  it('shows a prominent simulation label for the demo backend', () => {
+    const banner = simulationBanner({ simulated: true });
+    expect(banner.visible).toBe(true);
+    expect(banner.text).toContain('Simulation');
+    expect(banner.text).toContain('DemoShunBackend');
+    expect(banner.text).toContain('not the real');
+  });
+
+  it('hides only on an explicit simulated:false from a real backend', () => {
+    expect(simulationBanner({ simulated: false }).visible).toBe(false);
+  });
+
+  it('stays visible and says unknown when the API could not answer', () => {
+    // Fail loud, not silent: an unreachable or pre-disclosure API must keep
+    // the banner up rather than look like a confirmed real backend.
+    const unknown = simulationBanner(undefined);
+    expect(unknown.visible).toBe(true);
+    expect(unknown.text).toContain('unknown');
+    expect(simulationBanner({}).visible).toBe(true);
   });
 });
 
