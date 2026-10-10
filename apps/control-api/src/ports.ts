@@ -37,6 +37,9 @@ export interface PendingApproval {
   approvalId: string;
   taskId: string;
   planHash: string;
+  /** Actual record status. The UI renders decision buttons from this — an
+   *  absent status must surface as an explicit unknown, never as a button. */
+  status: 'PENDING' | 'APPROVED' | 'DECLINED' | 'EXPIRED';
   summary: string;
   evidenceRefs: string[];
   riskClass: RiskClass;

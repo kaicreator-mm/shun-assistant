@@ -452,6 +452,9 @@ export class DemoShunBackend implements ControlBackend {
       approvalId: approval.approvalId,
       taskId: approval.taskId,
       planHash: approval.planHash,
+      // The record's actual status (PENDING in the inbox, decided states when a
+      // single approval is fetched) so the UI never has to guess.
+      status: approval.status,
       summary: approval.requestSummary,
       evidenceRefs: [...approval.evidenceRefs],
       riskClass: approval.riskClass,
