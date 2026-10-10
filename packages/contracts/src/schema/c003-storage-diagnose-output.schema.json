@@ -306,6 +306,20 @@
           }
         }
       }
+    },
+    {
+      "if": {
+        "required": [
+          "executionEvidence"
+        ]
+      },
+      "then": {
+        "properties": {
+          "cleanupPlan": {
+            "type": "object"
+          }
+        }
+      }
     }
   ]
 }

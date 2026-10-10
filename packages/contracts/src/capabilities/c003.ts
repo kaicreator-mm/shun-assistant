@@ -145,6 +145,16 @@ export const StorageDiagnoseOutputSchema = z
     ),
   })
   .superRefine((output, ctx) => {
+    // executionEvidence is present only after the bounded action executed
+    // (field contract): a record carrying the receipt cannot claim "nothing
+    // was policy-eligible" (cleanupPlan null) to dodge the executed-cleanup
+    // invariants below (R3-01, review 5478735287).
+    if (output.executionEvidence && output.cleanupPlan === null) {
+      ctx.addIssue({
+        code: 'custom',
+        message: 'executionEvidence records an executed bounded action; cleanupPlan cannot be null',
+      });
+    }
     if (output.cleanupPlan && !output.executionEvidence) {
       ctx.addIssue({
         code: 'custom',

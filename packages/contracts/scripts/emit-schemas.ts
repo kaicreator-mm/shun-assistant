@@ -202,21 +202,32 @@ function overlayStorageDiagnoseOutput(output: EmittedSchema): EmittedSchema {
     };
   });
   return withRootAllOf(
-    {
-      ...output,
-      properties: { ...props, cleanupPlan: { ...cleanupPlan, anyOf: branches } },
-      'x-semantic-validation': ['validateC003OutputSemantics'],
-    },
-    // A non-null cleanup plan is an executed bounded action: evidence,
-    // reclaim measurement, and at least one protected-asset verification are
-    // required (frozen C-003 — protected assets are verified after any
-    // bounded action; review 5478548765 R2-03).
-    ifThen(
-      { properties: { cleanupPlan: { type: 'object' } }, required: ['cleanupPlan'] },
+    withRootAllOf(
       {
-        required: ['executionEvidence', 'reclaimed'],
-        properties: { protectedAssetVerification: { minItems: 1 } },
+        ...output,
+        properties: { ...props, cleanupPlan: { ...cleanupPlan, anyOf: branches } },
+        'x-semantic-validation': ['validateC003OutputSemantics'],
       },
+      // A non-null cleanup plan is an executed bounded action: evidence,
+      // reclaim measurement, and at least one protected-asset verification are
+      // required (frozen C-003 — protected assets are verified after any
+      // bounded action; review 5478548765 R2-03).
+      ifThen(
+        { properties: { cleanupPlan: { type: 'object' } }, required: ['cleanupPlan'] },
+        {
+          required: ['executionEvidence', 'reclaimed'],
+          properties: { protectedAssetVerification: { minItems: 1 } },
+        },
+      ),
+    ),
+    // executionEvidence is present only after the bounded action executed
+    // (field contract): a record carrying the receipt cannot dodge the
+    // executed-cleanup branch above by claiming cleanupPlan null
+    // (review 5478735287 R3-01). cleanupPlan is top-level required, so the
+    // type constraint alone makes null fail.
+    ifThen(
+      { required: ['executionEvidence'] },
+      { properties: { cleanupPlan: { type: 'object' } } },
     ),
   );
 }

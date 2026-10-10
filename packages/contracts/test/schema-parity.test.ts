@@ -333,6 +333,16 @@ const OVERLAY_MUTATIONS: {
       value.protectedAssetVerification = [];
     },
   },
+  {
+    name: 'c003 (R3-01, review 5478735287): executionEvidence with null cleanupPlan is rejected',
+    schema: 'c003-storage-diagnose-output',
+    fixture: 'valid/c003-storage-diagnose-output/cleanup-executed.json',
+    mutate: (value) => {
+      value.cleanupPlan = null;
+      delete value.reclaimed;
+      value.protectedAssetVerification = [];
+    },
+  },
 ];
 
 describe('overlay invariants are enforced by the artifact itself', () => {
