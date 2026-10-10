@@ -8,12 +8,20 @@ does not pre-select a Provider. The only output claim is `FIXTURE_ORACLE_ONLY`.
 
 The test-only lock at `tests/fixtures/fixture-lock-v0.1.json` records seed **37040**,
 Python **3.14.7**, Pillow **12.3.0**, numpy **2.5.3**, scikit-image **0.26.0**,
-the exact generator Git blob SHA, **200 images + 8 other fixture files**, and
+the exact generator Git blob SHA (CRLF/LF normalized like Git's Windows autocrlf clean filter), **200 images + 8 other fixture files**, and
 the independent Local Validator's precommit seal:
 `57f768973b1562e5d995fed350749db95a8a98a22619fac23766118b6e8a1649`.
 This reference was observed on PR #23 at `df01aef0d906d697e3ee59f5188306f4003fe1a5`.
 The seal covers 200 image SHA-256 hashes, protected/user asset hashes and
 the canonical private gold digest; it is **not** an invented full 208-file hash list.
+The lock also records three **Builder-derived, pending independent validation**
+fixed-source SHA-256 candidates: B-039 base-cache.bin, B-040 support-context.json
+and the public/capability-inputs.json challenge. The verifier checks each file's
+original bytes against the immutable Git-committed expected digest, not a hash
+recomputed from the mutable fixture or gold. B-038 archive/user source and B-039
+protected decoy remain bound by the externally sealed gold/precommit hashes.
+A new Local fixed-toolchain run must verify all three new candidates before
+admission. Same-size canary/source/input mutations must fail closed.
 
 Use Python **3.14.7** and exact test-only dependency versions on a fresh root:
 
@@ -25,8 +33,9 @@ python -m tests.fixtures.lock verify --root ./t09-run
 
 `verify` must exit 0 before any candidate execution or B-039 injection. It checks
 the **actual** interpreter/dependency versions, generator Git blob, seed,
-file set, independently recorded seal, gold and precommit integrity, source
-hashes, sample ordering, protected-asset integrity and blind input separation.
+file set, independently recorded seal, gold and precommit integrity, all
+fixed-source hashes (including public inputs and planted canaries), sample
+ordering, protected-asset integrity and blind input separation.
 Do not regenerate/reseal the locked reference to force a PASS, and do not
 claim portability to other Pillow/JPEG encoders or Python versions.
 The command only validates the **pre-execution** 208-file root; injection or

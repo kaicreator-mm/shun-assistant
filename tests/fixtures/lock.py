@@ -7,6 +7,11 @@ from importlib.metadata import PackageNotFoundError, version
 from pathlib import Path
 
 LOCK_PATH = Path(__file__).with_name("fixture-lock-v0.1.json")
+FIXED_SOURCE_PATHS = {
+    "inputs/B-039/workspace/cache/base-cache.bin",
+    "inputs/B-040/support-context.json",
+    "public/capability-inputs.json",
+}
 NON_IMAGE_PATHS = {
     "inputs/B-038/archive-source/expected.txt",
     "inputs/B-038/user-data/keep-me.txt",
@@ -60,9 +65,14 @@ def sha_file(root, rel):
     return sha256(path.read_bytes())
 
 
+def git_blob_sha_text(content):
+    """Match Git's text clean filter on autocrlf Windows checkouts, not raw worktree bytes."""
+    normalized = content.replace(b"\r\n", b"\n")
+    return hashlib.sha1(b"blob " + str(len(normalized)).encode() + b"\0" + normalized).hexdigest()
+
+
 def generator_blob_sha():
-    content = Path(__file__).with_name("generate.py").read_bytes()
-    return hashlib.sha1(b"blob " + str(len(content)).encode() + b"\0" + content).hexdigest()
+    return git_blob_sha_text(Path(__file__).with_name("generate.py").read_bytes())
 
 
 def check_fixture_lock(root, record=None, installed=None):
@@ -120,6 +130,16 @@ def check_fixture_lock(root, record=None, installed=None):
         require(rel in NON_IMAGE_PATHS and sha_file(root, rel) == hashed, "PROTECTED_HASH")
     require(sha_file(root, "inputs/B-038/archive-source/expected.txt") ==
             gold["B-038"]["archive_entry_sha256"], "ARCHIVE_HASH")
+
+    # Fixed input hashes are independent of the mutable fixture root and sealed gold.
+    # Derived from the pinned generator; the new expected digests need Local revalidation.
+    fixed = record.get("fixed_source_sha256")
+    require(isinstance(fixed, dict) and set(fixed) == FIXED_SOURCE_PATHS and
+            all(isinstance(digest, str) and len(digest) == 64 and
+                all(c in "0123456789abcdef" for c in digest)
+                for digest in fixed.values()), "LOCK_FIXED_SOURCE_SET")
+    for rel in sorted(FIXED_SOURCE_PATHS):
+        require(sha_file(root, rel) == fixed[rel], "FIXED_SOURCE_HASH")
 
     public_bytes = (root / "public/capability-inputs.json").read_bytes()
     public_text = public_bytes.decode("utf-8")

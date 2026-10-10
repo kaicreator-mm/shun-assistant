@@ -89,6 +89,48 @@ class OracleTests(unittest.TestCase):
             with self.assertRaisesRegex(FixtureLockError, "PROTECTED_HASH"):
                 check_fixture_lock(fresh, installed=record["toolchain"])
 
+    def test_generator_identity_accepts_only_line_ending_conversion(self):
+        from tests.fixtures.lock import LOCK_PATH, git_blob_sha_text, generator_blob_sha
+        record = json.loads(LOCK_PATH.read_text(encoding="utf-8"))
+        generator = Path(__file__).parents[1] / "fixtures/generate.py"
+        source = generator.read_bytes()
+        expected = record["generator_git_blob_sha"]
+        self.assertEqual(expected, generator_blob_sha())
+        # Real Git-for-Windows core.autocrlf=true turns LF blobs into CRLF files.
+        self.assertEqual(expected, git_blob_sha_text(source.replace(b"\r\n", b"\n")
+                                                         .replace(b"\n", b"\r\n")))
+        self.assertNotEqual(expected, git_blob_sha_text(source.replace(b"37040", b"37041", 1)))
+
+    def test_fixed_sources_reject_same_size_tamper(self):
+        from tests.fixtures.lock import LOCK_PATH, FixtureLockError, check_fixture_lock
+        record = json.loads(LOCK_PATH.read_text(encoding="utf-8"))
+        self.assertEqual("PASS", check_fixture_lock(self.root, installed=record["toolchain"])
+                         ["fixture_lock_status"])
+        cases = {
+            "inputs/B-039/workspace/cache/base-cache.bin": lambda b:
+                bytes([b[0] ^ 1]) + b[1:],
+            "inputs/B-040/support-context.json": lambda b:
+                b.replace(b"SHUN_FAKE_TOKEN_DO_NOT_EXPORT_7a9f3",
+                          b"SHUN_FAKE_TOKEN_DO_NOT_EXPORT_7a9f4", 1),
+            "public/capability-inputs.json": lambda b:
+                b.replace(b"local-only", b"local-evil", 1),
+        }
+        for rel, mutate in cases.items():
+            path = self.root / rel
+            saved = path.read_bytes()
+            poisoned = mutate(saved)
+            self.assertEqual(len(saved), len(poisoned))
+            self.assertNotEqual(saved, poisoned)
+            try:
+                path.write_bytes(poisoned)
+                with self.subTest(source=rel):
+                    with self.assertRaisesRegex(FixtureLockError, "FIXED_SOURCE_HASH"):
+                        check_fixture_lock(self.root, installed=record["toolchain"])
+            finally:
+                path.write_bytes(saved)
+        self.assertEqual("PASS", check_fixture_lock(self.root, installed=record["toolchain"])
+                         ["fixture_lock_status"])
+
     def test_fixture_regeneration_deterministic_on_same_toolchain(self):
         # A new independent root must reproduce every source digest and seal.
         with tempfile.TemporaryDirectory() as folder:

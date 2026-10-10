@@ -26,6 +26,12 @@
     "public/precommit.json"
   ],
   "precommit_seal_sha256": "57f768973b1562e5d995fed350749db95a8a98a22619fac23766118b6e8a1649",
-  "hash_coverage": "The pinned seal commits 200 image SHA-256 hashes, protected/user asset hashes and private gold digest; not an externally evidenced full 208-file hash list.",
-  "exclusions": "No real Windows E2E, official provenance, host reclaim, UAC, complete integration, CI PASS or historical B-010 upgrade; never use as production Capability input."
+  "hash_coverage": "Pinned external seal covers 200 image SHA-256 hashes, protected/user asset hashes and private gold digest; three additional fixed-source digest candidates cover B-039 base cache, B-040 source and public Capability input, all awaiting independent successor-SHA validation; not an independently observed 208-file hash list.",
+  "exclusions": "No real Windows E2E, official provenance, host reclaim, UAC, complete integration, CI PASS or historical B-010 upgrade; never use as production Capability input.",
+  "fixed_source_sha256": {
+    "inputs/B-039/workspace/cache/base-cache.bin": "6aaf0dfc86832c50a35acb16ffbc9eb5c525c29c2761bc827e211dd90a421524",
+    "inputs/B-040/support-context.json": "137157f8f5813cfe811ed16aae3dd53c5ca99dadcce7772a524cf80458dd87ad",
+    "public/capability-inputs.json": "6bd2ed54583fb9ad02774adba0d60c20746341850da507b7d40a8a736233c96f"
+  },
+  "fixed_source_evidence": "Builder-computed from pinned generator v0.1 deterministic bytes, NOT independently validated at this successor SHA; Local fixed-toolchain verification required."
 }
