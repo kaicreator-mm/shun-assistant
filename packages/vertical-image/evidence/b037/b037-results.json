@@ -30,14 +30,8 @@
     "png": 80,
     "withCaptureDate": 113,
     "longEdgeRange": {
-      "JPG": [
-        1800,
-        3600
-      ],
-      "PNG": [
-        1800,
-        2400
-      ]
+      "JPG": [1800, 3600],
+      "PNG": [1800, 2400]
     },
     "fingerprint": "37aecdd35c073e7734bab364e4edfe141c4a0ad8c222c06bff00b7c3647db119",
     "generatorRevision": "gen-corpus-v1 (seeded soft scenes, deterministic)"
@@ -396,10 +390,7 @@
         "metricIdentity": "ssim.js@3.5.0 original/11x11/gauss",
         "metricAvailable": true
       },
-      "evidenceRefs": [
-        "oracle://b037-main/committed-oracle",
-        "oracle://b037-main/ssim-results"
-      ]
+      "evidenceRefs": ["oracle://b037-main/committed-oracle", "oracle://b037-main/ssim-results"]
     },
     "durationMs": 85224,
     "corpusGenerationMs": 79712
@@ -497,9 +488,7 @@
       "outputDirEmpty": true
     },
     "corruptInput": {
-      "rejectionCodes": [
-        "DECODE_FAILED"
-      ],
+      "rejectionCodes": ["DECODE_FAILED"],
       "verification": "PASS"
     },
     "unsupportedDeclared": {
