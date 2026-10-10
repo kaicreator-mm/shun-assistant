@@ -6,7 +6,7 @@
 // blocked output location) are typed failures returned before any write.
 // Per-input problems become explicit REJECTED records; original inputs are
 // never modified and failed outputs are removed again.
-import { existsSync } from 'node:fs';
+import { readdirSync } from 'node:fs';
 import { mkdir, mkdtemp, readFile, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { basename, dirname, join, resolve } from 'node:path';
@@ -91,7 +91,20 @@ export async function runImageBatchProcess(
   }
 
   // Collision detection happens BEFORE any write: duplicates inside the batch
-  // (case-insensitive) and pre-existing targets both reject up front.
+  // (case-insensitive) and pre-existing targets both reject up front. Existing
+  // targets are detected by listing the output directory and comparing entry
+  // names case-insensitively — relying on the filesystem's case behavior (e.g.
+  // existsSync) would detect A.JPG vs a.jpg on Windows but silently miss it on
+  // case-sensitive POSIX filesystems.
+  const existingTargets = new Map<string, string>();
+  try {
+    for (const name of readdirSync(outputDir)) {
+      existingTargets.set(name.toLowerCase(), join(outputDir, name));
+    }
+  } catch {
+    // Output directory does not exist yet: nothing can collide with it.
+  }
+
   const preRejected = new Map<string, string>();
   const seenBasenames = new Set<string>();
   for (const file of input.inputFiles) {
@@ -101,9 +114,9 @@ export async function runImageBatchProcess(
       continue;
     }
     seenBasenames.add(key);
-    const targetPath = join(outputDir, basename(file.path));
-    if (existsSync(targetPath)) {
-      preRejected.set(file.path, `target already exists: ${targetPath}`);
+    const existing = existingTargets.get(key);
+    if (existing) {
+      preRejected.set(file.path, `target already exists: ${existing}`);
     }
   }
 
