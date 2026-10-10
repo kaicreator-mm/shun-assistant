@@ -14,6 +14,7 @@ import {
   runStep,
 } from '../src/interpreter.ts';
 import { JournalWriter } from '../src/journal.ts';
+import { ON_WINDOWS } from './helpers.ts';
 
 const root = mkdtempSync(join(tmpdir(), 'shun-interp-'));
 const workspace = join(root, 'ws');
@@ -38,7 +39,7 @@ function ctx(overrides?: Partial<InterpreterContext>): InterpreterContext {
 beforeAll(() => mkdirSync(workspace, { recursive: true }));
 afterAll(() => rmSync(root, { recursive: true, force: true }));
 
-describe('fs ops', () => {
+describe.skipIf(!ON_WINDOWS)('fs ops', () => {
   it('windows.fs.write lands byte-exact, metacharacters and all', async () => {
     const content = 'a & b | c; d%PATH%e "f" <g> $(h) `i` \u00e9\u4f60\u597d';
     const path = join(workspace, 'metachars & ; %PX%.txt');
@@ -93,7 +94,7 @@ describe('fs ops', () => {
   });
 });
 
-describe('registry ops (HKCU)', () => {
+describe.skipIf(!ON_WINDOWS)('registry ops (HKCU)', () => {
   const key = `${registryScopeKey}\\interp`;
 
   it('create → setValue → verify → delete lifecycle', async () => {
@@ -140,7 +141,7 @@ describe('registry ops (HKCU)', () => {
   });
 });
 
-describe('proc.exec (typed argv, shell:false)', () => {
+describe.skipIf(!ON_WINDOWS)('proc.exec (typed argv, shell:false)', () => {
   it('arguments arrive BYTE-EXACT — metacharacters are data, not syntax', async () => {
     const probe = join(root, 'argv-probe.mjs');
     mkdirSync(root, { recursive: true });
@@ -211,7 +212,7 @@ describe('proc.exec (typed argv, shell:false)', () => {
   });
 });
 
-describe('contextCheck', () => {
+describe.skipIf(!ON_WINDOWS)('contextCheck', () => {
   it('matches the actual (non-elevated) token state on this test surface', async () => {
     const r = await runStep(
       { op: 'windows.proc.contextCheck', args: { expectElevated: false } },

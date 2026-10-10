@@ -22,6 +22,7 @@ import {
   computePlanHash,
 } from '@shun/contracts';
 import { build } from 'esbuild';
+import { isElevatedToken } from '../src/elevation.ts';
 import {
   generateGrantHmacKey,
   type HelperPin,
@@ -33,6 +34,29 @@ import {
   writeHelperPin,
   writePlanRecord,
 } from '../src/trusted-store.ts';
+
+/**
+ * Host posture gates for the always-on suite. GitHub's windows-latest
+ * runners run with an ELEVATED admin token, so elevation-negative cases are
+ * meaningful only on a filtered-token host (like a developer workstation);
+ * Windows-only surfaces are skipped on other platforms so the root
+ * cross-platform `pnpm test` stays honest instead of failing.
+ */
+export const ON_WINDOWS = process.platform === 'win32';
+
+export const IS_ELEVATED_HOST: boolean = (() => {
+  if (!ON_WINDOWS) return false;
+  try {
+    return isElevatedToken(
+      execFileSync('whoami.exe', ['/groups', '/fo', 'csv'], {
+        encoding: 'utf8',
+        windowsHide: true,
+      }),
+    );
+  } catch {
+    return false;
+  }
+})();
 
 export const AUTHORITY_ID = 'shun.action-controller.test';
 export const AUTHORITY_REVISION = 'auth-rev-1';

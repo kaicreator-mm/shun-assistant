@@ -5,9 +5,9 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { resolveWithinScope } from '../src/fs-safety.ts';
-import { createJunction } from './helpers.ts';
+import { createJunction, ON_WINDOWS } from './helpers.ts';
 
-describe('resolveWithinScope (real fs)', () => {
+describe.skipIf(!ON_WINDOWS)('resolveWithinScope (real fs)', () => {
   const root = mkdtempSync(join(tmpdir(), 'shun-fsafety-'));
   const scope = join(root, 'scope');
   const outside = join(root, 'outside');

@@ -12,10 +12,11 @@ import {
   createTestAuthority,
   disposeTestAuthority,
   must,
+  ON_WINDOWS,
   type TestAuthority,
 } from './helpers.ts';
 
-describe('LocalWindowsBackend (real, unprivileged)', () => {
+describe.skipIf(!ON_WINDOWS)('LocalWindowsBackend (real, unprivileged)', () => {
   let authority: TestAuthority;
   let workspace: string;
   let backend: LocalWindowsBackend;

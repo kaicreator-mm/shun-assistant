@@ -303,7 +303,24 @@ describe('one-shot helper — privileged-boundary negatives (real bundle, filter
 
     // The launcher-side check refuses BEFORE any UAC/subprocess; running the
     // impostor directly also refuses inside (no pin in its bogus authority).
-    const p = validEnvelope('impostor');
+    // Unique target file: no other case in this file writes it.
+    const built = buildAuthorizedAction(authority, {
+      op: 'windows.fs.write',
+      parameters: { path: join(workspace, 'impostor-target.txt'), content: 'x' },
+      requiredPrivilege: 'USER',
+      filesystemScope: { read: [], write: [workspace] },
+    });
+    const p = envelopePaths('impostor');
+    writeEnvelopeFile(p.envelopeFile, {
+      action: built.action,
+      grant: built.grant,
+      plan: built.plan,
+      io: {
+        journalFile: p.journalFile,
+        receiptFile: p.receiptFile,
+        evidenceDir: join(p.runDir, 'evidence'),
+      },
+    });
     const run = runHelperDirectly(
       { ...authority, helperBundle: impostor },
       p.envelopeFile,
@@ -311,7 +328,7 @@ describe('one-shot helper — privileged-boundary negatives (real bundle, filter
       p.receiptFile,
     );
     expect(run.exitCode).toBe(2);
-    expect(existsSync(join(workspace, 'helper-target.txt'))).toBe(false);
+    expect(existsSync(join(workspace, 'impostor-target.txt'))).toBe(false);
   });
 
   it('launcher I/O path outside the pinned workspace root → REFUSED pre-journal (no files written)', () => {
