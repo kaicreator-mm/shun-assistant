@@ -231,9 +231,10 @@ d('B-039 — diagnose → bounded cleanup → verify (real Windows filesystem)',
     await expect(runStorageDiagnose(ctx.runtime, ctx.productionInput)).rejects.toThrow(
       /execution-receipts-terminal/,
     );
-    // Both targets still exist on disk: the refused action deleted nothing,
-    // and the failure was surfaced instead of being averaged into a PASS.
-    expect((await fsp.readdir(ctx.cacheDir)).length).toBe(3);
+    // The first (valid-grant) action reclaimed its cache target; the refused
+    // action deleted nothing in its tmp target — and the partial execution
+    // failed the whole task instead of averaging into a PASS.
+    expect(await fsp.readdir(ctx.cacheDir)).toEqual([]);
     expect((await fsp.readdir(ctx.tmpDir)).length).toBe(1);
   });
 });

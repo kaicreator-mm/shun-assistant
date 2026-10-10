@@ -7,7 +7,7 @@ import { createHash } from 'node:crypto';
 import { promises as fsp } from 'node:fs';
 import * as os from 'node:os';
 import * as path from 'node:path';
-import { type ExecutionReceipt } from '@shun/contracts';
+import type { ExecutionReceipt } from '@shun/contracts';
 import { describe, expect, it } from 'vitest';
 import { hashFile, verifyProtectedAssets, verifyStorageCleanup } from '../src/index.ts';
 

@@ -246,6 +246,9 @@ export async function runStorageDiagnose(
       preActionFingerprints,
       baselines: benchmarkBaselinesFor(runtime, input, protectedRealPaths),
     },
+    // The verifier sees EVERY receipt: a failed/refused/partial target can
+    // never be averaged into a task-level PASS (VS-P1-03).
+    receipts,
   });
 
   if (outcome.receipt.status === 'FAIL') {

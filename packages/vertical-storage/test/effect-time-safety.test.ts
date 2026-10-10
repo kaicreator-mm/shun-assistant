@@ -9,7 +9,7 @@
 // TOCTOU swaps reproducible; on non-Windows hosts the Windows-mechanism
 // controls skip honestly while the portable controls still run.
 import { promises as fsp, symlinkSync as fspSymlink } from 'node:fs';
-import * as path from 'path';
+import * as path from 'node:path';
 import {
   type ActionPlan,
   type AuthorizedAction,
@@ -19,8 +19,8 @@ import {
 import { describe, expect, it } from 'vitest';
 import {
   classifyFromJournal,
-  executeBoundedCleanup,
   type ExecuteCleanupInput,
+  executeBoundedCleanup,
   replayJournal,
   StorageVerticalError,
 } from '../src/index.ts';
@@ -178,10 +178,10 @@ describe('VS-P0-01 — descendant junction/reparse swap cannot escape the delete
       const target = result.targets[result.receipt.actionId];
       expect(target?.blockedErrors.join(';')).toMatch(/REPARSE_POINT/);
       // Nothing outside the target was touched.
-      expect(await fsp.readFile(path.join(outsideDir, 'f1.bin'), 'utf8')).toBe('x'.repeat(32));
-      expect(await fsp.readFile(path.join(outsideDir, 'f2.bin'), 'utf8')).toBe('x'.repeat(32));
+      expect(await fsp.readFile(path.join(outsideDir, 'f1.bin'), 'utf8')).toBe('a'.repeat(32));
+      expect(await fsp.readFile(path.join(outsideDir, 'f2.bin'), 'utf8')).toBe('a'.repeat(32));
       // The real descendant content (now at the hidden name) also survives.
-      expect(await fsp.readFile(path.join(`${sub}.hidden`, 'f1.bin'), 'utf8')).toBe('x'.repeat(32));
+      expect(await fsp.readFile(path.join(`${sub}.hidden`, 'f1.bin'), 'utf8')).toBe('a'.repeat(32));
     },
   );
 
@@ -216,11 +216,11 @@ describe('VS-P0-01 — descendant junction/reparse swap cannot escape the delete
       // each one, never delete through the reparse point.
       expect(result.receipt.terminal).toBe('FAILED');
       expect(target?.blockedErrors.join(';')).toMatch(/OUTSIDE_SCOPE/);
-      expect(await fsp.readFile(path.join(outsideDir, 'f1.bin'), 'utf8')).toBe('x'.repeat(32));
-      expect(await fsp.readFile(path.join(outsideDir, 'f2.bin'), 'utf8')).toBe('x'.repeat(32));
+      expect(await fsp.readFile(path.join(outsideDir, 'f1.bin'), 'utf8')).toBe('a'.repeat(32));
+      expect(await fsp.readFile(path.join(outsideDir, 'f2.bin'), 'utf8')).toBe('a'.repeat(32));
       // The authentic descendant files survive under the hidden real directory.
-      expect(await fsp.readFile(path.join(`${sub}.hidden`, 'f1.bin'), 'utf8')).toBe('x'.repeat(32));
-      expect(await fsp.readFile(path.join(`${sub}.hidden`, 'f2.bin'), 'utf8')).toBe('x'.repeat(32));
+      expect(await fsp.readFile(path.join(`${sub}.hidden`, 'f1.bin'), 'utf8')).toBe('a'.repeat(32));
+      expect(await fsp.readFile(path.join(`${sub}.hidden`, 'f2.bin'), 'utf8')).toBe('a'.repeat(32));
     },
   );
 });
@@ -299,7 +299,11 @@ describe('VS-P1-05 — uncertain same-action reentry must reconcile first', () =
     const ctx = await setup('reentry-uncertain');
     const { PhaseJournal } = await import('../src/index.ts');
     const journal = await PhaseJournal.open(ctx.journalPath);
-    await journal.append({ at: makeClock().now(), phase: 'RECEIVED', actionId: 'action/test/clean-safety-1' });
+    await journal.append({
+      at: makeClock().now(),
+      phase: 'RECEIVED',
+      actionId: 'action/test/clean-safety-1',
+    });
     await journal.append({
       at: makeClock().now(),
       phase: 'EXEC_START',

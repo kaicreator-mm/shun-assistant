@@ -37,26 +37,29 @@ function allowRead(dir: string): void {
 }
 
 describe('VS-P2-07 — unreadable directories are explicit, never silently empty', () => {
-  itWin('records an ACL-denied directory as inaccessible instead of measuring it as 0 bytes', async () => {
-    const root = await makeFixtureRoot('observe-denied');
-    const locked = path.join(root, 'lockedcache');
-    await plantFiles(locked, [{ relativePath: 'secret.bin', bytes: 4096 }]);
-    if (!denyRead(locked)) return; // host cannot apply ACLs: skip honestly
-    try {
-      const scope = await resolveScope(volumeOf(root), { roots: [root] });
-      const observation = await observeStorage(scope, () => '2026-10-10T10:00:00.000Z');
-      const lockedReal = await fsp.realpath(locked);
-      const stat = observation.directories.find((d) => d.path === lockedReal);
-      expect(stat).toBeDefined();
-      // The directory EXISTS and holds 4096 bytes: silence would claim 0/0.
-      expect(stat?.bytes).toBe(0); // unmeasured, not "empty on disk"
-      expect(stat?.files).toBe(0);
-      expect(stat?.inaccessibleEntries.length).toBeGreaterThan(0);
-      expect(stat?.inaccessibleEntries.join(';')).toMatch(/unreadable/);
-    } finally {
-      allowRead(locked);
-    }
-  });
+  itWin(
+    'records an ACL-denied directory as inaccessible instead of measuring it as 0 bytes',
+    async () => {
+      const root = await makeFixtureRoot('observe-denied');
+      const locked = path.join(root, 'lockedcache');
+      await plantFiles(locked, [{ relativePath: 'secret.bin', bytes: 4096 }]);
+      if (!denyRead(locked)) return; // host cannot apply ACLs: skip honestly
+      try {
+        const scope = await resolveScope(volumeOf(root), { roots: [root] });
+        const observation = await observeStorage(scope, () => '2026-10-10T10:00:00.000Z');
+        const lockedReal = await fsp.realpath(locked);
+        const stat = observation.directories.find((d) => d.path === lockedReal);
+        expect(stat).toBeDefined();
+        // The directory EXISTS and holds 4096 bytes: silence would claim 0/0.
+        expect(stat?.bytes).toBe(0); // unmeasured, not "empty on disk"
+        expect(stat?.files).toBe(0);
+        expect(stat?.inaccessibleEntries.length).toBeGreaterThan(0);
+        expect(stat?.inaccessibleEntries.join(';')).toMatch(/unreadable/);
+      } finally {
+        allowRead(locked);
+      }
+    },
+  );
 
   itWin('never attributes or plans a cleanup target from an unreadable directory', async () => {
     const root = await makeFixtureRoot('observe-plan-denied');
