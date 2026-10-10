@@ -1,0 +1,6 @@
+{
+  "case": "E5-metachars-elevated",
+  "terminal": "SUCCEEDED",
+  "byteExact": true,
+  "hostileSample": "a & b | c; d%PATH%e \"f\" <g> $(h) `i` — 恶意参数; DEL /S /Q C:\\"
+}

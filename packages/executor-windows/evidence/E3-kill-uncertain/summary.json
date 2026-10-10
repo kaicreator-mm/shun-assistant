@@ -1,0 +1,18 @@
+{
+  "case": "E3-kill-uncertain",
+  "terminal": "UNCERTAIN",
+  "recoveryClassification": "MAY_HAVE_EXECUTED_UNCERTAIN",
+  "basis": "crash/interruption inside a step [EXEC_START, EXEC_DONE) window and no verifiable expected state resolves it",
+  "journalPhases": [
+    "RECEIVED",
+    "VALIDATED",
+    "PLAN_IDENTITY_OK",
+    "GRANT_OK",
+    "SCOPE_OK",
+    "PRIVILEGE_OK",
+    "EXEC_BEGIN",
+    "EXEC_START"
+  ],
+  "helperKilledPid": 21848,
+  "startedAt": null
+}

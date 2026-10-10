@@ -1,0 +1,8 @@
+{"schemaVersion":"shun.executor-windows.journal/1","ts":"2026-10-10T13:56:16.522Z","pid":24188,"phase":"RECEIVED","detail":{"envelopeFile":"C:\\Users\\15549\\AppData\\Local\\Temp\\shun-ev-viBwWw\\workspace\\e4\\run\\envelope.json","helperPid":24188}}
+{"schemaVersion":"shun.executor-windows.journal/1","ts":"2026-10-10T13:56:16.560Z","pid":24188,"phase":"VALIDATED","detail":{"actionId":"e4-kill-reconciled"}}
+{"schemaVersion":"shun.executor-windows.journal/1","ts":"2026-10-10T13:56:16.562Z","pid":24188,"phase":"PLAN_IDENTITY_OK","detail":{"planHash":"0a4e2a856a5a037d60dfb990acb377273f54b051dd3e1a1f559cb6fd53407eaf"}}
+{"schemaVersion":"shun.executor-windows.journal/1","ts":"2026-10-10T13:56:16.563Z","pid":24188,"phase":"GRANT_OK","detail":{"grantId":"grant-64634410","authorityRevision":"auth-rev-1"}}
+{"schemaVersion":"shun.executor-windows.journal/1","ts":"2026-10-10T13:56:16.564Z","pid":24188,"phase":"SCOPE_OK","detail":{"actionId":"e4-kill-reconciled"}}
+{"schemaVersion":"shun.executor-windows.journal/1","ts":"2026-10-10T13:56:16.565Z","pid":24188,"phase":"PRIVILEGE_OK","detail":{"isElevated":false}}
+{"schemaVersion":"shun.executor-windows.journal/1","ts":"2026-10-10T13:56:16.565Z","pid":24188,"phase":"EXEC_BEGIN","detail":{"totalSteps":1}}
+{"schemaVersion":"shun.executor-windows.journal/1","ts":"2026-10-10T13:56:16.565Z","pid":24188,"phase":"EXEC_START","step":0,"op":"windows.proc.exec"}

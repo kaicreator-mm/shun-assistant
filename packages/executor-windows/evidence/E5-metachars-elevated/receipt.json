@@ -1,0 +1,33 @@
+{
+  "actionId": "e5-metachars",
+  "environmentId": "local-windows/Nilar",
+  "providerId": "shun.executor-windows",
+  "providerVersion": "0.1.0",
+  "startedAt": "2026-10-10T14:06:30.618Z",
+  "finishedAt": "2026-10-10T14:06:33.836Z",
+  "terminal": "SUCCEEDED",
+  "exitCode": 0,
+  "outputRefs": [
+    "C:\\Users\\15549\\AppData\\Local\\Temp\\shun-ev-GAuavz\\workspace\\executions\\e5-metachars-1791641190618-3b994346\\journal.jsonl",
+    "C:\\Users\\15549\\AppData\\Local\\Temp\\shun-ev-GAuavz\\workspace\\executions\\e5-metachars-1791641190618-3b994346\\receipt.json",
+    "C:\\Users\\15549\\AppData\\Local\\Temp\\shun-ev-GAuavz\\workspace\\executions\\e5-metachars-1791641190618-3b994346\\journal.jsonl",
+    "C:\\Users\\15549\\AppData\\Local\\Temp\\shun-ev-GAuavz\\workspace\\executions\\e5-metachars-1791641190618-3b994346\\receipt.json"
+  ],
+  "sideEffectEvidence": {
+    "sideEffectClass": "R1",
+    "recoveryClassification": "COMPLETED_VERIFIED",
+    "postStateVerified": true,
+    "journalRef": "C:\\Users\\15549\\AppData\\Local\\Temp\\shun-ev-GAuavz\\workspace\\executions\\e5-metachars-1791641190618-3b994346\\journal.jsonl"
+  },
+  "launcherDetail": {
+    "reason": "step completed",
+    "classificationBasis": "RECEIPT_WRITTEN + independent post-state verification pass (reconcile-first verified expected state via windows.fs.verify)",
+    "resolvedByPostState": false,
+    "relay": {
+      "kind": "RAN",
+      "exitCode": 0,
+      "childPid": 736
+    },
+    "journalDigest": "9ee412118307e78d3b2cba9f53cfad4817ae36a48ecf32a77371ade749949fde"
+  }
+}
