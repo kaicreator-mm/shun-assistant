@@ -101,6 +101,7 @@ describe('PlannerPort seam stays proposal-only and policy-bounded', () => {
       registry: registry(),
       planner: spyPlanner(validProposal(input)),
       transport: 'LOCAL',
+      objectExists: () => true,
     });
     expect(result.status).toBe('PROPOSAL_ACCEPTED');
     if (result.status !== 'PROPOSAL_ACCEPTED') return;

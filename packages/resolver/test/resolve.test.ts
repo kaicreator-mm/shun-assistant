@@ -58,7 +58,7 @@ function registryOf(parts: {
 function resolve(registry: ShunRegistry, scoreFacts?: BindingScoreFacts[]) {
   const request = goalRequest({ goal: 'image.batch_process: batch resize my photos offline' });
   request.constraints.other = { offline: true };
-  return resolveGoal({ request, registry, scoreFacts });
+  return resolveGoal({ request, registry, scoreFacts, objectExists: () => true });
 }
 
 describe('resolution records over scenario registries', () => {
@@ -121,7 +121,7 @@ describe('resolution records over scenario registries', () => {
     const request = goalRequest({
       goal: 'software.uninstall_safe: uninstall a normal desktop app',
     });
-    const result = resolveGoal({ request, registry: b034Registry() });
+    const result = resolveGoal({ request, registry: b034Registry(), objectExists: () => true });
     expect(result.stage).toBe('RESOLUTION');
     if (result.stage !== 'RESOLUTION') return;
     const record = result.record;
@@ -147,6 +147,7 @@ describe('resolution records over scenario registries', () => {
       request,
       registry: b034Registry(),
       scoreFacts: B034_ACKNOWLEDGED_FACTS,
+      objectExists: () => true,
     });
     expect(result.stage).toBe('RESOLUTION');
     if (result.stage !== 'RESOLUTION') return;
@@ -198,7 +199,7 @@ describe('resolution records over scenario registries', () => {
     const request = goalRequest({
       goal: 'system.storage.diagnose_bounded_action: explain C: usage',
     });
-    const result = resolveGoal({ request, registry });
+    const result = resolveGoal({ request, registry, objectExists: () => true });
     expect(result.stage).toBe('RESOLUTION');
     if (result.stage !== 'RESOLUTION') return;
     const record = result.record;
@@ -428,6 +429,24 @@ describe('resolution records over scenario registries', () => {
     expect(once).toEqual(twice);
   });
 
+  it('referenced objects without an observed-object proof source fail closed before resolution (P2-01)', () => {
+    const registry = registryOf({
+      capabilities: [capabilityDef({ capabilityId: 'image.batch_process' })],
+    });
+    const request = goalRequest({ goal: 'image.batch_process: resize photos' });
+    const result = resolveGoal({ request, registry });
+    expect(result.stage).toBe('GOAL_NOT_READY');
+    if (result.stage !== 'GOAL_NOT_READY') return;
+    const normalization = result.normalization;
+    expect(normalization).toMatchObject({
+      status: 'NOT_READY',
+      disposition: 'UNRESOLVED_OBJECT',
+      failureCode: 'OBJECT_UNRESOLVED',
+    });
+    if (normalization.status !== 'NOT_READY') return;
+    expect(normalization.detail).toContain('observed-object proof source');
+  });
+
   it('an ambiguous goal surfaces the typed normalization outcome, never a record', () => {
     const registry = registryOf({
       capabilities: [
@@ -441,7 +460,7 @@ describe('resolution records over scenario registries', () => {
     const request = goalRequest({
       goal: 'image.batch_process and system.storage.diagnose_bounded_action please',
     });
-    const result = resolveGoal({ request, registry });
+    const result = resolveGoal({ request, registry, objectExists: () => true });
     expect(result.stage).toBe('GOAL_NOT_READY');
     if (result.stage !== 'GOAL_NOT_READY') return;
     expect(result.normalization).toEqual({
