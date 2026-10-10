@@ -9,7 +9,8 @@
       "!**/dist/**",
       "!**/coverage/**",
       "!packages/contracts/src/schema/**",
-      "!packages/contracts/fixtures/**"
+      "!packages/contracts/fixtures/**",
+      "!packages/executor-windows/evidence/**"
     ]
   },
   "formatter": {
