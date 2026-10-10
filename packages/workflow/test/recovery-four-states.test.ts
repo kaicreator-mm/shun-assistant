@@ -261,6 +261,17 @@ describe('uncertain destructive actions are never blindly retried', () => {
       }),
     ).rejects.toBeInstanceOf(KernelUnresolvedDestructiveActionError);
 
+    // Reconcile-first (declared post-state verification, L2 §9.4) is the ONLY
+    // door back to execution: the probe proves the crashed attempt never took
+    // effect, downgrading the action to FAILED_BEFORE_EFFECT.
+    const probe: DestructiveReconcileProbe = {
+      verifyExpectedState: async () => ({
+        outcome: 'CONFIRMED_NOT_EXECUTED',
+        evidence: { moved: 0 },
+      }),
+    };
+    await kernel.reconcile('task-1', { destructiveProbe: probe });
+
     // Resume with the SAME actionId is the only execution path forward.
     await kernel.beginAction('task-1', {
       actionId: 'action-destructive',
@@ -350,6 +361,17 @@ describe('uncertain destructive actions are never blindly retried', () => {
         classification: 'MAY_HAVE_EXECUTED_UNCERTAIN',
         resolved: false,
       });
+
+      // Reconcile-first after the restart: the probe proves the crashed
+      // attempt never took effect — same-actionId resume only opens after
+      // this downgrade, never blindly (Issue #36 C01).
+      const probe: DestructiveReconcileProbe = {
+        verifyExpectedState: async () => ({
+          outcome: 'CONFIRMED_NOT_EXECUTED',
+          evidence: { moved: 0 },
+        }),
+      };
+      await reopened.reconcile('task-1', { destructiveProbe: probe });
 
       // Same-actionId resume on the reopened kernel completes the action.
       const receipt = executionReceipt({ actionId: 'action-1' });
