@@ -1,0 +1,33 @@
+{
+  "actionId": "e1-hklm-create",
+  "environmentId": "local-windows/Nilar",
+  "providerId": "shun.executor-windows",
+  "providerVersion": "0.1.0",
+  "startedAt": "2026-10-10T14:06:45.251Z",
+  "finishedAt": "2026-10-10T14:06:49.507Z",
+  "terminal": "SUCCEEDED",
+  "exitCode": 0,
+  "outputRefs": [
+    "C:\\Users\\15549\\AppData\\Local\\Temp\\shun-ev-C7tPHz\\workspace\\executions\\e1-hklm-create-1791641205251-5b535b8e\\journal.jsonl",
+    "C:\\Users\\15549\\AppData\\Local\\Temp\\shun-ev-C7tPHz\\workspace\\executions\\e1-hklm-create-1791641205251-5b535b8e\\receipt.json",
+    "C:\\Users\\15549\\AppData\\Local\\Temp\\shun-ev-C7tPHz\\workspace\\executions\\e1-hklm-create-1791641205251-5b535b8e\\journal.jsonl",
+    "C:\\Users\\15549\\AppData\\Local\\Temp\\shun-ev-C7tPHz\\workspace\\executions\\e1-hklm-create-1791641205251-5b535b8e\\receipt.json"
+  ],
+  "sideEffectEvidence": {
+    "sideEffectClass": "R2",
+    "recoveryClassification": "COMPLETED_VERIFIED",
+    "postStateVerified": true,
+    "journalRef": "C:\\Users\\15549\\AppData\\Local\\Temp\\shun-ev-C7tPHz\\workspace\\executions\\e1-hklm-create-1791641205251-5b535b8e\\journal.jsonl"
+  },
+  "launcherDetail": {
+    "reason": "step completed",
+    "classificationBasis": "RECEIPT_WRITTEN + independent post-state verification pass (reconcile-first verified expected state via windows.registry.verify)",
+    "resolvedByPostState": false,
+    "relay": {
+      "kind": "RAN",
+      "exitCode": 0,
+      "childPid": 22656
+    },
+    "journalDigest": "b6f6741b3322e745d2f6a817bc6f678c3ba89eb36395b5a389f0ef05a7819d27"
+  }
+}
