@@ -423,6 +423,13 @@ async function main(): Promise<number> {
   };
   await mkdir(join(evidenceFile, '..'), { recursive: true });
   await writeFile(evidenceFile, `${JSON.stringify(evidence, null, 2)}\n`, 'utf8');
+  // The evidence file is a committed artifact inside the linted tree: normalize
+  // it with the repo's own biome formatter so `biome check` stays green.
+  try {
+    execSync(`pnpm exec biome format --write "${evidenceFile}"`, { stdio: 'pipe' });
+  } catch {
+    console.log('[b037] note: biome formatter unavailable, evidence left as written');
+  }
   console.log(`[b037] evidence written: ${evidenceFile}`);
 
   // Keep the workspace clean: the corpus is deterministically reproducible.
