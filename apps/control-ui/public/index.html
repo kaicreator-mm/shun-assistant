@@ -1,0 +1,63 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Shun Control</title>
+    <link rel="stylesheet" href="./styles.css" />
+  </head>
+  <body>
+    <header>
+      <h1>Shun Control</h1>
+      <p id="health" class="muted">Connecting…</p>
+    </header>
+
+    <main>
+      <section id="submit-section" aria-labelledby="submit-title">
+        <h2 id="submit-title">New goal</h2>
+        <form id="goal-form">
+          <label for="goal-input">What should Shun do?</label>
+          <input
+            id="goal-input"
+            name="goal"
+            placeholder="e.g. clean up the DemoApp cache leftovers"
+            autocomplete="off"
+          />
+          <button type="submit">Submit goal</button>
+          <p id="submit-feedback" role="status"></p>
+        </form>
+      </section>
+
+      <section id="approvals-section" aria-labelledby="approvals-title">
+        <h2 id="approvals-title">Waiting for your approval</h2>
+        <ul id="approval-list"></ul>
+        <p id="decision-feedback" role="status"></p>
+      </section>
+
+      <section id="tasks-section" aria-labelledby="tasks-title">
+        <h2 id="tasks-title">Tasks</h2>
+        <ul id="task-list"></ul>
+      </section>
+
+      <section id="detail-section" aria-labelledby="detail-title">
+        <h2 id="detail-title">Task detail</h2>
+        <div id="task-detail"><p class="muted">Select a task to see its progress.</p></div>
+      </section>
+
+      <section id="evidence-section" aria-labelledby="evidence-title">
+        <h2 id="evidence-title">Evidence</h2>
+        <p class="muted">Detailed records load only when you ask for them. Local evidence only.</p>
+        <div id="evidence-box"></div>
+      </section>
+    </main>
+
+    <footer>
+      <p class="muted">
+        This surface can approve or decline plans. It cannot create authorization and cannot bypass
+        the Action Controller.
+      </p>
+    </footer>
+
+    <script type="module" src="./app.js"></script>
+  </body>
+</html>
