@@ -50,7 +50,7 @@ export const StorageBenchmarkInputSchema = StorageDiagnoseInputSchema.extend({
 export type StorageBenchmarkInput = z.infer<typeof StorageBenchmarkInputSchema>;
 
 /**
- * Semantic invariant the committed JSON Schema artifact cannot express
+ * Semantic invariants the committed JSON Schema artifact cannot express
  * (identity/uniqueness across array elements): each protected asset is
  * verified at most once. Exported so consumers of the artifact — which names
  * this function in its `x-semantic-validation` annotation — run the same
@@ -64,6 +64,42 @@ export function validateC003OutputSemantics(output: StorageDiagnoseOutput): stri
       issues.push(`duplicate protected asset verification for ${asset.path}`);
     }
     seen.add(asset.path);
+  }
+  return issues;
+}
+
+/**
+ * VerifierPort boundary invariant (L2 §4.7/§13): coverage equality between
+ * the protected assets declared in the input and the verifications recorded
+ * in the output. Nonemptiness alone is not asset-set proof: every declared
+ * asset must be verified (exactly once — the duplicate rule lives in
+ * validateC003OutputSemantics), and no verification may name a path the
+ * input never declared.
+ *
+ * This is a contract-level consistency check over declared vs. recorded
+ * verifications. It does NOT observe the filesystem and does not prove the
+ * assets were actually untouched — interpreting the `unchanged` flags and any
+ * hashing is the executor/verifier adapters' responsibility (L2 §8.2.1); no
+ * executor-level guarantee may be claimed from this helper. Path identity is
+ * exact string equality; adapters needing case-insensitive or normalized
+ * matching must canonicalize paths before calling.
+ */
+export function validateProtectedAssetCoverage(
+  input: StorageDiagnoseInput,
+  output: StorageDiagnoseOutput,
+): string[] {
+  const declared = new Set(input.protectedAssets.map((asset) => asset.path));
+  const verified = new Set(output.protectedAssetVerification.map((asset) => asset.path));
+  const issues: string[] = [];
+  for (const path of declared) {
+    if (!verified.has(path)) {
+      issues.push(`protected asset ${path} declared in the input was not verified in the output`);
+    }
+  }
+  for (const path of verified) {
+    if (!declared.has(path)) {
+      issues.push(`protected asset verification names ${path}, which the input never declared`);
+    }
   }
   return issues;
 }
@@ -119,6 +155,17 @@ export const StorageDiagnoseOutputSchema = z
       ctx.addIssue({
         code: 'custom',
         message: 'an executed cleanup plan requires reclaimed measurement',
+      });
+    }
+    // Frozen C-003: protected assets are verified after any bounded action.
+    // An executed cleanup that verifies nothing must not pass (R2-03, review
+    // 5478548765); full input→output coverage equality is additionally
+    // available via validateProtectedAssetCoverage at the VerifierPort
+    // boundary.
+    if (output.cleanupPlan && output.protectedAssetVerification.length === 0) {
+      ctx.addIssue({
+        code: 'custom',
+        message: 'an executed cleanup requires at least one protected-asset verification',
       });
     }
     for (const message of validateC003OutputSemantics(output)) {

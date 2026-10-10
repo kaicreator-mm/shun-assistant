@@ -13,11 +13,12 @@ import type { ZodType } from 'zod';
 import type { ResolutionRecord } from '../src/capabilities/c000.ts';
 import { validateResolutionRecordSemantics } from '../src/capabilities/c000.ts';
 import { JitBenchmarkInputSchema, JitLifecycleInputSchema } from '../src/capabilities/c002.ts';
-import type { StorageDiagnoseOutput } from '../src/capabilities/c003.ts';
+import type { StorageDiagnoseInput, StorageDiagnoseOutput } from '../src/capabilities/c003.ts';
 import {
   StorageBenchmarkInputSchema,
   StorageDiagnoseInputSchema,
   validateC003OutputSemantics,
+  validateProtectedAssetCoverage,
 } from '../src/capabilities/c003.ts';
 import type { ActionPlan } from '../src/plan.ts';
 import { validateActionPlanSemantics } from '../src/plan.ts';
@@ -324,6 +325,14 @@ const OVERLAY_MUTATIONS: {
       gate.phases = ['PLAN'];
     },
   },
+  {
+    name: 'c003 (R2-03, review 5478548765): executed cleanup with empty protectedAssetVerification is rejected',
+    schema: 'c003-storage-diagnose-output',
+    fixture: 'valid/c003-storage-diagnose-output/cleanup-executed.json',
+    mutate: (value) => {
+      value.protectedAssetVerification = [];
+    },
+  },
 ];
 
 describe('overlay invariants are enforced by the artifact itself', () => {
@@ -379,6 +388,62 @@ describe('x-semantic-validation annotations close the inexpressible gap', () => 
     expect(artifactValidator('c003-storage-diagnose-output')(mutated)).toBe(true);
     expect(zodSchemaFor('c003-storage-diagnose-output').safeParse(mutated).success).toBe(false);
     expect(validateC003OutputSemantics(mutated as StorageDiagnoseOutput).length).toBeGreaterThan(0);
+  });
+});
+
+describe('protected-asset coverage equality at the VerifierPort boundary (R2-03, review 5478548765)', () => {
+  const input = StorageDiagnoseInputSchema.parse(
+    loadFixture('valid/c003-storage-diagnose-input/basic.json'),
+  ) as StorageDiagnoseInput;
+
+  function executedOutput(): StorageDiagnoseOutput {
+    return zodSchemaFor('c003-storage-diagnose-output').parse(
+      loadFixture('valid/c003-storage-diagnose-output/cleanup-executed.json'),
+    ) as StorageDiagnoseOutput;
+  }
+
+  it('the valid fixture pair covers every declared asset and nothing else', () => {
+    expect(validateProtectedAssetCoverage(input, executedOutput())).toEqual([]);
+  });
+
+  it('missing-asset-coverage: verifying only a subset of the declared assets is flagged', () => {
+    const twoAssetInput: StorageDiagnoseInput = {
+      ...input,
+      protectedAssets: [
+        { path: 'C:\\fixtures\\protected\\photos' },
+        { path: 'C:\\fixtures\\protected\\documents' },
+      ],
+    };
+    // Nonemptiness alone would pass this case — the helper carries the
+    // stronger asset-set invariant.
+    expect(validateProtectedAssetCoverage(twoAssetInput, executedOutput())).toEqual([
+      'protected asset C:\\fixtures\\protected\\documents declared in the input was not verified in the output',
+    ]);
+  });
+
+  it('missing-asset-coverage: empty verification on an executed cleanup is flagged and structurally rejected', () => {
+    const output = executedOutput();
+    const emptied: StorageDiagnoseOutput = { ...output, protectedAssetVerification: [] };
+    expect(validateProtectedAssetCoverage(input, emptied).length).toBeGreaterThan(0);
+    // The structural rule (Zod + committed artifact) rejects the same record outright.
+    expect(zodSchemaFor('c003-storage-diagnose-output').safeParse(emptied).success).toBe(false);
+    expect(artifactValidator('c003-storage-diagnose-output')(emptied)).toBe(false);
+  });
+
+  it('undeclared verification: a verification path the input never declared is flagged', () => {
+    const output = executedOutput();
+    const widened: StorageDiagnoseOutput = {
+      ...output,
+      protectedAssetVerification: [
+        ...output.protectedAssetVerification,
+        { path: 'C:\\fixtures\\undeclared', unchanged: true },
+      ],
+    };
+    expect(
+      validateProtectedAssetCoverage(input, widened).some((message) =>
+        /never declared/.test(message),
+      ),
+    ).toBe(true);
   });
 });
 

@@ -299,7 +299,12 @@
         "required": [
           "executionEvidence",
           "reclaimed"
-        ]
+        ],
+        "properties": {
+          "protectedAssetVerification": {
+            "minItems": 1
+          }
+        }
       }
     }
   ]

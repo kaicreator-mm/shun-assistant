@@ -207,10 +207,16 @@ function overlayStorageDiagnoseOutput(output: EmittedSchema): EmittedSchema {
       properties: { ...props, cleanupPlan: { ...cleanupPlan, anyOf: branches } },
       'x-semantic-validation': ['validateC003OutputSemantics'],
     },
-    // A non-null cleanup plan is an executed bounded action: evidence and reclaim measurement required.
+    // A non-null cleanup plan is an executed bounded action: evidence,
+    // reclaim measurement, and at least one protected-asset verification are
+    // required (frozen C-003 — protected assets are verified after any
+    // bounded action; review 5478548765 R2-03).
     ifThen(
       { properties: { cleanupPlan: { type: 'object' } }, required: ['cleanupPlan'] },
-      { required: ['executionEvidence', 'reclaimed'] },
+      {
+        required: ['executionEvidence', 'reclaimed'],
+        properties: { protectedAssetVerification: { minItems: 1 } },
+      },
     ),
   );
 }
