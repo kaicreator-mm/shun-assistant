@@ -1,0 +1,5 @@
+{"seq":0,"ts":"2026-10-10T14:12:18.362Z","phase":"RECEIVED","actionId":"b038-s2-remove-uninstall"}
+{"seq":1,"ts":"2026-10-10T14:12:18.365Z","phase":"VALIDATED","actionId":"b038-s2-remove-uninstall","detail":"grant grant-0003"}
+{"seq":3,"ts":"2026-10-10T14:12:18.366Z","phase":"EXEC_START","actionId":"b038-s2-remove-uninstall"}
+{"seq":4,"ts":"2026-10-10T14:12:19.533Z","phase":"EXEC_DONE","actionId":"b038-s2-remove-uninstall","detail":"winget exit 0 :: Found RipGrep MSVC [BurntSushi.ripgrep.MSVC] Starting package uninstall... Successfully uninstalled"}
+{"seq":5,"ts":"2026-10-10T14:12:19.534Z","phase":"RECEIPT_WRITTEN","actionId":"b038-s2-remove-uninstall"}

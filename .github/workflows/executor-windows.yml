@@ -1,0 +1,31 @@
+name: executor-windows
+
+on:
+  push:
+    branches: ['**']
+    paths:
+      - 'packages/executor-windows/**'
+      - '.github/workflows/executor-windows.yml'
+  pull_request:
+
+jobs:
+  check:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10.34.5
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm --filter @shun/contracts run lint && pnpm --filter @shun/executor-windows run lint
+      - run: pnpm --filter @shun/executor-windows run typecheck
+      # helper bundle must build deterministically from committed sources
+      - run: pnpm --filter @shun/executor-windows run build:helper
+      # unit + integration suite (no elevation required; evidence runs are
+      # operator-gated and never run in CI)
+      - run: pnpm --filter @shun/executor-windows run test
+      - run: pnpm --filter @shun/contracts run test

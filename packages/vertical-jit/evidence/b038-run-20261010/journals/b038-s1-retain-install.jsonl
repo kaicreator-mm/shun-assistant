@@ -1,0 +1,5 @@
+{"seq":0,"ts":"2026-10-10T14:11:12.588Z","phase":"RECEIVED","actionId":"b038-s1-retain-install"}
+{"seq":1,"ts":"2026-10-10T14:11:12.599Z","phase":"VALIDATED","actionId":"b038-s1-retain-install","detail":"grant grant-0001"}
+{"seq":3,"ts":"2026-10-10T14:11:12.600Z","phase":"EXEC_START","actionId":"b038-s1-retain-install"}
+{"seq":4,"ts":"2026-10-10T14:11:34.992Z","phase":"EXEC_DONE","actionId":"b038-s1-retain-install","detail":"winget exit 0 :: Found jq [jqlang.jq] Version 1.8.2 This application is licensed to you by its owner. Microsoft is not responsible for, nor does it grant any licenses to, third-party packages. Downloading https://github.com/jqlang/jq/releases/download/jq-1."}
+{"seq":5,"ts":"2026-10-10T14:11:34.995Z","phase":"RECEIPT_WRITTEN","actionId":"b038-s1-retain-install"}

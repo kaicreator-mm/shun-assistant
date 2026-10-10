@@ -1,0 +1,9 @@
+{
+  "code": "INSTALL_FAILED",
+  "detail": "privileged boundary refused the install presentation: GRANT_POLICY_STALE (no side effect)",
+  "recovery": {
+    "actionId": "b038-s6-stale-install",
+    "recoveryClassification": "FAILED_BEFORE_EFFECT",
+    "detail": "install terminal REFUSED; no automatic retry — a declined elevation or refused grant is a decision, not a transport fault"
+  }
+}

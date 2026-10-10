@@ -1,0 +1,17 @@
+{
+  "case": "E4-kill-reconciled",
+  "resolved": true,
+  "recoveryClassification": "COMPLETED_VERIFIED",
+  "basis": "interrupted inside an effect window; expected state verified present (reconcile-first verified expected state via windows.fs.verify)",
+  "journalPhases": [
+    "RECEIVED",
+    "VALIDATED",
+    "PLAN_IDENTITY_OK",
+    "GRANT_OK",
+    "SCOPE_OK",
+    "PRIVILEGE_OK",
+    "EXEC_BEGIN",
+    "EXEC_START"
+  ],
+  "helperKilledPid": 24188
+}
