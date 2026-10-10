@@ -23,6 +23,7 @@ import {
 import { assertSafeActionId } from './action-id.ts';
 import { PROVIDER_ID, PROVIDER_VERSION } from './backend.ts';
 import { type HelperReceiptFile, HelperReceiptFileSchema, writeEnvelopeFile } from './envelope.ts';
+import { resolveAgainstRoot } from './fs-safety.ts';
 import { verifyPinnedHelper } from './helper-pinning.ts';
 import type { InterpreterScope } from './interpreter.ts';
 import { JournalWriter, journalDigest, readJournal } from './journal.ts';
@@ -153,6 +154,19 @@ export class PrivilegedWindowsExecutionBackend implements ExecutionBackend {
         return await launchRefused(
           'helper pin vanished between verification and launch (fail closed)',
         );
+
+      // C07: the run artifacts (and therefore the elevated helper's I/O
+      // envelope) must resolve INSIDE the pinned workspace root on real
+      // paths — a launcher-configured root outside the pin would make every
+      // helper run refuse at containment, or worse, resolve through a
+      // junction outside the pin. Fail fast before any envelope/UAC work.
+      const rootCheck = resolveAgainstRoot(this.options.workspaceRoot, pin.workspaceRoot);
+      if (!rootCheck.ok) {
+        return await launchRefused(
+          `configured workspace root refused against the pinned root: ${rootCheck.reason}`,
+          'WORKSPACE_ROOT_ESCAPE',
+        );
+      }
 
       // ---- trusted plan source; a missing plan fails closed. ----
       const plan = new FilePlanSource(join(this.options.authorityDir, 'plans')).byPlanHash(

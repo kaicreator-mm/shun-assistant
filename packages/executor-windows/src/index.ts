@@ -21,7 +21,7 @@ export {
   writeEnvelopeFile,
 } from './envelope.ts';
 export { observeEnvironment } from './facts.ts';
-export { resolveWithinScope } from './fs-safety.ts';
+export { resolveAgainstRoot, resolveWithinScope } from './fs-safety.ts';
 export type { IdentityCheck } from './helper-pinning.ts';
 export { verifyPinnedHelper } from './helper-pinning.ts';
 export type { InterpreterContext, InterpreterScope, StepOutcome } from './interpreter.ts';

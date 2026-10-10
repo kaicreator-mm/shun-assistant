@@ -22,12 +22,11 @@
 import { execFile } from 'node:child_process';
 import { renameSync } from 'node:fs';
 import { hostname } from 'node:os';
-import { join, resolve } from 'node:path';
+import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import {
   type ExecutionReceipt,
   ExecutionReceiptSchema,
-  pathWithin,
   validateGrantPresentation,
 } from '@shun/contracts';
 import { checkStepSurface, resolveActionStep } from '../action-surface.ts';
@@ -39,6 +38,7 @@ import {
   HelperReceiptFileSchema,
   readEnvelopeFile,
 } from '../envelope.ts';
+import { resolveAgainstRoot } from '../fs-safety.ts';
 import {
   CancelledError,
   checkGuards,
@@ -130,14 +130,19 @@ class Helper {
       );
       return HELPER_EXIT_CODES.REFUSED;
     }
+    // C07: containment on RESOLVED paths, not lexical ones — a junction
+    // planted inside the pinned root would otherwise turn the elevated
+    // journal/receipt/evidence writes into an arbitrary-write primitive.
     for (const p of [
       journalFile,
       receiptFile,
       this.envelope.io.cancelFile,
       this.envelope.io.evidenceDir,
     ]) {
-      if (p !== undefined && !pathWithin(resolve(p), pin.workspaceRoot)) {
-        process.stderr.write(`I/O path outside the pinned workspace root: ${p}\n`);
+      if (p === undefined) continue;
+      const contained = resolveAgainstRoot(p, pin.workspaceRoot);
+      if (!contained.ok) {
+        process.stderr.write(`I/O path refused: ${contained.reason}\n`);
         return HELPER_EXIT_CODES.REFUSED;
       }
     }

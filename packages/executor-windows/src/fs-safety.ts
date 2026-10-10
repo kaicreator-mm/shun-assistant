@@ -88,6 +88,45 @@ function deepestExistingAncestor(target: string): string | null {
   }
 }
 
+/**
+ * Resolve an I/O channel path against a trusted root on REAL paths (C07):
+ * the root is realpath'd, the target is realpath'd (deepest existing
+ * ancestor + literal tail for not-yet-created files), and containment is
+ * checked on the resolved pair. A junction/symlink planted inside the root
+ * therefore cannot redirect the elevated journal/receipt/evidence writes
+ * outside it — the lexical path would pass `pathWithin` while the real
+ * landing does not. In-root junctions above the root itself are fine: both
+ * sides resolve through them consistently. TOCTOU on a local single-user
+ * host is re-checked at helper startup immediately before the journal opens.
+ */
+export function resolveAgainstRoot(target: string, root: string): FsSafetyCheck {
+  let resolvedRoot: string;
+  try {
+    resolvedRoot = realpathSync(root);
+  } catch {
+    return { ok: false, reason: `workspace root does not resolve to a real path: ${root}` };
+  }
+  let resolved: string;
+  try {
+    resolved = realpathSync(target);
+  } catch {
+    const ancestor = deepestExistingAncestor(target);
+    if (!ancestor) {
+      return { ok: false, reason: `no existing ancestor to resolve: ${target}` };
+    }
+    try {
+      resolved = realpathSync(ancestor) + target.slice(ancestor.length);
+    } catch (e) {
+      return { ok: false, reason: `ancestor resolution failed: ${message(e)}` };
+    }
+  }
+  if (pathWithin(resolved, resolvedRoot)) return { ok: true, resolved };
+  return {
+    ok: false,
+    reason: `resolved I/O path ${resolved} escapes the pinned workspace root ${resolvedRoot} (junction/symlink escape refused)`,
+  };
+}
+
 function message(e: unknown): string {
   return e instanceof Error ? e.message : String(e);
 }
