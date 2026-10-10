@@ -25,20 +25,46 @@ export interface SafetyProfile {
   escalationReason: string;
 }
 
-export function readSafetyProfile(provider: ProviderDefinition): SafetyProfile | undefined {
+/**
+ * Strict parse result of a provider's curated safetyProfile (P1-03): ABSENT
+ * means the fact class is not declared (no escalation posture known); VALID
+ * parses into the SafetyProfile shape; MALFORMED means a safetyProfile IS
+ * present but does not parse — it never degrades to "no profile".
+ */
+export type SafetyProfileRead =
+  | { status: 'ABSENT' }
+  | { status: 'VALID'; profile: SafetyProfile }
+  | { status: 'MALFORMED'; reason: string };
+
+export function readSafetyProfile(provider: ProviderDefinition): SafetyProfileRead {
   const profile = provider.provenanceFacts.safetyProfile;
-  if (
-    typeof profile === 'object' &&
-    profile !== null &&
-    (profile as Record<string, unknown>).riskEscalationRequired === true &&
-    typeof (profile as Record<string, unknown>).escalationReason === 'string'
-  ) {
+  if (profile === undefined) {
+    return { status: 'ABSENT' };
+  }
+  if (typeof profile !== 'object' || profile === null || Array.isArray(profile)) {
     return {
-      riskEscalationRequired: true,
-      escalationReason: (profile as Record<string, unknown>).escalationReason as string,
+      status: 'MALFORMED',
+      reason: `safetyProfile must be an object, got ${typeof profile}`,
     };
   }
-  return undefined;
+  const record = profile as Record<string, unknown>;
+  if (record.riskEscalationRequired !== true) {
+    return {
+      status: 'MALFORMED',
+      reason:
+        'safetyProfile.riskEscalationRequired must be the literal true (missing/false is not a parseable safety posture)',
+    };
+  }
+  if (typeof record.escalationReason !== 'string' || record.escalationReason.length === 0) {
+    return {
+      status: 'MALFORMED',
+      reason: 'safetyProfile.escalationReason must be a non-empty string',
+    };
+  }
+  return {
+    status: 'VALID',
+    profile: { riskEscalationRequired: true, escalationReason: record.escalationReason },
+  };
 }
 
 export interface BindingGateOutcome {
@@ -218,9 +244,22 @@ export function runHardGates(
   );
 
   // Gate 5 — Required safety constraints: curated escalation posture is
-  // explicit, never a score component (P2-02).
-  const safetyProfile = readSafetyProfile(provider);
-  if (safetyProfile !== undefined) {
+  // explicit, never a score component (P2-02). A present-but-malformed
+  // safetyProfile fails closed (P1-03) — it is never read as "no profile".
+  const safetyRead = readSafetyProfile(provider);
+  if (safetyRead.status === 'MALFORMED') {
+    dispositions.push(
+      disposition(
+        'SAFETY_CONSTRAINTS',
+        binding.bindingId,
+        'REJECT',
+        `provider safetyProfile is present but malformed — fail closed: ${safetyRead.reason}`,
+      ),
+    );
+    return { binding, dispositions, passed: false };
+  }
+  if (safetyRead.status === 'VALID') {
+    const safetyProfile = safetyRead.profile;
     const acknowledged = context.constraints.other?.riskEscalationAcknowledged === true;
     if (!acknowledged) {
       dispositions.push(

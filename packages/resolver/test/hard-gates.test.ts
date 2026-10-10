@@ -254,6 +254,41 @@ describe('hard gates execute before ranking, in frozen order', () => {
     });
   });
 
+  it('safety: a present but malformed safetyProfile fails closed instead of counting as safety PASS (P1-03)', () => {
+    const malformedProfiles: unknown[] = [
+      // riskEscalationRequired: true with a missing reason
+      { riskEscalationRequired: true },
+      // non-string escalation reason
+      { riskEscalationRequired: true, escalationReason: 42 },
+      // empty-string escalation reason
+      { riskEscalationRequired: true, escalationReason: '' },
+      // non-object profile
+      'aggressive cleanup',
+      // out-of-vocabulary escalation flag (the curated fact only models true)
+      { riskEscalationRequired: false, escalationReason: 'no escalation' },
+    ];
+    for (const [index, safetyProfile] of malformedProfiles.entries()) {
+      const outcome = gateScenario({
+        provider: {
+          provenanceFacts: { trustState: 'TRUSTED', safetyProfile } as Record<string, unknown>,
+        },
+      });
+      expect(outcome.passed, `malformed profile case ${index}`).toBe(false);
+      const last = outcome.dispositions[outcome.dispositions.length - 1];
+      expect(last, `malformed profile case ${index}`).toMatchObject({
+        gate: 'SAFETY_CONSTRAINTS',
+        outcome: 'REJECT',
+        reason: expect.stringContaining('malformed'),
+      });
+    }
+  });
+
+  it('safety: an absent safetyProfile still means no escalation and passes (P1-03 absence case)', () => {
+    const outcome = gateScenario({});
+    const last = outcome.dispositions[outcome.dispositions.length - 1];
+    expect(last).toMatchObject({ gate: 'SAFETY_CONSTRAINTS', outcome: 'PASS' });
+  });
+
   it('safety: acknowledged escalation stays feasible and is surfaced as ESCALATION_REQUIRED', () => {
     const requestWithAck = goalRequest({ goal: 'image.batch_process: resize photos' });
     requestWithAck.constraints.other = { riskEscalationAcknowledged: true };
