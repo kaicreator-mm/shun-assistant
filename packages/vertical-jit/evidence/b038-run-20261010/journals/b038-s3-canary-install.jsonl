@@ -1,0 +1,5 @@
+{"seq":0,"ts":"2026-10-10T14:12:51.286Z","phase":"RECEIVED","actionId":"b038-s3-canary-install"}
+{"seq":1,"ts":"2026-10-10T14:12:51.288Z","phase":"VALIDATED","actionId":"b038-s3-canary-install","detail":"grant grant-0003"}
+{"seq":3,"ts":"2026-10-10T14:12:51.289Z","phase":"EXEC_START","actionId":"b038-s3-canary-install"}
+{"seq":4,"ts":"2026-10-10T14:12:51.814Z","phase":"EXEC_DONE","actionId":"b038-s3-canary-install","detail":"winget exit 2316632107 :: Found an existing package already installed. Trying to upgrade the installed package... No available upgrade found. No newer package versions are available from the configured sources. already-installed treated as present"}
+{"seq":5,"ts":"2026-10-10T14:12:51.816Z","phase":"RECEIPT_WRITTEN","actionId":"b038-s3-canary-install"}

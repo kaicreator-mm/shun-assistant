@@ -10,6 +10,7 @@
       "!**/coverage/**",
       "!packages/contracts/src/schema/**",
       "!packages/contracts/fixtures/**",
+      "!packages/vertical-jit/evidence/**",
       "!packages/executor-windows/evidence/**"
     ]
   },

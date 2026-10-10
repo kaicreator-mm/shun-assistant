@@ -1,0 +1,67 @@
+{
+  "taskId": "b038-s1b-remove",
+  "selectedBindingId": "binding-tool.jq",
+  "provenance": {
+    "source": "winget",
+    "official": true,
+    "version": "1.8.2",
+    "hash": "a6fc67fedaf9128a3309a1e2ebb8b986aeccf70122ee46d2cb4849e423f0c627",
+    "signature": "authenticode:jqlang",
+    "licenseDisposition": "MIT License accepted for task use"
+  },
+  "taskResult": {
+    "status": "SUCCEEDED",
+    "verification": {
+      "taskId": "b038-s1b-remove",
+      "verifierId": "verifier.jit-cli",
+      "verifierRevision": "r1",
+      "status": "PASS",
+      "checks": [
+        {
+          "checkId": "provider-task-observable",
+          "status": "PASS",
+          "detail": "task output names the exact acquired version 1.8.2"
+        }
+      ],
+      "oracleInputs": {
+        "expectedVersion": "1.8.2",
+        "actualStdout": "jq-1.8.2\r\n"
+      },
+      "evidenceRefs": [
+        "evidence\\b038-run-20261010\\s1-task-out\\stdout.txt"
+      ]
+    }
+  },
+  "lifecycleState": {
+    "providerId": "tool.jq",
+    "version": "1.8.2",
+    "state": "REMOVED"
+  },
+  "residueReport": {
+    "candidates": [
+      {
+        "path": "C:\\Users\\15549\\AppData\\Local\\Microsoft\\WinGet\\Packages\\jqlang.jq_Microsoft.Winget.Source_8wekyb3d8bbwe",
+        "classification": "PROGRAM_OWNED",
+        "disposition": "DELETE"
+      },
+      {
+        "path": "C:\\Users\\15549\\AppData\\Local\\Microsoft\\WinGet\\Packages\\jqlang.jq_Microsoft.Winget.Source_8wekyb3d8bbwe\\jq.exe",
+        "classification": "PROGRAM_OWNED",
+        "disposition": "DELETE"
+      }
+    ],
+    "unknownOrProtectedDeleted": false
+  },
+  "r2Gate": {
+    "phases": [
+      "PLAN",
+      "PREVIEW",
+      "CHECKPOINT",
+      "APPROVAL",
+      "EXECUTE",
+      "VERIFY"
+    ],
+    "approvedBy": "DURABLE_POLICY"
+  },
+  "finalState": "REMOVED"
+}
