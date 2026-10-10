@@ -32,17 +32,25 @@ export {
   parseRegQueryOutput,
   runStep,
 } from './interpreter.ts';
-export type { JournalEvent, JournalPhase, ReplayEvent, TornJournalLine } from './journal.ts';
+export type {
+  CorruptJournalLine,
+  JournalEvent,
+  JournalPhase,
+  ReplayEvent,
+  TornJournalLine,
+} from './journal.ts';
 export {
+  isCorrupt,
   isTorn,
   JOURNAL_PHASES,
   JOURNAL_SCHEMA_VERSION,
-  JournalWriter,
   journalDigest,
+  journalHasCorrupt,
   journalHasExecStart,
   journalHasReceived,
   journalPhases,
   journalStepResults,
+  JournalWriter,
   readJournal,
 } from './journal.ts';
 export type { ExecutorOp, ExecutorStep } from './ops.ts';

@@ -22,6 +22,7 @@
 import type { ExecutionTerminal, RecoveryClassification } from '@shun/contracts';
 import type { JournalEvent, ReplayEvent } from './journal.ts';
 import {
+  isCorrupt,
   isTorn,
   journalHasExecStart,
   journalHasReceived,
@@ -60,6 +61,17 @@ export interface ClassificationResult {
 }
 
 export function classifyRecovery(input: ClassificationInput): ClassificationResult {
+  // C16: corruption/tampering evidence overrides every other rule. A journal
+  // containing a complete-but-malformed line cannot prove ANYTHING — not
+  // "never started", not "failed before effect", not "completed verified".
+  if (input.journal.some(isCorrupt)) {
+    return {
+      recoveryClassification: 'MAY_HAVE_EXECUTED_UNCERTAIN',
+      resolvedByPostState: false,
+      basis:
+        'journal integrity violation: complete but malformed line(s) present — fail closed (torn-tail tolerance applies only to a physically incomplete final append)',
+    };
+  }
   const phases = journalPhases(input.journal);
   const received = journalHasReceived(input.journal);
   const execStart = journalHasExecStart(input.journal);

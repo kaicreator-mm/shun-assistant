@@ -64,10 +64,31 @@ export interface TornJournalLine {
   readonly line: string;
 }
 
-export type ReplayEvent = JournalEvent | TornJournalLine;
+/**
+ * A COMPLETE line (newline-terminated, or anywhere but the physically
+ * incomplete final append) that is not a valid journal event (C16): this is
+ * corruption or tampering evidence, not a crash artifact — a torn-append
+ * tolerance that silently swallowed it would let a doctored journal replay
+ * as "helper crashed mid-write". Recovery fails closed on any corrupt line.
+ */
+export interface CorruptJournalLine {
+  readonly corrupt: true;
+  readonly line: string;
+}
+
+export type ReplayEvent = JournalEvent | TornJournalLine | CorruptJournalLine;
 
 export function isTorn(e: ReplayEvent): e is TornJournalLine {
   return (e as TornJournalLine).torn === true;
+}
+
+export function isCorrupt(e: ReplayEvent): e is CorruptJournalLine {
+  return (e as CorruptJournalLine).corrupt === true;
+}
+
+/** True when replay found corruption/tampering evidence (C16) — classification must fail closed. */
+export function journalHasCorrupt(events: readonly ReplayEvent[]): boolean {
+  return events.some(isCorrupt);
 }
 
 export class JournalWriter {
@@ -150,19 +171,34 @@ export function readJournal(file: string): ReplayEvent[] {
     return [];
   }
   const events: ReplayEvent[] = [];
-  for (const line of raw.split(/\r?\n/)) {
+  const lines = raw.split(/\r?\n/);
+  const endsWithNewline = raw.endsWith('\n');
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i];
     if (line.trim().length === 0) continue;
     try {
       events.push(JournalEventSchema.parse(JSON.parse(line)));
     } catch {
-      events.push({ torn: true, line: line.slice(0, 200) });
+      // Torn-tail tolerance is limited to a PHYSICALLY INCOMPLETE final
+      // append (C16): the journal writer emits each event as one
+      // write+fsync of `line + '\n'`, so a crash can only truncate the final
+      // append (bytes missing → no trailing newline). Anything else —
+      // malformed bytes mid-file, or a newline-terminated line that parses
+      // as JSON but violates the event schema — is corruption/tampering.
+      const physicallyIncompleteFinal = i === lines.length - 1 && !endsWithNewline;
+      events.push({
+        ...(physicallyIncompleteFinal ? { torn: true } : { corrupt: true }),
+        line: line.slice(0, 200),
+      });
     }
   }
   return events;
 }
 
 export function journalPhases(events: readonly ReplayEvent[]): JournalPhase[] {
-  return events.filter((e): e is JournalEvent => !isTorn(e)).map((e) => e.phase);
+  return events
+    .filter((e): e is JournalEvent => !isTorn(e) && !isCorrupt(e))
+    .map((e) => e.phase);
 }
 
 /** True once the journal proves the helper began validation (first durable record). */
@@ -187,6 +223,7 @@ export function journalStepResults(events: readonly ReplayEvent[]): JournalStepR
   const results: JournalStepResult[] = [];
   for (const event of events) {
     if (isTorn(event)) continue;
+    if (isCorrupt(event)) continue;
     if (event.phase === 'EXEC_DONE' && event.step !== undefined && event.op !== undefined) {
       results.push({ step: event.step, op: event.op, ok: true, detail: event.detail ?? {} });
     }
@@ -201,7 +238,13 @@ export function journalStepResults(events: readonly ReplayEvent[]): JournalStepR
 export function journalDigest(events: readonly ReplayEvent[]): string {
   const hash = createHash('sha256');
   for (const event of events) {
-    hash.update(isTorn(event) ? `TORN\t${event.line}\n` : `${JSON.stringify(event)}\n`);
+    hash.update(
+      isTorn(event)
+        ? `TORN\t${event.line}\n`
+        : isCorrupt(event)
+          ? `CORRUPT\t${event.line}\n`
+          : `${JSON.stringify(event)}\n`,
+    );
   }
   return hash.digest('hex');
 }
