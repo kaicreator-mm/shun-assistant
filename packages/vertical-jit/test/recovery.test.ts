@@ -50,7 +50,9 @@ describe('JIT lifecycle — declined elevation (UAC)', () => {
     // The journal carries the explicit NO_EFFECT marker.
     const entries = await harness.deps.journals('task-2026-10-10-002-install').replay();
     expect(entries.some((entry) => entry.detail?.startsWith('NO_EFFECT:'))).toBe(true);
-    expect(classifyFromJournal(entries, 'task-2026-10-10-002-install')).toBe('FAILED_BEFORE_EFFECT');
+    expect(classifyFromJournal(entries, 'task-2026-10-10-002-install')).toBe(
+      'FAILED_BEFORE_EFFECT',
+    );
   });
 
   it('fails the removal with the provider retained when elevation is declined at uninstall', async () => {
