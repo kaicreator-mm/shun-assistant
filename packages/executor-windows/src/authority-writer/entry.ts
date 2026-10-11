@@ -134,10 +134,10 @@ function main(): never {
     mkdirSync(dir, { recursive: true });
     // Path derives only from the strict proposal schema's AnchorIdSchema.
     writeFileSync(
-        protectedReceiptPath(anchorRoot, sealed.job.jobId),
-        `${JSON.stringify(receipt, null, 2)}\n`,
-        { encoding: 'utf8', flag: 'wx' },
-      );
+      protectedReceiptPath(anchorRoot, sealed.job.jobId),
+      `${JSON.stringify(receipt, null, 2)}\n`,
+      { encoding: 'utf8', flag: 'wx' },
+    );
   } catch (error) {
     return emitAndExit(
       {
