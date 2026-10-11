@@ -130,7 +130,6 @@ describe('P1-A: grant records prove prior policy existence — unmarked loss is 
   });
 });
 
-
 describe('R3: missing policy is never implicit proof of a virgin authority', () => {
   it('an unmarked REVOKED legacy policy with zero grant history cannot reactivate after slot loss', async () => {
     const state = memoryPolicyState({
