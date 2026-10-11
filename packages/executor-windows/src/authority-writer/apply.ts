@@ -32,6 +32,7 @@ import {
   CurrentAuthorityStateSchema,
   pathWithin,
 } from '@shun/contracts';
+import { verifyGrantWithHmac } from '../trusted-store.ts';
 import {
   isSafeAnchorId,
   jobPayloadAsCurrentness,
@@ -176,6 +177,13 @@ export function applyWriterJob(ctx: ApplyContext, rawJob: unknown): ApplyResult 
         ok: false,
         code: 'PAYLOAD_INVALID',
         reason: `grantId ${JSON.stringify(grant.grantId)} is not a canonical Windows-safe anchor identifier`,
+      };
+    }
+    if (!verifyGrantWithHmac(ctx.hmacKeyBase64, grant)) {
+      return {
+        ok: false,
+        code: 'PAYLOAD_INVALID',
+        reason: 'grant integrity envelope is not authentic under the protected authority key',
       };
     }
     const grantViolation = grantWindowViolation(
