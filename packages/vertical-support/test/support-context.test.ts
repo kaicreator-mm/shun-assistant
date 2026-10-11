@@ -214,12 +214,9 @@ describe('real Windows collector boundary', () => {
           'win32',
         ),
       () =>
-        collectWindowsSupportContextWithTrustedRunner(
-          async () => {
-            throw new Error(fakePath);
-          },
-          'win32',
-        ),
+        collectWindowsSupportContextWithTrustedRunner(async () => {
+          throw new Error(fakePath);
+        }, 'win32'),
     ];
 
     for (const probe of probes) {
