@@ -40,7 +40,10 @@ export async function createOwnedDir(path: string): Promise<OwnedDir> {
   await mkdir(path, { recursive: true });
   const entries = await readdir(path);
   if (entries.length > 0) {
-    throw new NotOwnedError(path, `directory is not empty (${entries.length} entr${entries.length === 1 ? 'y' : 'ies'})`);
+    throw new NotOwnedError(
+      path,
+      `directory is not empty (${entries.length} entr${entries.length === 1 ? 'y' : 'ies'})`,
+    );
   }
   const nonce = randomBytes(16).toString('hex');
   await writeFile(join(path, OWNERSHIP_MARKER), `${nonce}\n`, { flag: 'wx' });

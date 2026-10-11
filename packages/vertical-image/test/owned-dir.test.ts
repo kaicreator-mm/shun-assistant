@@ -1,10 +1,15 @@
+import { execFile } from 'node:child_process';
 import { existsSync } from 'node:fs';
 import { readFile, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
-import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { createOwnedDir, NotOwnedError, OWNERSHIP_MARKER, removeOwnedDir } from '../src/owned-dir.ts';
+import {
+  createOwnedDir,
+  NotOwnedError,
+  OWNERSHIP_MARKER,
+  removeOwnedDir,
+} from '../src/owned-dir.ts';
 import { type FixtureDir, fixtureDir } from './helpers.ts';
 
 const execFileAsync = promisify(execFile);
@@ -23,11 +28,13 @@ describe('owned-dir guard (VI-P1-05)', () => {
   it('refuses to delete a foreign directory containing user data', async () => {
     await victim.write('precious.txt', Buffer.from('user data — must survive'));
     // A buggy tool claims ownership it never established.
-    await expect(removeOwnedDir({ path: victim.path, nonce: 'deadbeef'.repeat(4) })).rejects.toBeInstanceOf(
-      NotOwnedError,
-    );
+    await expect(
+      removeOwnedDir({ path: victim.path, nonce: 'deadbeef'.repeat(4) }),
+    ).rejects.toBeInstanceOf(NotOwnedError);
     expect(existsSync(join(victim.path, 'precious.txt'))).toBe(true);
-    expect(await readFile(join(victim.path, 'precious.txt'), 'utf8')).toBe('user data — must survive');
+    expect(await readFile(join(victim.path, 'precious.txt'), 'utf8')).toBe(
+      'user data — must survive',
+    );
   });
 
   it('refuses to adopt a pre-existing directory with content', async () => {
