@@ -191,6 +191,67 @@ describe('R3: missing policy is never implicit proof of a virgin authority', () 
     });
   });
 
+  it('R4: async bootstrap authorization cannot persist caller-mutated or authorizer-mutated policy rules', async () => {
+    const state = memoryPolicyState({ authority: AUTHORITY });
+    let releaseAuthorization!: () => void;
+    const pause = new Promise<void>((resolve) => {
+      releaseAuthorization = resolve;
+    });
+    let reachedAuthorizer!: () => void;
+    const entered = new Promise<void>((resolve) => {
+      reachedAuthorizer = resolve;
+    });
+    const authority = new AuthorizationAuthority({
+      state,
+      grants: memoryGrantStore(),
+      integritySecret: 'test-authority-secret',
+      issuanceSecret: ISSUANCE_SECRET,
+      clock: fixedClock().now,
+      bootstrapAuthorizer: async ({ proof, snapshot }) => {
+        expect(proof).toBe('trusted-one-shot-bootstrap');
+        expect(snapshot.policySnapshotRevision).toBe(POLICY_REVISION);
+        expect(snapshot.rules).toEqual([]);
+        reachedAuthorizer();
+        await pause;
+        // A callback must not be able to mutate the candidate persisted by
+        // the authority, even if it changes the snapshot it was shown.
+        snapshot.rules.push({
+          ruleId: 'rule-authorizer-injected',
+          capabilityId: 'software.remove',
+          op: 'software.uninstall',
+          maxRiskClass: 'R2',
+          privilegeLevel: 'ELEVATED',
+        });
+        return true;
+      },
+    });
+    const candidate = { policySnapshotRevision: POLICY_REVISION, rules: [] as PolicySnapshotRecord['rules'] };
+    const pending = authority.bootstrapPolicy(candidate, 'trusted-one-shot-bootstrap');
+    await entered;
+    // Independent review R3 P1: mutate the caller-owned object while the
+    // trusted authorizer is parked, AFTER it inspected benign S1.
+    candidate.policySnapshotRevision = 'policy-broadened-after-approval';
+    candidate.rules.push({
+      ruleId: 'rule-caller-injected',
+      capabilityId: 'software.remove',
+      op: 'software.uninstall',
+      maxRiskClass: 'R2',
+      privilegeLevel: 'ELEVATED',
+    });
+    releaseAuthorization();
+    await pending;
+    expect(state.policySlot).toMatchObject({
+      policySnapshotRevision: POLICY_REVISION,
+      rules: [],
+      riskGuards: [],
+      status: 'ACTIVE',
+    });
+    expect(await authority.currentAuthority()).toMatchObject({
+      kind: 'CURRENT',
+      policySnapshotRevision: POLICY_REVISION,
+    });
+  });
+
   it('an absent or rejected bootstrap proof leaves the virgin store byte-state untouched', async () => {
     const state = memoryPolicyState({ authority: AUTHORITY });
     const grants = memoryGrantStore();
