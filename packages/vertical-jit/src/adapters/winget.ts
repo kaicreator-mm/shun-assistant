@@ -13,7 +13,11 @@ import { homedir } from 'node:os';
 import { join } from 'node:path';
 import type { JournalPort } from '../journal.ts';
 import type { LocalAuthority } from '../local-authority.ts';
-import { LocalPrivilegedBackend, type PrivilegedFault } from '../local-backend.ts';
+import {
+  LocalPrivilegedBackend,
+  type PerformOutcome,
+  type PrivilegedFault,
+} from '../local-backend.ts';
 import type {
   AcquisitionCandidate,
   AcquisitionPort,
@@ -271,6 +275,7 @@ export class WingetPrivilegedBackend extends LocalPrivilegedBackend {
         }`,
       providerVersion: (action) =>
         String((action.action.parameters as Record<string, unknown>).version ?? 'unknown'),
+      preflight: (action) => this.#preflight(action),
       perform: (action) => this.#perform(action),
       ...(deps.faults ? { faults: deps.faults } : {}),
     });
@@ -278,6 +283,21 @@ export class WingetPrivilegedBackend extends LocalPrivilegedBackend {
   }
 
   readonly #deps: WingetBackendDeps;
+
+  async #preflight(
+    action: { op: string; parameters: Record<string, unknown> },
+  ): Promise<(PerformOutcome & { readonly noEffect: true }) | undefined> {
+    if (action.op !== 'software.uninstall') return undefined;
+    // R5b: this refusal is an EFFECT PRECONDITION, so it must be decided
+    // before LocalPrivilegedBackend appends EXEC_START. A durable EXEC_START
+    // plus NOT_STARTED receipt is contradictory recovery evidence.
+    return {
+      ok: false,
+      note: 'POLICY_BLOCKED: external WinGet uninstall cannot guarantee user-asset preservation for the lifetime of the uninstaller; retain provider and require manual intervention',
+      noEffect: true,
+      refusalTerminal: 'REFUSED',
+    };
+  }
 
   async #perform(action: { op: string; parameters: Record<string, unknown> }): Promise<{
     ok: boolean;
@@ -292,24 +312,13 @@ export class WingetPrivilegedBackend extends LocalPrivilegedBackend {
       return { ok: false, note: 'plan parameters lack packageId/version' };
     }
     if (action.op === 'software.uninstall') {
-      // VJ-P1-01 R5 security gate. An external winget uninstaller controls
-      // its own deletion traversal for the ENTIRE lifetime of process.run.
-      // A point-in-time manifest census cannot prevent another process from
-      // placing user-owned files immediately after the census or during the
-      // uninstaller's minutes-long execution. The manifest's existence or a
-      // clean pre-spawn scope is NOT proof of exclusive write authority.
-      //
-      // Until a trusted manifest-bound removal mechanism or enforceable
-      // lifetime-wide exclusion is implemented, refuse this backend's raw
-      // external uninstall unconditionally. The provider remains installed;
-      // no process is spawned, no removal/REMOVED claim is permitted.
-      // The in-process manifest-restricted MemoryCatalog is a different
-      // destructive owner and remains usable for its tested bounded path.
+      // Defense in depth: the trusted preflight above should have refused
+      // before EXEC_START. If composition ever bypasses that preflight, do
+      // NOT execute the external remover; return an uncertain failed effect
+      // window rather than falsely claiming NOT_STARTED after EXEC_START.
       return {
         ok: false,
-        note: 'POLICY_BLOCKED: external WinGet uninstall cannot guarantee user-asset preservation for the lifetime of the uninstaller; retain provider and require manual intervention',
-        noEffect: true,
-        refusalTerminal: 'REFUSED',
+        note: 'internal safety invariant: external WinGet uninstall reached perform after mandatory preflight',
       };
     }
     const argv =
