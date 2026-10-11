@@ -182,9 +182,9 @@ export class PrivilegedWindowsExecutionBackend implements ExecutionBackend {
       // caller who somehow learns the symmetric HMAC key cannot mint a new
       // privileged presentation unless the exact grant record was first
       // committed by the elevated-only anchor writer.
-      const storedGrant = new FileGrantSource(
-        join(this.options.authorityDir, 'grants'),
-      ).byGrantId(action.authorizationRef);
+      const storedGrant = new FileGrantSource(join(this.options.authorityDir, 'grants')).byGrantId(
+        action.authorizationRef,
+      );
       if (!storedGrant) {
         return await launchRefused(
           `grant ${action.authorizationRef} is absent from the protected authority store`,
