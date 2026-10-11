@@ -371,8 +371,7 @@ export class WingetPrivilegedBackend extends LocalPrivilegedBackend {
       return {
         ok: false,
         exitCode: result.exitCode,
-        note: `${note} elevation-required`,
-        noEffect: true,
+        note: `${note} elevation-required (external installer was invoked; no zero-effect claim)`,
       };
     }
     if (
