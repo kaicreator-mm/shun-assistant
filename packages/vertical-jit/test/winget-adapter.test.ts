@@ -172,7 +172,7 @@ describe('WingetAcquisition — observed layout', () => {
 });
 
 describe('WingetPrivilegedBackend — elevation refusal', () => {
-  it('maps a declined elevation to terminal UAC_DECLINED with NOT_STARTED recovery', async () => {
+  it('does not fabricate UAC decline or zero-effect proof from external installer stderr', async () => {
     const authority = new LocalAuthority({ now: () => '2026-10-10T08:00:00.000Z' });
     const journals = new Map<string, MemoryJournal>();
     const journalsFor = (actionId: string) => {
@@ -254,9 +254,11 @@ describe('WingetPrivilegedBackend — elevation refusal', () => {
       grant,
     );
 
-    expect(receipt.terminal).toBe('UAC_DECLINED');
-    expect(receipt.sideEffectEvidence.recoveryClassification).toBe('NOT_STARTED');
+    expect(receipt.terminal).toBe('FAILED');
+    expect(receipt.sideEffectEvidence.recoveryClassification).toBe('MAY_HAVE_EXECUTED_UNCERTAIN');
     const entries = await journalsFor('a1-install').replay();
-    expect(entries.some((entry) => entry.detail?.startsWith('NO_EFFECT:'))).toBe(true);
+    expect(entries.some((entry) => entry.detail?.startsWith('NO_EFFECT:'))).toBe(false);
+    expect(entries.some((entry) => entry.phase === 'EXEC_START')).toBe(true);
+    expect(entries.some((entry) => entry.phase === 'EXEC_DONE')).toBe(true);
   });
 });
