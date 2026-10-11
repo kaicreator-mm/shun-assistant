@@ -30,6 +30,7 @@ import {
   ExecutionReceiptSchema,
   validateGrantPresentation,
 } from '@shun/contracts';
+import { assessAnchorOwnership } from '../anchor-protection.ts';
 import { checkStepSurface, resolveActionStep } from '../action-surface.ts';
 import { isElevatedToken } from '../elevation.ts';
 import {
@@ -154,6 +155,22 @@ class Helper {
       );
       return HELPER_EXIT_CODES.REFUSED;
     }
+    // C06 R5: the elevated helper cannot repeat the filtered-token
+    // writability/readability probes (its admin token is expected to write and
+    // read the key), but it CAN independently reject ACL theater by requiring
+    // every authority object to be owned by Administrators/SYSTEM. This check
+    // is pre-journal and uses the pinned real system PowerShell.
+    const ownership = assessAnchorOwnership(
+      authorityDirectory(),
+      resolveGrantHmacKeyFile(authorityDirectory(), grantHmacKeyFileOverride()),
+    );
+    if (ownership.length > 0) {
+      process.stderr.write(
+        `authorization anchor ownership rejected: ${ownership.join('; ')}\n`,
+      );
+      return HELPER_EXIT_CODES.REFUSED;
+    }
+
     // N-2: the program of a windows.proc.exec step is part of the trusted
     // identity chain too — the plan hash binds only its PATH string, so the
     // launcher preflights its BYTES into an authority program pin and this
