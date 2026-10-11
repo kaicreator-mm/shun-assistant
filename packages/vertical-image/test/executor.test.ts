@@ -280,8 +280,153 @@ describe('runImageBatchProcess — per-record failures', () => {
     expect(result.output.records.filter((r) => r.status === 'WRITTEN')).toHaveLength(4);
   });
 
-  it('marks PNG records UNSUPPORTED_INPUT when no provider covers PNG', async () => {
-    const limited: BindingView = {
+  it('never falls back to an unregistered provider for an uncovered format (VI-P0-02)', async () => {
+    const trustedJpgOnly: BindingView = {
+      bindingId: 'binding-jpg-only-trusted',
+      providerId: 'provider-jpg-only',
+      providerVersion: '0.0.1',
+      adapterId: 'adapter-jpg-only',
+      interfaceClass: 'I1',
+      verifierId: 'verifier.image-c001',
+      environmentRequirements: { backendKind: 'LOCAL_WINDOWS' },
+      unsupportedFormats: ['PNG'],
+    };
+    const rogue: BindingView = {
+      ...trustedJpgOnly,
+      bindingId: 'binding-rogue-unregistered',
+      unsupportedFormats: [],
+    };
+    let rogueCalls = 0;
+    const rogueProvider: ImageProvider = {
+      binding: rogue,
+      async resizeTo() {
+        rogueCalls += 1;
+        throw new Error('rogue provider must never be invoked');
+      },
+    };
+    const jpg = await src.write(
+      'ok.jpg',
+      await jpegBytes({ width: 600, height: 400, seed: 171 }),
+    );
+    const png = await src.write('ok.png', await pngBytes({ width: 600, height: 400, seed: 172 }));
+    const result = await runImageBatchProcess(
+      input([
+        { path: jpg, format: 'JPG' },
+        { path: png, format: 'PNG' },
+      ]),
+      {
+        facts: testFacts(),
+        providers: [makeSharpImageProvider(trustedJpgOnly), rogueProvider],
+        // Only the trusted binding is a registered candidate; the rogue is
+        // deliberately absent from the candidate set.
+        candidates: [{ binding: trustedJpgOnly, registered: true }],
+      },
+    );
+    expect(result.ok).toBe(true);
+    expect(rogueCalls).toBe(0);
+    if (!result.ok) {
+      return;
+    }
+    const byPath = new Map(result.output.records.map((r) => [r.inputPath, r]));
+    expect(byPath.get(jpg)?.status).toBe('WRITTEN');
+    expect(byPath.get(png)?.rejectionCode).toBe('UNSUPPORTED_INPUT');
+  });
+
+  it('never falls back to a registered-but-infeasible provider for an uncovered format (VI-P0-02)', async () => {
+    const trustedJpgOnly: BindingView = {
+      bindingId: 'binding-jpg-only-trusted',
+      providerId: 'provider-jpg-only',
+      providerVersion: '0.0.1',
+      adapterId: 'adapter-jpg-only',
+      interfaceClass: 'I1',
+      verifierId: 'verifier.image-c001',
+      environmentRequirements: { backendKind: 'LOCAL_WINDOWS' },
+      unsupportedFormats: ['PNG'],
+    };
+    const infeasible: BindingView = {
+      ...trustedJpgOnly,
+      bindingId: 'binding-rogue-infeasible',
+      unsupportedFormats: [],
+      environmentRequirements: { backendKind: 'LOCAL_POSIX' },
+    };
+    let infeasibleCalls = 0;
+    const infeasibleProvider: ImageProvider = {
+      binding: infeasible,
+      async resizeTo() {
+        infeasibleCalls += 1;
+        throw new Error('infeasible provider must never be invoked');
+      },
+    };
+    const jpg = await src.write(
+      'ok.jpg',
+      await jpegBytes({ width: 600, height: 400, seed: 173 }),
+    );
+    const png = await src.write('ok.png', await pngBytes({ width: 600, height: 400, seed: 174 }));
+    const result = await runImageBatchProcess(
+      input([
+        { path: jpg, format: 'JPG' },
+        { path: png, format: 'PNG' },
+      ]),
+      {
+        facts: testFacts(),
+        providers: [makeSharpImageProvider(trustedJpgOnly), infeasibleProvider],
+        candidates: [
+          { binding: trustedJpgOnly, registered: true },
+          { binding: infeasible, registered: true },
+        ],
+      },
+    );
+    expect(result.ok).toBe(true);
+    expect(infeasibleCalls).toBe(0);
+    if (!result.ok) {
+      return;
+    }
+    const byPath = new Map(result.output.records.map((r) => [r.inputPath, r]));
+    expect(byPath.get(png)?.rejectionCode).toBe('UNSUPPORTED_INPUT');
+  });
+
+  it('records the real executing binding when a registered feasible fallback is used (VI-P0-02)', async () => {
+    const jpgOnly: BindingView = {
+      bindingId: 'binding-jpg-only',
+      providerId: 'provider-jpg-only',
+      providerVersion: '0.0.1',
+      adapterId: 'adapter-jpg-only',
+      interfaceClass: 'I0',
+      verifierId: 'verifier.image-c001',
+      environmentRequirements: { backendKind: 'LOCAL_WINDOWS' },
+      unsupportedFormats: ['PNG'],
+    };
+    const pngOnly: BindingView = {
+      ...jpgOnly,
+      bindingId: 'binding-png-only',
+      unsupportedFormats: ['JPG'],
+    };
+    const files = await standardBatch();
+    const result = await runImageBatchProcess(input(files), {
+      facts: testFacts(),
+      providers: [makeSharpImageProvider(jpgOnly), makeSharpImageProvider(pngOnly)],
+      candidates: [
+        { binding: jpgOnly, registered: true },
+        { binding: pngOnly, registered: true },
+      ],
+    });
+    expect(result.ok).toBe(true);
+    if (!result.ok) {
+      return;
+    }
+    // Neither binding covers the whole batch, so the I0 jpg-only binding is
+    // selected and PNG records must route to the registered feasible png-only
+    // binding — never to an arbitrary provider.
+    expect(result.output.selectedBindingId).toBe('binding-jpg-only');
+    const byPath = new Map(result.output.records.map((r) => [r.inputPath, r]));
+    expect(byPath.get(files[0]?.path ?? '')?.status).toBe('WRITTEN');
+    const pngRecord = byPath.get(files[2]?.path ?? '');
+    expect(pngRecord?.status).toBe('WRITTEN');
+    // The receipt must disclose the binding that actually executed the record.
+    expect(result.diagnostics[pngRecord?.inputPath ?? '']).toContain('binding-png-only');
+  });
+
+  it('marks PNG records UNSUPPORTED_INPUT when no provider covers PNG', async () => {    const limited: BindingView = {
       bindingId: 'binding-jpg-only',
       providerId: 'provider-jpg-only',
       providerVersion: '0.0.1',
