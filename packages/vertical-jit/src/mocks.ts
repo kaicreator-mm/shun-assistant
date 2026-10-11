@@ -243,7 +243,8 @@ export class MemoryAcquisition implements AcquisitionPort {
       installerSha256: entry.installerSha256,
       publisher: entry.publisher,
       license: entry.license,
-      signature: `authenticode:${entry.publisher}`,
+      // VJ-P2-05: the memory harness mirrors the real adapter — no
+      // fabricated signature claim without independent verification.
     };
   }
 

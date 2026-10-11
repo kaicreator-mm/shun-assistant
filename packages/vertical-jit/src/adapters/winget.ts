@@ -157,7 +157,10 @@ export class WingetAcquisition implements AcquisitionPort {
         : {}),
       ...(publisher ? { publisher } : {}),
       ...(fields.license ? { license: fields.license } : {}),
-      ...(publisher ? { signature: `authenticode:${publisher}` } : {}),
+      // VJ-P2-05: the publisher string is UNVERIFIED text output. A
+      // signature claim ("authenticode:…") may only be recorded after an
+      // independent Authenticode verification, which this adapter does not
+      // perform — so no signature field is fabricated here.
     };
   }
 
