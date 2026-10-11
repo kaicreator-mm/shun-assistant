@@ -130,7 +130,9 @@ describe.skipIf(!ON_WINDOWS)(
       if (dir?.startsWith(tmpdir())) rmSync(dir, { recursive: true, force: true });
     });
 
-    it('spawnRelay runs the relay with a sterilized environment (NODE_OPTIONS/NODE_PATH have no carrier)', async () => {
+    it('spawnRelay runs the relay with a sterilized environment (NODE_OPTIONS/NODE_PATH have no carrier)', {
+      timeout: 120000,
+    }, async () => {
       expect(existsSync(machinePowershell)).toBe(true);
       dir = mkdtempSync(join(tmpdir(), 'shun-envrelay-'));
       relayScript = join(dir, 'probe-relay.ps1');
@@ -154,9 +156,9 @@ describe.skipIf(!ON_WINDOWS)(
         helperBundle: join(dir, 'unused-bundle.mjs'),
         helperArgs: [probeFile],
         relayFile: join(dir, 'relay.json'),
-        timeoutMs: 30000,
+        timeoutMs: 60000,
       });
-      expect(result.kind).toBe('RAN');
+      expect(result, `relay result: ${JSON.stringify(result)}`).toMatchObject({ kind: 'RAN' });
       expect(existsSync(probeFile)).toBe(true);
       const observed = JSON.parse(readFileSync(probeFile, 'utf8')) as string[];
       expect(observed).toEqual([]);

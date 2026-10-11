@@ -487,6 +487,28 @@ type RelayResult = {
   timedOut?: boolean;
 };
 
+/**
+ * Bounded stdio capture: the relay's console text is intentionally NOT a
+ * structured channel (§8.2.1), but its tail is diagnostic gold when the
+ * relay process never exits or never writes its relay file — keep the last
+ * few KiB, never the whole stream.
+ */
+function stdioTail(): { push(chunk: Buffer | string): void; tail(): string | undefined } {
+  const decoder = new TextDecoder('utf8', { fatal: false });
+  let buffered = '';
+  return {
+    push(chunk: Buffer | string): void {
+      buffered = (buffered + (typeof chunk === 'string' ? chunk : decoder.decode(chunk))).slice(
+        -8192,
+      );
+    },
+    tail(): string | undefined {
+      const t = buffered.trim();
+      return t.length > 0 ? t.slice(-2048) : undefined;
+    },
+  };
+}
+
 // Exported for the N-R2-1 negative controls (test/evidence tooling): the
 // privileged-path relay spawn must demonstrably carry a sterilized
 // environment. Security callers still enter through PrivilegedWindowsExecutionBackend.
@@ -507,6 +529,8 @@ export async function spawnRelay(params: {
   // before any self-check. Both spawns below (relay + tree-kill) pass the
   // explicit minimal environment; the pinned relay re-scrubs on top.
   const sterileEnv = privilegedSpawnEnv();
+  const stdout = stdioTail();
+  const stderr = stdioTail();
   const child = spawn(
     params.powershellExe,
     [
@@ -527,6 +551,8 @@ export async function spawnRelay(params: {
     ],
     { shell: false, windowsHide: true, env: sterileEnv },
   );
+  child.stdout?.on('data', (c: Buffer) => stdout.push(c));
+  child.stderr?.on('data', (c: Buffer) => stderr.push(c));
   params.onRelayPid?.(child.pid ?? -1);
   return new Promise((resolve) => {
     let timedOut = false;
@@ -557,12 +583,13 @@ export async function spawnRelay(params: {
       } catch {
         relay = undefined;
       }
+      const diagnostics = [stderr.tail(), stdout.tail()].filter((t) => t !== undefined).join(' | ');
       if (timedOut && !relay) {
-        resolve({ kind: 'TIMED_OUT', timedOut });
+        resolve({ kind: 'TIMED_OUT', timedOut, error: diagnostics || undefined });
         return;
       }
       if (!relay) {
-        resolve({ kind: 'NO_RELAY', timedOut });
+        resolve({ kind: 'NO_RELAY', timedOut, error: diagnostics || undefined });
         return;
       }
       if (relay.kind === 'UAC_DECLINED') {

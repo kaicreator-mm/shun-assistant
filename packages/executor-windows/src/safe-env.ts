@@ -24,6 +24,10 @@
 // interpreted as code or module resolution by the elevated node interpreter
 // (NODE_OPTIONS/NODE_PATH and friends are structurally excluded: any key
 // matching /^node$/i is dropped even if a future edit adds it to the list).
+// PSModulePath is deliberately NOT on the list for the same reason: it is a
+// module-auto-load vector for the PowerShell relay itself, and the relay
+// needs no autoloaded cmdlets (built-ins resolve from the WindowsPowerShell
+// install directory without it).
 
 const PRIVILEGED_ENV_ALLOWLIST: readonly string[] = [
   // Windows CRT / .NET initialization (PowerShell fails to start without
@@ -35,13 +39,28 @@ const PRIVILEGED_ENV_ALLOWLIST: readonly string[] = [
   'PATHEXT',
   'PATH',
   'Path',
-  // Temp resolution for the relay/child (PS writes, .NET temp).
+  // Temp + per-machine/per-user data roots PowerShell and .NET consult at
+  // initialization (their ABSENCE has been observed to stall PowerShell
+  // startup on CI runners; their VALUES are inert OS configuration for the
+  // child — no name on this list is a code-loading directive for the pinned
+  // node interpreter).
   'TEMP',
   'TMP',
+  'APPDATA',
+  'LOCALAPPDATA',
+  'ALLUSERSPROFILE',
+  'PROGRAMDATA',
+  'PROGRAMFILES',
+  'ProgramFiles(x86)',
+  'ProgramW6432',
+  'COMMONPROGRAMFILES',
+  'CommonProgramFiles(x86)',
+  'DriverData',
   // Inert OS facts some runtimes consult at init.
   'OS',
   'NUMBER_OF_PROCESSORS',
   'PROCESSOR_ARCHITECTURE',
+  'PROCESSOR_ARCHITEW6432',
   'PROCESSOR_IDENTIFIER',
   'PROCESSOR_LEVEL',
   'PROCESSOR_REVISION',
@@ -52,6 +71,7 @@ const PRIVILEGED_ENV_ALLOWLIST: readonly string[] = [
   'USERPROFILE',
   'HOMEDRIVE',
   'HOMEPATH',
+  'SESSIONNAME',
 ];
 
 /**
