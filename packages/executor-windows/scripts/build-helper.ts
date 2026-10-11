@@ -46,6 +46,7 @@ await build({
   define: {
     SHUN_EXECUTOR_AUTHORITY_DIR: JSON.stringify(authorityDir),
     SHUN_EXECUTOR_HMAC_KEY_FILE: JSON.stringify(hmacKeyFile),
+    SHUN_EXECUTOR_REQUIRE_PROTECTED_OWNER: 'true',
   },
   banner: {
     // `import.meta.url` is preserved by esbuild; nothing else needed. The
