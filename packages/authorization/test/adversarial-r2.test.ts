@@ -48,6 +48,7 @@ function authorityOn(
     grants,
     integritySecret: 'test-authority-secret',
     issuanceSecret: ISSUANCE_SECRET,
+    bootstrapAuthorizer: ({ proof }) => proof === 'trusted-one-shot-bootstrap',
     clock: clock.now,
   });
   return { authority, grants, clock };
@@ -114,10 +115,13 @@ describe('P1-A: grant records prove prior policy existence — unmarked loss is 
     expect((state.policySlot as PolicySnapshotRecord | undefined) ?? null).toBeNull();
   });
 
-  it('a virgin store without grants and without the marker still bootstraps (positive control)', async () => {
+  it('a virgin store bootstraps only through the explicit trusted ceremony (positive control)', async () => {
     const state = memoryPolicyState({ authority: AUTHORITY });
     const { authority } = authorityOn(state);
-    await authority.adoptPolicy({ policySnapshotRevision: POLICY_REVISION, rules: [] });
+    await authority.bootstrapPolicy(
+      { policySnapshotRevision: POLICY_REVISION, rules: [] },
+      'trusted-one-shot-bootstrap',
+    );
     expect(await authority.currentAuthority()).toMatchObject({
       kind: 'CURRENT',
       policySnapshotRevision: POLICY_REVISION,
