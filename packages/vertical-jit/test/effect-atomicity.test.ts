@@ -127,6 +127,48 @@ describe('post-recensus trace-callback injection (VJ-P1-01 R4 window 1)', () => 
   });
 });
 
+describe('R7: one refusal has one durable recovery classification', () => {
+  it('backend receipt, latest journal attempt and lifecycle error agree on failed-before-effect', async () => {
+    const harness = buildHarness({ approvalMode: 'approve' });
+    installWorld(harness);
+    const baseTrace = harness.deps.trace;
+    const innerBackend = harness.deps.privileged;
+    const receipts: Awaited<ReturnType<typeof innerBackend.execute>>[] = [];
+    const deps = withDeps(harness, {
+      trace: (event) => {
+        baseTrace?.(event);
+        if (event.kind === 'R2_RECENSUS') plantLateUserAsset(harness);
+      },
+      privileged: {
+        execute: async (...args: Parameters<typeof innerBackend.execute>) => {
+          const receipt = await innerBackend.execute(...args);
+          if (args[0].action.op === 'software.uninstall') receipts.push(receipt);
+          return receipt;
+        },
+      },
+    });
+
+    const error = await runJitLifecycle(REMOVE_INPUT, deps).catch((caught: unknown) => caught);
+    expect(error).toMatchObject({
+      code: 'REMOVE_FAILED',
+      recovery: { recoveryClassification: 'FAILED_BEFORE_EFFECT' },
+    });
+    expect(receipts).toHaveLength(1);
+    expect(receipts[0]).toMatchObject({
+      terminal: 'REFUSED',
+      sideEffectEvidence: {
+        recoveryClassification: 'FAILED_BEFORE_EFFECT',
+        postStateVerified: false,
+      },
+    });
+    const entries = await harness.deps.journals(UNINSTALL_ACTION_ID).replay();
+    expect(classifyFromJournal(entries, UNINSTALL_ACTION_ID)).toBe('FAILED_BEFORE_EFFECT');
+    expect(entries.some((entry) => entry.detail?.startsWith('NO_EFFECT:'))).toBe(true);
+    expect(await harness.fs.readText(LATE_USER_FILE)).toBe(LATE_USER_CONTENT);
+    await assertNoRemovedClaim(harness);
+  });
+});
+
 describe('issueGrant async-window injection (VJ-P1-01 R4 window 2)', () => {
   it('explicit approval: an asset planted while the uninstall grant is issued survives byte-exact and no REMOVED is claimed', async () => {
     const harness = buildHarness({ approvalMode: 'approve' });
