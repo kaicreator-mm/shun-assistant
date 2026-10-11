@@ -3,6 +3,25 @@
 // are exported: EnvironmentBackend, ExecutionBackend, and the recovery/
 // journaling machinery the §9.4 classification is built on.
 
+export type { ApplyContext, ApplyResult, WriterRefusalCode } from './authority-writer/apply.ts';
+export { applyWriterJob, verifyWriterIdentity } from './authority-writer/apply.ts';
+export type {
+  AnchorWriterLaunchOptions,
+  AnchorWriterLaunchResult,
+} from './authority-writer/launcher.ts';
+export { launchAnchorWriterJob } from './authority-writer/launcher.ts';
+export type {
+  PolicyWindow,
+  PolicyWindowScopeBudget,
+  WriterJob,
+  WriterJobInput,
+} from './authority-writer/job.ts';
+export {
+  PolicyWindowSchema,
+  PolicyWindowScopeBudgetSchema,
+  signWriterJob,
+  WriterJobSchema,
+} from './authority-writer/job.ts';
 export { ACTION_ID_PATTERN, ActionIdRefusedError, assertSafeActionId } from './action-id.ts';
 export type { LocalWindowsBackendOptions } from './backend.ts';
 export { LocalWindowsBackend, PROVIDER_ID, PROVIDER_VERSION } from './backend.ts';
@@ -69,7 +88,7 @@ export {
 } from './privileged-backend.ts';
 export type { ClassificationInput, ClassificationResult, PostStateOutcome } from './recovery.ts';
 export { classifyRecovery, terminalForClassification } from './recovery.ts';
-export type { HelperPin, ProgramPin, SystemToolsPin } from './trusted-store.ts';
+export type { HelperPin, ProgramPin, SystemToolsPin, WriterPin } from './trusted-store.ts';
 export {
   FileCurrentnessSource,
   FileGrantSource,
@@ -83,8 +102,11 @@ export {
   readHelperPin,
   readProgramPin,
   readSystemToolsPin,
+  readWriterPin,
   resolveGrantHmacKeyFile,
   SYSTEM_TOOLS_PIN_SCHEMA_VERSION,
+  WRITER_PIN_SCHEMA_VERSION,
+  WriterPinSchema,
   SystemToolsPinSchema,
   sha256File,
   sha256Text,
@@ -96,4 +118,5 @@ export {
   writePlanRecord,
   writeProgramPin,
   writeSystemToolsPin,
+  writeWriterPin,
 } from './trusted-store.ts';
