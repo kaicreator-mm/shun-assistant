@@ -211,6 +211,7 @@ export class LocalPrivilegedBackend implements ExecutionBackend {
         ts: this.#deps.clock(),
         phase: 'RECEIPT_WRITTEN',
         actionId: action.actionId,
+        attemptId,
       });
       return this.#receipt(
         action,

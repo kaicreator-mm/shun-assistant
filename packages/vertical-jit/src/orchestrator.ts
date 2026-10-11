@@ -761,8 +761,18 @@ async function runRemovalGate(
     approvalRef = `approval://${decision.approvalId}`;
   }
 
-  // (5) EXECUTE — bounded removal through the privileged boundary only,
-  // with reconcile-first recovery on uncertain interruption (L2 §9.4).
+  // Effect-boundary strict re-census (VJ-P1-01 post-preview race): the
+  // preview census is a PRE-approval snapshot; anything planted during the
+  // async approval wait — or between preview and effect under a durable
+  // policy — is invisible to it, and the whole-root uninstaller would
+  // destroy it while the lifecycle reported REMOVED. Immediately before the
+  // privileged effect, re-enumerate BOTH deletion-scope root kinds
+  // (install + cache) and classify strictly against the install-time owned
+  // manifest. Any newly appeared unknown/protected asset refuses the effect
+  // with zero deletions (an unrecorded reparse point or mutable drop is
+  // exactly such an unknown — it can never be manifest-recorded).
+  await assertRemovalScopeAtEffectBoundary(deps, layout, ownedManifest);
+  trace(deps, 'R2_RECENSUS', 'removal scope re-validated at the effect boundary');
   let run = await runPrivileged(deps, {
     taskId: input.taskId,
     plan: uninstallPlan,
@@ -784,6 +794,10 @@ async function runRemovalGate(
         'R2_RECONCILE',
         'uncertain interrupted; provider still present — retry SAME actionId',
       );
+      // The retry is a NEW privileged effect: the same post-preview race
+      // applies to the window the first attempt opened, so the removal scope
+      // is re-censused again before the retry executes.
+      await assertRemovalScopeAtEffectBoundary(deps, layout, ownedManifest);
       run = await runPrivileged(deps, {
         taskId: input.taskId,
         plan: uninstallPlan,
@@ -915,6 +929,53 @@ async function collectCandidates(
     observed.push(...(await treeUnder(deps, root)));
   }
   return observed;
+}
+
+/**
+ * Fail-closed re-census of the deletion scope at the privileged effect
+ * boundary (VJ-P1-01 post-preview race). The preview census is a snapshot
+ * taken before the approval surface is consulted; the approval wait (or the
+ * preview→effect gap under a durable policy) is unbounded real time, and a
+ * whole-root uninstaller destroys everything inside the scope — including a
+ * user asset planted into that gap, which the snapshot never saw. Before the
+ * effect runs, BOTH root kinds (install + cache) are re-enumerated and
+ * classified STRICTLY against the install-time owned manifest: any path that
+ * is present now but not census-recorded is USER_CREATED_UNKNOWN, and any
+ * protected-root content is PROTECTED — either one refuses the removal with
+ * zero deletions. There is no depth cap and the walk is cycle-guarded, so a
+ * planted reparse point or directory junction is traversed and its content
+ * enumerated (as unknown when unrecorded) rather than silently skipped.
+ */
+async function assertRemovalScopeAtEffectBoundary(
+  deps: JitLifecycleDeps,
+  layout: ProviderInstallLayout,
+  ownedManifest: readonly string[],
+): Promise<void> {
+  const observed: string[] = [];
+  for (const root of [...layout.installDirs, ...layout.cacheDirs]) {
+    observed.push(root);
+    observed.push(...(await treeUnder(deps, root)));
+  }
+  const reCensus = classifyResidue({
+    layout,
+    observed,
+    protectedRoots: deps.policy.protectedRoots,
+    providerOwnedFiles: ownedManifest,
+  });
+  const atRisk = reCensus.filter(
+    (candidate) =>
+      candidate.disposition === 'RETAIN' &&
+      (candidate.classification === 'USER_CREATED_UNKNOWN' ||
+        candidate.classification === 'PROTECTED'),
+  );
+  if (atRisk.length > 0) {
+    throw new JitLifecycleError(
+      'USER_ASSET_AT_RISK',
+      `effect-boundary re-census blocked the removal: assets inside the deletion scope were never census-recorded by the install (planted after the preview snapshot) and must be resolved by a human first: ${atRisk
+        .map((candidate) => candidate.path)
+        .join(', ')}`,
+    );
+  }
 }
 
 function joinPath(root: string, child: string): string {

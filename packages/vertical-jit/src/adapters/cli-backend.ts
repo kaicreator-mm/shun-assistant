@@ -148,8 +148,21 @@ export class CliTaskBackend implements EnvironmentBackend {
     if (canonicalJson(planned) !== canonicalJson(action.action)) {
       return 'presented action body does not match the trusted plan ledger';
     }
-    if (action.expiresAt !== undefined && action.expiresAt <= this.#deps.clock()) {
-      return `authorization window expired at ${action.expiresAt}`;
+    if (action.expiresAt !== undefined) {
+      // Real time semantics (matching the contract's grant validation, which
+      // compares parsed instants): an ISO string with a timezone offset is
+      // evaluated at its true instant, never by lexicographic string order —
+      // '…T09:00:00.000+02:00' is 07:00Z and sorts AFTER '…T08:00:00.000Z'
+      // while being one hour in the past. Unparseable instants fail closed:
+      // an expiry this backend cannot interpret authorizes nothing.
+      const expiresMs = Date.parse(action.expiresAt);
+      const nowMs = Date.parse(this.#deps.clock());
+      if (Number.isNaN(expiresMs)) {
+        return `authorization window expiry "${action.expiresAt}" is not a parseable timestamp — refusing fail-closed`;
+      }
+      if (Number.isNaN(nowMs) || expiresMs <= nowMs) {
+        return `authorization window expired at ${action.expiresAt}`;
+      }
     }
     return undefined;
   }
