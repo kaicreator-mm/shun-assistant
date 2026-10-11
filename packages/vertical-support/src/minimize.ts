@@ -1,8 +1,8 @@
 import {
   type RedactionRecord,
+  type SupportContextResult,
   SupportContextResultSchema,
   SupportObservationSchema,
-  type SupportContextResult,
 } from './schema.ts';
 
 const REDACTED = '[REDACTED]' as const;
