@@ -14,5 +14,4 @@ export {
   SupportObservationSchema,
   SupportReportSchema,
 } from './schema.ts';
-export type { WindowsCollectorDeps } from './windows.ts';
 export { collectWindowsSupportContext } from './windows.ts';
