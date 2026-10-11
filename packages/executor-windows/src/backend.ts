@@ -61,6 +61,12 @@ export interface LocalWindowsBackendOptions {
    * protected location). Unset = the key resolves inside the authority store.
    */
   grantHmacKeyFile?: string;
+  /**
+   * Content-addressed ActionPlan ledger. Plans are NOT signing authority:
+   * planHash is recomputed by validateGrantPresentation and bound by the
+   * protected grant, so this cache may remain runtime-writable.
+   */
+  planDir?: string;
   /** Root for per-action journals/evidence; also the disk-free probe root. */
   workspaceRoot: string;
   defaultTimeoutMs?: number;
@@ -191,9 +197,9 @@ export class LocalWindowsBackend implements EnvironmentBackend {
       );
       if (!grant)
         return refused(`grant ${action.authorizationRef} not found in the authority store`);
-      const plan = new FilePlanSource(join(this.options.authorityDir, 'plans')).byPlanHash(
-        action.planHash,
-      );
+      const plan = new FilePlanSource(
+        this.options.planDir ?? join(this.options.authorityDir, 'plans'),
+      ).byPlanHash(action.planHash);
       if (!plan) return refused(`plan ${action.planHash} not found in the authority store`);
       const currentness = new FileCurrentnessSource(
         join(this.options.authorityDir, 'current-authority.json'),
