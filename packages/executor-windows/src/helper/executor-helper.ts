@@ -170,12 +170,11 @@ class Helper {
     }
 
     // N-2: the program of a windows.proc.exec step is part of the trusted
-    // identity chain too — the plan hash binds only its PATH string, so the
-    // launcher preflights its BYTES into an authority program pin and this
-    // boundary RE-MEASURES pre-journal: no pin (unpinned) or bytes replaced
-    // after pinning refuse with NOTHING written. The measured identity is
-    // carried into the EXEC_START journal evidence. Honest boundary: bytes
-    // swapped before the launcher preflight are pinned AS-SWAPPED — that
+    // identity chain too — the plan hash binds only its PATH string. A
+    // trusted provisioning/authority event pins its BYTES; the runtime
+    // launcher is verify-only and this boundary RE-MEASURES pre-journal.
+    // No pin or bytes replaced after provisioning refuse with NOTHING
+    // written. The measured identity is carried into EXEC_START evidence.nned AS-SWAPPED — that
     // same-user race is the C06 open boundary.
     const preflightStep = resolveActionStep(this.envelope.action);
     if (preflightStep?.op === 'windows.proc.exec') {
