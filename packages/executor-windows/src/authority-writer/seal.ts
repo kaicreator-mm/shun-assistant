@@ -11,14 +11,9 @@ import {
   WriterJobProposalSchema,
 } from './job.ts';
 
-export type SealWriterJobResult =
-  | { ok: true; job: WriterJob }
-  | { ok: false; reason: string };
+export type SealWriterJobResult = { ok: true; job: WriterJob } | { ok: false; reason: string };
 
-export function sealWriterJobProposal(
-  keyBase64: string,
-  proposal: unknown,
-): SealWriterJobResult {
+export function sealWriterJobProposal(keyBase64: string, proposal: unknown): SealWriterJobResult {
   const parsed = WriterJobProposalSchema.safeParse(proposal);
   if (!parsed.success) {
     return { ok: false, reason: `writer proposal rejected: ${parsed.error.message}` };
