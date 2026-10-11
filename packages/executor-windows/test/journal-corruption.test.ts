@@ -60,6 +60,26 @@ describe('journal replay — torn tail vs corrupt line (C16)', () => {
     expect(events.filter(isTorn)).toHaveLength(0);
   });
 
+  it('N-3: a JSON-COMPLETE schema-invalid final line WITHOUT a newline is corrupt, not torn', () => {
+    // The crash-shape exception exists for a physically truncated WRITE, which
+    // cannot produce well-formed JSON. A complete JSON document that merely
+    // violates the event schema is a whole crafted record — doctored content,
+    // and its unterminated form only means the tamperer skipped the trailing
+    // byte. It must be corrupt (fail closed), never swallowed as a torn tail.
+    const file = journalWith((w) => {
+      w.append('RECEIVED');
+      w.appendTornForTest(
+        '{"schemaVersion":"evil.attacker/1","ts":"x","pid":1,"phase":"RECEIPT_WRITTEN"}', // NO trailing newline
+      );
+    });
+    const events = readJournal(file);
+    expect(events.filter(isCorrupt)).toHaveLength(1);
+    expect(events.filter(isTorn)).toHaveLength(0);
+    const r = classifyRecovery({ journal: events });
+    expect(r.recoveryClassification).toBe('MAY_HAVE_EXECUTED_UNCERTAIN');
+    expect(r.basis).toContain('integrity');
+  });
+
   it('digest covers corrupt lines distinctly from torn ones', () => {
     const corrupt = journalWith((w) => {
       w.append('RECEIVED');

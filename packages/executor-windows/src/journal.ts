@@ -139,6 +139,15 @@ export function appendFileSyncDurable(file: string, text: string): void {
  * Write a complete file behind a durable barrier (fsync before close). Used
  * for the helper's receipt tmp file so the subsequent atomic rename cannot
  * publish content that exists only in the page cache.
+ *
+ * N-4 (honest platform limit): the RENAME itself has no persistence barrier —
+ * Windows/Node cannot fsync a directory, so a crash/power-loss between the
+ * rename and the next durable journal event can still lose the receipt file
+ * even though its content was fsynced. The recovery authority is deliberately
+ * ordered around this: the helper appends RECEIPT_WRITTEN to the journal ONLY
+ * AFTER the rename (executor-helper writeReceipt), so a lost receipt file is
+ * classified by the journal alone (C09: effect window closed + receipt ABSENT
+ * → MAY_HAVE_EXECUTED_UNCERTAIN, never a fabricated terminal).
  */
 export function durableWriteFileSync(file: string, text: string): void {
   const fd = openSync(file, 'w');
@@ -169,20 +178,27 @@ export function readJournal(file: string): ReplayEvent[] {
   for (let i = 0; i < lines.length; i++) {
     const line = lines[i];
     if (line === undefined || line.trim().length === 0) continue;
+    // N-3: JSON syntax failure and schema violation are SEPARATE verdicts.
+    // Torn-tail tolerance exists for a physically truncated WRITE (a crash
+    // mid-append can only cut bytes, so the survivor is syntactically broken
+    // JSON on the unterminated final line). A line that parses as JSON but
+    // violates the event schema is a WHOLE crafted record — even when it is
+    // the final, unterminated line — and is always corruption/tampering.
+    let parsed: unknown;
     try {
-      events.push(JournalEventSchema.parse(JSON.parse(line)));
+      parsed = JSON.parse(line);
     } catch {
-      // Torn-tail tolerance is limited to a PHYSICALLY INCOMPLETE final
-      // append (C16): the journal writer emits each event as one
-      // write+fsync of `line + '\n'`, so a crash can only truncate the final
-      // append (bytes missing → no trailing newline). Anything else —
-      // malformed bytes mid-file, or a newline-terminated line that parses
-      // as JSON but violates the event schema — is corruption/tampering.
       const physicallyIncompleteFinal = i === lines.length - 1 && !endsWithNewline;
       events.push({
         ...(physicallyIncompleteFinal ? { torn: true } : { corrupt: true }),
         line: line.slice(0, 200),
       });
+      continue;
+    }
+    try {
+      events.push(JournalEventSchema.parse(parsed));
+    } catch {
+      events.push({ corrupt: true, line: line.slice(0, 200) });
     }
   }
   return events;

@@ -31,6 +31,13 @@ export interface InterpreterContext {
   deadlineAt: Date;
   cancelFile?: string;
   evidenceDir: string;
+  /**
+   * N-1: trusted authority store holding the system-tools identity pin.
+   * Registry ops resolve reg.exe through it and REFUSE the step when the
+   * anchor is absent or any digest mismatches (fail closed — a step is never
+   * executed through an unpinned system binary).
+   */
+  authorityDir?: string;
 }
 
 export type StepOutcome =
@@ -228,12 +235,12 @@ async function runParsedStep(step: ExecutorStep, ctx: InterpreterContext): Promi
         return failScope('grant declares no registry scope but the action touches the registry');
       const contained = prefixes.some((p) => pathWithin(step.args.key, p));
       if (!contained) return failScope(`registry key outside declared scope: ${step.args.key}`);
-      const regExe = systemRegExe();
+      const regExe = systemRegExe(ctx.authorityDir);
       if (!regExe) {
         return {
           ok: false,
           reason:
-            'system directory unresolvable (fail closed) — refusing registry verification instead of guessing',
+            'system tool identity pin unavailable or mismatched (fail closed) — refusing registry verification instead of guessing',
           result: { key: step.args.key },
         };
       }
@@ -456,12 +463,12 @@ function registryExec(
   const contained = prefixes.some((p) => pathWithin(step.args.key, p));
   if (!contained)
     return Promise.resolve(failScope(`registry key outside declared scope: ${step.args.key}`));
-  const regExe = systemRegExe();
+  const regExe = systemRegExe(ctx.authorityDir);
   if (!regExe) {
     return Promise.resolve({
       ok: false,
       reason:
-        'system directory unresolvable (fail closed) — refusing registry mutation instead of guessing',
+        'system tool identity pin unavailable or mismatched (fail closed) — refusing registry mutation instead of guessing',
       result: result(),
     } as StepOutcome);
   }

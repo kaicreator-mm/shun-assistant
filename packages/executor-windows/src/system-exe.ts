@@ -1,36 +1,60 @@
-// SystemRoot-anchored system executables (C13). Anything the executor or the
-// privileged helper spawns MUST be resolved against the real Windows system
-// directory, never against PATH and never against the inherited SystemRoot
-// variable alone: the launcher that spawned us is UNTRUSTED and fully
-// controls our inherited environment — a planted SystemRoot would let it ship
-// fake whoami/reg/powershell/taskkill binaries and forge every token /
-// elevation observation, or replace the very binary the UAC relay elevates.
+// SystemRoot-anchored system executables (C13) with pinned BINARY IDENTITY
+// (N-1). Anything the executor or the privileged helper spawns MUST be
+// resolved against the real Windows system directory, never against PATH and
+// never against the inherited SystemRoot variable alone: the launcher that
+// spawned us is UNTRUSTED and fully controls our inherited environment — a
+// planted SystemRoot would let it ship fake whoami/reg/powershell/taskkill
+// binaries and forge every token / elevation observation, or replace the very
+// binary the UAC relay elevates.
 //
 // Windows semantics: the system directory is machine state recorded in
 // HKLM\SOFTWARE\Microsoft\Windows NT\CurrentVersion (SystemRoot value), which
 // requires elevation to modify — a same-user attacker at the caller's IL can
 // rewrite their own environment variables but NOT that registry key. We read
 // the machine record with reg.exe found from independent evidence (env hints
-// cross-checked against the pinned well-known root), validate it as a
+// cross-checked against the pinned well-known root) and validate it as a
 // fixed point (the reported root's own reg.exe re-reports the same value and
-// the directory genuinely exists), and fail CLOSED when machine evidence is
-// unavailable or contradictory. A planted fake reg.exe cannot forge the
-// fixed point: a copy of the real reg.exe reports the real root, and the
-// elevated helper path (the real System32 is admin-writable only) is outside
-// the same-user threat model.
+// the directory genuinely exists).
+//
+// N-1 honest boundary of that fixed point: it constrains the REPORT, not the
+// REPORTER's bytes. A self-written reg.exe in a planted root can re-report
+// the planted root and satisfy the loop — so every resolved candidate binary
+// is additionally verified against the authority store's system-tools identity
+// pin (SystemToolsPinSchema, provisioned at the same trusted moment as the
+// helper pin): a FORGED binary is refused (sha mismatch) and a missing record
+// or digest fails closed. What identity CANNOT do is distinguish a real
+// binary COPIED into a planted root (equal bytes = equal sha256); the
+// machine-evidence path defeats copies by construction — a real reg.exe copy
+// reports the real root — and the pin store itself sits inside the C06
+// same-user boundary (an attacker who can rewrite the store can re-pin their
+// own tools; the complete fix stays escalated).
 //
 // Residual (documented, not hidden): if the registry is entirely unreadable,
 // resolution falls back to inherited env ONLY on unanimous SystemRoot/windir
 // agreement plus existence — a degraded, honest mode, never a silent guess
-// from a single attacker-set variable.
+// from a single attacker-set variable; even there the binary identity gate
+// still applies to whatever this module hands out.
+
 import { execFileSync } from 'node:child_process';
-import { statSync } from 'node:fs';
+import { createHash } from 'node:crypto';
+import { readFileSync, statSync } from 'node:fs';
 import { join } from 'node:path';
+import { readSystemToolsPin } from './trusted-store.ts';
 
 export type SystemRootResolution = { ok: true; systemRoot: string } | { ok: false; reason: string };
 
 /** Shape of the injected registry probe (kept a pure function for tests). */
 export type RegQuery = (regExe: string, args: readonly string[]) => string | undefined;
+
+/** The security-relevant system tools whose bytes are pinned (N-1). */
+export type SystemToolKey = 'whoami' | 'reg' | 'powershell' | 'taskkill';
+
+const SYSTEM_TOOL_RELATIVE: Record<SystemToolKey, readonly string[]> = {
+  whoami: ['System32', 'whoami.exe'],
+  reg: ['System32', 'reg.exe'],
+  powershell: ['System32', 'WindowsPowerShell', 'v1.0', 'powershell.exe'],
+  taskkill: ['System32', 'taskkill.exe'],
+};
 
 const REG_QUERY_SYSTEMROOT_ARGS = [
   'query',
@@ -59,15 +83,17 @@ export function resolveSystemRoot(
 
   // 1. Machine evidence: the HKLM SystemRoot value, read with reg.exe from
   //    every candidate root that actually has one. The first report that
-  //    validates as a fixed point wins.
+  //    validates as a fixed point wins. (N-1: the fixed point constrains the
+  //    REPORTED ROOT; the identity gate below constrains the BYTES.)
   for (const hint of uniqueRoots([env.SystemRoot, env.windir, HARD_CODED_FALLBACK_ROOT])) {
     const hintReg = join(hint, 'System32', 'reg.exe');
     if (!isFile(hintReg)) continue;
     const reported = query(hintReg, REG_QUERY_SYSTEMROOT_ARGS)?.trim();
     if (!reported || !isAbsoluteWindowsPath(reported)) continue;
     // Fixed point: the machine record must reference a real directory whose
-    // own reg.exe re-reports the same value. This is what a planted fake
-    // root cannot satisfy with the REAL reg.exe (it reports the real root).
+    // own reg.exe re-reports the same value. A self-written reg.exe CAN
+    // satisfy this loop with self-referential answers — which is exactly why
+    // the candidate binaries are identity-checked against the pin afterwards.
     const reportedReg = join(reported, 'System32', 'reg.exe');
     if (!isDirectory(reported) || !isFile(reportedReg)) continue;
     const confirmed = query(reportedReg, REG_QUERY_SYSTEMROOT_ARGS)?.trim();
@@ -95,28 +121,88 @@ export function systemRoot(): string | undefined {
   return cached.ok ? cached.systemRoot : undefined;
 }
 
+/**
+ * N-1 core identity gate: `root` + tool → binary path, verified against the
+ * pinned digest. Only fs observation (no process spawns), injectable
+ * expected value so planted-root negative tests run on any host.
+ * `expectedSha256` undefined (pin record or digest missing) fails closed.
+ */
+export function verifySystemToolExe(
+  root: string,
+  tool: SystemToolKey,
+  expectedSha256: string | undefined,
+): { ok: true; exe: string } | { ok: false; reason: string } {
+  if (!expectedSha256) {
+    return {
+      ok: false,
+      reason: `system tool identity pin missing for '${tool}' — refusing to resolve an unpinned system executable (fail closed)`,
+    };
+  }
+  const exe = join(root, ...SYSTEM_TOOL_RELATIVE[tool]);
+  if (!isFile(exe)) {
+    return { ok: false, reason: `system tool '${tool}' candidate is not a file: ${exe}` };
+  }
+  let measured: string;
+  try {
+    measured = createHash('sha256').update(readFileSync(exe)).digest('hex');
+  } catch {
+    return { ok: false, reason: `system tool '${tool}' candidate unreadable: ${exe}` };
+  }
+  if (measured !== expectedSha256) {
+    return {
+      ok: false,
+      reason: `system tool identity mismatch for '${tool}': measured sha256 ${measured} != pinned ${expectedSha256} — forged/substituted binary refused (fail closed)`,
+    };
+  }
+  return { ok: true, exe };
+}
+
 /** <SystemRoot>\System32\whoami.exe — the token-state probe. */
-export function systemWhoamiExe(): string | undefined {
-  const root = systemRoot();
-  return root ? join(root, 'System32', 'whoami.exe') : undefined;
+export function systemWhoamiExe(authorityDir?: string): string | undefined {
+  return resolvePinnedSystemExe('whoami', authorityDir);
 }
 
 /** <SystemRoot>\System32\reg.exe — the registry op binary. */
-export function systemRegExe(): string | undefined {
-  const root = systemRoot();
-  return root ? join(root, 'System32', 'reg.exe') : undefined;
+export function systemRegExe(authorityDir?: string): string | undefined {
+  return resolvePinnedSystemExe('reg', authorityDir);
 }
 
 /** <SystemRoot>\System32\WindowsPowerShell\v1.0\powershell.exe — the UAC relay host. */
-export function systemPowershellExe(): string | undefined {
-  const root = systemRoot();
-  return root ? join(root, 'System32', 'WindowsPowerShell', 'v1.0', 'powershell.exe') : undefined;
+export function systemPowershellExe(authorityDir?: string): string | undefined {
+  return resolvePinnedSystemExe('powershell', authorityDir);
 }
 
 /** <SystemRoot>\System32\taskkill.exe — the non-elevated relay tree kill. */
-export function systemTaskkillExe(): string | undefined {
+export function systemTaskkillExe(authorityDir?: string): string | undefined {
+  return resolvePinnedSystemExe('taskkill', authorityDir);
+}
+
+/**
+ * Root resolution + identity pin verification for one tool. `authorityDir`
+ * is the trusted store whose system-tools pin provisions the expected
+ * digests; WITHOUT it there is no trust anchor to verify against and the
+ * resolution fails closed — callers degrade honestly (empty token
+ * observation, refused step, refused relay spawn).
+ */
+function resolvePinnedSystemExe(
+  tool: SystemToolKey,
+  authorityDir: string | undefined,
+): string | undefined {
+  if (!authorityDir) return undefined;
+  const pin = readSystemToolsPin(authorityDir);
+  if (!pin) return undefined;
   const root = systemRoot();
-  return root ? join(root, 'System32', 'taskkill.exe') : undefined;
+  if (!root) return undefined;
+  const expected =
+    tool === 'whoami'
+      ? pin.whoamiSha256
+      : tool === 'reg'
+        ? pin.regSha256
+        : tool === 'powershell'
+          ? pin.powershellSha256
+          : pin.taskkillSha256;
+  const verdict = verifySystemToolExe(root, tool, expected);
+  return verdict.ok ? verdict.exe : undefined;
 }
 
 // ---- internals. ----

@@ -23,6 +23,7 @@ import {
 } from '@shun/contracts';
 import { build } from 'esbuild';
 import { isElevatedToken } from '../src/elevation.ts';
+import { resolveSystemRoot } from '../src/system-exe.ts';
 import {
   generateGrantHmacKey,
   type HelperPin,
@@ -33,6 +34,7 @@ import {
   writeGrantRecord,
   writeHelperPin,
   writePlanRecord,
+  writeSystemToolsPin,
 } from '../src/trusted-store.ts';
 
 /**
@@ -88,6 +90,29 @@ export async function buildHelperBundle(
   });
 }
 
+/**
+ * N-1 provisioning stand-in: pin the REAL host system tools' digests into an
+ * authority store (production provisioning does this at the same trusted
+ * moment as the helper pin; on this host the "real" tools are the ones under
+ * the machine-evidenced system root). Skips silently off-Windows — every
+ * consumer of the pin is Windows-gated anyway.
+ */
+export function writeHostSystemToolsPin(authorityDir: string): void {
+  if (!ON_WINDOWS) return;
+  const root = resolveSystemRoot();
+  if (!root.ok) return;
+  const digest = (relative: readonly string[]): string =>
+    sha256File(join(root.systemRoot, ...relative));
+  writeSystemToolsPin(authorityDir, {
+    schemaVersion: 'shun.executor-windows.system-tools-pin/1',
+    whoamiSha256: digest(['System32', 'whoami.exe']),
+    regSha256: digest(['System32', 'reg.exe']),
+    powershellSha256: digest(['System32', 'WindowsPowerShell', 'v1.0', 'powershell.exe']),
+    taskkillSha256: digest(['System32', 'taskkill.exe']),
+    pinnedAt: new Date().toISOString(),
+  });
+}
+
 /** Build the helper bundle with the TEST authority dir baked in + a full pin. */
 export async function createTestAuthority(basename = 'shun-exec-'): Promise<TestAuthority> {
   const root = mkdtempSync(join(tmpdir(), basename));
@@ -118,6 +143,10 @@ export async function createTestAuthority(basename = 'shun-exec-'): Promise<Test
     pinnedAt: new Date().toISOString(),
   };
   writeHelperPin(authorityDir, pin);
+  // N-1: the system-tools identity pin is provisioned at the same trusted
+  // moment as the helper pin (the helper's whoami probe and the registry ops
+  // verify candidates against it and fail closed without it).
+  writeHostSystemToolsPin(authorityDir);
   return { root, authorityDir, workspaceRoot, hmacKey, helperBundle, relayScript };
 }
 

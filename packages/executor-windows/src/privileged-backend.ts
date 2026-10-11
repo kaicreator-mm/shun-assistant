@@ -21,6 +21,7 @@ import {
   ExecutionReceiptSchema,
 } from '@shun/contracts';
 import { assertSafeActionId } from './action-id.ts';
+import { resolveActionStep } from './action-surface.ts';
 import { PROVIDER_ID, PROVIDER_VERSION } from './backend.ts';
 import { type HelperReceiptFile, HelperReceiptFileSchema, writeEnvelopeFile } from './envelope.ts';
 import { resolveAgainstRoot } from './fs-safety.ts';
@@ -28,6 +29,7 @@ import { verifyPinnedHelper } from './helper-pinning.ts';
 import type { InterpreterScope } from './interpreter.ts';
 import { JournalWriter, journalDigest, readJournal } from './journal.ts';
 import { reconcileExpectedState, rerunVerifyStep } from './poststate.ts';
+import { pinProgram } from './program-pinning.ts';
 import {
   type ClassificationResult,
   classifyRecovery,
@@ -172,6 +174,23 @@ export class PrivilegedWindowsExecutionBackend implements ExecutionBackend {
       if (!plan)
         return await launchRefused(`plan ${action.planHash} not found in the authority store`);
 
+      // ---- N-2 program identity preflight, BEFORE any UAC work. ----
+      // The plan hash binds only the proc.exec program PATH; the launcher
+      // pins its BYTES (canonical path + measured sha256) into the authority
+      // store so the privileged helper's pre-journal re-measurement has an
+      // anchor. A missing/non-file/unreadable program refuses here — no UAC
+      // prompt, no relay artifact.
+      const preflightStep = resolveActionStep(action);
+      if (preflightStep?.op === 'windows.proc.exec') {
+        const programPin = pinProgram(this.options.authorityDir, preflightStep.args.program);
+        if (!programPin.ok) {
+          return await launchRefused(
+            `program identity preflight failed: ${programPin.reason}`,
+            'PROGRAM_PIN_REFUSED',
+          );
+        }
+      }
+
       // ---- run artifacts + envelope (typed JSON on disk, never shell text). ----
       mkdirSync(runDir, { recursive: true });
       const evidenceDir = join(runDir, 'evidence');
@@ -202,12 +221,14 @@ export class PrivilegedWindowsExecutionBackend implements ExecutionBackend {
       // C13: the relay host is the MOST sensitive spawn — it is the binary
       // UAC elevates. Refuse to launch from an inherited-SystemRoot guess:
       // a planted root would hand the RunAs prompt's consent to a fake
-      // powershell.
-      const powershellExe = systemPowershellExe();
-      const taskkillExe = systemTaskkillExe();
+      // powershell. N-1: the candidate binaries are additionally verified
+      // against the authority store's system-tools identity pin — a forged
+      // tool, or a missing/corrupt pin, refuses the launch (fail closed).
+      const powershellExe = systemPowershellExe(this.options.authorityDir);
+      const taskkillExe = systemTaskkillExe(this.options.authorityDir);
       if (!powershellExe || !taskkillExe) {
         return await launchRefused(
-          'system directory unresolvable — refusing to spawn the elevation relay (fail closed)',
+          'system directory unresolvable or system-tool identity pin missing/mismatched — refusing to spawn the elevation relay (fail closed)',
           'SYSTEM_DIR_UNRESOLVABLE',
         );
       }
@@ -347,12 +368,22 @@ export class PrivilegedWindowsExecutionBackend implements ExecutionBackend {
         const scope = await scopeOf(action, this.options.authorityDir);
         let postState =
           helperReceipt.terminal === 'SUCCEEDED'
-            ? await rerunVerifyStep(action, scope, input.launcherJournal)
-            : await reconcileExpectedState(action, scope, input.launcherJournal);
+            ? await rerunVerifyStep(action, scope, input.launcherJournal, this.options.authorityDir)
+            : await reconcileExpectedState(
+                action,
+                scope,
+                input.launcherJournal,
+                this.options.authorityDir,
+              );
         if (helperReceipt.terminal === 'SUCCEEDED' && !postState.verified) {
           // A mutating action may declare verifiable expected state — the
           // reconcile convention doubles as its success verification.
-          postState = await reconcileExpectedState(action, scope, input.launcherJournal);
+          postState = await reconcileExpectedState(
+            action,
+            scope,
+            input.launcherJournal,
+            this.options.authorityDir,
+          );
         }
         const classification = classifyRecovery({
           journal,
@@ -381,7 +412,12 @@ export class PrivilegedWindowsExecutionBackend implements ExecutionBackend {
 
     // No receipt: crash / kill / lost channel. Journal + reconcile-first decide.
     const scope = await scopeOf(action, this.options.authorityDir);
-    const postState = await reconcileExpectedState(action, scope, input.launcherJournal);
+    const postState = await reconcileExpectedState(
+      action,
+      scope,
+      input.launcherJournal,
+      this.options.authorityDir,
+    );
     const classification = classifyRecovery({
       journal,
       receipt: undefined,

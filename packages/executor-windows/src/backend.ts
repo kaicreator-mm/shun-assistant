@@ -83,6 +83,7 @@ export class LocalWindowsBackend implements EnvironmentBackend {
     this.factsCache ??= await observeEnvironment({
       workspaceRoot: this.options.workspaceRoot,
       networkPolicy: this.options.networkPolicy,
+      authorityDir: this.options.authorityDir,
     });
     return this.factsCache;
   }
@@ -237,6 +238,9 @@ export class LocalWindowsBackend implements EnvironmentBackend {
         deadlineAt: new Date(Date.now() + timeoutMs),
         cancelFile,
         evidenceDir: join(runDir, 'evidence'),
+        // N-1: registry ops resolve reg.exe against the trusted system-tools
+        // identity pin from this store (absent anchor ⇒ step refuses).
+        authorityDir: this.options.authorityDir,
       };
 
       journal.append('EXEC_BEGIN', { detail: { totalSteps: 1 } });
@@ -300,12 +304,12 @@ export class LocalWindowsBackend implements EnvironmentBackend {
       // declared verify steps on success, and reconciles declared
       // expectedState before classifying a failure.
       let postState = outcome.ok
-        ? await rerunVerifyStep(action, scope, journal)
-        : await reconcileExpectedState(action, scope, journal);
+        ? await rerunVerifyStep(action, scope, journal, this.options.authorityDir)
+        : await reconcileExpectedState(action, scope, journal, this.options.authorityDir);
       if (outcome.ok && !postState.verified) {
         // A mutating action may still declare verifiable expected state —
         // the reconcile convention doubles as its success verification.
-        postState = await reconcileExpectedState(action, scope, journal);
+        postState = await reconcileExpectedState(action, scope, journal, this.options.authorityDir);
       }
       const classification = classifyRecovery({
         journal: readJournal(journalFile),

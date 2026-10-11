@@ -22,6 +22,7 @@ export async function rerunVerifyStep(
   action: AuthorizedAction,
   scope: InterpreterScope,
   journal: JournalWriter,
+  authorityDir?: string,
 ): Promise<PostStateOutcome> {
   const step = resolveActionStep(action);
   if (!step || !LAUNCHER_RERUNNABLE.has(step.op)) {
@@ -33,6 +34,9 @@ export async function rerunVerifyStep(
     isElevated: false,
     deadlineAt: new Date(Date.now() + 30000),
     evidenceDir: '',
+    // N-1: registry verify steps resolve reg.exe against the trusted
+    // system-tools identity pin when the caller provides the anchor.
+    authorityDir,
   };
   const outcome = await runStep(step, ctx);
   return outcome.ok
@@ -52,6 +56,7 @@ export async function reconcileExpectedState(
   action: AuthorizedAction,
   scope: InterpreterScope,
   journal: JournalWriter,
+  authorityDir?: string,
 ): Promise<PostStateOutcome> {
   const expected = action.action.expectedState;
   if (!expected || Object.keys(expected).length === 0) {
@@ -114,6 +119,9 @@ export async function reconcileExpectedState(
     isElevated: false,
     deadlineAt: new Date(Date.now() + 30000),
     evidenceDir: '',
+    // N-1: registry verify steps resolve reg.exe against the trusted
+    // system-tools identity pin when the caller provides the anchor.
+    authorityDir,
   };
   const outcome = await runStep(
     { op: synthesized.op, args: synthesized.args } as Parameters<typeof runStep>[0],

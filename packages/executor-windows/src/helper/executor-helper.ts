@@ -49,6 +49,7 @@ import {
   runStep,
 } from '../interpreter.ts';
 import { durableWriteFileSync, JournalWriter } from '../journal.ts';
+import { verifyPinnedProgram } from '../program-pinning.ts';
 import { preflightScope } from '../scope-preflight.ts';
 import { systemWhoamiExe } from '../system-exe.ts';
 import {
@@ -93,6 +94,8 @@ class Helper {
   private sideEffectClass: 'R0' | 'R1' | 'R2' | 'R3' = 'R0';
   private journalFile = '';
   private receiptFile = '';
+  /** N-2: measured byte identity of a pinned proc.exec program (journal evidence). */
+  private programSha256: string | undefined;
 
   async run(argv: string[]): Promise<number> {
     const [, , envelopeFile, journalFile, receiptFile] = argv;
@@ -150,6 +153,23 @@ class Helper {
         `node.exe identity mismatch: measured sha256 ${nodeSha256} != pinned ${pin.nodeExeSha256} — refusing to run on an unpinned interpreter\n`,
       );
       return HELPER_EXIT_CODES.REFUSED;
+    }
+    // N-2: the program of a windows.proc.exec step is part of the trusted
+    // identity chain too — the plan hash binds only its PATH string, so the
+    // launcher preflights its BYTES into an authority program pin and this
+    // boundary RE-MEASURES pre-journal: no pin (unpinned) or bytes replaced
+    // after pinning refuse with NOTHING written. The measured identity is
+    // carried into the EXEC_START journal evidence. Honest boundary: bytes
+    // swapped before the launcher preflight are pinned AS-SWAPPED — that
+    // same-user race is the C06 open boundary.
+    const preflightStep = resolveActionStep(this.envelope.action);
+    if (preflightStep?.op === 'windows.proc.exec') {
+      const programIdentity = verifyPinnedProgram(authorityDirectory(), preflightStep.args.program);
+      if (!programIdentity.ok) {
+        process.stderr.write(`program identity refused: ${programIdentity.reason}\n`);
+        return HELPER_EXIT_CODES.REFUSED;
+      }
+      this.programSha256 = programIdentity.programSha256;
     }
     // C07: containment on RESOLVED paths, not lexical ones — a junction
     // planted inside the pinned root would otherwise turn the elevated
@@ -297,10 +317,21 @@ class Helper {
       deadlineAt: new Date(Date.now() + timeoutMs),
       cancelFile: this.envelope.io.cancelFile,
       evidenceDir: this.envelope.io.evidenceDir,
+      // N-1: registry ops resolve reg.exe against the trusted system-tools
+      // identity pin from this store (absent anchor ⇒ step refuses).
+      authorityDir: authorityDirectory(),
     };
 
     this.journal.append('EXEC_BEGIN', { detail: { totalSteps: 1 } });
-    this.journal.append('EXEC_START', { step: 0, op: step.op });
+    this.journal.append('EXEC_START', {
+      step: 0,
+      op: step.op,
+      // N-2: the measured byte identity of the pinned program, so the journal
+      // evidence records WHICH bytes ran — not merely which path was named.
+      ...(this.programSha256 !== undefined
+        ? { detail: { programSha256: this.programSha256 } }
+        : {}),
+    });
     let outcome: Awaited<ReturnType<typeof runStep>>;
     try {
       checkGuards(ctx, 'before-step');
@@ -427,6 +458,15 @@ class Helper {
     const parsed = HelperReceiptFileSchema.parse(payload);
     const tmp = `${this.receiptFile}.tmp`;
     durableWriteFileSync(tmp, `${JSON.stringify(parsed, null, 2)}\n`);
+    // N-4 (honest platform limit): this rename has NO persistence barrier —
+    // Windows/Node cannot fsync a directory, so a crash after the rename but
+    // before the next durable journal event may still lose the receipt file
+    // even though its content was fsynced. The recovery order is therefore
+    // journal-authoritative: RECEIPT_WRITTEN below is appended (fsynced) only
+    // AFTER the rename, and a receipt that vanished despite the rename
+    // degrades to the C09 path — the launcher classifies from the journal
+    // alone (effect window closed + receipt ABSENT →
+    // MAY_HAVE_EXECUTED_UNCERTAIN), never a fabricated terminal.
     renameSync(tmp, this.receiptFile);
     this.journal.append('RECEIPT_WRITTEN', {
       detail: { terminal: input.terminal, receiptFile: this.receiptFile },
@@ -440,9 +480,11 @@ async function whoamiGroups(): Promise<string> {
   return new Promise((resolvePromise) => {
     // C13: machine-evidenced resolution, never PATH and never the inherited
     // SystemRoot alone: the launcher controls both, and a planted fake
-    // whoami could get a filtered token judged elevated. Unresolvable ⇒
+    // whoami could get a filtered token judged elevated. N-1: the candidate
+    // binary is additionally verified against the authority store's
+    // system-tools identity pin — a forged whoami (or a missing pin) ⇒
     // empty capture ⇒ isElevatedToken('') = false ⇒ ELEVATED refused.
-    const exe = systemWhoamiExe();
+    const exe = systemWhoamiExe(authorityDirectory());
     if (!exe) {
       resolvePromise('');
       return;

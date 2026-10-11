@@ -6,6 +6,8 @@
 //   current-authority.json   CurrentAuthorityState — CURRENT | UNRESOLVABLE
 //   grant-hmac.key           base64 32-byte HMAC key (authority-held)
 //   helper-pin.json          pinned helper/relay identity + revision
+//   system-tools.json        pinned binary identity of the system tools (N-1)
+//   programs/<pathHash>.json pinned byte identity per proc.exec program (N-2)
 //   plans/<planHash>.json    ActionPlan records (trusted plan source)
 //
 // Trust anchors, not security theater: on a single-user Windows host the
@@ -60,6 +62,116 @@ export const HelperPinSchema = z.strictObject({
   note: z.string().min(1).optional(),
 });
 export type HelperPin = z.infer<typeof HelperPinSchema>;
+
+export const SYSTEM_TOOLS_PIN_SCHEMA_VERSION = 'shun.executor-windows.system-tools-pin/1';
+
+/**
+ * Pinned BINARY IDENTITY of the security-relevant Windows system tools
+ * (N-1): whoami.exe decides whether a token counts as elevated, reg.exe both
+ * answers the C13 fixed-point probe and performs registry mutations, and
+ * powershell.exe is the very host the UAC relay elevates. The C13 fixed
+ * point proves nothing about WHICH BYTES answered (a self-written reg.exe in
+ * a planted root can re-report itself), so authority provisioning records
+ * the real tools' sha256 at the same trusted moment as the helper pin and
+ * resolution (src/system-exe.ts) verifies candidates against it — missing
+ * record, missing digest, or any mismatch fails closed.
+ *
+ * Honest boundary: a real binary COPIED elsewhere passes identity (equal
+ * bytes); the machine-evidence path defeats copies by construction. The
+ * record itself is same-user writable — the C06 ESCALATED boundary applies.
+ */
+export const SystemToolsPinSchema = z.strictObject({
+  schemaVersion: z.literal(SYSTEM_TOOLS_PIN_SCHEMA_VERSION),
+  /** SHA-256 of <SystemRoot>\System32\whoami.exe (lowercase hex). */
+  whoamiSha256: z.string().regex(/^[0-9a-f]{64}$/),
+  /** SHA-256 of <SystemRoot>\System32\reg.exe (lowercase hex). */
+  regSha256: z.string().regex(/^[0-9a-f]{64}$/),
+  /** SHA-256 of <SystemRoot>\System32\WindowsPowerShell\v1.0\powershell.exe (lowercase hex). */
+  powershellSha256: z.string().regex(/^[0-9a-f]{64}$/),
+  /** SHA-256 of <SystemRoot>\System32\taskkill.exe (lowercase hex). */
+  taskkillSha256: z.string().regex(/^[0-9a-f]{64}$/),
+  pinnedAt: z.string().min(1),
+});
+export type SystemToolsPin = z.infer<typeof SystemToolsPinSchema>;
+
+/** Reads + parses the system-tools pin. Any absence/corruption fails closed (undefined). */
+export function readSystemToolsPin(authorityDir: string): SystemToolsPin | undefined {
+  const file = join(authorityDir, 'system-tools.json');
+  if (!existsSync(file)) return undefined;
+  try {
+    return SystemToolsPinSchema.parse(JSON.parse(readFileSync(file, 'utf8')));
+  } catch {
+    return undefined;
+  }
+}
+
+/** Authority-side provisioning write — same trusted moment as writeHelperPin. */
+export function writeSystemToolsPin(authorityDir: string, pin: SystemToolsPin): void {
+  mkdirSync(authorityDir, { recursive: true });
+  writeFileSync(
+    join(authorityDir, 'system-tools.json'),
+    `${JSON.stringify(pin, null, 2)}\n`,
+    'utf8',
+  );
+}
+
+export const PROGRAM_PIN_SCHEMA_VERSION = 'shun.executor-windows.program-pin/1';
+
+/**
+ * Pinned BYTE IDENTITY of a windows.proc.exec program (N-2, the C12 audit's
+ * actual target). The plan hash binds the program PATH string only, so bytes
+ * swapped at the same path after the grant would otherwise run elevated
+ * untouched. The launcher preflights every privileged proc.exec step —
+ * canonical real path + measured sha256 recorded here — and the privileged
+ * helper re-measures pre-journal: NO pin for the path, or any byte change
+ * after pinning, refuses the run (fail closed). An interpreter update of a
+ * program is exactly such a byte change and must be re-pinned by a fresh
+ * launch-side measurement.
+ *
+ * Honest boundary: bytes swapped BEFORE the launcher's preflight are pinned
+ * AS-SWAPPED (the pin attests what was measured at provisioning time; the
+ * measured identity lands in the journal evidence). That race is a same-user
+ * attack on the authority store itself — the C06 ESCALATED boundary.
+ */
+export const ProgramPinSchema = z.strictObject({
+  schemaVersion: z.literal(PROGRAM_PIN_SCHEMA_VERSION),
+  /** The canonical (real) program path this pin is keyed by. */
+  programPath: z.string().min(1),
+  /** SHA-256 of the program file content at pin time (lowercase hex). */
+  programSha256: z.string().regex(/^[0-9a-f]{64}$/),
+  pinnedAt: z.string().min(1),
+});
+export type ProgramPin = z.infer<typeof ProgramPinSchema>;
+
+/** Deterministic store key: the lowercased canonical path, digested. */
+export function programPinKey(canonicalProgramPath: string): string {
+  return createHash('sha256').update(canonicalProgramPath.toLowerCase(), 'utf8').digest('hex');
+}
+
+/** Reads the pin for one canonical program path; absence/corruption fails closed (undefined). */
+export function readProgramPin(
+  authorityDir: string,
+  canonicalPath: string,
+): ProgramPin | undefined {
+  const file = join(authorityDir, 'programs', `${programPinKey(canonicalPath)}.json`);
+  if (!existsSync(file)) return undefined;
+  try {
+    return ProgramPinSchema.parse(JSON.parse(readFileSync(file, 'utf8')));
+  } catch {
+    return undefined;
+  }
+}
+
+/** Launcher-side preflight write (per privileged proc.exec launch). */
+export function writeProgramPin(authorityDir: string, pin: ProgramPin): void {
+  const dir = join(authorityDir, 'programs');
+  mkdirSync(dir, { recursive: true });
+  writeFileSync(
+    join(dir, `${programPinKey(pin.programPath)}.json`),
+    `${JSON.stringify(pin, null, 2)}\n`,
+    'utf8',
+  );
+}
 
 export function sha256File(file: string): string {
   return createHash('sha256').update(readFileSync(file)).digest('hex');

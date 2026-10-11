@@ -1,15 +1,34 @@
 // EnvironmentFacts probe hygiene: the token-state probe must be anchored to
-// SystemRoot, never resolved via PATH (review finding: a PATH-injected fake
-// whoami.exe could get a filtered token judged ELEVATED_ADMIN).
-import { existsSync } from 'node:fs';
-import { describe, expect, it } from 'vitest';
+// the machine-evidenced SystemRoot (never PATH) AND, since N-1, verified
+// against the authority store's system-tools identity pin — an unpinned or
+// mismatched whoami degrades the observation honestly instead of reporting.
+import { existsSync, mkdirSync, mkdtempSync, rmSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+import { afterAll, describe, expect, it } from 'vitest';
 import { whoamiGroups } from '../src/facts.ts';
 import { systemWhoamiExe } from '../src/system-exe.ts';
-import { ON_WINDOWS } from './helpers.ts';
+import { ON_WINDOWS, writeHostSystemToolsPin } from './helpers.ts';
 
-describe('whoami token probe anchoring', () => {
-  it('resolves whoami.exe under SystemRoot (same convention as reg.exe/powershell.exe)', () => {
-    const exe = systemWhoamiExe();
+const pinnedDirs: string[] = [];
+
+function pinnedAuthorityDir(): string {
+  const dir = mkdtempSync(join(tmpdir(), 'shun-facts-pin-'));
+  mkdirSync(dir, { recursive: true });
+  writeHostSystemToolsPin(dir);
+  pinnedDirs.push(dir);
+  return dir;
+}
+
+afterAll(() => {
+  for (const dir of pinnedDirs) rmSync(dir, { recursive: true, force: true });
+});
+
+describe('whoami token probe anchoring + identity pin (N-1)', () => {
+  it('resolves whoami.exe under SystemRoot only through a pinned authority store', () => {
+    // Without an authority anchor the probe refuses to resolve (fail closed).
+    expect(systemWhoamiExe(undefined)).toBeUndefined();
+    const exe = systemWhoamiExe(pinnedAuthorityDir());
     // Off-Windows the resolution is a harmless best-effort constant.
     if (exe === undefined) return;
     expect(exe.toLowerCase()).toContain('system32');
@@ -29,10 +48,10 @@ describe('whoami token probe anchoring', () => {
         process.env[key] = '';
       }
       try {
-        const csv = await whoamiGroups();
+        const csv = await whoamiGroups(pinnedAuthorityDir());
         // The real `whoami /groups` CSV always carries at least the mandatory
-        // S-1-16 integrity SID; a PATH-dependent probe would have failed to
-        // spawn and degraded to ''.
+        // S-1-16 integrity SID; a PATH-dependent or unpinned probe would have
+        // failed to spawn and degraded to ''.
         expect(csv).toContain('S-1-');
       } finally {
         for (const key of pathKeys) {
@@ -41,10 +60,14 @@ describe('whoami token probe anchoring', () => {
         }
       }
     });
+
+    it('degrades honestly without an authority anchor (empty capture, never fabricated)', async () => {
+      expect(await whoamiGroups(undefined)).toBe('');
+    });
   });
 
   it('degrades honestly off-Windows (empty capture, never fabricated)', async () => {
-    if (process.platform === 'win32') return; // covered by the case above
-    expect(await whoamiGroups()).toBe('');
+    if (process.platform === 'win32') return; // covered by the cases above
+    expect(await whoamiGroups(pinnedAuthorityDir())).toBe('');
   });
 });
