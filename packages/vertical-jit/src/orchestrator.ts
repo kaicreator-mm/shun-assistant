@@ -767,8 +767,14 @@ async function persistLifecycle(
   provenance: ReturnType<typeof provenanceRecord>,
   layout: ProviderInstallLayout,
   state: string,
+  providerOwnedFiles?: readonly string[],
 ): Promise<string> {
-  const effectId = `jit:${input.taskId}:lifecycle`;
+  // Each state transition is its own append-only revision: the store's
+  // idempotent replay keys on effectId, so a shared identity would let the
+  // CHECKPOINT transition be swallowed by the earlier INSTALLED record
+  // (VJ-P1-02). The checkpoint the R2 approval gate relies on must be
+  // durably recorded in its own right.
+  const effectId = `jit:${input.taskId}:lifecycle:${state.toLowerCase()}`;
   const receipt = await deps.store.apply(effectId, {
     recordKind: 'lifecycle_record',
     recordId: effectId,
@@ -784,9 +790,21 @@ async function persistLifecycle(
         executables: [...layout.executables],
       },
       state,
+      ...(providerOwnedFiles ? { providerOwnedFiles: [...providerOwnedFiles] } : {}),
       recordedAt: deps.clock(),
     },
   });
+  // Read-back validation before any gate step may rely on the record: a
+  // replayed (not applied) receipt for a fresh revision identity means the
+  // durable store refused the transition — proceeding would run the R2 gate
+  // against a checkpoint that was never recorded.
+  if (!receipt.applied) {
+    throw new JitLifecycleError(
+      'POLICY_BLOCKED',
+      `durable store returned a replay instead of recording the ${state} lifecycle transition — refusing to continue on an unrecorded state migration`,
+    );
+  }
+  trace(deps, 'LIFECYCLE_PERSISTED', `${state} -> ${receipt.receiptRef}`);
   return receipt.receiptRef;
 }
 
