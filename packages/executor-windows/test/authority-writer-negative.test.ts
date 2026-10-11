@@ -198,6 +198,7 @@ describe('ShunAnchorWriter core — unattended negative controls (L2 v0.2 delta 
     const malformed = signWriterJob(fx.anchorKey, {
       jobId: 'job-malformed-grant',
       jobType: 'issue-grant',
+      riskClass: 'R2',
       policyWindowRef: fx.windowId,
       payload: { grantId: 'grant-malformed-only-id' },
     });
@@ -216,6 +217,7 @@ describe('ShunAnchorWriter core — unattended negative controls (L2 v0.2 delta 
     const traversal = signWriterJob(fx.anchorKey, {
       jobId: 'job-traversal-grant',
       jobType: 'issue-grant',
+      riskClass: 'R2',
       policyWindowRef: fx.windowId,
       payload: { ...base, grantId: '../escape-grant' },
     });
@@ -234,6 +236,7 @@ describe('ShunAnchorWriter core — unattended negative controls (L2 v0.2 delta 
     const staleAuthority = signWriterJob(fx.anchorKey, {
       jobId: 'job-stale-authority',
       jobType: 'issue-grant',
+      riskClass: 'R2',
       policyWindowRef: fx.windowId,
       payload: {
         ...base,
@@ -253,6 +256,7 @@ describe('ShunAnchorWriter core — unattended negative controls (L2 v0.2 delta 
     const wrongPolicy = signWriterJob(fx.anchorKey, {
       jobId: 'job-wrong-policy',
       jobType: 'issue-grant',
+      riskClass: 'R2',
       policyWindowRef: fx.windowId,
       payload: { ...base, policySnapshotRevision: 'policy-rev-other' },
     });
@@ -266,6 +270,7 @@ describe('ShunAnchorWriter core — unattended negative controls (L2 v0.2 delta 
     const expired = signWriterJob(fx.anchorKey, {
       jobId: 'job-expired-grant',
       jobType: 'issue-grant',
+      riskClass: 'R2',
       policyWindowRef: fx.windowId,
       payload: {
         ...base,
@@ -403,6 +408,7 @@ describe('ShunAnchorWriter core — unattended negative controls (L2 v0.2 delta 
     const secondJob = signWriterJob(fx.anchorKey, {
       jobId: 'job-grant-2',
       jobType: 'issue-grant',
+      riskClass: 'R2',
       policyWindowRef: fx.windowId,
       payload,
     });
