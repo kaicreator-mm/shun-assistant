@@ -13,7 +13,7 @@
 // with CANCELLED / TIMED_OUT markers emitted at the point of observation.
 
 import { createHash } from 'node:crypto';
-import { appendFileSync, readFileSync } from 'node:fs';
+import { appendFileSync, closeSync, fsyncSync, openSync, readFileSync, writeSync } from 'node:fs';
 import { z } from 'zod';
 
 export const JOURNAL_SCHEMA_VERSION = 'shun.executor-windows.journal/1';
@@ -57,10 +57,31 @@ export interface TornJournalLine {
   readonly line: string;
 }
 
-export type ReplayEvent = JournalEvent | TornJournalLine;
+/**
+ * A COMPLETE line (newline-terminated, or anywhere but the physically
+ * incomplete final append) that is not a valid journal event (C16): this is
+ * corruption or tampering evidence, not a crash artifact — a torn-append
+ * tolerance that silently swallowed it would let a doctored journal replay
+ * as "helper crashed mid-write". Recovery fails closed on any corrupt line.
+ */
+export interface CorruptJournalLine {
+  readonly corrupt: true;
+  readonly line: string;
+}
+
+export type ReplayEvent = JournalEvent | TornJournalLine | CorruptJournalLine;
 
 export function isTorn(e: ReplayEvent): e is TornJournalLine {
   return (e as TornJournalLine).torn === true;
+}
+
+export function isCorrupt(e: ReplayEvent): e is CorruptJournalLine {
+  return (e as CorruptJournalLine).corrupt === true;
+}
+
+/** True when replay found corruption/tampering evidence (C16) — classification must fail closed. */
+export function journalHasCorrupt(events: readonly ReplayEvent[]): boolean {
+  return events.some(isCorrupt);
 }
 
 export class JournalWriter {
@@ -85,19 +106,57 @@ export class JournalWriter {
       ...(fields?.op !== undefined ? { op: fields.op } : {}),
       ...(fields?.detail ? { detail: fields.detail } : {}),
     };
-    appendFileSyncTolerant(this.file, `${JSON.stringify(event)}\n`);
+    appendFileSyncDurable(this.file, `${JSON.stringify(event)}\n`);
   }
 
-  /** Deliberately torn half-append: crash-simulation support for recovery tests. */
+  /**
+   * Deliberately torn half-append: crash-simulation support for recovery
+   * tests. Raw append, NO fsync barrier — it simulates a write that died
+   * mid-flight, so claiming durability would defeat the simulation.
+   */
   appendTornForTest(text: string): void {
-    appendFileSyncTolerant(this.file, text);
+    appendFileSync(this.file, text, { encoding: 'utf8' });
   }
 }
 
-function appendFileSyncTolerant(file: string, text: string): void {
-  // appendFileSync creates the file on first write; encoding UTF-8 without
-  // BOM keeps strict JSONL parsers happy.
-  appendFileSync(file, text, { encoding: 'utf8' });
+/**
+ * Append `text` to `file` behind a durable barrier (C17): open, write, fsync,
+ * close. The journal is the §9.4 recovery authority — every event must survive
+ * a process crash AND a power loss before the next phase begins, otherwise
+ * the classification derived from "the journal proves…" is built on cache.
+ */
+export function appendFileSyncDurable(file: string, text: string): void {
+  const fd = openSync(file, 'a');
+  try {
+    writeSync(fd, text, null, 'utf8');
+    fsyncSync(fd);
+  } finally {
+    closeSync(fd);
+  }
+}
+
+/**
+ * Write a complete file behind a durable barrier (fsync before close). Used
+ * for the helper's receipt tmp file so the subsequent atomic rename cannot
+ * publish content that exists only in the page cache.
+ *
+ * N-4 (honest platform limit): the RENAME itself has no persistence barrier —
+ * Windows/Node cannot fsync a directory, so a crash/power-loss between the
+ * rename and the next durable journal event can still lose the receipt file
+ * even though its content was fsynced. The recovery authority is deliberately
+ * ordered around this: the helper appends RECEIPT_WRITTEN to the journal ONLY
+ * AFTER the rename (executor-helper writeReceipt), so a lost receipt file is
+ * classified by the journal alone (C09: effect window closed + receipt ABSENT
+ * → MAY_HAVE_EXECUTED_UNCERTAIN, never a fabricated terminal).
+ */
+export function durableWriteFileSync(file: string, text: string): void {
+  const fd = openSync(file, 'w');
+  try {
+    writeSync(fd, text, null, 'utf8');
+    fsyncSync(fd);
+  } finally {
+    closeSync(fd);
+  }
 }
 
 /**
@@ -114,19 +173,39 @@ export function readJournal(file: string): ReplayEvent[] {
     return [];
   }
   const events: ReplayEvent[] = [];
-  for (const line of raw.split(/\r?\n/)) {
-    if (line.trim().length === 0) continue;
+  const lines = raw.split(/\r?\n/);
+  const endsWithNewline = raw.endsWith('\n');
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i];
+    if (line === undefined || line.trim().length === 0) continue;
+    // N-3: JSON syntax failure and schema violation are SEPARATE verdicts.
+    // Torn-tail tolerance exists for a physically truncated WRITE (a crash
+    // mid-append can only cut bytes, so the survivor is syntactically broken
+    // JSON on the unterminated final line). A line that parses as JSON but
+    // violates the event schema is a WHOLE crafted record — even when it is
+    // the final, unterminated line — and is always corruption/tampering.
+    let parsed: unknown;
     try {
-      events.push(JournalEventSchema.parse(JSON.parse(line)));
+      parsed = JSON.parse(line);
     } catch {
-      events.push({ torn: true, line: line.slice(0, 200) });
+      const physicallyIncompleteFinal = i === lines.length - 1 && !endsWithNewline;
+      events.push({
+        ...(physicallyIncompleteFinal ? { torn: true } : { corrupt: true }),
+        line: line.slice(0, 200),
+      });
+      continue;
+    }
+    try {
+      events.push(JournalEventSchema.parse(parsed));
+    } catch {
+      events.push({ corrupt: true, line: line.slice(0, 200) });
     }
   }
   return events;
 }
 
 export function journalPhases(events: readonly ReplayEvent[]): JournalPhase[] {
-  return events.filter((e): e is JournalEvent => !isTorn(e)).map((e) => e.phase);
+  return events.filter((e): e is JournalEvent => !isTorn(e) && !isCorrupt(e)).map((e) => e.phase);
 }
 
 /** True once the journal proves the helper began validation (first durable record). */
@@ -151,6 +230,7 @@ export function journalStepResults(events: readonly ReplayEvent[]): JournalStepR
   const results: JournalStepResult[] = [];
   for (const event of events) {
     if (isTorn(event)) continue;
+    if (isCorrupt(event)) continue;
     if (event.phase === 'EXEC_DONE' && event.step !== undefined && event.op !== undefined) {
       results.push({ step: event.step, op: event.op, ok: true, detail: event.detail ?? {} });
     }
@@ -165,7 +245,13 @@ export function journalStepResults(events: readonly ReplayEvent[]): JournalStepR
 export function journalDigest(events: readonly ReplayEvent[]): string {
   const hash = createHash('sha256');
   for (const event of events) {
-    hash.update(isTorn(event) ? `TORN\t${event.line}\n` : `${JSON.stringify(event)}\n`);
+    hash.update(
+      isTorn(event)
+        ? `TORN\t${event.line}\n`
+        : isCorrupt(event)
+          ? `CORRUPT\t${event.line}\n`
+          : `${JSON.stringify(event)}\n`,
+    );
   }
   return hash.digest('hex');
 }

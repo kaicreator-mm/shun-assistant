@@ -5,12 +5,14 @@
 //
 // Changing the location changes the bundle hash → the helper must be re-pinned
 // → an explicit authority event (§4.6.1).
-import { homedir } from 'node:os';
-import { join } from 'node:path';
 
 // Build-time constant injected by scripts/build-helper.ts (JSON.stringify'd,
 // so a production build without SHUN_EXECUTOR_BUILD_AUTHORITY_DIR yields '').
 declare const SHUN_EXECUTOR_AUTHORITY_DIR: string | undefined;
+
+// Optional C06 externalization: the HMAC grant-integrity key path, injected
+// the same way (empty/absent = key resolved inside the authority store).
+declare const SHUN_EXECUTOR_HMAC_KEY_FILE: string | undefined;
 
 /** Resolves the trusted authority store the helper re-verifies against. */
 export function authorityDirectory(): string {
@@ -20,8 +22,23 @@ export function authorityDirectory(): string {
 }
 
 /**
+ * C06: external HMAC key path baked in at build time. Empty/absent define =
+ * the key stays co-located in the authority store (the residual same-user
+ * risk, ESCALATED); a deployment protecting the key path via ACLs or a
+ * privileged authority service sets this so store tampering cannot forge
+ * grants. Same trust rules as the authority dir: a build-time constant,
+ * never argv/env, and changing it changes the bundle → re-pin.
+ */
+export function grantHmacKeyFileOverride(): string | undefined {
+  const defined: string | undefined =
+    typeof SHUN_EXECUTOR_HMAC_KEY_FILE === 'string' ? SHUN_EXECUTOR_HMAC_KEY_FILE : undefined;
+  const trimmed = defined?.trim();
+  return trimmed && trimmed.length > 0 ? trimmed : undefined;
+}
+
+/**
  * Empty define == production build without the override env var: it means the
- * documented default (<USERPROFILE>\.shun\authority), NOT the empty string.
+ * protected Windows default (C:\\ProgramData\\Shun\\authority), NOT the empty string.
  * Honoring '' would degrade every trust anchor (helper-pin.json,
  * current-authority.json, grant-hmac.key, plans/) to CWD-relative resolution —
  * and the helper CWD is inherited from the untrusted launcher, which could
@@ -30,5 +47,5 @@ export function authorityDirectory(): string {
  */
 export function resolveAuthorityDirectory(defined: string | undefined): string {
   const trusted = defined?.trim();
-  return trusted && trusted.length > 0 ? trusted : join(homedir(), '.shun', 'authority');
+  return trusted && trusted.length > 0 ? trusted : 'C:\\ProgramData\\Shun\\authority';
 }

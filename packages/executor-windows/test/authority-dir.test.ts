@@ -5,7 +5,7 @@
 // degraded to CWD-relative resolution, and the helper CWD is inherited from
 // the untrusted launcher). No real elevation anywhere in this file.
 import { existsSync, mkdirSync, mkdtempSync, rmSync } from 'node:fs';
-import { homedir, tmpdir } from 'node:os';
+import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { writeEnvelopeFile } from '../src/envelope.ts';
@@ -20,14 +20,14 @@ import {
   type TestAuthority,
 } from './helpers.ts';
 
-const DEFAULT_AUTHORITY_DIR = join(homedir(), '.shun', 'authority');
+const DEFAULT_AUTHORITY_DIR = 'C:\\ProgramData\\Shun\\authority';
 
 describe('authority directory build-define fallback (no elevation)', () => {
-  it('treats the production empty define as "use the documented default"', () => {
+  it('treats the production empty define as "use the protected production default"', () => {
     expect(resolveAuthorityDirectory('')).toBe(DEFAULT_AUTHORITY_DIR);
   });
 
-  it('treats an undefined define as the documented default', () => {
+  it('treats an undefined define as the protected production default', () => {
     expect(resolveAuthorityDirectory(undefined)).toBe(DEFAULT_AUTHORITY_DIR);
   });
 
@@ -89,6 +89,7 @@ describe.skipIf(!ON_WINDOWS)(
         helperRevision: 'shun.executor-windows.helper/planted',
         helperSha256: sha256File(emptyDefineBundle),
         relaySha256: sha256File(authority.relayScript),
+        nodeExeSha256: sha256File(process.execPath),
         workspaceRoot: plantedCwd,
         pinnedAt: new Date().toISOString(),
       });

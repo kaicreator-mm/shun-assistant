@@ -14,6 +14,7 @@ import { hostname } from 'node:os';
 import { join } from 'node:path';
 import {
   type AuthorizedAction,
+  canonicalJson,
   type EnvironmentBackend,
   type EnvironmentFacts,
   type EnvironmentRequirements,
@@ -26,6 +27,7 @@ import {
 } from '@shun/contracts';
 import { assertSafeActionId } from './action-id.ts';
 import { checkStepSurface, resolveActionStep } from './action-surface.ts';
+import { assessAuthorityAnchors } from './anchor-protection.ts';
 import { observeEnvironment } from './facts.ts';
 import {
   CancelledError,
@@ -45,6 +47,7 @@ import {
   FileGrantSource,
   FilePlanSource,
   hmacGrantIntegrityVerifier,
+  resolveGrantHmacKeyFile,
 } from './trusted-store.ts';
 
 export const PROVIDER_ID = 'shun.executor-windows';
@@ -53,6 +56,17 @@ export const PROVIDER_VERSION = '0.1.0';
 export interface LocalWindowsBackendOptions {
   /** Trusted authority store (currentness, grants, plans, HMAC key). */
   authorityDir: string;
+  /**
+   * C06: optional external HMAC grant-integrity key path (e.g. an ACL'd
+   * protected location). Unset = the key resolves inside the authority store.
+   */
+  grantHmacKeyFile?: string;
+  /**
+   * Content-addressed ActionPlan ledger. Plans are NOT signing authority:
+   * planHash is recomputed by validateGrantPresentation and bound by the
+   * protected grant, so this cache may remain runtime-writable.
+   */
+  planDir?: string;
   /** Root for per-action journals/evidence; also the disk-free probe root. */
   workspaceRoot: string;
   defaultTimeoutMs?: number;
@@ -77,6 +91,7 @@ export class LocalWindowsBackend implements EnvironmentBackend {
     this.factsCache ??= await observeEnvironment({
       workspaceRoot: this.options.workspaceRoot,
       networkPolicy: this.options.networkPolicy,
+      authorityDir: this.options.authorityDir,
     });
     return this.factsCache;
   }
@@ -182,20 +197,35 @@ export class LocalWindowsBackend implements EnvironmentBackend {
       );
       if (!grant)
         return refused(`grant ${action.authorizationRef} not found in the authority store`);
-      const plan = new FilePlanSource(join(this.options.authorityDir, 'plans')).byPlanHash(
-        action.planHash,
-      );
+      const plan = new FilePlanSource(
+        this.options.planDir ?? join(this.options.authorityDir, 'plans'),
+      ).byPlanHash(action.planHash);
       if (!plan) return refused(`plan ${action.planHash} not found in the authority store`);
       const currentness = new FileCurrentnessSource(
         join(this.options.authorityDir, 'current-authority.json'),
       ).read();
+      const keyFile = resolveGrantHmacKeyFile(
+        this.options.authorityDir,
+        this.options.grantHmacKeyFile,
+      );
+      const anchors = assessAuthorityAnchors(this.options.authorityDir, keyFile);
+      // USER/NONE execution does not cross an OS privilege boundary: a
+      // same-user process already holds the underlying user rights. Preserve
+      // the legacy HMAC verifier for writable development/local stores. When
+      // production points at the protected C06 anchor (whose HMAC key is
+      // intentionally unreadable), the protected record itself is the trusted
+      // local channel and exact equality authenticates the pre-issued grant.
+      // The elevated backend is the surface that MUST refuse forgeable anchors.
+      const verifyIntegrity = anchors.forgeable
+        ? hmacGrantIntegrityVerifier(keyFile)
+        : (candidate: typeof grant) => canonicalJson(candidate) === canonicalJson(grant);
       const verdict = validateGrantPresentation({
         grant,
         plan,
         action,
         currentAuthority: currentness,
         now: new Date().toISOString(),
-        verifyIntegrity: hmacGrantIntegrityVerifier(this.options.authorityDir),
+        verifyIntegrity,
       });
       if (!verdict.ok)
         return refused(`grant rejected: ${verdict.code} — ${verdict.detail}`, verdict.code);
@@ -229,6 +259,9 @@ export class LocalWindowsBackend implements EnvironmentBackend {
         deadlineAt: new Date(Date.now() + timeoutMs),
         cancelFile,
         evidenceDir: join(runDir, 'evidence'),
+        // N-1: registry ops resolve reg.exe against the trusted system-tools
+        // identity pin from this store (absent anchor ⇒ step refuses).
+        authorityDir: this.options.authorityDir,
       };
 
       journal.append('EXEC_BEGIN', { detail: { totalSteps: 1 } });
@@ -292,12 +325,12 @@ export class LocalWindowsBackend implements EnvironmentBackend {
       // declared verify steps on success, and reconciles declared
       // expectedState before classifying a failure.
       let postState = outcome.ok
-        ? await rerunVerifyStep(action, scope, journal)
-        : await reconcileExpectedState(action, scope, journal);
+        ? await rerunVerifyStep(action, scope, journal, this.options.authorityDir)
+        : await reconcileExpectedState(action, scope, journal, this.options.authorityDir);
       if (outcome.ok && !postState.verified) {
         // A mutating action may still declare verifiable expected state —
         // the reconcile convention doubles as its success verification.
-        postState = await reconcileExpectedState(action, scope, journal);
+        postState = await reconcileExpectedState(action, scope, journal, this.options.authorityDir);
       }
       const classification = classifyRecovery({
         journal: readJournal(journalFile),
@@ -305,10 +338,18 @@ export class LocalWindowsBackend implements EnvironmentBackend {
         allStepsSettled: true,
         postState,
       });
+      // C11: a completed step is only SUCCEEDED when the recovery
+      // classification is COMPLETED_VERIFIED; without independent post-state
+      // evidence the honest terminal is UNCERTAIN — never a dangling success.
+      const terminal: ExecutionReceipt['terminal'] = outcome.ok
+        ? classification.recoveryClassification === 'COMPLETED_VERIFIED'
+          ? 'SUCCEEDED'
+          : 'UNCERTAIN'
+        : 'FAILED';
 
       return this.finalize({
         action: action.actionId,
-        terminal: outcome.ok ? 'SUCCEEDED' : 'FAILED',
+        terminal,
         exitCode: typeof outcome.result.exitCode === 'number' ? outcome.result.exitCode : undefined,
         startedAt,
         reason: outcome.ok ? 'step completed' : outcome.reason,

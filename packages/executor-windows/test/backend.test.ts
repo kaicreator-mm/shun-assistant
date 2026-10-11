@@ -213,11 +213,16 @@ describe.skipIf(!ON_WINDOWS)('LocalWindowsBackend (real, unprivileged)', () => {
   it('failed mutating step stays honestly classified and reconciles declared expectedState', async () => {
     // proc.exec fails (exit 1); expectedState proves the (non-)effect: a
     // marker file that was never created → FAILED_BEFORE_EFFECT resolved.
+    // T04 C10/C14: the reconcile evidence only exists because the grant
+    // declares a filesystem READ scope — without it the reconcile cannot
+    // observe the marker at all and the honest classification is UNCERTAIN
+    // (a structured receipt alone never proves "no effect").
     const marker = join(workspace, 'reconcile-marker.txt');
     const { action } = buildAuthorizedAction(authority, {
       op: 'windows.proc.exec',
       parameters: { program: process.execPath, args: ['-e', 'process.exit(1)'], expectExitCode: 0 },
       requiredPrivilege: 'USER',
+      filesystemScope: { read: [workspace], write: [] },
       expectedState: { path: marker, exists: false },
     });
     const receipt = await backend.execute(action);

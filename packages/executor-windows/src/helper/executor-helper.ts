@@ -14,23 +14,24 @@
 // inside the privileged boundary.
 //
 // Independently re-verified here, never on the launcher's say-so (§4.6.1):
-// envelope schema → own-bundle pin self-check → I/O containment → currentness
+// envelope schema → own-bundle pin self-check → own-interpreter pin self-check
+// → I/O containment → currentness
 // (trusted store, UNRESOLVABLE fails closed) → grant authenticity (HMAC) →
 // grant currentness/expiry → plan-hash re-derivation → action↔plan exact
 // identity → op allowlist + typed surface + declared scope → privilege
 // consistency → execute → structured receipt.
 import { execFile } from 'node:child_process';
-import { renameSync, writeFileSync } from 'node:fs';
+import { renameSync } from 'node:fs';
 import { hostname } from 'node:os';
-import { join, resolve } from 'node:path';
+import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import {
   type ExecutionReceipt,
   ExecutionReceiptSchema,
-  pathWithin,
   validateGrantPresentation,
 } from '@shun/contracts';
 import { checkStepSurface, resolveActionStep } from '../action-surface.ts';
+import { assessAnchorOwnership } from '../anchor-protection.ts';
 import { isElevatedToken } from '../elevation.ts';
 import {
   ENVELOPE_SCHEMA_VERSION,
@@ -39,6 +40,7 @@ import {
   HelperReceiptFileSchema,
   readEnvelopeFile,
 } from '../envelope.ts';
+import { resolveAgainstRoot } from '../fs-safety.ts';
 import {
   CancelledError,
   checkGuards,
@@ -47,16 +49,26 @@ import {
   type InterpreterScope,
   runStep,
 } from '../interpreter.ts';
-import { JournalWriter } from '../journal.ts';
+import { durableWriteFileSync, JournalWriter } from '../journal.ts';
+import { verifyPinnedProgram } from '../program-pinning.ts';
 import { preflightScope } from '../scope-preflight.ts';
 import { systemWhoamiExe } from '../system-exe.ts';
 import {
   FileCurrentnessSource,
   hmacGrantIntegrityVerifier,
   readHelperPin,
+  resolveGrantHmacKeyFile,
   sha256File,
 } from '../trusted-store.ts';
-import { authorityDirectory } from './authority-dir.ts';
+import { authorityDirectory, grantHmacKeyFileOverride } from './authority-dir.ts';
+
+declare const SHUN_EXECUTOR_REQUIRE_PROTECTED_OWNER: boolean | undefined;
+
+function requireProtectedOwner(): boolean {
+  return typeof SHUN_EXECUTOR_REQUIRE_PROTECTED_OWNER === 'boolean'
+    ? SHUN_EXECUTOR_REQUIRE_PROTECTED_OWNER
+    : true;
+}
 
 const PROVIDER_ID = 'shun.executor-windows';
 const PROVIDER_VERSION = '0.1.0';
@@ -91,6 +103,8 @@ class Helper {
   private sideEffectClass: 'R0' | 'R1' | 'R2' | 'R3' = 'R0';
   private journalFile = '';
   private receiptFile = '';
+  /** N-2: measured byte identity of a pinned proc.exec program (journal evidence). */
+  private programSha256: string | undefined;
 
   async run(argv: string[]): Promise<number> {
     const [, , envelopeFile, journalFile, receiptFile] = argv;
@@ -130,14 +144,69 @@ class Helper {
       );
       return HELPER_EXIT_CODES.REFUSED;
     }
+    // C12: the interpreter is part of the pinned identity. The launcher
+    // chooses WHICH node.exe runs this bundle; without this re-measure a
+    // launcher that slipped a substitute interpreter past the launch-side
+    // check would still get an elevated arbitrary-code primitive (the
+    // substitute can ignore this bundle entirely). Pre-journal: nothing
+    // written, REFUSED via the relay exit code only.
+    let nodeSha256: string;
+    try {
+      nodeSha256 = sha256File(process.execPath);
+    } catch {
+      process.stderr.write('helper cannot measure its own node.exe for the pin self-check\n');
+      return HELPER_EXIT_CODES.REFUSED;
+    }
+    if (nodeSha256 !== pin.nodeExeSha256) {
+      process.stderr.write(
+        `node.exe identity mismatch: measured sha256 ${nodeSha256} != pinned ${pin.nodeExeSha256} — refusing to run on an unpinned interpreter\n`,
+      );
+      return HELPER_EXIT_CODES.REFUSED;
+    }
+    // C06 R5: the elevated helper cannot repeat the filtered-token
+    // writability/readability probes (its admin token is expected to write and
+    // read the key), but it CAN independently reject ACL theater by requiring
+    // every authority object to be owned by Administrators/SYSTEM. This check
+    // is pre-journal and uses the pinned real system PowerShell.
+    if (requireProtectedOwner()) {
+      const ownership = assessAnchorOwnership(
+        authorityDirectory(),
+        resolveGrantHmacKeyFile(authorityDirectory(), grantHmacKeyFileOverride()),
+      );
+      if (ownership.length > 0) {
+        process.stderr.write(`authorization anchor ownership rejected: ${ownership.join('; ')}\n`);
+        return HELPER_EXIT_CODES.REFUSED;
+      }
+    }
+
+    // N-2: the program of a windows.proc.exec step is part of the trusted
+    // identity chain too — the plan hash binds only its PATH string. A
+    // trusted provisioning/authority event pins its BYTES; the runtime
+    // launcher is verify-only and this boundary RE-MEASURES pre-journal.
+    // No pin or bytes replaced after provisioning refuse with NOTHING
+    // written. The measured identity is carried into EXEC_START evidence.
+    const preflightStep = resolveActionStep(this.envelope.action);
+    if (preflightStep?.op === 'windows.proc.exec') {
+      const programIdentity = verifyPinnedProgram(authorityDirectory(), preflightStep.args.program);
+      if (!programIdentity.ok) {
+        process.stderr.write(`program identity refused: ${programIdentity.reason}\n`);
+        return HELPER_EXIT_CODES.REFUSED;
+      }
+      this.programSha256 = programIdentity.programSha256;
+    }
+    // C07: containment on RESOLVED paths, not lexical ones — a junction
+    // planted inside the pinned root would otherwise turn the elevated
+    // journal/receipt/evidence writes into an arbitrary-write primitive.
     for (const p of [
       journalFile,
       receiptFile,
       this.envelope.io.cancelFile,
       this.envelope.io.evidenceDir,
     ]) {
-      if (p !== undefined && !pathWithin(resolve(p), pin.workspaceRoot)) {
-        process.stderr.write(`I/O path outside the pinned workspace root: ${p}\n`);
+      if (p === undefined) continue;
+      const contained = resolveAgainstRoot(p, pin.workspaceRoot);
+      if (!contained.ok) {
+        process.stderr.write(`I/O path refused: ${contained.reason}\n`);
         return HELPER_EXIT_CODES.REFUSED;
       }
     }
@@ -185,7 +254,12 @@ class Helper {
       action: this.envelope.action,
       currentAuthority: currentness,
       now: new Date().toISOString(),
-      verifyIntegrity: hmacGrantIntegrityVerifier(authorityDirectory()),
+      verifyIntegrity: hmacGrantIntegrityVerifier(
+        // C06: the key may be externalized to a protected path (build define);
+        // a store-located key tampered by a same-user attacker then simply
+        // fails verification — refuse, never "presented, therefore fine".
+        resolveGrantHmacKeyFile(authorityDirectory(), grantHmacKeyFileOverride()),
+      ),
     });
     if (!verdict.ok) {
       this.journal.append('REFUSED', {
@@ -231,6 +305,23 @@ class Helper {
     }
     this.journal.append('SCOPE_OK', { detail: { actionId } });
 
+    // C08: the one-shot helper IS the elevated execution surface. A USER/NONE
+    // grant executed here would run a user-level action with admin rights —
+    // a privilege gain across the boundary. The unprivileged in-process
+    // backend owns NONE/USER actions; this surface accepts ELEVATED only.
+    const grantLevel = verdict.grant.actionScope.privilegeLevel;
+    if (grantLevel !== 'ELEVATED') {
+      this.journal.append('REFUSED', {
+        detail: {
+          why: 'privilege',
+          detail: `grant privilegeLevel ${grantLevel} presented to the privileged helper`,
+        },
+      });
+      return this.refuse(
+        `privileged helper refuses ${grantLevel} grants — USER/NONE actions must run on the unprivileged surface`,
+      );
+    }
+
     // Privilege consistency: ELEVATED action on a filtered token is a
     // structured refusal (also the direct-launch negative evidence path).
     if (this.envelope.action.action.requiredPrivilege === 'ELEVATED' && !this.isElevated) {
@@ -249,10 +340,21 @@ class Helper {
       deadlineAt: new Date(Date.now() + timeoutMs),
       cancelFile: this.envelope.io.cancelFile,
       evidenceDir: this.envelope.io.evidenceDir,
+      // N-1: registry ops resolve reg.exe against the trusted system-tools
+      // identity pin from this store (absent anchor ⇒ step refuses).
+      authorityDir: authorityDirectory(),
     };
 
     this.journal.append('EXEC_BEGIN', { detail: { totalSteps: 1 } });
-    this.journal.append('EXEC_START', { step: 0, op: step.op });
+    this.journal.append('EXEC_START', {
+      step: 0,
+      op: step.op,
+      // N-2: the measured byte identity of the pinned program, so the journal
+      // evidence records WHICH bytes ran — not merely which path was named.
+      ...(this.programSha256 !== undefined
+        ? { detail: { programSha256: this.programSha256 } }
+        : {}),
+    });
     let outcome: Awaited<ReturnType<typeof runStep>>;
     try {
       checkGuards(ctx, 'before-step');
@@ -378,7 +480,16 @@ class Helper {
     };
     const parsed = HelperReceiptFileSchema.parse(payload);
     const tmp = `${this.receiptFile}.tmp`;
-    writeFileSync(tmp, `${JSON.stringify(parsed, null, 2)}\n`, 'utf8');
+    durableWriteFileSync(tmp, `${JSON.stringify(parsed, null, 2)}\n`);
+    // N-4 (honest platform limit): this rename has NO persistence barrier —
+    // Windows/Node cannot fsync a directory, so a crash after the rename but
+    // before the next durable journal event may still lose the receipt file
+    // even though its content was fsynced. The recovery order is therefore
+    // journal-authoritative: RECEIPT_WRITTEN below is appended (fsynced) only
+    // AFTER the rename, and a receipt that vanished despite the rename
+    // degrades to the C09 path — the launcher classifies from the journal
+    // alone (effect window closed + receipt ABSENT →
+    // MAY_HAVE_EXECUTED_UNCERTAIN), never a fabricated terminal.
     renameSync(tmp, this.receiptFile);
     this.journal.append('RECEIPT_WRITTEN', {
       detail: { terminal: input.terminal, receiptFile: this.receiptFile },
@@ -390,9 +501,18 @@ class Helper {
 
 async function whoamiGroups(): Promise<string> {
   return new Promise((resolvePromise) => {
-    // SystemRoot-anchored, never PATH: the launcher controls PATH, and a
-    // planted fake whoami could get a filtered token judged elevated.
-    execFile(systemWhoamiExe(), ['/groups', '/fo', 'csv'], { windowsHide: true }, (err, stdout) => {
+    // C13: machine-evidenced resolution, never PATH and never the inherited
+    // SystemRoot alone: the launcher controls both, and a planted fake
+    // whoami could get a filtered token judged elevated. N-1: the candidate
+    // binary is additionally verified against the authority store's
+    // system-tools identity pin — a forged whoami (or a missing pin) ⇒
+    // empty capture ⇒ isElevatedToken('') = false ⇒ ELEVATED refused.
+    const exe = systemWhoamiExe(authorityDirectory());
+    if (!exe) {
+      resolvePromise('');
+      return;
+    }
+    execFile(exe, ['/groups', '/fo', 'csv'], { windowsHide: true }, (err, stdout) => {
       resolvePromise(err ? '' : String(stdout));
     });
   });
@@ -455,6 +575,8 @@ export function toContractsReceipt(helper: unknown): ExecutionReceipt {
   return ExecutionReceiptSchema.parse(rest);
 }
 
-await new Helper().run(process.argv).then((code) => {
-  process.exit(code);
-});
+// Natural exit (exitCode, not process.exit): an explicit process.exit can
+// truncate pending stderr pipe writes on Windows, and the pre-journal refusal
+// messages ARE the negative evidence channel.
+const exitCode = await new Helper().run(process.argv);
+process.exitCode = exitCode;

@@ -23,6 +23,7 @@ import {
 } from '@shun/contracts';
 import { build } from 'esbuild';
 import { isElevatedToken } from '../src/elevation.ts';
+import { resolveSystemRoot } from '../src/system-exe.ts';
 import {
   generateGrantHmacKey,
   type HelperPin,
@@ -33,6 +34,7 @@ import {
   writeGrantRecord,
   writeHelperPin,
   writePlanRecord,
+  writeSystemToolsPin,
 } from '../src/trusted-store.ts';
 
 /**
@@ -44,14 +46,28 @@ import {
  */
 export const ON_WINDOWS = process.platform === 'win32';
 
+/**
+ * P3a: probe with the MACHINE System32 whoami.exe, never whatever wins PATH
+ * resolution — under Git Bash a coreutils `whoami.exe` (which takes no
+ * /groups flag) can shadow the Windows one and the parse would fail; the
+ * catch below would then misreport the host as non-elevated and silently
+ * skip the elevation-negative cases. Falls back to PATH only when the
+ * well-known binary does not exist (non-standard install).
+ */
+const HOST_WHOAMI_EXE = 'C:\\Windows\\System32\\whoami.exe';
+
 export const IS_ELEVATED_HOST: boolean = (() => {
   if (!ON_WINDOWS) return false;
   try {
     return isElevatedToken(
-      execFileSync('whoami.exe', ['/groups', '/fo', 'csv'], {
-        encoding: 'utf8',
-        windowsHide: true,
-      }),
+      execFileSync(
+        existsSync(HOST_WHOAMI_EXE) ? HOST_WHOAMI_EXE : 'whoami.exe',
+        ['/groups', '/fo', 'csv'],
+        {
+          encoding: 'utf8',
+          windowsHide: true,
+        },
+      ),
     );
   } catch {
     return false;
@@ -71,6 +87,50 @@ export interface TestAuthority {
   relayScript: string;
 }
 
+/** Build a helper bundle with the GIVEN authority dir baked in. */
+export async function buildHelperBundle(
+  authorityDir: string,
+  outfile: string,
+  extraDefines: Record<string, string> = {},
+): Promise<void> {
+  await build({
+    entryPoints: [join(import.meta.dirname, '..', 'src', 'helper', 'executor-helper.ts')],
+    bundle: true,
+    platform: 'node',
+    format: 'esm',
+    target: 'node24',
+    outfile,
+    define: {
+      SHUN_EXECUTOR_AUTHORITY_DIR: JSON.stringify(authorityDir),
+      SHUN_EXECUTOR_REQUIRE_PROTECTED_OWNER: 'false',
+      ...extraDefines,
+    },
+  });
+}
+
+/**
+ * N-1 provisioning stand-in: pin the REAL host system tools' digests into an
+ * authority store (production provisioning does this at the same trusted
+ * moment as the helper pin; on this host the "real" tools are the ones under
+ * the machine-evidenced system root). Skips silently off-Windows — every
+ * consumer of the pin is Windows-gated anyway.
+ */
+export function writeHostSystemToolsPin(authorityDir: string): void {
+  if (!ON_WINDOWS) return;
+  const root = resolveSystemRoot();
+  if (!root.ok) return;
+  const digest = (relative: readonly string[]): string =>
+    sha256File(join(root.systemRoot, ...relative));
+  writeSystemToolsPin(authorityDir, {
+    schemaVersion: 'shun.executor-windows.system-tools-pin/1',
+    whoamiSha256: digest(['System32', 'whoami.exe']),
+    regSha256: digest(['System32', 'reg.exe']),
+    powershellSha256: digest(['System32', 'WindowsPowerShell', 'v1.0', 'powershell.exe']),
+    taskkillSha256: digest(['System32', 'taskkill.exe']),
+    pinnedAt: new Date().toISOString(),
+  });
+}
+
 /** Build the helper bundle with the TEST authority dir baked in + a full pin. */
 export async function createTestAuthority(basename = 'shun-exec-'): Promise<TestAuthority> {
   const root = mkdtempSync(join(tmpdir(), basename));
@@ -82,15 +142,7 @@ export async function createTestAuthority(basename = 'shun-exec-'): Promise<Test
   mkdirSync(distDir, { recursive: true });
 
   const helperBundle = join(distDir, 'executor-helper.mjs');
-  await build({
-    entryPoints: [join(import.meta.dirname, '..', 'src', 'helper', 'executor-helper.ts')],
-    bundle: true,
-    platform: 'node',
-    format: 'esm',
-    target: 'node24',
-    outfile: helperBundle,
-    define: { SHUN_EXECUTOR_AUTHORITY_DIR: JSON.stringify(authorityDir) },
-  });
+  await buildHelperBundle(authorityDir, helperBundle);
 
   const relayScript = join(import.meta.dirname, '..', 'src', 'relay', 'elevate-relay.ps1');
   const hmacKey = generateGrantHmacKey();
@@ -102,10 +154,17 @@ export async function createTestAuthority(basename = 'shun-exec-'): Promise<Test
     helperRevision: 'shun.executor-windows.helper/test',
     helperSha256: sha256File(helperBundle),
     relaySha256: sha256File(relayScript),
+    // C12: the interpreter running the helper is pinned like the bundle; the
+    // test host's node IS the pinned interpreter.
+    nodeExeSha256: sha256File(process.execPath),
     workspaceRoot,
     pinnedAt: new Date().toISOString(),
   };
   writeHelperPin(authorityDir, pin);
+  // N-1: the system-tools identity pin is provisioned at the same trusted
+  // moment as the helper pin (the helper's whoami probe and the registry ops
+  // verify candidates against it and fail closed without it).
+  writeHostSystemToolsPin(authorityDir);
   return { root, authorityDir, workspaceRoot, hmacKey, helperBundle, relayScript };
 }
 

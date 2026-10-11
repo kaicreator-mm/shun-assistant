@@ -6,16 +6,17 @@
 //   current-authority.json   CurrentAuthorityState — CURRENT | UNRESOLVABLE
 //   grant-hmac.key           base64 32-byte HMAC key (authority-held)
 //   helper-pin.json          pinned helper/relay identity + revision
-//   plans/<planHash>.json    ActionPlan records (trusted plan source)
+//   system-tools.json        pinned binary identity of the system tools (N-1)
+//   programs/<pathHash>.json pinned byte identity per proc.exec program (N-2)
 //
-// Trust anchors, not security theater: on a single-user Windows host the
-// store is protected by user-profile ACLs, and the HELPER resolves this
-// directory from a build-time constant — never from the envelope, argv or
-// environment an attacker-controlled launcher could influence (§4.6.1: the
-// privileged boundary re-verifies against trusted state "never on the
-// caller's say-so"). Moving or re-keying the store is an explicit authority
-// event: it changes the helper bundle (build-time constant) and therefore
-// requires a helper re-pin, exactly like any other helper revision.
+// C06 R5 production trust anchor: the helper/writer resolve this store from a
+// build-time constant (default C:\\ProgramData\\Shun\\authority). Runtime
+// receives read-only access to non-secret records; grants/currentness/pins and
+// every child object are owned by Administrators/SYSTEM; the symmetric HMAC
+// key is unreadable to the filtered runtime token. Dynamic ActionPlan records
+// may live in a separate runtime-writable content-addressed cache because the
+// protected grant binds planHash and both launcher/helper re-derive it.
+// Moving/re-keying the anchor is an explicit authority/provisioning event.
 import { createHash, createHmac, randomBytes, timingSafeEqual } from 'node:crypto';
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
@@ -41,6 +42,15 @@ export const HelperPinSchema = z.strictObject({
   /** SHA-256 of the elevation relay script content (lowercase hex). */
   relaySha256: z.string().regex(/^[0-9a-f]{64}$/),
   /**
+   * SHA-256 of the node.exe interpreter the helper runs on (lowercase hex,
+   * C12). The launcher chooses the interpreter path and an attacker-run
+   * launcher could point it at its own node; without this pin the bundle
+   * hash would be measured theater — a substituted interpreter can ignore
+   * the bundle entirely. An interpreter update is an authority event: it
+   * changes this pin exactly like a helper revision.
+   */
+  nodeExeSha256: z.string().regex(/^[0-9a-f]{64}$/),
+  /**
    * The only directory root inside which the helper accepts its I/O channel
    * paths (journal/receipt/cancel/evidence). The helper runs elevated: an
    * unbounded journal/receipt path from the launcher would be an elevated
@@ -51,6 +61,145 @@ export const HelperPinSchema = z.strictObject({
   note: z.string().min(1).optional(),
 });
 export type HelperPin = z.infer<typeof HelperPinSchema>;
+
+export const WRITER_PIN_SCHEMA_VERSION = 'shun.executor-windows.anchor-writer-pin/1';
+
+export const WriterPinSchema = z.strictObject({
+  schemaVersion: z.literal(WRITER_PIN_SCHEMA_VERSION),
+  writerSha256: z.string().regex(/^[0-9a-f]{64}$/),
+  nodeExeSha256: z.string().regex(/^[0-9a-f]{64}$/),
+  pinnedAt: z.string().min(1),
+});
+export type WriterPin = z.infer<typeof WriterPinSchema>;
+
+export function readWriterPin(authorityDir: string): WriterPin | undefined {
+  const file = join(authorityDir, 'writer-pin.json');
+  if (!existsSync(file)) return undefined;
+  try {
+    return WriterPinSchema.parse(JSON.parse(readFileSync(file, 'utf8')));
+  } catch {
+    return undefined;
+  }
+}
+
+export function writeWriterPin(authorityDir: string, pin: WriterPin): void {
+  mkdirSync(authorityDir, { recursive: true });
+  writeFileSync(join(authorityDir, 'writer-pin.json'), `${JSON.stringify(pin, null, 2)}\n`, 'utf8');
+}
+
+export const SYSTEM_TOOLS_PIN_SCHEMA_VERSION = 'shun.executor-windows.system-tools-pin/1';
+
+/**
+ * Pinned BINARY IDENTITY of the security-relevant Windows system tools
+ * (N-1): whoami.exe decides whether a token counts as elevated, reg.exe both
+ * answers the C13 fixed-point probe and performs registry mutations, and
+ * powershell.exe is the very host the UAC relay elevates. The C13 fixed
+ * point proves nothing about WHICH BYTES answered (a self-written reg.exe in
+ * a planted root can re-report itself), so authority provisioning records
+ * the real tools' sha256 at the same trusted moment as the helper pin and
+ * resolution (src/system-exe.ts) verifies candidates against it — missing
+ * record, missing digest, or any mismatch fails closed.
+ *
+ * Honest boundary: a real binary COPIED elsewhere passes identity (equal
+ * bytes); the machine-evidence path defeats copies by construction. In the
+ * R5 production deployment this record is in the protected admin-owned
+ * anchor and is runtime read-only; writable legacy/test stores are not a
+ * privileged trust root.
+ */
+export const SystemToolsPinSchema = z.strictObject({
+  schemaVersion: z.literal(SYSTEM_TOOLS_PIN_SCHEMA_VERSION),
+  /** SHA-256 of <SystemRoot>\System32\whoami.exe (lowercase hex). */
+  whoamiSha256: z.string().regex(/^[0-9a-f]{64}$/),
+  /** SHA-256 of <SystemRoot>\System32\reg.exe (lowercase hex). */
+  regSha256: z.string().regex(/^[0-9a-f]{64}$/),
+  /** SHA-256 of <SystemRoot>\System32\WindowsPowerShell\v1.0\powershell.exe (lowercase hex). */
+  powershellSha256: z.string().regex(/^[0-9a-f]{64}$/),
+  /** SHA-256 of <SystemRoot>\System32\taskkill.exe (lowercase hex). */
+  taskkillSha256: z.string().regex(/^[0-9a-f]{64}$/),
+  pinnedAt: z.string().min(1),
+});
+export type SystemToolsPin = z.infer<typeof SystemToolsPinSchema>;
+
+/** Reads + parses the system-tools pin. Any absence/corruption fails closed (undefined). */
+export function readSystemToolsPin(authorityDir: string): SystemToolsPin | undefined {
+  const file = join(authorityDir, 'system-tools.json');
+  if (!existsSync(file)) return undefined;
+  try {
+    return SystemToolsPinSchema.parse(JSON.parse(readFileSync(file, 'utf8')));
+  } catch {
+    return undefined;
+  }
+}
+
+/** Authority-side provisioning write — same trusted moment as writeHelperPin. */
+export function writeSystemToolsPin(authorityDir: string, pin: SystemToolsPin): void {
+  mkdirSync(authorityDir, { recursive: true });
+  writeFileSync(
+    join(authorityDir, 'system-tools.json'),
+    `${JSON.stringify(pin, null, 2)}\n`,
+    'utf8',
+  );
+}
+
+export const PROGRAM_PIN_SCHEMA_VERSION = 'shun.executor-windows.program-pin/1';
+
+/**
+ * Pinned BYTE IDENTITY of a windows.proc.exec program (N-2, the C12 audit's
+ * actual target). The plan hash binds the program PATH string only, so bytes
+ * swapped at the same path after the grant would otherwise run elevated.
+ * Program pins are created/updated only by a trusted provisioning/authority
+ * event. Runtime launcher and elevated helper are verify-only: both
+ * canonicalize + re-measure and require the same protected pin. An intentional
+ * program update therefore requires an explicit re-pin authority event.
+ */
+export const ProgramPinSchema = z.strictObject({
+  schemaVersion: z.literal(PROGRAM_PIN_SCHEMA_VERSION),
+  /** The canonical (real) program path this pin is keyed by. */
+  programPath: z.string().min(1),
+  /** SHA-256 of the program file content at pin time (lowercase hex). */
+  programSha256: z.string().regex(/^[0-9a-f]{64}$/),
+  pinnedAt: z.string().min(1),
+});
+export type ProgramPin = z.infer<typeof ProgramPinSchema>;
+
+/** Deterministic store key: the lowercased canonical path, digested. */
+export function programPinKey(canonicalProgramPath: string): string {
+  return createHash('sha256').update(canonicalProgramPath.toLowerCase(), 'utf8').digest('hex');
+}
+
+/**
+ * Reads the pin for one canonical program path; absence, corruption, or a
+ * record that does not NAME the requested path fails closed (undefined, F-3):
+ * the store key is only an addressing digest — a record is trusted for a path
+ * solely when its own `programPath` field cross-checks against the request
+ * (case-insensitive, like Win32 paths). A key collision or a crafted record
+ * therefore never authenticates a path it does not name.
+ */
+export function readProgramPin(
+  authorityDir: string,
+  canonicalPath: string,
+): ProgramPin | undefined {
+  const file = join(authorityDir, 'programs', `${programPinKey(canonicalPath)}.json`);
+  if (!existsSync(file)) return undefined;
+  try {
+    const pin = ProgramPinSchema.parse(JSON.parse(readFileSync(file, 'utf8')));
+    if (pin.programPath.toLowerCase() !== canonicalPath.toLowerCase()) return undefined;
+    return pin;
+  } catch {
+    return undefined;
+  }
+}
+
+/** Trusted provisioning/authority-side write; normal runtime is verify-only. */
+export function writeProgramPin(authorityDir: string, pin: ProgramPin): void {
+  const dir = join(authorityDir, 'programs');
+  mkdirSync(dir, { recursive: true });
+  writeFileSync(
+    join(dir, `${programPinKey(pin.programPath)}.json`),
+    `${JSON.stringify(pin, null, 2)}\n`,
+    'utf8',
+  );
+}
 
 export function sha256File(file: string): string {
   return createHash('sha256').update(readFileSync(file)).digest('hex');
@@ -123,6 +272,25 @@ export function writeGrantHmacKey(authorityDir: string, keyBase64: string): void
   writeFileSync(join(authorityDir, 'grant-hmac.key'), `${keyBase64}\n`, 'utf8');
 }
 
+/**
+ * C06 — HMAC key location (the grant-integrity trust anchor). Default: the
+ * key sits co-located in the authority store, which on a single-user Windows
+ * host is writable (and readable) by the very user whose grants it protects:
+ * a same-user attacker can rewrite grants AND re-sign them with the readable
+ * key — the residual hole that only an independently protected trust
+ * principal closes (see ESCALATED in the T04 report). What CAN be hardened
+ * in scope is key EXTERNALIZATION: a deployment may move the key to a
+ * protected path (ACL'd to Administrators/SYSTEM, or held by the privileged
+ * authority service) and pass it in via the build define. The helper then
+ * ignores any store-located key, so a rewritten grant record or a swapped
+ * co-located key fails HMAC verification and the privileged boundary refuses
+ * (fail closed) instead of accepting the tampered anchor.
+ */
+export function resolveGrantHmacKeyFile(authorityDir: string, overridePath?: string): string {
+  const trimmed = overridePath?.trim();
+  return trimmed && trimmed.length > 0 ? trimmed : join(authorityDir, 'grant-hmac.key');
+}
+
 function hmacOf(keyBase64: string, grant: AuthorizationGrant): string {
   const { integrity: _omit, ...payload } = grant;
   return createHmac('sha256', Buffer.from(keyBase64, 'base64'))
@@ -135,27 +303,32 @@ export function signGrantWithHmac(keyBase64: string, grant: AuthorizationGrant):
   return { scheme: 'HMAC_SHA256', value: hmacOf(keyBase64, grant) };
 }
 
+export function verifyGrantWithHmac(keyBase64: string, grant: AuthorizationGrant): boolean {
+  if (grant.integrity.scheme !== 'HMAC_SHA256') return false;
+  const expected = hmacOf(keyBase64, grant);
+  const a = Buffer.from(expected, 'utf8');
+  const b = Buffer.from(grant.integrity.value, 'utf8');
+  return a.length === b.length && timingSafeEqual(a, b);
+}
+
 /**
- * Privileged-side verifier for `validateGrantPresentation`. Deliberately
- * returns false on ANY substrate failure (missing/corrupt key file): an
- * unverifiable envelope is an unauthentic grant, and the boundary never
- * degrades to "presented, therefore fine".
+ * Privileged-side verifier for `validateGrantPresentation`. `keyFile` names
+ * the HMAC key explicitly (resolve via resolveGrantHmacKeyFile). Deliberately
+ * returns false on ANY substrate failure (missing/unreadable/corrupt key
+ * file): an unverifiable envelope is an unauthentic grant, and the boundary
+ * never degrades to "presented, therefore fine".
  */
-export function hmacGrantIntegrityVerifier(authorityDir: string) {
+export function hmacGrantIntegrityVerifier(keyFile: string) {
   return (grant: AuthorizationGrant, envelope: GrantIntegrity): boolean => {
     if (envelope.scheme !== 'HMAC_SHA256') return false;
     let keyBase64: string;
     try {
-      keyBase64 = readFileSync(join(authorityDir, 'grant-hmac.key'), 'utf8').trim();
+      keyBase64 = readFileSync(keyFile, 'utf8').trim();
       if (keyBase64.length === 0) return false;
     } catch {
       return false;
     }
-    const expected = hmacOf(keyBase64, grant);
-    // Constant-time compare; both values are base64 of 32 raw bytes.
-    const a = Buffer.from(expected, 'utf8');
-    const b = Buffer.from(envelope.value, 'utf8');
-    return a.length === b.length && timingSafeEqual(a, b);
+    return verifyGrantWithHmac(keyBase64, { ...grant, integrity: envelope });
   };
 }
 

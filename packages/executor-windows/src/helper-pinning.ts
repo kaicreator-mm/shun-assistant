@@ -12,22 +12,36 @@
 // path: the path is resolved from the backend's own package location, the op
 // schemas carry no helper-shaped keys, and a substituted file simply fails
 // the identity check.
+//
+// C12: the bundle hash alone is measured theater if the INTERPRETER running
+// it is arbitrary — the launcher chooses node.exe, an attacker-run launcher
+// points it at its own node, and Start-Process -Verb RunAs would elevate that
+// substitute. The pin therefore also records node.exe's sha256; the launcher
+// measures before the relay spawn and the helper re-measures its own process
+// image inside the privileged boundary.
 import { readFileSync } from 'node:fs';
 import type { HelperPin } from './trusted-store.ts';
 import { sha256File } from './trusted-store.ts';
 
 export type IdentityCheck =
-  | { ok: true; helperRevision: string; measuredSha256: string; relayMeasuredSha256: string }
+  | {
+      ok: true;
+      helperRevision: string;
+      measuredSha256: string;
+      relayMeasuredSha256: string;
+      nodeExeSha256: string;
+    }
   | { ok: false; reason: string };
 
 /**
- * Measure the helper bundle and relay script on disk and compare against the
- * authority pin. Refuses on: missing/corrupt pin (fail closed, never a
- * default), unreadable helper/relay, or any digest mismatch.
+ * Measure the helper bundle, relay script and node.exe interpreter on disk
+ * and compare against the authority pin. Refuses on: missing/corrupt pin
+ * (fail closed, never a default), unreadable files, or any digest mismatch.
  */
 export function verifyPinnedHelper(
   helperBundlePath: string,
   relayScriptPath: string,
+  nodeExePath: string,
   pin: HelperPin | undefined,
 ): IdentityCheck {
   if (!pin) {
@@ -37,16 +51,22 @@ export function verifyPinnedHelper(
     };
   }
   let helperSha256: string;
-  let relaySha256: string;
   try {
     helperSha256 = sha256File(helperBundlePath);
   } catch (e) {
     return { ok: false, reason: `helper bundle unreadable: ${message(e)}` };
   }
+  let relaySha256: string;
   try {
     relaySha256 = sha256File(relayScriptPath);
   } catch (e) {
     return { ok: false, reason: `relay script unreadable: ${message(e)}` };
+  }
+  let nodeExeSha256: string;
+  try {
+    nodeExeSha256 = sha256File(nodeExePath);
+  } catch (e) {
+    return { ok: false, reason: `node.exe unreadable: ${message(e)}` };
   }
   if (helperSha256 !== pin.helperSha256) {
     return {
@@ -60,11 +80,18 @@ export function verifyPinnedHelper(
       reason: `relay identity mismatch: measured sha256 ${relaySha256} != pinned ${pin.relaySha256} (revision ${pin.helperRevision}) — substitution refused`,
     };
   }
+  if (nodeExeSha256 !== pin.nodeExeSha256) {
+    return {
+      ok: false,
+      reason: `node.exe identity mismatch: measured sha256 ${nodeExeSha256} != pinned ${pin.nodeExeSha256} (revision ${pin.helperRevision}) — unpinned interpreter refused`,
+    };
+  }
   return {
     ok: true,
     helperRevision: pin.helperRevision,
     measuredSha256: helperSha256,
     relayMeasuredSha256: relaySha256,
+    nodeExeSha256,
   };
 }
 

@@ -37,6 +37,19 @@ function Write-Relay($obj) {
 }
 
 try {
+  # N-R2-1 (belt-and-braces): the elevated child inherits THIS process's
+  # environment through Start-Process -Verb RunAs. The launcher already
+  # spawned us with a sterilized minimal environment, but the relay is the
+  # last gate before UAC consent: no Node interpreter-directive variable may
+  # cross, or NODE_OPTIONS=--require=attacker.js would execute attacker JS
+  # inside the pinned elevated node before any self-check. Remove the known
+  # names AND sweep the whole NODE_* family.
+  foreach ($name in @('NODE_OPTIONS','NODE_PATH','NODE_EXTRA_CA_CERTS','NODE_V8_COVERAGE','NODE_DEBUG','NODE_COMPILE_CACHE','NODE_REPL_EXTERNAL_MODULE')) {
+    if (Test-Path "Env:\$name") { Remove-Item "Env:\$name" -ErrorAction SilentlyContinue }
+  }
+  Get-ChildItem Env: | Where-Object { $_.Name -like 'NODE*' } | ForEach-Object {
+    Remove-Item ("Env:\" + $_.Name) -ErrorAction SilentlyContinue
+  }
   $helperArgs = @()
   foreach ($a in (ConvertFrom-Json $HelperArgsJson)) { $helperArgs += [string]$a }
   # The helper bundle itself leads the command line, then its argv.

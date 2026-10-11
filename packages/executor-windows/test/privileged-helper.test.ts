@@ -117,7 +117,12 @@ describe.skipIf(!ON_WINDOWS)(
       },
     );
 
-    it('USER action on the same token runs the full validation chain to EXEC', () => {
+    it('USER action on the same token → REFUSED: the privileged helper accepts ELEVATED grants only (C08)', () => {
+      // Encoded defect, corrected for T04 C08: the old assertion ran a USER
+      // grant to completion inside the privileged boundary — a privilege
+      // gain (user-level action executing with whatever rights the helper
+      // process carries). USER/NONE actions belong to the unprivileged
+      // backend; the helper must refuse them before any effect.
       const target = join(workspace, 'user-ok.txt');
       const built = buildAuthorizedAction(authority, {
         op: 'windows.fs.write',
@@ -138,10 +143,16 @@ describe.skipIf(!ON_WINDOWS)(
         },
       });
       const run = runHelperDirectly(authority, p.envelopeFile, p.journalFile, p.receiptFile);
-      expect(run.exitCode, run.receipt ?? run.stderr).toBe(0);
-      expect(JSON.parse(must(run.receipt, 'helper receipt')).terminal).toBe('SUCCEEDED');
-      expect(existsSync(target)).toBe(true);
-      expect(journalPhases(readJournal(p.journalFile))).toContain('RECEIPT_WRITTEN');
+      expect(run.exitCode).toBe(2);
+      const receipt = JSON.parse(must(run.receipt, 'helper receipt'));
+      expect(receipt.terminal).toBe('REFUSED');
+      expect(receipt.detail.reason).toContain(
+        'USER/NONE actions must run on the unprivileged surface',
+      );
+      expect(existsSync(target)).toBe(false);
+      const phases = journalPhases(readJournal(p.journalFile));
+      expect(phases).not.toContain('PRIVILEGE_OK');
+      expect(phases).not.toContain('EXEC_START');
     });
 
     it('forged grant (self-declared, no integrity envelope) → REFUSED GRANT_NOT_AUTHENTIC', () => {
@@ -314,7 +325,7 @@ describe.skipIf(!ON_WINDOWS)(
         define: { SHUN_EXECUTOR_AUTHORITY_DIR: JSON.stringify(join(authority.root, 'elsewhere')) },
       });
       const pin = readHelperPin(authority.authorityDir);
-      const check = verifyPinnedHelper(impostor, authority.relayScript, pin);
+      const check = verifyPinnedHelper(impostor, authority.relayScript, process.execPath, pin);
       expect(check.ok).toBe(false);
       if (!check.ok) expect(check.reason).toContain('helper identity mismatch');
 
@@ -396,55 +407,75 @@ describe.skipIf(!ON_WINDOWS)(
       expect(existsSync(join(workspace, 'executions'))).toBe(false);
     });
 
-    it('cancel sentinel present before effects → CANCELLED receipt (exit 5)', () => {
-      const built = buildAuthorizedAction(authority, {
-        op: 'windows.fs.write',
-        parameters: { path: join(workspace, 'cancel-me.txt'), content: 'x' },
-        requiredPrivilege: 'USER',
-        filesystemScope: { read: [], write: [workspace] },
-      });
-      const p = envelopePaths('cancel-before');
-      writeFileSync(join(p.runDir, 'cancel.sentinel'), 'x', 'utf8');
-      writeEnvelopeFile(p.envelopeFile, {
-        action: built.action,
-        grant: built.grant,
-        plan: built.plan,
-        io: {
-          journalFile: p.journalFile,
-          receiptFile: p.receiptFile,
-          cancelFile: join(p.runDir, 'cancel.sentinel'),
-          evidenceDir: join(p.runDir, 'evidence'),
-        },
-      });
-      const run = runHelperDirectly(authority, p.envelopeFile, p.journalFile, p.receiptFile);
-      expect(run.exitCode).toBe(5);
-      expect(JSON.parse(must(run.receipt, 'helper receipt')).terminal).toBe('CANCELLED');
-      expect(existsSync(join(workspace, 'cancel-me.txt'))).toBe(false);
-    });
+    // T04 C08: ELEVATED-only helper surface; on a filtered-token host the
+    // elevation-consistency refusal fires first (covered by the
+    // privilege-negative case above), so this runs on elevated hosts only.
+    it.skipIf(!IS_ELEVATED_HOST)(
+      'cancel sentinel present before effects → CANCELLED receipt (exit 5)',
+      () => {
+        // T04 C08: only ELEVATED grants are accepted by the helper, so this
+        // case is meaningful only where the direct-spawned helper can
+        // actually pass the elevation check (elevated host). The cancel
+        // machinery itself is exercised unprivileged in backend.test.ts.
+        const built = buildAuthorizedAction(authority, {
+          op: 'windows.fs.write',
+          parameters: { path: join(workspace, 'cancel-me.txt'), content: 'x' },
+          requiredPrivilege: 'ELEVATED',
+          sideEffectClass: 'R2',
+          filesystemScope: { read: [], write: [workspace] },
+        });
+        const p = envelopePaths('cancel-before');
+        writeFileSync(join(p.runDir, 'cancel.sentinel'), 'x', 'utf8');
+        writeEnvelopeFile(p.envelopeFile, {
+          action: built.action,
+          grant: built.grant,
+          plan: built.plan,
+          io: {
+            journalFile: p.journalFile,
+            receiptFile: p.receiptFile,
+            cancelFile: join(p.runDir, 'cancel.sentinel'),
+            evidenceDir: join(p.runDir, 'evidence'),
+          },
+        });
+        const run = runHelperDirectly(authority, p.envelopeFile, p.journalFile, p.receiptFile);
+        expect(run.exitCode).toBe(5);
+        expect(JSON.parse(must(run.receipt, 'helper receipt')).terminal).toBe('CANCELLED');
+        expect(existsSync(join(workspace, 'cancel-me.txt'))).toBe(false);
+      },
+    );
 
-    it('action deadline (tiny timeoutMs) → TIMED_OUT receipt (exit 4)', () => {
-      const built = buildAuthorizedAction(authority, {
-        op: 'windows.fs.write',
-        parameters: { path: join(workspace, 'deadline.txt'), content: 'x' },
-        requiredPrivilege: 'USER',
-        filesystemScope: { read: [], write: [workspace] },
-        timeoutMs: 1,
-      });
-      const p = envelopePaths('deadline');
-      writeEnvelopeFile(p.envelopeFile, {
-        action: built.action,
-        grant: built.grant,
-        plan: built.plan,
-        io: {
-          journalFile: p.journalFile,
-          receiptFile: p.receiptFile,
-          evidenceDir: join(p.runDir, 'evidence'),
-        },
-      });
-      const run = runHelperDirectly(authority, p.envelopeFile, p.journalFile, p.receiptFile);
-      expect(run.exitCode).toBe(4);
-      expect(JSON.parse(must(run.receipt, 'helper receipt')).terminal).toBe('TIMED_OUT');
-    });
+    // T04 C08: ELEVATED-only helper surface; meaningful on elevated hosts
+    // only (filtered hosts refuse at elevation consistency first).
+    it.skipIf(!IS_ELEVATED_HOST)(
+      'action deadline (tiny timeoutMs) → TIMED_OUT receipt (exit 4)',
+      () => {
+        // T04 C08: only ELEVATED grants are accepted by the helper; the
+        // deadline machinery on an elevated host still exercises the
+        // helper-side guard path (unprivileged coverage in backend.test.ts).
+        const built = buildAuthorizedAction(authority, {
+          op: 'windows.fs.write',
+          parameters: { path: join(workspace, 'deadline.txt'), content: 'x' },
+          requiredPrivilege: 'ELEVATED',
+          sideEffectClass: 'R2',
+          filesystemScope: { read: [], write: [workspace] },
+          timeoutMs: 1,
+        });
+        const p = envelopePaths('deadline');
+        writeEnvelopeFile(p.envelopeFile, {
+          action: built.action,
+          grant: built.grant,
+          plan: built.plan,
+          io: {
+            journalFile: p.journalFile,
+            receiptFile: p.receiptFile,
+            evidenceDir: join(p.runDir, 'evidence'),
+          },
+        });
+        const run = runHelperDirectly(authority, p.envelopeFile, p.journalFile, p.receiptFile);
+        expect(run.exitCode).toBe(4);
+        expect(JSON.parse(must(run.receipt, 'helper receipt')).terminal).toBe('TIMED_OUT');
+      },
+    );
 
     it('malformed envelope (unknown key) → REFUSED pre-journal without receipt', () => {
       const built = buildAuthorizedAction(authority, {

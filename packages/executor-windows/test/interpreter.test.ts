@@ -14,11 +14,17 @@ import {
   runStep,
 } from '../src/interpreter.ts';
 import { JournalWriter } from '../src/journal.ts';
-import { ON_WINDOWS } from './helpers.ts';
+import { ON_WINDOWS, writeHostSystemToolsPin } from './helpers.ts';
 
 const root = mkdtempSync(join(tmpdir(), 'shun-interp-'));
 const workspace = join(root, 'ws');
 const registryScopeKey = 'HKCU\\SOFTWARE\\ShunExecutorTests';
+
+// N-1: registry ops resolve reg.exe against the system-tools identity pin in
+// this store; a missing anchor must refuse the step (negative case below).
+const authorityDir = mkdtempSync(join(tmpdir(), 'shun-interp-auth-'));
+mkdirSync(authorityDir, { recursive: true });
+writeHostSystemToolsPin(authorityDir);
 
 function ctx(overrides?: Partial<InterpreterContext>): InterpreterContext {
   const journalFile = join(root, `journal-${Math.random().toString(36).slice(2)}.jsonl`);
@@ -32,6 +38,7 @@ function ctx(overrides?: Partial<InterpreterContext>): InterpreterContext {
     isElevated: false,
     deadlineAt: new Date(Date.now() + 30000),
     evidenceDir: join(root, 'evidence'),
+    authorityDir,
     ...overrides,
   };
 }
@@ -132,6 +139,21 @@ describe.skipIf(!ON_WINDOWS)('registry ops (HKCU)', () => {
     );
     expect(r.ok).toBe(false);
     if (!r.ok) expect(r.reason).toContain('scope');
+  });
+
+  it('N-1: registry ops without a system-tools anchor refuse the step (fail closed)', async () => {
+    const r = await runStep(
+      { op: 'windows.registry.createKey', args: { key } },
+      ctx({ authorityDir: undefined }),
+    );
+    expect(r.ok).toBe(false);
+    if (!r.ok) expect(r.reason).toContain('fail closed');
+    const v = await runStep(
+      { op: 'windows.registry.verify', args: { key, expectKeyExists: false } },
+      ctx({ authorityDir: undefined }),
+    );
+    expect(v.ok).toBe(false);
+    if (!v.ok) expect(v.reason).toContain('fail closed');
   });
 
   it('parseRegQueryOutput reads typed value lines', () => {

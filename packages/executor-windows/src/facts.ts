@@ -7,16 +7,24 @@ import { createHash } from 'node:crypto';
 import { existsSync, statfsSync } from 'node:fs';
 import { cpus, hostname, version as osVersion, platform, release, totalmem } from 'node:os';
 import { canonicalJson, type EnvironmentFacts, type PrivilegeMode } from '@shun/contracts';
-import { systemWhoamiExe } from './system-exe.ts';
+import { resolveWithinScope } from './fs-safety.ts';
+import { systemPowershellExe, systemRoot, systemWhoamiExe } from './system-exe.ts';
 
 export interface ObserveOptions {
   /** Disk free is reported for this root (the executor workspace). */
   workspaceRoot: string;
   networkPolicy?: EnvironmentFacts['networkPolicy'];
+  /**
+   * N-1: trusted authority store holding the system-tools identity pin. The
+   * whoami/powershell probes verify candidates against it; without the
+   * anchor the token probe degrades honestly to STANDARD_USER and the
+   * powershell capability is not reported (fail-closed, never fabricated).
+   */
+  authorityDir?: string;
 }
 
 export async function observeEnvironment(options: ObserveOptions): Promise<EnvironmentFacts> {
-  const groupsCsv = await whoamiGroups();
+  const groupsCsv = await whoamiGroups(options.authorityDir);
   const privilegeMode = privilegeModeOf(groupsCsv);
   let freeDiskMb = 0;
   try {
@@ -31,7 +39,7 @@ export async function observeEnvironment(options: ObserveOptions): Promise<Envir
     os: `${platform()} ${release()} (${osVersion()})`,
     arch: process.arch,
     observationRevision: '',
-    runtimeCapabilities: runtimeCapabilities(),
+    runtimeCapabilities: runtimeCapabilities(options.authorityDir),
     privilegeMode,
     guiSession: hasGuiSession(),
     filesystemCapabilities: ['ntfs', 'long-path'],
@@ -64,28 +72,82 @@ function hasGuiSession(): boolean {
   return session.startsWith('console') || session.startsWith('rdp');
 }
 
-function runtimeCapabilities(): string[] {
+function runtimeCapabilities(authorityDir: string | undefined): string[] {
   const caps = ['node'];
-  const systemRoot = process.env.SystemRoot ?? 'C:\\Windows';
-  if (existsSync(`${systemRoot}\\System32\\WindowsPowerShell\\v1.0\\powershell.exe`))
-    caps.push('powershell');
-  if (findOnPath('winget.exe')) caps.push('winget');
+  // C13: anchored to the machine-evidenced system root, never the inherited
+  // SystemRoot variable — a planted root would fabricate a 'powershell'
+  // capability for the planner out of a fake binary. N-1: the candidate is
+  // additionally verified against the system-tools identity pin; without the
+  // anchor the capability degrades honestly (not reported).
+  const ps = systemPowershellExe(authorityDir);
+  if (ps && existsSync(ps)) caps.push('powershell');
+  // N-R2-3 (P2 honesty): winget is reported ONLY through machine-owned
+  // evidence. The inherited PATH is attacker-settable — a same-user attacker
+  // planting 'winget.exe' anywhere on it (or pointing a PATH entry at their
+  // own directory) must not fabricate a capability the planner would trust.
+  // The probe therefore accepts a PATH hit only when the containing
+  // directory natively resolves INSIDE a machine-owned root (the
+  // machine-evidenced system root or the well-known Program Files
+  // locations); everything else — user-profile alias dirs, TEMP, any
+  // attacker dir — degrades honestly to "not reported". Machine roots are
+  // admin-owned, so planting there is out of the same-user threat model.
+  // Residual (documented): non-default Program Files installs on other
+  // drives are simply not reported — capability reporting stays honest.
+  if (wingetFromMachineOwnedPath()) caps.push('winget');
   return caps;
 }
 
-function findOnPath(exe: string): boolean {
-  const pathDirs = (process.env.Path ?? process.env.PATH ?? '').split(';');
-  return pathDirs.some((d) => d && existsSync(`${d.trim()}\\${exe}`));
+const WINGET_EXE = 'winget.exe';
+
+/** Machine-owned roots a same-user (non-elevated) attacker cannot write. */
+function machineOwnedRoots(): string[] {
+  const roots: string[] = [];
+  const root = systemRoot();
+  if (root) roots.push(root);
+  roots.push('C:\\Program Files', 'C:\\Program Files (x86)');
+  return roots;
 }
 
-export async function whoamiGroups(): Promise<string> {
+/**
+ * N-R2-3 winget honesty probe. Accepts a PATH hit only when the containing
+ * directory natively resolves INSIDE a machine-owned root; everything else
+ * (user-profile alias dirs, TEMP, any attacker-planted directory) reports
+ * nothing. `pathValue` and `fileExists` are injectable so the negative
+ * controls run on any host without touching the real machine roots.
+ */
+export function wingetFromMachineOwnedPath(
+  pathValue: string = process.env.Path ?? process.env.PATH ?? '',
+  fileExists: (candidate: string) => boolean = (candidate) => existsSync(candidate),
+): boolean {
+  const pathDirs = pathValue.split(';');
+  for (const entry of pathDirs) {
+    const dir = entry.trim();
+    if (!dir) continue;
+    if (!fileExists(`${dir}\\${WINGET_EXE}`)) continue;
+    for (const root of machineOwnedRoots()) {
+      // Native realpath containment (C07 surface): a junction planted inside
+      // a machine-rooted PATH entry that redirects OUTSIDE the root is
+      // refused, and sibling-name prefixes ('C:\Program Files-Evil') do not
+      // pass pathWithin's boundary check.
+      if (resolveWithinScope(dir, [root]).ok) return true;
+    }
+  }
+  return false;
+}
+
+export async function whoamiGroups(authorityDir?: string): Promise<string> {
   if (process.platform !== 'win32') return '';
+  // C13: machine-evidenced resolution, never PATH and never the inherited
+  // SystemRoot alone: whoever calls observeEnvironment can control PATH and
+  // the environment, and a planted fake whoami could get a filtered token
+  // judged ELEVATED_ADMIN. N-1: the candidate is additionally verified
+  // against the system-tools identity pin — without the anchor (or on any
+  // mismatch) the capture degrades to '' ⇒ fail-closed STANDARD_USER.
+  const exe = systemWhoamiExe(authorityDir);
+  if (!exe) return '';
   return new Promise((resolvePromise) => {
-    // SystemRoot-anchored, never PATH: whoever calls observeEnvironment can
-    // control PATH, and a planted fake whoami could get a filtered token
-    // judged ELEVATED_ADMIN (same convention as reg.exe/powershell.exe).
     execFile(
-      systemWhoamiExe(),
+      exe,
       ['/groups', '/fo', 'csv'],
       { windowsHide: true, timeout: 10000 },
       (err, stdout) => {

@@ -16,27 +16,46 @@ import { fileURLToPath } from 'node:url';
 import {
   type AuthorizationGrantPresentationInput,
   type AuthorizedAction,
+  canonicalJson,
   type ExecutionBackend,
   type ExecutionReceipt,
   ExecutionReceiptSchema,
 } from '@shun/contracts';
 import { assertSafeActionId } from './action-id.ts';
+import { resolveActionStep } from './action-surface.ts';
+import { assessAuthorityAnchors } from './anchor-protection.ts';
 import { PROVIDER_ID, PROVIDER_VERSION } from './backend.ts';
 import { type HelperReceiptFile, HelperReceiptFileSchema, writeEnvelopeFile } from './envelope.ts';
+import { resolveAgainstRoot } from './fs-safety.ts';
+import { grantHmacKeyFileOverride } from './helper/authority-dir.ts';
 import { verifyPinnedHelper } from './helper-pinning.ts';
 import type { InterpreterScope } from './interpreter.ts';
 import { JournalWriter, journalDigest, readJournal } from './journal.ts';
 import { reconcileExpectedState, rerunVerifyStep } from './poststate.ts';
+import { verifyPinnedProgram } from './program-pinning.ts';
 import {
   type ClassificationResult,
   classifyRecovery,
   terminalForClassification,
 } from './recovery.ts';
-import { FileGrantSource, FilePlanSource, readHelperPin } from './trusted-store.ts';
+import { privilegedSpawnEnv } from './safe-env.ts';
+import { systemPowershellExe, systemTaskkillExe } from './system-exe.ts';
+import {
+  FileGrantSource,
+  FilePlanSource,
+  readHelperPin,
+  resolveGrantHmacKeyFile,
+} from './trusted-store.ts';
 
 export interface PrivilegedBackendOptions {
   /** Trusted authority store (helper pin, plans, currentness, HMAC key). */
   authorityDir: string;
+  /**
+   * Content-addressed ActionPlan ledger. The launcher may read this from a
+   * runtime-writable cache because the protected grant binds planHash and the
+   * helper re-derives the hash/action identity before any effect.
+   */
+  planDir?: string;
   /** Root for per-action run artifacts; MUST equal the pin's workspaceRoot. */
   workspaceRoot: string;
   /** Package root containing dist/executor-helper.mjs and the relay script. */
@@ -48,6 +67,12 @@ export interface PrivilegedBackendOptions {
   /** Grace for the secure-desktop prompt + helper run, over the action deadline. */
   uacGraceMs?: number;
   defaultTimeoutMs?: number;
+  /**
+   * Externalized HMAC key path this deployment trusts (P2-2 anchor probing).
+   * Falls back to the build-time define (grantHmacKeyFileOverride); the
+   * co-located default is probed in addition, never instead.
+   */
+  grantHmacKeyFileOverride?: string;
 }
 
 interface InFlightElevation {
@@ -56,17 +81,6 @@ interface InFlightElevation {
   relayPid?: number;
   elevated: boolean;
 }
-
-const POWERSELL_EXE = () =>
-  join(
-    process.env.SystemRoot ?? 'C:\\Windows',
-    'System32',
-    'WindowsPowerShell',
-    'v1.0',
-    'powershell.exe',
-  );
-const TASKKILL_EXE = () =>
-  join(process.env.SystemRoot ?? 'C:\\Windows', 'System32', 'taskkill.exe');
 
 export class PrivilegedWindowsExecutionBackend implements ExecutionBackend {
   private readonly options: PrivilegedBackendOptions;
@@ -134,21 +148,116 @@ export class PrivilegedWindowsExecutionBackend implements ExecutionBackend {
     };
 
     try {
+      // C08: this backend is the ELEVATED surface. USER/NONE actions belong
+      // to the unprivileged in-process backend; launching them through the
+      // UAC-relayed helper would execute user-level actions with admin
+      // rights. Refuse before any pin read, envelope write or relay spawn.
+      if (action.action.requiredPrivilege !== 'ELEVATED') {
+        return await launchRefused(
+          `privileged backend only accepts ELEVATED actions; ${action.action.requiredPrivilege} actions must run on the unprivileged surface`,
+          'PRIVILEGE_LEVEL_MISMATCH',
+        );
+      }
+
+      // P2-2 / N-R2-4: interim fail-closed default for the open C06
+      // architecture — no privileged side effect under anchors a same-user
+      // attacker could have forged. Read-only (R0) observations are untouched;
+      // deployments that externalize the HMAC key to a genuinely protected
+      // path keep working (the probes reflect what the OS actually enforces
+      // for this token). This refusal happens BEFORE any UAC work: no consent
+      // is ever requested, so no elevated effect can occur. The readable-key
+      // re-sign attack is NOT this gate's trigger — it stays the known-open
+      // C06 defect for the L2 v0.2 privileged writer (see anchor-protection.ts).
+      if (action.action.sideEffectClass !== 'R0') {
+        const anchors = assessAuthorityAnchors(
+          this.options.authorityDir,
+          resolveGrantHmacKeyFile(
+            this.options.authorityDir,
+            grantHmacKeyFileOverride() ?? this.options.grantHmacKeyFileOverride,
+          ),
+        );
+        if (anchors.forgeable) {
+          return await launchRefused(
+            `authorization anchors are same-user-writable (interim fail-closed default while the privileged writer architecture is open): ${anchors.reasons.join('; ')}`,
+            'ANCHOR_FORGEABLE_SAME_USER',
+          );
+        }
+      }
+
+      // The presented grant crosses an untrusted caller boundary. Even a
+      // caller who somehow learns the symmetric HMAC key cannot mint a new
+      // privileged presentation unless the exact grant record was first
+      // committed by the elevated-only anchor writer.
+      const storedGrant = new FileGrantSource(join(this.options.authorityDir, 'grants')).byGrantId(
+        action.authorizationRef,
+      );
+      if (!storedGrant) {
+        return await launchRefused(
+          `grant ${action.authorizationRef} is absent from the protected authority store`,
+          'GRANT_NOT_AUTHENTIC',
+        );
+      }
+      if (canonicalJson(storedGrant) !== canonicalJson(grant)) {
+        return await launchRefused(
+          'presented grant does not byte-canonically match the protected pre-issued record',
+          'GRANT_NOT_AUTHENTIC',
+        );
+      }
+
       // ---- launch-side pin verification (the helper re-checks its own). ----
       const pin = readHelperPin(this.options.authorityDir);
-      const identity = verifyPinnedHelper(this.helperBundlePath(), this.relayScriptPath(), pin);
+      // C12: the pin covers the interpreter too — the launcher measures
+      // node.exe (the very binary the relay will elevate) before any spawn.
+      const identity = verifyPinnedHelper(
+        this.helperBundlePath(),
+        this.relayScriptPath(),
+        process.execPath,
+        pin,
+      );
       if (!identity.ok) return await launchRefused(identity.reason);
       if (!pin)
         return await launchRefused(
           'helper pin vanished between verification and launch (fail closed)',
         );
 
+      // C07: the run artifacts (and therefore the elevated helper's I/O
+      // envelope) must resolve INSIDE the pinned workspace root on real
+      // paths — a launcher-configured root outside the pin would make every
+      // helper run refuse at containment, or worse, resolve through a
+      // junction outside the pin. Fail fast before any envelope/UAC work.
+      const rootCheck = resolveAgainstRoot(this.options.workspaceRoot, pin.workspaceRoot);
+      if (!rootCheck.ok) {
+        return await launchRefused(
+          `configured workspace root refused against the pinned root: ${rootCheck.reason}`,
+          'WORKSPACE_ROOT_ESCAPE',
+        );
+      }
+
       // ---- trusted plan source; a missing plan fails closed. ----
-      const plan = new FilePlanSource(join(this.options.authorityDir, 'plans')).byPlanHash(
-        action.planHash,
-      );
+      const plan = new FilePlanSource(
+        this.options.planDir ?? join(this.options.authorityDir, 'plans'),
+      ).byPlanHash(action.planHash);
       if (!plan)
         return await launchRefused(`plan ${action.planHash} not found in the authority store`);
+
+      // ---- N-2 program identity preflight, BEFORE any UAC work. ----
+      // A protected authority root is runtime READ-ONLY: an unprivileged
+      // launcher must NEVER create/update program pins. Program identity is a
+      // provisioning/authority event. Here we only verify the already-pinned
+      // canonical path + bytes; the elevated helper repeats this check.
+      const preflightStep = resolveActionStep(action);
+      if (preflightStep?.op === 'windows.proc.exec') {
+        const programPin = verifyPinnedProgram(
+          this.options.authorityDir,
+          preflightStep.args.program,
+        );
+        if (!programPin.ok) {
+          return await launchRefused(
+            `program identity preflight failed: ${programPin.reason}`,
+            'PROGRAM_PIN_REFUSED',
+          );
+        }
+      }
 
       // ---- run artifacts + envelope (typed JSON on disk, never shell text). ----
       mkdirSync(runDir, { recursive: true });
@@ -177,7 +286,23 @@ export class PrivilegedWindowsExecutionBackend implements ExecutionBackend {
       });
 
       // ---- single UAC elevation via the pinned relay. ----
+      // C13: the relay host is the MOST sensitive spawn — it is the binary
+      // UAC elevates. Refuse to launch from an inherited-SystemRoot guess:
+      // a planted root would hand the RunAs prompt's consent to a fake
+      // powershell. N-1: the candidate binaries are additionally verified
+      // against the authority store's system-tools identity pin — a forged
+      // tool, or a missing/corrupt pin, refuses the launch (fail closed).
+      const powershellExe = systemPowershellExe(this.options.authorityDir);
+      const taskkillExe = systemTaskkillExe(this.options.authorityDir);
+      if (!powershellExe || !taskkillExe) {
+        return await launchRefused(
+          'system directory unresolvable or system-tool identity pin missing/mismatched — refusing to spawn the elevation relay (fail closed)',
+          'SYSTEM_DIR_UNRESOLVABLE',
+        );
+      }
       const relayResult = await spawnRelay({
+        powershellExe,
+        taskkillExe,
         nodeExe: process.execPath,
         relayScript: this.relayScriptPath(),
         helperBundle: this.helperBundlePath(),
@@ -274,19 +399,22 @@ export class PrivilegedWindowsExecutionBackend implements ExecutionBackend {
       return receipt;
     };
 
-    // UAC refusal: relay exception, helper provably never started — verify
-    // the empty journal is REALLY empty before classifying NOT_STARTED.
+    // UAC refusal: only "helper provably never started" when the EMPTY
+    // journal agrees (C15). A non-empty journal contradicting the relay
+    // verdict fails closed via classifyRecovery (execStart → UNCERTAIN,
+    // received-only → FAILED_BEFORE_EFFECT).
     if (relayResult.kind === 'UAC_DECLINED') {
-      const clean = journal.length === 0;
+      const classification = classifyRecovery({
+        journal,
+        relay: { kind: 'UAC_DECLINED', hresult: relayResult.hresult },
+      });
+      const terminal: ExecutionReceipt['terminal'] =
+        classification.recoveryClassification === 'NOT_STARTED'
+          ? 'UAC_DECLINED'
+          : terminalForClassification(classification);
       return mint({
-        terminal: 'UAC_DECLINED',
-        classification: {
-          recoveryClassification: clean ? 'NOT_STARTED' : 'MAY_HAVE_EXECUTED_UNCERTAIN',
-          resolvedByPostState: false,
-          basis: clean
-            ? 'UAC consent refused/timed out; empty journal — helper provably never started'
-            : 'UAC relay reported decline but the journal is non-empty — fail-closed to uncertain',
-        },
+        terminal,
+        classification,
         postStateVerified: false,
         reason: `UAC declined (${relayResult.hresult ?? 'n/a'})`,
       });
@@ -308,12 +436,22 @@ export class PrivilegedWindowsExecutionBackend implements ExecutionBackend {
         const scope = await scopeOf(action, this.options.authorityDir);
         let postState =
           helperReceipt.terminal === 'SUCCEEDED'
-            ? await rerunVerifyStep(action, scope, input.launcherJournal)
-            : await reconcileExpectedState(action, scope, input.launcherJournal);
+            ? await rerunVerifyStep(action, scope, input.launcherJournal, this.options.authorityDir)
+            : await reconcileExpectedState(
+                action,
+                scope,
+                input.launcherJournal,
+                this.options.authorityDir,
+              );
         if (helperReceipt.terminal === 'SUCCEEDED' && !postState.verified) {
           // A mutating action may declare verifiable expected state — the
           // reconcile convention doubles as its success verification.
-          postState = await reconcileExpectedState(action, scope, input.launcherJournal);
+          postState = await reconcileExpectedState(
+            action,
+            scope,
+            input.launcherJournal,
+            this.options.authorityDir,
+          );
         }
         const classification = classifyRecovery({
           journal,
@@ -342,7 +480,12 @@ export class PrivilegedWindowsExecutionBackend implements ExecutionBackend {
 
     // No receipt: crash / kill / lost channel. Journal + reconcile-first decide.
     const scope = await scopeOf(action, this.options.authorityDir);
-    const postState = await reconcileExpectedState(action, scope, input.launcherJournal);
+    const postState = await reconcileExpectedState(
+      action,
+      scope,
+      input.launcherJournal,
+      this.options.authorityDir,
+    );
     const classification = classifyRecovery({
       journal,
       receipt: undefined,
@@ -373,7 +516,34 @@ type RelayResult = {
   timedOut?: boolean;
 };
 
-async function spawnRelay(params: {
+/**
+ * Bounded stdio capture: the relay's console text is intentionally NOT a
+ * structured channel (§8.2.1), but its tail is diagnostic gold when the
+ * relay process never exits or never writes its relay file — keep the last
+ * few KiB, never the whole stream.
+ */
+function stdioTail(): { push(chunk: Buffer | string): void; tail(): string | undefined } {
+  const decoder = new TextDecoder('utf8', { fatal: false });
+  let buffered = '';
+  return {
+    push(chunk: Buffer | string): void {
+      buffered = (buffered + (typeof chunk === 'string' ? chunk : decoder.decode(chunk))).slice(
+        -8192,
+      );
+    },
+    tail(): string | undefined {
+      const t = buffered.trim();
+      return t.length > 0 ? t.slice(-2048) : undefined;
+    },
+  };
+}
+
+// Exported for the N-R2-1 negative controls (test/evidence tooling): the
+// privileged-path relay spawn must demonstrably carry a sterilized
+// environment. Security callers still enter through PrivilegedWindowsExecutionBackend.
+export async function spawnRelay(params: {
+  powershellExe: string;
+  taskkillExe: string;
   nodeExe: string;
   relayScript: string;
   helperBundle: string;
@@ -383,8 +553,15 @@ async function spawnRelay(params: {
   onRelayPid?: (pid: number) => void;
 }): Promise<RelayResult> {
   const helperArgsJson = JSON.stringify(params.helperArgs);
+  // N-R2-1: the relay host is the spawn UAC consents FOR — an inherited
+  // NODE_OPTIONS here becomes attacker JS inside the pinned elevated node
+  // before any self-check. Both spawns below (relay + tree-kill) pass the
+  // explicit minimal environment; the pinned relay re-scrubs on top.
+  const sterileEnv = privilegedSpawnEnv();
+  const stdout = stdioTail();
+  const stderr = stdioTail();
   const child = spawn(
-    POWERSELL_EXE(),
+    params.powershellExe,
     [
       '-NoProfile',
       '-NonInteractive',
@@ -401,8 +578,10 @@ async function spawnRelay(params: {
       '-RelayFile',
       params.relayFile,
     ],
-    { shell: false, windowsHide: true },
+    { shell: false, windowsHide: true, env: sterileEnv },
   );
+  child.stdout?.on('data', (c: Buffer) => stdout.push(c));
+  child.stderr?.on('data', (c: Buffer) => stderr.push(c));
   params.onRelayPid?.(child.pid ?? -1);
   return new Promise((resolve) => {
     let timedOut = false;
@@ -412,9 +591,10 @@ async function spawnRelay(params: {
       // helper child survives (Access Denied) — exactly why the helper owns
       // its deadline and the journal decides the outcome (§8.2.1).
       if (child.pid) {
-        spawn(TASKKILL_EXE(), ['/PID', String(child.pid), '/T', '/F'], {
+        spawn(params.taskkillExe, ['/PID', String(child.pid), '/T', '/F'], {
           shell: false,
           windowsHide: true,
+          env: sterileEnv,
         });
       }
     }, params.timeoutMs);
@@ -432,12 +612,13 @@ async function spawnRelay(params: {
       } catch {
         relay = undefined;
       }
+      const diagnostics = [stderr.tail(), stdout.tail()].filter((t) => t !== undefined).join(' | ');
       if (timedOut && !relay) {
-        resolve({ kind: 'TIMED_OUT', timedOut });
+        resolve({ kind: 'TIMED_OUT', timedOut, error: diagnostics || undefined });
         return;
       }
       if (!relay) {
-        resolve({ kind: 'NO_RELAY', timedOut });
+        resolve({ kind: 'NO_RELAY', timedOut, error: diagnostics || undefined });
         return;
       }
       if (relay.kind === 'UAC_DECLINED') {

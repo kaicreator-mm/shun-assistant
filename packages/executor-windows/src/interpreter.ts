@@ -16,6 +16,7 @@ import { canonicalJson, pathWithin } from '@shun/contracts';
 import { resolveWithinScope } from './fs-safety.ts';
 import type { JournalWriter } from './journal.ts';
 import { type ExecutorStep, ExecutorStepSchema } from './ops.ts';
+import { systemRegExe } from './system-exe.ts';
 
 export interface InterpreterScope {
   filesystem?: { read: string[]; write: string[] };
@@ -30,6 +31,13 @@ export interface InterpreterContext {
   deadlineAt: Date;
   cancelFile?: string;
   evidenceDir: string;
+  /**
+   * N-1: trusted authority store holding the system-tools identity pin.
+   * Registry ops resolve reg.exe through it and REFUSE the step when the
+   * anchor is absent or any digest mismatches (fail closed — a step is never
+   * executed through an unpinned system binary).
+   */
+  authorityDir?: string;
 }
 
 export type StepOutcome =
@@ -168,14 +176,33 @@ async function runParsedStep(step: ExecutorStep, ctx: InterpreterContext): Promi
         if (step.args.expectSha256 !== undefined && sha256 !== step.args.expectSha256)
           contentMatches = false;
       }
+      // C14: expectExists is the assertion. Both directions must work —
+      // absence proofs (expectedState { exists: false }) are unreachable
+      // otherwise, and the inverted "file absent ⇒ step failure" made every
+      // delete-style verify fail closed as an error.
+      const existenceOk = step.args.expectExists ? exists : !exists;
       const result = {
         path: within.resolved,
         exists,
+        existenceOk,
         contentMatches,
         ...(sha256 ? { sha256 } : {}),
       };
-      if (!exists || !contentMatches) {
-        return { ok: false, reason: 'post-state verification failed inside executor', result };
+      if (!existenceOk) {
+        return {
+          ok: false,
+          reason: step.args.expectExists
+            ? 'post-state verification failed: expected file absent'
+            : 'post-state verification failed: expected file present',
+          result,
+        };
+      }
+      if (exists && !contentMatches) {
+        return {
+          ok: false,
+          reason: 'post-state verification failed: content mismatch',
+          result,
+        };
       }
       return { ok: true, result };
     }
@@ -208,23 +235,46 @@ async function runParsedStep(step: ExecutorStep, ctx: InterpreterContext): Promi
         return failScope('grant declares no registry scope but the action touches the registry');
       const contained = prefixes.some((p) => pathWithin(step.args.key, p));
       if (!contained) return failScope(`registry key outside declared scope: ${step.args.key}`);
-      const query = await execCaptured(REG_EXE, ['query', step.args.key], ctx, 30000);
+      const regExe = systemRegExe(ctx.authorityDir);
+      if (!regExe) {
+        return {
+          ok: false,
+          reason:
+            'system tool identity pin unavailable or mismatched (fail closed) — refusing registry verification instead of guessing',
+          result: { key: step.args.key },
+        };
+      }
+      const query = await execCaptured(regExe, ['query', step.args.key], ctx, 30000);
       const exists = query.exitCode === 0;
       const values = exists ? parseRegQueryOutput(query.stdout) : {};
-      let ok = true;
+      // Dimension reporting (C10 input): existence and value mismatches must
+      // be distinguishable — only the former proves absence of the effect.
+      let existenceOk = true;
+      let valuesOk = true;
       if (step.args.expectKeyExists !== undefined && exists !== step.args.expectKeyExists)
-        ok = false;
+        existenceOk = false;
       for (const [name, expected] of Object.entries(step.args.expectValues ?? {})) {
-        if (values[name.toLowerCase()] !== expected) ok = false;
+        if (values[name.toLowerCase()] !== expected) valuesOk = false;
       }
+      const ok = existenceOk && valuesOk;
       const result = {
         key: step.args.key,
         exists,
+        existenceOk,
+        valuesOk,
         observedValues: values,
         expectKeyExists: step.args.expectKeyExists,
         expectValues: step.args.expectValues ?? {},
       };
-      if (!ok) return { ok: false, reason: 'registry post-state mismatch', result };
+      if (!ok) {
+        return {
+          ok: false,
+          reason: existenceOk
+            ? 'registry post-state value mismatch'
+            : 'registry post-state key mismatch',
+          result,
+        };
+      }
       return { ok: true, result };
     }
     case 'windows.proc.exec': {
@@ -293,7 +343,6 @@ interface CapturedResult {
   truncated: boolean;
 }
 
-const REG_EXE = join(process.env.SystemRoot ?? 'C:\\Windows', 'System32', 'reg.exe');
 const POLL_MS = 250;
 
 async function execCaptured(
@@ -414,9 +463,18 @@ function registryExec(
   const contained = prefixes.some((p) => pathWithin(step.args.key, p));
   if (!contained)
     return Promise.resolve(failScope(`registry key outside declared scope: ${step.args.key}`));
+  const regExe = systemRegExe(ctx.authorityDir);
+  if (!regExe) {
+    return Promise.resolve({
+      ok: false,
+      reason:
+        'system tool identity pin unavailable or mismatched (fail closed) — refusing registry mutation instead of guessing',
+      result: result(),
+    } as StepOutcome);
+  }
   const finalArgv = typeof argv === 'function' ? argv() : argv;
   const remainingMs = ctx.deadlineAt.getTime() - now().getTime();
-  return execCaptured(REG_EXE, [...finalArgv], ctx, Math.max(remainingMs, 0)).then((r) => {
+  return execCaptured(regExe, [...finalArgv], ctx, Math.max(remainingMs, 0)).then((r) => {
     if (r.timedOut) {
       return {
         ok: false,
