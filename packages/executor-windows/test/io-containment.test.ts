@@ -16,6 +16,7 @@ import {
   createJunction,
   createTestAuthority,
   disposeTestAuthority,
+  IS_ELEVATED_HOST,
   ON_WINDOWS,
   runHelperDirectly,
   type TestAuthority,
@@ -46,9 +47,10 @@ describe.skipIf(!ON_WINDOWS)('C07 — junction escape on privileged I/O paths (r
     name: string,
     io: { journalFile: string; receiptFile: string; evidenceDir: string; cancelFile?: string },
   ) {
+    const target = join(workspace, `c07-${name}-target.txt`);
     const built = buildAuthorizedAction(authority, {
       op: 'windows.fs.write',
-      parameters: { path: join(workspace, `c07-${name}-target.txt`), content: 'x' },
+      parameters: { path: target, content: 'x' },
       requiredPrivilege: 'ELEVATED',
       sideEffectClass: 'R2',
       filesystemScope: { read: [], write: [workspace] },
@@ -69,6 +71,7 @@ describe.skipIf(!ON_WINDOWS)('C07 — junction escape on privileged I/O paths (r
         io.receiptFile,
       ),
       runDir,
+      target,
     };
   }
 
@@ -138,7 +141,7 @@ describe.skipIf(!ON_WINDOWS)('C07 — junction escape on privileged I/O paths (r
     }
   });
 
-  it('non-junction layout passes containment: the journal OPENS (receipt refusal on a filtered token happens later)', () => {
+  it('non-junction layout passes containment: the journal OPENS (outcome after startup is host-dependent)', () => {
     const runDir = join(workspace, 'c07-clean');
     mkdirSync(runDir, { recursive: true });
     const io = {
@@ -146,12 +149,22 @@ describe.skipIf(!ON_WINDOWS)('C07 — junction escape on privileged I/O paths (r
       receiptFile: join(runDir, 'receipt.json'),
       evidenceDir: join(runDir, 'evidence'),
     };
-    const { run } = envelopeFor('c07-clean', io);
-    // Containment passed: the journal opened with RECEIVED. On this filtered
-    // host the ELEVATED action is then refused at elevation consistency.
+    const { run, target } = envelopeFor('c07-clean', io);
+    // Containment passed: the journal opened with RECEIVED (the subject of
+    // this test). What happens AFTER startup depends on the host token:
+    // a filtered token refuses the ELEVATED action at elevation consistency
+    // (exit 2, structured receipt); an elevated host (CI windows-latest)
+    // executes the action. CI honesty: do not pin the exit code to the
+    // filtered-token branch here — the elevation gate has its own tests.
     expect(existsSync(io.journalFile)).toBe(true);
     expect(journalPhases(readJournal(io.journalFile))).toContain('RECEIVED');
-    expect(run.exitCode).toBe(2);
+    if (IS_ELEVATED_HOST) {
+      expect(run.exitCode).toBe(0);
+      expect(existsSync(target)).toBe(true);
+    } else {
+      expect(run.exitCode).toBe(2);
+      expect(run.receipt).toBeDefined();
+    }
   });
 
   it('launcher refuses a workspace root that does not resolve inside the pinned root (no UAC burned)', async () => {
