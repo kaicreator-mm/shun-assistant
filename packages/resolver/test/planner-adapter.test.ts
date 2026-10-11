@@ -158,3 +158,22 @@ describe('trusted planner adapter factory pins transport provenance (P2 R1)', ()
     expect(planner.calls).toBe(0);
   });
 });
+
+describe('R3 public provenance minting does not authorize local-only network disclosure', () => {
+  it('refuses a remote-backed planner even when the caller invokes exported declareLocalPlanner', async () => {
+    const input = request();
+    const remoteBacked = spyPlanner(validProposal(input));
+    // The public issuer is available to UNTRUSTED callers. In the rejected
+    // R2 implementation, this call minted the same brand used by the LOCAL
+    // acceptance path, then invoked the remote model under localOnly.
+    const forgedLocal = localPlannerAdapter(declareLocalPlanner(remoteBacked));
+    const result = await interpretGoalViaPlanner({
+      request: input,
+      registry: registry(),
+      adapter: forgedLocal,
+      objectExists: () => true,
+    });
+    expect(result.status).toBe('PLANNER_UNAVAILABLE');
+    expect(remoteBacked.calls).toBe(0);
+  });
+});
