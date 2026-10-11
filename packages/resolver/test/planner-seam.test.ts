@@ -76,6 +76,11 @@ function validProposal(requestInput: GoalRequest): GoalProposal {
   };
 }
 
+function permitRemoteDisclosure(input: GoalRequest): GoalRequest {
+  input.policyContext.privacyPolicy = { localOnly: false, externalDisclosure: 'ALLOWED' };
+  return input;
+}
+
 describe('PlannerPort seam stays proposal-only and policy-bounded', () => {
   it('local-only policy makes a remote planner ineligible WITHOUT calling it', async () => {
     const planner = spyPlanner(validProposal(request()));
@@ -100,11 +105,11 @@ describe('PlannerPort seam stays proposal-only and policy-bounded', () => {
   });
 
   it('a local planner proposal is accepted only as data, then re-validated deterministically', async () => {
-    const input = request();
+    const input = permitRemoteDisclosure(request());
     const result = await interpretGoalViaPlanner({
       request: input,
       registry: registry(),
-      adapter: localPlannerAdapter(declareLocalPlanner(spyPlanner(validProposal(input)))),
+      adapter: remotePlannerAdapter(spyPlanner(validProposal(input))),
       objectExists: () => true,
     });
     expect(result.status).toBe('PROPOSAL_ACCEPTED');
@@ -115,13 +120,13 @@ describe('PlannerPort seam stays proposal-only and policy-bounded', () => {
   });
 
   it('a proposal whose objective names no capability is accepted as data but stays CAPABILITY_UNRESOLVED', async () => {
-    const input = request();
+    const input = permitRemoteDisclosure(request());
     const proposal = validProposal(input);
     proposal.goalContract.objective = 'make photos smaller with magic';
     const result = await interpretGoalViaPlanner({
       request: input,
       registry: registry(),
-      adapter: localPlannerAdapter(declareLocalPlanner(spyPlanner(proposal))),
+      adapter: remotePlannerAdapter(spyPlanner(proposal)),
       objectExists: () => true,
     });
     expect(result.status).toBe('PROPOSAL_ACCEPTED');
@@ -133,13 +138,13 @@ describe('PlannerPort seam stays proposal-only and policy-bounded', () => {
   });
 
   it('a proposal that broadens privacy policy is rejected — policy is request authority', async () => {
-    const input = request();
+    const input = permitRemoteDisclosure(request());
     const proposal = validProposal(input);
-    proposal.goalContract.privacyPolicy = { localOnly: false, externalDisclosure: 'ALLOWED' };
+    proposal.goalContract.privacyPolicy = { localOnly: true, externalDisclosure: 'FORBIDDEN' };
     const result = await interpretGoalViaPlanner({
       request: input,
       registry: registry(),
-      adapter: localPlannerAdapter(declareLocalPlanner(spyPlanner(proposal))),
+      adapter: remotePlannerAdapter(spyPlanner(proposal)),
     });
     expect(result).toMatchObject({
       status: 'PROPOSAL_REJECTED',
@@ -148,13 +153,13 @@ describe('PlannerPort seam stays proposal-only and policy-bounded', () => {
   });
 
   it('a proposal inventing objects outside the request scope is rejected', async () => {
-    const input = request();
+    const input = permitRemoteDisclosure(request());
     const proposal = validProposal(input);
     proposal.goalContract.objects = [...input.objects, { kind: 'DIRECTORY', ref: 'D:\\elsewhere' }];
     const result = await interpretGoalViaPlanner({
       request: input,
       registry: registry(),
-      adapter: localPlannerAdapter(declareLocalPlanner(spyPlanner(proposal))),
+      adapter: remotePlannerAdapter(spyPlanner(proposal)),
     });
     expect(result).toMatchObject({
       status: 'PROPOSAL_REJECTED',
@@ -182,13 +187,13 @@ describe('PlannerPort seam stays proposal-only and policy-bounded', () => {
   });
 
   it('a structurally invalid proposal is rejected by the frozen contract schema', async () => {
-    const input = request();
+    const input = permitRemoteDisclosure(request());
     const malformed = { ...validProposal(input) } as Record<string, unknown>;
     delete malformed.proposalId;
     const result = await interpretGoalViaPlanner({
       request: input,
       registry: registry(),
-      adapter: localPlannerAdapter(declareLocalPlanner(spyPlanner(malformed))),
+      adapter: remotePlannerAdapter(spyPlanner(malformed)),
     });
     expect(result).toMatchObject({
       status: 'PROPOSAL_REJECTED',
@@ -197,7 +202,7 @@ describe('PlannerPort seam stays proposal-only and policy-bounded', () => {
   });
 
   it('a crashing planner yields a typed rejection, never a fabricated plan', async () => {
-    const input = request();
+    const input = permitRemoteDisclosure(request());
     const failing: PlannerPort = {
       interpretGoal: async () => {
         throw new Error('model backend exploded');
@@ -206,7 +211,7 @@ describe('PlannerPort seam stays proposal-only and policy-bounded', () => {
     const result = await interpretGoalViaPlanner({
       request: input,
       registry: registry(),
-      adapter: localPlannerAdapter(declareLocalPlanner(failing)),
+      adapter: remotePlannerAdapter(failing),
     });
     expect(result).toMatchObject({
       status: 'PROPOSAL_REJECTED',
@@ -269,16 +274,18 @@ describe('PlannerPort seam stays proposal-only and policy-bounded', () => {
     expect(planner.calls).toBe(0);
   });
 
-  it('an offline constraint still admits a LOCAL planner (P1 supplemental R1 — legitimate scenario stays usable)', async () => {
+  it('offline/local-planner execution fails closed when the runtime cannot attest transport origin (R3)', async () => {
     const input = request();
     input.constraints.other = { offline: true };
     input.policyContext.privacyPolicy = { localOnly: false, externalDisclosure: 'ALLOWED' };
+    const planner = spyPlanner(validProposal(input));
     const result = await interpretGoalViaPlanner({
       request: input,
       registry: registry(),
-      adapter: localPlannerAdapter(declareLocalPlanner(spyPlanner(validProposal(input)))),
+      adapter: localPlannerAdapter(declareLocalPlanner(planner)),
       objectExists: () => true,
     });
-    expect(result.status).toBe('PROPOSAL_ACCEPTED');
+    expect(result.status).toBe('PLANNER_UNAVAILABLE');
+    expect(planner.calls).toBe(0);
   });
 });
