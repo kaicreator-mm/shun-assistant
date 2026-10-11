@@ -33,6 +33,7 @@ import {
   classifyRecovery,
   terminalForClassification,
 } from './recovery.ts';
+import { systemPowershellExe, systemTaskkillExe } from './system-exe.ts';
 import { FileGrantSource, FilePlanSource, readHelperPin } from './trusted-store.ts';
 
 export interface PrivilegedBackendOptions {
@@ -57,17 +58,6 @@ interface InFlightElevation {
   relayPid?: number;
   elevated: boolean;
 }
-
-const POWERSELL_EXE = () =>
-  join(
-    process.env.SystemRoot ?? 'C:\\Windows',
-    'System32',
-    'WindowsPowerShell',
-    'v1.0',
-    'powershell.exe',
-  );
-const TASKKILL_EXE = () =>
-  join(process.env.SystemRoot ?? 'C:\\Windows', 'System32', 'taskkill.exe');
 
 export class PrivilegedWindowsExecutionBackend implements ExecutionBackend {
   private readonly options: PrivilegedBackendOptions;
@@ -209,7 +199,21 @@ export class PrivilegedWindowsExecutionBackend implements ExecutionBackend {
       });
 
       // ---- single UAC elevation via the pinned relay. ----
+      // C13: the relay host is the MOST sensitive spawn — it is the binary
+      // UAC elevates. Refuse to launch from an inherited-SystemRoot guess:
+      // a planted root would hand the RunAs prompt's consent to a fake
+      // powershell.
+      const powershellExe = systemPowershellExe();
+      const taskkillExe = systemTaskkillExe();
+      if (!powershellExe || !taskkillExe) {
+        return await launchRefused(
+          'system directory unresolvable — refusing to spawn the elevation relay (fail closed)',
+          'SYSTEM_DIR_UNRESOLVABLE',
+        );
+      }
       const relayResult = await spawnRelay({
+        powershellExe,
+        taskkillExe,
         nodeExe: process.execPath,
         relayScript: this.relayScriptPath(),
         helperBundle: this.helperBundlePath(),
@@ -409,6 +413,8 @@ type RelayResult = {
 };
 
 async function spawnRelay(params: {
+  powershellExe: string;
+  taskkillExe: string;
   nodeExe: string;
   relayScript: string;
   helperBundle: string;
@@ -419,7 +425,7 @@ async function spawnRelay(params: {
 }): Promise<RelayResult> {
   const helperArgsJson = JSON.stringify(params.helperArgs);
   const child = spawn(
-    POWERSELL_EXE(),
+    params.powershellExe,
     [
       '-NoProfile',
       '-NonInteractive',
@@ -447,7 +453,7 @@ async function spawnRelay(params: {
       // helper child survives (Access Denied) — exactly why the helper owns
       // its deadline and the journal decides the outcome (§8.2.1).
       if (child.pid) {
-        spawn(TASKKILL_EXE(), ['/PID', String(child.pid), '/T', '/F'], {
+        spawn(params.taskkillExe, ['/PID', String(child.pid), '/T', '/F'], {
           shell: false,
           windowsHide: true,
         });

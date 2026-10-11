@@ -16,6 +16,7 @@ import { canonicalJson, pathWithin } from '@shun/contracts';
 import { resolveWithinScope } from './fs-safety.ts';
 import type { JournalWriter } from './journal.ts';
 import { type ExecutorStep, ExecutorStepSchema } from './ops.ts';
+import { systemRegExe } from './system-exe.ts';
 
 export interface InterpreterScope {
   filesystem?: { read: string[]; write: string[] };
@@ -227,7 +228,16 @@ async function runParsedStep(step: ExecutorStep, ctx: InterpreterContext): Promi
         return failScope('grant declares no registry scope but the action touches the registry');
       const contained = prefixes.some((p) => pathWithin(step.args.key, p));
       if (!contained) return failScope(`registry key outside declared scope: ${step.args.key}`);
-      const query = await execCaptured(REG_EXE, ['query', step.args.key], ctx, 30000);
+      const regExe = systemRegExe();
+      if (!regExe) {
+        return {
+          ok: false,
+          reason:
+            'system directory unresolvable (fail closed) — refusing registry verification instead of guessing',
+          result: { key: step.args.key },
+        };
+      }
+      const query = await execCaptured(regExe, ['query', step.args.key], ctx, 30000);
       const exists = query.exitCode === 0;
       const values = exists ? parseRegQueryOutput(query.stdout) : {};
       // Dimension reporting (C10 input): existence and value mismatches must
@@ -326,7 +336,6 @@ interface CapturedResult {
   truncated: boolean;
 }
 
-const REG_EXE = join(process.env.SystemRoot ?? 'C:\\Windows', 'System32', 'reg.exe');
 const POLL_MS = 250;
 
 async function execCaptured(
@@ -447,9 +456,18 @@ function registryExec(
   const contained = prefixes.some((p) => pathWithin(step.args.key, p));
   if (!contained)
     return Promise.resolve(failScope(`registry key outside declared scope: ${step.args.key}`));
+  const regExe = systemRegExe();
+  if (!regExe) {
+    return Promise.resolve({
+      ok: false,
+      reason:
+        'system directory unresolvable (fail closed) — refusing registry mutation instead of guessing',
+      result: result(),
+    } as StepOutcome);
+  }
   const finalArgv = typeof argv === 'function' ? argv() : argv;
   const remainingMs = ctx.deadlineAt.getTime() - now().getTime();
-  return execCaptured(REG_EXE, [...finalArgv], ctx, Math.max(remainingMs, 0)).then((r) => {
+  return execCaptured(regExe, [...finalArgv], ctx, Math.max(remainingMs, 0)).then((r) => {
     if (r.timedOut) {
       return {
         ok: false,

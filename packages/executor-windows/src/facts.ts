@@ -7,7 +7,7 @@ import { createHash } from 'node:crypto';
 import { existsSync, statfsSync } from 'node:fs';
 import { cpus, hostname, version as osVersion, platform, release, totalmem } from 'node:os';
 import { canonicalJson, type EnvironmentFacts, type PrivilegeMode } from '@shun/contracts';
-import { systemWhoamiExe } from './system-exe.ts';
+import { systemPowershellExe, systemWhoamiExe } from './system-exe.ts';
 
 export interface ObserveOptions {
   /** Disk free is reported for this root (the executor workspace). */
@@ -66,9 +66,11 @@ function hasGuiSession(): boolean {
 
 function runtimeCapabilities(): string[] {
   const caps = ['node'];
-  const systemRoot = process.env.SystemRoot ?? 'C:\\Windows';
-  if (existsSync(`${systemRoot}\\System32\\WindowsPowerShell\\v1.0\\powershell.exe`))
-    caps.push('powershell');
+  // C13: anchored to the machine-evidenced system root, never the inherited
+  // SystemRoot variable — a planted root would fabricate a 'powershell'
+  // capability for the planner out of a fake binary.
+  const ps = systemPowershellExe();
+  if (ps && existsSync(ps)) caps.push('powershell');
   if (findOnPath('winget.exe')) caps.push('winget');
   return caps;
 }
@@ -80,12 +82,16 @@ function findOnPath(exe: string): boolean {
 
 export async function whoamiGroups(): Promise<string> {
   if (process.platform !== 'win32') return '';
+  // C13: machine-evidenced resolution, never PATH and never the inherited
+  // SystemRoot alone: whoever calls observeEnvironment can control PATH and
+  // the environment, and a planted fake whoami could get a filtered token
+  // judged ELEVATED_ADMIN. Unresolvable ⇒ empty capture ⇒ fail-closed
+  // STANDARD_USER / filtered downstream.
+  const exe = systemWhoamiExe();
+  if (!exe) return '';
   return new Promise((resolvePromise) => {
-    // SystemRoot-anchored, never PATH: whoever calls observeEnvironment can
-    // control PATH, and a planted fake whoami could get a filtered token
-    // judged ELEVATED_ADMIN (same convention as reg.exe/powershell.exe).
     execFile(
-      systemWhoamiExe(),
+      exe,
       ['/groups', '/fo', 'csv'],
       { windowsHide: true, timeout: 10000 },
       (err, stdout) => {

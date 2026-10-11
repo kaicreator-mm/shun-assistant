@@ -432,9 +432,16 @@ class Helper {
 
 async function whoamiGroups(): Promise<string> {
   return new Promise((resolvePromise) => {
-    // SystemRoot-anchored, never PATH: the launcher controls PATH, and a
-    // planted fake whoami could get a filtered token judged elevated.
-    execFile(systemWhoamiExe(), ['/groups', '/fo', 'csv'], { windowsHide: true }, (err, stdout) => {
+    // C13: machine-evidenced resolution, never PATH and never the inherited
+    // SystemRoot alone: the launcher controls both, and a planted fake
+    // whoami could get a filtered token judged elevated. Unresolvable ⇒
+    // empty capture ⇒ isElevatedToken('') = false ⇒ ELEVATED refused.
+    const exe = systemWhoamiExe();
+    if (!exe) {
+      resolvePromise('');
+      return;
+    }
+    execFile(exe, ['/groups', '/fo', 'csv'], { windowsHide: true }, (err, stdout) => {
       resolvePromise(err ? '' : String(stdout));
     });
   });
