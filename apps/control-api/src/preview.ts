@@ -79,9 +79,10 @@ function describeVerification(plan: ActionPlan): PlanPreview['verification'] {
       `After execution Shun verifies the outcome with \`${plan.verificationPlan.verifierId}\` ` +
       `(revision ${plan.verificationPlan.verifierRevision})` +
       (oracle ? ', against success criteria fixed BEFORE execution started.' : '.'),
-    checks: plan.verificationPlan.checks.map((check) =>
-      check.description ? `${check.checkId} — ${check.description}` : check.checkId,
-    ),
+    // checkId only: `checks[].description` is plan-supplied free text, so
+    // rendering it would let a crafted plan reframe what verification means
+    // and blur the fixed risk statement's authority (Issue #41, VC-P2-05).
+    checks: plan.verificationPlan.checks.map((check) => check.checkId),
   };
 }
 

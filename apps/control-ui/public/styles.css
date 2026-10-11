@@ -29,6 +29,18 @@ header h1 {
   font-size: 1.5rem;
 }
 
+/* Prominent simulation disclosure (VC-P2-06): the demo backend must never
+   pass as the real Action Controller. */
+.sim-banner {
+  margin: 0.4rem 0;
+  padding: 0.55rem 0.8rem;
+  border: 2px solid var(--warn);
+  border-radius: 6px;
+  background: #fff7e0;
+  color: var(--warn);
+  font-weight: 700;
+}
+
 main section {
   background: var(--panel);
   border: 1px solid var(--line);

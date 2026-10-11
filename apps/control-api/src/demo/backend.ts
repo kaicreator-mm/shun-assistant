@@ -86,6 +86,17 @@ interface DemoTask {
   script: {
     /** 'interrupt' leaves an uncertain journal window; 'fail-verify' fails semantic verification. */
     interruption?: 'UNCERTAIN';
+    /**
+     * What the demo's modeled post-state inspection finds during reconciliation
+     * (Issue #41, VC-P1-03): the demo executes nothing real, so it may only
+     * conclude "provably not executed" when a post-state proof is explicitly
+     * scripted. PROVEN_PRESENT models the opposite proof — the declared effect
+     * IS there — which must keep the uncertain classification (the frozen
+     * taxonomy has no "completed but unverified" class) with retry blocked.
+     * Default is UNDETERMINED — fail-closed, the uncertain classification
+     * stands and retry stays blocked.
+     */
+    reconcilePostState?: 'PROVEN_ABSENT' | 'PROVEN_PRESENT' | 'UNDETERMINED';
     verifyFail?: boolean;
     trustBlocked?: boolean;
   };
@@ -129,8 +140,8 @@ export class DemoShunBackend implements ControlBackend {
     this.policy = options.policy ?? { kind: 'ACTIVE', revision: 'pol-snap-2026-10-10-a' };
   }
 
-  meta(): { policy: PolicyState; localOnly: true } {
-    return { policy: this.policy, localOnly: true };
+  meta(): { policy: PolicyState; localOnly: true; simulated: true } {
+    return { policy: this.policy, localOnly: true, simulated: true };
   }
 
   /** Test/demo hook: pin the clock so expiry/decision timing is deterministic. */
@@ -187,6 +198,11 @@ export class DemoShunBackend implements ControlBackend {
       progress: [],
       script: {
         interruption: request.goal.toLowerCase().includes('interrupt') ? 'UNCERTAIN' : undefined,
+        reconcilePostState: request.goal.toLowerCase().includes('proven-absent')
+          ? 'PROVEN_ABSENT'
+          : request.goal.toLowerCase().includes('proven-present')
+            ? 'PROVEN_PRESENT'
+            : 'UNDETERMINED',
         verifyFail: request.goal.toLowerCase().includes('fail-verify'),
         trustBlocked: request.goal.toLowerCase().includes('untrusted-provider'),
       },
@@ -452,6 +468,9 @@ export class DemoShunBackend implements ControlBackend {
       approvalId: approval.approvalId,
       taskId: approval.taskId,
       planHash: approval.planHash,
+      // The record's actual status (PENDING in the inbox, decided states when a
+      // single approval is fetched) so the UI never has to guess.
+      status: approval.status,
       summary: approval.requestSummary,
       evidenceRefs: [...approval.evidenceRefs],
       riskClass: approval.riskClass,
@@ -502,6 +521,25 @@ export class DemoShunBackend implements ControlBackend {
         ok: false,
         code: 'POLICY_EXPIRED',
         detail: `The policy snapshot expired at ${policy.expiredAt}. Approval is refused until Shun re-resolves under a current snapshot — this cannot be overridden here.`,
+      };
+    }
+    if (
+      policy.kind === 'ACTIVE' &&
+      input.approved &&
+      policy.revision !== task.plan?.policySnapshotRevision
+    ) {
+      // Active-policy revision drift (Issue #41, VC-P1-02): the plan — and the
+      // approval bound to its hash — was resolved under a different policy
+      // snapshot than the one now active. Approving would authorize the plan
+      // against a policy the user never reviewed, so the decision is refused
+      // and nothing is recorded. Declining stays available (it grants nothing).
+      return {
+        ok: false,
+        code: 'POLICY_REVISION_DRIFT',
+        detail:
+          `The active policy snapshot is “${policy.revision}”, but this plan was resolved under ` +
+          `“${task.plan?.policySnapshotRevision ?? 'unknown'}”. Approval is refused; ask Shun to ` +
+          're-resolve the plan under the current snapshot — this cannot be overridden here.',
       };
     }
 
@@ -645,23 +683,59 @@ export class DemoShunBackend implements ControlBackend {
         detail: 'There is no uncertain side effect to reconcile for this task.',
       };
     }
-    // Reconcile from journal + post-state only (L2 §9.4). The demo post-state
-    // check finds the declared expected outputs absent → the step provably
-    // never completed its effect.
+    // Reconcile from journal + post-state only (L2 §9.4) — and honestly. The
+    // journal shows EXEC_START inside the execution window, so the journal
+    // alone cannot prove the step never ran; only an explicit post-state
+    // inspection that finds the plan's declared expected state absent may
+    // reclassify to FAILED_BEFORE_EFFECT (Issue #41, VC-P1-03). Without that
+    // proof the uncertain classification STANDS: it must never be laundered
+    // into a "provably safe" retry.
+    if (task.script.reconcilePostState === 'PROVEN_ABSENT') {
+      task.recovery = {
+        classification: 'FAILED_BEFORE_EFFECT',
+        detail:
+          'Reconciliation compared the journal (stopped inside the execution window) and the actual state ' +
+          'against the plan’s declared expected state: the declared outputs are provably absent, so the ' +
+          'step never took effect. A retry is now provably safe.',
+        reconciled: true,
+      };
+      task.execution = {
+        terminal: 'FAILED',
+        startedAt: task.execution?.startedAt,
+        finishedAt: now,
+      };
+      task.failure = {
+        code: 'EXECUTION_INTERRUPTED',
+        message:
+          'Execution was interrupted. Reconciliation proved the step did not take effect; the task can be retried safely.',
+      };
+      this.transition(task, 'FAILED', now, task.recovery.detail);
+      return { ok: true, value: { classification: task.recovery.classification } };
+    }
+    if (task.script.reconcilePostState === 'PROVEN_PRESENT') {
+      // Post-state proof the step DID take effect (Issue #41, VC-P1-03): the
+      // frozen taxonomy has no "completed but unverified" class, so this must
+      // not be laundered into FAILED_BEFORE_EFFECT or any safe disposition.
+      // The uncertain classification stands, the task stays in
+      // NEEDS_INTERVENTION, and retry stays blocked (RETRY_BLOCKED_UNCERTAIN).
+      task.recovery = {
+        classification: 'MAY_HAVE_EXECUTED_UNCERTAIN',
+        detail:
+          'Reconciliation compared the journal (stopped inside the execution window) and the actual state ' +
+          'against the plan’s declared expected state: the declared outputs are present, so the step took ' +
+          'effect — but verification never ran, so nothing is reported as success and a retry stays blocked.',
+        reconciled: false,
+      };
+      return { ok: true, value: { classification: task.recovery.classification } };
+    }
     task.recovery = {
-      classification: 'FAILED_BEFORE_EFFECT',
+      classification: 'MAY_HAVE_EXECUTED_UNCERTAIN',
       detail:
-        'Reconciliation compared the journal and the actual state against the plan’s declared expected state: ' +
-        'the step never took effect. A retry is now provably safe.',
-      reconciled: true,
+        'Reconciliation compared the journal (stopped inside the execution window) and the actual state, ' +
+        'but it could not prove whether the step took effect. The uncertain classification stands and ' +
+        'retry stays blocked until a post-state inspection proves the step never ran.',
+      reconciled: false,
     };
-    task.execution = { terminal: 'FAILED', startedAt: task.execution?.startedAt, finishedAt: now };
-    task.failure = {
-      code: 'EXECUTION_INTERRUPTED',
-      message:
-        'Execution was interrupted. Reconciliation proved the step did not take effect; the task can be retried safely.',
-    };
-    this.transition(task, 'FAILED', now, task.recovery.detail);
     return { ok: true, value: { classification: task.recovery.classification } };
   }
 

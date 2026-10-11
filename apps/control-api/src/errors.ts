@@ -25,6 +25,7 @@ export const CONTROL_ERROR_CODES = [
   'APPROVAL_EXPIRED',
   'PLAN_HASH_MISMATCH',
   'POLICY_EXPIRED',
+  'POLICY_REVISION_DRIFT',
   'POLICY_STATE_UNKNOWN',
   'TRUST_BLOCKED',
   // cancellation / recovery
@@ -36,6 +37,8 @@ export const CONTROL_ERROR_CODES = [
   'EVIDENCE_REF_INVALID',
   'EVIDENCE_NOT_FOUND',
   'LOCAL_ONLY_VIOLATION',
+  // cross-site request protection on mutations
+  'CSRF_REFUSED',
 ] as const;
 
 export type ControlErrorCode = (typeof CONTROL_ERROR_CODES)[number];
@@ -57,6 +60,7 @@ export function httpStatusForCode(code: ControlErrorCode): number {
     case 'METHOD_NOT_ALLOWED':
       return 405;
     case 'LOCAL_ONLY_VIOLATION':
+    case 'CSRF_REFUSED':
       return 403;
     case 'APPROVAL_EXPIRED':
     case 'POLICY_EXPIRED':
@@ -67,6 +71,7 @@ export function httpStatusForCode(code: ControlErrorCode): number {
     case 'PREVIEW_NOT_AVAILABLE':
     case 'APPROVAL_ALREADY_DECIDED':
     case 'PLAN_HASH_MISMATCH':
+    case 'POLICY_REVISION_DRIFT':
     case 'CANCEL_UNSUPPORTED':
     case 'CANCEL_INVALID_STATE':
     case 'RECOVERY_NOT_APPLICABLE':

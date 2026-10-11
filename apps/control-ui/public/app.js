@@ -4,6 +4,7 @@
 // served this page. The UI renders and relays; it never constructs
 // authorization and never talks to anything but the local control-api.
 import {
+  approvalDecisionState,
   decisionGuard,
   failureLines,
   fallbackFor,
@@ -12,6 +13,7 @@ import {
   progressLines,
   recoveryLines,
   residueLines,
+  simulationBanner,
   stateLabel,
   stateTone,
   taskCard,
@@ -260,8 +262,13 @@ function renderPreviewInto(box, preview) {
   hash.textContent = `You are approving exactly this plan: ${blocks.planHash}`;
   box.append(headline, risk, list, hash);
 
+  // Decision buttons render only from the approval DTO's actual status
+  // (VC-P1-01): PENDING → buttons; decided → explicit already-decided note;
+  // missing/unknown status → fail-closed refusal, never silent and never a
+  // guessed button state.
   const approval = state.approvals.find((candidate) => candidate.taskId === preview.taskId);
-  if (approval && approval.status === 'PENDING') {
+  const decision = approvalDecisionState(approval);
+  if (decision.decidable) {
     // UI-side guard: the click is only sent when the displayed plan hash is
     // the one bound to this approval (the server re-checks fail-closed).
     const guard = decisionGuard({
@@ -282,6 +289,11 @@ function renderPreviewInto(box, preview) {
     decline.textContent = 'Decline';
     decline.addEventListener('click', () => decide(approval.approvalId, preview.planHash, false));
     box.append(approve, ' ', decline);
+  } else if (approval) {
+    const note = document.createElement('p');
+    note.className = 'muted';
+    note.textContent = decision.reason;
+    box.append(note);
   }
 }
 
@@ -352,11 +364,22 @@ async function refresh() {
   renderTasks();
   renderApprovals();
   renderDetail();
+  // Simulation banner (VC-P2-06): rendered from the backend's own disclosure;
+  // it stays visible while the API is unreachable or silent.
+  const banner = el('simulation-banner');
+  const sim = simulationBanner(undefined);
+  banner.textContent = sim.text;
+  banner.hidden = !sim.visible;
+  banner.className = 'sim-banner';
   const health = el('health');
   api('/health')
     .then((info) => {
       health.textContent = `Local only · policy ${info.policy?.kind ?? 'UNKNOWN'} · ${info.api ?? ''}`;
       health.className = 'muted';
+      const label = simulationBanner(info);
+      banner.textContent = label.text;
+      banner.hidden = !label.visible;
+      banner.className = label.visible ? 'sim-banner' : 'muted';
     })
     .catch(() => {
       health.textContent = 'Control API unreachable.';

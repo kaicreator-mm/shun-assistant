@@ -27,6 +27,8 @@ export const FALLBACK_MESSAGES = {
     'The plan changed after the preview you saw. Nothing was recorded — review the fresh preview and decide again.',
   POLICY_EXPIRED:
     'The policy snapshot has expired, so approval is refused until Shun re-resolves policy. This cannot be overridden here.',
+  POLICY_REVISION_DRIFT:
+    'The active policy snapshot changed since this plan was resolved, so approval is refused. Ask Shun to re-plan under the current policy — this cannot be overridden here.',
   POLICY_STATE_UNKNOWN:
     'The current policy cannot be established, so approval is refused. This cannot be overridden here.',
   TRUST_BLOCKED:
@@ -40,6 +42,8 @@ export const FALLBACK_MESSAGES = {
   EVIDENCE_NOT_FOUND: 'That evidence record does not exist.',
   LOCAL_ONLY_VIOLATION:
     'The control surface is local-only and refused a request that did not come from this computer.',
+  CSRF_REFUSED:
+    'The control surface refused a request that did not come from this page (cross-site request protection). Nothing was changed.',
 };
 
 /** Fallback text for an error code; unknown codes still get a predictable sentence. */
@@ -186,6 +190,36 @@ export function decisionGuard({ previewPlanHash, approvalPlanHash, enteredPlanHa
   return { allowed: true, reason: '' };
 }
 
+/**
+ * Decision gating on the approval DTO's ACTUAL status (Issue #41, VC-P1-01):
+ * decision buttons render only from an explicit `status: 'PENDING'`. A DTO
+ * without a status is an explicit unknown (no buttons, visible refusal) —
+ * it must never degrade into silent buttons-or-nothing rendering.
+ */
+/**
+ * @param {{ status?: unknown } & Record<string, unknown> | undefined} approval
+ * @returns {{ decidable: boolean, reason: string }}
+ */
+export function approvalDecisionState(approval) {
+  if (!approval) {
+    return { decidable: false, reason: 'No approval is attached to this task.' };
+  }
+  if (approval.status === 'PENDING') {
+    return { decidable: true, reason: '' };
+  }
+  if (typeof approval.status !== 'string' || approval.status === '') {
+    return {
+      decidable: false,
+      reason:
+        'Approval status is unknown, so deciding is disabled. Reload the approval inbox before deciding.',
+    };
+  }
+  return {
+    decidable: false,
+    reason: `This approval was already ${String(approval.status).toLowerCase()}. Nothing more to decide.`,
+  };
+}
+
 /** Progress history as readable lines. */
 /**
  * @param {SnapshotLike} snapshot
@@ -268,4 +302,34 @@ export function localOnlyBadge(snapshot) {
   return snapshot.localOnly?.enforced
     ? 'Local only — nothing leaves this computer'
     : `External disclosure: ${snapshot.localOnly?.externalDisclosure ?? 'UNKNOWN'}`;
+}
+
+/**
+ * Simulation disclosure (Issue #41, VC-P2-06): the surface must prominently
+ * state when it runs the scripted DemoShunBackend so demo approvals can never
+ * pass as real-world authority. Fail loud on unknown — an API that cannot
+ * answer keeps the banner up instead of looking like a confirmed real backend.
+ */
+/**
+ * @param {{ simulated?: boolean } | undefined} health
+ * @returns {{ visible: boolean, text: string }}
+ */
+export function simulationBanner(health) {
+  if (health?.simulated === true) {
+    return {
+      visible: true,
+      text:
+        'Simulation — this surface runs the scripted DemoShunBackend, not the real Action ' +
+        'Controller. Nothing here touches a real system.',
+    };
+  }
+  if (health?.simulated === false) {
+    return { visible: false, text: '' };
+  }
+  return {
+    visible: true,
+    text:
+      'Simulation status unknown — the control surface has not confirmed whether a real backend ' +
+      'is connected. Treat everything shown here as simulated.',
+  };
 }

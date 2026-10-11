@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest';
 // the control-api's closed error taxonomy, and this test enforces it.
 import { CONTROL_ERROR_CODES } from '../../control-api/src/errors.ts';
 import {
+  approvalDecisionState,
   decisionGuard,
   FALLBACK_MESSAGES,
   failureLines,
@@ -13,6 +14,7 @@ import {
   recoveryLines,
   residueLines,
   STATE_LABELS,
+  simulationBanner,
   stateLabel,
   stateTone,
   taskCard,
@@ -79,6 +81,12 @@ describe('predictable fallback: every typed error code has a human sentence', ()
   it('never throws on unknown codes and still says nothing was changed', () => {
     const message = fallbackFor('SOME_FUTURE_CODE');
     expect(message).toContain('Nothing was changed');
+  });
+
+  it('explains policy revision drift as a refusal that cannot be overridden (VC-P1-02)', () => {
+    const message = fallbackFor('POLICY_REVISION_DRIFT');
+    expect(message).toContain('refused');
+    expect(message).toContain('cannot be overridden');
   });
 });
 
@@ -203,6 +211,54 @@ describe('progress and residue readability', () => {
     expect(lines[0]).toContain('6 leftover items');
     expect(lines.some((line) => line.includes('never touched'))).toBe(true);
     expect(lines.some((line) => line.includes('~65.0 MB'))).toBe(true);
+  });
+});
+
+describe('approval decision gating on the actual DTO status (VC-P1-01)', () => {
+  it('is decidable only when the approval DTO is explicitly PENDING', () => {
+    const decidable = approvalDecisionState({ status: 'PENDING' });
+    expect(decidable.decidable).toBe(true);
+    expect(decidable.reason).toBe('');
+
+    const decided = approvalDecisionState({ status: 'APPROVED' });
+    expect(decided.decidable).toBe(false);
+    expect(decided.reason).toContain('already approved');
+  });
+
+  it('fails closed with an explicit unknown when the DTO carries no status', () => {
+    // The merged defect: the inbox DTO had no status field, so the UI silently
+    // rendered no decision UI at all. A missing status must surface as an
+    // explicit unknown-state refusal, never as buttons and never as silence.
+    const noStatus = approvalDecisionState({ summary: 'Shun wants to delete files.' });
+    expect(noStatus.decidable).toBe(false);
+    expect(noStatus.reason).toContain('unknown');
+
+    const undefinedApproval = approvalDecisionState(undefined);
+    expect(undefinedApproval.decidable).toBe(false);
+    expect(undefinedApproval.reason).toContain('No approval');
+  });
+});
+
+describe('simulation banner (VC-P2-06)', () => {
+  it('shows a prominent simulation label for the demo backend', () => {
+    const banner = simulationBanner({ simulated: true });
+    expect(banner.visible).toBe(true);
+    expect(banner.text).toContain('Simulation');
+    expect(banner.text).toContain('DemoShunBackend');
+    expect(banner.text).toContain('not the real');
+  });
+
+  it('hides only on an explicit simulated:false from a real backend', () => {
+    expect(simulationBanner({ simulated: false }).visible).toBe(false);
+  });
+
+  it('stays visible and says unknown when the API could not answer', () => {
+    // Fail loud, not silent: an unreachable or pre-disclosure API must keep
+    // the banner up rather than look like a confirmed real backend.
+    const unknown = simulationBanner(undefined);
+    expect(unknown.visible).toBe(true);
+    expect(unknown.text).toContain('unknown');
+    expect(simulationBanner({}).visible).toBe(true);
   });
 });
 
