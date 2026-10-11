@@ -91,11 +91,12 @@ function ownerSid(authorityDir: string, path: string): string | undefined {
   const env = privilegedSpawnEnv();
   env.SHUN_OWNER_PROBE_PATH = path;
   try {
-    const out = execFileSync(
-      powershell,
-      ['-NoProfile', '-NonInteractive', '-Command', script],
-      { encoding: 'utf8', windowsHide: true, timeout: 15_000, env },
-    ).trim();
+    const out = execFileSync(powershell, ['-NoProfile', '-NonInteractive', '-Command', script], {
+      encoding: 'utf8',
+      windowsHide: true,
+      timeout: 15_000,
+      env,
+    }).trim();
     return /^S-1-/.test(out) ? out : undefined;
   } catch {
     return undefined;
