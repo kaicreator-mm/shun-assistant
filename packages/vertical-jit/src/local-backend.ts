@@ -23,7 +23,7 @@ import {
   type PlanAction,
   ShunContractError,
 } from '@shun/contracts';
-import type { JournalPort } from './journal.ts';
+import { newJournalId, type JournalPort } from './journal.ts';
 import type { LocalAuthority } from './local-authority.ts';
 
 /** Transport-level crash of the privileged worker (simulates a killed helper). */
@@ -108,11 +108,16 @@ export class LocalPrivilegedBackend implements ExecutionBackend {
   async execute(action: AuthorizedAction, presentation: unknown): Promise<ExecutionReceipt> {
     const journal = await this.#journalFor(action.actionId);
     const startedAt = this.#deps.clock();
+    // Every execute() call is a fresh attempt of this actionId: the
+    // reconcile-first retry re-uses the same actionId, and recovery
+    // classification isolates the latest attempt by this id (VJ-P1-04).
+    const attemptId = newJournalId('attempt');
     await journal.append({
       seq: 0,
       ts: startedAt,
       phase: 'RECEIVED',
       actionId: action.actionId,
+      attemptId,
     });
 
     const plan = await this.#deps.authority.ledger.byHash(action.planHash);
@@ -138,7 +143,8 @@ export class LocalPrivilegedBackend implements ExecutionBackend {
       ts: this.#deps.clock(),
       phase: 'VALIDATED',
       actionId: action.actionId,
-      detail: `grant ${verdict.grant.grantId}`,
+      detail: `grant ${verdict.grantId}`,
+      attemptId,
     });
 
     const fault = this.#deps.faults?.find((candidate) =>
@@ -154,6 +160,7 @@ export class LocalPrivilegedBackend implements ExecutionBackend {
         phase: 'RECEIPT_WRITTEN',
         actionId: action.actionId,
         detail: 'NO_EFFECT:UAC_DECLINED — elevation refused before the effect phase',
+        attemptId,
       });
       return this.#receipt(
         action,
@@ -172,6 +179,7 @@ export class LocalPrivilegedBackend implements ExecutionBackend {
       ts: this.#deps.clock(),
       phase: 'EXEC_START',
       actionId: action.actionId,
+      attemptId,
     });
 
     if (fault?.kind === 'INTERRUPT') {
@@ -196,6 +204,7 @@ export class LocalPrivilegedBackend implements ExecutionBackend {
         phase: 'EXEC_DONE',
         actionId: action.actionId,
         detail: 'simulated execution failure',
+        attemptId,
       });
       await journal.append({
         seq: 8,
@@ -214,6 +223,7 @@ export class LocalPrivilegedBackend implements ExecutionBackend {
         phase: 'RECEIPT_WRITTEN',
         actionId: action.actionId,
         detail: `NO_EFFECT:${outcome.note ?? 'worker refused before effect'}`,
+        attemptId,
       });
       return this.#receipt(
         action,
@@ -232,12 +242,14 @@ export class LocalPrivilegedBackend implements ExecutionBackend {
       phase: 'EXEC_DONE',
       actionId: action.actionId,
       ...(outcome.note ? { detail: outcome.note } : {}),
+      attemptId,
     });
     await journal.append({
       seq: 5,
       ts: this.#deps.clock(),
       phase: 'RECEIPT_WRITTEN',
       actionId: action.actionId,
+      attemptId,
     });
     return this.#receipt(
       action,

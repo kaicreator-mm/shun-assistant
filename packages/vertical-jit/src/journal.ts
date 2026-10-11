@@ -24,6 +24,13 @@ export interface JournalEntry {
   readonly ts: string;
   readonly phase: JournalPhase;
   readonly actionId: string;
+  /**
+   * Identity of ONE attempt of this actionId. The reconcile-first retry
+   * re-uses a stable actionId, so a single journal can hold several
+   * attempts; classification must isolate the latest (VJ-P1-04). Entries
+   * without an attemptId are treated as one legacy attempt.
+   */
+  readonly attemptId?: string;
   readonly detail?: string;
 }
 
@@ -80,14 +87,28 @@ export type RecoveryClassification =
  * elevation seam refuses before any effect phase, e.g. UAC_DECLINED) proves
  * the helper never started, which classifies NOT_STARTED exactly like the
  * empty-journal case.
+ *
+ * Attempt isolation (VJ-P1-04): one actionId may carry MULTIPLE attempts —
+ * the reconcile-first retry keeps the SAME actionId and starts a new
+ * attempt. Only the LATEST attempt describes the current recovery
+ * situation: an earlier attempt's RECEIPT_WRITTEN must not turn a torn new
+ * attempt into COMPLETED_VERIFIED, and an earlier NO_EFFECT marker must not
+ * dominate a later attempt that did reach the effect phase. Entries without
+ * an attemptId form a single legacy attempt (replay order is the order
+ * truth: the attempt of the LAST replayed entry wins).
  */
 export function classifyFromJournal(
   entries: readonly JournalEntry[],
   actionId: string,
 ): RecoveryClassification | 'NO_ENTRIES' {
   const mine = entries.filter((entry) => entry.actionId === actionId);
-  const phases = new Set(mine.map((entry) => entry.phase));
-  if (mine.some((entry) => entry.detail?.startsWith('NO_EFFECT:'))) {
+  if (mine.length === 0) {
+    return 'NO_ENTRIES';
+  }
+  const latestAttemptId = mine[mine.length - 1]?.attemptId ?? 'legacy';
+  const attempt = mine.filter((entry) => (entry.attemptId ?? 'legacy') === latestAttemptId);
+  const phases = new Set(attempt.map((entry) => entry.phase));
+  if (attempt.some((entry) => entry.detail?.startsWith('NO_EFFECT:'))) {
     return 'NOT_STARTED';
   }
   if (!phases.has('RECEIVED')) {
