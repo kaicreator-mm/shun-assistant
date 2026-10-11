@@ -85,13 +85,17 @@ caller-asserted label:
 - R2: the caller-supplied `{ planner, transport }` pair form is REMOVED. A
   caller-labeled `'LOCAL'` transport previously let a remote-backed planner
   run under local-only/offline policy.
-- R2: `localPlannerAdapter` requires the planner's local provenance to be
-  declared at the trusted composition boundary via
-  `declareLocalPlanner(planner)`; minting throws otherwise. The composition
-  layer is the trust anchor that asserts a planner executes in-process.
-- Policy enforcement is unchanged: REMOTE is ineligible under local-only /
-  no-disclosure policy and under the offline constraint, always at zero
-  planner invocations.
+- R3: `declareLocalPlanner` is a public caller-accessible issuer; its
+  symbol brand does **not** prove no network egress. Until a distinct trusted
+  host can enforce/attest transport provenance, **all LOCAL PlannerPort
+  execution is unavailable** at the runtime seam, even after factory minting.
+  The resolver fails closed as `PLANNER_UNAVAILABLE` with zero planner calls.
+  Deterministic/structured normalization remains available.
+- REMOTE remains an explicit adapter and is ineligible under local-only /
+  no-disclosure policy or any offline constraint. Under a policy that permits
+  external-model disclosure, remote proposals still undergo schema checks and
+  deterministic re-resolution. Do not claim a provider is LOCAL based on a
+  public brand or a caller-provided transport assertion.
 
 ## Benchmark gold evidence (P1-07, Issue #33)
 
