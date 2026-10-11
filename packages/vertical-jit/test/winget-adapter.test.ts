@@ -80,9 +80,13 @@ describe('WingetAcquisition — exact provenance resolution', () => {
       version: '2.4.1',
       publisher: 'ExampleSoftware',
       license: 'MIT',
-      signature: 'authenticode:ExampleSoftware',
     });
     expect(candidate.installerSha256).toMatch(/^[0-9a-f]{64}$/);
+    // VJ-P2-05: publisher text is metadata only. Without an independent
+    // Authenticode verification the adapter must NOT fabricate a signature
+    // provenance claim.
+    expect(candidate.signature).toBeUndefined();
+    expect('signature' in candidate).toBe(false);
   });
 
   it('maps an unknown package to a typed PACKAGE_UNKNOWN acquisition error', async () => {

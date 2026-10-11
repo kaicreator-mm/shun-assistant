@@ -57,7 +57,9 @@ describe('JIT lifecycle — RETAIN happy path', () => {
     expect(output.provenance.hash).toBe(
       'b2c3d4e5f60718293a4b5c6d7e8f90a1b2c3d4e5f60718293a4b5c6d7e8f90a1',
     );
-    expect(output.provenance.signature).toContain('authenticode:');
+    // VJ-P2-05: no signature claim without independent verification — the
+    // publisher string from `winget show` is metadata, not proof.
+    expect(output.provenance.signature).toBeUndefined();
   });
 
   it('refuses the benchmark envelope at the production entry point', async () => {
