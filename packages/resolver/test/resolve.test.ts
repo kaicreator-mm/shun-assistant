@@ -17,7 +17,7 @@
 import { describe, expect, it } from 'vitest';
 import { goldEvidenceFor } from '../evidence/gold-ranking-evidence.ts';
 import { type BindingScoreFacts, rankFeasibleBindings } from '../src/ranking.ts';
-import { type ObjectiveMatcherTable, ShunRegistry } from '../src/registry.ts';
+import { type ObjectiveMatcherTable, ShunRegistry, snapshotFactsRevision } from '../src/registry.ts';
 import { resolveGoal } from '../src/resolve.ts';
 import {
   B033_FACTS,
@@ -44,15 +44,19 @@ function registryOf(parts: {
   env?: ReturnType<typeof envFacts>;
   additionalObjectiveMatchers?: ObjectiveMatcherTable;
 }) {
-  return ShunRegistry.fromSnapshot(
-    {
-      capabilities: parts.capabilities ?? [],
-      providers: parts.providers ?? [],
-      bindings: parts.bindings ?? [],
-      environment: parts.env ?? ENV_LOCAL,
-    },
-    { additionalObjectiveMatchers: parts.additionalObjectiveMatchers },
-  );
+  const snapshot = {
+    capabilities: parts.capabilities ?? [],
+    providers: parts.providers ?? [],
+    bindings: parts.bindings ?? [],
+    environment: parts.env ?? ENV_LOCAL,
+  };
+  return ShunRegistry.fromSnapshot(snapshot, {
+    additionalObjectiveMatchers: parts.additionalObjectiveMatchers,
+    // R1 (review blocker 1): resolution only runs over currentness-attested
+    // registries — the harness derives the source-issued revision from the
+    // exact assembled facts, standing in for the trusted authority.
+    authorityRevision: snapshotFactsRevision(snapshot),
+  });
 }
 
 function resolve(registry: ShunRegistry, scoreFacts?: BindingScoreFacts[]) {
@@ -541,5 +545,95 @@ describe('resolution records over scenario registries', () => {
       failureCode: 'GOAL_AMBIGUOUS',
       detail: expect.any(String),
     });
+  });
+});
+
+describe('R1 fresh-review negatives (end-to-end resolution, Issue #33)', () => {
+  function registryWithBinding(networkAccess: 'REQUIRED' | 'OPTIONAL' | 'FORBIDDEN') {
+    const capability = capabilityDef({ capabilityId: 'image.batch_process' });
+    const provider = providerDef({ providerId: 'imageProvider.imagemagick' });
+    return {
+      capability,
+      registry: registryOf({
+        capabilities: [capability],
+        providers: [provider],
+        bindings: [
+          bindingDef({
+            bindingId: 'b-im',
+            providerId: provider.providerId,
+            capabilityId: 'image.batch_process',
+            environmentRequirements: requirements({ networkAccess }),
+          }),
+        ],
+      }),
+    };
+  }
+
+  it('a fabricated caller policy fact cannot unlock a capability end-to-end — POLICY_BLOCKED without a trusted evaluator (P1-04 R1)', () => {
+    // The review counterexample: capability requires userApprovedDelete and
+    // the request carries constraints.other = { userApprovedDelete: true }.
+    // Without a trusted policy evaluator this must never select a binding.
+    const capability = capabilityDef({
+      capabilityId: 'image.batch_process',
+      requiredPolicyFacts: ['userApprovedDelete'],
+    });
+    const provider = providerDef({ providerId: 'imageProvider.imagemagick' });
+    const registry = registryOf({
+      capabilities: [capability],
+      providers: [provider],
+      bindings: [
+        bindingDef({
+          bindingId: 'b-im',
+          providerId: provider.providerId,
+          capabilityId: 'image.batch_process',
+          environmentRequirements: requirements({ networkAccess: 'FORBIDDEN' }),
+        }),
+      ],
+    });
+    const request = goalRequest({ goal: 'image.batch_process: resize photos' });
+    request.constraints.other = { userApprovedDelete: true };
+    const result = resolveGoal({ request, registry, objectExists: () => true });
+    expect(result.stage).toBe('RESOLUTION');
+    if (result.stage !== 'RESOLUTION') return;
+    const record = result.record;
+    expect(record.selectedBindingId).toBeNull();
+    expect(record.failureDisposition?.failureCode).toBe('POLICY_BLOCKED');
+    const policyRow = record.hardGateDispositions.find(
+      (entry) => entry.gate === 'USER_ORG_POLICY',
+    );
+    expect(policyRow).toMatchObject({ outcome: 'REJECT' });
+  });
+
+  it('an offline goal whose only binding is networkAccess OPTIONAL is policy-blocked end-to-end (P1 supplemental R1)', () => {
+    const { registry } = registryWithBinding('OPTIONAL');
+    const request = goalRequest({ goal: 'image.batch_process: resize photos' });
+    request.constraints.other = { offline: true };
+    request.policyContext.privacyPolicy = { localOnly: false, externalDisclosure: 'ALLOWED' };
+    const result = resolveGoal({ request, registry, objectExists: () => true });
+    expect(result.stage).toBe('RESOLUTION');
+    if (result.stage !== 'RESOLUTION') return;
+    const record = result.record;
+    expect(record.selectedBindingId).toBeNull();
+    expect(record.feasibleBindings).toEqual([]);
+    expect(record.failureDisposition?.failureCode).toBe('POLICY_BLOCKED');
+    const policyRow = record.hardGateDispositions.find(
+      (entry) => entry.gate === 'USER_ORG_POLICY',
+    );
+    expect(policyRow).toMatchObject({
+      outcome: 'REJECT',
+      reason: expect.stringContaining('offline'),
+    });
+  });
+
+  it('an offline goal over an explicitly no-network binding still resolves (P1 supplemental R1 — legitimate scenario stays eligible)', () => {
+    const { registry } = registryWithBinding('FORBIDDEN');
+    const request = goalRequest({ goal: 'image.batch_process: resize photos' });
+    request.constraints.other = { offline: true };
+    request.policyContext.privacyPolicy = { localOnly: false, externalDisclosure: 'ALLOWED' };
+    const result = resolveGoal({ request, registry, objectExists: () => true });
+    expect(result.stage).toBe('RESOLUTION');
+    if (result.stage !== 'RESOLUTION') return;
+    expect(result.record.selectedBindingId).toBe('b-im');
+    expect(result.record.failureDisposition).toBeNull();
   });
 });

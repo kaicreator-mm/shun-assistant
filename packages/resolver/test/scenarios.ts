@@ -38,7 +38,14 @@ export function providerDef(
       official: true,
       version: '1.0.0',
     },
-    provenanceFacts: { trustState: 'TRUSTED', publisher: 'scenario publisher' },
+    provenanceFacts: {
+      trustState: 'TRUSTED',
+      publisher: 'scenario publisher',
+      // R1 (review blocker 3): scenario requests carry required format 'JPG',
+      // and a required format may only be served over curated format facts —
+      // an unprovable mandatory format is a REJECT, never a deferred PASS.
+      formatSupport: ['JPG'],
+    },
     licenseFacts: { license: 'MIT' },
     supportedPlatforms: [{ os: 'WINDOWS', arch: 'X64' }],
     lifecycle: { supportedOperations: ['CONFIGURE'] },

@@ -1,9 +1,19 @@
 // Registry integrity: identity uniqueness and trusted snapshot currentness.
 // One stable identity must designate exactly one fact (P1-05), and the
 // resolver only resolves over a currentness-verifiable snapshot (P1-06).
+//
+// R1 (Issue #33 fresh review blockers 1–2): a caller-computable content
+// digest is NOT currentness evidence — attestation requires a trusted
+// source-issued revision/currentness authority compared against the CURRENT
+// authority state, and attested facts are immutable after construction.
 import { type RegistryReadModelPort, ShunContractError } from '@shun/contracts';
 import { describe, expect, it } from 'vitest';
-import { type RegistrySnapshot, ShunRegistry, sealRegistrySnapshot } from '../src/registry.ts';
+import {
+  type RegistryCurrentnessAuthority,
+  type RegistrySnapshot,
+  ShunRegistry,
+  snapshotFactsRevision,
+} from '../src/registry.ts';
 import { resolveGoal } from '../src/resolve.ts';
 import {
   bindingDef,
@@ -128,8 +138,13 @@ function resolvingRequest() {
   return request;
 }
 
-describe('trusted snapshot currentness seam (P1-06)', () => {
-  it('a registry collected via sequential async reads without a snapshot seal fails closed at resolution', async () => {
+/** Test double standing in for the TRUSTED registry currentness authority. */
+function authorityFor(snapshot: RegistrySnapshot): RegistryCurrentnessAuthority {
+  return { currentRevision: async () => snapshotFactsRevision(snapshot) };
+}
+
+describe('trusted currentness authority seam (P1-06, R1 blocker 1)', () => {
+  it('a registry collected via sequential async reads without a trusted currentness authority fails closed at resolution', async () => {
     const registry = await ShunRegistry.fromPort(portOf(baseSnapshot()));
     expect(registry.currentnessAttested).toBe(false);
     const result = resolveGoal({
@@ -141,13 +156,13 @@ describe('trusted snapshot currentness seam (P1-06)', () => {
     if (result.stage !== 'RESOLUTION') return;
     expect(result.record.selectedBindingId).toBeNull();
     expect(result.record.failureDisposition?.failureCode).toBe('REGISTRY_CURRENTNESS_INSUFFICIENT');
-    expect(result.record.failureDisposition?.detail).toContain('snapshot seal');
+    expect(result.record.failureDisposition?.detail).toContain('currentness authority');
   });
 
-  it('a port-built registry with a matching snapshot seal is currentness-attested and resolves', async () => {
+  it('a port-built registry whose trusted authority confirms the collected revision is currentness-attested and resolves', async () => {
     const snapshot = baseSnapshot();
     const registry = await ShunRegistry.fromPort(portOf(snapshot), {
-      snapshotSeal: sealRegistrySnapshot(snapshot),
+      currentnessAuthority: authorityFor(snapshot),
     });
     expect(registry.currentnessAttested).toBe(true);
     const result = resolveGoal({
@@ -160,35 +175,119 @@ describe('trusted snapshot currentness seam (P1-06)', () => {
     expect(result.record.selectedBindingId).toBe('b-im');
   });
 
-  it('reads-between-changed: a seal that does not bind to the collected facts is rejected at construction', async () => {
-    // The collector sealed an atomic read of snapshot A; the port then served
-    // facts in which the environment changed mid-collection (snapshot B).
-    const sealed = baseSnapshot();
-    const served = baseSnapshot();
-    served.environment = { ...served.environment, observationRevision: 'obs-0043' };
-    await expect(
-      ShunRegistry.fromPort(portOf(served), { snapshotSeal: sealRegistrySnapshot(sealed) }),
-    ).rejects.toThrow(/stale or altered|does not bind/);
+  it('the review counterexample: the port keeps serving stale snapshot A after the authority moved to revision B — resolution fails closed and A is never selected', async () => {
+    // The trusted authority has already issued a new revision (provider trust
+    // revoked); the async port keeps returning the superseded snapshot A.
+    const stale = baseSnapshot();
+    const current = baseSnapshot();
+    current.providers[0] = providerDef({
+      providerId: 'imageProvider.imagemagick',
+      provenanceFacts: { trustState: 'UNTRUSTED' },
+    });
+    const registry = await ShunRegistry.fromPort(portOf(stale), {
+      currentnessAuthority: authorityFor(current),
+    });
+    expect(registry.currentnessAttested).toBe(false);
+    const result = resolveGoal({
+      request: resolvingRequest(),
+      registry,
+      objectExists: () => true,
+    });
+    expect(result.stage).toBe('RESOLUTION');
+    if (result.stage !== 'RESOLUTION') return;
+    expect(result.record.selectedBindingId).toBeNull();
+    expect(result.record.failureDisposition?.failureCode).toBe('REGISTRY_CURRENTNESS_INSUFFICIENT');
+    expect(result.record.failureDisposition?.detail).toContain('reads-between-changed');
   });
 
-  it('stale snapshot: facts mutated after sealing are rejected by fromSnapshot', () => {
+  it('a currentness authority that cannot be consulted leaves the registry unattested — resolution fails closed', async () => {
+    const registry = await ShunRegistry.fromPort(portOf(baseSnapshot()), {
+      currentnessAuthority: {
+        currentRevision: async () => {
+          throw new Error('authority unreachable');
+        },
+      },
+    });
+    expect(registry.currentnessAttested).toBe(false);
+    const result = resolveGoal({
+      request: resolvingRequest(),
+      registry,
+      objectExists: () => true,
+    });
+    expect(result.stage).toBe('RESOLUTION');
+    if (result.stage !== 'RESOLUTION') return;
+    expect(result.record.failureDisposition?.failureCode).toBe('REGISTRY_CURRENTNESS_INSUFFICIENT');
+    expect(result.record.failureDisposition?.detail).toContain('authority unreachable');
+  });
+
+  it('a synchronous snapshot is NOT attested by default — an arbitrary stale snapshot cannot masquerade as current (R1)', () => {
+    // Premise tightened (R1 review blocker 1): R0 attested fromSnapshot by
+    // default, so any self-consistent stale snapshot resolved. A snapshot
+    // without a source-issued authority revision has unverifiable currentness.
+    const registry = ShunRegistry.fromSnapshot(baseSnapshot());
+    expect(registry.currentnessAttested).toBe(false);
+    const result = resolveGoal({
+      request: resolvingRequest(),
+      registry,
+      objectExists: () => true,
+    });
+    expect(result.stage).toBe('RESOLUTION');
+    if (result.stage !== 'RESOLUTION') return;
+    expect(result.record.selectedBindingId).toBeNull();
+    expect(result.record.failureDisposition?.failureCode).toBe('REGISTRY_CURRENTNESS_INSUFFICIENT');
+  });
+
+  it('a matching source-issued authorityRevision attests a synchronous snapshot and resolution proceeds', () => {
     const snapshot = baseSnapshot();
-    const seal = sealRegistrySnapshot(snapshot);
+    const registry = ShunRegistry.fromSnapshot(snapshot, {
+      authorityRevision: snapshotFactsRevision(snapshot),
+    });
+    expect(registry.currentnessAttested).toBe(true);
+    const result = resolveGoal({
+      request: resolvingRequest(),
+      registry,
+      objectExists: () => true,
+    });
+    expect(result.stage).toBe('RESOLUTION');
+    if (result.stage !== 'RESOLUTION') return;
+    expect(result.record.selectedBindingId).toBe('b-im');
+  });
+
+  it('stale snapshot: facts mutated after the authority issued its revision are rejected by fromSnapshot', () => {
+    const snapshot = baseSnapshot();
+    const issued = snapshotFactsRevision(snapshot);
     snapshot.environment = { ...snapshot.environment, networkPolicy: 'OPEN' };
-    expect(() => ShunRegistry.fromSnapshot(snapshot, { snapshotSeal: seal })).toThrow(
+    expect(() => ShunRegistry.fromSnapshot(snapshot, { authorityRevision: issued })).toThrow(
       ShunContractError,
     );
-    expect(() => ShunRegistry.fromSnapshot(snapshot, { snapshotSeal: seal })).toThrow(
+    expect(() => ShunRegistry.fromSnapshot(snapshot, { authorityRevision: issued })).toThrow(
       /stale or was altered/,
     );
   });
+});
 
-  it('a matching fromSnapshot seal verifies and resolution proceeds over the attested snapshot', () => {
-    const snapshot = baseSnapshot();
-    const registry = ShunRegistry.fromSnapshot(snapshot, {
-      snapshotSeal: sealRegistrySnapshot(snapshot),
+describe('attested registry facts are immutable after construction (R1 blocker 2)', () => {
+  function attestedRegistry(snapshot: RegistrySnapshot): ShunRegistry {
+    return ShunRegistry.fromSnapshot(snapshot, {
+      authorityRevision: snapshotFactsRevision(snapshot),
     });
-    expect(registry.currentnessAttested).toBe(true);
+  }
+
+  it('the review counterexample: a post-construction trust upgrade is refused — resolution still fails the provider closed', () => {
+    const snapshot = baseSnapshot();
+    snapshot.providers[0] = providerDef({
+      providerId: 'imageProvider.imagemagick',
+      provenanceFacts: { trustState: 'UNKNOWN', formatSupport: ['JPG'] },
+    });
+    const registry = attestedRegistry(snapshot);
+    const provider = registry.provider('imageProvider.imagemagick');
+    expect(provider?.provenanceFacts.trustState).toBe('UNKNOWN');
+    expect(() => {
+      (provider!.provenanceFacts as { trustState: string }).trustState = 'TRUSTED';
+    }).toThrow(TypeError);
+    expect(registry.provider('imageProvider.imagemagick')?.provenanceFacts.trustState).toBe(
+      'UNKNOWN',
+    );
     const result = resolveGoal({
       request: resolvingRequest(),
       registry,
@@ -196,6 +295,36 @@ describe('trusted snapshot currentness seam (P1-06)', () => {
     });
     expect(result.stage).toBe('RESOLUTION');
     if (result.stage !== 'RESOLUTION') return;
-    expect(result.record.selectedBindingId).toBe('b-im');
+    expect(result.record.selectedBindingId).toBeNull();
+    expect(result.record.failureDisposition?.failureCode).toBe('NO_TRUSTED_PROVIDER');
+  });
+
+  it('observed environment facts, bindings and capability policy declarations are equally frozen', () => {
+    const snapshot = baseSnapshot();
+    snapshot.capabilities[0] = capabilityDef({
+      capabilityId: 'image.batch_process',
+      requiredPolicyFacts: ['userApprovedDelete'],
+    });
+    const registry = attestedRegistry(snapshot);
+    expect(() => {
+      (registry.observedEnvironment() as { observationRevision: string }).observationRevision =
+        'obs-forged';
+    }).toThrow(TypeError);
+    expect(() => {
+      const requirement = registry.bindingsForCapability('image.batch_process')[0]
+        .environmentRequirements as { networkAccess: string };
+      requirement.networkAccess = 'REQUIRED';
+    }).toThrow(TypeError);
+    expect(() => {
+      registry.capability('image.batch_process')!.requiredPolicyFacts.push('another-fact');
+    }).toThrow(TypeError);
+    expect(registry.observedEnvironment().observationRevision).toBe('obs-0042');
+    expect(
+      registry.bindingsForCapability('image.batch_process')[0].environmentRequirements
+        .networkAccess,
+    ).toBe('FORBIDDEN');
+    expect(registry.capability('image.batch_process')!.requiredPolicyFacts).toEqual([
+      'userApprovedDelete',
+    ]);
   });
 });

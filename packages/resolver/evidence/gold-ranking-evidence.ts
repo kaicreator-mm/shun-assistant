@@ -43,6 +43,7 @@ const SHARED_LIMITATIONS: readonly string[] = [
   'NOT independent validation in the docs/validation/benchmark-v0.1.md sense — that procedure requires an independent evaluator, observed real task outcomes and recorded top-k agreement from actual benchmark runs.',
   'Real independent validation is deferred to a later Integration gate benchmark run; until then these records are unit-test fixtures and must not be cited as independent verification of the resolver.',
   'Gold dispositions were derived from the hard requirements of the frozen scenario inputs, never from the resolver score under test.',
+  'Fixture revision 2 (R1, Issue #33): curated formatSupport facts were added to the scenario providers so required-format goals carry gate evidence; gold dispositions and rankings are unchanged.',
 ];
 
 const SHARED_DERIVED_BY =
@@ -53,7 +54,7 @@ const SHARED_INPUTS = 'packages/resolver/test/benchmark-scenarios.ts (frozen v0.
 export const GOLD_RANKING_EVIDENCE: readonly GoldRankingEvidence[] = [
   {
     benchmarkId: 'B-033',
-    evidenceRevision: '1',
+    evidenceRevision: '2',
     goldProcedure:
       'docs/validation/benchmark-v0.1.md, Provider-ranking gold procedure steps 1–6 (unit-scenario application)',
     derivedFrom: [
@@ -70,7 +71,7 @@ export const GOLD_RANKING_EVIDENCE: readonly GoldRankingEvidence[] = [
   },
   {
     benchmarkId: 'B-034',
-    evidenceRevision: '1',
+    evidenceRevision: '2',
     goldProcedure:
       'docs/validation/benchmark-v0.1.md, Provider-ranking gold procedure steps 1–6 (unit-scenario application)',
     derivedFrom: [
@@ -86,7 +87,7 @@ export const GOLD_RANKING_EVIDENCE: readonly GoldRankingEvidence[] = [
   },
   {
     benchmarkId: 'B-035',
-    evidenceRevision: '1',
+    evidenceRevision: '2',
     goldProcedure:
       'docs/validation/benchmark-v0.1.md, Provider-ranking gold procedure steps 1–6 (unit-scenario application)',
     derivedFrom: [

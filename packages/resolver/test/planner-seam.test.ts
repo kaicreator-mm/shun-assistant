@@ -250,4 +250,39 @@ describe('PlannerPort seam stays proposal-only and policy-bounded', () => {
     });
     expect(planner.calls).toBe(0);
   });
+
+  it('an offline constraint makes a remote planner ineligible WITHOUT calling it, even when disclosure is allowed (P1 supplemental R1)', async () => {
+    // Review counterexample: schema-valid request with offline=true and an
+    // open privacy policy reached the remote adapter. External disclosure
+    // permission never overrides a separately required offline execution.
+    const input = request();
+    input.constraints.other = { offline: true };
+    input.policyContext.privacyPolicy = { localOnly: false, externalDisclosure: 'ALLOWED' };
+    const planner = spyPlanner(validProposal(input));
+    const result = await interpretGoalViaPlanner({
+      request: input,
+      registry: registry(),
+      planner,
+      transport: 'REMOTE',
+    });
+    expect(result).toMatchObject({
+      status: 'PLANNER_UNAVAILABLE',
+      reason: expect.stringContaining('offline'),
+    });
+    expect(planner.calls).toBe(0);
+  });
+
+  it('an offline constraint still admits a LOCAL planner (P1 supplemental R1 — legitimate scenario stays usable)', async () => {
+    const input = request();
+    input.constraints.other = { offline: true };
+    input.policyContext.privacyPolicy = { localOnly: false, externalDisclosure: 'ALLOWED' };
+    const result = await interpretGoalViaPlanner({
+      request: input,
+      registry: registry(),
+      planner: spyPlanner(validProposal(input)),
+      transport: 'LOCAL',
+      objectExists: () => true,
+    });
+    expect(result.status).toBe('PROPOSAL_ACCEPTED');
+  });
 });

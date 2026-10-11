@@ -7,7 +7,7 @@
 // score under test. Changing a fixture here invalidates the corresponding
 // gold record and requires an evidence revision bump.
 import type { BindingScoreFacts } from '../src/ranking.ts';
-import { type ObjectiveMatcherTable, ShunRegistry } from '../src/registry.ts';
+import { type ObjectiveMatcherTable, ShunRegistry, snapshotFactsRevision } from '../src/registry.ts';
 import { bindingDef, capabilityDef, ENV_LOCAL, providerDef, requirements } from './scenarios.ts';
 
 function registryOf(parts: {
@@ -17,15 +17,19 @@ function registryOf(parts: {
   env?: typeof ENV_LOCAL;
   additionalObjectiveMatchers?: ObjectiveMatcherTable;
 }) {
-  return ShunRegistry.fromSnapshot(
-    {
-      capabilities: parts.capabilities ?? [],
-      providers: parts.providers ?? [],
-      bindings: parts.bindings ?? [],
-      environment: parts.env ?? ENV_LOCAL,
-    },
-    { additionalObjectiveMatchers: parts.additionalObjectiveMatchers },
-  );
+  const snapshot = {
+    capabilities: parts.capabilities ?? [],
+    providers: parts.providers ?? [],
+    bindings: parts.bindings ?? [],
+    environment: parts.env ?? ENV_LOCAL,
+  };
+  return ShunRegistry.fromSnapshot(snapshot, {
+    additionalObjectiveMatchers: parts.additionalObjectiveMatchers,
+    // R1 (review blocker 1): snapshot currentness must be bound to a
+    // source-issued authority revision — the test harness derives it from the
+    // exact assembled facts, standing in for the trusted registry authority.
+    authorityRevision: snapshotFactsRevision(snapshot),
+  });
 }
 
 // ---------------------------------------------------------------------------
@@ -143,6 +147,9 @@ export function b034Registry() {
     providerId: 'softwareProvider.aggressive-uninstaller',
     provenanceFacts: {
       trustState: 'TRUSTED',
+      // Curated format facts: the scenario request carries required format
+      // 'JPG' (R1 review blocker 3 — format evidence before ranking).
+      formatSupport: ['JPG'],
       safetyProfile: {
         riskEscalationRequired: true,
         escalationReason:
