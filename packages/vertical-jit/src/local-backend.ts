@@ -10,8 +10,9 @@
 //   RECEIVED → (grant validation) → VALIDATED → EXEC_START → EXEC_DONE →
 //   RECEIPT_WRITTEN
 //
-// A refused presentation journals RECEIVED only (recovery NOT_STARTED); a
-// declined elevation journals a NO_EFFECT marker (NOT_STARTED, L2 §9.4);
+// A refused presentation journals RECEIVED only (FAILED_BEFORE_EFFECT); a
+// declined elevation journals a NO_EFFECT marker (FAILED_BEFORE_EFFECT after
+// RECEIVED, L2 §9.4);
 // an interruption between EXEC_START and EXEC_DONE leaves the journal torn
 // and classifies MAY_HAVE_EXECUTED_UNCERTAIN upstream.
 import {
@@ -47,14 +48,15 @@ export interface PerformOutcome {
   readonly outputRefs?: readonly string[];
   /**
    * True when the worker refused before any effect phase (e.g. elevation
-   * declined): receipt classifies NOT_STARTED and the journal carries an
+   * declined): receipt classifies FAILED_BEFORE_EFFECT (once RECEIVED is
+   * durable) and the journal carries an
    * explicit NO_EFFECT marker (L2 §9.4 UAC_DECLINED semantics).
    */
   readonly noEffect?: true;
   /**
    * A mechanism-level safety/policy refusal before any side effect is not
    * a declined UAC prompt. The frozen receipt taxonomy already contains
-   * REFUSED; keep the NOT_STARTED recovery proof and journal NO_EFFECT.
+   * REFUSED; keep FAILED_BEFORE_EFFECT and journal NO_EFFECT.
    */
   readonly refusalTerminal?: 'REFUSED';
 }
@@ -167,7 +169,7 @@ export class LocalPrivilegedBackend implements ExecutionBackend {
 
     if (fault?.kind === 'UAC_DECLINED') {
       // The elevation seam refused BEFORE any effect phase (L2 §9.4:
-      // UAC_DECLINED ⇒ NOT_STARTED).
+      // UAC_DECLINED after RECEIVED ⇒ FAILED_BEFORE_EFFECT).
       await journal.append({
         seq: 2,
         ts: this.#deps.clock(),
@@ -180,7 +182,7 @@ export class LocalPrivilegedBackend implements ExecutionBackend {
         action,
         startedAt,
         'UAC_DECLINED',
-        'NOT_STARTED',
+        'FAILED_BEFORE_EFFECT',
         false,
         undefined,
         [],
@@ -202,7 +204,7 @@ export class LocalPrivilegedBackend implements ExecutionBackend {
         action,
         startedAt,
         preflight.refusalTerminal ?? 'REFUSED',
-        'NOT_STARTED',
+        'FAILED_BEFORE_EFFECT',
         false,
         preflight.exitCode,
         [],
@@ -276,7 +278,7 @@ export class LocalPrivilegedBackend implements ExecutionBackend {
         action,
         startedAt,
         outcome.refusalTerminal ?? 'UAC_DECLINED',
-        'NOT_STARTED',
+        'FAILED_BEFORE_EFFECT',
         false,
         outcome.exitCode,
         [],
