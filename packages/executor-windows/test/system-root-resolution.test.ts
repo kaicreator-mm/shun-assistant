@@ -158,6 +158,39 @@ describe('C13 P1 — a lying planted reg.exe cannot forge the machine fixed poin
     expect(r.ok).toBe(true);
     if (r.ok) expect(lower(r.systemRoot)).toBe(lower(PLANTED));
   });
+
+  it('P1-2 (host-independent path construction): every candidate handed to the seam is a backslash-canonical Windows path on ANY host', () => {
+    // Root cause of the historical Linux-CI red (run 38114000384): the
+    // resolver built candidates with node:path's host `join`, which on POSIX
+    // spliced '/' into Windows paths (`C:\Windows/System32/reg.exe`) — the
+    // seam never matched, the machine anchor "vanished", and these pure
+    // injected-seam controls degraded for the wrong reason. This control
+    // pins the invariant directly: whatever host runs the suite, the paths
+    // probed against the (virtual) filesystem must be Windows-canonical.
+    const probed: string[] = [];
+    const recordingSeam: SystemRootFsSeam = {
+      isFile: (p: string) => {
+        probed.push(p);
+        return false;
+      },
+      isDirectory: (p: string) => {
+        probed.push(p);
+        return false;
+      },
+      shaFile: (p: string) => {
+        probed.push(p);
+        return undefined;
+      },
+    };
+    resolveSystemRoot(
+      { SystemRoot: PLANTED, windir: PLANTED },
+      () => undefined,
+      'win32',
+      recordingSeam,
+    );
+    expect(probed.length).toBeGreaterThan(0);
+    for (const p of probed) expect(p.includes('/')).toBe(false);
+  });
 });
 
 describe('F-1 — the resolver never EXECUTES an unpinned reg.exe candidate (probe identity gate)', () => {
