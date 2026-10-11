@@ -17,7 +17,11 @@
 import { describe, expect, it } from 'vitest';
 import { goldEvidenceFor } from '../evidence/gold-ranking-evidence.ts';
 import { type BindingScoreFacts, rankFeasibleBindings } from '../src/ranking.ts';
-import { type ObjectiveMatcherTable, ShunRegistry, snapshotFactsRevision } from '../src/registry.ts';
+import {
+  type ObjectiveMatcherTable,
+  ShunRegistry,
+  snapshotFactsRevision,
+} from '../src/registry.ts';
 import { resolveGoal } from '../src/resolve.ts';
 import {
   B033_FACTS,
@@ -598,9 +602,7 @@ describe('R1 fresh-review negatives (end-to-end resolution, Issue #33)', () => {
     const record = result.record;
     expect(record.selectedBindingId).toBeNull();
     expect(record.failureDisposition?.failureCode).toBe('POLICY_BLOCKED');
-    const policyRow = record.hardGateDispositions.find(
-      (entry) => entry.gate === 'USER_ORG_POLICY',
-    );
+    const policyRow = record.hardGateDispositions.find((entry) => entry.gate === 'USER_ORG_POLICY');
     expect(policyRow).toMatchObject({ outcome: 'REJECT' });
   });
 
@@ -616,9 +618,7 @@ describe('R1 fresh-review negatives (end-to-end resolution, Issue #33)', () => {
     expect(record.selectedBindingId).toBeNull();
     expect(record.feasibleBindings).toEqual([]);
     expect(record.failureDisposition?.failureCode).toBe('POLICY_BLOCKED');
-    const policyRow = record.hardGateDispositions.find(
-      (entry) => entry.gate === 'USER_ORG_POLICY',
-    );
+    const policyRow = record.hardGateDispositions.find((entry) => entry.gate === 'USER_ORG_POLICY');
     expect(policyRow).toMatchObject({
       outcome: 'REJECT',
       reason: expect.stringContaining('offline'),

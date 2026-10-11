@@ -283,7 +283,8 @@ describe('attested registry facts are immutable after construction (R1 blocker 2
     const provider = registry.provider('imageProvider.imagemagick');
     expect(provider?.provenanceFacts.trustState).toBe('UNKNOWN');
     expect(() => {
-      (provider!.provenanceFacts as { trustState: string }).trustState = 'TRUSTED';
+      if (!provider) throw new Error('provider missing from registry');
+      (provider.provenanceFacts as { trustState: string }).trustState = 'TRUSTED';
     }).toThrow(TypeError);
     expect(registry.provider('imageProvider.imagemagick')?.provenanceFacts.trustState).toBe(
       'UNKNOWN',
@@ -316,14 +317,16 @@ describe('attested registry facts are immutable after construction (R1 blocker 2
       requirement.networkAccess = 'REQUIRED';
     }).toThrow(TypeError);
     expect(() => {
-      registry.capability('image.batch_process')!.requiredPolicyFacts.push('another-fact');
+      const capability = registry.capability('image.batch_process');
+      if (!capability) throw new Error('capability missing from registry');
+      capability.requiredPolicyFacts.push('another-fact');
     }).toThrow(TypeError);
     expect(registry.observedEnvironment().observationRevision).toBe('obs-0042');
     expect(
       registry.bindingsForCapability('image.batch_process')[0].environmentRequirements
         .networkAccess,
     ).toBe('FORBIDDEN');
-    expect(registry.capability('image.batch_process')!.requiredPolicyFacts).toEqual([
+    expect(registry.capability('image.batch_process')?.requiredPolicyFacts).toEqual([
       'userApprovedDelete',
     ]);
   });

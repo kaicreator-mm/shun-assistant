@@ -7,7 +7,11 @@
 // score under test. Changing a fixture here invalidates the corresponding
 // gold record and requires an evidence revision bump.
 import type { BindingScoreFacts } from '../src/ranking.ts';
-import { type ObjectiveMatcherTable, ShunRegistry, snapshotFactsRevision } from '../src/registry.ts';
+import {
+  type ObjectiveMatcherTable,
+  ShunRegistry,
+  snapshotFactsRevision,
+} from '../src/registry.ts';
 import { bindingDef, capabilityDef, ENV_LOCAL, providerDef, requirements } from './scenarios.ts';
 
 function registryOf(parts: {

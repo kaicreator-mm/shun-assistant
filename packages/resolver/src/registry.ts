@@ -296,7 +296,15 @@ export class ShunRegistry {
     )) {
       matchers[capabilityId] = [...(matchers[capabilityId] ?? []), ...patterns];
     }
-    return new ShunRegistry(capabilities, providers, bindingsByCapability, environment, matchers, attested, note);
+    return new ShunRegistry(
+      capabilities,
+      providers,
+      bindingsByCapability,
+      environment,
+      matchers,
+      attested,
+      note,
+    );
   }
 
   capability(capabilityId: string): CapabilityDefinition | undefined {

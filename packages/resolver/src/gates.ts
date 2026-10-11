@@ -294,10 +294,7 @@ export function runHardGates(
   // REQUIRED (network transfer), OPTIONAL (unproven offline mode) and an
   // absent declaration all fail closed; an explicit FORBIDDEN posture stays
   // eligible.
-  if (
-    context.constraints.other?.offline === true &&
-    requirements.networkAccess !== 'FORBIDDEN'
-  ) {
+  if (context.constraints.other?.offline === true && requirements.networkAccess !== 'FORBIDDEN') {
     if (requirements.networkAccess === 'REQUIRED') {
       policyProblems.push('offline constraint forbids network access');
     } else {
@@ -326,9 +323,7 @@ export function runHardGates(
         `policy fact "${factKey}" verified current by the trusted policy evaluator (${verdict.evidence})`,
       );
     } else {
-      const detail = verdict
-        ? verdict.reason
-        : 'no trusted policy fact evaluator is configured';
+      const detail = verdict ? verdict.reason : 'no trusted policy fact evaluator is configured';
       policyProblems.push(
         `capability requires policy fact "${factKey}" current per trusted policy authority — ${detail}; caller-provided constraint values are not verification — fail closed`,
       );
