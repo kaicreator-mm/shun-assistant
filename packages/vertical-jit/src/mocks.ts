@@ -30,6 +30,12 @@ import {
 import { type JournalPort, MemoryJournal } from './journal.ts';
 import { LocalAuthority, MemoryPlanLedger } from './local-authority.ts';
 import { LocalPrivilegedBackend, type PrivilegedFault } from './local-backend.ts';
+import {
+  effectTimeScopeRefusal,
+  type ManifestDeletionSpec,
+  manifestDeletionSpec,
+  removeManifestEntries,
+} from './manifest-removal.ts';
 import type { JitLifecycleDeps } from './orchestrator.ts';
 import type {
   AcquisitionCandidate,
@@ -163,6 +169,26 @@ export class MemoryFilesystem implements FilesystemPort {
       if (key === this.#key(path) || key.startsWith(prefix)) this.#nodes.delete(key);
     }
   }
+
+  /**
+   * Effect executor surface: remove exactly ONE node — a file, or a directory
+   * ONLY when it holds no remaining children. Unrecorded residue inside a
+   * directory is never forced out (VJ-P1-01 R4 manifest-restricted deletion).
+   */
+  removeEntry(path: string): boolean {
+    const key = this.#key(path);
+    const node = this.#nodes.get(key);
+    if (!node) return false;
+    if (node.kind === 'dir') {
+      const prefix = `${key}/`;
+      for (const existing of this.#nodes.keys()) {
+        if (existing.startsWith(prefix)) return false;
+      }
+    }
+    this.#nodes.delete(key);
+    this.#display.delete(key);
+    return true;
+  }
 }
 
 // ---- process (scripted) ----
@@ -277,11 +303,32 @@ export class MemoryAcquisition implements AcquisitionPort {
     return { ok: true, note: `installed ${packageId} ${version}` };
   }
 
-  uninstallByPlan(packageId: string): { ok: boolean; note: string } {
-    const entry = this.#require(packageId);
-    this.#fs.removeTree(entry.installDir);
-    if (entry.cacheDir) this.#fs.removeTree(entry.cacheDir);
-    return { ok: true, note: `removed ${packageId}` };
+  /**
+   * Manifest-bound removal effect (VJ-P1-01 R4 effect atomicity). Two
+   * fail-closed layers inside the executor, after every caller-reachable
+   * seam: (1) effect-time scope exclusivity — any present-but-unrecorded
+   * path refuses the whole effect with zero deletions and an honest
+   * NO_EFFECT note; (2) the deletion itself consumes exactly the manifest
+   * entries (deepest first, empty-directory-only), so a file planted after
+   * the manifest was recorded is structurally outside what this effect can
+   * delete. This is deliberately NOT a whole-root removeTree.
+   */
+  async uninstallByPlan(
+    packageId: string,
+    deletion: ManifestDeletionSpec,
+  ): Promise<{ ok: boolean; note: string; noEffect?: true }> {
+    this.#require(packageId);
+    const refusal = await effectTimeScopeRefusal(this.#fs, deletion);
+    if (refusal) {
+      return { ok: false, note: `removal refused before any effect — ${refusal}`, noEffect: true };
+    }
+    const { removed, retained } = await removeManifestEntries(this.#fs, this.#fs, deletion);
+    return {
+      ok: true,
+      note: `removed ${packageId} (${removed.length} recorded entries${
+        retained.length > 0 ? `, ${retained.length} retained` : ''
+      })`,
+    };
   }
 
   #require(packageId: string): MemoryCatalogEntry {
@@ -643,8 +690,18 @@ function buildBackend(
         return { ok: outcome.ok, note: outcome.note };
       }
       if (action.op === 'software.uninstall') {
-        const outcome = acquisition.uninstallByPlan(packageId);
-        return { ok: outcome.ok, note: outcome.note };
+        // Fail closed on a legacy whole-root shape: an uninstall action
+        // without a manifest-restricted deletion set is refused, never
+        // executed (VJ-P1-01 R4).
+        const deletion = manifestDeletionSpec(action);
+        if (!deletion) {
+          return {
+            ok: false,
+            note: 'software.uninstall plan carries no manifest-restricted deletion set — refusing a whole-root removal',
+            noEffect: true,
+          };
+        }
+        return await acquisition.uninstallByPlan(packageId, deletion);
       }
       return { ok: false, note: `unsupported op ${action.op}` };
     },

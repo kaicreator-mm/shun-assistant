@@ -195,6 +195,7 @@ describe('WingetPrivilegedBackend — elevation refusal', () => {
       clock: () => '2026-10-10T08:00:01.000Z',
       journals: journalsFor,
       process,
+      fs: new MemoryFilesystem(),
       machineScope: true,
     });
 

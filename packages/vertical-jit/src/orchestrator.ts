@@ -43,6 +43,7 @@ import {
 } from '@shun/contracts';
 import { JitLifecycleError } from './failures.ts';
 import { classifyFromJournal, type JournalPort } from './journal.ts';
+import { canonicalKey, treeUnder } from './manifest-removal.ts';
 import { buildActionPlan, installAction, taskAction, uninstallAction } from './plans.ts';
 import type {
   AcquisitionCandidate,
@@ -440,7 +441,7 @@ async function runLifecycle(
   // never be claimed as program-owned (VJ-P1-01).
   const preInstallTree = new Set<string>();
   for (const root of scopeRoots) {
-    for (const path of await treeUnder(deps, root)) {
+    for (const path of await treeUnder(deps.fs, root)) {
       preInstallTree.add(canonicalKey(path));
     }
   }
@@ -663,6 +664,11 @@ async function runRemovalGate(
     packageId: candidate.packageId,
     version: candidate.version,
     deleteRoots,
+    // The effect is manifest-bound (VJ-P1-01 R4): the privileged executor
+    // validates scope exclusivity at effect time and deletes exactly the
+    // install-recorded entries, so a post-census injection can never enter
+    // the deletion set and an unrecorded asset refuses the whole effect.
+    deletionManifest: ownedManifest,
     elevated: binding.elevated,
     timeoutMs: UNINSTALL_TIMEOUT_MS,
   });
@@ -764,13 +770,20 @@ async function runRemovalGate(
   // Effect-boundary strict re-census (VJ-P1-01 post-preview race): the
   // preview census is a PRE-approval snapshot; anything planted during the
   // async approval wait — or between preview and effect under a durable
-  // policy — is invisible to it, and the whole-root uninstaller would
-  // destroy it while the lifecycle reported REMOVED. Immediately before the
+  // policy — is invisible to it, and a destructive uninstaller would destroy
+  // it while the lifecycle reported REMOVED. Immediately before the
   // privileged effect, re-enumerate BOTH deletion-scope root kinds
   // (install + cache) and classify strictly against the install-time owned
   // manifest. Any newly appeared unknown/protected asset refuses the effect
   // with zero deletions (an unrecorded reparse point or mutable drop is
   // exactly such an unknown — it can never be manifest-recorded).
+  //
+  // This census is the OUTER layer only (VJ-P1-01 R4): caller-reachable
+  // seams still follow it (the trace hook below, the async grant issuance
+  // inside runPrivileged), so the privileged effect itself is manifest-bound
+  // — it re-validates scope exclusivity at effect time inside the trusted
+  // executor and deletes exactly the recorded entries, structurally unable
+  // to touch anything planted after this point.
   await assertRemovalScopeAtEffectBoundary(deps, layout, ownedManifest);
   trace(deps, 'R2_RECENSUS', 'removal scope re-validated at the effect boundary');
   let run = await runPrivileged(deps, {
@@ -857,40 +870,6 @@ async function providerPresent(
 }
 
 /**
- * Recursively enumerate every descendant path (directories and files) of a
- * root, with NO depth cap: a fixed depth bound would make content deeper
- * than the bound invisible to the removal preview, and content the preview
- * cannot see cannot block deletion (VJ-P1-01). A visited set keyed on the
- * canonical path guards against symlink/reparse-point cycles — a directory
- * graph that is not a tree — so the walk always terminates.
- */
-async function treeUnder(deps: JitLifecycleDeps, root: string): Promise<string[]> {
-  const found: string[] = [];
-  const visited = new Set<string>();
-  const walk = async (dir: string): Promise<void> => {
-    const key = canonicalKey(dir);
-    if (visited.has(key)) return;
-    visited.add(key);
-    if (!(await deps.fs.isDirectory(dir))) return;
-    for (const child of await deps.fs.listChildren(dir)) {
-      const path = joinPath(dir, child);
-      found.push(path);
-      await walk(path);
-    }
-  };
-  await walk(root);
-  return found;
-}
-
-/** Canonical comparison key: separator-normalized, case-insensitive (Windows truth). */
-function canonicalKey(path: string): string {
-  return path
-    .replaceAll('\\', '/')
-    .replace(/^\/+|\/+$/g, '')
-    .toLowerCase();
-}
-
-/**
  * The exact install-owned manifest: every path — census roots included —
  * that the install created and that was NOT on disk before the install ran,
  * across BOTH install roots and cache roots (VJ-P1-01 cache census: cache
@@ -910,7 +889,7 @@ async function recordedOwnedManifest(
     if (!preInstallTree.has(canonicalKey(root))) {
       owned.push(root);
     }
-    for (const path of await treeUnder(deps, root)) {
+    for (const path of await treeUnder(deps.fs, root)) {
       if (!preInstallTree.has(canonicalKey(path))) {
         owned.push(path);
       }
@@ -926,7 +905,7 @@ async function collectCandidates(
   const observed: string[] = [];
   for (const root of [...layout.installDirs, ...layout.cacheDirs, ...layout.configDirs]) {
     observed.push(root);
-    observed.push(...(await treeUnder(deps, root)));
+    observed.push(...(await treeUnder(deps.fs, root)));
   }
   return observed;
 }
@@ -954,7 +933,7 @@ async function assertRemovalScopeAtEffectBoundary(
   const observed: string[] = [];
   for (const root of [...layout.installDirs, ...layout.cacheDirs]) {
     observed.push(root);
-    observed.push(...(await treeUnder(deps, root)));
+    observed.push(...(await treeUnder(deps.fs, root)));
   }
   const reCensus = classifyResidue({
     layout,
@@ -976,10 +955,6 @@ async function assertRemovalScopeAtEffectBoundary(
         .join(', ')}`,
     );
   }
-}
-
-function joinPath(root: string, child: string): string {
-  return `${root.replace(/[\\/]+$/, '')}\\${child}`;
 }
 
 async function persistLifecycle(

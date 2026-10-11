@@ -106,6 +106,15 @@ export function uninstallAction(input: {
   version: string;
   /** Deletion scope: program-owned and cache roots ONLY. Configuration/user paths never enter the scope. */
   deleteRoots: readonly string[];
+  /**
+   * Exact manifest-restricted deletion set (VJ-P1-01 R4): only the paths the
+   * install recorded at install time. The privileged effect consumes THIS,
+   * never the coarse roots — content planted after the manifest was recorded
+   * is structurally outside what the effect can delete, and an effect-time
+   * exclusivity check inside the executor refuses the whole effect when
+   * unrecorded content is present.
+   */
+  deletionManifest: readonly string[];
   elevated: boolean;
   timeoutMs: number;
 }): PlanAction {
@@ -113,7 +122,11 @@ export function uninstallAction(input: {
     actionId: input.actionId,
     bindingRef: input.bindingId,
     op: 'software.uninstall',
-    parameters: { packageId: input.packageId, version: input.version },
+    parameters: {
+      packageId: input.packageId,
+      version: input.version,
+      deletionManifest: [...input.deletionManifest],
+    },
     sideEffectClass: 'R2',
     requiredPrivilege: input.elevated ? 'ELEVATED' : 'USER',
     filesystemScope: {

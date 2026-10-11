@@ -19,6 +19,14 @@ export type { LocalAuthorityOptions } from './local-authority.ts';
 export { LocalAuthority, MemoryPlanLedger } from './local-authority.ts';
 export type { LocalBackendDeps, PerformOutcome, PrivilegedFault } from './local-backend.ts';
 export { BackendInterruptError, LocalPrivilegedBackend } from './local-backend.ts';
+export type { EntryRemovalPort, ManifestDeletionSpec } from './manifest-removal.ts';
+export {
+  canonicalKey,
+  effectTimeScopeRefusal,
+  manifestDeletionSpec,
+  removeManifestEntries,
+  treeUnder,
+} from './manifest-removal.ts';
 export type { HarnessOptions, JitHarness, MemoryCatalogEntry } from './mocks.ts';
 export {
   buildHarness,

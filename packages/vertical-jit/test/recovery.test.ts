@@ -117,8 +117,11 @@ describe('JIT lifecycle — interrupted removal (reconcile-first)', () => {
       ],
     });
     installWorld(harness);
-    // The interrupted worker actually performed the removal, then crashed
-    // before journaling EXEC_DONE: on interrupt, the provider is gone.
+    // The interrupted worker actually performed the manifest-bound removal,
+    // then crashed before journaling EXEC_DONE: on interrupt, the provider is
+    // gone. The effect consumes the install-time manifest exactly as the
+    // privileged backend recorded it durably in the CHECKPOINT lifecycle
+    // record (VJ-P1-01 R4 manifest-restricted deletion).
     const inner = harness.deps.privileged;
     const deps = withDeps(harness, {
       privileged: {
@@ -127,7 +130,18 @@ describe('JIT lifecycle — interrupted removal (reconcile-first)', () => {
             return await inner.execute(action, grant);
           } catch (error) {
             if (error instanceof BackendInterruptError) {
-              harness.acquisition.uninstallByPlan('ExampleSoft.PdfTool');
+              const checkpoint = [...harness.store.records.values()].find(
+                (mutation) => mutation.payload.state === 'CHECKPOINT',
+              );
+              const manifest =
+                (checkpoint?.payload.providerOwnedFiles as readonly string[] | undefined) ?? [];
+              const layout = checkpoint?.payload.layout as
+                | { installDirs: string[]; cacheDirs: string[] }
+                | undefined;
+              await harness.acquisition.uninstallByPlan('ExampleSoft.PdfTool', {
+                manifest,
+                scopeRoots: [...(layout?.installDirs ?? []), ...(layout?.cacheDirs ?? [])],
+              });
             }
             throw error;
           }

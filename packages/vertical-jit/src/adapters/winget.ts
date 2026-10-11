@@ -11,9 +11,11 @@
 // is read-only resolution/observation.
 import { homedir } from 'node:os';
 import { join } from 'node:path';
+import type { PlanAction } from '@shun/contracts';
 import type { JournalPort } from '../journal.ts';
 import type { LocalAuthority } from '../local-authority.ts';
 import { LocalPrivilegedBackend, type PrivilegedFault } from '../local-backend.ts';
+import { effectTimeScopeRefusal, manifestDeletionSpec } from '../manifest-removal.ts';
 import type {
   AcquisitionCandidate,
   AcquisitionPort,
@@ -243,6 +245,14 @@ export interface WingetBackendDeps {
   readonly clock: () => string;
   readonly journals: (actionId: string) => JournalPort;
   readonly process: ProcessPort;
+  /**
+   * Read-only filesystem observation for the uninstall effect-time exclusivity
+   * gate (VJ-P1-01 R4): the external uninstaller's deletion set cannot be
+   * bounded by the manifest, so scope exclusivity must be PROVEN inside the
+   * executor immediately before any spawn. Unwiring it is a wiring fault —
+   * uninstall refuses fail-closed.
+   */
+  readonly fs: FilesystemPort;
   readonly timeoutMs?: number;
   readonly machineScope: boolean;
   /** Fault injection for negative evidence scenarios (never in production). */
@@ -281,6 +291,33 @@ export class WingetPrivilegedBackend extends LocalPrivilegedBackend {
     const version = String(action.parameters.version ?? '');
     if (!packageId || !version) {
       return { ok: false, note: 'plan parameters lack packageId/version' };
+    }
+    if (action.op === 'software.uninstall') {
+      // VJ-P1-01 R4: winget spawns the package's OWN removal program, whose
+      // deletion set cannot be bounded by the manifest — it may remove the
+      // whole tree, including user files written after every census. Two
+      // fail-closed gates precede any spawn, INSIDE the trusted executor
+      // after the last caller-reachable seam: (1) the action must be
+      // manifest-bound (a whole-root shape refuses outright); (2) scope
+      // exclusivity must be proven at effect time — unrecorded content
+      // refuses the effect with the provider retained and an honest
+      // NO_EFFECT journal marker, never a REMOVED claim.
+      const deletion = manifestDeletionSpec(action as PlanAction);
+      if (!deletion) {
+        return {
+          ok: false,
+          note: 'software.uninstall plan carries no manifest-restricted deletion set — refusing an external uninstaller of unprovable scope',
+          noEffect: true,
+        };
+      }
+      const refusal = await effectTimeScopeRefusal(this.#deps.fs, deletion);
+      if (refusal) {
+        return {
+          ok: false,
+          note: `removal refused before any effect — ${refusal}`,
+          noEffect: true,
+        };
+      }
     }
     const argv =
       action.op === 'software.install'
