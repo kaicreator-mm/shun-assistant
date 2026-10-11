@@ -81,6 +81,18 @@ function main(): never {
     );
   }
 
+  const preOwnership = assessAnchorOwnership(anchorRoot, keyFile);
+  if (preOwnership.length > 0) {
+    return emitAndExit(
+      {
+        ok: false,
+        code: 'ANCHOR_WRITE_DENIED',
+        reason: `authorization anchor ownership rejected before apply: ${preOwnership.join('; ')}`,
+      },
+      2,
+    );
+  }
+
   let key: string;
   let raw: unknown;
   try {
