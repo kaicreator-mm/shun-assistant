@@ -26,8 +26,8 @@ import {
   validateGrantPresentation,
 } from '@shun/contracts';
 import { assertSafeActionId } from './action-id.ts';
-import { assessAuthorityAnchors } from './anchor-protection.ts';
 import { checkStepSurface, resolveActionStep } from './action-surface.ts';
+import { assessAuthorityAnchors } from './anchor-protection.ts';
 import { observeEnvironment } from './facts.ts';
 import {
   CancelledError,
