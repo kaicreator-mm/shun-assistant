@@ -63,6 +63,31 @@ export const HelperPinSchema = z.strictObject({
 });
 export type HelperPin = z.infer<typeof HelperPinSchema>;
 
+export const WRITER_PIN_SCHEMA_VERSION = 'shun.executor-windows.anchor-writer-pin/1';
+
+export const WriterPinSchema = z.strictObject({
+  schemaVersion: z.literal(WRITER_PIN_SCHEMA_VERSION),
+  writerSha256: z.string().regex(/^[0-9a-f]{64}$/),
+  nodeExeSha256: z.string().regex(/^[0-9a-f]{64}$/),
+  pinnedAt: z.string().min(1),
+});
+export type WriterPin = z.infer<typeof WriterPinSchema>;
+
+export function readWriterPin(authorityDir: string): WriterPin | undefined {
+  const file = join(authorityDir, 'writer-pin.json');
+  if (!existsSync(file)) return undefined;
+  try {
+    return WriterPinSchema.parse(JSON.parse(readFileSync(file, 'utf8')));
+  } catch {
+    return undefined;
+  }
+}
+
+export function writeWriterPin(authorityDir: string, pin: WriterPin): void {
+  mkdirSync(authorityDir, { recursive: true });
+  writeFileSync(join(authorityDir, 'writer-pin.json'), `${JSON.stringify(pin, null, 2)}\n`, 'utf8');
+}
+
 export const SYSTEM_TOOLS_PIN_SCHEMA_VERSION = 'shun.executor-windows.system-tools-pin/1';
 
 /**
