@@ -28,6 +28,7 @@
 import { execFileSync } from 'node:child_process';
 import { closeSync, mkdirSync, openSync, rmSync, unlinkSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
+import { privilegedSpawnEnv } from './safe-env.ts';
 import { systemPowershellExe } from './system-exe.ts';
 import { resolveGrantHmacKeyFile } from './trusted-store.ts';
 
@@ -83,16 +84,17 @@ function ownerSid(authorityDir: string, path: string): string | undefined {
   const powershell = systemPowershellExe(authorityDir);
   if (!powershell) return undefined;
   const script = [
-    'param([string]$p)',
-    '$acl = Get-Acl -LiteralPath $p',
+    '$acl = Get-Acl -LiteralPath $env:SHUN_OWNER_PROBE_PATH',
     '$owner = New-Object System.Security.Principal.NTAccount($acl.Owner)',
     '$owner.Translate([System.Security.Principal.SecurityIdentifier]).Value',
   ].join('; ');
+  const env = privilegedSpawnEnv();
+  env.SHUN_OWNER_PROBE_PATH = path;
   try {
     const out = execFileSync(
       powershell,
-      ['-NoProfile', '-NonInteractive', '-Command', `& { ${script} } ${JSON.stringify(path)}`],
-      { encoding: 'utf8', windowsHide: true, timeout: 15_000 },
+      ['-NoProfile', '-NonInteractive', '-Command', script],
+      { encoding: 'utf8', windowsHide: true, timeout: 15_000, env },
     ).trim();
     return /^S-1-/.test(out) ? out : undefined;
   } catch {
