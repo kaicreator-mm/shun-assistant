@@ -26,11 +26,7 @@ function unsafeOutbound(value: string): boolean {
   );
 }
 
-function outbound(
-  value: string,
-  field: string,
-  redactions: RedactionRecord[],
-): string {
+function outbound(value: string, field: string, redactions: RedactionRecord[]): string {
   if (!unsafeOutbound(value)) {
     return value;
   }
