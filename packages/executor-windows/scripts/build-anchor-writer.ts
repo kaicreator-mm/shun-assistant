@@ -14,8 +14,7 @@ mkdirSync(dirname(outfile), { recursive: true });
 const anchorRoot =
   process.env.SHUN_ANCHOR_WRITER_BUILD_ROOT?.trim() || 'C:\\ProgramData\\Shun\\authority';
 const keyFile =
-  process.env.SHUN_ANCHOR_WRITER_BUILD_HMAC_KEY_FILE?.trim() ||
-  join(anchorRoot, 'grant-hmac.key');
+  process.env.SHUN_ANCHOR_WRITER_BUILD_HMAC_KEY_FILE?.trim() || join(anchorRoot, 'grant-hmac.key');
 
 await build({
   entryPoints: [join(packageRoot, 'src', 'authority-writer', 'entry.ts')],
