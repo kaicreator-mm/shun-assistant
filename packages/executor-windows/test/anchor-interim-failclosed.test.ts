@@ -187,10 +187,24 @@ describe.skipIf(!ON_WINDOWS)(
         execFileSync(join(machinePs, 'icacls.exe'), [dir, '/deny', `*${sid}:(OI)(CI)W`], {
           windowsHide: true,
         });
+        // C06 R5: HMAC verification authority is signing authority. A
+        // protected deployment must also keep the key unreadable by the
+        // filtered runtime token, not merely non-writable.
+        execFileSync(
+          join(machinePs, 'icacls.exe'),
+          [join(dir, 'grant-hmac.key'), '/deny', `*${sid}:R`],
+          { windowsHide: true },
+        );
         const assessment = assessAuthorityAnchors(dir);
         expect(assessment.forgeable).toBe(false);
+        expect(assessment.keyReadable).toBe(false);
       } finally {
         try {
+          execFileSync(
+            join(machinePs, 'icacls.exe'),
+            [join(dir, 'grant-hmac.key'), '/remove:d', `*${sid}`],
+            { windowsHide: true },
+          );
           execFileSync(join(machinePs, 'icacls.exe'), [dir, '/remove:d', `*${sid}`], {
             windowsHide: true,
           });
