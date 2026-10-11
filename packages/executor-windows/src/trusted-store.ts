@@ -309,6 +309,14 @@ export function signGrantWithHmac(keyBase64: string, grant: AuthorizationGrant):
   return { scheme: 'HMAC_SHA256', value: hmacOf(keyBase64, grant) };
 }
 
+export function verifyGrantWithHmac(keyBase64: string, grant: AuthorizationGrant): boolean {
+  if (grant.integrity.scheme !== 'HMAC_SHA256') return false;
+  const expected = hmacOf(keyBase64, grant);
+  const a = Buffer.from(expected, 'utf8');
+  const b = Buffer.from(grant.integrity.value, 'utf8');
+  return a.length === b.length && timingSafeEqual(a, b);
+}
+
 /**
  * Privileged-side verifier for `validateGrantPresentation`. `keyFile` names
  * the HMAC key explicitly (resolve via resolveGrantHmacKeyFile). Deliberately
@@ -326,11 +334,7 @@ export function hmacGrantIntegrityVerifier(keyFile: string) {
     } catch {
       return false;
     }
-    const expected = hmacOf(keyBase64, grant);
-    // Constant-time compare; both values are base64 of 32 raw bytes.
-    const a = Buffer.from(expected, 'utf8');
-    const b = Buffer.from(envelope.value, 'utf8');
-    return a.length === b.length && timingSafeEqual(a, b);
+    return verifyGrantWithHmac(keyBase64, { ...grant, integrity: envelope });
   };
 }
 
