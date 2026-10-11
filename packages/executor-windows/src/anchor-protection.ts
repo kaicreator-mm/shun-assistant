@@ -84,10 +84,7 @@ interface OwnerRecord {
   owner?: string;
 }
 
-function anchorOwnerSnapshot(
-  authorityDir: string,
-  hmacKeyFile: string,
-): OwnerRecord[] | undefined {
+function anchorOwnerSnapshot(authorityDir: string, hmacKeyFile: string): OwnerRecord[] | undefined {
   if (process.platform !== 'win32') return undefined;
   const powershell = systemPowershellExe(authorityDir);
   if (!powershell) return undefined;
