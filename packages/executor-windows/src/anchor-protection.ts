@@ -41,11 +41,12 @@ export interface AnchorAssessment {
 const ANCHOR_RECORD_FILES = [
   'current-authority.json',
   'helper-pin.json',
-  'system-tools-pin.json',
+  'system-tools.json',
+  'writer-pin.json',
 ] as const;
 
 /** Record directories the attacker could add/replace records in. */
-const ANCHOR_RECORD_DIRS = ['grants', 'plans'] as const;
+const ANCHOR_RECORD_DIRS = ['grants', 'plans', 'programs', 'jobs'] as const;
 
 function fileReadable(path: string): boolean | undefined {
   try {
