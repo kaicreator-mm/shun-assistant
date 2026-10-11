@@ -100,7 +100,11 @@ export async function buildHelperBundle(
     format: 'esm',
     target: 'node24',
     outfile,
-    define: { SHUN_EXECUTOR_AUTHORITY_DIR: JSON.stringify(authorityDir), ...extraDefines },
+    define: {
+      SHUN_EXECUTOR_AUTHORITY_DIR: JSON.stringify(authorityDir),
+      SHUN_EXECUTOR_REQUIRE_PROTECTED_OWNER: 'false',
+      ...extraDefines,
+    },
   });
 }
 
