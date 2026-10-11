@@ -79,25 +79,51 @@ function fileWritable(path: string): boolean | undefined {
 
 const PRIVILEGED_OWNER_SIDS = new Set(['S-1-5-18', 'S-1-5-32-544']);
 
-function ownerSid(authorityDir: string, path: string): string | undefined {
+interface OwnerRecord {
+  path: string;
+  owner?: string;
+}
+
+function anchorOwnerSnapshot(
+  authorityDir: string,
+  hmacKeyFile: string,
+): OwnerRecord[] | undefined {
   if (process.platform !== 'win32') return undefined;
   const powershell = systemPowershellExe(authorityDir);
   if (!powershell) return undefined;
+  // Fixed script, data only through a scrubbed environment. Scan the complete
+  // anchor tree so dynamically-created grant/job/program-pin files cannot
+  // hide a same-user owner beneath an admin-owned parent directory.
   const script = [
-    '$acl = Get-Acl -LiteralPath $env:SHUN_OWNER_PROBE_PATH',
-    '$owner = New-Object System.Security.Principal.NTAccount($acl.Owner)',
-    '$owner.Translate([System.Security.Principal.SecurityIdentifier]).Value',
+    '$root = $env:SHUN_OWNER_PROBE_ROOT',
+    '$key = $env:SHUN_OWNER_PROBE_KEY',
+    '$paths = New-Object System.Collections.Generic.List[string]',
+    '$paths.Add($root)',
+    'Get-ChildItem -LiteralPath $root -Force -Recurse | ForEach-Object { $paths.Add($_.FullName) }',
+    'if ($key -and -not $paths.Contains($key)) { $paths.Add($key) }',
+    '$rows = foreach ($p in $paths) {',
+    '  try {',
+    '    $acl = Get-Acl -LiteralPath $p',
+    '    $owner = New-Object System.Security.Principal.NTAccount($acl.Owner)',
+    '    [pscustomobject]@{ path = $p; owner = $owner.Translate([System.Security.Principal.SecurityIdentifier]).Value }',
+    '  } catch { [pscustomobject]@{ path = $p; owner = $null } }',
+    '}',
+    '$rows | ConvertTo-Json -Compress',
   ].join('; ');
   const env = privilegedSpawnEnv();
-  env.SHUN_OWNER_PROBE_PATH = path;
+  env.SHUN_OWNER_PROBE_ROOT = authorityDir;
+  env.SHUN_OWNER_PROBE_KEY = hmacKeyFile;
   try {
     const out = execFileSync(powershell, ['-NoProfile', '-NonInteractive', '-Command', script], {
       encoding: 'utf8',
       windowsHide: true,
-      timeout: 15_000,
+      timeout: 30_000,
       env,
+      maxBuffer: 4 * 1024 * 1024,
     }).trim();
-    return /^S-1-/.test(out) ? out : undefined;
+    const decoded = JSON.parse(out) as OwnerRecord | OwnerRecord[];
+    const rows = Array.isArray(decoded) ? decoded : [decoded];
+    return rows.length > 0 ? rows : undefined;
   } catch {
     return undefined;
   }
@@ -110,18 +136,21 @@ export function assessAnchorOwnership(
   if (process.platform !== 'win32') {
     return ['authorization anchor ownership is only verifiable on Windows'];
   }
+  const rows = anchorOwnerSnapshot(authorityDir, hmacKeyFile);
+  if (!rows) return ['authorization anchor owner scan failed (fail closed)'];
   const reasons: string[] = [];
-  const targets: Array<[string, string]> = [
-    ['authority store root', authorityDir],
-    ...ANCHOR_RECORD_DIRS.map((dir) => [`${dir}/ record directory`, join(authorityDir, dir)] as [string, string]),
-    ...ANCHOR_RECORD_FILES.map((file) => [file, join(authorityDir, file)] as [string, string]),
-    ['grant-hmac key', hmacKeyFile],
-  ];
-  for (const [name, path] of targets) {
-    const owner = ownerSid(authorityDir, path);
-    if (!owner || !PRIVILEGED_OWNER_SIDS.has(owner)) {
+  const key = hmacKeyFile.toLowerCase();
+  const root = authorityDir.toLowerCase();
+  if (!rows.some((row) => row.path.toLowerCase() === root)) {
+    reasons.push('authority store root absent from owner scan');
+  }
+  if (!rows.some((row) => row.path.toLowerCase() === key)) {
+    reasons.push('grant-hmac key absent from owner scan');
+  }
+  for (const row of rows) {
+    if (!row.owner || !PRIVILEGED_OWNER_SIDS.has(row.owner)) {
       reasons.push(
-        `${name} owner is not Administrators/SYSTEM (${owner ?? 'unresolvable'})`,
+        `anchor object owner is not Administrators/SYSTEM: ${row.path} (${row.owner ?? 'unresolvable'})`,
       );
     }
   }
