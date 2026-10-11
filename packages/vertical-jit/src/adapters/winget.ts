@@ -279,10 +279,7 @@ export class WingetPrivilegedBackend extends LocalPrivilegedBackend {
 
   readonly #deps: WingetBackendDeps;
 
-  async #perform(action: {
-    op: string;
-    parameters: Record<string, unknown>;
-  }): Promise<{
+  async #perform(action: { op: string; parameters: Record<string, unknown> }): Promise<{
     ok: boolean;
     exitCode?: number;
     note?: string;
