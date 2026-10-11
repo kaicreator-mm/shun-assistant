@@ -76,6 +76,66 @@ describe('JIT lifecycle — declined elevation (UAC)', () => {
   });
 });
 
+describe('R8 — failure metadata converges with durable recovery truth', () => {
+  it('install transport interruption stays MAY_HAVE_EXECUTED_UNCERTAIN end-to-end', async () => {
+    const harness = buildHarness({
+      backendFaults: [
+        { kind: 'INTERRUPT', when: (action) => action.action.op === 'software.install' },
+      ],
+    });
+    installWorld(harness);
+
+    const error = await runJitLifecycle(jitInput({ retention: 'RETAIN' }), harness.deps).catch(
+      (caught: unknown) => caught,
+    );
+    expect(error).toMatchObject({
+      code: 'INSTALL_FAILED',
+      recovery: { recoveryClassification: 'MAY_HAVE_EXECUTED_UNCERTAIN' },
+    });
+    const actionId = 'task-2026-10-10-002-install';
+    const entries = await harness.deps.journals(actionId).replay();
+    expect(classifyFromJournal(entries, actionId)).toBe('MAY_HAVE_EXECUTED_UNCERTAIN');
+  });
+
+  it('install worker failure never claims FAILED_BEFORE_EFFECT after EXEC_DONE', async () => {
+    const harness = buildHarness({
+      backendFaults: [
+        { kind: 'FAIL_EXEC', when: (action) => action.action.op === 'software.install' },
+      ],
+    });
+    installWorld(harness);
+
+    const error = await runJitLifecycle(jitInput({ retention: 'RETAIN' }), harness.deps).catch(
+      (caught: unknown) => caught,
+    );
+    expect(error).toMatchObject({
+      code: 'INSTALL_FAILED',
+      recovery: { recoveryClassification: 'MAY_HAVE_EXECUTED_UNCERTAIN' },
+    });
+    const actionId = 'task-2026-10-10-002-install';
+    const entries = await harness.deps.journals(actionId).replay();
+    expect(classifyFromJournal(entries, actionId)).toBe('MAY_HAVE_EXECUTED_UNCERTAIN');
+  });
+
+  it('removal worker failure preserves MAY_HAVE_EXECUTED_UNCERTAIN in lifecycle metadata', async () => {
+    const harness = buildHarness({
+      durableJitPolicy: durablePolicy(),
+      backendFaults: [
+        { kind: 'FAIL_EXEC', when: (action) => action.action.op === 'software.uninstall' },
+      ],
+    });
+    installWorld(harness);
+
+    const error = await runJitLifecycle(REMOVE_INPUT, harness.deps).catch(
+      (caught: unknown) => caught,
+    );
+    expect(error).toMatchObject({
+      code: 'REMOVE_FAILED',
+      recovery: { recoveryClassification: 'MAY_HAVE_EXECUTED_UNCERTAIN' },
+    });
+  });
+});
+
 describe('JIT lifecycle — interrupted removal (reconcile-first)', () => {
   it('resolves an uncertain interruption by post-state and retries the SAME actionId', async () => {
     let interrupts = 0;
