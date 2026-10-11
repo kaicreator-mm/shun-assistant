@@ -24,9 +24,11 @@ export const SupportObservationSchema = z.strictObject({
 });
 export type SupportObservation = z.infer<typeof SupportObservationSchema>;
 
-const RedactionFieldSchema = z.string().regex(
-  /^(?:os\.(?:name|build)|device\.model|updates\.last_check|env\[\d+\]\.value|processes\[\d+\]\.(?:name|command_line)|unrelated_document)$/,
-);
+const RedactionFieldSchema = z
+  .string()
+  .regex(
+    /^(?:os\.(?:name|build)|device\.model|updates\.last_check|env\[\d+\]\.value|processes\[\d+\]\.(?:name|command_line)|unrelated_document)$/,
+  );
 
 export const RedactionRecordSchema = z.strictObject({
   field: RedactionFieldSchema,
