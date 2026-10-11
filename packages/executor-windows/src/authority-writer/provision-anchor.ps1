@@ -1,8 +1,12 @@
 param(
   [Parameter(Mandatory=$true)][string]$AnchorRoot,
   [Parameter(Mandatory=$true)][string]$WriterBundle,
+  [Parameter(Mandatory=$true)][string]$HelperBundle,
+  [Parameter(Mandatory=$true)][string]$RelayScript,
   [Parameter(Mandatory=$true)][string]$NodeExe,
-  [Parameter(Mandatory=$true)][string]$BootstrapManifest
+  [Parameter(Mandatory=$true)][string]$WorkspaceRoot,
+  [Parameter(Mandatory=$true)][string]$BootstrapManifest,
+  [string]$HelperRevision = 'shun.executor-windows.helper/0.1.0'
 )
 
 $ErrorActionPreference = 'Stop'
@@ -49,6 +53,14 @@ function Write-Json([string]$Path, $Value) {
   [System.IO.File]::WriteAllText($Path, $json + [Environment]::NewLine, [System.Text.UTF8Encoding]::new($false))
 }
 
+function File-Sha256([string]$Path) {
+  return (Get-FileHash -LiteralPath $Path -Algorithm SHA256).Hash.ToLowerInvariant()
+}
+
+function Assert-File([string]$Path, [string]$Name) {
+  if (-not (Test-Path -LiteralPath $Path -PathType Leaf)) { throw "$Name missing: $Path" }
+}
+
 function Assert-AnchorId([string]$Value, [string]$Name) {
   if ($Value.Length -lt 1 -or $Value.Length -gt 128 -or $Value -cne $Value.ToLowerInvariant() -or $Value -notmatch '^[a-z0-9][a-z0-9._-]*$' -or $Value.Contains('..')) {
     throw "$Name is not a canonical anchor id: $Value"
@@ -56,26 +68,50 @@ function Assert-AnchorId([string]$Value, [string]$Name) {
 }
 
 if ($env:OS -ne 'Windows_NT') { throw 'protected anchor provisioning is Windows-only' }
+$identity = [System.Security.Principal.WindowsIdentity]::GetCurrent()
+$principal = New-Object System.Security.Principal.WindowsPrincipal($identity)
+if (-not $principal.IsInRole([System.Security.Principal.WindowsBuiltInRole]::Administrator)) {
+  throw 'protected anchor provisioning requires an elevated Administrator token'
+}
 if (Test-Path -LiteralPath $AnchorRoot) {
   throw "anchor root already exists; refusing in-place reprovision/migration: $AnchorRoot"
 }
-if (-not (Test-Path -LiteralPath $WriterBundle -PathType Leaf)) { throw "writer bundle missing: $WriterBundle" }
-if (-not (Test-Path -LiteralPath $NodeExe -PathType Leaf)) { throw "node executable missing: $NodeExe" }
-if (-not (Test-Path -LiteralPath $BootstrapManifest -PathType Leaf)) { throw "bootstrap manifest missing: $BootstrapManifest" }
+Assert-File $WriterBundle 'writer bundle'
+Assert-File $HelperBundle 'helper bundle'
+Assert-File $RelayScript 'elevation relay'
+Assert-File $NodeExe 'node executable'
+Assert-File $BootstrapManifest 'bootstrap manifest'
+if (-not (Test-Path -LiteralPath $WorkspaceRoot -PathType Container)) {
+  throw "workspace root missing: $WorkspaceRoot"
+}
+
+# Infrastructure identity is measured HERE, in the elevated bootstrap
+# ceremony. The untrusted manifest never supplies executable hashes.
+$systemDir = [Environment]::GetFolderPath([Environment+SpecialFolder]::System)
+if ([string]::IsNullOrWhiteSpace($systemDir)) { throw 'Windows system directory unavailable' }
+$whoamiExe = Join-Path $systemDir 'whoami.exe'
+$regExe = Join-Path $systemDir 'reg.exe'
+$taskkillExe = Join-Path $systemDir 'taskkill.exe'
+$powershellExe = Join-Path $systemDir 'WindowsPowerShell\v1.0\powershell.exe'
+foreach ($pair in @(
+  @($whoamiExe, 'whoami.exe'),
+  @($regExe, 'reg.exe'),
+  @($taskkillExe, 'taskkill.exe'),
+  @($powershellExe, 'powershell.exe')
+)) {
+  Assert-File $pair[0] $pair[1]
+}
 
 $bootstrap = Get-Content -LiteralPath $BootstrapManifest -Raw | ConvertFrom-Json
 if ($null -eq $bootstrap.currentAuthority) { throw 'bootstrap manifest requires currentAuthority' }
-if ($null -eq $bootstrap.helperPin) { throw 'bootstrap manifest requires helperPin' }
-if ($null -eq $bootstrap.systemToolsPin) { throw 'bootstrap manifest requires systemToolsPin' }
-if ($null -eq $bootstrap.policyWindows -or @($bootstrap.policyWindows).Count -lt 1) { throw 'bootstrap manifest requires at least one policyWindow' }
+if ($null -eq $bootstrap.policyWindows -or @($bootstrap.policyWindows).Count -lt 1) {
+  throw 'bootstrap manifest requires at least one policyWindow'
+}
 
 [System.IO.Directory]::CreateDirectory($AnchorRoot) | Out-Null
+# Protect the root BEFORE writing any authority record.
 Set-ProtectedDirectoryAcl $AnchorRoot
-
-# Root is protected before any authority record exists. Children inherit the
-# protected DACL; unexpected pre-existing children are impossible because an
-# existing root is refused above.
-foreach ($relative in @('grants','jobs','jobs\ledger','jobs\window-budget','jobs\receipts','programs','plans')) {
+foreach ($relative in @('grants','jobs','jobs\ledger','jobs\window-budget','jobs\receipts','programs')) {
   [System.IO.Directory]::CreateDirectory((Join-Path $AnchorRoot $relative)) | Out-Null
 }
 
@@ -83,44 +119,57 @@ $keyBytes = New-Object byte[] 32
 $rng = [System.Security.Cryptography.RandomNumberGenerator]::Create()
 try { $rng.GetBytes($keyBytes) } finally { $rng.Dispose() }
 $keyFile = Join-Path $AnchorRoot 'grant-hmac.key'
-[System.IO.File]::WriteAllText($keyFile, [Convert]::ToBase64String($keyBytes) + [Environment]::NewLine, [System.Text.UTF8Encoding]::new($false))
+[System.IO.File]::WriteAllText(
+  $keyFile,
+  [Convert]::ToBase64String($keyBytes) + [Environment]::NewLine,
+  [System.Text.UTF8Encoding]::new($false)
+)
 Set-SecretFileAcl $keyFile
 
-$writerSha = (Get-FileHash -LiteralPath $WriterBundle -Algorithm SHA256).Hash.ToLowerInvariant()
-$nodeSha = (Get-FileHash -LiteralPath $NodeExe -Algorithm SHA256).Hash.ToLowerInvariant()
+$now = [DateTimeOffset]::UtcNow.ToString('o')
+$nodeSha = File-Sha256 $NodeExe
 Write-Json (Join-Path $AnchorRoot 'writer-pin.json') ([ordered]@{
   schemaVersion = 'shun.executor-windows.anchor-writer-pin/1'
-  writerSha256 = $writerSha
+  writerSha256 = File-Sha256 $WriterBundle
   nodeExeSha256 = $nodeSha
-  pinnedAt = [DateTimeOffset]::UtcNow.ToString('o')
+  pinnedAt = $now
+})
+Write-Json (Join-Path $AnchorRoot 'helper-pin.json') ([ordered]@{
+  schemaVersion = 'shun.executor-windows.helper-pin/1'
+  helperRevision = $HelperRevision
+  helperSha256 = File-Sha256 $HelperBundle
+  relaySha256 = File-Sha256 $RelayScript
+  nodeExeSha256 = $nodeSha
+  workspaceRoot = [System.IO.Path]::GetFullPath($WorkspaceRoot)
+  pinnedAt = $now
+})
+Write-Json (Join-Path $AnchorRoot 'system-tools.json') ([ordered]@{
+  schemaVersion = 'shun.executor-windows.system-tools-pin/1'
+  whoamiSha256 = File-Sha256 $whoamiExe
+  regSha256 = File-Sha256 $regExe
+  powershellSha256 = File-Sha256 $powershellExe
+  taskkillSha256 = File-Sha256 $taskkillExe
+  pinnedAt = $now
 })
 Write-Json (Join-Path $AnchorRoot 'current-authority.json') $bootstrap.currentAuthority
-Write-Json (Join-Path $AnchorRoot 'helper-pin.json') $bootstrap.helperPin
-Write-Json (Join-Path $AnchorRoot 'system-tools.json') $bootstrap.systemToolsPin
 
 foreach ($window in @($bootstrap.policyWindows)) {
   Assert-AnchorId ([string]$window.windowId) 'policyWindow.windowId'
   Write-Json (Join-Path $AnchorRoot ("jobs\window-{0}.json" -f $window.windowId)) $window
 }
-if ($null -ne $bootstrap.programPins) {
-  foreach ($pin in @($bootstrap.programPins)) {
-    if ([string]::IsNullOrWhiteSpace([string]$pin.programPath)) { throw 'program pin missing programPath' }
-    $digest = [System.Security.Cryptography.SHA256]::HashData([System.Text.Encoding]::UTF8.GetBytes(([string]$pin.programPath).ToLowerInvariant()))
-    $key = ([Convert]::ToHexString($digest)).ToLowerInvariant()
-    Write-Json (Join-Path $AnchorRoot ("programs\{0}.json" -f $key)) $pin
-  }
-}
 
-# Re-assert the root ACL after all bootstrap writes. The runtime user keeps
-# read/execute only; the secret key remains admin/SYSTEM-only by its explicit ACL.
+# Re-assert after bootstrap writes. Runtime gets read/execute only on records;
+# the symmetric key remains Administrator/SYSTEM-read only.
 Set-ProtectedDirectoryAcl $AnchorRoot
 Set-SecretFileAcl $keyFile
 
 $result = [ordered]@{
   ok = $true
-  anchorRoot = $AnchorRoot
-  keyFile = $keyFile
-  writerSha256 = $writerSha
+  anchorRoot = [System.IO.Path]::GetFullPath($AnchorRoot)
+  keyFile = [System.IO.Path]::GetFullPath($keyFile)
+  writerSha256 = File-Sha256 $WriterBundle
+  helperSha256 = File-Sha256 $HelperBundle
+  relaySha256 = File-Sha256 $RelayScript
   nodeExeSha256 = $nodeSha
   policyWindowCount = @($bootstrap.policyWindows).Count
 }
