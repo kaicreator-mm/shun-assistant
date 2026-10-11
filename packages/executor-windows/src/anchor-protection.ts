@@ -30,8 +30,10 @@ import { join } from 'node:path';
 import { resolveGrantHmacKeyFile } from './trusted-store.ts';
 
 export interface AnchorAssessment {
-  /** true = at least one trust anchor is same-user-writable (or a probe failed). */
+  /** true = the runtime user can rewrite anchors OR read the HMAC signing key. */
   forgeable: boolean;
+  /** HMAC verifier/signing symmetry: readable key means caller can mint presentations. */
+  keyReadable: boolean;
   reasons: string[];
 }
 
@@ -44,6 +46,18 @@ const ANCHOR_RECORD_FILES = [
 
 /** Record directories the attacker could add/replace records in. */
 const ANCHOR_RECORD_DIRS = ['grants', 'plans'] as const;
+
+function fileReadable(path: string): boolean | undefined {
+  try {
+    const fd = openSync(path, 'r');
+    closeSync(fd);
+    return true;
+  } catch (e) {
+    const code = (e as NodeJS.ErrnoException).code;
+    if (code === 'EACCES' || code === 'EPERM') return false;
+    return undefined;
+  }
+}
 
 function fileWritable(path: string): boolean | undefined {
   // undefined = probe failed ⇒ callers must fail closed.
@@ -124,6 +138,14 @@ export function assessAuthorityAnchors(
     note(file, fileWritable(join(authorityDir, file)));
   }
   note('grant-hmac key', fileWritable(hmacKeyFile));
+  const keyReadable = fileReadable(hmacKeyFile);
+  if (keyReadable !== false) {
+    reasons.push(
+      keyReadable === true
+        ? 'grant-hmac key is same-user-readable (HMAC verification key is also signing authority)'
+        : 'grant-hmac key readability probe failed (fail closed)',
+    );
+  }
 
-  return { forgeable: reasons.length > 0, reasons };
+  return { forgeable: reasons.length > 0, keyReadable: keyReadable !== false, reasons };
 }
