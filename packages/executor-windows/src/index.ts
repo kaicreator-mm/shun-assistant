@@ -3,13 +3,9 @@
 // are exported: EnvironmentBackend, ExecutionBackend, and the recovery/
 // journaling machinery the §9.4 classification is built on.
 
+export { ACTION_ID_PATTERN, ActionIdRefusedError, assertSafeActionId } from './action-id.ts';
 export type { ApplyContext, ApplyResult, WriterRefusalCode } from './authority-writer/apply.ts';
 export { applyWriterJob, verifyWriterIdentity } from './authority-writer/apply.ts';
-export type {
-  AnchorWriterLaunchOptions,
-  AnchorWriterLaunchResult,
-} from './authority-writer/launcher.ts';
-export { launchAnchorWriterJob } from './authority-writer/launcher.ts';
 export type {
   PolicyWindow,
   PolicyWindowScopeBudget,
@@ -22,7 +18,11 @@ export {
   signWriterJob,
   WriterJobSchema,
 } from './authority-writer/job.ts';
-export { ACTION_ID_PATTERN, ActionIdRefusedError, assertSafeActionId } from './action-id.ts';
+export type {
+  AnchorWriterLaunchOptions,
+  AnchorWriterLaunchResult,
+} from './authority-writer/launcher.ts';
+export { launchAnchorWriterJob } from './authority-writer/launcher.ts';
 export type { LocalWindowsBackendOptions } from './backend.ts';
 export { LocalWindowsBackend, PROVIDER_ID, PROVIDER_VERSION } from './backend.ts';
 export {
@@ -105,12 +105,12 @@ export {
   readWriterPin,
   resolveGrantHmacKeyFile,
   SYSTEM_TOOLS_PIN_SCHEMA_VERSION,
-  WRITER_PIN_SCHEMA_VERSION,
-  WriterPinSchema,
   SystemToolsPinSchema,
   sha256File,
   sha256Text,
   signGrantWithHmac,
+  WRITER_PIN_SCHEMA_VERSION,
+  WriterPinSchema,
   writeCurrentAuthority,
   writeGrantHmacKey,
   writeGrantRecord,
