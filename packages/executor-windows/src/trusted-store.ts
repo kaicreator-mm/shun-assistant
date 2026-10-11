@@ -8,16 +8,15 @@
 //   helper-pin.json          pinned helper/relay identity + revision
 //   system-tools.json        pinned binary identity of the system tools (N-1)
 //   programs/<pathHash>.json pinned byte identity per proc.exec program (N-2)
-//   plans/<planHash>.json    ActionPlan records (trusted plan source)
 //
-// Trust anchors, not security theater: on a single-user Windows host the
-// store is protected by user-profile ACLs, and the HELPER resolves this
-// directory from a build-time constant — never from the envelope, argv or
-// environment an attacker-controlled launcher could influence (§4.6.1: the
-// privileged boundary re-verifies against trusted state "never on the
-// caller's say-so"). Moving or re-keying the store is an explicit authority
-// event: it changes the helper bundle (build-time constant) and therefore
-// requires a helper re-pin, exactly like any other helper revision.
+// C06 R5 production trust anchor: the helper/writer resolve this store from a
+// build-time constant (default C:\\ProgramData\\Shun\\authority). Runtime
+// receives read-only access to non-secret records; grants/currentness/pins and
+// every child object are owned by Administrators/SYSTEM; the symmetric HMAC
+// key is unreadable to the filtered runtime token. Dynamic ActionPlan records
+// may live in a separate runtime-writable content-addressed cache because the
+// protected grant binds planHash and both launcher/helper re-derive it.
+// Moving/re-keying the anchor is an explicit authority/provisioning event.
 import { createHash, createHmac, randomBytes, timingSafeEqual } from 'node:crypto';
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
@@ -102,8 +101,10 @@ export const SYSTEM_TOOLS_PIN_SCHEMA_VERSION = 'shun.executor-windows.system-too
  * record, missing digest, or any mismatch fails closed.
  *
  * Honest boundary: a real binary COPIED elsewhere passes identity (equal
- * bytes); the machine-evidence path defeats copies by construction. The
- * record itself is same-user writable — the C06 ESCALATED boundary applies.
+ * bytes); the machine-evidence path defeats copies by construction. In the
+ * R5 production deployment this record is in the protected admin-owned
+ * anchor and is runtime read-only; writable legacy/test stores are not a
+ * privileged trust root.
  */
 export const SystemToolsPinSchema = z.strictObject({
   schemaVersion: z.literal(SYSTEM_TOOLS_PIN_SCHEMA_VERSION),
@@ -145,18 +146,11 @@ export const PROGRAM_PIN_SCHEMA_VERSION = 'shun.executor-windows.program-pin/1';
 /**
  * Pinned BYTE IDENTITY of a windows.proc.exec program (N-2, the C12 audit's
  * actual target). The plan hash binds the program PATH string only, so bytes
- * swapped at the same path after the grant would otherwise run elevated
- * untouched. The launcher preflights every privileged proc.exec step —
- * canonical real path + measured sha256 recorded here — and the privileged
- * helper re-measures pre-journal: NO pin for the path, or any byte change
- * after pinning, refuses the run (fail closed). An interpreter update of a
- * program is exactly such a byte change and must be re-pinned by a fresh
- * launch-side measurement.
- *
- * Honest boundary: bytes swapped BEFORE the launcher's preflight are pinned
- * AS-SWAPPED (the pin attests what was measured at provisioning time; the
- * measured identity lands in the journal evidence). That race is a same-user
- * attack on the authority store itself — the C06 ESCALATED boundary.
+ * swapped at the same path after the grant would otherwise run elevated.
+ * Program pins are created/updated only by a trusted provisioning/authority
+ * event. Runtime launcher and elevated helper are verify-only: both
+ * canonicalize + re-measure and require the same protected pin. An intentional
+ * program update therefore requires an explicit re-pin authority event.
  */
 export const ProgramPinSchema = z.strictObject({
   schemaVersion: z.literal(PROGRAM_PIN_SCHEMA_VERSION),
@@ -196,7 +190,7 @@ export function readProgramPin(
   }
 }
 
-/** Launcher-side preflight write (per privileged proc.exec launch). */
+/** Trusted provisioning/authority-side write; normal runtime is verify-only. */
 export function writeProgramPin(authorityDir: string, pin: ProgramPin): void {
   const dir = join(authorityDir, 'programs');
   mkdirSync(dir, { recursive: true });
