@@ -62,6 +62,14 @@ import {
 } from '../trusted-store.ts';
 import { authorityDirectory, grantHmacKeyFileOverride } from './authority-dir.ts';
 
+declare const SHUN_EXECUTOR_REQUIRE_PROTECTED_OWNER: boolean | undefined;
+
+function requireProtectedOwner(): boolean {
+  return typeof SHUN_EXECUTOR_REQUIRE_PROTECTED_OWNER === 'boolean'
+    ? SHUN_EXECUTOR_REQUIRE_PROTECTED_OWNER
+    : true;
+}
+
 const PROVIDER_ID = 'shun.executor-windows';
 const PROVIDER_VERSION = '0.1.0';
 
@@ -160,13 +168,15 @@ class Helper {
     // read the key), but it CAN independently reject ACL theater by requiring
     // every authority object to be owned by Administrators/SYSTEM. This check
     // is pre-journal and uses the pinned real system PowerShell.
-    const ownership = assessAnchorOwnership(
-      authorityDirectory(),
-      resolveGrantHmacKeyFile(authorityDirectory(), grantHmacKeyFileOverride()),
-    );
-    if (ownership.length > 0) {
-      process.stderr.write(`authorization anchor ownership rejected: ${ownership.join('; ')}\n`);
-      return HELPER_EXIT_CODES.REFUSED;
+    if (requireProtectedOwner()) {
+      const ownership = assessAnchorOwnership(
+        authorityDirectory(),
+        resolveGrantHmacKeyFile(authorityDirectory(), grantHmacKeyFileOverride()),
+      );
+      if (ownership.length > 0) {
+        process.stderr.write(`authorization anchor ownership rejected: ${ownership.join('; ')}\n`);
+        return HELPER_EXIT_CODES.REFUSED;
+      }
     }
 
     // N-2: the program of a windows.proc.exec step is part of the trusted
