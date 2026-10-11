@@ -74,6 +74,29 @@ describe('anchor writability probe (unit)', () => {
   });
 });
 
+describe('C06 R5 — HMAC read authority is signing authority', () => {
+  it('a read-only-looking store is still forgeable when the runtime user can read the HMAC key', () => {
+    const dir = join(
+      tmpdir(),
+      `shun-anchor-readable-key-${Date.now()}-${Math.random().toString(36).slice(2)}`,
+    );
+    mkdirSync(join(dir, 'grants'), { recursive: true });
+    mkdirSync(join(dir, 'plans'), { recursive: true });
+    writeFileSync(join(dir, 'current-authority.json'), '{}\n');
+    writeFileSync(join(dir, 'helper-pin.json'), '{}\n');
+    writeFileSync(join(dir, 'system-tools-pin.json'), '{}\n');
+    writeFileSync(join(dir, 'grant-hmac.key'), 'AAAA\n');
+    try {
+      const assessment = assessAuthorityAnchors(dir);
+      expect(assessment.forgeable).toBe(true);
+      expect(assessment.keyReadable).toBe(true);
+      expect(assessment.reasons.join('\n')).toContain('same-user-readable');
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+});
+
 describe('P2-2 — the privileged launcher refuses side effects under forgeable anchors', () => {
   let authority: TestAuthority;
   let backend: PrivilegedWindowsExecutionBackend;
