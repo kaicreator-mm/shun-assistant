@@ -14,6 +14,7 @@ import { hostname } from 'node:os';
 import { join } from 'node:path';
 import {
   type AuthorizedAction,
+  canonicalJson,
   type EnvironmentBackend,
   type EnvironmentFacts,
   type EnvironmentRequirements,
@@ -25,6 +26,7 @@ import {
   validateGrantPresentation,
 } from '@shun/contracts';
 import { assertSafeActionId } from './action-id.ts';
+import { assessAuthorityAnchors } from './anchor-protection.ts';
 import { checkStepSurface, resolveActionStep } from './action-surface.ts';
 import { observeEnvironment } from './facts.ts';
 import {
@@ -196,15 +198,31 @@ export class LocalWindowsBackend implements EnvironmentBackend {
       const currentness = new FileCurrentnessSource(
         join(this.options.authorityDir, 'current-authority.json'),
       ).read();
+      const keyFile = resolveGrantHmacKeyFile(
+        this.options.authorityDir,
+        this.options.grantHmacKeyFile,
+      );
+      const anchors = assessAuthorityAnchors(this.options.authorityDir, keyFile);
+      if (action.action.sideEffectClass !== 'R0' && anchors.forgeable) {
+        return refused(
+          `authorization anchors are not protected for a mutating runtime action: ${anchors.reasons.join('; ')}`,
+          'ANCHOR_FORGEABLE_SAME_USER',
+        );
+      }
+      // A protected read-only authority root is itself a trusted local
+      // channel for the pre-issued grant. The runtime user intentionally
+      // cannot read the HMAC key; authenticity is the exact protected record
+      // identity. Legacy/read-only deployments may still use HMAC directly.
+      const verifyIntegrity = anchors.forgeable
+        ? hmacGrantIntegrityVerifier(keyFile)
+        : (candidate: typeof grant) => canonicalJson(candidate) === canonicalJson(grant);
       const verdict = validateGrantPresentation({
         grant,
         plan,
         action,
         currentAuthority: currentness,
         now: new Date().toISOString(),
-        verifyIntegrity: hmacGrantIntegrityVerifier(
-          resolveGrantHmacKeyFile(this.options.authorityDir, this.options.grantHmacKeyFile),
-        ),
+        verifyIntegrity,
       });
       if (!verdict.ok)
         return refused(`grant rejected: ${verdict.code} — ${verdict.detail}`, verdict.code);
