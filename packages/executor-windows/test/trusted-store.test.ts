@@ -13,6 +13,7 @@ import {
   generateGrantHmacKey,
   hmacGrantIntegrityVerifier,
   readHelperPin,
+  resolveGrantHmacKeyFile,
   sha256Text,
   signGrantWithHmac,
   writeCurrentAuthority,
@@ -83,7 +84,7 @@ describe('HMAC grant integrity', () => {
     writeGrantHmacKey(dir, key);
     const grant = grantFixture();
     const envelope = signGrantWithHmac(key, grant);
-    expect(hmacGrantIntegrityVerifier(dir)(grant, envelope)).toBe(true);
+    expect(hmacGrantIntegrityVerifier(join(dir, 'grant-hmac.key'))(grant, envelope)).toBe(true);
   });
 
   it('tampered grant content voids the envelope', () => {
@@ -92,9 +93,12 @@ describe('HMAC grant integrity', () => {
     writeGrantHmacKey(dir, key);
     const grant = grantFixture();
     const envelope = signGrantWithHmac(key, grant);
-    expect(hmacGrantIntegrityVerifier(dir)({ ...grant, taskId: 'evil-task' }, envelope)).toBe(
-      false,
-    );
+    expect(
+      hmacGrantIntegrityVerifier(join(dir, 'grant-hmac.key'))(
+        { ...grant, taskId: 'evil-task' },
+        envelope,
+      ),
+    ).toBe(false);
   });
 
   it('envelope from a different (attacker) key fails', () => {
@@ -102,13 +106,15 @@ describe('HMAC grant integrity', () => {
     writeGrantHmacKey(dir, generateGrantHmacKey());
     const grant = grantFixture();
     const forged = signGrantWithHmac(generateGrantHmacKey(), grant);
-    expect(hmacGrantIntegrityVerifier(dir)(grant, forged)).toBe(false);
+    expect(hmacGrantIntegrityVerifier(join(dir, 'grant-hmac.key'))(grant, forged)).toBe(false);
   });
 
   it('substrate failure (missing key file) fails closed to false', () => {
     const grant = grantFixture();
     const envelope = signGrantWithHmac(generateGrantHmacKey(), grant);
-    expect(hmacGrantIntegrityVerifier(tmpDir())(grant, envelope)).toBe(false);
+    expect(hmacGrantIntegrityVerifier(join(tmpDir(), 'grant-hmac.key'))(grant, envelope)).toBe(
+      false,
+    );
   });
 
   it('corrupt key file fails closed to false', () => {
@@ -116,7 +122,7 @@ describe('HMAC grant integrity', () => {
     writeFileSync(join(dir, 'grant-hmac.key'), '!!!not-base64-32-bytes!!!', 'utf8');
     const grant = grantFixture();
     const envelope = signGrantWithHmac(generateGrantHmacKey(), grant);
-    expect(hmacGrantIntegrityVerifier(dir)(grant, envelope)).toBe(false);
+    expect(hmacGrantIntegrityVerifier(join(dir, 'grant-hmac.key'))(grant, envelope)).toBe(false);
   });
 
   it('non-HMAC schemes are refused by the verifier', () => {
@@ -124,7 +130,65 @@ describe('HMAC grant integrity', () => {
     writeGrantHmacKey(dir, generateGrantHmacKey());
     const grant = grantFixture();
     expect(
-      hmacGrantIntegrityVerifier(dir)(grant, { scheme: 'TRUSTED_LOCAL_CHANNEL', value: 'x' }),
+      hmacGrantIntegrityVerifier(join(dir, 'grant-hmac.key'))(grant, {
+        scheme: 'TRUSTED_LOCAL_CHANNEL',
+        value: 'x',
+      }),
+    ).toBe(false);
+  });
+});
+
+// C06 — the grant-integrity trust anchor may be externalized to a protected
+// path. resolveGrantHmacKeyFile picks the explicit override over the
+// store-co-located default; any tampering against the OTHER location then
+// fails verification (fail closed) instead of silently re-keying the trust.
+describe('grant HMAC key externalization (C06)', () => {
+  it('defaults to the store-co-located key file', () => {
+    const dir = tmpDir();
+    expect(resolveGrantHmacKeyFile(dir)).toBe(join(dir, 'grant-hmac.key'));
+  });
+
+  it('an override path wins verbatim; whitespace/empty overrides fall back', () => {
+    const dir = tmpDir();
+    expect(resolveGrantHmacKeyFile(dir, 'D:\\protected\\shun.grant-hmac.key')).toBe(
+      'D:\\protected\\shun.grant-hmac.key',
+    );
+    expect(resolveGrantHmacKeyFile(dir, '   ')).toBe(join(dir, 'grant-hmac.key'));
+    expect(resolveGrantHmacKeyFile(dir, '')).toBe(join(dir, 'grant-hmac.key'));
+  });
+
+  it('with an external key, a store-located attacker key cannot forge grants', () => {
+    const dir = tmpDir();
+    const external = join(tmpDir(), 'external.grant-hmac.key');
+    const realKey = generateGrantHmacKey();
+    writeFileSync(external, `${realKey}\n`, 'utf8');
+    // Attacker rewrites the co-located key AND re-signs the grant with it.
+    const attackerKey = generateGrantHmacKey();
+    writeGrantHmacKey(dir, attackerKey);
+    const grant = grantFixture();
+    const forged = signGrantWithHmac(attackerKey, grant);
+    // The verifier reads ONLY the external path: the forgery fails.
+    expect(hmacGrantIntegrityVerifier(resolveGrantHmacKeyFile(dir, external))(grant, forged)).toBe(
+      false,
+    );
+    // And the genuine authority signature verifies.
+    expect(
+      hmacGrantIntegrityVerifier(resolveGrantHmacKeyFile(dir, external))(
+        grant,
+        signGrantWithHmac(realKey, grant),
+      ),
+    ).toBe(true);
+  });
+
+  it('an unreadable external key fails closed (never degrade to trust)', () => {
+    const dir = tmpDir();
+    const grant = grantFixture();
+    const envelope = signGrantWithHmac(generateGrantHmacKey(), grant);
+    expect(
+      hmacGrantIntegrityVerifier(resolveGrantHmacKeyFile(dir, join(dir, 'absent.key')))(
+        grant,
+        envelope,
+      ),
     ).toBe(false);
   });
 });

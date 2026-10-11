@@ -12,6 +12,12 @@
 // SHUN_EXECUTOR_BUILD_AUTHORITY_DIR; production default is
 // <USERPROFILE>\.shun\authority. Changing the location changes the bundle
 // hash → the helper must be re-pinned → an explicit authority event.
+//
+// C06: SHUN_EXECUTOR_BUILD_HMAC_KEY_FILE externalizes the grant-integrity
+// HMAC key to a protected path (ACL'd to Administrators/SYSTEM or held by a
+// privileged authority service). Without it the key sits co-located in the
+// authority store — writable and readable by the same user it protects
+// (residual risk; the independently protected trust principal is ESCALATED).
 
 import { mkdirSync } from 'node:fs';
 import { dirname, join } from 'node:path';
@@ -24,6 +30,7 @@ const outfile = join(packageRoot, 'dist', 'executor-helper.mjs');
 mkdirSync(dirname(outfile), { recursive: true });
 
 const authorityDir = process.env.SHUN_EXECUTOR_BUILD_AUTHORITY_DIR ?? '';
+const hmacKeyFile = process.env.SHUN_EXECUTOR_BUILD_HMAC_KEY_FILE ?? '';
 
 await build({
   entryPoints: [join(packageRoot, 'src', 'helper', 'executor-helper.ts')],
@@ -36,6 +43,7 @@ await build({
   minify: false,
   define: {
     SHUN_EXECUTOR_AUTHORITY_DIR: JSON.stringify(authorityDir),
+    SHUN_EXECUTOR_HMAC_KEY_FILE: JSON.stringify(hmacKeyFile),
   },
   banner: {
     // `import.meta.url` is preserved by esbuild; nothing else needed. The
@@ -45,5 +53,5 @@ await build({
 });
 
 process.stdout.write(
-  `helper bundle: ${outfile}\nsha256: ${sha256File(outfile)}\nauthorityDir: '${authorityDir || '<default>~/.shun/authority'}'\n`,
+  `helper bundle: ${outfile}\nsha256: ${sha256File(outfile)}\nauthorityDir: '${authorityDir || '<default>~/.shun/authority'}'\nhmacKeyFile: '${hmacKeyFile || '<store>authority/grant-hmac.key'}'\n`,
 );

@@ -132,6 +132,25 @@ export function writeGrantHmacKey(authorityDir: string, keyBase64: string): void
   writeFileSync(join(authorityDir, 'grant-hmac.key'), `${keyBase64}\n`, 'utf8');
 }
 
+/**
+ * C06 — HMAC key location (the grant-integrity trust anchor). Default: the
+ * key sits co-located in the authority store, which on a single-user Windows
+ * host is writable (and readable) by the very user whose grants it protects:
+ * a same-user attacker can rewrite grants AND re-sign them with the readable
+ * key — the residual hole that only an independently protected trust
+ * principal closes (see ESCALATED in the T04 report). What CAN be hardened
+ * in scope is key EXTERNALIZATION: a deployment may move the key to a
+ * protected path (ACL'd to Administrators/SYSTEM, or held by the privileged
+ * authority service) and pass it in via the build define. The helper then
+ * ignores any store-located key, so a rewritten grant record or a swapped
+ * co-located key fails HMAC verification and the privileged boundary refuses
+ * (fail closed) instead of accepting the tampered anchor.
+ */
+export function resolveGrantHmacKeyFile(authorityDir: string, overridePath?: string): string {
+  const trimmed = overridePath?.trim();
+  return trimmed && trimmed.length > 0 ? trimmed : join(authorityDir, 'grant-hmac.key');
+}
+
 function hmacOf(keyBase64: string, grant: AuthorizationGrant): string {
   const { integrity: _omit, ...payload } = grant;
   return createHmac('sha256', Buffer.from(keyBase64, 'base64'))
@@ -145,17 +164,18 @@ export function signGrantWithHmac(keyBase64: string, grant: AuthorizationGrant):
 }
 
 /**
- * Privileged-side verifier for `validateGrantPresentation`. Deliberately
- * returns false on ANY substrate failure (missing/corrupt key file): an
- * unverifiable envelope is an unauthentic grant, and the boundary never
- * degrades to "presented, therefore fine".
+ * Privileged-side verifier for `validateGrantPresentation`. `keyFile` names
+ * the HMAC key explicitly (resolve via resolveGrantHmacKeyFile). Deliberately
+ * returns false on ANY substrate failure (missing/unreadable/corrupt key
+ * file): an unverifiable envelope is an unauthentic grant, and the boundary
+ * never degrades to "presented, therefore fine".
  */
-export function hmacGrantIntegrityVerifier(authorityDir: string) {
+export function hmacGrantIntegrityVerifier(keyFile: string) {
   return (grant: AuthorizationGrant, envelope: GrantIntegrity): boolean => {
     if (envelope.scheme !== 'HMAC_SHA256') return false;
     let keyBase64: string;
     try {
-      keyBase64 = readFileSync(join(authorityDir, 'grant-hmac.key'), 'utf8').trim();
+      keyBase64 = readFileSync(keyFile, 'utf8').trim();
       if (keyBase64.length === 0) return false;
     } catch {
       return false;

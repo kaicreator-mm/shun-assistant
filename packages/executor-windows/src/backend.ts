@@ -45,6 +45,7 @@ import {
   FileGrantSource,
   FilePlanSource,
   hmacGrantIntegrityVerifier,
+  resolveGrantHmacKeyFile,
 } from './trusted-store.ts';
 
 export const PROVIDER_ID = 'shun.executor-windows';
@@ -53,6 +54,11 @@ export const PROVIDER_VERSION = '0.1.0';
 export interface LocalWindowsBackendOptions {
   /** Trusted authority store (currentness, grants, plans, HMAC key). */
   authorityDir: string;
+  /**
+   * C06: optional external HMAC grant-integrity key path (e.g. an ACL'd
+   * protected location). Unset = the key resolves inside the authority store.
+   */
+  grantHmacKeyFile?: string;
   /** Root for per-action journals/evidence; also the disk-free probe root. */
   workspaceRoot: string;
   defaultTimeoutMs?: number;
@@ -195,7 +201,9 @@ export class LocalWindowsBackend implements EnvironmentBackend {
         action,
         currentAuthority: currentness,
         now: new Date().toISOString(),
-        verifyIntegrity: hmacGrantIntegrityVerifier(this.options.authorityDir),
+        verifyIntegrity: hmacGrantIntegrityVerifier(
+          resolveGrantHmacKeyFile(this.options.authorityDir, this.options.grantHmacKeyFile),
+        ),
       });
       if (!verdict.ok)
         return refused(`grant rejected: ${verdict.code} — ${verdict.detail}`, verdict.code);

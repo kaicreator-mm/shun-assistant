@@ -55,9 +55,10 @@ import {
   FileCurrentnessSource,
   hmacGrantIntegrityVerifier,
   readHelperPin,
+  resolveGrantHmacKeyFile,
   sha256File,
 } from '../trusted-store.ts';
-import { authorityDirectory } from './authority-dir.ts';
+import { authorityDirectory, grantHmacKeyFileOverride } from './authority-dir.ts';
 
 const PROVIDER_ID = 'shun.executor-windows';
 const PROVIDER_VERSION = '0.1.0';
@@ -210,7 +211,12 @@ class Helper {
       action: this.envelope.action,
       currentAuthority: currentness,
       now: new Date().toISOString(),
-      verifyIntegrity: hmacGrantIntegrityVerifier(authorityDirectory()),
+      verifyIntegrity: hmacGrantIntegrityVerifier(
+        // C06: the key may be externalized to a protected path (build define);
+        // a store-located key tampered by a same-user attacker then simply
+        // fails verification — refuse, never "presented, therefore fine".
+        resolveGrantHmacKeyFile(authorityDirectory(), grantHmacKeyFileOverride()),
+      ),
     });
     if (!verdict.ok) {
       this.journal.append('REFUSED', {

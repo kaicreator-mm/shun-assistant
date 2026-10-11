@@ -79,6 +79,7 @@ export {
   HelperPinSchema,
   hmacGrantIntegrityVerifier,
   readHelperPin,
+  resolveGrantHmacKeyFile,
   sha256File,
   sha256Text,
   signGrantWithHmac,

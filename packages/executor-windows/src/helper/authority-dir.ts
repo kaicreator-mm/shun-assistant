@@ -12,11 +12,30 @@ import { join } from 'node:path';
 // so a production build without SHUN_EXECUTOR_BUILD_AUTHORITY_DIR yields '').
 declare const SHUN_EXECUTOR_AUTHORITY_DIR: string | undefined;
 
+// Optional C06 externalization: the HMAC grant-integrity key path, injected
+// the same way (empty/absent = key resolved inside the authority store).
+declare const SHUN_EXECUTOR_HMAC_KEY_FILE: string | undefined;
+
 /** Resolves the trusted authority store the helper re-verifies against. */
 export function authorityDirectory(): string {
   const defined: string | undefined =
     typeof SHUN_EXECUTOR_AUTHORITY_DIR === 'string' ? SHUN_EXECUTOR_AUTHORITY_DIR : undefined;
   return resolveAuthorityDirectory(defined);
+}
+
+/**
+ * C06: external HMAC key path baked in at build time. Empty/absent define =
+ * the key stays co-located in the authority store (the residual same-user
+ * risk, ESCALATED); a deployment protecting the key path via ACLs or a
+ * privileged authority service sets this so store tampering cannot forge
+ * grants. Same trust rules as the authority dir: a build-time constant,
+ * never argv/env, and changing it changes the bundle → re-pin.
+ */
+export function grantHmacKeyFileOverride(): string | undefined {
+  const defined: string | undefined =
+    typeof SHUN_EXECUTOR_HMAC_KEY_FILE === 'string' ? SHUN_EXECUTOR_HMAC_KEY_FILE : undefined;
+  const trimmed = defined?.trim();
+  return trimmed && trimmed.length > 0 ? trimmed : undefined;
 }
 
 /**
