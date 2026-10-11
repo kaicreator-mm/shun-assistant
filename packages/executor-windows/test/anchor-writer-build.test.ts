@@ -2,8 +2,8 @@
 // one-shot writer cannot actually bundle with its trust root/key fixed at
 // build time.
 import { join } from 'node:path';
-import { describe, expect, it } from 'vitest';
 import { build } from 'esbuild';
+import { describe, expect, it } from 'vitest';
 
 describe('C06 R5 anchor-writer production bundle', () => {
   it('bundles as one ESM artifact with root/key compile-time constants', async () => {
