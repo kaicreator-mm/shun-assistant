@@ -82,6 +82,16 @@ export interface GrantRecordStore {
   hasAnyGrant(): Promise<boolean>;
 }
 
+/**
+ * The first-policy ceremony binds its decision to an owned, schema-normalized
+ * candidate. No asynchronous callback receives the object later persisted.
+ */
+const PolicyBootstrapSnapshotSchema = z.strictObject({
+  policySnapshotRevision: PolicySnapshotRecordSchema.shape.policySnapshotRevision,
+  rules: PolicySnapshotRecordSchema.shape.rules,
+  riskGuards: PolicySnapshotRecordSchema.shape.riskGuards.optional(),
+});
+
 export interface PolicyBootstrapSnapshot {
   policySnapshotRevision: string;
   rules: PolicySnapshotRecord['rules'];
@@ -519,6 +529,14 @@ export class AuthorizationAuthority implements AuthorizationPort {
    * race cannot turn a stale ceremony into a policy overwrite.
    */
   async bootstrapPolicy(snapshot: PolicyBootstrapSnapshot, proof: unknown): Promise<void> {
+    // R4 P1: snapshot is caller-owned and may change across any await.
+    // Parse a PRIVATE candidate synchronously at entry (Zod constructs new
+    // nested arrays/objects), before the mutation queue may await its turn.
+    const parsedCandidate = PolicyBootstrapSnapshotSchema.safeParse(snapshot);
+    if (!parsedCandidate.success) {
+      issueFailure('SCHEMA_VIOLATION', 'initial policy bootstrap candidate violates the policy schema');
+    }
+    const candidate = parsedCandidate.data;
     await this.#serializeEvent(async () => {
       const authorizer = this.#config.bootstrapAuthorizer;
       if (!authorizer) {
@@ -555,8 +573,8 @@ export class AuthorizationAuthority implements AuthorizationPort {
       try {
         authorized = await authorizer({
           proof,
-          authorityRecord: authorityBefore,
-          snapshot,
+          authorityRecord: structuredClone(authorityBefore),
+          snapshot: structuredClone(candidate),
         });
       } catch (error) {
         issueFailure(
@@ -617,20 +635,20 @@ export class AuthorizationAuthority implements AuthorizationPort {
         );
       }
       const initial: PolicySnapshotRecord = {
-        policySnapshotRevision: snapshot.policySnapshotRevision,
+        policySnapshotRevision: candidate.policySnapshotRevision,
         status: 'ACTIVE',
         authorityId: markedAuthority.authorityId,
         authorityRevision: markedAuthority.authorityRevision,
         revokedGrantIds: [],
         priorRevisions: [],
-        rules: snapshot.rules,
-        riskGuards: snapshot.riskGuards ?? [],
+        rules: candidate.rules,
+        riskGuards: candidate.riskGuards ?? [],
         updatedAt: requireInstant(this.#config.clock),
       };
       if (!(await this.#savePolicyMutation(initial, rawPrior))) {
         issueFailure(
           'GRANT_CURRENTNESS_UNRESOLVABLE',
-          `initial policy slot moved before commit of ${snapshot.policySnapshotRevision}; refusing instead of overwriting concurrent state`,
+          `initial policy slot moved before commit of ${candidate.policySnapshotRevision}; refusing instead of overwriting concurrent state`,
         );
       }
     });
