@@ -9,8 +9,8 @@
 //
 // The trusted authority store location is baked in at build time (never
 // argv/env — an attacker-run launcher controls both). Override for tests via
-// SHUN_EXECUTOR_BUILD_AUTHORITY_DIR; production default is
-// <USERPROFILE>\.shun\authority. Changing the location changes the bundle
+// SHUN_EXECUTOR_BUILD_AUTHORITY_DIR; production default is the protected
+// C:\\ProgramData\\Shun\\authority root. Changing the location changes the bundle
 // hash → the helper must be re-pinned → an explicit authority event.
 //
 // C06: SHUN_EXECUTOR_BUILD_HMAC_KEY_FILE externalizes the grant-integrity
@@ -29,8 +29,11 @@ const packageRoot = join(dirname(fileURLToPath(import.meta.url)), '..');
 const outfile = join(packageRoot, 'dist', 'executor-helper.mjs');
 mkdirSync(dirname(outfile), { recursive: true });
 
-const authorityDir = process.env.SHUN_EXECUTOR_BUILD_AUTHORITY_DIR ?? '';
-const hmacKeyFile = process.env.SHUN_EXECUTOR_BUILD_HMAC_KEY_FILE ?? '';
+const authorityDir =
+  process.env.SHUN_EXECUTOR_BUILD_AUTHORITY_DIR?.trim() || 'C:\\ProgramData\\Shun\\authority';
+const hmacKeyFile =
+  process.env.SHUN_EXECUTOR_BUILD_HMAC_KEY_FILE?.trim() ||
+  join(authorityDir, 'grant-hmac.key');
 
 await build({
   entryPoints: [join(packageRoot, 'src', 'helper', 'executor-helper.ts')],
@@ -53,5 +56,5 @@ await build({
 });
 
 process.stdout.write(
-  `helper bundle: ${outfile}\nsha256: ${sha256File(outfile)}\nauthorityDir: '${authorityDir || '<default>~/.shun/authority'}'\nhmacKeyFile: '${hmacKeyFile || '<store>authority/grant-hmac.key'}'\n`,
+  `helper bundle: ${outfile}\nsha256: ${sha256File(outfile)}\nauthorityDir: '${authorityDir}'\nhmacKeyFile: '${hmacKeyFile}'\n`,
 );
