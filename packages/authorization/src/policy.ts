@@ -113,6 +113,15 @@ export const AuthorityRecordSchema = z.strictObject({
    * loss it makes detectable.
    */
   policyInitialized: z.boolean().optional(),
+  /**
+   * R2 (P1-D) durable authority-revision lineage: every authority revision
+   * superseded before the current one, carried forward by each rotation.
+   * Authority identities are non-reusable — rotating back to a used revision
+   * would re-cohere the policy bound to it and re-current its stale grants.
+   * Records from before this field cannot prove rotations older than the
+   * field's introduction (bounded, documented limitation).
+   */
+  priorAuthorityRevisions: z.array(z.string().min(1)).optional(),
 });
 export type AuthorityRecord = z.infer<typeof AuthorityRecordSchema>;
 
@@ -150,6 +159,12 @@ export type PolicySnapshotRecord = z.infer<typeof PolicySnapshotRecordSchema>;
  * schema-validated by `resolveCurrentAuthorityState`, so corrupt or foreign
  * records fail closed instead of being trusted. The workflow/store package
  * provides the durable ShunStore adapter; tests provide an in-memory one.
+ *
+ * R2 (P1-B/P1-C): the atomic shared-durable primitives are MANDATORY — a
+ * store that cannot provide them is an unsafe implementation and the
+ * authority refuses to construct over it. The R1 optional CAS let a no-CAS
+ * shared store silently degrade to unconditional saves, which a second
+ * Authority instance could drive a policy/authority rollback through.
  */
 export interface PolicyStateStore {
   loadAuthorityRecord(): Promise<unknown>;
@@ -157,20 +172,37 @@ export interface PolicyStateStore {
   saveAuthorityRecord(record: AuthorityRecord): Promise<void>;
   savePolicySnapshot(snapshot: PolicySnapshotRecord): Promise<void>;
   /**
-   * R1 (P1-B) optimistic-concurrency extension: atomically save the policy
-   * snapshot ONLY IF the currently stored policy record still equals
-   * `expectedPrior` — the exact record (or absence of one) the caller last
-   * read; equality is canonical-JSON equality, and null/undefined demands an
-   * empty slot. Returns false — writing nothing — when the record moved, so
-   * the caller can reload, re-apply and retry (bounded) or refuse typed.
-   * Stores that cannot provide this atomicity omit the method; the authority
-   * then relies on its in-instance single-writer mutation lock alone, and a
-   * cross-process atomic store remains a Controller disposition item.
+   * R1 (P1-B) / R2 (P1-B, mandatory): atomically save the policy snapshot
+   * ONLY IF the currently stored policy record still equals `expectedPrior` —
+   * the exact record (or absence of one) the caller last read; equality is
+   * canonical-JSON equality, and null/undefined demands an empty slot.
+   * Returns false — writing nothing — when the record moved, so the caller
+   * can reload, re-apply and retry (bounded) or refuse typed.
    */
-  compareAndSavePolicySnapshot?(
+  compareAndSavePolicySnapshot(
     snapshot: PolicySnapshotRecord,
     expectedPrior: unknown,
   ): Promise<boolean>;
+  /**
+   * R2 (P1-B, mandatory): the compare-and-save twin for the AUTHORITY record
+   * (initialization marker, rotation). Same equality semantics as
+   * {@link compareAndSavePolicySnapshot}: save only while the stored record
+   * still equals `expectedPrior`; return false — writing nothing — when it
+   * moved, so a parked marker write can never overwrite an intervening
+   * rotation from another instance/process.
+   */
+  compareAndSaveAuthorityRecord(record: AuthorityRecord, expectedPrior: unknown): Promise<boolean>;
+  /**
+   * R2 (P1-C, mandatory): atomically consume one issuance-proof nonce across
+   * EVERY authority instance (and process/restart, once the durable adapter
+   * persists the ledger) sharing this state. Returns true exactly when the
+   * nonce had not been consumed before — the check-and-set must be atomic,
+   * so two concurrent presentations of one proof cannot both succeed.
+   * `expiresAtMs` lets the ledger prune expired entries; `nowMs` is the
+   * presentation instant. The durable adapter must persist consumed nonces
+   * so consumption survives restarts (store-adapter obligation).
+   */
+  consumeIssuanceNonce(nonce: string, expiresAtMs: number, nowMs: number): Promise<boolean>;
 }
 
 function unresolvable(reason: string) {

@@ -48,10 +48,11 @@ import {
 export const DEFAULT_GRANT_TTL_MS = 15 * 60 * 1000;
 
 /**
- * R1 (P1-B): bounded retry budget for compare-and-save policy mutations.
- * Every attempt re-reads the fresh record and re-applies the mutation; if a
- * concurrent writer wins every generation the mutation refuses typed instead
- * of silently clobbering (fail-closed).
+ * R2 (P1-B): bounded retry budget for compare-and-save mutations of BOTH
+ * durable slots (policy snapshot and authority record). Every attempt
+ * re-reads the fresh record and re-applies the mutation; if a concurrent
+ * writer wins every generation the mutation refuses typed instead of
+ * silently clobbering (fail-closed).
  */
 const POLICY_MUTATION_CAS_ATTEMPTS = 4;
 
@@ -67,10 +68,18 @@ export type StoredGrantRecord = z.infer<typeof StoredGrantRecordSchema>;
  * Durable grant-record seam. Like PolicyStateStore, reads return unknown so
  * corrupt records can never re-enter the trust domain; the workflow/store
  * package provides the ShunStore adapter, tests an in-memory one.
+ *
+ * R2 (P1-A): `hasAnyGrant` is the evidence seam that distinguishes a VIRGIN
+ * store (never any policy — nothing to resurrect) from an initialized-but-
+ * unmarked one (grant records exist, so a policy once existed): grants are
+ * only ever written by issuance under an ACTIVE policy, so any grant record
+ * proves prior policy existence.
  */
 export interface GrantRecordStore {
   put(record: StoredGrantRecord): Promise<void>;
   get(grantId: string): Promise<unknown>;
+  /** R2 (P1-A): true when at least one grant record is durably stored. */
+  hasAnyGrant(): Promise<boolean>;
 }
 
 export interface AuthorizationAuthorityConfig {
@@ -109,14 +118,13 @@ export class AuthorizationAuthority implements AuthorizationPort {
    * inside this serialized tail, so two events on this instance can never
    * interleave their load→compute→save windows (the reviewer's parked
    * revocation could previously roll a concurrent adoption back).
+   *
+   * R2 (P1-B): the tail serializes THIS instance's events; cross-instance and
+   * cross-process ordering is enforced by the store's MANDATORY
+   * compare-and-save primitives, which every mutation uses — a store without
+   * them is rejected at construction.
    */
   #mutationTail: Promise<unknown> = Promise.resolve();
-  /**
-   * R1 (P1-C): consumed issuance-proof nonces (nonce → expiry epoch ms).
-   * Check-and-consume is SYNCHRONOUS, so the event loop can never interleave
-   * two presentations of the same proof between the check and the set.
-   */
-  readonly #consumedIssuanceNonces = new Map<string, number>();
 
   constructor(config: AuthorizationAuthorityConfig) {
     if (config.integritySecret.length === 0) {
@@ -125,27 +133,43 @@ export class AuthorizationAuthority implements AuthorizationPort {
     if (config.issuanceSecret.length === 0) {
       throw new TypeError('AuthorizationAuthority requires a non-empty issuanceSecret');
     }
+    // R2 (P1-B): the shared-durable atomicity primitives are mandatory. A
+    // store that cannot provide them previously degraded to unconditional
+    // saves (the optional-CAS fallback) — a second Authority instance could
+    // drive a policy/authority rollback straight through that hole. Refuse
+    // the unsafe implementation instead of degrading.
+    const store = config.state as Partial<PolicyStateStore>;
+    if (typeof store.compareAndSavePolicySnapshot !== 'function') {
+      throw new TypeError(
+        'AuthorizationAuthority requires a PolicyStateStore with a mandatory compareAndSavePolicySnapshot primitive — a store without shared-durable atomic compare-and-save is an unsafe implementation and is refused',
+      );
+    }
+    if (typeof store.compareAndSaveAuthorityRecord !== 'function') {
+      throw new TypeError(
+        'AuthorizationAuthority requires a PolicyStateStore with a mandatory compareAndSaveAuthorityRecord primitive — authority-record mutations (initialization marker, rotation) must be atomic against concurrent instances',
+      );
+    }
+    if (typeof store.consumeIssuanceNonce !== 'function') {
+      throw new TypeError(
+        'AuthorizationAuthority requires a PolicyStateStore with a mandatory consumeIssuanceNonce primitive — issuance-proof consumption must be shared durable state, not an instance-local ledger',
+      );
+    }
     this.#config = config;
     this.#grantTtlMs = config.grantTtlMs ?? DEFAULT_GRANT_TTL_MS;
     this.#newGrantId = config.newGrantId ?? (() => randomUUID());
   }
 
   /**
-   * R1 (P1-C): single-use proof consumption. Synchronous check-and-set — no
-   * await sits between the membership check and the insert, so two concurrent
-   * presentations of the same proof cannot both pass. Expired nonces are
-   * pruned opportunistically so the registry stays bounded by the live proof
-   * window.
+   * R2 (P1-C): single-use proof consumption is SHARED DURABLE STATE. The
+   * instance-local ledger was reset by every reconstructed issuer — a second
+   * Authority over the same state (or an issuer restart) replayed an already
+   * consumed proof inside its validity window and minted an unrevoked grant.
+   * Consumption now runs through the store's mandatory atomic
+   * `consumeIssuanceNonce`, so every instance (and, once the durable adapter
+   * persists the ledger, every restart) sees the same one-shot record.
    */
-  #consumeIssuanceNonce(nonce: string, expiresAtMs: number, nowMs: number): boolean {
-    if (this.#consumedIssuanceNonces.size > 0) {
-      for (const [seen, expiry] of this.#consumedIssuanceNonces) {
-        if (expiry < nowMs) this.#consumedIssuanceNonces.delete(seen);
-      }
-    }
-    if (this.#consumedIssuanceNonces.has(nonce)) return false;
-    this.#consumedIssuanceNonces.set(nonce, expiresAtMs);
-    return true;
+  async #consumeIssuanceNonce(nonce: string, expiresAtMs: number, nowMs: number): Promise<boolean> {
+    return this.#config.state.consumeIssuanceNonce(nonce, expiresAtMs, nowMs);
   }
 
   /**
@@ -166,36 +190,59 @@ export class AuthorizationAuthority implements AuthorizationPort {
   }
 
   /**
-   * R1 (P1-B): save a computed policy mutation only while the store still
-   * holds exactly the record (or absence) this event last read. With a
-   * CAS-capable store a lost race returns false and the caller re-reads and
-   * retries (bounded); without one the write is a plain save — the instance
-   * lock is then the only serialization, and cross-process atomicity remains
-   * a store-adapter obligation.
+   * R2 (P1-B): save a computed policy mutation ONLY while the store still
+   * holds exactly the record (or absence) this event last read. The
+   * compare-and-save primitive is mandatory (validated at construction); a
+   * lost race returns false and the caller re-reads and retries (bounded) —
+   * there is no unconditional-save fallback.
    */
   async #savePolicyMutation(next: PolicySnapshotRecord, expectedPrior: unknown): Promise<boolean> {
-    const store = this.#config.state;
-    if (typeof store.compareAndSavePolicySnapshot === 'function') {
-      return store.compareAndSavePolicySnapshot.call(store, next, expectedPrior);
-    }
-    await store.savePolicySnapshot(next);
-    return true;
+    return this.#config.state.compareAndSavePolicySnapshot(next, expectedPrior);
   }
 
   /**
-   * R1 (P1-A): persist the durable initialization marker BEFORE the snapshot
-   * it guards. Ordering is deliberate: a crash between marker and snapshot
-   * bricks adoption (fail-closed, operator-visible), while the reverse order
-   * would leave a window in which storage loss looks like a virgin store and
-   * adoption resurrects revoked grants.
+   * R2 (P1-B): save an authority-record mutation (initialization marker,
+   * rotation) ONLY while the stored record still equals `expectedPrior`.
+   * The R1 plain save let a parked unmarked-A1 marker write overwrite an
+   * intervening A2 rotation from another instance — currentness rolled back.
    */
-  async #ensureInitializationMarker(authorityRecord: AuthorityRecord): Promise<void> {
-    if (authorityRecord.policyInitialized === true) return;
-    await this.#config.state.saveAuthorityRecord({
-      ...authorityRecord,
-      policyInitialized: true,
-      updatedAt: requireInstant(this.#config.clock),
-    });
+  async #saveAuthorityRecordMutation(
+    next: AuthorityRecord,
+    expectedPrior: unknown,
+  ): Promise<boolean> {
+    return this.#config.state.compareAndSaveAuthorityRecord(next, expectedPrior);
+  }
+
+  /**
+   * R1 (P1-A), R2 (P1-B): persist the durable initialization marker BEFORE
+   * the snapshot it guards, as a compare-and-save against the record just
+   * read. Ordering is deliberate: a crash between marker and snapshot bricks
+   * adoption (fail-closed, operator-visible), while the reverse order would
+   * leave a window in which storage loss looks like a virgin store and
+   * adoption resurrects revoked grants. A lost race re-reads the FRESH record
+   * (the marker carries forward there — a concurrent rotation is preserved,
+   * never overwritten) and retries bounded. Returns the record the marker is
+   * effective on — the caller binds its snapshot to THAT record, never to a
+   * pre-race read.
+   */
+  async #ensureInitializationMarker(authorityRecord: AuthorityRecord): Promise<AuthorityRecord> {
+    let current = authorityRecord;
+    for (let attempt = 1; ; attempt++) {
+      if (current.policyInitialized === true) return current;
+      const marked: AuthorityRecord = {
+        ...current,
+        policyInitialized: true,
+        updatedAt: requireInstant(this.#config.clock),
+      };
+      if (await this.#saveAuthorityRecordMutation(marked, current)) return marked;
+      if (attempt >= POLICY_MUTATION_CAS_ATTEMPTS) {
+        throw new ShunContractError(
+          'GRANT_CURRENTNESS_UNRESOLVABLE',
+          `authority record moved concurrently on every initialization-marker attempt; refusing after ${POLICY_MUTATION_CAS_ATTEMPTS} bounded retries (fail-closed)`,
+        );
+      }
+      current = await this.#loadAuthorityOrThrow();
+    }
   }
 
   /**
@@ -298,7 +345,7 @@ export class AuthorizationAuthority implements AuthorizationPort {
         'issuance refused: the controller issuance proof expired before presentation; obtain a fresh proof from the Action Controller',
       );
     }
-    if (!this.#consumeIssuanceNonce(claims.nonce, Date.parse(claims.expiresAt), nowMs)) {
+    if (!(await this.#consumeIssuanceNonce(claims.nonce, Date.parse(claims.expiresAt), nowMs))) {
       issueFailure(
         'GRANT_NOT_AUTHENTIC',
         'issuance refused: the controller issuance proof was already consumed; controller approval is strictly single-use',
@@ -348,22 +395,63 @@ export class AuthorizationAuthority implements AuthorizationPort {
 
   /**
    * Authority event: rotate the authority revision (A1 → A2). Until a policy is adopted under the new revision, currentness is deliberately UNRESOLVABLE.
+   *
    * R1 (P1-A): the rewritten record carries the initialization marker forward
    * (a rotation never un-initializes lineage), and the event runs serialized
    * against the other authority events.
+   *
+   * R2 (P1-D): authority revisions are NON-REUSABLE. Rotating back to a used
+   * revision re-coheres the policy still bound to it and re-currents its
+   * stale grants without any race (A1→A2→A1 resurrected A1/P1 grants). The
+   * revision is checked against the durable lineage (current + every prior
+   * revision) and refused with GRANT_AUTHORITY_STALE; each rotation carries
+   * the lineage forward.
+   *
+   * R2 (P1-B): the record write is a compare-and-save against the record just
+   * read — a concurrent rotation from another instance wins the CAS, this
+   * event re-reads the fresh record, re-checks reuse against ITS lineage and
+   * re-applies (bounded), so a parked rotation can never overwrite an
+   * intervening one and no revision is ever dropped from the lineage.
    */
   async rotateAuthority(next: { authorityRevision: string }): Promise<void> {
     await this.#serializeEvent(async () => {
       // Authority events are deliberate mutations of a readable domain: refuse
       // to act blindly on an unreadable/corrupt state.
-      const currentRecord = await this.#loadAuthorityOrThrow();
+      let currentRecord = await this.#loadAuthorityOrThrow();
       await this.#parsePolicyRecordOrThrow(await this.#rawPolicyRecordOrThrow());
-      const record: AuthorityRecord = {
-        ...currentRecord,
-        authorityRevision: next.authorityRevision,
-        updatedAt: requireInstant(this.#config.clock),
-      };
-      await this.#config.state.saveAuthorityRecord(record);
+      for (let attempt = 1; ; attempt++) {
+        // Re-check non-reuse against the FRESH lineage on every attempt: a
+        // lost CAS race reveals a moved record whose lineage may already use
+        // the requested revision.
+        const usedRevisions = new Set([
+          ...(currentRecord.priorAuthorityRevisions ?? []),
+          currentRecord.authorityRevision,
+        ]);
+        if (usedRevisions.has(next.authorityRevision)) {
+          issueFailure(
+            'GRANT_AUTHORITY_STALE',
+            `authority revision ${next.authorityRevision} was already used; authority revisions are non-reusable — rotating back would re-current the grants bound to it (rotate to a fresh revision instead)`,
+          );
+        }
+        const record: AuthorityRecord = {
+          ...currentRecord,
+          authorityRevision: next.authorityRevision,
+          priorAuthorityRevisions: [
+            ...(currentRecord.priorAuthorityRevisions ?? []),
+            currentRecord.authorityRevision,
+          ],
+          updatedAt: requireInstant(this.#config.clock),
+        };
+        if (await this.#saveAuthorityRecordMutation(record, currentRecord)) return;
+        if (attempt >= POLICY_MUTATION_CAS_ATTEMPTS) {
+          issueFailure(
+            'GRANT_CURRENTNESS_UNRESOLVABLE',
+            `authority record moved concurrently on every rotation attempt; refusing after ${POLICY_MUTATION_CAS_ATTEMPTS} bounded retries (fail-closed)`,
+          );
+        }
+        currentRecord = await this.#loadAuthorityOrThrow();
+        await this.#parsePolicyRecordOrThrow(await this.#rawPolicyRecordOrThrow());
+      }
     });
   }
 
@@ -388,6 +476,14 @@ export class AuthorizationAuthority implements AuthorizationPort {
    * once marked, adoption over a missing policy record refuses fail-closed
    * (that state is storage loss, and sealing over it would resurrect revoked
    * grants and reset lineage).
+   *
+   * R2 (P1-A): the marker alone cannot prove initialization for LEGACY
+   * stores predating it (a valid unmarked state with an issued grant history).
+   * Grant records are issuance evidence: grants are only ever written under
+   * an ACTIVE policy, so ANY durable grant record proves a policy once
+   * existed. A missing predecessor is therefore accepted as virgin bootstrap
+   * only when NEITHER the marker NOR any grant record proves prior
+   * initialization; otherwise adoption refuses fail-closed.
    *
    * R1 (P1-B): the whole event runs on the single-writer tail, and the
    * snapshot write is a compare-and-save against the exact record this event
@@ -418,8 +514,20 @@ export class AuthorizationAuthority implements AuthorizationPort {
           `authority record proves an earlier policy adoption, but the current policy record is missing; this is durable-state loss, never a first bootstrap — adopt only after the lineage is restored (refusing ${snapshot.policySnapshotRevision}, fail-closed)`,
         );
       }
-      // Marker precedes the snapshot write (see #ensureInitializationMarker).
-      await this.#ensureInitializationMarker(authorityRecord);
+      // R2 (P1-A): grant records are issuance evidence — grants are only ever
+      // written under an ACTIVE policy. An unmarked authority holding grant
+      // records is an initialized LEGACY store whose policy slot was lost, not
+      // a virgin store: bootstrapping over it would reset revocations and
+      // resurrect its grants. Only a store with no marker AND no grant record
+      // may ever bootstrap.
+      if (missingPrior && authorityRecord.policyInitialized !== true) {
+        if (await this.#config.grants.hasAnyGrant()) {
+          issueFailure(
+            'GRANT_CURRENTNESS_UNRESOLVABLE',
+            `durable grant records prove an earlier policy existed, but the current policy record is missing (and the authority record carries no initialization marker); this is durable-state loss or a pre-marker legacy store, never a first bootstrap — adopt only after the lineage is restored (refusing ${snapshot.policySnapshotRevision}, fail-closed)`,
+          );
+        }
+      }
 
       for (let attempt = 1; ; attempt++) {
         // Re-evaluate absence on EVERY attempt: a lost CAS race may reveal a
@@ -435,6 +543,14 @@ export class AuthorizationAuthority implements AuthorizationPort {
             `current policy record is missing during adoption of ${snapshot.policySnapshotRevision}; an absent predecessor can only ever bootstrap a virgin store — refusing fail-closed`,
           );
         }
+        // R2 (P1-B): re-read the authority record on EVERY attempt and bind
+        // the snapshot to the record the marker is effective on — a
+        // concurrent instance rotation between the marker and the snapshot
+        // write must never leave the new policy bound to a stale authority
+        // revision (the marker retry re-reads the moved record and returns it).
+        const authorityNow = await this.#ensureInitializationMarker(
+          await this.#loadAuthorityOrThrow(),
+        );
         let prior: PolicySnapshotRecord | undefined;
         if (!priorMissingNow) {
           const parsedPrior = PolicySnapshotRecordSchema.safeParse(rawPrior);
@@ -459,8 +575,8 @@ export class AuthorizationAuthority implements AuthorizationPort {
         const snapshotRecord: PolicySnapshotRecord = {
           policySnapshotRevision: snapshot.policySnapshotRevision,
           status: 'ACTIVE',
-          authorityId: authorityRecord.authorityId,
-          authorityRevision: authorityRecord.authorityRevision,
+          authorityId: authorityNow.authorityId,
+          authorityRevision: authorityNow.authorityRevision,
           revokedGrantIds: prior ? [...prior.revokedGrantIds] : [],
           priorRevisions: prior
             ? [...(prior.priorRevisions ?? []), prior.policySnapshotRevision]

@@ -55,8 +55,10 @@ function authorityOn(
 
 /**
  * Deterministic store barrier (same pattern as adversarial-r1): parks the
- * FIRST authority-record write the store receives so a concurrent event on a
- * SECOND Authority instance interleaves at an exact, reproducible point.
+ * FIRST authority-record mutation the store receives — whichever write shape
+ * the authority emits (plain save pre-fix, compare-and-save post-fix) — so a
+ * concurrent event on a SECOND Authority instance interleaves at an exact,
+ * reproducible point.
  */
 function gateFirstAuthorityRecordSave(state: ReturnType<typeof memoryPolicyState>) {
   let releaseBarrier!: () => void;
@@ -68,22 +70,20 @@ function gateFirstAuthorityRecordSave(state: ReturnType<typeof memoryPolicyState
     markEntered = resolve;
   });
   let parked = false;
-  const baseSave = state.saveAuthorityRecord.bind(state);
-  state.saveAuthorityRecord = async (record: AuthorityRecord) => {
+  const park = async <T>(run: () => Promise<T>): Promise<T> => {
     if (!parked) {
       parked = true;
       markEntered();
       await gate;
     }
-    return baseSave(record);
+    return run();
   };
+  const baseSave = state.saveAuthorityRecord.bind(state);
+  const baseCas = state.compareAndSaveAuthorityRecord.bind(state);
+  state.saveAuthorityRecord = async (record: AuthorityRecord) => park(() => baseSave(record));
+  state.compareAndSaveAuthorityRecord = async (record: AuthorityRecord, expectedPrior: unknown) =>
+    park(() => baseCas(record, expectedPrior));
   return { entered, release: releaseBarrier };
-}
-
-async function settleUnlockedInterleaving(): Promise<void> {
-  await new Promise<void>((resolve) => {
-    setTimeout(resolve, 0);
-  });
 }
 
 describe('P1-A: grant records prove prior policy existence — unmarked loss is never a bootstrap', () => {
@@ -133,15 +133,13 @@ describe('P1-B: shared-durable atomicity is mandatory, not optional or per-insta
     // authority used to fall back to unconditional saves — the exact hole a
     // second instance could drive a rollback through. Construction must
     // reject it instead of degrading.
-    const unsafe = state as typeof state & {
-      compareAndSavePolicySnapshot?: unknown;
-      compareAndSaveAuthorityRecord?: unknown;
-      consumeIssuanceNonce?: unknown;
-    };
+    const unsafe = state as unknown as Record<string, unknown>;
     delete unsafe.compareAndSavePolicySnapshot;
     delete unsafe.compareAndSaveAuthorityRecord;
     delete unsafe.consumeIssuanceNonce;
-    expect(() => authorityOn(unsafe)).toThrow(/compare-and-save|atomic/i);
+    expect(() => authorityOn(unsafe as unknown as ReturnType<typeof memoryPolicyState>)).toThrow(
+      /compare-and-save|atomic/i,
+    );
   });
 
   it('a parked initialization-marker write cannot overwrite an intervening rotation from another instance', async () => {
@@ -247,7 +245,9 @@ describe('P1-D: authority revisions are non-reusable — rollback re-currents st
     // grant passed currentness again without any race.
     const state = memoryPolicyState({ authority: AUTHORITY, policy: activePolicy() });
     const { authority, grants } = authorityOn(state);
-    const grant = await grantOf(authority, buildPlan());
+    // The grant record must exist under A1/P1 so the reuse attempt has a
+    // stale grant it could resurrect.
+    await grantOf(authority, buildPlan());
 
     await authority.rotateAuthority({ authorityRevision: 'auth-rev-2' });
     expect(await authority.currentAuthority()).toMatchObject({ kind: 'UNRESOLVABLE' });

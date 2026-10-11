@@ -48,6 +48,8 @@ export function memoryPolicyState(seed?: {
   authority?: AuthorityRecord;
   policy?: PolicySnapshotRecord;
 }) {
+  /** R2 (P1-C): durable one-shot issuance-nonce ledger, shared by every authority over this state. */
+  const consumedNonces = new Map<string, number>();
   const state = {
     authoritySlot: undefined as unknown,
     policySlot: undefined as unknown,
@@ -68,12 +70,11 @@ export function memoryPolicyState(seed?: {
       state.policySlot = structuredClone(snapshot);
     },
     /**
-     * Optimistic-concurrency reference implementation (R1 P1-B): save only
-     * while the slot still holds exactly what the caller last read
+     * Optimistic-concurrency reference implementation (R1 P1-B, mandatory R2):
+     * save only while the slot still holds exactly what the caller last read
      * (canonical-JSON equality; a null/undefined expectation demands an empty
-     * slot). Returns false — writing nothing — when the record moved. The
-     * authority uses this whenever present so adversarial tests can drive
-     * deterministic lost-update races.
+     * slot). Returns false — writing nothing — when the record moved, so
+     * adversarial tests can drive deterministic lost-update races.
      */
     async compareAndSavePolicySnapshot(snapshot: PolicySnapshotRecord, expectedPrior: unknown) {
       const stored = state.policySlot;
@@ -87,6 +88,41 @@ export function memoryPolicyState(seed?: {
       state.policySlot = structuredClone(snapshot);
       return true;
     },
+    /**
+     * R2 (P1-B): compare-and-save twin for the authority record (marker,
+     * rotation) — same equality semantics, so a parked write can never
+     * overwrite an intervening record move.
+     */
+    async compareAndSaveAuthorityRecord(record: AuthorityRecord, expectedPrior: unknown) {
+      const stored = state.authoritySlot;
+      const matches =
+        expectedPrior === null || expectedPrior === undefined
+          ? stored === null || stored === undefined
+          : stored !== null &&
+            stored !== undefined &&
+            canonicalJson(stored) === canonicalJson(expectedPrior);
+      if (!matches) return false;
+      state.authoritySlot = structuredClone(record);
+      return true;
+    },
+    /**
+     * R2 (P1-C): atomic shared one-shot consumption. The check-and-set is
+     * synchronous within the async method, so no two authorities over this
+     * state can both consume one nonce. Expired entries are pruned
+     * opportunistically so the ledger stays bounded by the live proof window.
+     */
+    async consumeIssuanceNonce(nonce: string, expiresAtMs: number, nowMs: number) {
+      if (consumedNonces.size > 0) {
+        for (const [seen, expiry] of consumedNonces) {
+          if (expiry < nowMs) consumedNonces.delete(seen);
+        }
+      }
+      if (consumedNonces.has(nonce)) return false;
+      consumedNonces.set(nonce, expiresAtMs);
+      return true;
+    },
+    /** Test observability into the shared consumption ledger. */
+    consumedNonces,
   };
   if (seed?.authority) state.authoritySlot = structuredClone(seed.authority);
   if (seed?.policy) state.policySlot = structuredClone(seed.policy);
@@ -101,6 +137,10 @@ export function memoryGrantStore() {
     },
     async get(grantId: string) {
       return records.get(grantId) ?? null;
+    },
+    /** R2 (P1-A): grant records are the evidence that a policy once existed. */
+    async hasAnyGrant() {
+      return records.size > 0;
     },
     snapshot(): StoredGrantRecord[] {
       return [...records.values()];
@@ -238,6 +278,15 @@ export function secondPolicyReadReturns(
     },
     async savePolicySnapshot(snapshot) {
       return state.savePolicySnapshot(snapshot);
+    },
+    async compareAndSavePolicySnapshot(snapshot, expectedPrior) {
+      return state.compareAndSavePolicySnapshot(snapshot, expectedPrior);
+    },
+    async compareAndSaveAuthorityRecord(record, expectedPrior) {
+      return state.compareAndSaveAuthorityRecord(record, expectedPrior);
+    },
+    async consumeIssuanceNonce(nonce, expiresAtMs, nowMs) {
+      return state.consumeIssuanceNonce(nonce, expiresAtMs, nowMs);
     },
   };
 }
