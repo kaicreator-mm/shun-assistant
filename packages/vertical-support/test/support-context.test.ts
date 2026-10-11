@@ -97,6 +97,18 @@ describe('B-040 support-context minimization', () => {
     ).toBe(false);
   });
 
+  it('maps direct minimizer schema failures to bounded errors without attacker-controlled names', () => {
+    let caught: unknown;
+    try {
+      minimizeSupportContext({ ...fixture(), [fakeToken]: 'value' });
+    } catch (error) {
+      caught = error;
+    }
+    expect(caught).toBeInstanceOf(Error);
+    expect((caught as Error).message).toBe('SUPPORT_CONTEXT_INVALID: OBSERVATION');
+    expect((caught as Error).message).not.toContain(fakeToken);
+  });
+
   it('fails closed on malformed required sections', () => {
     expect(() => minimizeSupportContext({ ...fixture(), os: { name: '', build: '' } })).toThrow();
   });
