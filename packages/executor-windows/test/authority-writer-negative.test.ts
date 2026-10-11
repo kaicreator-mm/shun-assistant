@@ -231,15 +231,12 @@ describe('ShunAnchorWriter core — unattended negative controls (L2 v0.2 delta 
       policyWindowRef: fx.windowId,
       payload: badGrant,
     });
-    const result = applyWriterJob(
-      { anchorRoot: fx.anchorRoot, hmacKeyBase64: fx.anchorKey },
-      job,
-    );
+    const result = applyWriterJob({ anchorRoot: fx.anchorRoot, hmacKeyBase64: fx.anchorKey }, job);
     expect(result.ok).toBe(false);
     if (!result.ok) expect(result.code).toBe('PAYLOAD_INVALID');
-    expect(
-      existsSync(join(fx.anchorRoot, 'jobs', 'ledger', 'job-bad-inner-hmac.consumed')),
-    ).toBe(false);
+    expect(existsSync(join(fx.anchorRoot, 'jobs', 'ledger', 'job-bad-inner-hmac.consumed'))).toBe(
+      false,
+    );
     expect(existsSync(join(fx.anchorRoot, 'grants', 'grant-bad-inner-hmac.json'))).toBe(false);
   });
 
