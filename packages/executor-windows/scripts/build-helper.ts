@@ -32,8 +32,7 @@ mkdirSync(dirname(outfile), { recursive: true });
 const authorityDir =
   process.env.SHUN_EXECUTOR_BUILD_AUTHORITY_DIR?.trim() || 'C:\\ProgramData\\Shun\\authority';
 const hmacKeyFile =
-  process.env.SHUN_EXECUTOR_BUILD_HMAC_KEY_FILE?.trim() ||
-  join(authorityDir, 'grant-hmac.key');
+  process.env.SHUN_EXECUTOR_BUILD_HMAC_KEY_FILE?.trim() || join(authorityDir, 'grant-hmac.key');
 
 await build({
   entryPoints: [join(packageRoot, 'src', 'helper', 'executor-helper.ts')],
