@@ -356,16 +356,13 @@ describe('ShunAnchorWriter core — unattended negative controls (L2 v0.2 delta 
 
   it('path-ambiguous jobId is rejected before it can name a ledger file', () => {
     const fx = createFixture();
-    const unsafe = signWriterJob(
-      fx.anchorKey,
-      {
-        jobId: '../job-escape',
-        jobType: 'issue-grant',
-        riskClass: 'R2',
-        policyWindowRef: fx.windowId,
-        payload: fx.grantJob.payload,
-      } as Parameters<typeof signWriterJob>[1],
-    );
+    const unsafe = signWriterJob(fx.anchorKey, {
+      jobId: '../job-escape',
+      jobType: 'issue-grant',
+      riskClass: 'R2',
+      policyWindowRef: fx.windowId,
+      payload: fx.grantJob.payload,
+    } as Parameters<typeof signWriterJob>[1]);
     const result = applyWriterJob(
       { anchorRoot: fx.anchorRoot, hmacKeyBase64: fx.anchorKey },
       unsafe,
