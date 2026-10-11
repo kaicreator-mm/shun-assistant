@@ -72,8 +72,102 @@ async function freshOracle(input: Parameters<typeof verifyBatch>[0]['input']) {
 }
 
 describe('verifyBatch', () => {
-  it('stays honest when the metric cannot be produced (INCOMPLETE, never PASS)', async () => {
+  it('never reports PASS when a committed eligible sample produced no output (VI-P1-04)', async () => {
+    const a = await src.write(
+      'a.jpg',
+      await jpegBytes({ width: 900, height: 600, seed: 301, captureDate: '2024:03:04 05:06:07' }),
+    );
+    const b = await src.write('b.png', await pngBytes({ width: 500, height: 700, seed: 302 }));
+    const inputFiles = [
+      { path: a, format: 'JPG' as const },
+      { path: b, format: 'PNG' as const },
+    ];
+    const input = {
+      taskId: 'task-gap',
+      inputFiles,
+      operation: { kind: 'RESIZE' as const, maxLongEdgePx: BOUND },
+      metadataPolicy: { preserveCaptureDate: true as const },
+      outputDirectory: out.path,
+      qualityPolicy: { oracle: 'NO_OBVIOUS_DEGRADATION_V1' as const, ssimThreshold: 0.95 },
+      networkUsage: 'LOCAL_ONLY' as const,
+    };
+    const hashes = new Map<string, Awaited<ReturnType<typeof sha256Hex>>>();
+    for (const f of inputFiles) {
+      hashes.set(f.path, sha256Hex(await readFile(f.path)));
+    }
+    const oracle = await commitOracle({
+      sourceHashes: hashes,
+      maxLongEdgePx: BOUND,
+      ssimThreshold: 0.95,
+      workDir: join(out.path, 'oracle-gap'),
+    });
+    // Both samples are committed and eligible; the second one produced no
+    // output (its record was rejected). Perfect SSIM on the first must not
+    // launder the missing coverage into a PASS.
+    const dimsA = scaledDims(900, 600, BOUND);
+    const honestA = await sharp(await readFile(a))
+      .resize(dimsA.width, dimsA.height, { fit: 'fill', kernel: 'lanczos3' })
+      .toBuffer();
+    const aOut = join(out.path, 'a.jpg');
+    await writeFile(aOut, honestA);
+    const records: BatchRecord[] = [
+      { inputPath: a, status: 'WRITTEN', outputPath: aOut },
+      { inputPath: b, status: 'REJECTED', rejectionCode: 'OUTPUT_VERIFY_FAILED' },
+    ];
+    const receipt = await verifyBatch({
+      input,
+      records,
+      oracle,
+      sourceHashesBefore: hashes,
+      sourceHashesAfter: hashes,
+      metric: () => 1,
+    });
+    const oracleCheck = receipt.checks.find((c) => c.checkId === 'ssim-oracle');
+    expect(oracleCheck?.status).not.toBe('PASS');
+    expect(receipt.status).not.toBe('PASS');
+  });
+
+  it('rejects a non-finite metric value (Infinity) as unavailable, never PASS (VI-P2-06)', async () => {
     const { input, records } = await runStandardBatch();
+    const oracle = await freshOracle(input);
+    const before = new Map<string, Awaited<ReturnType<typeof sha256Hex>>>();
+    for (const f of input.inputFiles) {
+      before.set(f.path, sha256Hex(await readFile(f.path)));
+    }
+    const receipt = await verifyBatch({
+      input,
+      records,
+      oracle,
+      sourceHashesBefore: before,
+      sourceHashesAfter: before,
+      metric: () => Number.POSITIVE_INFINITY,
+    });
+    const oracleCheck = receipt.checks.find((c) => c.checkId === 'ssim-oracle');
+    expect(oracleCheck?.status).toBe('NOT_RUN');
+    expect(receipt.status).not.toBe('PASS');
+  });
+
+  it('rejects an out-of-range metric value (>1) as unavailable, never PASS (VI-P2-06)', async () => {
+    const { input, records } = await runStandardBatch();
+    const oracle = await freshOracle(input);
+    const before = new Map<string, Awaited<ReturnType<typeof sha256Hex>>>();
+    for (const f of input.inputFiles) {
+      before.set(f.path, sha256Hex(await readFile(f.path)));
+    }
+    const receipt = await verifyBatch({
+      input,
+      records,
+      oracle,
+      sourceHashesBefore: before,
+      sourceHashesAfter: before,
+      metric: () => 1.5,
+    });
+    const oracleCheck = receipt.checks.find((c) => c.checkId === 'ssim-oracle');
+    expect(oracleCheck?.status).toBe('NOT_RUN');
+    expect(receipt.status).not.toBe('PASS');
+  });
+
+  it('stays honest when the metric cannot be produced (INCOMPLETE, never PASS)', async () => {    const { input, records } = await runStandardBatch();
     const oracle = await freshOracle(input);
     const deadMetric: SsimMetric = () => null;
     const receipt = await verifyBatch({
