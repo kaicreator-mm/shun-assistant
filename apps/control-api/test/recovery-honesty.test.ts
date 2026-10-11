@@ -57,6 +57,42 @@ describe('reconciliation never launders uncertainty (VC-P1-03)', () => {
     );
   });
 
+  it('keeps MAY_HAVE_EXECUTED_UNCERTAIN when the post-state proves the effect took effect', async () => {
+    // Audit recipe VC-P1-03: a post-state inspection that finds the plan's
+    // declared effect PRESENT (the step actually ran) must not be laundered
+    // into FAILED_BEFORE_EFFECT or any "safe retry" claim. The frozen
+    // taxonomy has no "completed but unverified" class, so the honest outcome
+    // is: the uncertain classification stands, the task stays in
+    // NEEDS_INTERVENTION, and retry stays blocked.
+    const snapshot = await interruptedCleanupTask(
+      'cleanup with interrupt mid-run and a proven-present post-state',
+    );
+    expect(snapshot.recovery?.classification).toBe('MAY_HAVE_EXECUTED_UNCERTAIN');
+
+    const reconciled = await h.post(`/api/tasks/${snapshot.taskId}/recovery`);
+    expect(reconciled.status).toBe(200);
+    expect((reconciled.body as { classification: string }).classification).toBe(
+      'MAY_HAVE_EXECUTED_UNCERTAIN',
+    );
+
+    const after = (await h.get(`/api/tasks/${snapshot.taskId}`)).body as TaskSnapshot;
+    expect(after.state).toBe('NEEDS_INTERVENTION');
+    expect(after.recovery?.classification).toBe('MAY_HAVE_EXECUTED_UNCERTAIN');
+    expect(after.recovery?.reconciled).toBe(false);
+    // The detail must state what the inspection actually found: the declared
+    // effect IS present — never "could not prove", never "provably safe".
+    expect(after.recovery?.detail).toContain('present');
+    expect(after.recovery?.detail).not.toContain('could not prove');
+    expect(after.recovery?.detail).not.toContain('provably safe');
+
+    // And the retry gate stays shut.
+    const blocked = await h.post(`/api/tasks/${snapshot.taskId}/retry`);
+    expect(blocked.status).toBe(409);
+    expect((blocked.body as { error: { code: string } }).error.code).toBe(
+      'RETRY_BLOCKED_UNCERTAIN',
+    );
+  });
+
   it('records FAILED_BEFORE_EFFECT only from an explicit proven-absent post-state', async () => {
     // Demo marker: the scripted post-state inspection finds the plan's
     // declared expected outputs provably absent.

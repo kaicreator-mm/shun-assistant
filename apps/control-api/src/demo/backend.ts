@@ -90,10 +90,13 @@ interface DemoTask {
      * What the demo's modeled post-state inspection finds during reconciliation
      * (Issue #41, VC-P1-03): the demo executes nothing real, so it may only
      * conclude "provably not executed" when a post-state proof is explicitly
-     * scripted. Default is UNDETERMINED — fail-closed, the uncertain
-     * classification stands and retry stays blocked.
+     * scripted. PROVEN_PRESENT models the opposite proof — the declared effect
+     * IS there — which must keep the uncertain classification (the frozen
+     * taxonomy has no "completed but unverified" class) with retry blocked.
+     * Default is UNDETERMINED — fail-closed, the uncertain classification
+     * stands and retry stays blocked.
      */
-    reconcilePostState?: 'PROVEN_ABSENT' | 'UNDETERMINED';
+    reconcilePostState?: 'PROVEN_ABSENT' | 'PROVEN_PRESENT' | 'UNDETERMINED';
     verifyFail?: boolean;
     trustBlocked?: boolean;
   };
@@ -197,7 +200,9 @@ export class DemoShunBackend implements ControlBackend {
         interruption: request.goal.toLowerCase().includes('interrupt') ? 'UNCERTAIN' : undefined,
         reconcilePostState: request.goal.toLowerCase().includes('proven-absent')
           ? 'PROVEN_ABSENT'
-          : 'UNDETERMINED',
+          : request.goal.toLowerCase().includes('proven-present')
+            ? 'PROVEN_PRESENT'
+            : 'UNDETERMINED',
         verifyFail: request.goal.toLowerCase().includes('fail-verify'),
         trustBlocked: request.goal.toLowerCase().includes('untrusted-provider'),
       },
@@ -705,6 +710,22 @@ export class DemoShunBackend implements ControlBackend {
           'Execution was interrupted. Reconciliation proved the step did not take effect; the task can be retried safely.',
       };
       this.transition(task, 'FAILED', now, task.recovery.detail);
+      return { ok: true, value: { classification: task.recovery.classification } };
+    }
+    if (task.script.reconcilePostState === 'PROVEN_PRESENT') {
+      // Post-state proof the step DID take effect (Issue #41, VC-P1-03): the
+      // frozen taxonomy has no "completed but unverified" class, so this must
+      // not be laundered into FAILED_BEFORE_EFFECT or any safe disposition.
+      // The uncertain classification stands, the task stays in
+      // NEEDS_INTERVENTION, and retry stays blocked (RETRY_BLOCKED_UNCERTAIN).
+      task.recovery = {
+        classification: 'MAY_HAVE_EXECUTED_UNCERTAIN',
+        detail:
+          'Reconciliation compared the journal (stopped inside the execution window) and the actual state ' +
+          'against the plan’s declared expected state: the declared outputs are present, so the step took ' +
+          'effect — but verification never ran, so nothing is reported as success and a retry stays blocked.',
+        reconciled: false,
+      };
       return { ok: true, value: { classification: task.recovery.classification } };
     }
     task.recovery = {
