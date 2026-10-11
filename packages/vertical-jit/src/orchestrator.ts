@@ -42,7 +42,11 @@ import {
   type VerifierPort,
 } from '@shun/contracts';
 import { JitLifecycleError } from './failures.ts';
-import { classifyFromJournal, type JournalPort } from './journal.ts';
+import {
+  classifyFromJournal,
+  type JournalPort,
+  type RecoveryClassification,
+} from './journal.ts';
 import { canonicalKey, treeUnder } from './manifest-removal.ts';
 import { buildActionPlan, installAction, taskAction, uninstallAction } from './plans.ts';
 import type {
@@ -289,30 +293,43 @@ async function runPrivileged(
     authorizationKind: 'AUTOMATIC' | 'EXPLICIT_APPROVAL' | 'DURABLE_POLICY';
     approvalRef?: string;
   },
-): Promise<{ terminal: string; refusalCode?: string }> {
+): Promise<{
+  terminal: string;
+  refusalCode?: string;
+  recoveryClassification: RecoveryClassification;
+}> {
   const { grant, authorized } = await issueGrant(deps, input);
   try {
     // The issued grant IS the presentation; the boundary re-validates it
     // against the trusted plan ledger (never on the caller's say-so).
     const receipt = ExecutionReceiptSchema.parse(await deps.privileged.execute(authorized, grant));
-    return { terminal: receipt.terminal };
+    return {
+      terminal: receipt.terminal,
+      recoveryClassification: receipt.sideEffectEvidence.recoveryClassification,
+    };
   } catch (error) {
     // A typed contract refusal happened at the boundary BEFORE any effect
     // (stale grant, revocation, plan mismatch): surface the frozen code.
     if (error instanceof ShunContractError) {
-      return { terminal: 'REFUSED', refusalCode: error.code };
+      return {
+        terminal: 'REFUSED',
+        refusalCode: error.code,
+        recoveryClassification: 'FAILED_BEFORE_EFFECT',
+      };
     }
     // Transport-level interruption: the classification comes from the phase
     // journal alone — never from the exception's optimism (L2 §9.4).
     const entries = await deps.journals(input.action.actionId).replay();
-    const classification = classifyFromJournal(entries, input.action.actionId);
+    const journalClassification = classifyFromJournal(entries, input.action.actionId);
+    const recoveryClassification: RecoveryClassification =
+      journalClassification === 'NO_ENTRIES' ? 'NOT_STARTED' : journalClassification;
     const terminal =
-      classification === 'MAY_HAVE_EXECUTED_UNCERTAIN'
+      recoveryClassification === 'MAY_HAVE_EXECUTED_UNCERTAIN'
         ? 'UNCERTAIN'
-        : classification === 'COMPLETED_VERIFIED'
+        : recoveryClassification === 'COMPLETED_VERIFIED'
           ? 'SUCCEEDED'
           : 'FAILED';
-    return { terminal };
+    return { terminal, recoveryClassification };
   }
 }
 
@@ -472,7 +489,12 @@ async function runLifecycle(
   });
   trace(deps, 'INSTALL_EXECUTED', `terminal=${installRun.terminal}`);
   if (installRun.terminal !== 'SUCCEEDED') {
-    throw installFailure(installRun.terminal, installActionSpec.actionId, installRun.refusalCode);
+    throw installFailure(
+      installRun.terminal,
+      installActionSpec.actionId,
+      installRun.recoveryClassification,
+      installRun.refusalCode,
+    );
   }
   const layout: ProviderInstallLayout = await deps.acquisition.layoutOf(candidate);
   if (!(await providerPresent(deps, layout))) {
@@ -481,8 +503,9 @@ async function runLifecycle(
       'install reported success but the provider is not present on disk (post-state check failed)',
       {
         actionId: installActionSpec.actionId,
-        recoveryClassification: 'FAILED_BEFORE_EFFECT',
-        detail: 'post-state verification found no provider files',
+        recoveryClassification: 'MAY_HAVE_EXECUTED_UNCERTAIN',
+        detail:
+          'installer returned success but independent post-state verification found no provider files; effect outcome is unresolved',
       },
     );
   }
@@ -821,7 +844,7 @@ async function runRemovalGate(
     }
   }
   if (run.terminal !== 'SUCCEEDED') {
-    throw removalFailure(run.terminal, actionId, run.refusalCode);
+    throw removalFailure(run.terminal, actionId, run.recoveryClassification, run.refusalCode);
   }
 
   // (6) VERIFY — final provider state and residue disposition.
@@ -1029,20 +1052,23 @@ function removalSummary(
 function installFailure(
   terminal: string,
   actionId: string,
+  recoveryClassification: RecoveryClassification,
   refusalCode?: string,
 ): JitLifecycleError {
+  const provenNoEffect =
+    recoveryClassification === 'NOT_STARTED' ||
+    recoveryClassification === 'FAILED_BEFORE_EFFECT';
   return new JitLifecycleError(
     'INSTALL_FAILED',
     refusalCode
-      ? `privileged boundary refused the install presentation: ${refusalCode} (no side effect)`
+      ? `privileged boundary refused the install presentation: ${refusalCode}${
+          provenNoEffect ? ' (no side effect)' : ''
+        }`
       : `privileged install ended ${terminal}`,
     {
       actionId,
-      // Refusal: the journal stops at RECEIVED (validation precedes any side
-      // effect) ⇒ FAILED_BEFORE_EFFECT. UAC_DECLINED carries the NO_EFFECT
-      // marker ⇒ NOT_STARTED (L2 §9.4).
-      recoveryClassification: 'FAILED_BEFORE_EFFECT',
-      detail: `install terminal ${terminal}; no automatic retry — a declined elevation or refused grant is a decision, not a transport fault`,
+      recoveryClassification,
+      detail: `install terminal ${terminal}; recovery follows privileged receipt/journal truth (${recoveryClassification})`,
     },
   );
 }
@@ -1050,17 +1076,23 @@ function installFailure(
 function removalFailure(
   terminal: string,
   actionId: string,
+  recoveryClassification: RecoveryClassification,
   refusalCode?: string,
 ): JitLifecycleError {
+  const provenNoEffect =
+    recoveryClassification === 'NOT_STARTED' ||
+    recoveryClassification === 'FAILED_BEFORE_EFFECT';
   return new JitLifecycleError(
     'REMOVE_FAILED',
     refusalCode
-      ? `privileged boundary refused the removal presentation: ${refusalCode} (no side effect)`
+      ? `privileged boundary refused the removal presentation: ${refusalCode}${
+          provenNoEffect ? ' (no side effect)' : ''
+        }`
       : `privileged removal ended ${terminal}`,
     {
       actionId,
-      recoveryClassification: 'FAILED_BEFORE_EFFECT',
-      detail: `removal terminal ${terminal}`,
+      recoveryClassification,
+      detail: `removal terminal ${terminal}; recovery follows privileged receipt/journal truth (${recoveryClassification})`,
     },
   );
 }
