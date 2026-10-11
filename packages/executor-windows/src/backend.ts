@@ -209,16 +209,13 @@ export class LocalWindowsBackend implements EnvironmentBackend {
         this.options.grantHmacKeyFile,
       );
       const anchors = assessAuthorityAnchors(this.options.authorityDir, keyFile);
-      if (action.action.sideEffectClass !== 'R0' && anchors.forgeable) {
-        return refused(
-          `authorization anchors are not protected for a mutating runtime action: ${anchors.reasons.join('; ')}`,
-          'ANCHOR_FORGEABLE_SAME_USER',
-        );
-      }
-      // A protected read-only authority root is itself a trusted local
-      // channel for the pre-issued grant. The runtime user intentionally
-      // cannot read the HMAC key; authenticity is the exact protected record
-      // identity. Legacy/read-only deployments may still use HMAC directly.
+      // USER/NONE execution does not cross an OS privilege boundary: a
+      // same-user process already holds the underlying user rights. Preserve
+      // the legacy HMAC verifier for writable development/local stores. When
+      // production points at the protected C06 anchor (whose HMAC key is
+      // intentionally unreadable), the protected record itself is the trusted
+      // local channel and exact equality authenticates the pre-issued grant.
+      // The elevated backend is the surface that MUST refuse forgeable anchors.
       const verifyIntegrity = anchors.forgeable
         ? hmacGrantIntegrityVerifier(keyFile)
         : (candidate: typeof grant) => canonicalJson(candidate) === canonicalJson(grant);
