@@ -4,6 +4,7 @@ import {
   minimizeSupportContext,
   SupportObservationSchema,
 } from '../src/index.ts';
+import { collectWindowsSupportContextWithTrustedRunner } from '../src/internal/windows-runner.ts';
 
 const fakeToken = 'SHUN_FAKE_TOKEN_DO_NOT_EXPORT_7a9f3';
 const fakeKey =
@@ -159,8 +160,8 @@ describe('real Windows collector boundary', () => {
         env: Readonly<Record<string, string>>;
       };
     }> = [];
-    const result = await collectWindowsSupportContext({
-      execFile: async (file, args, options) => {
+    const result = await collectWindowsSupportContextWithTrustedRunner(
+      async (file, args, options) => {
         calls.push({ file, args, options });
         return {
           stdout: JSON.stringify({
@@ -171,7 +172,8 @@ describe('real Windows collector boundary', () => {
           stderr: '',
         };
       },
-    });
+      'win32',
+    );
 
     expect(calls).toHaveLength(1);
     expect(calls[0]?.file).toBe(
@@ -202,19 +204,22 @@ describe('real Windows collector boundary', () => {
   it('maps stderr, invalid JSON and execution failures to bounded errors with no raw canaries', async () => {
     const probes = [
       () =>
-        collectWindowsSupportContext({
-          execFile: async () => ({ stdout: '{}', stderr: fakeToken }),
-        }),
+        collectWindowsSupportContextWithTrustedRunner(
+          async () => ({ stdout: '{}', stderr: fakeToken }),
+          'win32',
+        ),
       () =>
-        collectWindowsSupportContext({
-          execFile: async () => ({ stdout: fakeKey, stderr: '' }),
-        }),
+        collectWindowsSupportContextWithTrustedRunner(
+          async () => ({ stdout: fakeKey, stderr: '' }),
+          'win32',
+        ),
       () =>
-        collectWindowsSupportContext({
-          execFile: async () => {
+        collectWindowsSupportContextWithTrustedRunner(
+          async () => {
             throw new Error(fakePath);
           },
-        }),
+          'win32',
+        ),
     ];
 
     for (const probe of probes) {
@@ -229,6 +234,44 @@ describe('real Windows collector boundary', () => {
       for (const canary of canaries) {
         expect((caught as Error).message).not.toContain(canary);
       }
+    }
+  });
+
+  it('rejects a non-Windows internal run before invoking the runner', async () => {
+    let invoked = false;
+    await expect(
+      collectWindowsSupportContextWithTrustedRunner(async () => {
+        invoked = true;
+        return { stdout: '{}', stderr: '' };
+      }, 'linux'),
+    ).rejects.toThrow('WINDOWS_REQUIRED');
+    expect(invoked).toBe(false);
+  });
+
+  it('public API has no runner parameter and cannot be bypassed by an extra JavaScript argument', async () => {
+    expect(collectWindowsSupportContext.length).toBe(0);
+
+    if (process.platform !== 'win32') {
+      let invoked = false;
+      const malicious = async () => {
+        invoked = true;
+        return {
+          stdout: JSON.stringify({
+            os: { name: 'Windows', build: '1' },
+            device: { model: 'forged' },
+            updates: { last_check: 'now' },
+          }),
+          stderr: '',
+        };
+      };
+
+      const callWithIgnoredArgument = collectWindowsSupportContext as unknown as (
+        injected: unknown,
+      ) => Promise<unknown>;
+      await expect(callWithIgnoredArgument({ execFile: malicious })).rejects.toThrow(
+        'WINDOWS_REQUIRED',
+      );
+      expect(invoked).toBe(false);
     }
   });
 });
