@@ -132,6 +132,7 @@ function anchorOwnerSnapshot(
 export function assessAnchorOwnership(
   authorityDir: string,
   hmacKeyFile: string = resolveGrantHmacKeyFile(authorityDir),
+  requireKeyOwner = true,
 ): string[] {
   if (process.platform !== 'win32') {
     return ['authorization anchor ownership is only verifiable on Windows'];
@@ -144,10 +145,15 @@ export function assessAnchorOwnership(
   if (!rows.some((row) => row.path.toLowerCase() === root)) {
     reasons.push('authority store root absent from owner scan');
   }
-  if (!rows.some((row) => row.path.toLowerCase() === key)) {
+  if (requireKeyOwner && !rows.some((row) => row.path.toLowerCase() === key)) {
     reasons.push('grant-hmac key absent from owner scan');
   }
   for (const row of rows) {
+    // The filtered runtime token is intentionally denied READ_CONTROL on the
+    // secret key. It proves key confidentiality with a direct read probe and
+    // leaves key-owner verification to the elevated helper/writer. All other
+    // anchor objects must expose their owner to the runtime read-only token.
+    if (!requireKeyOwner && row.path.toLowerCase() === key) continue;
     if (!row.owner || !PRIVILEGED_OWNER_SIDS.has(row.owner)) {
       reasons.push(
         `anchor object owner is not Administrators/SYSTEM: ${row.path} (${row.owner ?? 'unresolvable'})`,
@@ -236,7 +242,7 @@ export function assessAuthorityAnchors(
   // look protected, require privileged ownership as a second independent
   // fact. The query runs through the already pinned real system PowerShell.
   if (reasons.length === 0 && process.platform === 'win32') {
-    reasons.push(...assessAnchorOwnership(authorityDir, hmacKeyFile));
+    reasons.push(...assessAnchorOwnership(authorityDir, hmacKeyFile, false));
   }
 
   return { forgeable: reasons.length > 0, keyReadable: keyReadable !== false, reasons };
