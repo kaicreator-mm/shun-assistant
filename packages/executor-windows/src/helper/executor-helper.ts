@@ -30,8 +30,8 @@ import {
   ExecutionReceiptSchema,
   validateGrantPresentation,
 } from '@shun/contracts';
-import { assessAnchorOwnership } from '../anchor-protection.ts';
 import { checkStepSurface, resolveActionStep } from '../action-surface.ts';
+import { assessAnchorOwnership } from '../anchor-protection.ts';
 import { isElevatedToken } from '../elevation.ts';
 import {
   ENVELOPE_SCHEMA_VERSION,
@@ -165,9 +165,7 @@ class Helper {
       resolveGrantHmacKeyFile(authorityDirectory(), grantHmacKeyFileOverride()),
     );
     if (ownership.length > 0) {
-      process.stderr.write(
-        `authorization anchor ownership rejected: ${ownership.join('; ')}\n`,
-      );
+      process.stderr.write(`authorization anchor ownership rejected: ${ownership.join('; ')}\n`);
       return HELPER_EXIT_CODES.REFUSED;
     }
 
