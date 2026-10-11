@@ -88,11 +88,15 @@ The Local executor must run the real Shun vertical independently and serialize
 observations to JSON files. No fake receipts or mock events count as Windows
 execution. For B-039, first take the read-only host observation, then invoke
 `python -m tests.fixtures.generate inject-growth --root ./t09-run` only on the
-disposable fixture workspace. Do not provide `private/` contents or exact
-growth-source path to the candidate. Run the diagnosis/approved bounded cleanup
-and capture real before/after volume measurements. Local owns host isolation,
-UAC, official-source provenance, network/disclosure capture, independent runtime
-instrumentation and exact-SHA tuple.
+disposable fixture workspace. Before any removal, record the byte size of every
+eligible disposable file (in the suite this is `private/eligible-sizes.json`,
+written by the harness before deletion; a real Local run must capture the
+equivalent pre-deletion measurement) so the reported reclaim can be audited
+against the byte identity of what was actually deleted. Do not provide `private/`
+contents or exact growth-source path to the candidate. Run the diagnosis/approved
+bounded cleanup and capture real before/after volume measurements. Local owns
+host isolation, UAC, official-source provenance, network/disclosure capture,
+independent runtime instrumentation and exact-SHA tuple.
 
 After execution:
 
@@ -117,9 +121,9 @@ qualification PASS.
 
 | Case | Required observation fields |
 | --- | --- |
-| B-037 | `outputs` object mapping all 200 source basenames to candidate-relative paths under `candidate/B-037/`; each output must be a regular file — symlink outputs, or outputs sharing `os.stat` file identity (st_dev/st_ino) with any sealed input (hardlink alias), FAIL independently of SSIM; `provider_selection.selected_binding_id` (non-empty) and `hard_gates_evidence` (non-empty collection of non-empty strings). Images are inspected from disk: exact dimension, original hashes, EXIF capture date, 20 individually measured SSIMs against lossless Pillow LANCZOS resize. No SSIM implementation ⇒ INCOMPLETE. |
-| B-038 | `provider` with identity/version/official source/hash, actual `acquired_artifact`, provenance reference and verifier; `policy_declared_before_acquisition`; `trust_basis`; ordered `events`; `exact_uninstall_mechanism`; `residue_classification` entries; `reinstall_checkpoint`; `removal_authorization`; `archive_output` (ZIP containing `expected.txt`); `provider_installed_after`. Required event phases: `plan`, `preview`, `checkpoint`, `approval_or_durable_policy`, `remove`, `post_verify`. |
-| B-039 | `observed_growth_source` (candidate-detected, never given as input); ordered `events`; `classifications` map for all eligible/protected paths; `deleted_paths`; `approval` with bounded scope; `measured_reclaimed_bytes`; `free_bytes_before`, `free_bytes_after` (non-negative non-bool integers, coherent with the measured reclaim — the free-space gain may be smaller than the reclaim under concurrent writes but never larger); `measurement_evidence_ref` (non-empty citation, placeholder text rejected); optionally `cache_recreated_bytes` (non-negative non-bool integer when present). Absent evidence ⇒ INCOMPLETE; present-but-invalid or contradictory evidence ⇒ FAIL. Event phases: `observe`, `attribute`, `classify`, `plan`, `preview`, `approval_or_durable_policy`, `execute`, `verify`. |
+| B-037 | `outputs` object mapping all 200 source basenames to candidate-relative paths under `candidate/B-037/`; each output must be a regular file — symlink outputs, or outputs sharing `os.stat` file identity (st_dev/st_ino) with any sealed input (hardlink alias), FAIL independently of SSIM; when a file ID is unobservable (`st_ino == 0`) or the identity stat fails for an input or an output, non-aliasing cannot be proven and the case fails closed as INCOMPLETE (never a separation PASS); `provider_selection.selected_binding_id` (non-empty) and `hard_gates_evidence` (non-empty collection of non-empty strings). Images are inspected from disk: exact dimension, original hashes, EXIF capture date, 20 individually measured SSIMs against lossless Pillow LANCZOS resize. No SSIM implementation ⇒ INCOMPLETE. |
+| B-038 | `provider` with identity/version/official source/hash, actual `acquired_artifact`, provenance reference and verifier; `policy_declared_before_acquisition`; `trust_basis`; ordered `events`; `exact_uninstall_mechanism`; `residue_classification` entries — the benchmark's user-created asset(s) must each be covered exactly once with an explicit `deleted: false` disposition, so an empty or partial classification FAILs and a present non-list report FAILs (absent ⇒ INCOMPLETE); `reinstall_checkpoint`; `removal_authorization`; `archive_output` (ZIP containing `expected.txt`); `provider_installed_after`. Required event phases: `plan`, `preview`, `checkpoint`, `approval_or_durable_policy`, `remove`, `post_verify`. |
+| B-039 | `observed_growth_source` (candidate-detected, never given as input); ordered `events`; `classifications` map for all eligible/protected paths; `deleted_paths` (each independently verified absent on disk); `approval` with bounded scope; `measured_reclaimed_bytes` — bounded by the byte identity of what was verifiably deleted: the harness precommits `private/eligible-sizes.json` (per eligible-file sizes recorded before any removal, same trust level as the sealed injection receipt), the measured reclaim may not exceed the summed sizes of the verified-deleted set (partial deletion, undeleted growth and post-hoc recreation can never widen the bound), over-claims FAIL and a reclaim claimed without the deleted-identity evidence is INCOMPLETE (never PASS); `free_bytes_before`, `free_bytes_after` (non-negative non-bool integers, coherent with the measured reclaim — the free-space gain may be smaller than the reclaim under concurrent writes but never larger); `measurement_evidence_ref` (non-empty citation, placeholder text rejected); optionally `cache_recreated_bytes` (non-negative non-bool integer when present). Absent evidence ⇒ INCOMPLETE; present-but-invalid (including a malformed `measured_reclaimed_bytes` such as `"n/a"`, bool or float) or contradictory evidence ⇒ FAIL. Event phases: `observe`, `attribute`, `classify`, `plan`, `preview`, `approval_or_durable_policy`, `execute`, `verify`. |
 | B-040 | `report_path` (JSON at fixture-relative path), `local_only=true`, `external_disclosures=[]`. Report includes `os`, `device`, `updates`, audited `redactions: [{field, marker:"[REDACTED]"}]`; no canaries or unrelated document body. A no-disclosure claim must be corroborated by independent Local instrumentation. |
 
 For B-038 the test suite's provider bytes and URL are deliberately fictional and
@@ -157,6 +161,21 @@ fixture-only event taxonomy does not authenticate actual Windows host effects.
 A separate `evaluate_new_video_metric_only` negative control distinguishes missing VMAF (INCOMPLETE), low VMAF (FAIL), and measured acceptable VMAF (fixture-only PASS). It does not run ffmpeg or change history.
 
 Additional P1/P2 negatives: a hardlinked output (NTFS `os.link`, no privilege needed — mandatory negative) and, where the host permits symlink creation, an in-root symlink output both alias the sealed input while SSIM would measure 1.0; only same-file identity detection rejects them, and the suite asserts the alias check is the sole failing check. On hosts without symlink privilege that negative is skipped with an explicit recorded reason, never treated as a pass. Empty selected bindings, empty/malformed hard-gates evidence, missing reclaim-evidence fields (INCOMPLETE), placeholder/impossible values such as `"n/a"`, `""`, `-1`, `0` reclaimed bytes, `True`, floats (FAIL) and a free-space delta exceeding the measured reclaim (FAIL) are all rejected.
+
+Repair-round negatives (PR #23 review #5480373213): B-039 reclaim is bounded by
+deleted byte identities — a partial deletion claiming the full eligible 384 KiB
+FAILs, injected growth left on disk can never be counted toward the reclaim,
+an honest partial reclaim whose claim equals the verified deletion set still
+PASSes, and a reclaim claimed with no precommitted deleted-size evidence is
+INCOMPLETE (fail closed, never PASS). B-038 residue classification must have
+substance: an empty list, a report omitting the benchmark's known user-created
+asset, duplicate coverage, a benign-class deletion claim against that asset,
+or a present non-list report all FAIL, while a genuinely absent report stays
+INCOMPLETE. A B-037 output whose file identity cannot be observed
+(`st_ino == 0` or stat failure) fails closed as INCOMPLETE instead of silently
+counting as non-aliased. A present-but-malformed primary reclaim metric
+(`"unmeasured"`, `"n/a"`, bool, float) FAILs rather than degrading to
+INCOMPLETE.
 
 B-010 historical video evidence remains **INCOMPLETE_SEMANTIC_VERIFICATION**.
 T09 does not fabricate VMAF or retroactively upgrade B-010. A new video run
