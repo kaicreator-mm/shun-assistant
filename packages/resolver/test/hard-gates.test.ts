@@ -1,7 +1,7 @@
 // Hard gates: frozen order, short-circuit on first REJECT, fail-closed trust,
 // explicit risk escalation (L2 §7.2, P2-02).
 import { describe, expect, it } from 'vitest';
-import { runHardGates } from '../src/gates.ts';
+import { type PolicyFactEvaluator, runHardGates } from '../src/gates.ts';
 import {
   bindingDef,
   capabilityDef,
@@ -23,20 +23,28 @@ function gateScenario(opts: {
     allowedBackendKinds: ('LOCAL_WINDOWS' | 'LOCAL_POSIX' | 'REMOTE_ECF')[];
     allowElevation: boolean;
   };
+  capability?: ReturnType<typeof capabilityDef>;
+  constraints?: ReturnType<typeof goalRequest>['constraints'];
+  policyFacts?: PolicyFactEvaluator;
 }) {
+  const gateCapability = opts.capability ?? capability;
   const provider = providerDef({ providerId: 'imageProvider.imagemagick', ...opts.provider });
   const binding = bindingDef({
     bindingId: 'b-1',
     providerId: provider.providerId,
-    capabilityId: capability.capabilityId,
+    capabilityId: gateCapability.capabilityId,
+    // The scenario policy is local-only/FORBIDDEN, so the default binding
+    // declares its no-network posture explicitly (P1-02 disclosure evidence).
+    environmentRequirements: requirements({ networkAccess: 'FORBIDDEN' }),
     ...opts.binding,
   });
   return runHardGates(binding, provider, {
-    capability,
+    capability: gateCapability,
     environment: opts.env ?? ENV_LOCAL,
     privacyPolicy: request.policyContext.privacyPolicy,
     environmentPolicy: opts.envPolicy ?? request.policyContext.environmentPolicy,
-    constraints: request.constraints,
+    constraints: opts.constraints ?? request.constraints,
+    policyFacts: opts.policyFacts,
   });
 }
 
@@ -136,6 +144,86 @@ describe('hard gates execute before ranking, in frozen order', () => {
     });
   });
 
+  it('policy: externalDisclosure FORBIDDEN rejects network-transferring bindings even when localOnly is false (P1-02)', () => {
+    const openRequest = goalRequest({ goal: 'image.batch_process: resize photos' });
+    openRequest.policyContext.privacyPolicy = {
+      localOnly: false,
+      externalDisclosure: 'FORBIDDEN',
+    };
+    const provider = providerDef({ providerId: 'imageProvider.imagemagick' });
+    const binding = bindingDef({
+      bindingId: 'b-1',
+      providerId: provider.providerId,
+      capabilityId: capability.capabilityId,
+      environmentRequirements: requirements({ networkAccess: 'REQUIRED' }),
+    });
+    const outcome = runHardGates(binding, provider, {
+      capability,
+      environment: envFacts({ networkPolicy: 'POLICY_CONTROLLED' }),
+      privacyPolicy: openRequest.policyContext.privacyPolicy,
+      environmentPolicy: openRequest.policyContext.environmentPolicy,
+      constraints: openRequest.constraints,
+    });
+    expect(outcome.passed).toBe(false);
+    const last = outcome.dispositions[outcome.dispositions.length - 1];
+    expect(last).toMatchObject({
+      gate: 'USER_ORG_POLICY',
+      outcome: 'REJECT',
+      reason: expect.stringContaining('disclosure'),
+    });
+  });
+
+  it('policy: networkAccess OPTIONAL is not a proven no-disclosure posture under a no-disclosure policy (P1-02)', () => {
+    const outcome = gateScenario({
+      binding: { environmentRequirements: requirements({ networkAccess: 'OPTIONAL' }) },
+    });
+    expect(outcome.passed).toBe(false);
+    const last = outcome.dispositions[outcome.dispositions.length - 1];
+    expect(last).toMatchObject({
+      gate: 'USER_ORG_POLICY',
+      outcome: 'REJECT',
+      reason: expect.stringContaining('OPTIONAL'),
+    });
+  });
+
+  it('policy: a binding that declares no network-access posture fails closed under a no-disclosure policy (P1-02)', () => {
+    const outcome = gateScenario({
+      binding: { environmentRequirements: requirements({}) },
+    });
+    expect(outcome.passed).toBe(false);
+    const last = outcome.dispositions[outcome.dispositions.length - 1];
+    expect(last).toMatchObject({
+      gate: 'USER_ORG_POLICY',
+      outcome: 'REJECT',
+      reason: expect.stringContaining('no network-access posture'),
+    });
+  });
+
+  it('policy: an explicitly no-network binding is the disclosure evidence a no-disclosure policy accepts (P1-02)', () => {
+    const openRequest = goalRequest({ goal: 'image.batch_process: resize photos' });
+    openRequest.policyContext.privacyPolicy = {
+      localOnly: false,
+      externalDisclosure: 'FORBIDDEN',
+    };
+    const provider = providerDef({ providerId: 'imageProvider.imagemagick' });
+    const binding = bindingDef({
+      bindingId: 'b-1',
+      providerId: provider.providerId,
+      capabilityId: capability.capabilityId,
+      environmentRequirements: requirements({ networkAccess: 'FORBIDDEN' }),
+    });
+    const outcome = runHardGates(binding, provider, {
+      capability,
+      environment: ENV_LOCAL,
+      privacyPolicy: openRequest.policyContext.privacyPolicy,
+      environmentPolicy: openRequest.policyContext.environmentPolicy,
+      constraints: openRequest.constraints,
+    });
+    expect(outcome.passed).toBe(true);
+    const policyRow = outcome.dispositions.find((entry) => entry.gate === 'USER_ORG_POLICY');
+    expect(policyRow).toMatchObject({ outcome: 'PASS' });
+  });
+
   it('policy: elevation forbidden by goal policy is a policy rejection, not a feasibility fact', () => {
     const outcome = gateScenario({
       binding: { environmentRequirements: requirements({ privilegeMode: 'ELEVATED_ADMIN' }) },
@@ -155,6 +243,7 @@ describe('hard gates execute before ranking, in frozen order', () => {
       provider: {
         provenanceFacts: {
           trustState: 'TRUSTED',
+          formatSupport: ['JPG'],
           safetyProfile: {
             riskEscalationRequired: true,
             escalationReason: 'aggressive residue cleanup exceeds the capability risk envelope',
@@ -171,6 +260,168 @@ describe('hard gates execute before ranking, in frozen order', () => {
     });
   });
 
+  it('policy: requested format not covered by curated provider format facts is rejected (P1-04)', () => {
+    const outcome = gateScenario({
+      provider: {
+        provenanceFacts: { trustState: 'TRUSTED', formatSupport: ['PNG', 'WEBP'] },
+      },
+    });
+    expect(outcome.passed).toBe(false);
+    const last = outcome.dispositions[outcome.dispositions.length - 1];
+    expect(last).toMatchObject({
+      gate: 'USER_ORG_POLICY',
+      outcome: 'REJECT',
+      reason: expect.stringContaining('format'),
+    });
+  });
+
+  it('policy: requested format covered by curated format facts passes (P1-04)', () => {
+    const outcome = gateScenario({
+      provider: {
+        provenanceFacts: { trustState: 'TRUSTED', formatSupport: ['jpg', 'PNG'] },
+      },
+    });
+    expect(outcome.passed).toBe(true);
+    const policyRow = outcome.dispositions.find((entry) => entry.gate === 'USER_ORG_POLICY');
+    expect(policyRow).toMatchObject({ outcome: 'PASS' });
+  });
+
+  it('policy: a required format the provider cannot prove is REJECTED, never a deferred PASS (P1-04 R1)', () => {
+    // Premise tightened (R1 review blocker 3): R0 encoded the unsafe PASS
+    // here — a mandatory output format with no curated support evidence was
+    // deferred as a prose note while the binding still won selection. An
+    // unprovable required format now fails the policy gate closed.
+    const outcome = gateScenario({
+      provider: { provenanceFacts: { trustState: 'TRUSTED', publisher: 'scenario publisher' } },
+    });
+    expect(outcome.passed).toBe(false);
+    const policyRow = outcome.dispositions.find((entry) => entry.gate === 'USER_ORG_POLICY');
+    expect(policyRow?.outcome).toBe('REJECT');
+    expect(policyRow?.reason).toContain('no curated format facts');
+  });
+
+  it('policy: a malformed curated formatSupport fact fails closed (P1-04)', () => {
+    const outcome = gateScenario({
+      provider: {
+        provenanceFacts: {
+          trustState: 'TRUSTED',
+          formatSupport: ['JPG', 42],
+        } as unknown as Record<string, unknown>,
+      },
+    });
+    expect(outcome.passed).toBe(false);
+    const last = outcome.dispositions[outcome.dispositions.length - 1];
+    expect(last).toMatchObject({
+      gate: 'USER_ORG_POLICY',
+      outcome: 'REJECT',
+      reason: expect.stringContaining('formatSupport'),
+    });
+  });
+
+  it('policy: a requested licensing identity that the provider license facts do not satisfy is rejected (P1-04)', () => {
+    const outcome = gateScenario({
+      constraints: { format: 'JPG', licensing: 'Apache-2.0' },
+    });
+    expect(outcome.passed).toBe(false);
+    const last = outcome.dispositions[outcome.dispositions.length - 1];
+    expect(last).toMatchObject({
+      gate: 'USER_ORG_POLICY',
+      outcome: 'REJECT',
+      reason: expect.stringContaining('Apache-2.0'),
+    });
+  });
+
+  it('policy: a requested licensing identity matching the provider license facts passes case-insensitively (P1-04)', () => {
+    const outcome = gateScenario({
+      constraints: { format: 'JPG', licensing: '  mit ' },
+    });
+    expect(outcome.passed).toBe(true);
+  });
+
+  it('policy: a capability-required policy fact missing from goal constraints fails closed (P1-04)', () => {
+    const outcome = gateScenario({
+      capability: capabilityDef({
+        capabilityId: 'image.batch_process',
+        requiredPolicyFacts: ['maxDeleteBytesPerRun'],
+      }),
+    });
+    expect(outcome.passed).toBe(false);
+    const last = outcome.dispositions[outcome.dispositions.length - 1];
+    expect(last).toMatchObject({
+      gate: 'USER_ORG_POLICY',
+      outcome: 'REJECT',
+      reason: expect.stringContaining('maxDeleteBytesPerRun'),
+    });
+  });
+
+  it('policy: capability-required policy facts verified by a trusted evaluator pass (P1-04 R1)', () => {
+    // Premise tightened (R1 review blocker 4): R0 accepted any key present in
+    // the caller-supplied constraints as a current fact. A trusted evaluator
+    // verdict is now the only acceptance path; constraint values are never
+    // proof.
+    const requestWithFact = goalRequest({ goal: 'image.batch_process: resize photos' });
+    requestWithFact.constraints.other = { maxDeleteBytesPerRun: 1_000_000 };
+    const outcome = gateScenario({
+      capability: capabilityDef({
+        capabilityId: 'image.batch_process',
+        requiredPolicyFacts: ['maxDeleteBytesPerRun'],
+      }),
+      constraints: requestWithFact.constraints,
+      policyFacts: {
+        // R2 (fresh review P2): the evaluator carries its trusted provenance
+        // identity — who issued the verdicts and for which policy revision.
+        evaluatorId: 'policy-authority-primary',
+        policyRevision: 'ps-7',
+        evaluate: (factKey) =>
+          factKey === 'maxDeleteBytesPerRun'
+            ? { status: 'SATISFIED', evidence: 'policy snapshot ps-7 current' }
+            : { status: 'UNVERIFIABLE', reason: `unknown fact ${factKey}` },
+      },
+    });
+    expect(outcome.passed).toBe(true);
+    const policyRow = outcome.dispositions.find((entry) => entry.gate === 'USER_ORG_POLICY');
+    expect(policyRow?.reason).toContain('ps-7');
+  });
+
+  it('safety: a present but malformed safetyProfile fails closed instead of counting as safety PASS (P1-03)', () => {
+    const malformedProfiles: unknown[] = [
+      // riskEscalationRequired: true with a missing reason
+      { riskEscalationRequired: true },
+      // non-string escalation reason
+      { riskEscalationRequired: true, escalationReason: 42 },
+      // empty-string escalation reason
+      { riskEscalationRequired: true, escalationReason: '' },
+      // non-object profile
+      'aggressive cleanup',
+      // out-of-vocabulary escalation flag (the curated fact only models true)
+      { riskEscalationRequired: false, escalationReason: 'no escalation' },
+    ];
+    for (const [index, safetyProfile] of malformedProfiles.entries()) {
+      const outcome = gateScenario({
+        provider: {
+          provenanceFacts: {
+            trustState: 'TRUSTED',
+            formatSupport: ['JPG'],
+            safetyProfile,
+          } as Record<string, unknown>,
+        },
+      });
+      expect(outcome.passed, `malformed profile case ${index}`).toBe(false);
+      const last = outcome.dispositions[outcome.dispositions.length - 1];
+      expect(last, `malformed profile case ${index}`).toMatchObject({
+        gate: 'SAFETY_CONSTRAINTS',
+        outcome: 'REJECT',
+        reason: expect.stringContaining('malformed'),
+      });
+    }
+  });
+
+  it('safety: an absent safetyProfile still means no escalation and passes (P1-03 absence case)', () => {
+    const outcome = gateScenario({});
+    const last = outcome.dispositions[outcome.dispositions.length - 1];
+    expect(last).toMatchObject({ gate: 'SAFETY_CONSTRAINTS', outcome: 'PASS' });
+  });
+
   it('safety: acknowledged escalation stays feasible and is surfaced as ESCALATION_REQUIRED', () => {
     const requestWithAck = goalRequest({ goal: 'image.batch_process: resize photos' });
     requestWithAck.constraints.other = { riskEscalationAcknowledged: true };
@@ -178,6 +429,7 @@ describe('hard gates execute before ranking, in frozen order', () => {
       providerId: 'imageProvider.imagemagick',
       provenanceFacts: {
         trustState: 'TRUSTED',
+        formatSupport: ['JPG'],
         safetyProfile: {
           riskEscalationRequired: true,
           escalationReason: 'aggressive residue cleanup exceeds the capability risk envelope',
@@ -188,6 +440,7 @@ describe('hard gates execute before ranking, in frozen order', () => {
       bindingId: 'b-1',
       providerId: provider.providerId,
       capabilityId: capability.capabilityId,
+      environmentRequirements: requirements({ networkAccess: 'FORBIDDEN' }),
     });
     const outcome = runHardGates(binding, provider, {
       capability,
@@ -204,5 +457,151 @@ describe('hard gates execute before ranking, in frozen order', () => {
       escalationReason: 'aggressive residue cleanup exceeds the capability risk envelope',
       acknowledged: true,
     });
+  });
+});
+
+describe('R1 fresh-review negatives (hard gates, Issue #33)', () => {
+  function openOfflineRequest(): ReturnType<typeof goalRequest> {
+    // Open disclosure policy isolates the offline dimension from the
+    // no-disclosure path (P1-02 already covers local-only/FORBIDDEN).
+    const offline = goalRequest({ goal: 'image.batch_process: resize photos' });
+    offline.constraints.other = { offline: true };
+    offline.policyContext.privacyPolicy = { localOnly: false, externalDisclosure: 'ALLOWED' };
+    return offline;
+  }
+
+  function gateWithOffline(networkAccess: 'REQUIRED' | 'OPTIONAL' | 'FORBIDDEN' | undefined) {
+    const offlineRequest = openOfflineRequest();
+    const provider = providerDef({ providerId: 'imageProvider.imagemagick' });
+    const binding = bindingDef({
+      bindingId: 'b-1',
+      providerId: provider.providerId,
+      capabilityId: capability.capabilityId,
+      environmentRequirements: requirements({ networkAccess }),
+    });
+    return runHardGates(binding, provider, {
+      capability,
+      environment: ENV_LOCAL,
+      privacyPolicy: offlineRequest.policyContext.privacyPolicy,
+      environmentPolicy: offlineRequest.policyContext.environmentPolicy,
+      constraints: offlineRequest.constraints,
+    });
+  }
+
+  it('offline constraint rejects networkAccess OPTIONAL — optional network use is not a proven offline mode (P1 supplemental R1)', () => {
+    const outcome = gateWithOffline('OPTIONAL');
+    expect(outcome.passed).toBe(false);
+    const last = outcome.dispositions[outcome.dispositions.length - 1];
+    expect(last).toMatchObject({
+      gate: 'USER_ORG_POLICY',
+      outcome: 'REJECT',
+      reason: expect.stringContaining('offline'),
+    });
+  });
+
+  it('offline constraint rejects an undeclared network posture — unknown offline capability fails closed (P1 supplemental R1)', () => {
+    const outcome = gateWithOffline(undefined);
+    expect(outcome.passed).toBe(false);
+    const last = outcome.dispositions[outcome.dispositions.length - 1];
+    expect(last).toMatchObject({
+      gate: 'USER_ORG_POLICY',
+      outcome: 'REJECT',
+      reason: expect.stringContaining('offline'),
+    });
+  });
+
+  it('an explicitly no-network binding stays eligible under the offline constraint (P1 supplemental R1 — legitimate scenario must not be over-blocked)', () => {
+    const outcome = gateWithOffline('FORBIDDEN');
+    expect(outcome.passed).toBe(true);
+    const policyRow = outcome.dispositions.find((entry) => entry.gate === 'USER_ORG_POLICY');
+    expect(policyRow).toMatchObject({ outcome: 'PASS' });
+  });
+
+  it('capability-required policy facts are never satisfied by caller-provided constraint values (P1-04 R1)', () => {
+    // The review counterexample: the request fabricates userApprovedDelete in
+    // constraints.other; without a trusted evaluator the gate must REJECT.
+    const fabricated = goalRequest({ goal: 'image.batch_process: resize photos' });
+    fabricated.constraints.other = { userApprovedDelete: true };
+    const outcome = gateScenario({
+      capability: capabilityDef({
+        capabilityId: 'image.batch_process',
+        requiredPolicyFacts: ['userApprovedDelete'],
+      }),
+      constraints: fabricated.constraints,
+    });
+    expect(outcome.passed).toBe(false);
+    const last = outcome.dispositions[outcome.dispositions.length - 1];
+    expect(last).toMatchObject({
+      gate: 'USER_ORG_POLICY',
+      outcome: 'REJECT',
+      reason: expect.stringContaining('userApprovedDelete'),
+    });
+  });
+
+  it('a trusted policy evaluator that cannot verify a required fact fails the gate closed (P1-04 R1)', () => {
+    const fabricated = goalRequest({ goal: 'image.batch_process: resize photos' });
+    fabricated.constraints.other = { userApprovedDelete: true };
+    const outcome = gateScenario({
+      capability: capabilityDef({
+        capabilityId: 'image.batch_process',
+        requiredPolicyFacts: ['userApprovedDelete'],
+      }),
+      constraints: fabricated.constraints,
+      policyFacts: {
+        evaluatorId: 'policy-authority-primary',
+        policyRevision: 'ps-7',
+        evaluate: (factKey) => ({
+          status: 'UNVERIFIABLE',
+          reason: `no current observation for ${factKey}`,
+        }),
+      },
+    });
+    expect(outcome.passed).toBe(false);
+    const last = outcome.dispositions[outcome.dispositions.length - 1];
+    expect(last).toMatchObject({
+      gate: 'USER_ORG_POLICY',
+      outcome: 'REJECT',
+      reason: expect.stringContaining('no current observation'),
+    });
+  });
+
+  it('a trusted UNSATISFIED verdict rejects even when the caller constraint value looks approving (P1-04 R1)', () => {
+    const approving = goalRequest({ goal: 'image.batch_process: resize photos' });
+    approving.constraints.other = { userApprovedDelete: true };
+    const outcome = gateScenario({
+      capability: capabilityDef({
+        capabilityId: 'image.batch_process',
+        requiredPolicyFacts: ['userApprovedDelete'],
+      }),
+      constraints: approving.constraints,
+      policyFacts: {
+        evaluatorId: 'policy-authority-primary',
+        policyRevision: 'ps-7',
+        evaluate: () => ({ status: 'UNSATISFIED', reason: 'approval ap-1 was revoked' }),
+      },
+    });
+    expect(outcome.passed).toBe(false);
+    const last = outcome.dispositions[outcome.dispositions.length - 1];
+    expect(last).toMatchObject({
+      gate: 'USER_ORG_POLICY',
+      outcome: 'REJECT',
+      reason: expect.stringContaining('revoked'),
+    });
+  });
+
+  it('declared descriptive constraints are a typed REJECT — an unevaluated mandatory constraint is never a PASS (P1-04 R1, tightened R2)', () => {
+    // Premise tightened (R2 review blocker 3): the R1 record surfaced
+    // descriptive constraints as a PASS note ("not certified") and allowed
+    // selection. A free-text disclaimer is not a typed unresolved mandatory
+    // condition — a present descriptive constraint now REJECTs the binding.
+    const descriptive = goalRequest({ goal: 'image.batch_process: resize photos' });
+    descriptive.constraints.resourceLimits = 'keep under 2 GB disk';
+    descriptive.constraints.retainRemove = 'RETAIN';
+    const outcome = gateScenario({ constraints: descriptive.constraints });
+    expect(outcome.passed).toBe(false);
+    const policyRow = outcome.dispositions.find((entry) => entry.gate === 'USER_ORG_POLICY');
+    expect(policyRow?.outcome).toBe('REJECT');
+    expect(policyRow?.reason).toContain('resourceLimits');
+    expect(policyRow?.reason).toContain('retainRemove');
   });
 });

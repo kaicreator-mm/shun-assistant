@@ -27,7 +27,14 @@ const registry = ShunRegistry.fromSnapshot({
 });
 
 function normalize(goal: string, objectExists?: (ref: string) => boolean) {
-  return normalizeGoal({ request: goalRequest({ goal }), registry, objectExists });
+  // Objects are referenced by the default scenario request, so tests that do
+  // not target the object dimension provide the observed-object proof source
+  // explicitly (P2-01: resolution requires a proof source for references).
+  return normalizeGoal({
+    request: goalRequest({ goal }),
+    registry,
+    objectExists: objectExists ?? (() => true),
+  });
 }
 
 describe('deterministic goal normalization', () => {
@@ -96,6 +103,24 @@ describe('deterministic goal normalization', () => {
     });
   });
 
+  it('referenced objects without any observed-object proof source fail closed (P2-01)', () => {
+    const request = goalRequest({ goal: 'image.batch_process: resize photos' });
+    const result = normalizeGoal({ request, registry });
+    expect(result).toEqual({
+      status: 'NOT_READY',
+      disposition: 'UNRESOLVED_OBJECT',
+      failureCode: 'OBJECT_UNRESOLVED',
+      detail: expect.stringContaining('observed-object proof source'),
+    });
+  });
+
+  it('a zero-object request keeps the fast path with no proof source (P2-01)', () => {
+    const request = goalRequest({ goal: 'image.batch_process: resize photos' });
+    request.objects = [];
+    const result = normalizeGoal({ request, registry });
+    expect(result.status).toBe('READY');
+  });
+
   it('a contradictory privacy policy is ambiguous input, not a configuration', () => {
     const request = goalRequest({ goal: 'image.batch_process: resize photos' });
     request.policyContext.privacyPolicy = { localOnly: true, externalDisclosure: 'ALLOWED' };
@@ -127,6 +152,7 @@ describe('deterministic goal normalization', () => {
     const result = normalizeGoal({
       request: goalRequest({ goal: 'image.batch_process: resize photos' }),
       registry: unverifiable,
+      objectExists: () => true,
     });
     expect(result).toEqual({
       status: 'NOT_READY',

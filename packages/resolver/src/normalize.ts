@@ -52,7 +52,18 @@ export function normalizeGoal(input: {
     );
   }
 
-  // Objects must resolve, or the resolver reports which object is missing (C-000 precondition).
+  // Objects must resolve, or the resolver reports which object is missing
+  // (C-000 precondition). A proof source is REQUIRED whenever objects are
+  // referenced (P2-01): the previous default — absent callback ⇒ assume
+  // resolvable — silently treated unverified references as resolved. The
+  // zero-object request keeps its fast path.
+  if (request.objects.length > 0 && objectExists === undefined) {
+    return notReady(
+      'UNRESOLVED_OBJECT',
+      'OBJECT_UNRESOLVED',
+      `no observed-object proof source provided for ${request.objects.length} referenced object(s) — referenced objects require observed-object evidence and fail closed without it`,
+    );
+  }
   if (objectExists !== undefined) {
     for (const object of request.objects) {
       if (!objectExists(object.ref)) {

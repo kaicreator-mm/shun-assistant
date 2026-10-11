@@ -3,7 +3,13 @@
 
 import type { GoalProposal, GoalRequest, PlannerPort } from '@shun/contracts';
 import { describe, expect, it } from 'vitest';
-import { interpretGoalViaPlanner } from '../src/planner-seam.ts';
+import {
+  declareLocalPlanner,
+  type InterpretGoalViaPlannerInput,
+  interpretGoalViaPlanner,
+  localPlannerAdapter,
+  remotePlannerAdapter,
+} from '../src/planner-seam.ts';
 import { ShunRegistry } from '../src/registry.ts';
 import { bindingDef, capabilityDef, goalRequest, providerDef } from './scenarios.ts';
 
@@ -70,14 +76,18 @@ function validProposal(requestInput: GoalRequest): GoalProposal {
   };
 }
 
+function permitRemoteDisclosure(input: GoalRequest): GoalRequest {
+  input.policyContext.privacyPolicy = { localOnly: false, externalDisclosure: 'ALLOWED' };
+  return input;
+}
+
 describe('PlannerPort seam stays proposal-only and policy-bounded', () => {
   it('local-only policy makes a remote planner ineligible WITHOUT calling it', async () => {
     const planner = spyPlanner(validProposal(request()));
     const result = await interpretGoalViaPlanner({
       request: request(),
       registry: registry(),
-      planner,
-      transport: 'REMOTE',
+      adapter: remotePlannerAdapter(planner),
     });
     expect(result).toMatchObject({
       status: 'PLANNER_UNAVAILABLE',
@@ -95,12 +105,12 @@ describe('PlannerPort seam stays proposal-only and policy-bounded', () => {
   });
 
   it('a local planner proposal is accepted only as data, then re-validated deterministically', async () => {
-    const input = request();
+    const input = permitRemoteDisclosure(request());
     const result = await interpretGoalViaPlanner({
       request: input,
       registry: registry(),
-      planner: spyPlanner(validProposal(input)),
-      transport: 'LOCAL',
+      adapter: remotePlannerAdapter(spyPlanner(validProposal(input))),
+      objectExists: () => true,
     });
     expect(result.status).toBe('PROPOSAL_ACCEPTED');
     if (result.status !== 'PROPOSAL_ACCEPTED') return;
@@ -110,13 +120,14 @@ describe('PlannerPort seam stays proposal-only and policy-bounded', () => {
   });
 
   it('a proposal whose objective names no capability is accepted as data but stays CAPABILITY_UNRESOLVED', async () => {
-    const input = request();
+    const input = permitRemoteDisclosure(request());
     const proposal = validProposal(input);
     proposal.goalContract.objective = 'make photos smaller with magic';
     const result = await interpretGoalViaPlanner({
       request: input,
       registry: registry(),
-      planner: spyPlanner(proposal),
+      adapter: remotePlannerAdapter(spyPlanner(proposal)),
+      objectExists: () => true,
     });
     expect(result.status).toBe('PROPOSAL_ACCEPTED');
     if (result.status !== 'PROPOSAL_ACCEPTED') return;
@@ -127,13 +138,13 @@ describe('PlannerPort seam stays proposal-only and policy-bounded', () => {
   });
 
   it('a proposal that broadens privacy policy is rejected — policy is request authority', async () => {
-    const input = request();
+    const input = permitRemoteDisclosure(request());
     const proposal = validProposal(input);
-    proposal.goalContract.privacyPolicy = { localOnly: false, externalDisclosure: 'ALLOWED' };
+    proposal.goalContract.privacyPolicy = { localOnly: true, externalDisclosure: 'FORBIDDEN' };
     const result = await interpretGoalViaPlanner({
       request: input,
       registry: registry(),
-      planner: spyPlanner(proposal),
+      adapter: remotePlannerAdapter(spyPlanner(proposal)),
     });
     expect(result).toMatchObject({
       status: 'PROPOSAL_REJECTED',
@@ -142,13 +153,13 @@ describe('PlannerPort seam stays proposal-only and policy-bounded', () => {
   });
 
   it('a proposal inventing objects outside the request scope is rejected', async () => {
-    const input = request();
+    const input = permitRemoteDisclosure(request());
     const proposal = validProposal(input);
     proposal.goalContract.objects = [...input.objects, { kind: 'DIRECTORY', ref: 'D:\\elsewhere' }];
     const result = await interpretGoalViaPlanner({
       request: input,
       registry: registry(),
-      planner: spyPlanner(proposal),
+      adapter: remotePlannerAdapter(spyPlanner(proposal)),
     });
     expect(result).toMatchObject({
       status: 'PROPOSAL_REJECTED',
@@ -167,8 +178,7 @@ describe('PlannerPort seam stays proposal-only and policy-bounded', () => {
     const result = await interpretGoalViaPlanner({
       request: openRequest,
       registry: registry(),
-      planner: spyPlanner(proposal),
-      transport: 'REMOTE',
+      adapter: remotePlannerAdapter(spyPlanner(proposal)),
     });
     expect(result).toMatchObject({
       status: 'PROPOSAL_REJECTED',
@@ -177,13 +187,13 @@ describe('PlannerPort seam stays proposal-only and policy-bounded', () => {
   });
 
   it('a structurally invalid proposal is rejected by the frozen contract schema', async () => {
-    const input = request();
+    const input = permitRemoteDisclosure(request());
     const malformed = { ...validProposal(input) } as Record<string, unknown>;
     delete malformed.proposalId;
     const result = await interpretGoalViaPlanner({
       request: input,
       registry: registry(),
-      planner: spyPlanner(malformed),
+      adapter: remotePlannerAdapter(spyPlanner(malformed)),
     });
     expect(result).toMatchObject({
       status: 'PROPOSAL_REJECTED',
@@ -192,7 +202,7 @@ describe('PlannerPort seam stays proposal-only and policy-bounded', () => {
   });
 
   it('a crashing planner yields a typed rejection, never a fabricated plan', async () => {
-    const input = request();
+    const input = permitRemoteDisclosure(request());
     const failing: PlannerPort = {
       interpretGoal: async () => {
         throw new Error('model backend exploded');
@@ -201,11 +211,81 @@ describe('PlannerPort seam stays proposal-only and policy-bounded', () => {
     const result = await interpretGoalViaPlanner({
       request: input,
       registry: registry(),
-      planner: failing,
+      adapter: remotePlannerAdapter(failing),
     });
     expect(result).toMatchObject({
       status: 'PROPOSAL_REJECTED',
       reason: expect.stringContaining('model backend exploded'),
     });
+  });
+
+  it('a remote-backed adapter that omits transport fails closed and is never invoked (P1-01)', async () => {
+    const planner = spyPlanner(validProposal(request()));
+    // Simulates the untyped / misconfigured caller the type signature now
+    // forbids: a planner is configured but its transport provenance is absent.
+    // It must NOT default to LOCAL and must NOT reach the adapter.
+    const omitted = {
+      request: request(),
+      registry: registry(),
+      planner,
+      transport: undefined,
+    } as unknown as InterpretGoalViaPlannerInput;
+    const result = await interpretGoalViaPlanner(omitted);
+    expect(result).toMatchObject({
+      status: 'PLANNER_UNAVAILABLE',
+      reason: expect.stringContaining('transport'),
+    });
+    expect(planner.calls).toBe(0);
+  });
+
+  it('an unknown transport value fails closed instead of being treated as LOCAL (P1-01)', async () => {
+    const planner = spyPlanner(validProposal(request()));
+    const unknown = {
+      request: request(),
+      registry: registry(),
+      planner,
+      transport: 'UNVERIFIED_REMOTE_GATEWAY',
+    } as unknown as InterpretGoalViaPlannerInput;
+    const result = await interpretGoalViaPlanner(unknown);
+    expect(result).toMatchObject({
+      status: 'PLANNER_UNAVAILABLE',
+      reason: expect.stringContaining('transport'),
+    });
+    expect(planner.calls).toBe(0);
+  });
+
+  it('an offline constraint makes a remote planner ineligible WITHOUT calling it, even when disclosure is allowed (P1 supplemental R1)', async () => {
+    // Review counterexample: schema-valid request with offline=true and an
+    // open privacy policy reached the remote adapter. External disclosure
+    // permission never overrides a separately required offline execution.
+    const input = request();
+    input.constraints.other = { offline: true };
+    input.policyContext.privacyPolicy = { localOnly: false, externalDisclosure: 'ALLOWED' };
+    const planner = spyPlanner(validProposal(input));
+    const result = await interpretGoalViaPlanner({
+      request: input,
+      registry: registry(),
+      adapter: remotePlannerAdapter(planner),
+    });
+    expect(result).toMatchObject({
+      status: 'PLANNER_UNAVAILABLE',
+      reason: expect.stringContaining('offline'),
+    });
+    expect(planner.calls).toBe(0);
+  });
+
+  it('offline/local-planner execution fails closed when the runtime cannot attest transport origin (R3)', async () => {
+    const input = request();
+    input.constraints.other = { offline: true };
+    input.policyContext.privacyPolicy = { localOnly: false, externalDisclosure: 'ALLOWED' };
+    const planner = spyPlanner(validProposal(input));
+    const result = await interpretGoalViaPlanner({
+      request: input,
+      registry: registry(),
+      adapter: localPlannerAdapter(declareLocalPlanner(planner)),
+      objectExists: () => true,
+    });
+    expect(result.status).toBe('PLANNER_UNAVAILABLE');
+    expect(planner.calls).toBe(0);
   });
 });
