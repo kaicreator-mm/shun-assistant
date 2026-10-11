@@ -74,6 +74,28 @@ export const WriterJobIntegritySchema = z.strictObject({
   value: z.string().min(1),
 });
 
+export const AuthorizationGrantProposalSchema = AuthorizationGrantSchema.omit({
+  integrity: true,
+});
+export type AuthorizationGrantProposal = z.infer<typeof AuthorizationGrantProposalSchema>;
+
+export const WriterJobProposalSchema = z.discriminatedUnion('jobType', [
+  z.strictObject({
+    jobId: AnchorIdSchema,
+    jobType: z.literal('issue-grant'),
+    policyWindowRef: AnchorIdSchema,
+    riskClass: RiskClassSchema,
+    payload: AuthorizationGrantProposalSchema,
+  }),
+  z.strictObject({
+    jobId: AnchorIdSchema,
+    jobType: z.literal('write-currentness'),
+    policyWindowRef: AnchorIdSchema,
+    payload: CurrentAuthorityStateSchema,
+  }),
+]);
+export type WriterJobProposal = z.infer<typeof WriterJobProposalSchema>;
+
 export const WriterJobSchema = z
   .strictObject({
     jobId: AnchorIdSchema,
