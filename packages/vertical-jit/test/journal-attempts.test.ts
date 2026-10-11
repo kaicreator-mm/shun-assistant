@@ -36,7 +36,7 @@ describe('journal attempt isolation (VJ-P1-04)', () => {
     expect(classifyFromJournal(entries, 'a1')).toBe('MAY_HAVE_EXECUTED_UNCERTAIN');
   });
 
-  it('a COMPLETED new attempt classifies COMPLETED_VERIFIED over an older torn one', () => {
+  it('a journal-complete new attempt remains UNCERTAIN until independent post-state verification', () => {
     const entries: JournalEntry[] = [
       entry(1, 'RECEIVED', 'att-1'),
       entry(2, 'EXEC_START', 'att-1'),
@@ -45,7 +45,7 @@ describe('journal attempt isolation (VJ-P1-04)', () => {
       entry(5, 'EXEC_DONE', 'att-2'),
       entry(6, 'RECEIPT_WRITTEN', 'att-2'),
     ];
-    expect(classifyFromJournal(entries, 'a1')).toBe('COMPLETED_VERIFIED');
+    expect(classifyFromJournal(entries, 'a1')).toBe('MAY_HAVE_EXECUTED_UNCERTAIN');
   });
 
   it('an OLD NO_EFFECT marker does not dominate a later torn attempt', () => {
@@ -66,6 +66,6 @@ describe('journal attempt isolation (VJ-P1-04)', () => {
       entry(3, 'EXEC_DONE', undefined),
       entry(4, 'RECEIPT_WRITTEN', undefined),
     ];
-    expect(classifyFromJournal(entries, 'a1')).toBe('COMPLETED_VERIFIED');
+    expect(classifyFromJournal(entries, 'a1')).toBe('MAY_HAVE_EXECUTED_UNCERTAIN');
   });
 });
