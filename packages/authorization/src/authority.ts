@@ -82,6 +82,18 @@ export interface GrantRecordStore {
   hasAnyGrant(): Promise<boolean>;
 }
 
+export interface PolicyBootstrapSnapshot {
+  policySnapshotRevision: string;
+  rules: PolicySnapshotRecord['rules'];
+  riskGuards?: PolicySnapshotRecord['riskGuards'];
+}
+
+export interface PolicyBootstrapAuthorizationInput {
+  readonly proof: unknown;
+  readonly authorityRecord: AuthorityRecord;
+  readonly snapshot: PolicyBootstrapSnapshot;
+}
+
 export interface AuthorizationAuthorityConfig {
   state: PolicyStateStore;
   grants: GrantRecordStore;
@@ -93,6 +105,16 @@ export interface AuthorizationAuthorityConfig {
    * Issuance without a proof minted under this secret is refused.
    */
   issuanceSecret: GrantIntegritySecret;
+  /**
+   * Optional trusted ceremony gate for FIRST policy provisioning only.
+   * Absence means bootstrap is disabled. A production implementation must
+   * validate/consume a proof rooted outside ordinary policy state (T04's
+   * protected one-shot writer is the intended composition); a caller-visible
+   * "state is empty" observation is never sufficient authority.
+   */
+  bootstrapAuthorizer?: (
+    input: PolicyBootstrapAuthorizationInput,
+  ) => boolean | Promise<boolean>;
   /** ISO 8601 UTC clock; injected so issuance stays deterministic in tests. */
   clock: () => string;
   grantTtlMs?: number;
@@ -477,13 +499,10 @@ export class AuthorizationAuthority implements AuthorizationPort {
    * (that state is storage loss, and sealing over it would resurrect revoked
    * grants and reset lineage).
    *
-   * R2 (P1-A): the marker alone cannot prove initialization for LEGACY
-   * stores predating it (a valid unmarked state with an issued grant history).
-   * Grant records are issuance evidence: grants are only ever written under
-   * an ACTIVE policy, so ANY durable grant record proves a policy once
-   * existed. A missing predecessor is therefore accepted as virgin bootstrap
-   * only when NEITHER the marker NOR any grant record proves prior
-   * initialization; otherwise adoption refuses fail-closed.
+   * R3 (P1-A): absence is never bootstrap authority. Legacy revoked state
+   * with zero grants is observationally identical to a truly virgin policy
+   * slot, so ordinary adoption always refuses a missing predecessor. Initial
+   * policy creation uses bootstrapPolicy() with a separately trusted ceremony.
    *
    * R1 (P1-B): the whole event runs on the single-writer tail, and the
    * snapshot write is a compare-and-save against the exact record this event
@@ -491,13 +510,136 @@ export class AuthorizationAuthority implements AuthorizationPort {
    * non-reuse included) against the fresh record, refusing typed after
    * bounded retries instead of clobbering a concurrent writer.
    */
-  async adoptPolicy(snapshot: {
-    policySnapshotRevision: string;
-    rules: PolicySnapshotRecord['rules'];
-    riskGuards?: PolicySnapshotRecord['riskGuards'];
-  }): Promise<void> {
+  /**
+   * Establish the FIRST policy only through an explicit trusted provisioning
+   * ceremony. Ordinary adoptPolicy() never bootstraps from absence.
+   *
+   * The authorizer is injected at trusted composition and must validate a
+   * one-shot proof protected independently from the mutable policy slot. This
+   * method still re-checks authority/policy/grant state after an async
+   * authorization decision and commits through the same CAS primitives, so a
+   * race cannot turn a stale ceremony into a policy overwrite.
+   */
+  async bootstrapPolicy(snapshot: PolicyBootstrapSnapshot, proof: unknown): Promise<void> {
     await this.#serializeEvent(async () => {
-      const authorityRecord = await this.#loadAuthorityOrThrow();
+      const authorizer = this.#config.bootstrapAuthorizer;
+      if (!authorizer) {
+        issueFailure(
+          'GRANT_CURRENTNESS_UNRESOLVABLE',
+          'initial policy bootstrap is disabled: no trusted bootstrap authorizer is configured',
+        );
+      }
+
+      const authorityBefore = await this.#loadAuthorityOrThrow();
+      let rawPrior: unknown;
+      try {
+        rawPrior = await this.#config.state.loadCurrentPolicy();
+      } catch (error) {
+        issueFailure(
+          'GRANT_CURRENTNESS_UNRESOLVABLE',
+          `current policy read failed during bootstrap: ${(error as Error).message}`,
+        );
+      }
+      if (rawPrior !== null && rawPrior !== undefined) {
+        issueFailure(
+          'GRANT_POLICY_STALE',
+          'initial policy bootstrap refused: a policy record already exists; use adoptPolicy for a successor revision',
+        );
+      }
+      if (authorityBefore.policyInitialized === true || (await this.#config.grants.hasAnyGrant())) {
+        issueFailure(
+          'GRANT_CURRENTNESS_UNRESOLVABLE',
+          'initial policy bootstrap refused: durable state proves this authority was already initialized',
+        );
+      }
+
+      let authorized = false;
+      try {
+        authorized = await authorizer({
+          proof,
+          authorityRecord: authorityBefore,
+          snapshot,
+        });
+      } catch (error) {
+        issueFailure(
+          'GRANT_NOT_AUTHENTIC',
+          `trusted bootstrap authorizer rejected the ceremony: ${(error as Error).message}`,
+        );
+      }
+      if (!authorized) {
+        issueFailure(
+          'GRANT_NOT_AUTHENTIC',
+          'trusted bootstrap authorizer rejected the initial policy ceremony',
+        );
+      }
+
+      // The authorizer may perform I/O. Re-read EVERY durable premise after
+      // it returns so a concurrent rotate/bootstrap/grant cannot be hidden by
+      // the earlier snapshot.
+      const authorityNow = await this.#loadAuthorityOrThrow();
+      if (
+        authorityNow.authorityId !== authorityBefore.authorityId ||
+        authorityNow.authorityRevision !== authorityBefore.authorityRevision ||
+        authorityNow.policyInitialized === true
+      ) {
+        issueFailure(
+          'GRANT_CURRENTNESS_UNRESOLVABLE',
+          'authority state moved while the bootstrap ceremony was being authorized; obtain a fresh trusted ceremony',
+        );
+      }
+      try {
+        rawPrior = await this.#config.state.loadCurrentPolicy();
+      } catch (error) {
+        issueFailure(
+          'GRANT_CURRENTNESS_UNRESOLVABLE',
+          `current policy re-read failed during bootstrap: ${(error as Error).message}`,
+        );
+      }
+      if (rawPrior !== null && rawPrior !== undefined) {
+        issueFailure(
+          'GRANT_POLICY_STALE',
+          'a policy appeared while the bootstrap ceremony was being authorized; bootstrap is no longer applicable',
+        );
+      }
+      if (await this.#config.grants.hasAnyGrant()) {
+        issueFailure(
+          'GRANT_CURRENTNESS_UNRESOLVABLE',
+          'grant history appeared while the bootstrap ceremony was being authorized; refusing fail-closed',
+        );
+      }
+
+      const markedAuthority = await this.#ensureInitializationMarker(authorityNow);
+      if (
+        markedAuthority.authorityId !== authorityBefore.authorityId ||
+        markedAuthority.authorityRevision !== authorityBefore.authorityRevision
+      ) {
+        issueFailure(
+          'GRANT_CURRENTNESS_UNRESOLVABLE',
+          'authority revision moved before initial policy persistence; refusing stale bootstrap',
+        );
+      }
+      const initial: PolicySnapshotRecord = {
+        policySnapshotRevision: snapshot.policySnapshotRevision,
+        status: 'ACTIVE',
+        authorityId: markedAuthority.authorityId,
+        authorityRevision: markedAuthority.authorityRevision,
+        revokedGrantIds: [],
+        priorRevisions: [],
+        rules: snapshot.rules,
+        riskGuards: snapshot.riskGuards ?? [],
+        updatedAt: requireInstant(this.#config.clock),
+      };
+      if (!(await this.#savePolicyMutation(initial, rawPrior))) {
+        issueFailure(
+          'GRANT_CURRENTNESS_UNRESOLVABLE',
+          `initial policy slot moved before commit of ${snapshot.policySnapshotRevision}; refusing instead of overwriting concurrent state`,
+        );
+      }
+    });
+  }
+
+  async adoptPolicy(snapshot: PolicyBootstrapSnapshot): Promise<void> {
+    await this.#serializeEvent(async () => {
       let rawPrior: unknown;
       try {
         rawPrior = await this.#config.state.loadCurrentPolicy();
@@ -507,64 +649,34 @@ export class AuthorizationAuthority implements AuthorizationPort {
           `current policy read failed: ${(error as Error).message}`,
         );
       }
-      const missingPrior = rawPrior === null || rawPrior === undefined;
-      if (missingPrior && authorityRecord.policyInitialized === true) {
+      if (rawPrior === null || rawPrior === undefined) {
         issueFailure(
           'GRANT_CURRENTNESS_UNRESOLVABLE',
-          `authority record proves an earlier policy adoption, but the current policy record is missing; this is durable-state loss, never a first bootstrap — adopt only after the lineage is restored (refusing ${snapshot.policySnapshotRevision}, fail-closed)`,
+          `current policy record is missing; ordinary adoption can never infer a virgin authority from absence (refusing ${snapshot.policySnapshotRevision}). Use an explicit trusted bootstrap ceremony for first provisioning, or restore the lost lineage`,
         );
-      }
-      // R2 (P1-A): grant records are issuance evidence — grants are only ever
-      // written under an ACTIVE policy. An unmarked authority holding grant
-      // records is an initialized LEGACY store whose policy slot was lost, not
-      // a virgin store: bootstrapping over it would reset revocations and
-      // resurrect its grants. Only a store with no marker AND no grant record
-      // may ever bootstrap.
-      if (missingPrior && authorityRecord.policyInitialized !== true) {
-        if (await this.#config.grants.hasAnyGrant()) {
-          issueFailure(
-            'GRANT_CURRENTNESS_UNRESOLVABLE',
-            `durable grant records prove an earlier policy existed, but the current policy record is missing (and the authority record carries no initialization marker); this is durable-state loss or a pre-marker legacy store, never a first bootstrap — adopt only after the lineage is restored (refusing ${snapshot.policySnapshotRevision}, fail-closed)`,
-          );
-        }
       }
 
       for (let attempt = 1; ; attempt++) {
-        // Re-evaluate absence on EVERY attempt: a lost CAS race may reveal a
-        // predecessor that appeared (a concurrent bootstrap — the successor
-        // path then re-validates revision non-reuse against it) or one that
-        // vanished mid-adoption (never sealable over in an initialized
-        // authority). Only the initial read of a not-yet-initialized store
-        // may ever bootstrap.
-        const priorMissingNow = rawPrior === null || rawPrior === undefined;
-        if (priorMissingNow && !(attempt === 1 && missingPrior)) {
+        if (rawPrior === null || rawPrior === undefined) {
           issueFailure(
             'GRANT_CURRENTNESS_UNRESOLVABLE',
-            `current policy record is missing during adoption of ${snapshot.policySnapshotRevision}; an absent predecessor can only ever bootstrap a virgin store — refusing fail-closed`,
+            `current policy record disappeared during adoption of ${snapshot.policySnapshotRevision}; refusing fail-closed`,
           );
         }
-        // R2 (P1-B): re-read the authority record on EVERY attempt and bind
-        // the snapshot to the record the marker is effective on — a
-        // concurrent instance rotation between the marker and the snapshot
-        // write must never leave the new policy bound to a stale authority
-        // revision (the marker retry re-reads the moved record and returns it).
         const authorityNow = await this.#ensureInitializationMarker(
           await this.#loadAuthorityOrThrow(),
         );
-        let prior: PolicySnapshotRecord | undefined;
-        if (!priorMissingNow) {
-          const parsedPrior = PolicySnapshotRecordSchema.safeParse(rawPrior);
-          if (!parsedPrior.success) {
-            issueFailure(
-              'GRANT_CURRENTNESS_UNRESOLVABLE',
-              'current policy record is corrupt; refusing to adopt a new revision over unreadable state',
-            );
-          }
-          prior = parsedPrior.data;
+        const parsedPrior = PolicySnapshotRecordSchema.safeParse(rawPrior);
+        if (!parsedPrior.success) {
+          issueFailure(
+            'GRANT_CURRENTNESS_UNRESOLVABLE',
+            'current policy record is corrupt; refusing to adopt a new revision over unreadable state',
+          );
         }
+        const prior = parsedPrior.data;
         const usedRevisions = new Set([
-          ...(prior?.priorRevisions ?? []),
-          ...(prior ? [prior.policySnapshotRevision] : []),
+          ...(prior.priorRevisions ?? []),
+          prior.policySnapshotRevision,
         ]);
         if (usedRevisions.has(snapshot.policySnapshotRevision)) {
           issueFailure(
@@ -577,10 +689,8 @@ export class AuthorizationAuthority implements AuthorizationPort {
           status: 'ACTIVE',
           authorityId: authorityNow.authorityId,
           authorityRevision: authorityNow.authorityRevision,
-          revokedGrantIds: prior ? [...prior.revokedGrantIds] : [],
-          priorRevisions: prior
-            ? [...(prior.priorRevisions ?? []), prior.policySnapshotRevision]
-            : [],
+          revokedGrantIds: [...prior.revokedGrantIds],
+          priorRevisions: [...(prior.priorRevisions ?? []), prior.policySnapshotRevision],
           rules: snapshot.rules,
           riskGuards: snapshot.riskGuards ?? [],
           updatedAt: requireInstant(this.#config.clock),
