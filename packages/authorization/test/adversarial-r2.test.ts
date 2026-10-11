@@ -126,6 +126,89 @@ describe('P1-A: grant records prove prior policy existence — unmarked loss is 
   });
 });
 
+
+describe('R3: missing policy is never implicit proof of a virgin authority', () => {
+  it('an unmarked REVOKED legacy policy with zero grant history cannot reactivate after slot loss', async () => {
+    const state = memoryPolicyState({
+      authority: AUTHORITY,
+      policy: activePolicy({ status: 'REVOKED' }),
+    });
+    const { authority } = authorityOn(state);
+    // Exact R2 independent-review counterexample: no grants ever existed,
+    // so grant-history evidence is empty. Losing the policy slot still must
+    // not transform a previously revoked authority into a virgin bootstrap.
+    state.policySlot = undefined;
+    await expect(
+      authority.adoptPolicy({ policySnapshotRevision: POLICY_REVISION, rules: [] }),
+    ).rejects.toMatchObject({
+      name: 'ShunContractError',
+      code: 'GRANT_CURRENTNESS_UNRESOLVABLE',
+    });
+    expect(state.policySlot).toBeUndefined();
+  });
+
+  it('ordinary adoptPolicy refuses an actually empty policy slot too — bootstrap must be explicit', async () => {
+    const state = memoryPolicyState({ authority: AUTHORITY });
+    const { authority } = authorityOn(state);
+    await expect(
+      authority.adoptPolicy({ policySnapshotRevision: POLICY_REVISION, rules: [] }),
+    ).rejects.toMatchObject({
+      name: 'ShunContractError',
+      code: 'GRANT_CURRENTNESS_UNRESOLVABLE',
+    });
+    expect(state.policySlot).toBeUndefined();
+    expect(state.authoritySlot).toEqual(AUTHORITY);
+  });
+
+  it('a trusted explicit bootstrap ceremony can establish the first policy on a virgin store', async () => {
+    const state = memoryPolicyState({ authority: AUTHORITY });
+    const grants = memoryGrantStore();
+    const authority = new AuthorizationAuthority({
+      state,
+      grants,
+      integritySecret: 'test-authority-secret',
+      issuanceSecret: ISSUANCE_SECRET,
+      clock: fixedClock().now,
+      bootstrapAuthorizer: ({ proof, authorityRecord, snapshot }) =>
+        proof === 'trusted-one-shot-bootstrap' &&
+        authorityRecord.authorityRevision === AUTHORITY.authorityRevision &&
+        snapshot.policySnapshotRevision === POLICY_REVISION,
+    });
+
+    await authority.bootstrapPolicy(
+      { policySnapshotRevision: POLICY_REVISION, rules: [] },
+      'trusted-one-shot-bootstrap',
+    );
+
+    expect(state.authoritySlot).toMatchObject({ policyInitialized: true });
+    expect(await authority.currentAuthority()).toMatchObject({
+      kind: 'CURRENT',
+      policySnapshotRevision: POLICY_REVISION,
+      policyStatus: 'ACTIVE',
+    });
+  });
+
+  it('an absent or rejected bootstrap proof leaves the virgin store byte-state untouched', async () => {
+    const state = memoryPolicyState({ authority: AUTHORITY });
+    const grants = memoryGrantStore();
+    const authority = new AuthorizationAuthority({
+      state,
+      grants,
+      integritySecret: 'test-authority-secret',
+      issuanceSecret: ISSUANCE_SECRET,
+      clock: fixedClock().now,
+      bootstrapAuthorizer: () => false,
+    });
+
+    const beforeAuthority = structuredClone(state.authoritySlot);
+    await expect(
+      authority.bootstrapPolicy({ policySnapshotRevision: POLICY_REVISION, rules: [] }, 'forged'),
+    ).rejects.toMatchObject({ name: 'ShunContractError', code: 'GRANT_NOT_AUTHENTIC' });
+    expect(state.authoritySlot).toEqual(beforeAuthority);
+    expect(state.policySlot).toBeUndefined();
+  });
+});
+
 describe('P1-B: shared-durable atomicity is mandatory, not optional or per-instance', () => {
   it('an authority refuses a store without the mandatory compare-and-save primitives', () => {
     const state = memoryPolicyState({ authority: AUTHORITY, policy: activePolicy() });
