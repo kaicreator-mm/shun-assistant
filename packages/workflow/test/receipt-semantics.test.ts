@@ -7,7 +7,11 @@
 // their FAILED_BEFORE_EFFECT / NOT_STARTED classification and stay resumable).
 import { appendFileSync } from 'node:fs';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { DurableWorkflowKernel, KernelActionUncertainError } from '../src/index.ts';
+import {
+  DurableWorkflowKernel,
+  JournalIntegrityError,
+  KernelActionUncertainError,
+} from '../src/index.ts';
 import { CountingStore, executionReceipt, goalContract, tempDir } from './helpers.ts';
 
 let dir: string;
@@ -121,6 +125,54 @@ describe('C02 — receipt semantics, not schema validity alone, decide completio
     expect(verified.terminal).toBe('SUCCEEDED');
     const after = await kernel.listActionRecoveries('task-1');
     expect(after[0]).toMatchObject({ classification: 'COMPLETED_VERIFIED', resolved: true });
+  });
+
+  it('a forged syntactically-complete ACTION_RECONCILED row fails replay closed on kernel reopen', async () => {
+    // C04 end-to-end: the attack writes a well-formed JSONL line with an
+    // ILLEGAL classification (NOT_STARTED would mark a destructive action
+    // resumable). Reopening the kernel replays the journal; replay must FAIL
+    // CLOSED (JournalIntegrityError at load) — never resolve with the forged
+    // verdict in effect.
+    await kernel.open({ taskId: 'task-1', goal: goalContract() });
+    await kernel.close();
+
+    const journalFile = `${dir}/effect-journal.jsonl`;
+    appendFileSync(
+      journalFile,
+      [
+        JSON.stringify({
+          seq: 1,
+          ts: '2026-10-10T12:00:00.000Z',
+          kind: 'ACTION_INTENT',
+          taskId: 'task-1',
+          actionId: 'action-1',
+          payload: { planHash: 'p1', riskClass: 'R2' },
+        }),
+        JSON.stringify({
+          seq: 2,
+          ts: '2026-10-10T12:00:01.000Z',
+          kind: 'ACTION_DISPATCHED',
+          taskId: 'task-1',
+          actionId: 'action-1',
+          payload: {},
+        }),
+        JSON.stringify({
+          seq: 3,
+          ts: '2026-10-10T12:00:02.000Z',
+          kind: 'ACTION_RECONCILED',
+          taskId: 'task-1',
+          actionId: 'action-1',
+          payload: { classification: 'NOT_STARTED', evidence: { forged: true } },
+        }),
+      ]
+        .map((line) => `${line}\n`)
+        .join(''),
+      'utf8',
+    );
+
+    // The kernel loads the journal in its constructor — the forged authority
+    // row is rejected before any port method can resolve state from it.
+    expect(() => new DurableWorkflowKernel({ dataDir: dir, store })).toThrow(JournalIntegrityError);
   });
 
   it('a journaled UNCERTAIN receipt replays as UNCERTAIN, not COMPLETED_VERIFIED, across restarts', async () => {

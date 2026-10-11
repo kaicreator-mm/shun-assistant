@@ -42,6 +42,24 @@ const dispatchedEvent = {
 };
 
 describe('C04 — semantic journal validation for action outcome rows', () => {
+  it('rejects an ACTION_RECEIPTED row with a syntactically complete but empty payload={} (the audit recipe)', () => {
+    // The C04 attack is a well-formed JSONL line — envelope fields all present
+    // and typed — whose payload carries no receipt at all. Syntax alone must
+    // never promote it into a terminal authority row.
+    appendLine(intentEvent);
+    appendLine(dispatchedEvent);
+    appendLine({
+      seq: 3,
+      ts: '2026-10-10T12:00:02.000Z',
+      kind: 'ACTION_RECEIPTED',
+      taskId: 't1',
+      actionId: 'a1',
+      payload: {},
+    });
+
+    expect(() => new WorkflowEffectJournal({ file })).toThrow(JournalIntegrityError);
+  });
+
   it('rejects an ACTION_RECEIPTED row whose receipt violates the frozen schema', () => {
     appendLine(intentEvent);
     appendLine(dispatchedEvent);
