@@ -243,13 +243,21 @@ export class ShunStore implements StorePort {
   }
 
   /**
-   * Test-only hard-exit simulation: drops the handle without checkpoint/close
-   * so the next connection observes the true post-crash durable state.
+   * Test-only hard-exit simulation. This is FLAG-ONLY semantics: reuse of the
+   * store is blocked (every port method fails closed with
+   * ShunStoreClosedError), but the underlying SQLite handle is deliberately
+   * NOT closed — closing the last WAL-mode connection would checkpoint the
+   * journal and thereby destroy the very condition this simulates (no
+   * checkpoint, no clean teardown). The handle is left for GC.
+   *
+   * Honesty boundary (Issue #36, C05): this can only simulate disappearance
+   * within one live process; a sibling connection in the same process still
+   * sees committed state regardless. Real process-death durability evidence
+   * lives in test/crash-hard-kill.test.ts, which hard-kills a child process
+   * and reopens the database in a brand-new process.
    */
   abandon(): void {
     this.closed = true;
-    // node:sqlite keeps no explicit handle to abandon; a new DatabaseSync on
-    // the same file sees only committed transactions regardless.
   }
 
   async close(): Promise<void> {

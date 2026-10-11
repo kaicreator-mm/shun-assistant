@@ -68,8 +68,13 @@ describe('ShunStore — torn application atomicity', () => {
   });
 });
 
-describe('ShunStore — hard-exit durability', () => {
-  it('keeps committed effects readable by a brand-new connection (post-crash view)', async () => {
+describe('ShunStore — committed-state visibility across connections (in-process)', () => {
+  // Narrowed claim (Issue #36, C05): abandon() simulates disappearance only
+  // within ONE live process; a sibling connection sees committed state
+  // regardless. This test deliberately proves only connection-level
+  // visibility. Real hard-kill/process-death durability evidence lives in
+  // crash-hard-kill.test.ts (spawn → taskkill|SIGKILL → reopen).
+  it('keeps committed effects readable by a brand-new connection after abandon()', async () => {
     const receipt = await store.apply('effect-1', mutation);
     // Simulate the process disappearing: no checkpoint, no clean teardown.
     store.abandon();

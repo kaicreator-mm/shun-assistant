@@ -14,6 +14,7 @@
 //
 // The kernel owns mechanics only. Goal semantics, registries, trust, policy
 // and business records stay outside (§5.3 MUST-NOT-own list).
+import { AsyncLocalStorage } from 'node:async_hooks';
 import { createHash } from 'node:crypto';
 import { mkdirSync } from 'node:fs';
 import { join } from 'node:path';
@@ -137,6 +138,18 @@ interface MessageRow {
   processed_at: string | null;
 }
 
+/**
+ * Lifetime-scoped identity for ONE task-lock acquisition (Issue #36 C03).
+ * A fresh lease object is minted per acquisition; ownership is validated
+ * LIVE against the active-lease registry, so an async context that merely
+ * carries a former holder's lease (a detached descendant or deferred
+ * subscriber callback that outlived its holder) holds an expired token that
+ * no longer matches and queues like any unrelated caller.
+ */
+interface LockLease {
+  readonly taskId: string;
+}
+
 export class DurableWorkflowKernel implements WorkflowKernelPort {
   /** Exposed for store-separation tests (runtime.db holds mechanics tables only). */
   readonly database: DatabaseSync;
@@ -146,7 +159,20 @@ export class DurableWorkflowKernel implements WorkflowKernelPort {
   private readonly handlers = new Map<string, WorkflowMessageHandler>();
   private readonly subscribers = new Map<string, Set<(state: TaskWorkflowState) => void>>();
   private readonly locks = new Map<string, Promise<unknown>>();
-  private readonly lockDepth = new Map<string, number>();
+  /**
+   * Async context carrying the CURRENT holder's lease while it runs. The
+   * stored value is a per-acquisition lease object (NOT a bare task id):
+   * re-entrancy is decided by OWNERSHIP of the live lease, never by context
+   * equality on a value that survives across holder generations (Issue #36
+   * C03).
+   */
+  private readonly lockOwner = new AsyncLocalStorage<LockLease>();
+  /**
+   * taskId → lease of the current lock holder. Revoked the moment the
+   * holder's critical section settles, so any context still carrying the
+   * expired lease fails the live check in withLock and queues.
+   */
+  private readonly activeLeases = new Map<string, LockLease>();
   private closed = false;
 
   private readonly statements: {
@@ -579,6 +605,18 @@ export class DurableWorkflowKernel implements WorkflowKernelPort {
     if (recovery.resolved && recovery.classification === 'COMPLETED_VERIFIED') {
       throw new KernelActionResolvedError(actionId);
     }
+    // C01 (L2 §9.4 reconcile-first): a destructive action whose last attempt
+    // is MAY_HAVE_EXECUTED_UNCERTAIN is NEVER blindly re-dispatched — not on
+    // the same actionId, not after a restart. The only door back to
+    // execution is a reconciliation that downgrades it to
+    // FAILED_BEFORE_EFFECT (declared post-state verification).
+    if (
+      !recovery.resolved &&
+      recovery.classification === 'MAY_HAVE_EXECUTED_UNCERTAIN' &&
+      DESTRUCTIVE_RISK.has(recovery.riskClass)
+    ) {
+      throw new KernelUnresolvedDestructiveActionError(actionId);
+    }
 
     // EXEC_START analog: from this journaled point the action may have executed.
     this.journal.append({ kind: 'ACTION_DISPATCHED', taskId, actionId, payload: {} });
@@ -596,6 +634,18 @@ export class DurableWorkflowKernel implements WorkflowKernelPort {
           new Error(`receipt carries foreign actionId ${parsed.data.actionId}`),
         );
       }
+      // C02: schema validity alone never closes an action. A receipt whose
+      // own semantics say unknown/unverified/contradictory fails closed to
+      // MAY_HAVE_EXECUTED_UNCERTAIN — journaled as ACTION_UNCERTAIN so that
+      // reconcile-first decides instead of receipt optimism.
+      if (classifyReceiptOutcome(parsed.data) === 'MAY_HAVE_EXECUTED_UNCERTAIN') {
+        throw new KernelActionUncertainError(
+          actionId,
+          new Error(
+            `receipt terminal=${parsed.data.terminal} recoveryClassification=${parsed.data.sideEffectEvidence.recoveryClassification} postStateVerified=${parsed.data.sideEffectEvidence.postStateVerified} does not prove completion`,
+          ),
+        );
+      }
       receipt = parsed.data;
     } catch (error) {
       this.journal.append({
@@ -604,7 +654,10 @@ export class DurableWorkflowKernel implements WorkflowKernelPort {
         actionId,
         payload: { error: describeError(error) },
       });
-      throw new KernelActionUncertainError(actionId, { cause: error });
+      throw error instanceof KernelActionUncertainError ||
+        error instanceof KernelInvalidReceiptError
+        ? error
+        : new KernelActionUncertainError(actionId, { cause: error });
     }
 
     this.journal.append({
@@ -816,12 +869,19 @@ export class DurableWorkflowKernel implements WorkflowKernelPort {
         continue;
       }
       if (lastOutcome.kind === 'ACTION_RECEIPTED') {
+        // C02: the classification derives from the RECEIPT'S OWN SEMANTICS,
+        // not from the mere presence of a schema-valid receipt. An
+        // UNCERTAIN/unverified/contradictory receipt keeps the action
+        // honestly MAY_HAVE_EXECUTED_UNCERTAIN — also on replay (C04-hardened
+        // journals may still carry legacy defective rows).
+        const receipt = (lastOutcome.payload as { receipt: ExecutionReceipt }).receipt;
+        const classification = classifyReceiptOutcome(receipt);
         views.push({
           ...base,
-          classification: 'COMPLETED_VERIFIED',
-          resolved: true,
-          canResume: false,
-          receipt: (lastOutcome.payload as { receipt: ExecutionReceipt }).receipt,
+          classification,
+          resolved: classification !== 'MAY_HAVE_EXECUTED_UNCERTAIN',
+          canResume: classification === 'FAILED_BEFORE_EFFECT' || classification === 'NOT_STARTED',
+          receipt: classification === 'COMPLETED_VERIFIED' ? receipt : null,
         });
         continue;
       }
@@ -856,35 +916,61 @@ export class DurableWorkflowKernel implements WorkflowKernelPort {
   }
 
   /**
-   * Per-task serialized execution. Re-entrant: a nested withLock call made
-   * from inside the locked flow (e.g. a message handler calling
-   * transition/applyStoreEffect) joins the current holder instead of
-   * deadlocking on the queue.
+   * Per-task serialized execution. Re-entrant ONLY for the async context of
+   * the CURRENT live lease holder: a nested withLock call made from inside
+   * the locked flow (e.g. a message handler calling transition or
+   * applyStoreEffect) joins the live holder instead of deadlocking on the
+   * queue. Ownership is lifetime-scoped and validated LIVE against the
+   * active-lease registry — a context that merely carries a former holder's
+   * lease (a detached descendant or deferred subscriber callback that
+   * outlived its holder) does not match the active lease and queues like any
+   * unrelated caller, so it can never mutate the instance inside another
+   * holder's critical section (Issue #36 C03). An unrelated concurrent
+   * invocation for the same task always queues behind the holder, even if it
+   * arrives while the holder is suspended at an await inside its critical
+   * section.
    */
   private withLock<T>(taskId: string, fn: () => Promise<T> | T): Promise<T> {
-    if ((this.lockDepth.get(taskId) ?? 0) > 0) {
+    const ambient = this.lockOwner.getStore();
+    if (
+      ambient !== undefined &&
+      ambient.taskId === taskId &&
+      this.activeLeases.get(taskId) === ambient
+    ) {
       return Promise.resolve(fn());
     }
     const previous = this.locks.get(taskId) ?? Promise.resolve();
-    const run = async (): Promise<T> => {
-      this.lockDepth.set(taskId, (this.lockDepth.get(taskId) ?? 0) + 1);
-      try {
-        return await fn();
-      } finally {
-        const depth = (this.lockDepth.get(taskId) ?? 1) - 1;
-        if (depth <= 0) {
-          this.lockDepth.delete(taskId);
-        } else {
-          this.lockDepth.set(taskId, depth);
-        }
-      }
-    };
-    const next = previous.then(run, run);
+    const next = previous.then(
+      () => this.holdAndRun(taskId, fn),
+      () => this.holdAndRun(taskId, fn),
+    );
     this.locks.set(
       taskId,
       next.catch(() => undefined),
     );
     return next;
+  }
+
+  /**
+   * Acquire-scoped execution: mint a fresh lease, run the critical section
+   * under it, and revoke it the moment the section settles — including when
+   * the section's promise rejects or fn throws synchronously. The revocation
+   * (finally) strictly precedes the queued successor's start, so the lease
+   * lifetime exactly bounds the critical section. Anything still carrying
+   * the lease's context afterwards holds an EXPIRED token: the live check in
+   * withLock fails and the call queues behind the next holder instead of
+   * joining it (Issue #36 C03).
+   */
+  private async holdAndRun<T>(taskId: string, fn: () => Promise<T> | T): Promise<T> {
+    const lease: LockLease = { taskId };
+    this.activeLeases.set(taskId, lease);
+    try {
+      return await this.lockOwner.run(lease, fn);
+    } finally {
+      if (this.activeLeases.get(taskId) === lease) {
+        this.activeLeases.delete(taskId);
+      }
+    }
   }
 
   private notify(state: TaskWorkflowState): void {
@@ -928,6 +1014,39 @@ function parseGoal(goal: GoalContract): GoalContract {
     });
   }
   return parsed.data;
+}
+
+/**
+ * C02 — derive the recovery classification a receipt actually proves.
+ *
+ * Completion requires ALL THREE of: terminal SUCCEEDED, evidence claiming
+ * COMPLETED_VERIFIED, and postStateVerified. Every weaker or contradictory
+ * claim (UNCERTAIN terminal, MAY_HAVE_EXECUTED_UNCERTAIN evidence, an
+ * unverified completion claim, or a non-success terminal paired with a
+ * FAILED_BEFORE_EFFECT/NOT_STARTED claim) fails closed to
+ * MAY_HAVE_EXECUTED_UNCERTAIN. Honest non-completion claims keep their own
+ * classification so the action stays resumable on the same actionId.
+ */
+function classifyReceiptOutcome(receipt: ExecutionReceipt): RecoveryClassification {
+  const evidence = receipt.sideEffectEvidence;
+  if (
+    receipt.terminal === 'UNCERTAIN' ||
+    evidence.recoveryClassification === 'MAY_HAVE_EXECUTED_UNCERTAIN'
+  ) {
+    return 'MAY_HAVE_EXECUTED_UNCERTAIN';
+  }
+  if (evidence.recoveryClassification === 'COMPLETED_VERIFIED') {
+    return receipt.terminal === 'SUCCEEDED' && evidence.postStateVerified
+      ? 'COMPLETED_VERIFIED'
+      : 'MAY_HAVE_EXECUTED_UNCERTAIN';
+  }
+  // FAILED_BEFORE_EFFECT / NOT_STARTED claims are believable only alongside a
+  // non-success terminal; a SUCCEEDED terminal contradicts them, so it fails
+  // closed to uncertain rather than allowing a blind "resumable" downgrade of
+  // an action that may already have executed.
+  return receipt.terminal === 'SUCCEEDED'
+    ? 'MAY_HAVE_EXECUTED_UNCERTAIN'
+    : evidence.recoveryClassification;
 }
 
 function sha256Identity(kind: string, payload: unknown): string {
