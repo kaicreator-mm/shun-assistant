@@ -86,11 +86,12 @@ function createFixture(): Fixture {
     grantId: 'grant-writer-1',
     issuer: { authorityId: 'shun.action-controller.test', authorityRevision: 'auth-rev-1' },
     taskId: 'task-1',
-    planHash: 'sha256-abc',
+    planHash: 'a'.repeat(64),
     policySnapshotRevision: 'policy-rev-1',
     actionScope: { actionIds: ['act-1'], privilegeLevel: 'ELEVATED' },
     issuedAt: '2026-10-11T00:00:00.000Z',
-    expiresAt: '2026-10-11T01:00:00.000Z',
+    expiresAt: '2026-10-12T00:00:00.000Z',
+    integrity: { scheme: 'HMAC_SHA256', value: 'fixture-integrity' },
   };
   const grantJob = signWriterJob(anchorKey, {
     jobId: 'job-grant-1',
@@ -168,6 +169,151 @@ describe('ShunAnchorWriter core — unattended negative controls (L2 v0.2 delta 
     expect(r.ok).toBe(false);
     if (!r.ok) expect(r.code).toBe('WINDOW_NOT_CURRENT');
     expect(existsSync(grantTarget(fx.anchorRoot))).toBe(false);
+  });
+
+  it('UNRESOLVABLE currentness refuses before any writer payload is applied', () => {
+    const fx = createFixture();
+    writeFileSync(
+      join(fx.anchorRoot, 'current-authority.json'),
+      JSON.stringify({ kind: 'UNRESOLVABLE', reason: 'simulated lost authority state' }),
+    );
+    const result = applyWriterJob(
+      { anchorRoot: fx.anchorRoot, hmacKeyBase64: fx.anchorKey },
+      fx.grantJob,
+    );
+    expect(result.ok).toBe(false);
+    if (!result.ok) expect(result.code).toBe('WINDOW_NOT_CURRENT');
+    expect(existsSync(grantTarget(fx.anchorRoot))).toBe(false);
+  });
+
+  it('schema-invalid grant payload is refused instead of trusting grantId-only shape', () => {
+    const fx = createFixture();
+    const malformed = signWriterJob(fx.anchorKey, {
+      jobId: 'job-malformed-grant',
+      jobType: 'issue-grant',
+      policyWindowRef: fx.windowId,
+      payload: { grantId: 'grant-malformed-only-id' },
+    });
+    const result = applyWriterJob(
+      { anchorRoot: fx.anchorRoot, hmacKeyBase64: fx.anchorKey },
+      malformed,
+    );
+    expect(result.ok).toBe(false);
+    if (!result.ok) expect(result.code).toBe('PAYLOAD_INVALID');
+    expect(existsSync(join(fx.anchorRoot, 'grants', 'grant-malformed-only-id.json'))).toBe(false);
+  });
+
+  it('path-ambiguous grantId is refused and cannot escape the grants directory', () => {
+    const fx = createFixture();
+    const base = fx.grantJob.payload as Record<string, unknown>;
+    const traversal = signWriterJob(fx.anchorKey, {
+      jobId: 'job-traversal-grant',
+      jobType: 'issue-grant',
+      policyWindowRef: fx.windowId,
+      payload: { ...base, grantId: '../escape-grant' },
+    });
+    const result = applyWriterJob(
+      { anchorRoot: fx.anchorRoot, hmacKeyBase64: fx.anchorKey },
+      traversal,
+    );
+    expect(result.ok).toBe(false);
+    if (!result.ok) expect(result.code).toBe('PAYLOAD_INVALID');
+    expect(existsSync(join(fx.anchorRoot, 'escape-grant.json'))).toBe(false);
+  });
+
+  it('grant issuer/policy/expiry must remain inside the referenced CURRENT policy window', () => {
+    const fx = createFixture();
+    const base = fx.grantJob.payload as Record<string, unknown>;
+    const staleAuthority = signWriterJob(fx.anchorKey, {
+      jobId: 'job-stale-authority',
+      jobType: 'issue-grant',
+      policyWindowRef: fx.windowId,
+      payload: {
+        ...base,
+        issuer: {
+          authorityId: 'shun.action-controller.test',
+          authorityRevision: 'auth-rev-999',
+        },
+      },
+    });
+    const r1 = applyWriterJob(
+      { anchorRoot: fx.anchorRoot, hmacKeyBase64: fx.anchorKey },
+      staleAuthority,
+    );
+    expect(r1.ok).toBe(false);
+    if (!r1.ok) expect(r1.code).toBe('PAYLOAD_INVALID');
+
+    const wrongPolicy = signWriterJob(fx.anchorKey, {
+      jobId: 'job-wrong-policy',
+      jobType: 'issue-grant',
+      policyWindowRef: fx.windowId,
+      payload: { ...base, policySnapshotRevision: 'policy-rev-other' },
+    });
+    const r2 = applyWriterJob(
+      { anchorRoot: fx.anchorRoot, hmacKeyBase64: fx.anchorKey },
+      wrongPolicy,
+    );
+    expect(r2.ok).toBe(false);
+    if (!r2.ok) expect(r2.code).toBe('PAYLOAD_INVALID');
+
+    const expired = signWriterJob(fx.anchorKey, {
+      jobId: 'job-expired-grant',
+      jobType: 'issue-grant',
+      policyWindowRef: fx.windowId,
+      payload: {
+        ...base,
+        issuedAt: '2026-10-11T00:00:00.000Z',
+        expiresAt: '2099-06-01T00:00:00.000Z',
+      },
+    });
+    const r3 = applyWriterJob(
+      {
+        anchorRoot: fx.anchorRoot,
+        hmacKeyBase64: fx.anchorKey,
+        now: () => new Date('2026-10-11T12:00:00.000Z'),
+      },
+      expired,
+    );
+    expect(r3.ok).toBe(false);
+    if (!r3.ok) expect(r3.code).toBe('PAYLOAD_INVALID');
+  });
+
+  it('maxGrants is an enforced issuance budget across distinct jobIds', () => {
+    const fx = createFixture();
+    writeFileSync(
+      join(fx.anchorRoot, 'jobs', `window-${fx.windowId}.json`),
+      JSON.stringify({
+        windowId: fx.windowId,
+        notBefore: '2020-01-01T00:00:00.000Z',
+        notAfter: '2099-01-01T00:00:00.000Z',
+        policySnapshotRevision: 'policy-rev-1',
+        authorityRevision: 'auth-rev-1',
+        maxGrants: 1,
+      }),
+    );
+    const first = applyWriterJob(
+      { anchorRoot: fx.anchorRoot, hmacKeyBase64: fx.anchorKey },
+      fx.grantJob,
+    );
+    expect(first.ok).toBe(true);
+
+    const payload = {
+      ...(fx.grantJob.payload as Record<string, unknown>),
+      grantId: 'grant-writer-2',
+    };
+    const secondJob = signWriterJob(fx.anchorKey, {
+      jobId: 'job-grant-2',
+      jobType: 'issue-grant',
+      policyWindowRef: fx.windowId,
+      payload,
+    });
+    const second = applyWriterJob(
+      { anchorRoot: fx.anchorRoot, hmacKeyBase64: fx.anchorKey },
+      secondJob,
+    );
+    expect(second.ok).toBe(false);
+    if (!second.ok) expect(second.code).toBe('WINDOW_BUDGET_EXHAUSTED');
+    expect(existsSync(join(fx.anchorRoot, 'grants', 'grant-writer-2.json'))).toBe(false);
   });
 
   it('a legitimate grant job applies atomically, and its replay is refused forever', () => {
