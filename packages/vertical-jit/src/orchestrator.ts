@@ -823,7 +823,10 @@ async function runRemovalGate(
       // Reconcile-first resolution (L2 §9.4): independent post-state proves
       // the removal executed — the uncertain terminal resolves to success.
       trace(deps, 'R2_RECONCILE', 'uncertain interrupted; post-state proves removal executed');
-      run = { terminal: 'SUCCEEDED' };
+      run = {
+        terminal: 'SUCCEEDED',
+        recoveryClassification: 'COMPLETED_VERIFIED',
+      };
     } else {
       trace(
         deps,
