@@ -69,6 +69,13 @@ export interface JitLifecycleDeps {
   readonly verifier: VerifierPort;
   readonly store: StorePort;
   readonly planLedger: PlanLedgerPort;
+  /**
+   * Trusted gate the task grant presentation must cross before the
+   * environment executes (VJ-P1-03). Optional so plan-only harnesses can
+   * compose, but production wiring MUST provide it — executing argv without
+   * a validated presentation is the bypass this gate closes.
+   */
+  readonly taskPresentationGate?: TaskPresentationGate;
   /** Journal accessor per actionId — transport failures classify from it (L2 §9.4). */
   readonly journals: (actionId: string) => JournalPort;
   readonly fs: FilesystemPort;
@@ -93,6 +100,22 @@ export interface JitLifecycleDeps {
  * presentation is that record.
  */
 export type ImportableAuthorizationPort = Pick<AuthorizationPort, 'issue' | 'currentAuthority'>;
+
+/**
+ * Trusted-boundary validation for the task execution step (VJ-P1-03): the
+ * issued grant must be PRESENTED for validation against the trusted plan
+ * ledger and CURRENT authority/policy state — the environment backend is
+ * never invoked on the caller's say-so. Wired to the same authority that
+ * signs grants; absent ⇒ the caller explicitly runs a non-authoritative
+ * plan-only seam and the orchestrator refuses task side effects.
+ */
+export type TaskPresentationGate = {
+  validate(input: {
+    action: AuthorizedAction;
+    grant: unknown;
+    plan: ActionPlan;
+  }): { ok: true } | { ok: false; code: string; detail: string };
+};
 
 function trace(deps: JitLifecycleDeps, kind: string, detail?: string): void {
   deps.trace?.({ at: deps.clock(), kind, ...(detail !== undefined ? { detail } : {}) });
@@ -471,12 +494,31 @@ async function runLifecycle(
     verificationPlan,
     recovery: 'DECLARED_IDEMPOTENT',
   });
-  const { authorized: taskAuthorized } = await issueGrant(deps, {
+  const { grant: taskGrant, authorized: taskAuthorized } = await issueGrant(deps, {
     taskId: input.taskId,
     plan: taskPlan,
     action: taskActionSpec,
     authorizationKind: 'AUTOMATIC',
   });
+  // The task step is an executable step like any other: its grant must be
+  // presented at the trusted boundary and re-validated there BEFORE the
+  // environment backend runs argv (VJ-P1-03).
+  const gateVerdict = deps.taskPresentationGate?.validate({
+    action: taskAuthorized,
+    grant: taskGrant,
+    plan: taskPlan,
+  });
+  if (gateVerdict && !gateVerdict.ok) {
+    throw new JitLifecycleError(
+      'TASK_FAILED',
+      `task presentation refused at the trusted boundary: ${gateVerdict.code} — ${gateVerdict.detail}`,
+      {
+        actionId: taskActionSpec.actionId,
+        recoveryClassification: 'FAILED_BEFORE_EFFECT',
+        detail: 'presentation validation precedes any task side effect',
+      },
+    );
+  }
   const taskReceipt = ExecutionReceiptSchema.parse(await deps.environment.execute(taskAuthorized));
   if (taskReceipt.terminal !== 'SUCCEEDED') {
     throw new JitLifecycleError(

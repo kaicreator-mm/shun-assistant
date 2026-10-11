@@ -6,6 +6,7 @@
 import { join } from 'node:path';
 import {
   type AuthorizedAction,
+  canonicalJson,
   type EnvironmentBackend,
   type EnvironmentFacts,
   type EnvironmentRequirements,
@@ -15,7 +16,7 @@ import {
   type ProviderCapabilityBinding,
   type ProviderEnvironmentBinding,
 } from '@shun/contracts';
-import type { FilesystemPort, ProcessPort } from '../ports.ts';
+import type { FilesystemPort, PlanLedgerPort, ProcessPort } from '../ports.ts';
 
 export interface CliTaskBackendDeps {
   readonly process: ProcessPort;
@@ -24,6 +25,14 @@ export interface CliTaskBackendDeps {
   readonly clock: () => string;
   readonly taskOutputDir: string;
   readonly timeoutMs?: number;
+  /**
+   * Trusted plan ledger (L2 §9.3). When provided, every presented action is
+   * re-validated against the ledger BEFORE any process spawn: a plan that
+   * never entered the ledger, an action body that diverges from the ledger's
+   * copy, or an expired authorization window is refused with zero side
+   * effects (VJ-P1-03). Production wiring MUST provide it.
+   */
+  readonly ledger?: PlanLedgerPort;
 }
 
 export class CliTaskBackend implements EnvironmentBackend {
@@ -65,12 +74,18 @@ export class CliTaskBackend implements EnvironmentBackend {
   }
 
   async execute(action: AuthorizedAction) {
+    const startedAt = this.#deps.clock();
+    // Trusted-boundary re-validation (VJ-P1-03): argv is never spawned for a
+    // presentation the trusted ledger does not back.
+    const refusal = await this.#ledgerRefusal(action);
+    if (refusal) {
+      return this.#refusedReceipt(action, startedAt, refusal);
+    }
     const parameters = action.action.parameters as { executable?: unknown; argv?: unknown };
     const executable = typeof parameters.executable === 'string' ? parameters.executable : '';
     const argv = Array.isArray(parameters.argv)
       ? parameters.argv.filter((entry): entry is string => typeof entry === 'string')
       : [];
-    const startedAt = this.#deps.clock();
     if (!executable) {
       return this.#failedReceipt(action, startedAt);
     }
@@ -98,6 +113,54 @@ export class CliTaskBackend implements EnvironmentBackend {
         sideEffectClass: action.action.sideEffectClass,
         recoveryClassification: 'COMPLETED_VERIFIED',
         postStateVerified: await this.#deps.fs.exists(stdoutPath),
+      },
+    });
+  }
+
+  /**
+   * Trusted-ledger check for one presented action. Returns a refusal reason,
+   * or undefined when the presentation is backed by the ledger. Refusals
+   * happen BEFORE any process spawn (VJ-P1-03).
+   */
+  async #ledgerRefusal(action: AuthorizedAction): Promise<string | undefined> {
+    const ledger = this.#deps.ledger;
+    if (!ledger) {
+      // No ledger wired: this backend is a non-authoritative plan-only seam
+      // and must not be used for executable steps in production.
+      return undefined;
+    }
+    const plan = await ledger.byHash(action.planHash);
+    if (!plan) {
+      return `plan ${action.planHash} is not in the trusted ledger`;
+    }
+    const planned = plan.actions.find((candidate) => candidate.actionId === action.actionId);
+    if (!planned) {
+      return `action ${action.actionId} is not part of plan ${action.planHash}`;
+    }
+    if (canonicalJson(planned) !== canonicalJson(action.action)) {
+      return 'presented action body does not match the trusted plan ledger';
+    }
+    if (action.expiresAt <= this.#deps.clock()) {
+      return `authorization window expired at ${action.expiresAt}`;
+    }
+    return undefined;
+  }
+
+  #refusedReceipt(action: AuthorizedAction, startedAt: string, refusal: string) {
+    // Refused before any effect: terminal REFUSED, fail-closed recovery.
+    return ExecutionReceiptSchema.parse({
+      actionId: action.actionId,
+      environmentId: this.#deps.facts.environmentId,
+      providerId: 'cli-task',
+      providerVersion: 'task-execution',
+      startedAt,
+      finishedAt: this.#deps.clock(),
+      terminal: 'REFUSED',
+      outputRefs: [],
+      sideEffectEvidence: {
+        sideEffectClass: action.action.sideEffectClass,
+        recoveryClassification: 'FAILED_BEFORE_EFFECT',
+        postStateVerified: false,
       },
     });
   }

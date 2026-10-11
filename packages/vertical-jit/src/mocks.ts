@@ -677,6 +677,13 @@ export function buildHarness(options: HarnessOptions = {}): JitHarness {
     verifier,
     store,
     planLedger: ledger,
+    // The task grant is presented to the SAME trusted authority that signed
+    // it — the environment backend never runs on the caller's say-so
+    // (VJ-P1-03).
+    taskPresentationGate: {
+      validate: ({ action, grant, plan }) =>
+        authority.validatePresentation(authority.validationInput(grant, plan, action, clock())),
+    },
     journals: journalFor,
     fs,
     clock,
