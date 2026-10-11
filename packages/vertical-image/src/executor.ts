@@ -7,7 +7,7 @@
 // Per-input problems become explicit REJECTED records; original inputs are
 // never modified and failed outputs are removed again.
 import { readdirSync } from 'node:fs';
-import { lstat, mkdir, mkdtemp, readFile, rm } from 'node:fs/promises';
+import { lstat, mkdir, mkdtemp, readFile, realpath, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { basename, dirname, join, resolve } from 'node:path';
 import {
@@ -62,6 +62,28 @@ function reject(inputPath: string, code: ImageBatchFailure): BatchRecord {
   return { inputPath, status: 'REJECTED', rejectionCode: code };
 }
 
+/**
+ * Canonical (symlink/junction-resolved) form of `path`. For a path that does
+ * not exist yet, canonicalizes the nearest existing ancestor and appends the
+ * remaining segments — so an alias planted on a parent directory is still
+ * unmasked before anything is created through it.
+ */
+async function canonicalPath(path: string): Promise<string> {
+  try {
+    return await realpath(path);
+  } catch {
+    const parent = dirname(path);
+    if (parent === path) {
+      return path;
+    }
+    return join(await canonicalPath(parent), basename(path));
+  }
+}
+
+function rejectPolicyBlocked(detail: string): BatchRunResult {
+  return { ok: false, failure: { code: 'POLICY_BLOCKED', detail } };
+}
+
 export async function runImageBatchProcess(
   rawInput: unknown,
   deps: RunDeps,
@@ -78,16 +100,17 @@ export async function runImageBatchProcess(
   const diagnostics: Record<string, string> = {};
 
   // Safety precheck: the output location must differ from every input dir.
+  // Comparison is on canonical (link-resolved) paths — a symlink/junction
+  // alias of an input directory must not slip through lexical resolve().
   const outputDir = resolve(input.outputDirectory);
-  const inputDirs = new Set(input.inputFiles.map((f) => resolve(dirname(f.path))));
-  if (inputDirs.has(outputDir)) {
-    return {
-      ok: false,
-      failure: {
-        code: 'POLICY_BLOCKED',
-        detail: `outputDirectory ${outputDir} must differ from every input directory`,
-      },
-    };
+  const outputDirReal = await canonicalPath(outputDir);
+  const inputDirs = [...new Set(input.inputFiles.map((f) => resolve(dirname(f.path))))];
+  for (const inputDir of inputDirs) {
+    if ((await canonicalPath(inputDir)) === outputDirReal) {
+      return rejectPolicyBlocked(
+        `outputDirectory ${outputDir} aliases input directory ${inputDir} (canonical paths must differ)`,
+      );
+    }
   }
 
   // Collision detection happens BEFORE any write: duplicates inside the batch
@@ -161,6 +184,18 @@ export async function runImageBatchProcess(
         detail: `output directory ${outputDir} could not be created: ${cause instanceof Error ? cause.message : String(cause)}`,
       },
     };
+  }
+
+  // The output path may have been a not-yet-existing symlink/junction before
+  // mkdir: recursive mkdir succeeds on it and writes would flow through the
+  // alias. Re-canonicalize AFTER creation and re-check before any write.
+  const outputDirAfterMkdir = await canonicalPath(outputDir);
+  for (const inputDir of inputDirs) {
+    if ((await canonicalPath(inputDir)) === outputDirAfterMkdir) {
+      return rejectPolicyBlocked(
+        `outputDirectory ${outputDir} resolves to input directory ${inputDir} after creation (canonical paths must differ)`,
+      );
+    }
   }
 
   // Read + hash every input once (before execution) for the oracle and for
