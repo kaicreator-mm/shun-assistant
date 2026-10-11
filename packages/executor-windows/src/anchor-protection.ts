@@ -25,8 +25,10 @@
 // access) and a filtered-token view would need linked-token machinery that
 // does not exist in this package; helper-side refusal semantics stay with the
 // writer architecture.
+import { execFileSync } from 'node:child_process';
 import { closeSync, mkdirSync, openSync, rmSync, unlinkSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
+import { systemPowershellExe } from './system-exe.ts';
 import { resolveGrantHmacKeyFile } from './trusted-store.ts';
 
 export interface AnchorAssessment {
@@ -70,6 +72,30 @@ function fileWritable(path: string): boolean | undefined {
     const code = (e as NodeJS.ErrnoException).code;
     if (code === 'ENOENT') return false;
     if (code === 'EACCES' || code === 'EPERM') return false;
+    return undefined;
+  }
+}
+
+const PRIVILEGED_OWNER_SIDS = new Set(['S-1-5-18', 'S-1-5-32-544']);
+
+function ownerSid(authorityDir: string, path: string): string | undefined {
+  if (process.platform !== 'win32') return undefined;
+  const powershell = systemPowershellExe(authorityDir);
+  if (!powershell) return undefined;
+  const script = [
+    'param([string]$p)',
+    '$acl = Get-Acl -LiteralPath $p',
+    '$owner = New-Object System.Security.Principal.NTAccount($acl.Owner)',
+    '$owner.Translate([System.Security.Principal.SecurityIdentifier]).Value',
+  ].join('; ');
+  try {
+    const out = execFileSync(
+      powershell,
+      ['-NoProfile', '-NonInteractive', '-Command', `& { ${script} } ${JSON.stringify(path)}`],
+      { encoding: 'utf8', windowsHide: true, timeout: 15_000 },
+    ).trim();
+    return /^S-1-/.test(out) ? out : undefined;
+  } catch {
     return undefined;
   }
 }
@@ -146,6 +172,25 @@ export function assessAuthorityAnchors(
         ? 'grant-hmac key is same-user-readable (HMAC verification key is also signing authority)'
         : 'grant-hmac key readability probe failed (fail closed)',
     );
+  }
+
+  // A deny-to-self ACL is not protection when the same runtime user still
+  // OWNS the object and can rewrite its DACL. Once the direct access probes
+  // look protected, require privileged ownership as a second independent
+  // fact. The query runs through the already pinned real system PowerShell.
+  if (reasons.length === 0 && process.platform === 'win32') {
+    const rootOwner = ownerSid(authorityDir, authorityDir);
+    const keyOwner = ownerSid(authorityDir, hmacKeyFile);
+    if (!rootOwner || !PRIVILEGED_OWNER_SIDS.has(rootOwner)) {
+      reasons.push(
+        `authority store owner is not Administrators/SYSTEM (${rootOwner ?? 'unresolvable'})`,
+      );
+    }
+    if (!keyOwner || !PRIVILEGED_OWNER_SIDS.has(keyOwner)) {
+      reasons.push(
+        `grant-hmac key owner is not Administrators/SYSTEM (${keyOwner ?? 'unresolvable'})`,
+      );
+    }
   }
 
   return { forgeable: reasons.length > 0, keyReadable: keyReadable !== false, reasons };
