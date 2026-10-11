@@ -115,6 +115,59 @@ describe('CLI task backend — trusted boundary validation (VJ-P1-03)', () => {
     expect(receipt.terminal).toBe('SUCCEEDED');
     expect(process.calls).toHaveLength(1);
   });
+
+  it('fail-closed wiring seam: refuses to spawn ANY argv when no trusted ledger is wired', async () => {
+    const authority = new LocalAuthority({ now: () => NOW });
+    const action = taskAction({
+      actionId: 't1-task',
+      bindingId: 'b1',
+      executable: 'C:\\tools\\pdftool.exe',
+      argv: ['--version'],
+      outputDir: 'C:\\work\\out',
+      timeoutMs: 60_000,
+    });
+    const plan = buildActionPlan({
+      taskId: 't1',
+      capabilityId: 'pdf.convert',
+      bindingId: 'b1',
+      rankingPolicyRevision: 'rank-v1',
+      policySnapshotRevision: 'pol-snap-r1',
+      action,
+      verificationPlan: { verifierId: 'v', verifierRevision: 'r1', checks: [{ checkId: 'c1' }] },
+      recoveryPlan: {
+        classificationStrategy: 'JOURNAL_AND_POST_STATE',
+        reconcileBeforeRetry: true,
+        retryAllowedWhen: 'DECLARED_IDEMPOTENT',
+      },
+    });
+    await authority.ledger.register(plan);
+    const process = new ScriptedProcessPort([]);
+    const backend = new CliTaskBackend({
+      process,
+      fs: new MemoryFilesystem(),
+      facts: windowsFacts(),
+      clock: () => NOW,
+      taskOutputDir: 'C:\\work\\out',
+      // No ledger wired: an unwired trusted boundary is a wiring fault and
+      // must refuse before any spawn — never a silent fail-open.
+    });
+    const presented: AuthorizedAction = {
+      taskId: 't1',
+      actionId: 't1-task',
+      planHash: plan.planHash,
+      policySnapshotRevision: 'pol-snap-r1',
+      authorizationKind: 'AUTOMATIC',
+      authorizationRef: 'grant-0001',
+      expiresAt: SOON,
+      action,
+    };
+
+    const receipt = await backend.execute(presented);
+
+    expect(receipt.terminal).toBe('REFUSED');
+    expect(process.calls).toHaveLength(0);
+    expect(receipt.sideEffectEvidence.recoveryClassification).toBe('FAILED_BEFORE_EFFECT');
+  });
 });
 
 describe('orchestrator — task grant presentation (VJ-P1-03)', () => {
@@ -158,6 +211,41 @@ describe('orchestrator — task grant presentation (VJ-P1-03)', () => {
     expect(environmentCalls).toBe(0);
     // The install already happened; the task step was refused at the gate.
     expect(await harness.fs.exists(INSTALL_DIR)).toBe(true);
+  });
+
+  it('refuses the executable lifecycle entry when the task presentation gate is not wired — never a silent fail-open', async () => {
+    const harness = buildHarness();
+    installWorld(harness);
+    let environmentCalls = 0;
+    const innerEnvironment = harness.deps.environment;
+    const deps = {
+      ...harness.deps,
+      taskPresentationGate: undefined,
+      environment: {
+        observe: () => innerEnvironment.observe(),
+        canPrepare: (requirements: Parameters<typeof innerEnvironment.canPrepare>[0]) =>
+          innerEnvironment.canPrepare(requirements),
+        prepare: (binding: Parameters<typeof innerEnvironment.prepare>[0]) =>
+          innerEnvironment.prepare(binding),
+        execute: (action: Parameters<typeof innerEnvironment.execute>[0]) => {
+          environmentCalls += 1;
+          return innerEnvironment.execute(action);
+        },
+        cancel: (actionId: string) => innerEnvironment.cancel(actionId),
+        cleanup: (prepared: Parameters<typeof innerEnvironment.cleanup>[0]) =>
+          innerEnvironment.cleanup(prepared),
+      },
+    };
+
+    const error = await runJitLifecycle(jitInput({ retention: 'RETAIN' }), deps).catch(
+      (caught: unknown) => caught,
+    );
+
+    expect(isJitLifecycleError(error)).toBe(true);
+    expect((error as { code: string }).code).toBe('POLICY_BLOCKED');
+    // Nothing executed at all: neither install nor task side effects.
+    expect(environmentCalls).toBe(0);
+    expect(await harness.fs.exists(INSTALL_DIR)).toBe(false);
   });
 
   it('presents the task grant to the trusted gate on the happy path (positive control)', async () => {

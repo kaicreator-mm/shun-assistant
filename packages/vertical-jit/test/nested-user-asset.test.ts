@@ -7,7 +7,7 @@
 import { describe, expect, it } from 'vitest';
 import { buildHarness } from '../src/mocks.ts';
 import { runJitLifecycle } from '../src/orchestrator.ts';
-import { INSTALL_DIR, installWorld, jitInput } from './helpers.ts';
+import { CACHE_DIR, EXECUTABLE, INSTALL_DIR, installWorld, jitInput } from './helpers.ts';
 
 const DURABLE_POLICY = {
   policyId: 'pol.jit-removal',
@@ -58,8 +58,10 @@ describe('nested user asset ownership (VJ-P1-01)', () => {
     expect(installed).toBeDefined();
     const owned = installed?.payload.providerOwnedFiles;
     expect(Array.isArray(owned)).toBe(true);
-    // The manifest names exactly what the installer wrote — nothing more.
-    expect(owned).toEqual([`${INSTALL_DIR}\\pdftool.exe`]);
+    // The manifest names exactly what the installer created — the install
+    // root, the executable, and the cache root — nothing more (the cache
+    // root is censused too: it sits inside the deletion scope, VJ-P1-01).
+    expect(owned).toEqual([INSTALL_DIR, EXECUTABLE, CACHE_DIR]);
   });
 
   it('still removes cleanly when only installer-recorded paths occupy the install root', async () => {

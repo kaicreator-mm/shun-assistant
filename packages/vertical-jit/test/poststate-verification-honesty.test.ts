@@ -13,14 +13,39 @@ import { buildActionPlan, installAction } from '../src/plans.ts';
 
 const NOW = '2026-10-10T08:00:00.000Z';
 
-function cliBackend(scripted: ScriptedProcessPort) {
-  return new CliTaskBackend({
+/**
+ * Wire the backend to a trusted ledger holding a plan for EXACTLY the given
+ * action (VJ-P1-03): the backend refuses to spawn anything whose
+ * presentation the ledger does not back, so honesty tests must present a
+ * ledger-bound action — which is also the only production wiring.
+ */
+async function wiredCli(scripted: ScriptedProcessPort, action: AuthorizedAction) {
+  const authority = new LocalAuthority({ now: () => NOW });
+  const plan = buildActionPlan({
+    taskId: action.taskId,
+    capabilityId: 'pdf.convert',
+    bindingId: action.action.bindingRef,
+    rankingPolicyRevision: 'rank-v1',
+    policySnapshotRevision: action.policySnapshotRevision,
+    action: action.action,
+    verificationPlan: { verifierId: 'v', verifierRevision: 'r1', checks: [{ checkId: 'c1' }] },
+    recoveryPlan: {
+      classificationStrategy: 'JOURNAL_AND_POST_STATE',
+      reconcileBeforeRetry: true,
+      retryAllowedWhen: 'DECLARED_IDEMPOTENT',
+    },
+  });
+  await authority.ledger.register(plan);
+  const backend = new CliTaskBackend({
     process: scripted,
     fs: new MemoryFilesystem(),
     facts: windowsFacts(),
     clock: () => NOW,
     taskOutputDir: 'C:\\work\\out',
+    ledger: authority.ledger,
   });
+  const presented: AuthorizedAction = { ...action, planHash: plan.planHash };
+  return { backend, presented };
 }
 
 function cliAction(): AuthorizedAction {
@@ -114,7 +139,8 @@ describe('post-state verification honesty (VJ-P2-06)', () => {
     const scripted = new ScriptedProcessPort([
       () => ({ exitCode: 0, stdout: 'ok', stderr: '', timedOut: false }),
     ]);
-    const receipt = await cliBackend(scripted).execute(cliAction());
+    const { backend, presented } = await wiredCli(scripted, cliAction());
+    const receipt = await backend.execute(presented);
 
     expect(receipt.terminal).toBe('SUCCEEDED');
     expect(receipt.sideEffectEvidence.recoveryClassification).toBe('MAY_HAVE_EXECUTED_UNCERTAIN');
@@ -124,7 +150,8 @@ describe('post-state verification honesty (VJ-P2-06)', () => {
   it('CLI task executable-absent failure does not claim a verified state either', async () => {
     const action = cliAction();
     action.action.parameters = { executable: '', argv: [] };
-    const receipt = await cliBackend(new ScriptedProcessPort([])).execute(action);
+    const { backend, presented } = await wiredCli(new ScriptedProcessPort([]), action);
+    const receipt = await backend.execute(presented);
 
     expect(receipt.terminal).toBe('FAILED');
     expect(receipt.sideEffectEvidence.recoveryClassification).toBe('FAILED_BEFORE_EFFECT');

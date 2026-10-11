@@ -77,6 +77,50 @@ describe('residue classification (C-002 preview)', () => {
     });
   });
 
+  it('strict census applies to cache roots: recorded cache content stays CACHE, unrecorded content fails closed', () => {
+    const recordedCacheFile = `${CACHE_DIR}\\pkgindex.dat`;
+    const candidates = classifyResidue({
+      layout,
+      observed: [CACHE_DIR, recordedCacheFile, `${CACHE_DIR}\\notes.txt`],
+      protectedRoots: [],
+      providerOwnedFiles: [CACHE_DIR, recordedCacheFile],
+    });
+    const byPath = new Map(candidates.map((candidate) => [candidate.path, candidate]));
+    // The installer-created cache root and the cache file it recorded are
+    // deletion-eligible.
+    expect(byPath.get(CACHE_DIR)).toMatchObject({ classification: 'CACHE', disposition: 'DELETE' });
+    expect(byPath.get(recordedCacheFile)).toMatchObject({
+      classification: 'CACHE',
+      disposition: 'DELETE',
+    });
+    // Anything else dropped inside the cache root is user-created/unknown —
+    // never root-trusted into CACHE/DELETE.
+    expect(byPath.get(`${CACHE_DIR}\\notes.txt`)).toMatchObject({
+      classification: 'USER_CREATED_UNKNOWN',
+      disposition: 'RETAIN',
+    });
+  });
+
+  it('strict census does not let a recorded directory claim later-dropped descendants', () => {
+    const candidates = classifyResidue({
+      layout,
+      observed: [`${INSTALL_DIR}\\sub\\tool.dll`, `${INSTALL_DIR}\\sub\\user-notes.txt`],
+      protectedRoots: [],
+      providerOwnedFiles: [EXECUTABLE, `${INSTALL_DIR}\\sub`, `${INSTALL_DIR}\\sub\\tool.dll`],
+    });
+    const byPath = new Map(candidates.map((candidate) => [candidate.path, candidate]));
+    expect(byPath.get(`${INSTALL_DIR}\\sub\\tool.dll`)).toMatchObject({
+      classification: 'PROGRAM_OWNED',
+      disposition: 'DELETE',
+    });
+    // The installer created `sub`, but that says nothing about this file —
+    // it must be a manifest entry in its own right or it stays unknown.
+    expect(byPath.get(`${INSTALL_DIR}\\sub\\user-notes.txt`)).toMatchObject({
+      classification: 'USER_CREATED_UNKNOWN',
+      disposition: 'RETAIN',
+    });
+  });
+
   it('pre-existing canaries stay user-created even inside provider roots', () => {
     const canary = `${INSTALL_DIR}\\notes.txt`;
     const candidates = classifyResidue({
