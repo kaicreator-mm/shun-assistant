@@ -581,16 +581,19 @@ describe('R1 fresh-review negatives (hard gates, Issue #33)', () => {
     });
   });
 
-  it('declared descriptive constraints are dispositioned explicitly in the gate record, not silently certified (P1-04 R1)', () => {
+  it('declared descriptive constraints are a typed REJECT — an unevaluated mandatory constraint is never a PASS (P1-04 R1, tightened R2)', () => {
+    // Premise tightened (R2 review blocker 3): the R1 record surfaced
+    // descriptive constraints as a PASS note ("not certified") and allowed
+    // selection. A free-text disclaimer is not a typed unresolved mandatory
+    // condition — a present descriptive constraint now REJECTs the binding.
     const descriptive = goalRequest({ goal: 'image.batch_process: resize photos' });
     descriptive.constraints.resourceLimits = 'keep under 2 GB disk';
     descriptive.constraints.retainRemove = 'RETAIN';
     const outcome = gateScenario({ constraints: descriptive.constraints });
-    expect(outcome.passed).toBe(true);
+    expect(outcome.passed).toBe(false);
     const policyRow = outcome.dispositions.find((entry) => entry.gate === 'USER_ORG_POLICY');
-    expect(policyRow?.outcome).toBe('PASS');
+    expect(policyRow?.outcome).toBe('REJECT');
     expect(policyRow?.reason).toContain('resourceLimits');
     expect(policyRow?.reason).toContain('retainRemove');
-    expect(policyRow?.reason).toContain('not certified');
   });
 });
