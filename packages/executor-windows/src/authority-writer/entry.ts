@@ -1,14 +1,16 @@
 // Production entry for the bounded one-shot ShunAnchorWriter (L2 v0.2 delta).
 // Build-time constants pin the only writable authority root and key path.
-// argv names ONE signed job file to READ; no caller-controlled output path
-// ever becomes an elevated write primitive.
+// argv names ONE UNSIGNED strict-schema proposal file to READ. After UAC the
+// elevated writer seals the exact parsed proposal with the protected key and
+// immediately applies it; no caller-controlled output path ever becomes an
+// elevated write primitive.
 import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { assessAnchorOwnership } from '../anchor-protection.ts';
 import { readWriterPin, sha256File } from '../trusted-store.ts';
 import { applyWriterJob, verifyWriterIdentity } from './apply.ts';
-import { WriterJobSchema } from './job.ts';
+import { sealWriterJobProposal } from './seal.ts';
 
 declare const SHUN_ANCHOR_WRITER_ROOT: string | undefined;
 declare const SHUN_ANCHOR_WRITER_HMAC_KEY_FILE: string | undefined;
@@ -32,7 +34,7 @@ function main(): never {
   const jobFile = process.argv.at(2);
   if (process.argv.length !== 3 || !jobFile) {
     return emitAndExit(
-      { ok: false, code: 'USAGE', reason: 'expected exactly one signed job file' },
+      { ok: false, code: 'USAGE', reason: 'expected exactly one unsigned writer proposal file' },
       2,
     );
   }
@@ -106,8 +108,11 @@ function main(): never {
     );
   }
 
-  const parsed = WriterJobSchema.safeParse(raw);
-  const result = applyWriterJob({ anchorRoot, hmacKeyBase64: key }, raw);
+  const sealed = sealWriterJobProposal(key, raw);
+  if (!sealed.ok) {
+    return emitAndExit({ ok: false, code: 'PROPOSAL_INVALID', reason: sealed.reason }, 2);
+  }
+  const result = applyWriterJob({ anchorRoot, hmacKeyBase64: key }, sealed.job);
   const ownership = assessAnchorOwnership(anchorRoot, keyFile);
   const guardedResult =
     result.ok && ownership.length > 0
@@ -124,27 +129,25 @@ function main(): never {
     nodeExeSha256: pin.nodeExeSha256,
     finishedAt: new Date().toISOString(),
   };
-  if (parsed.success) {
-    try {
-      const dir = join(anchorRoot, 'jobs', 'receipts');
-      mkdirSync(dir, { recursive: true });
-      // Path derives only from AnchorIdSchema-validated jobId.
-      writeFileSync(
-        protectedReceiptPath(anchorRoot, parsed.data.jobId),
+  try {
+    const dir = join(anchorRoot, 'jobs', 'receipts');
+    mkdirSync(dir, { recursive: true });
+    // Path derives only from the strict proposal schema's AnchorIdSchema.
+    writeFileSync(
+        protectedReceiptPath(anchorRoot, sealed.job.jobId),
         `${JSON.stringify(receipt, null, 2)}\n`,
         { encoding: 'utf8', flag: 'wx' },
       );
-    } catch (error) {
-      return emitAndExit(
-        {
-          ok: false,
-          code: 'ANCHOR_WRITE_DENIED',
-          reason: `protected writer receipt could not be persisted: ${String(error)}`,
-          applyResult: guardedResult,
-        },
-        3,
-      );
-    }
+  } catch (error) {
+    return emitAndExit(
+      {
+        ok: false,
+        code: 'ANCHOR_WRITE_DENIED',
+        reason: `protected writer receipt could not be persisted: ${String(error)}`,
+        applyResult: guardedResult,
+      },
+      3,
+    );
   }
   return emitAndExit(receipt, guardedResult.ok ? 0 : 2);
 }
