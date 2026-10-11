@@ -51,6 +51,12 @@ export interface PerformOutcome {
    * explicit NO_EFFECT marker (L2 §9.4 UAC_DECLINED semantics).
    */
   readonly noEffect?: true;
+  /**
+   * A mechanism-level safety/policy refusal before any side effect is not
+   * a declined UAC prompt. The frozen receipt taxonomy already contains
+   * REFUSED; keep the NOT_STARTED recovery proof and journal NO_EFFECT.
+   */
+  readonly refusalTerminal?: 'REFUSED';
 }
 
 export interface LocalBackendDeps {
@@ -239,7 +245,7 @@ export class LocalPrivilegedBackend implements ExecutionBackend {
       return this.#receipt(
         action,
         startedAt,
-        'UAC_DECLINED',
+        outcome.refusalTerminal ?? 'UAC_DECLINED',
         'NOT_STARTED',
         false,
         outcome.exitCode,
