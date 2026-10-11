@@ -36,6 +36,13 @@ function Set-ProtectedDirectoryAcl([string]$Path) {
   Set-Acl -LiteralPath $Path -AclObject $acl
 }
 
+function Set-PrivilegedOwner([string]$Path) {
+  $admins = New-Object System.Security.Principal.SecurityIdentifier('S-1-5-32-544')
+  $acl = Get-Acl -LiteralPath $Path
+  $acl.SetOwner($admins)
+  Set-Acl -LiteralPath $Path -AclObject $acl
+}
+
 function Set-SecretFileAcl([string]$Path) {
   $admins = New-Object System.Security.Principal.SecurityIdentifier('S-1-5-32-544')
   $system = New-Object System.Security.Principal.SecurityIdentifier('S-1-5-18')
@@ -158,8 +165,13 @@ foreach ($window in @($bootstrap.policyWindows)) {
   Write-Json (Join-Path $AnchorRoot ("jobs\window-{0}.json" -f $window.windowId)) $window
 }
 
-# Re-assert after bootstrap writes. Runtime gets read/execute only on records;
-# the symmetric key remains Administrator/SYSTEM-read only.
+# Re-assert after bootstrap writes. Ownership is an independent security
+# condition: an owner implicitly holds WRITE_DAC even when its current ACEs
+# deny write. Every initial child is therefore moved to Administrators owner,
+# not merely the root/key.
+Get-ChildItem -LiteralPath $AnchorRoot -Force -Recurse | ForEach-Object {
+  Set-PrivilegedOwner $_.FullName
+}
 Set-ProtectedDirectoryAcl $AnchorRoot
 Set-SecretFileAcl $keyFile
 
