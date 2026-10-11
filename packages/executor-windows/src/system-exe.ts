@@ -100,6 +100,23 @@ const REG_QUERY_SYSTEMROOT_ARGS = [
 const HARD_CODED_FALLBACK_ROOT = 'C:\\Windows';
 
 /**
+ * Windows path construction that is HOST-INDEPENDENT (P1-2 root cause): the
+ * resolver runs its Windows logic on ANY platform (injected platform/fs seam
+ * in the negative controls), so candidate paths must always be
+ * backslash-joined. node:path's `join` splices the HOST separator — on a
+ * POSIX test host `join('C:\\Windows', 'System32', 'reg.exe')` yields the
+ * mixed-separator `C:\Windows/System32/reg.exe`, which silently misses every
+ * seam-registered (and every real Windows) candidate: the machine anchor
+ * "vanishes" and the resolver degrades for the wrong reason. Collapses
+ * duplicated separators except a leading UNC double-backslash.
+ */
+function winPathJoin(...parts: readonly string[]): string {
+  const merged = parts.filter((part) => part.length > 0).join('\\');
+  if (merged.startsWith('\\\\')) return `\\\\${merged.slice(2).replace(/\\{2,}/g, '\\')}`;
+  return merged.replace(/\\{2,}/g, '\\');
+}
+
+/**
  * Resolve the Windows system directory per machine evidence, not caller
  * say-so. `env`, `query`, `platform` and the fs `seam` are injectable so the
  * resolution logic is testable on any host without real elevation.
@@ -139,7 +156,7 @@ export function resolveSystemRoot(
   //    hints are only consulted when the machine evidence is absent or
   //    entirely unreadable. (N-1: the fixed point constrains the REPORTED
   //    ROOT; the identity gate below constrains the BYTES.)
-  const machineReg = join(HARD_CODED_FALLBACK_ROOT, 'System32', 'reg.exe');
+  const machineReg = winPathJoin(HARD_CODED_FALLBACK_ROOT, 'System32', 'reg.exe');
   if (statFile(machineReg)) {
     // F-1: verify the anchor's bytes BEFORE executing it. A readable anchor
     // that fails the pinned identity is readable contradicting evidence —
@@ -184,7 +201,7 @@ export function resolveSystemRoot(
   //    only after its bytes pass the pin gate, and why the binaries handed
   //    out are identity-checked against the pin afterwards.
   for (const hint of uniqueRoots([env.SystemRoot, env.windir])) {
-    const hintReg = join(hint, 'System32', 'reg.exe');
+    const hintReg = winPathJoin(hint, 'System32', 'reg.exe');
     if (!statFile(hintReg)) continue;
     if (!executeAllowed(hintReg)) continue; // never EXECUTE an unpinned candidate
     const reported = query(hintReg, REG_QUERY_SYSTEMROOT_ARGS)?.trim();
@@ -195,7 +212,7 @@ export function resolveSystemRoot(
 
   // 3. Degraded fallback: inherited env on unanimous agreement + existence.
   const agreed = uniqueRoots([env.SystemRoot, env.windir]);
-  if (agreed.length === 1 && statDirectory(join(agreed[0] as string, 'System32'))) {
+  if (agreed.length === 1 && statDirectory(winPathJoin(agreed[0] as string, 'System32'))) {
     return { ok: true, systemRoot: agreed[0] as string };
   }
   return {
@@ -325,7 +342,7 @@ function validatedFixedPoint(
 ): string | undefined {
   if (!isAbsoluteWindowsPath(reported)) return undefined;
   if (!statDirectory(reported)) return undefined;
-  const reportedReg = join(reported, 'System32', 'reg.exe');
+  const reportedReg = winPathJoin(reported, 'System32', 'reg.exe');
   if (!statFile(reportedReg)) return undefined;
   if (!executeAllowed(reportedReg)) return undefined;
   const confirmed = query(reportedReg, REG_QUERY_SYSTEMROOT_ARGS)?.trim();
