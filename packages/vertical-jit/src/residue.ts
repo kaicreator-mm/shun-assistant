@@ -48,6 +48,20 @@ export interface ResidueClassificationInput {
   readonly providerOwnedFiles?: readonly string[];
 }
 
+/**
+ * Strict census membership (VJ-P1-01): the manifest names every path the
+ * install recorded — files, directories and newly created roots alike. A
+ * path is recorded when it IS a manifest entry or an ANCESTOR of one (a
+ * directory holding installer-written content is itself installer-created).
+ * Descendants of a recorded directory are NOT covered by that entry: the
+ * installer creating a directory says nothing about files dropped inside it
+ * later — each of those must be a manifest entry in its own right or it
+ * stays unknown.
+ */
+function isCensusRecorded(path: string, providerOwnedFiles: readonly string[]): boolean {
+  return providerOwnedFiles.some((owned) => pathWithin(owned, path));
+}
+
 /** Fail-closed disposition for a classification. */
 export function dispositionFor(classification: ResidueClassification): 'DELETE' | 'RETAIN' {
   if ((NEVER_AUTO_DELETE_CLASSIFICATIONS as readonly string[]).includes(classification)) {
@@ -75,16 +89,21 @@ export function classifyPath(
     return 'CONFIGURATION';
   }
   if (input.layout.cacheDirs.some((root) => pathWithin(path, root))) {
+    // Strict census, same discipline as install roots (VJ-P1-01 cache
+    // census): the cache-root claim covers exactly what the install
+    // recorded. Cache roots sit inside the deletion scope, so anything
+    // unrecorded dropped inside one is user-created/unknown and fails
+    // closed — never root-trusted straight into CACHE/DELETE.
+    if (input.providerOwnedFiles && !isCensusRecorded(path, input.providerOwnedFiles)) {
+      return 'USER_CREATED_UNKNOWN';
+    }
     return 'CACHE';
   }
   if (input.layout.installDirs.some((root) => pathWithin(path, root))) {
-    // Strict mode: provider-owned structure is exactly what the install
-    // recorded — an owned file itself, or a directory containing one. Any
+    // Strict census: provider-owned structure is exactly what the install
+    // recorded — an owned path itself, or a directory containing one. Any
     // other file inside a program directory is user-created/unknown.
-    if (
-      input.providerOwnedFiles &&
-      !input.providerOwnedFiles.some((owned) => pathWithin(path, owned) || pathWithin(owned, path))
-    ) {
+    if (input.providerOwnedFiles && !isCensusRecorded(path, input.providerOwnedFiles)) {
       return 'USER_CREATED_UNKNOWN';
     }
     return 'PROGRAM_OWNED';

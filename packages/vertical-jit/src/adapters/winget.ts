@@ -13,7 +13,11 @@ import { homedir } from 'node:os';
 import { join } from 'node:path';
 import type { JournalPort } from '../journal.ts';
 import type { LocalAuthority } from '../local-authority.ts';
-import { LocalPrivilegedBackend, type PrivilegedFault } from '../local-backend.ts';
+import {
+  LocalPrivilegedBackend,
+  type PerformOutcome,
+  type PrivilegedFault,
+} from '../local-backend.ts';
 import type {
   AcquisitionCandidate,
   AcquisitionPort,
@@ -157,7 +161,10 @@ export class WingetAcquisition implements AcquisitionPort {
         : {}),
       ...(publisher ? { publisher } : {}),
       ...(fields.license ? { license: fields.license } : {}),
-      ...(publisher ? { signature: `authenticode:${publisher}` } : {}),
+      // VJ-P2-05: the publisher string is UNVERIFIED text output. A
+      // signature claim ("authenticode:…") may only be recorded after an
+      // independent Authenticode verification, which this adapter does not
+      // perform — so no signature field is fabricated here.
     };
   }
 
@@ -240,6 +247,12 @@ export interface WingetBackendDeps {
   readonly clock: () => string;
   readonly journals: (actionId: string) => JournalPort;
   readonly process: ProcessPort;
+  /**
+   * Host observation seam retained for consistent acquisition/backend wiring.
+   * No filesystem census can authorize raw external WinGet uninstall until
+   * lifetime-wide exclusive ownership of the deletion scope is provable.
+   */
+  readonly fs: FilesystemPort;
   readonly timeoutMs?: number;
   readonly machineScope: boolean;
   /** Fault injection for negative evidence scenarios (never in production). */
@@ -262,6 +275,7 @@ export class WingetPrivilegedBackend extends LocalPrivilegedBackend {
         }`,
       providerVersion: (action) =>
         String((action.action.parameters as Record<string, unknown>).version ?? 'unknown'),
+      preflight: (action) => this.#preflight(action),
       perform: (action) => this.#perform(action),
       ...(deps.faults ? { faults: deps.faults } : {}),
     });
@@ -270,14 +284,43 @@ export class WingetPrivilegedBackend extends LocalPrivilegedBackend {
 
   readonly #deps: WingetBackendDeps;
 
-  async #perform(action: {
+  async #preflight(action: {
     op: string;
     parameters: Record<string, unknown>;
-  }): Promise<{ ok: boolean; exitCode?: number; note?: string; noEffect?: true }> {
+  }): Promise<(PerformOutcome & { readonly noEffect: true }) | undefined> {
+    if (action.op !== 'software.uninstall') return undefined;
+    // R5b: this refusal is an EFFECT PRECONDITION, so it must be decided
+    // before LocalPrivilegedBackend appends EXEC_START. A durable EXEC_START
+    // plus NOT_STARTED receipt is contradictory recovery evidence.
+    return {
+      ok: false,
+      note: 'POLICY_BLOCKED: external WinGet uninstall cannot guarantee user-asset preservation for the lifetime of the uninstaller; retain provider and require manual intervention',
+      noEffect: true,
+      refusalTerminal: 'REFUSED',
+    };
+  }
+
+  async #perform(action: { op: string; parameters: Record<string, unknown> }): Promise<{
+    ok: boolean;
+    exitCode?: number;
+    note?: string;
+    noEffect?: true;
+    refusalTerminal?: 'REFUSED';
+  }> {
     const packageId = String(action.parameters.packageId ?? '');
     const version = String(action.parameters.version ?? '');
     if (!packageId || !version) {
       return { ok: false, note: 'plan parameters lack packageId/version' };
+    }
+    if (action.op === 'software.uninstall') {
+      // Defense in depth: the trusted preflight above should have refused
+      // before EXEC_START. If composition ever bypasses that preflight, do
+      // NOT execute the external remover; return an uncertain failed effect
+      // window rather than falsely claiming NOT_STARTED after EXEC_START.
+      return {
+        ok: false,
+        note: 'internal safety invariant: external WinGet uninstall reached perform after mandatory preflight',
+      };
     }
     const argv =
       action.op === 'software.install'
@@ -328,8 +371,7 @@ export class WingetPrivilegedBackend extends LocalPrivilegedBackend {
       return {
         ok: false,
         exitCode: result.exitCode,
-        note: `${note} elevation-required`,
-        noEffect: true,
+        note: `${note} elevation-required (external installer was invoked; no zero-effect claim)`,
       };
     }
     if (

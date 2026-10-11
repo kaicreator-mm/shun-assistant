@@ -207,6 +207,7 @@ function makeWorld(options: {
       clock: now,
       journals,
       process,
+      fs,
       machineScope: options.machineScope ?? false,
       ...(options.faults ? { faults: options.faults } : {}),
     }),

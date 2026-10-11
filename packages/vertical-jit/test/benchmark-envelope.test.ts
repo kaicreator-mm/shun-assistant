@@ -5,7 +5,7 @@
 import { describe, expect, it } from 'vitest';
 import { buildHarness } from '../src/mocks.ts';
 import { runJitBenchmarkLifecycle } from '../src/orchestrator.ts';
-import { EXECUTABLE, INSTALL_DIR, installWorld, jitInput } from './helpers.ts';
+import { CACHE_DIR, EXECUTABLE, INSTALL_DIR, installWorld, jitInput } from './helpers.ts';
 
 const CANARY_OUTSIDE = 'C:\\fixtures\\user-assets\\notes.txt';
 const CANARY_INSIDE = `${INSTALL_DIR}\\notes.txt`;
@@ -28,7 +28,11 @@ describe('benchmark envelope vs production input', () => {
     installWorld(harness);
 
     const output = await runJitBenchmarkLifecycle(REMOVE_ENVELOPE, harness.deps, {
-      providerOwnedFiles: [EXECUTABLE],
+      // Harness truth: the installer wrote the executable AND created the
+      // cache root — under the strict cache census (VJ-P1-01) an
+      // installer-created cache root must be named here or the removal gate
+      // fails closed on it.
+      providerOwnedFiles: [EXECUTABLE, CACHE_DIR],
     });
 
     expect(output.finalState).toBe('REMOVED');

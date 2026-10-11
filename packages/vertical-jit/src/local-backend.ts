@@ -10,8 +10,9 @@
 //   RECEIVED → (grant validation) → VALIDATED → EXEC_START → EXEC_DONE →
 //   RECEIPT_WRITTEN
 //
-// A refused presentation journals RECEIVED only (recovery NOT_STARTED); a
-// declined elevation journals a NO_EFFECT marker (NOT_STARTED, L2 §9.4);
+// A refused presentation journals RECEIVED only (FAILED_BEFORE_EFFECT); a
+// declined elevation journals a NO_EFFECT marker (FAILED_BEFORE_EFFECT after
+// RECEIVED, L2 §9.4);
 // an interruption between EXEC_START and EXEC_DONE leaves the journal torn
 // and classifies MAY_HAVE_EXECUTED_UNCERTAIN upstream.
 import {
@@ -23,7 +24,7 @@ import {
   type PlanAction,
   ShunContractError,
 } from '@shun/contracts';
-import type { JournalPort } from './journal.ts';
+import { type JournalPort, newJournalId } from './journal.ts';
 import type { LocalAuthority } from './local-authority.ts';
 
 /** Transport-level crash of the privileged worker (simulates a killed helper). */
@@ -47,10 +48,17 @@ export interface PerformOutcome {
   readonly outputRefs?: readonly string[];
   /**
    * True when the worker refused before any effect phase (e.g. elevation
-   * declined): receipt classifies NOT_STARTED and the journal carries an
+   * declined): receipt classifies FAILED_BEFORE_EFFECT (once RECEIVED is
+   * durable) and the journal carries an
    * explicit NO_EFFECT marker (L2 §9.4 UAC_DECLINED semantics).
    */
   readonly noEffect?: true;
+  /**
+   * A mechanism-level safety/policy refusal before any side effect is not
+   * a declined UAC prompt. The frozen receipt taxonomy already contains
+   * REFUSED; keep FAILED_BEFORE_EFFECT and journal NO_EFFECT.
+   */
+  readonly refusalTerminal?: 'REFUSED';
 }
 
 export interface LocalBackendDeps {
@@ -60,6 +68,14 @@ export interface LocalBackendDeps {
   readonly environmentId: string;
   readonly providerId: (action: AuthorizedAction) => string;
   readonly providerVersion: (action: AuthorizedAction) => string;
+  /**
+   * Trusted mechanism gate executed after grant validation but before
+   * EXEC_START. It may only produce a proven no-effect refusal; actual effects
+   * belong in perform(), after EXEC_START is durably journaled.
+   */
+  preflight?(
+    action: PlanAction,
+  ): Promise<(PerformOutcome & { readonly noEffect: true }) | undefined>;
   perform(action: PlanAction): Promise<PerformOutcome>;
   /** Fault injection for negative scenarios; production adapters pass none. */
   faults?: readonly PrivilegedFault[];
@@ -108,11 +124,16 @@ export class LocalPrivilegedBackend implements ExecutionBackend {
   async execute(action: AuthorizedAction, presentation: unknown): Promise<ExecutionReceipt> {
     const journal = await this.#journalFor(action.actionId);
     const startedAt = this.#deps.clock();
+    // Every execute() call is a fresh attempt of this actionId: the
+    // reconcile-first retry re-uses the same actionId, and recovery
+    // classification isolates the latest attempt by this id (VJ-P1-04).
+    const attemptId = newJournalId('attempt');
     await journal.append({
       seq: 0,
       ts: startedAt,
       phase: 'RECEIVED',
       actionId: action.actionId,
+      attemptId,
     });
 
     const plan = await this.#deps.authority.ledger.byHash(action.planHash);
@@ -139,6 +160,7 @@ export class LocalPrivilegedBackend implements ExecutionBackend {
       phase: 'VALIDATED',
       actionId: action.actionId,
       detail: `grant ${verdict.grant.grantId}`,
+      attemptId,
     });
 
     const fault = this.#deps.faults?.find((candidate) =>
@@ -147,21 +169,44 @@ export class LocalPrivilegedBackend implements ExecutionBackend {
 
     if (fault?.kind === 'UAC_DECLINED') {
       // The elevation seam refused BEFORE any effect phase (L2 §9.4:
-      // UAC_DECLINED ⇒ NOT_STARTED).
+      // UAC_DECLINED after RECEIVED ⇒ FAILED_BEFORE_EFFECT).
       await journal.append({
         seq: 2,
         ts: this.#deps.clock(),
         phase: 'RECEIPT_WRITTEN',
         actionId: action.actionId,
         detail: 'NO_EFFECT:UAC_DECLINED — elevation refused before the effect phase',
+        attemptId,
       });
       return this.#receipt(
         action,
         startedAt,
         'UAC_DECLINED',
-        'NOT_STARTED',
+        'FAILED_BEFORE_EFFECT',
         false,
         undefined,
+        [],
+        `journal:${action.actionId}`,
+      );
+    }
+
+    const preflight = await this.#deps.preflight?.(action.action);
+    if (preflight) {
+      await journal.append({
+        seq: 2,
+        ts: this.#deps.clock(),
+        phase: 'RECEIPT_WRITTEN',
+        actionId: action.actionId,
+        detail: `NO_EFFECT:${preflight.note ?? 'mechanism preflight refused before effect'}`,
+        attemptId,
+      });
+      return this.#receipt(
+        action,
+        startedAt,
+        preflight.refusalTerminal ?? 'REFUSED',
+        'FAILED_BEFORE_EFFECT',
+        false,
+        preflight.exitCode,
         [],
         `journal:${action.actionId}`,
       );
@@ -172,6 +217,7 @@ export class LocalPrivilegedBackend implements ExecutionBackend {
       ts: this.#deps.clock(),
       phase: 'EXEC_START',
       actionId: action.actionId,
+      attemptId,
     });
 
     if (fault?.kind === 'INTERRUPT') {
@@ -196,14 +242,26 @@ export class LocalPrivilegedBackend implements ExecutionBackend {
         phase: 'EXEC_DONE',
         actionId: action.actionId,
         detail: 'simulated execution failure',
+        attemptId,
       });
       await journal.append({
         seq: 8,
         ts: this.#deps.clock(),
         phase: 'RECEIPT_WRITTEN',
         actionId: action.actionId,
+        attemptId,
       });
-      return this.#receipt(action, startedAt, 'FAILED', 'COMPLETED_VERIFIED', true, 1, []);
+      return this.#receipt(
+        action,
+        startedAt,
+        'FAILED',
+        // VJ-P2-06: the worker self-reports failure; the expected post-state
+        // was NOT independently verified — no COMPLETED_VERIFIED claim.
+        'MAY_HAVE_EXECUTED_UNCERTAIN',
+        false,
+        1,
+        [],
+      );
     }
 
     const outcome = await this.#deps.perform(action.action);
@@ -214,12 +272,13 @@ export class LocalPrivilegedBackend implements ExecutionBackend {
         phase: 'RECEIPT_WRITTEN',
         actionId: action.actionId,
         detail: `NO_EFFECT:${outcome.note ?? 'worker refused before effect'}`,
+        attemptId,
       });
       return this.#receipt(
         action,
         startedAt,
-        'UAC_DECLINED',
-        'NOT_STARTED',
+        outcome.refusalTerminal ?? 'REFUSED',
+        'FAILED_BEFORE_EFFECT',
         false,
         outcome.exitCode,
         [],
@@ -232,19 +291,27 @@ export class LocalPrivilegedBackend implements ExecutionBackend {
       phase: 'EXEC_DONE',
       actionId: action.actionId,
       ...(outcome.note ? { detail: outcome.note } : {}),
+      attemptId,
     });
     await journal.append({
       seq: 5,
       ts: this.#deps.clock(),
       phase: 'RECEIPT_WRITTEN',
       actionId: action.actionId,
+      attemptId,
     });
     return this.#receipt(
       action,
       startedAt,
       outcome.ok ? 'SUCCEEDED' : 'FAILED',
-      'COMPLETED_VERIFIED',
-      true,
+      // VJ-P2-06: a whole journal plus a worker's ok self-report is effect
+      // completion, NOT verification. Independent post-state verification
+      // happens upstream (orchestrator providerPresent / R2 verify). Until
+      // it lands, claiming COMPLETED_VERIFIED or postStateVerified=true is a
+      // fabricated claim; the frozen taxonomy has no "completed-unverified"
+      // value, so the conservative non-claim is MAY_HAVE_EXECUTED_UNCERTAIN.
+      'MAY_HAVE_EXECUTED_UNCERTAIN',
+      false,
       outcome.exitCode,
       [...(outcome.outputRefs ?? [])],
       `journal:${action.actionId}`,

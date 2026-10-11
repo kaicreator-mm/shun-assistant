@@ -1,5 +1,5 @@
 // Declined-elevation and interrupted-removal scenarios (B-038 negatives):
-// UAC_DECLINED leaves the journal at NOT_STARTED with no side effect and no
+// UAC_DECLINED follows RECEIVED, so it is FAILED_BEFORE_EFFECT with no side effect and no
 // automatic retry; a mid-effect interruption classifies
 // MAY_HAVE_EXECUTED_UNCERTAIN from the journal and resolves reconcile-first
 // against the SAME stable actionId.
@@ -30,7 +30,7 @@ function durablePolicy() {
 }
 
 describe('JIT lifecycle — declined elevation (UAC)', () => {
-  it('fails the install with NOT_STARTED recovery and never retries', async () => {
+  it('fails the install with FAILED_BEFORE_EFFECT recovery and never retries', async () => {
     const harness = buildHarness({
       backendFaults: [
         { kind: 'UAC_DECLINED', when: (action) => action.action.op === 'software.install' },
@@ -44,13 +44,15 @@ describe('JIT lifecycle — declined elevation (UAC)', () => {
 
     expect(error).toMatchObject({ code: 'INSTALL_FAILED' });
     expect((error as { recovery?: { recoveryClassification: string } }).recovery).toMatchObject({
-      recoveryClassification: 'NOT_STARTED',
+      recoveryClassification: 'FAILED_BEFORE_EFFECT',
     });
     expect(await harness.fs.exists(INSTALL_DIR)).toBe(false);
     // The journal carries the explicit NO_EFFECT marker.
     const entries = await harness.deps.journals('task-2026-10-10-002-install').replay();
     expect(entries.some((entry) => entry.detail?.startsWith('NO_EFFECT:'))).toBe(true);
-    expect(classifyFromJournal(entries, 'task-2026-10-10-002-install')).toBe('NOT_STARTED');
+    expect(classifyFromJournal(entries, 'task-2026-10-10-002-install')).toBe(
+      'FAILED_BEFORE_EFFECT',
+    );
   });
 
   it('fails the removal with the provider retained when elevation is declined at uninstall', async () => {
@@ -68,9 +70,69 @@ describe('JIT lifecycle — declined elevation (UAC)', () => {
 
     expect(error).toMatchObject({ code: 'REMOVE_FAILED' });
     expect((error as { recovery?: { recoveryClassification: string } }).recovery).toMatchObject({
-      recoveryClassification: 'NOT_STARTED',
+      recoveryClassification: 'FAILED_BEFORE_EFFECT',
     });
     expect(await harness.fs.exists(INSTALL_DIR)).toBe(true);
+  });
+});
+
+describe('R8 — failure metadata converges with durable recovery truth', () => {
+  it('install transport interruption stays MAY_HAVE_EXECUTED_UNCERTAIN end-to-end', async () => {
+    const harness = buildHarness({
+      backendFaults: [
+        { kind: 'INTERRUPT', when: (action) => action.action.op === 'software.install' },
+      ],
+    });
+    installWorld(harness);
+
+    const error = await runJitLifecycle(jitInput({ retention: 'RETAIN' }), harness.deps).catch(
+      (caught: unknown) => caught,
+    );
+    expect(error).toMatchObject({
+      code: 'INSTALL_FAILED',
+      recovery: { recoveryClassification: 'MAY_HAVE_EXECUTED_UNCERTAIN' },
+    });
+    const actionId = 'task-2026-10-10-002-install';
+    const entries = await harness.deps.journals(actionId).replay();
+    expect(classifyFromJournal(entries, actionId)).toBe('MAY_HAVE_EXECUTED_UNCERTAIN');
+  });
+
+  it('install worker failure never claims FAILED_BEFORE_EFFECT after EXEC_DONE', async () => {
+    const harness = buildHarness({
+      backendFaults: [
+        { kind: 'FAIL_EXEC', when: (action) => action.action.op === 'software.install' },
+      ],
+    });
+    installWorld(harness);
+
+    const error = await runJitLifecycle(jitInput({ retention: 'RETAIN' }), harness.deps).catch(
+      (caught: unknown) => caught,
+    );
+    expect(error).toMatchObject({
+      code: 'INSTALL_FAILED',
+      recovery: { recoveryClassification: 'MAY_HAVE_EXECUTED_UNCERTAIN' },
+    });
+    const actionId = 'task-2026-10-10-002-install';
+    const entries = await harness.deps.journals(actionId).replay();
+    expect(classifyFromJournal(entries, actionId)).toBe('MAY_HAVE_EXECUTED_UNCERTAIN');
+  });
+
+  it('removal worker failure preserves MAY_HAVE_EXECUTED_UNCERTAIN in lifecycle metadata', async () => {
+    const harness = buildHarness({
+      durableJitPolicy: durablePolicy(),
+      backendFaults: [
+        { kind: 'FAIL_EXEC', when: (action) => action.action.op === 'software.uninstall' },
+      ],
+    });
+    installWorld(harness);
+
+    const error = await runJitLifecycle(REMOVE_INPUT, harness.deps).catch(
+      (caught: unknown) => caught,
+    );
+    expect(error).toMatchObject({
+      code: 'REMOVE_FAILED',
+      recovery: { recoveryClassification: 'MAY_HAVE_EXECUTED_UNCERTAIN' },
+    });
   });
 });
 
@@ -117,8 +179,11 @@ describe('JIT lifecycle — interrupted removal (reconcile-first)', () => {
       ],
     });
     installWorld(harness);
-    // The interrupted worker actually performed the removal, then crashed
-    // before journaling EXEC_DONE: on interrupt, the provider is gone.
+    // The interrupted worker actually performed the manifest-bound removal,
+    // then crashed before journaling EXEC_DONE: on interrupt, the provider is
+    // gone. The effect consumes the install-time manifest exactly as the
+    // privileged backend recorded it durably in the CHECKPOINT lifecycle
+    // record (VJ-P1-01 R4 manifest-restricted deletion).
     const inner = harness.deps.privileged;
     const deps = withDeps(harness, {
       privileged: {
@@ -127,7 +192,18 @@ describe('JIT lifecycle — interrupted removal (reconcile-first)', () => {
             return await inner.execute(action, grant);
           } catch (error) {
             if (error instanceof BackendInterruptError) {
-              harness.acquisition.uninstallByPlan('ExampleSoft.PdfTool');
+              const checkpoint = [...harness.store.records.values()].find(
+                (mutation) => mutation.payload.state === 'CHECKPOINT',
+              );
+              const manifest =
+                (checkpoint?.payload.providerOwnedFiles as readonly string[] | undefined) ?? [];
+              const layout = checkpoint?.payload.layout as
+                | { installDirs: string[]; cacheDirs: string[] }
+                | undefined;
+              await harness.acquisition.uninstallByPlan('ExampleSoft.PdfTool', {
+                manifest,
+                scopeRoots: [...(layout?.installDirs ?? []), ...(layout?.cacheDirs ?? [])],
+              });
             }
             throw error;
           }

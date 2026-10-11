@@ -70,10 +70,10 @@ describe('journal-only recovery classification', () => {
         [entry('RECEIVED'), entry('EXEC_START'), entry('EXEC_DONE'), entry('RECEIPT_WRITTEN')],
         'a1',
       ),
-    ).toBe('COMPLETED_VERIFIED');
+    ).toBe('MAY_HAVE_EXECUTED_UNCERTAIN');
   });
 
-  it('classifies UAC-style NO_EFFECT markers as NOT_STARTED', () => {
+  it('classifies NO_EFFECT after RECEIVED as FAILED_BEFORE_EFFECT', () => {
     const entries = [
       entry('RECEIVED'),
       entry('VALIDATED'),
@@ -82,7 +82,7 @@ describe('journal-only recovery classification', () => {
         'NO_EFFECT:UAC_DECLINED — elevation refused before the effect phase',
       ),
     ];
-    expect(classifyFromJournal(entries, 'a1')).toBe('NOT_STARTED');
+    expect(classifyFromJournal(entries, 'a1')).toBe('FAILED_BEFORE_EFFECT');
   });
 
   it('is per-actionId: another action’s phases do not leak into the classification', () => {

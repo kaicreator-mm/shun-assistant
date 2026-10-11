@@ -30,6 +30,12 @@ import {
 import { type JournalPort, MemoryJournal } from './journal.ts';
 import { LocalAuthority, MemoryPlanLedger } from './local-authority.ts';
 import { LocalPrivilegedBackend, type PrivilegedFault } from './local-backend.ts';
+import {
+  effectTimeScopeRefusal,
+  type ManifestDeletionSpec,
+  manifestDeletionSpec,
+  removeManifestEntries,
+} from './manifest-removal.ts';
 import type { JitLifecycleDeps } from './orchestrator.ts';
 import type {
   AcquisitionCandidate,
@@ -163,6 +169,26 @@ export class MemoryFilesystem implements FilesystemPort {
       if (key === this.#key(path) || key.startsWith(prefix)) this.#nodes.delete(key);
     }
   }
+
+  /**
+   * Effect executor surface: remove exactly ONE node — a file, or a directory
+   * ONLY when it holds no remaining children. Unrecorded residue inside a
+   * directory is never forced out (VJ-P1-01 R4 manifest-restricted deletion).
+   */
+  removeEntry(path: string): boolean {
+    const key = this.#key(path);
+    const node = this.#nodes.get(key);
+    if (!node) return false;
+    if (node.kind === 'dir') {
+      const prefix = `${key}/`;
+      for (const existing of this.#nodes.keys()) {
+        if (existing.startsWith(prefix)) return false;
+      }
+    }
+    this.#nodes.delete(key);
+    this.#display.delete(key);
+    return true;
+  }
 }
 
 // ---- process (scripted) ----
@@ -243,7 +269,8 @@ export class MemoryAcquisition implements AcquisitionPort {
       installerSha256: entry.installerSha256,
       publisher: entry.publisher,
       license: entry.license,
-      signature: `authenticode:${entry.publisher}`,
+      // VJ-P2-05: the memory harness mirrors the real adapter — no
+      // fabricated signature claim without independent verification.
     };
   }
 
@@ -276,11 +303,37 @@ export class MemoryAcquisition implements AcquisitionPort {
     return { ok: true, note: `installed ${packageId} ${version}` };
   }
 
-  uninstallByPlan(packageId: string): { ok: boolean; note: string } {
-    const entry = this.#require(packageId);
-    this.#fs.removeTree(entry.installDir);
-    if (entry.cacheDir) this.#fs.removeTree(entry.cacheDir);
-    return { ok: true, note: `removed ${packageId}` };
+  /**
+   * Manifest-bound removal effect (VJ-P1-01 R4 effect atomicity). Two
+   * fail-closed layers inside the executor, after every caller-reachable
+   * seam: (1) effect-time scope exclusivity — any present-but-unrecorded
+   * path refuses the whole effect with zero deletions and an honest
+   * NO_EFFECT note; (2) the deletion itself consumes exactly the manifest
+   * entries (deepest first, empty-directory-only), so a file planted after
+   * the manifest was recorded is structurally outside what this effect can
+   * delete. This is deliberately NOT a whole-root removeTree.
+   */
+  async uninstallByPlan(
+    packageId: string,
+    deletion: ManifestDeletionSpec,
+  ): Promise<{ ok: boolean; note: string; noEffect?: true; refusalTerminal?: 'REFUSED' }> {
+    this.#require(packageId);
+    const refusal = await effectTimeScopeRefusal(this.#fs, deletion);
+    if (refusal) {
+      return {
+        ok: false,
+        note: `removal refused before any effect — ${refusal}`,
+        noEffect: true,
+        refusalTerminal: 'REFUSED',
+      };
+    }
+    const { removed, retained } = await removeManifestEntries(this.#fs, this.#fs, deletion);
+    return {
+      ok: true,
+      note: `removed ${packageId} (${removed.length} recorded entries${
+        retained.length > 0 ? `, ${retained.length} retained` : ''
+      })`,
+    };
   }
 
   #require(packageId: string): MemoryCatalogEntry {
@@ -331,7 +384,12 @@ export function trustedProviderDefinition(
       official: true,
       version: entry.version,
       hash: entry.installerSha256,
-      signature: `authenticode:${entry.publisher}`,
+      // VJ-P2-05: NO fabricated signature field here. The schema makes it
+      // optional, and this catalog fixture performs no Authenticode
+      // verification — mirroring the honest real adapter (winget.ts), a
+      // signature claim may only be recorded after independent verification.
+      // The field stays absent so it can never be mistaken for verification
+      // evidence or flow into provenance output.
     },
     provenanceFacts: { publisher: entry.publisher, catalog: 'winget-official' },
     licenseFacts: { license: entry.license },
@@ -529,7 +587,8 @@ export class MemoryTaskBackend implements EnvironmentBackend {
         sideEffectEvidence: {
           sideEffectClass: action.action.sideEffectClass,
           recoveryClassification: 'FAILED_BEFORE_EFFECT',
-          postStateVerified: true,
+          // VJ-P2-06: nothing ran — nothing is verified.
+          postStateVerified: false,
         },
       });
       this.receipts.push(receipt);
@@ -551,8 +610,10 @@ export class MemoryTaskBackend implements EnvironmentBackend {
       stdoutRef: stdoutPath,
       sideEffectEvidence: {
         sideEffectClass: action.action.sideEffectClass,
-        recoveryClassification: 'COMPLETED_VERIFIED',
-        postStateVerified: true,
+        // VJ-P2-06: harness mirrors the honest real backend — completion is
+        // not verification; the oracle performs verification downstream.
+        recoveryClassification: 'MAY_HAVE_EXECUTED_UNCERTAIN',
+        postStateVerified: false,
       },
     });
     this.receipts.push(receipt);
@@ -634,8 +695,18 @@ function buildBackend(
         return { ok: outcome.ok, note: outcome.note };
       }
       if (action.op === 'software.uninstall') {
-        const outcome = acquisition.uninstallByPlan(packageId);
-        return { ok: outcome.ok, note: outcome.note };
+        // Fail closed on a legacy whole-root shape: an uninstall action
+        // without a manifest-restricted deletion set is refused, never
+        // executed (VJ-P1-01 R4).
+        const deletion = manifestDeletionSpec(action);
+        if (!deletion) {
+          return {
+            ok: false,
+            note: 'software.uninstall plan carries no manifest-restricted deletion set — refusing a whole-root removal',
+            noEffect: true,
+          };
+        }
+        return await acquisition.uninstallByPlan(packageId, deletion);
       }
       return { ok: false, note: `unsupported op ${action.op}` };
     },
@@ -677,6 +748,13 @@ export function buildHarness(options: HarnessOptions = {}): JitHarness {
     verifier,
     store,
     planLedger: ledger,
+    // The task grant is presented to the SAME trusted authority that signed
+    // it — the environment backend never runs on the caller's say-so
+    // (VJ-P1-03).
+    taskPresentationGate: {
+      validate: ({ action, grant, plan }) =>
+        authority.validatePresentation(authority.validationInput(grant, plan, action, clock())),
+    },
     journals: journalFor,
     fs,
     clock,

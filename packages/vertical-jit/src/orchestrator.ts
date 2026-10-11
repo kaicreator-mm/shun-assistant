@@ -42,7 +42,8 @@ import {
   type VerifierPort,
 } from '@shun/contracts';
 import { JitLifecycleError } from './failures.ts';
-import { classifyFromJournal, type JournalPort } from './journal.ts';
+import { classifyFromJournal, type JournalPort, type RecoveryClassification } from './journal.ts';
+import { canonicalKey, treeUnder } from './manifest-removal.ts';
 import { buildActionPlan, installAction, taskAction, uninstallAction } from './plans.ts';
 import type {
   AcquisitionCandidate,
@@ -69,6 +70,14 @@ export interface JitLifecycleDeps {
   readonly verifier: VerifierPort;
   readonly store: StorePort;
   readonly planLedger: PlanLedgerPort;
+  /**
+   * Trusted gate the task grant presentation must cross before the
+   * environment executes (VJ-P1-03). Typed optional only so non-executable
+   * composition type-checks; both public lifecycle entries enforce its
+   * presence at runtime — executing argv without a validated presentation
+   * is the bypass this gate closes.
+   */
+  readonly taskPresentationGate?: TaskPresentationGate;
   /** Journal accessor per actionId — transport failures classify from it (L2 §9.4). */
   readonly journals: (actionId: string) => JournalPort;
   readonly fs: FilesystemPort;
@@ -93,6 +102,22 @@ export interface JitLifecycleDeps {
  * presentation is that record.
  */
 export type ImportableAuthorizationPort = Pick<AuthorizationPort, 'issue' | 'currentAuthority'>;
+
+/**
+ * Trusted-boundary validation for the task execution step (VJ-P1-03): the
+ * issued grant must be PRESENTED for validation against the trusted plan
+ * ledger and CURRENT authority/policy state — the environment backend is
+ * never invoked on the caller's say-so. Wired to the same authority that
+ * signs grants; both public lifecycle entries refuse to run when it is
+ * absent, so an unwired gate is a wiring fault, never a silent fail-open.
+ */
+export type TaskPresentationGate = {
+  validate(input: {
+    action: AuthorizedAction;
+    grant: unknown;
+    plan: ActionPlan;
+  }): { ok: true } | { ok: false; code: string; detail: string };
+};
 
 function trace(deps: JitLifecycleDeps, kind: string, detail?: string): void {
   deps.trace?.({ at: deps.clock(), kind, ...(detail !== undefined ? { detail } : {}) });
@@ -264,30 +289,43 @@ async function runPrivileged(
     authorizationKind: 'AUTOMATIC' | 'EXPLICIT_APPROVAL' | 'DURABLE_POLICY';
     approvalRef?: string;
   },
-): Promise<{ terminal: string; refusalCode?: string }> {
+): Promise<{
+  terminal: string;
+  refusalCode?: string;
+  recoveryClassification: RecoveryClassification;
+}> {
   const { grant, authorized } = await issueGrant(deps, input);
   try {
     // The issued grant IS the presentation; the boundary re-validates it
     // against the trusted plan ledger (never on the caller's say-so).
     const receipt = ExecutionReceiptSchema.parse(await deps.privileged.execute(authorized, grant));
-    return { terminal: receipt.terminal };
+    return {
+      terminal: receipt.terminal,
+      recoveryClassification: receipt.sideEffectEvidence.recoveryClassification,
+    };
   } catch (error) {
     // A typed contract refusal happened at the boundary BEFORE any effect
     // (stale grant, revocation, plan mismatch): surface the frozen code.
     if (error instanceof ShunContractError) {
-      return { terminal: 'REFUSED', refusalCode: error.code };
+      return {
+        terminal: 'REFUSED',
+        refusalCode: error.code,
+        recoveryClassification: 'FAILED_BEFORE_EFFECT',
+      };
     }
     // Transport-level interruption: the classification comes from the phase
     // journal alone — never from the exception's optimism (L2 §9.4).
     const entries = await deps.journals(input.action.actionId).replay();
-    const classification = classifyFromJournal(entries, input.action.actionId);
+    const journalClassification = classifyFromJournal(entries, input.action.actionId);
+    const recoveryClassification: RecoveryClassification =
+      journalClassification === 'NO_ENTRIES' ? 'NOT_STARTED' : journalClassification;
     const terminal =
-      classification === 'MAY_HAVE_EXECUTED_UNCERTAIN'
+      recoveryClassification === 'MAY_HAVE_EXECUTED_UNCERTAIN'
         ? 'UNCERTAIN'
-        : classification === 'COMPLETED_VERIFIED'
+        : recoveryClassification === 'COMPLETED_VERIFIED'
           ? 'SUCCEEDED'
           : 'FAILED';
-    return { terminal };
+    return { terminal, recoveryClassification };
   }
 }
 
@@ -299,7 +337,24 @@ export async function runJitLifecycle(
   // hidden-harness truth and is refused here — fixture-only fields are never
   // production inputs (C-002 / L2 §4.2).
   const input: JitLifecycleInput = parseJitLifecycleInput(rawInput);
+  requireTaskPresentationGate(deps);
   return runLifecycle(input, deps);
+}
+
+/**
+ * Executable entries fail closed on the VJ-P1-03 seam: both public entries
+ * run argv through the environment backend, so both must present the task
+ * grant to the trusted gate. An unwired gate is a wiring fault, never an
+ * implicit opt-out — plan-only composition uses the plan seams, not an
+ * executable lifecycle entry.
+ */
+function requireTaskPresentationGate(deps: JitLifecycleDeps): void {
+  if (!deps.taskPresentationGate) {
+    throw new JitLifecycleError(
+      'POLICY_BLOCKED',
+      'task presentation gate is not wired — refusing to run an executable JIT lifecycle whose task grant is never validated at the trusted boundary (VJ-P1-03)',
+    );
+  }
 }
 
 /** Preview hints threaded into the R2 residue classification (benchmark only). */
@@ -320,6 +375,7 @@ export async function runJitBenchmarkLifecycle(
   options: { providerOwnedFiles?: readonly string[] } = {},
 ): Promise<JitLifecycleOutput> {
   const input: JitBenchmarkInput = JitBenchmarkInputSchema.parse(rawInput);
+  requireTaskPresentationGate(deps);
   const preExisting = input.preExistingUserAssets.map((asset) => asset.path);
   const canaryHashes = new Map<string, string>();
   for (const [index, path] of preExisting.entries()) {
@@ -392,6 +448,16 @@ async function runLifecycle(
     candidate,
     deps.policy.machineScopeInstall,
   );
+  // Snapshot the predicted scope BEFORE any side effect: the install-owned
+  // manifest is the post-install tree minus this pre-existing tree, so
+  // content that predates the install (user files inside provider roots) can
+  // never be claimed as program-owned (VJ-P1-01).
+  const preInstallTree = new Set<string>();
+  for (const root of scopeRoots) {
+    for (const path of await treeUnder(deps.fs, root)) {
+      preInstallTree.add(canonicalKey(path));
+    }
+  }
   const officialSources = await deps.acquisition.officialSources();
   const installActionSpec = installAction({
     actionId: `${input.taskId}-install`,
@@ -419,7 +485,12 @@ async function runLifecycle(
   });
   trace(deps, 'INSTALL_EXECUTED', `terminal=${installRun.terminal}`);
   if (installRun.terminal !== 'SUCCEEDED') {
-    throw installFailure(installRun.terminal, installActionSpec.actionId, installRun.refusalCode);
+    throw installFailure(
+      installRun.terminal,
+      installActionSpec.actionId,
+      installRun.recoveryClassification,
+      installRun.refusalCode,
+    );
   }
   const layout: ProviderInstallLayout = await deps.acquisition.layoutOf(candidate);
   if (!(await providerPresent(deps, layout))) {
@@ -428,11 +499,21 @@ async function runLifecycle(
       'install reported success but the provider is not present on disk (post-state check failed)',
       {
         actionId: installActionSpec.actionId,
-        recoveryClassification: 'FAILED_BEFORE_EFFECT',
-        detail: 'post-state verification found no provider files',
+        recoveryClassification: 'MAY_HAVE_EXECUTED_UNCERTAIN',
+        detail:
+          'installer returned success but independent post-state verification found no provider files; effect outcome is unresolved',
       },
     );
   }
+  // The exact install-owned manifest, recorded at install time and persisted
+  // with the lifecycle state. The removal preview classifies in strict mode
+  // against it: any path inside an install or cache root that the installer
+  // did not create is USER_CREATED_UNKNOWN and fails closed (VJ-P1-01).
+  const ownedManifest = await recordedOwnedManifest(
+    deps,
+    [...layout.installDirs, ...layout.cacheDirs],
+    preInstallTree,
+  );
 
   // ---- Task execute (bounded R1 use of the acquired provider) ----
   const executable = layout.executables[0];
@@ -459,12 +540,31 @@ async function runLifecycle(
     verificationPlan,
     recovery: 'DECLARED_IDEMPOTENT',
   });
-  const { authorized: taskAuthorized } = await issueGrant(deps, {
+  const { grant: taskGrant, authorized: taskAuthorized } = await issueGrant(deps, {
     taskId: input.taskId,
     plan: taskPlan,
     action: taskActionSpec,
     authorizationKind: 'AUTOMATIC',
   });
+  // The task step is an executable step like any other: its grant must be
+  // presented at the trusted boundary and re-validated there BEFORE the
+  // environment backend runs argv (VJ-P1-03).
+  const gateVerdict = deps.taskPresentationGate?.validate({
+    action: taskAuthorized,
+    grant: taskGrant,
+    plan: taskPlan,
+  });
+  if (gateVerdict && !gateVerdict.ok) {
+    throw new JitLifecycleError(
+      'TASK_FAILED',
+      `task presentation refused at the trusted boundary: ${gateVerdict.code} — ${gateVerdict.detail}`,
+      {
+        actionId: taskActionSpec.actionId,
+        recoveryClassification: 'FAILED_BEFORE_EFFECT',
+        detail: 'presentation validation precedes any task side effect',
+      },
+    );
+  }
   const taskReceipt = ExecutionReceiptSchema.parse(await deps.environment.execute(taskAuthorized));
   if (taskReceipt.terminal !== 'SUCCEEDED') {
     throw new JitLifecycleError(
@@ -488,7 +588,7 @@ async function runLifecycle(
   trace(deps, 'TASK_VERIFIED', `status=${verification.status}`);
 
   // ---- Lifecycle-state persistence ----
-  await persistLifecycle(deps, input, provenance, layout, 'INSTALLED');
+  await persistLifecycle(deps, input, provenance, layout, 'INSTALLED', ownedManifest);
 
   if (verification.status !== 'PASS') {
     throw new JitLifecycleError(
@@ -514,7 +614,17 @@ async function runLifecycle(
   }
 
   // ---- R2 removal gate (any removal is R2, Product C-002) ----
-  return runRemovalGate(deps, input, binding, candidate, layout, provenance, verification, hints);
+  return runRemovalGate(
+    deps,
+    input,
+    binding,
+    candidate,
+    layout,
+    provenance,
+    verification,
+    ownedManifest,
+    hints,
+  );
 }
 
 async function buildAndRegisterPlan(
@@ -556,6 +666,7 @@ async function runRemovalGate(
   layout: ProviderInstallLayout,
   provenance: ReturnType<typeof provenanceRecord>,
   verification: VerificationReceipt,
+  ownedManifest: readonly string[],
   hints?: RemovalPreviewHints,
 ): Promise<JitLifecycleOutput> {
   const actionId = `${input.taskId}-uninstall`;
@@ -572,6 +683,11 @@ async function runRemovalGate(
     packageId: candidate.packageId,
     version: candidate.version,
     deleteRoots,
+    // The effect is manifest-bound (VJ-P1-01 R4): the privileged executor
+    // validates scope exclusivity at effect time and deletes exactly the
+    // install-recorded entries, so a post-census injection can never enter
+    // the deletion set and an unrecorded asset refuses the whole effect.
+    deletionManifest: ownedManifest,
     elevated: binding.elevated,
     timeoutMs: UNINSTALL_TIMEOUT_MS,
   });
@@ -589,12 +705,15 @@ async function runRemovalGate(
   });
 
   // (2) PREVIEW — classify every candidate with fail-closed dispositions.
+  // Benchmark hints (harness truth) win; the production path classifies in
+  // strict mode against the install-time owned manifest recorded above, so
+  // any unrecorded nested content is USER_CREATED_UNKNOWN (VJ-P1-01).
   const candidates: ResidueCandidate[] = classifyResidue({
     layout,
     observed,
     protectedRoots: deps.policy.protectedRoots,
     ...(hints?.preExisting ? { preExisting: hints.preExisting } : {}),
-    ...(hints?.providerOwnedFiles ? { providerOwnedFiles: hints.providerOwnedFiles } : {}),
+    providerOwnedFiles: hints?.providerOwnedFiles ?? ownedManifest,
   });
   assertNoProtectedDeletions(candidates);
   // Fail-closed asset gate (C-002 step 2): anything user-created/unknown or
@@ -622,7 +741,14 @@ async function runRemovalGate(
   );
 
   // (3) CHECKPOINT — record exact version/source so reinstall is possible.
-  const checkpointRef = await persistLifecycle(deps, input, provenance, layout, 'CHECKPOINT');
+  const checkpointRef = await persistLifecycle(
+    deps,
+    input,
+    provenance,
+    layout,
+    'CHECKPOINT',
+    ownedManifest,
+  );
 
   // (4) APPROVAL CONDITION — explicit approval or a sufficiently specific
   // durable policy. Provenance passed earlier; this gate decides removal only.
@@ -660,8 +786,25 @@ async function runRemovalGate(
     approvalRef = `approval://${decision.approvalId}`;
   }
 
-  // (5) EXECUTE — bounded removal through the privileged boundary only,
-  // with reconcile-first recovery on uncertain interruption (L2 §9.4).
+  // Effect-boundary strict re-census (VJ-P1-01 post-preview race): the
+  // preview census is a PRE-approval snapshot; anything planted during the
+  // async approval wait — or between preview and effect under a durable
+  // policy — is invisible to it, and a destructive uninstaller would destroy
+  // it while the lifecycle reported REMOVED. Immediately before the
+  // privileged effect, re-enumerate BOTH deletion-scope root kinds
+  // (install + cache) and classify strictly against the install-time owned
+  // manifest. Any newly appeared unknown/protected asset refuses the effect
+  // with zero deletions (an unrecorded reparse point or mutable drop is
+  // exactly such an unknown — it can never be manifest-recorded).
+  //
+  // This census is the OUTER layer only (VJ-P1-01 R4): caller-reachable
+  // seams still follow it (the trace hook below, the async grant issuance
+  // inside runPrivileged), so the privileged effect itself is manifest-bound
+  // — it re-validates scope exclusivity at effect time inside the trusted
+  // executor and deletes exactly the recorded entries, structurally unable
+  // to touch anything planted after this point.
+  await assertRemovalScopeAtEffectBoundary(deps, layout, ownedManifest);
+  trace(deps, 'R2_RECENSUS', 'removal scope re-validated at the effect boundary');
   let run = await runPrivileged(deps, {
     taskId: input.taskId,
     plan: uninstallPlan,
@@ -676,13 +819,20 @@ async function runRemovalGate(
       // Reconcile-first resolution (L2 §9.4): independent post-state proves
       // the removal executed — the uncertain terminal resolves to success.
       trace(deps, 'R2_RECONCILE', 'uncertain interrupted; post-state proves removal executed');
-      run = { terminal: 'SUCCEEDED' };
+      run = {
+        terminal: 'SUCCEEDED',
+        recoveryClassification: 'COMPLETED_VERIFIED',
+      };
     } else {
       trace(
         deps,
         'R2_RECONCILE',
         'uncertain interrupted; provider still present — retry SAME actionId',
       );
+      // The retry is a NEW privileged effect: the same post-preview race
+      // applies to the window the first attempt opened, so the removal scope
+      // is re-censused again before the retry executes.
+      await assertRemovalScopeAtEffectBoundary(deps, layout, ownedManifest);
       run = await runPrivileged(deps, {
         taskId: input.taskId,
         plan: uninstallPlan,
@@ -693,7 +843,7 @@ async function runRemovalGate(
     }
   }
   if (run.terminal !== 'SUCCEEDED') {
-    throw removalFailure(run.terminal, actionId, run.refusalCode);
+    throw removalFailure(run.terminal, actionId, run.recoveryClassification, run.refusalCode);
   }
 
   // (6) VERIFY — final provider state and residue disposition.
@@ -741,6 +891,35 @@ async function providerPresent(
   return false;
 }
 
+/**
+ * The exact install-owned manifest: every path — census roots included —
+ * that the install created and that was NOT on disk before the install ran,
+ * across BOTH install roots and cache roots (VJ-P1-01 cache census: cache
+ * roots sit inside the deletion scope, so installer-written cache content
+ * must be claimed explicitly, and everything else inside a cache root stays
+ * unknown). The provider root claim cannot cover paths the installer never
+ * created — pre-existing or later-dropped user content stays unknown, and
+ * unknown is never deleted.
+ */
+async function recordedOwnedManifest(
+  deps: JitLifecycleDeps,
+  censusRoots: readonly string[],
+  preInstallTree: ReadonlySet<string>,
+): Promise<string[]> {
+  const owned: string[] = [];
+  for (const root of censusRoots) {
+    if (!preInstallTree.has(canonicalKey(root))) {
+      owned.push(root);
+    }
+    for (const path of await treeUnder(deps.fs, root)) {
+      if (!preInstallTree.has(canonicalKey(path))) {
+        owned.push(path);
+      }
+    }
+  }
+  return owned;
+}
+
 async function collectCandidates(
   deps: JitLifecycleDeps,
   layout: ProviderInstallLayout,
@@ -748,17 +927,56 @@ async function collectCandidates(
   const observed: string[] = [];
   for (const root of [...layout.installDirs, ...layout.cacheDirs, ...layout.configDirs]) {
     observed.push(root);
-    if (await deps.fs.isDirectory(root)) {
-      for (const child of await deps.fs.listChildren(root)) {
-        observed.push(joinPath(root, child));
-      }
-    }
+    observed.push(...(await treeUnder(deps.fs, root)));
   }
   return observed;
 }
 
-function joinPath(root: string, child: string): string {
-  return `${root.replace(/[\\/]+$/, '')}\\${child}`;
+/**
+ * Fail-closed re-census of the deletion scope at the privileged effect
+ * boundary (VJ-P1-01 post-preview race). The preview census is a snapshot
+ * taken before the approval surface is consulted; the approval wait (or the
+ * preview→effect gap under a durable policy) is unbounded real time, and a
+ * whole-root uninstaller destroys everything inside the scope — including a
+ * user asset planted into that gap, which the snapshot never saw. Before the
+ * effect runs, BOTH root kinds (install + cache) are re-enumerated and
+ * classified STRICTLY against the install-time owned manifest: any path that
+ * is present now but not census-recorded is USER_CREATED_UNKNOWN, and any
+ * protected-root content is PROTECTED — either one refuses the removal with
+ * zero deletions. There is no depth cap and the walk is cycle-guarded, so a
+ * planted reparse point or directory junction is traversed and its content
+ * enumerated (as unknown when unrecorded) rather than silently skipped.
+ */
+async function assertRemovalScopeAtEffectBoundary(
+  deps: JitLifecycleDeps,
+  layout: ProviderInstallLayout,
+  ownedManifest: readonly string[],
+): Promise<void> {
+  const observed: string[] = [];
+  for (const root of [...layout.installDirs, ...layout.cacheDirs]) {
+    observed.push(root);
+    observed.push(...(await treeUnder(deps.fs, root)));
+  }
+  const reCensus = classifyResidue({
+    layout,
+    observed,
+    protectedRoots: deps.policy.protectedRoots,
+    providerOwnedFiles: ownedManifest,
+  });
+  const atRisk = reCensus.filter(
+    (candidate) =>
+      candidate.disposition === 'RETAIN' &&
+      (candidate.classification === 'USER_CREATED_UNKNOWN' ||
+        candidate.classification === 'PROTECTED'),
+  );
+  if (atRisk.length > 0) {
+    throw new JitLifecycleError(
+      'USER_ASSET_AT_RISK',
+      `effect-boundary re-census blocked the removal: assets inside the deletion scope were never census-recorded by the install (planted after the preview snapshot) and must be resolved by a human first: ${atRisk
+        .map((candidate) => candidate.path)
+        .join(', ')}`,
+    );
+  }
 }
 
 async function persistLifecycle(
@@ -767,8 +985,14 @@ async function persistLifecycle(
   provenance: ReturnType<typeof provenanceRecord>,
   layout: ProviderInstallLayout,
   state: string,
+  providerOwnedFiles?: readonly string[],
 ): Promise<string> {
-  const effectId = `jit:${input.taskId}:lifecycle`;
+  // Each state transition is its own append-only revision: the store's
+  // idempotent replay keys on effectId, so a shared identity would let the
+  // CHECKPOINT transition be swallowed by the earlier INSTALLED record
+  // (VJ-P1-02). The checkpoint the R2 approval gate relies on must be
+  // durably recorded in its own right.
+  const effectId = `jit:${input.taskId}:lifecycle:${state.toLowerCase()}`;
   const receipt = await deps.store.apply(effectId, {
     recordKind: 'lifecycle_record',
     recordId: effectId,
@@ -784,9 +1008,21 @@ async function persistLifecycle(
         executables: [...layout.executables],
       },
       state,
+      ...(providerOwnedFiles ? { providerOwnedFiles: [...providerOwnedFiles] } : {}),
       recordedAt: deps.clock(),
     },
   });
+  // Read-back validation before any gate step may rely on the record: a
+  // replayed (not applied) receipt for a fresh revision identity means the
+  // durable store refused the transition — proceeding would run the R2 gate
+  // against a checkpoint that was never recorded.
+  if (!receipt.applied) {
+    throw new JitLifecycleError(
+      'POLICY_BLOCKED',
+      `durable store returned a replay instead of recording the ${state} lifecycle transition — refusing to continue on an unrecorded state migration`,
+    );
+  }
+  trace(deps, 'LIFECYCLE_PERSISTED', `${state} -> ${receipt.receiptRef}`);
   return receipt.receiptRef;
 }
 
@@ -815,20 +1051,22 @@ function removalSummary(
 function installFailure(
   terminal: string,
   actionId: string,
+  recoveryClassification: RecoveryClassification,
   refusalCode?: string,
 ): JitLifecycleError {
+  const provenNoEffect =
+    recoveryClassification === 'NOT_STARTED' || recoveryClassification === 'FAILED_BEFORE_EFFECT';
   return new JitLifecycleError(
     'INSTALL_FAILED',
     refusalCode
-      ? `privileged boundary refused the install presentation: ${refusalCode} (no side effect)`
+      ? `privileged boundary refused the install presentation: ${refusalCode}${
+          provenNoEffect ? ' (no side effect)' : ''
+        }`
       : `privileged install ended ${terminal}`,
     {
       actionId,
-      // Refusal: the journal stops at RECEIVED (validation precedes any side
-      // effect) ⇒ FAILED_BEFORE_EFFECT. UAC_DECLINED carries the NO_EFFECT
-      // marker ⇒ NOT_STARTED (L2 §9.4).
-      recoveryClassification: terminal === 'UAC_DECLINED' ? 'NOT_STARTED' : 'FAILED_BEFORE_EFFECT',
-      detail: `install terminal ${terminal}; no automatic retry — a declined elevation or refused grant is a decision, not a transport fault`,
+      recoveryClassification,
+      detail: `install terminal ${terminal}; recovery follows privileged receipt/journal truth (${recoveryClassification})`,
     },
   );
 }
@@ -836,17 +1074,22 @@ function installFailure(
 function removalFailure(
   terminal: string,
   actionId: string,
+  recoveryClassification: RecoveryClassification,
   refusalCode?: string,
 ): JitLifecycleError {
+  const provenNoEffect =
+    recoveryClassification === 'NOT_STARTED' || recoveryClassification === 'FAILED_BEFORE_EFFECT';
   return new JitLifecycleError(
     'REMOVE_FAILED',
     refusalCode
-      ? `privileged boundary refused the removal presentation: ${refusalCode} (no side effect)`
+      ? `privileged boundary refused the removal presentation: ${refusalCode}${
+          provenNoEffect ? ' (no side effect)' : ''
+        }`
       : `privileged removal ended ${terminal}`,
     {
       actionId,
-      recoveryClassification: terminal === 'UAC_DECLINED' ? 'NOT_STARTED' : 'FAILED_BEFORE_EFFECT',
-      detail: `removal terminal ${terminal}`,
+      recoveryClassification,
+      detail: `removal terminal ${terminal}; recovery follows privileged receipt/journal truth (${recoveryClassification})`,
     },
   );
 }
