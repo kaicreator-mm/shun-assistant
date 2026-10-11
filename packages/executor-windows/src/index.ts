@@ -7,15 +7,19 @@ export { ACTION_ID_PATTERN, ActionIdRefusedError, assertSafeActionId } from './a
 export type { ApplyContext, ApplyResult, WriterRefusalCode } from './authority-writer/apply.ts';
 export { applyWriterJob, verifyWriterIdentity } from './authority-writer/apply.ts';
 export type {
+  AuthorizationGrantProposal,
   PolicyWindow,
   PolicyWindowScopeBudget,
   WriterJob,
   WriterJobInput,
+  WriterJobProposal,
 } from './authority-writer/job.ts';
 export {
+  AuthorizationGrantProposalSchema,
   PolicyWindowSchema,
   PolicyWindowScopeBudgetSchema,
   signWriterJob,
+  WriterJobProposalSchema,
   WriterJobSchema,
 } from './authority-writer/job.ts';
 export type {
@@ -23,6 +27,8 @@ export type {
   AnchorWriterLaunchResult,
 } from './authority-writer/launcher.ts';
 export { launchAnchorWriterJob } from './authority-writer/launcher.ts';
+export type { SealWriterJobResult } from './authority-writer/seal.ts';
+export { sealWriterJobProposal } from './authority-writer/seal.ts';
 export type { LocalWindowsBackendOptions } from './backend.ts';
 export { LocalWindowsBackend, PROVIDER_ID, PROVIDER_VERSION } from './backend.ts';
 export {
