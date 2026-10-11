@@ -171,19 +171,28 @@ export async function verifyBatch(args: VerifyBatchArgs): Promise<VerificationRe
   let evaluated = 0;
   let metricUnavailable = 0;
   let ssimFailed = 0;
+  let coverageGaps = 0;
   let minSsim = Number.POSITIVE_INFINITY;
   for (const sample of args.oracle.samples) {
     const record = args.records.find((r) => r.inputPath === sample.inputPath);
-    if (
-      !sample.eligible ||
-      !sample.referencePath ||
-      record?.status !== 'WRITTEN' ||
-      !record.outputPath
-    ) {
+    if (!sample.eligible || !sample.referencePath) {
       ssimResults.push({
         inputPath: sample.inputPath,
         status: 'SKIPPED',
-        detail: sample.eligible ? 'no output for this sample' : sample.detail,
+        detail: sample.detail ?? 'sample not eligible at precommit',
+      });
+      continue;
+    }
+    // A committed ELIGIBLE sample that produced no written output is a
+    // coverage gap, not a skip: perfect scores on the other samples must
+    // never launder it into an overall PASS.
+    if (record?.status !== 'WRITTEN' || !record.outputPath) {
+      ssimFailed += 1;
+      coverageGaps += 1;
+      ssimResults.push({
+        inputPath: sample.inputPath,
+        status: 'FAIL',
+        detail: 'committed eligible sample has no written output (coverage gap)',
       });
       continue;
     }
@@ -204,9 +213,15 @@ export async function verifyBatch(args: VerifyBatchArgs): Promise<VerificationRe
         continue;
       }
       const value = metric(outPx, refPx);
-      if (value === null || Number.isNaN(value)) {
+      // SSIM is bounded to [0, 1]. Anything else — null, NaN, ±Infinity,
+      // out-of-range — is a broken metric, never evidence of quality.
+      if (value === null || !Number.isFinite(value) || value < 0 || value > 1) {
         metricUnavailable += 1;
-        ssimResults.push({ inputPath: sample.inputPath, status: 'METRIC_UNAVAILABLE' });
+        ssimResults.push({
+          inputPath: sample.inputPath,
+          status: 'METRIC_UNAVAILABLE',
+          detail: 'metric returned a non-finite or out-of-[0,1] value',
+        });
         continue;
       }
       minSsim = Math.min(minSsim, value);
@@ -230,9 +245,16 @@ export async function verifyBatch(args: VerifyBatchArgs): Promise<VerificationRe
   }
   let oracleStatus: CheckResult['status'];
   let oracleDetail: string;
+  const gapNote =
+    coverageGaps > 0
+      ? `${coverageGaps} committed eligible sample(s) produced no output (coverage gap)`
+      : '';
   if (evaluated === 0) {
-    oracleStatus = 'NOT_RUN';
-    oracleDetail = 'no eligible sample produced an output';
+    oracleStatus = coverageGaps > 0 ? 'FAIL' : 'NOT_RUN';
+    oracleDetail =
+      coverageGaps > 0
+        ? gapNote
+        : 'no eligible sample produced an output';
   } else if (metricUnavailable > 0) {
     oracleStatus = 'NOT_RUN';
     oracleDetail = `metric unavailable for ${metricUnavailable}/${evaluated} evaluated samples — no PASS-equivalent status`;
@@ -240,7 +262,7 @@ export async function verifyBatch(args: VerifyBatchArgs): Promise<VerificationRe
     oracleStatus = ssimFailed > 0 ? 'FAIL' : 'PASS';
     oracleDetail =
       ssimFailed > 0
-        ? `${ssimFailed}/${evaluated} sample(s) below ${args.oracle.ssimThreshold}`
+        ? `${ssimFailed}/${evaluated} sample(s) below ${args.oracle.ssimThreshold}${gapNote ? `; ${gapNote}` : ''}`
         : `min SSIM ${minSsim.toFixed(5)} >= ${args.oracle.ssimThreshold} over ${evaluated} sample(s)`;
   }
   checks.push({ checkId: 'ssim-oracle', status: oracleStatus, detail: oracleDetail });

@@ -283,7 +283,13 @@ describe('runImageBatchProcess — per-record failures', () => {
     expect(byPath.get(dup)?.rejectionCode).toBe('OUTPUT_COLLISION');
     expect(byPath.get(b)?.status).toBe('WRITTEN');
     expect(byPath.get(c)?.status).toBe('WRITTEN');
-    expect(result.output.verification.status).toBe('PASS');
+    // VI-P1-04: the two pre-rejected files are committed ELIGIBLE oracle
+    // samples with no output — a coverage gap. Verification must not claim
+    // PASS on the surviving samples alone.
+    const ssimCheck = result.output.verification.checks.find((c) => c.checkId === 'ssim-oracle');
+    expect(ssimCheck?.status).toBe('FAIL');
+    expect(ssimCheck?.detail).toContain('coverage gap');
+    expect(result.output.verification.status).toBe('FAIL');
   });
 
   it('routes formats to another registered provider when the selected one lacks them', async () => {
