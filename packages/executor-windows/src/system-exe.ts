@@ -46,6 +46,15 @@ export type SystemRootResolution = { ok: true; systemRoot: string } | { ok: fals
 /** Shape of the injected registry probe (kept a pure function for tests). */
 export type RegQuery = (regExe: string, args: readonly string[]) => string | undefined;
 
+/**
+ * Injectable filesystem gates so candidate probing runs against a virtual
+ * filesystem on any host (the negative controls never touch the real disk).
+ */
+export type SystemRootFsSeam = {
+  isFile?: (path: string) => boolean;
+  isDirectory?: (path: string) => boolean;
+};
+
 /** The security-relevant system tools whose bytes are pinned (N-1). */
 export type SystemToolKey = 'whoami' | 'reg' | 'powershell' | 'taskkill';
 
@@ -74,12 +83,15 @@ export function resolveSystemRoot(
   env: NodeJS.ProcessEnv = process.env,
   query: RegQuery = queryRegistryValue,
   platform: NodeJS.Platform = process.platform,
+  seam: SystemRootFsSeam = {},
 ): SystemRootResolution {
   if (platform !== 'win32') {
     // Best-effort constant for non-Windows hosts; every spawn site degrades
     // honestly (missing exe ⇒ empty observation / refused step).
     return { ok: true, systemRoot: HARD_CODED_FALLBACK_ROOT };
   }
+  const statFile = seam.isFile ?? isFile;
+  const statDirectory = seam.isDirectory ?? isDirectory;
 
   // 1. Machine evidence: the HKLM SystemRoot value, read with reg.exe from
   //    every candidate root that actually has one. The first report that
@@ -87,7 +99,7 @@ export function resolveSystemRoot(
   //    REPORTED ROOT; the identity gate below constrains the BYTES.)
   for (const hint of uniqueRoots([env.SystemRoot, env.windir, HARD_CODED_FALLBACK_ROOT])) {
     const hintReg = join(hint, 'System32', 'reg.exe');
-    if (!isFile(hintReg)) continue;
+    if (!statFile(hintReg)) continue;
     const reported = query(hintReg, REG_QUERY_SYSTEMROOT_ARGS)?.trim();
     if (!reported || !isAbsoluteWindowsPath(reported)) continue;
     // Fixed point: the machine record must reference a real directory whose
@@ -95,7 +107,7 @@ export function resolveSystemRoot(
     // satisfy this loop with self-referential answers — which is exactly why
     // the candidate binaries are identity-checked against the pin afterwards.
     const reportedReg = join(reported, 'System32', 'reg.exe');
-    if (!isDirectory(reported) || !isFile(reportedReg)) continue;
+    if (!statDirectory(reported) || !statFile(reportedReg)) continue;
     const confirmed = query(reportedReg, REG_QUERY_SYSTEMROOT_ARGS)?.trim();
     if (confirmed !== reported) continue;
     return { ok: true, systemRoot: reported };
@@ -103,7 +115,7 @@ export function resolveSystemRoot(
 
   // 2. Degraded fallback: inherited env on unanimous agreement + existence.
   const agreed = uniqueRoots([env.SystemRoot, env.windir]);
-  if (agreed.length === 1 && isDirectory(join(agreed[0] as string, 'System32'))) {
+  if (agreed.length === 1 && statDirectory(join(agreed[0] as string, 'System32'))) {
     return { ok: true, systemRoot: agreed[0] as string };
   }
   return {

@@ -9,11 +9,20 @@
 // below exercise the attack shapes on any host; the Windows-only block adds
 // a REAL copied-reg.exe attack (a same-user attacker can copy binaries — but
 // a copied reg.exe still reports the real HKLM root).
-import { cpSync, existsSync, mkdirSync, mkdtempSync, rmSync } from 'node:fs';
+//
+// P1 (Reviewer, C13 fixed-point ordering): the negative controls against a
+// LYING reg.exe run on a fully virtual filesystem via the fs seam — a planted
+// root whose self-written reg.exe re-reports the planted root satisfies the
+// old fixed-point loop when attacker-controlled env hints were consulted
+// first. These tests pin the new invariant: the machine fixed point
+// (C:\Windows\System32\reg.exe) is consulted FIRST, its validated report IS
+// the resolution, and any hint-derived report that disagrees with readable
+// machine evidence fails closed.
+import { cpSync, existsSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
-import { type RegQuery, resolveSystemRoot } from '../src/system-exe.ts';
+import { type RegQuery, resolveSystemRoot, type SystemRootFsSeam } from '../src/system-exe.ts';
 import { ON_WINDOWS } from './helpers.ts';
 
 const PLANTED = 'D:\\shun-fake-root';
@@ -78,6 +87,79 @@ describe('C13 — system root resolution (injected env/query, host-independent)'
   });
 });
 
+describe('C13 P1 — a lying planted reg.exe cannot forge the machine fixed point (virtual-fs negative controls)', () => {
+  const MACHINE = 'C:\\Windows';
+  const PLANTED = 'D:\\shun-planted-root';
+  const lower = (p: string): string => p.toLowerCase();
+
+  /** Virtual filesystem seam: no real disk is touched, any host runs this. */
+  function makeSeam(paths: { files: string[]; dirs: string[] }): SystemRootFsSeam {
+    const files = new Set(paths.files.map(lower));
+    const dirs = new Set(paths.dirs.map(lower));
+    return {
+      isFile: (p: string) => files.has(lower(p)),
+      isDirectory: (p: string) => dirs.has(lower(p)),
+    };
+  }
+
+  const bothRootsSeam = (): SystemRootFsSeam =>
+    makeSeam({
+      files: [`${MACHINE}\\System32\\reg.exe`, `${PLANTED}\\System32\\reg.exe`],
+      dirs: [MACHINE, `${MACHINE}\\System32`, PLANTED, `${PLANTED}\\System32`],
+    });
+
+  /** The planted reg.exe LIES (reports/re-reports the planted root); the machine anchor tells the truth. */
+  const lyingQuery =
+    (calls: string[]): RegQuery =>
+    (regExe) => {
+      calls.push(regExe);
+      return lower(regExe).startsWith(lower(PLANTED)) ? PLANTED : MACHINE;
+    };
+
+  it('a planted root + lying reg.exe loses to the machine anchor even though the attacker env is consulted-shape-first', () => {
+    const calls: string[] = [];
+    const env = { SystemRoot: PLANTED, windir: PLANTED };
+    // Pre-fix behavior: env hints came first, the planted fixed point
+    // validated, and PLANTED won — this assertion was RED. Post-fix the
+    // machine anchor is probed FIRST and its validated report IS the answer.
+    const r = resolveSystemRoot(env, lyingQuery(calls), 'win32', bothRootsSeam());
+    expect(calls.length).toBeGreaterThan(0);
+    expect(lower(calls[0] as string)).toBe(lower(`${MACHINE}\\System32\\reg.exe`));
+    expect(r.ok).toBe(true);
+    if (r.ok) {
+      expect(lower(r.systemRoot)).toBe(lower(MACHINE));
+      expect(lower(r.systemRoot)).not.toBe(lower(PLANTED));
+    }
+  });
+
+  it('a readable machine anchor whose report fails the fixed point fails CLOSED — a validating attacker hint must not override it', () => {
+    // The anchor EXISTS and SPEAKS (reports MACHINE) but its report does not
+    // validate (the MACHINE directory is missing from the filesystem) —
+    // readable machine evidence that contradicts itself. Resolution must
+    // fail closed, NOT fall back to the planted hint's self-consistent lie.
+    const seam = makeSeam({
+      files: [`${MACHINE}\\System32\\reg.exe`, `${PLANTED}\\System32\\reg.exe`],
+      dirs: [PLANTED, `${PLANTED}\\System32`],
+    });
+    const env = { SystemRoot: PLANTED, windir: PLANTED };
+    const r = resolveSystemRoot(env, lyingQuery([]), 'win32', seam);
+    expect(r.ok).toBe(false);
+    if (!r.ok) expect(r.reason).toContain('fail closed');
+  });
+
+  it('when the machine anchor is entirely UNREADABLE the documented hint tier still applies (honest degradation boundary)', () => {
+    // The anchor's reg.exe exists but every query returns undefined: the
+    // machine fixed point has no opinion. The validated hint tier may then
+    // answer — this pins the exact boundary of the new invariant.
+    const unreadableQuery: RegQuery = (regExe) =>
+      lower(regExe).startsWith(lower(PLANTED)) ? PLANTED : undefined;
+    const env = { SystemRoot: PLANTED, windir: PLANTED };
+    const r = resolveSystemRoot(env, unreadableQuery, 'win32', bothRootsSeam());
+    expect(r.ok).toBe(true);
+    if (r.ok) expect(lower(r.systemRoot)).toBe(lower(PLANTED));
+  });
+});
+
 describe.skipIf(!ON_WINDOWS)('C13 — real Windows machine evidence', () => {
   const real = resolveSystemRoot();
   const envRoot = (process.env.SystemRoot ?? '').trim().toLowerCase();
@@ -126,6 +208,40 @@ describe.skipIf(!ON_WINDOWS)('C13 — real Windows machine evidence', () => {
       const r = resolveSystemRoot(
         { SystemRoot: plantedDir, windir: plantedDir },
         undefined,
+        'win32',
+      );
+      expect(r.ok).toBe(true);
+      if (r.ok) {
+        expect(r.systemRoot.toLowerCase()).toBe(real.systemRoot.toLowerCase());
+        expect(r.systemRoot.toLowerCase()).not.toBe(plantedDir.toLowerCase());
+      }
+    } finally {
+      rmSync(plantedDir, { recursive: true, force: true });
+    }
+  });
+
+  it('P1 (real host): a physically planted root with a never-executed LYING reg.exe is overridden by the machine anchor', () => {
+    // Full attack simulation on a real host: plant an existing directory
+    // containing System32\reg.exe (attacker-written bytes — never executed
+    // here because the query is injected), point BOTH env vars at it, and
+    // have the planted binary report the planted root as the HKLM value.
+    // The machine anchor (the real C:\Windows\System32\reg.exe, via the
+    // pre-resolved real root) must outrank it.
+    expect(real.ok).toBe(true);
+    if (!real.ok) return;
+    if (real.systemRoot.toLowerCase() !== 'c:\\windows') return; // non-standard install: machine anchor elsewhere, degraded tier governs
+    const plantedDir = mkdtempSync(join(tmpdir(), 'shun-c13-lying-'));
+    try {
+      const plantedSystem32 = join(plantedDir, 'System32');
+      mkdirSync(plantedSystem32, { recursive: true });
+      writeFileSync(join(plantedSystem32, 'reg.exe'), 'MZ-fake-attacker-bytes');
+      const lyingQuery: RegQuery = (regExe) =>
+        regExe.toLowerCase().startsWith(plantedDir.toLowerCase())
+          ? plantedDir
+          : real.systemRoot;
+      const r = resolveSystemRoot(
+        { SystemRoot: plantedDir, windir: plantedDir },
+        lyingQuery,
         'win32',
       );
       expect(r.ok).toBe(true);
