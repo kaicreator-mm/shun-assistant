@@ -33,7 +33,7 @@ export async function collectWindowsSupportContext(
     '$cs=Get-CimInstance Win32_ComputerSystem',
     '$u=Get-HotFix | Sort-Object InstalledOn -Descending | Select-Object -First 1',
     "$last=if($null -eq $u){'UNKNOWN'}elseif($null -ne $u.InstalledOn){$u.InstalledOn.ToString('o')}else{$u.HotFixID}",
-    "[pscustomobject]@{os=@{name=[string]$os.Caption;build=[string]$os.BuildNumber};device=@{model=[string]$cs.Model};updates=@{last_check=[string]$last}} | ConvertTo-Json -Compress -Depth 5",
+    '[pscustomobject]@{os=@{name=[string]$os.Caption;build=[string]$os.BuildNumber};device=@{model=[string]$cs.Model};updates=@{last_check=[string]$last}} | ConvertTo-Json -Compress -Depth 5',
   ].join(';');
 
   const result = await run(
@@ -48,7 +48,9 @@ export async function collectWindowsSupportContext(
   try {
     parsed = JSON.parse(result.stdout.trim()) as unknown;
   } catch (error) {
-    throw new Error(`SUPPORT_COLLECTION_FAILED: invalid structured PowerShell output: ${String(error)}`);
+    throw new Error(
+      `SUPPORT_COLLECTION_FAILED: invalid structured PowerShell output: ${String(error)}`,
+    );
   }
   return minimizeSupportContext(parsed);
 }
