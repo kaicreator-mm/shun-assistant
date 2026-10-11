@@ -132,7 +132,7 @@ function main(): never {
       writeFileSync(
         protectedReceiptPath(anchorRoot, parsed.data.jobId),
         `${JSON.stringify(receipt, null, 2)}\n`,
-        { encoding: 'utf8' },
+        { encoding: 'utf8', flag: 'wx' },
       );
     } catch (error) {
       return emitAndExit(
