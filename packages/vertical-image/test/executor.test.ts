@@ -5,8 +5,8 @@ import { ShunContractError } from '@shun/contracts';
 import sharp from 'sharp';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { runImageBatchProcess } from '../src/executor.ts';
-import { type BindingView, ImageProviderError } from '../src/provider.ts';
-import { makeSharpImageProvider, SHARP_BINDING_ID } from '../src/sharp-engine.ts';
+import { type BindingView, type ImageProvider, ImageProviderError } from '../src/provider.ts';
+import { makeSharpImageProvider, SHARP_BINDING_ID, sharpBindingView } from '../src/sharp-engine.ts';
 import { type FixtureDir, fixtureDir, jpegBytes, pngBytes, testFacts } from './helpers.ts';
 
 let src: FixtureDir;
@@ -347,6 +347,61 @@ describe('runImageBatchProcess — per-record failures', () => {
     const result = await runImageBatchProcess(input([{ path: a, format: 'JPG' }]), {
       facts: testFacts(),
       providers: [exploding],
+    });
+    expect(result.ok).toBe(true);
+    if (!result.ok) {
+      return;
+    }
+    expect(result.output.records[0]?.status).toBe('REJECTED');
+    expect(existsSync(join(out.path, 'a.jpg'))).toBe(false);
+  });
+
+  it('never deletes a foreign file planted at the target path before a collision (VI-P0-01)', async () => {
+    const a = await src.write('a.jpg', await jpegBytes({ width: 300, height: 200, seed: 161 }));
+    const canary = Buffer.from('foreign canary — planted by another actor, not ours');
+    // Simulated race: between the precheck and the provider call another actor
+    // creates a file at the target path; the provider then reports the
+    // collision. The executor must not unlink a file it did not create.
+    const racer: ImageProvider = {
+      binding: sharpBindingView(),
+      async resizeTo(request) {
+        await writeFile(request.targetPath, canary, { flag: 'wx' });
+        throw new ImageProviderError(
+          'OUTPUT_COLLISION',
+          sharpBindingView().bindingId,
+          'output appeared between precheck and write',
+        );
+      },
+    };
+    const result = await runImageBatchProcess(input([{ path: a, format: 'JPG' }]), {
+      facts: testFacts(),
+      providers: [racer],
+    });
+    expect(result.ok).toBe(true);
+    if (!result.ok) {
+      return;
+    }
+    expect(result.output.records[0]?.status).toBe('REJECTED');
+    expect(result.output.records[0]?.rejectionCode).toBe('OUTPUT_COLLISION');
+    // The canary must survive byte-identical: ownership was never established.
+    expect(await readFile(join(out.path, 'a.jpg'))).toEqual(canary);
+  });
+
+  it('still removes its own malformed output after a dims self-check failure (VI-P0-01)', async () => {
+    const a = await src.write('a.jpg', await jpegBytes({ width: 600, height: 400, seed: 162 }));
+    // Provider writes a WRONG-dims output itself, then the executor's
+    // post-write self-check must reject and clean up the file it owns.
+    const sloppy: ImageProvider = {
+      binding: sharpBindingView(),
+      async resizeTo(request) {
+        const wrong = await jpegBytes({ width: 111, height: 77, seed: 163 });
+        await writeFile(request.targetPath, wrong, { flag: 'wx' });
+        return { captureDate: null, width: 111, height: 77, byteLength: wrong.length };
+      },
+    };
+    const result = await runImageBatchProcess(input([{ path: a, format: 'JPG' }]), {
+      facts: testFacts(),
+      providers: [sloppy],
     });
     expect(result.ok).toBe(true);
     if (!result.ok) {
