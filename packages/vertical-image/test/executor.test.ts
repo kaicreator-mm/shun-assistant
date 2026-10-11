@@ -1,5 +1,5 @@
 import { existsSync } from 'node:fs';
-import { mkdir, readdir, readFile, stat, truncate, writeFile } from 'node:fs/promises';
+import { mkdir, readdir, readFile, stat, symlink, truncate, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { ShunContractError } from '@shun/contracts';
 import sharp from 'sharp';
@@ -131,6 +131,37 @@ describe('runImageBatchProcess — task-level failures', () => {
     }
     expect(existsSync(join(src.path, 'a.jpg'))).toBe(true); // sources intact
     expect((await readdir(src.path)).filter((f) => f.endsWith('.tmp')).length).toBe(0);
+  });
+
+  it('blocks an output directory that aliases an input directory via a junction (VI-P1-03)', async () => {
+    const files = await standardBatch();
+    const before = await readdir(src.path);
+    const alias = join(out.path, 'alias-to-src');
+    // A junction/reparse alias of the input dir: lexically a different path,
+    // canonically the input directory itself.
+    await symlink(src.path, alias, 'junction');
+    const result = await runImageBatchProcess(input(files, alias), deps());
+    expect(result.ok).toBe(false);
+    if (!result.ok) {
+      expect(result.failure.code).toBe('POLICY_BLOCKED');
+    }
+    // No effects: the input directory is untouched, no outputs were written.
+    expect((await readdir(src.path)).sort()).toEqual(before.sort());
+  });
+
+  it('blocks an output directory symlink planted after precheck but before mkdir (VI-P1-03)', async () => {
+    const files = await standardBatch();
+    const before = await readdir(src.path);
+    const target = join(out.path, 'created-out');
+    // Plant a symlink AT the not-yet-created output path: mkdir succeeds on
+    // it and writes would land in the input dir unless re-canonicalized.
+    await symlink(src.path, target, 'junction');
+    const result = await runImageBatchProcess(input(files, target), deps());
+    expect(result.ok).toBe(false);
+    if (!result.ok) {
+      expect(result.failure.code).toBe('POLICY_BLOCKED');
+    }
+    expect((await readdir(src.path)).sort()).toEqual(before.sort());
   });
 
   it('returns NO_TRUSTED_PROVIDER with no provider and writes nothing', async () => {
