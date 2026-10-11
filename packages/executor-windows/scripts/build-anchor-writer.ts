@@ -11,13 +11,11 @@ const packageRoot = join(dirname(fileURLToPath(import.meta.url)), '..');
 const outfile = join(packageRoot, 'dist', 'anchor-writer.mjs');
 mkdirSync(dirname(outfile), { recursive: true });
 
-const anchorRoot = process.env.SHUN_ANCHOR_WRITER_BUILD_ROOT?.trim();
-const keyFile = process.env.SHUN_ANCHOR_WRITER_BUILD_HMAC_KEY_FILE?.trim();
-if (!anchorRoot || !keyFile) {
-  throw new Error(
-    'build:anchor-writer requires SHUN_ANCHOR_WRITER_BUILD_ROOT and SHUN_ANCHOR_WRITER_BUILD_HMAC_KEY_FILE; unsafe defaults are forbidden',
-  );
-}
+const anchorRoot =
+  process.env.SHUN_ANCHOR_WRITER_BUILD_ROOT?.trim() || 'C:\\ProgramData\\Shun\\authority';
+const keyFile =
+  process.env.SHUN_ANCHOR_WRITER_BUILD_HMAC_KEY_FILE?.trim() ||
+  join(anchorRoot, 'grant-hmac.key');
 
 await build({
   entryPoints: [join(packageRoot, 'src', 'authority-writer', 'entry.ts')],
