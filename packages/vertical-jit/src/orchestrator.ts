@@ -42,11 +42,7 @@ import {
   type VerifierPort,
 } from '@shun/contracts';
 import { JitLifecycleError } from './failures.ts';
-import {
-  classifyFromJournal,
-  type JournalPort,
-  type RecoveryClassification,
-} from './journal.ts';
+import { classifyFromJournal, type JournalPort, type RecoveryClassification } from './journal.ts';
 import { canonicalKey, treeUnder } from './manifest-removal.ts';
 import { buildActionPlan, installAction, taskAction, uninstallAction } from './plans.ts';
 import type {
@@ -1059,8 +1055,7 @@ function installFailure(
   refusalCode?: string,
 ): JitLifecycleError {
   const provenNoEffect =
-    recoveryClassification === 'NOT_STARTED' ||
-    recoveryClassification === 'FAILED_BEFORE_EFFECT';
+    recoveryClassification === 'NOT_STARTED' || recoveryClassification === 'FAILED_BEFORE_EFFECT';
   return new JitLifecycleError(
     'INSTALL_FAILED',
     refusalCode
@@ -1083,8 +1078,7 @@ function removalFailure(
   refusalCode?: string,
 ): JitLifecycleError {
   const provenNoEffect =
-    recoveryClassification === 'NOT_STARTED' ||
-    recoveryClassification === 'FAILED_BEFORE_EFFECT';
+    recoveryClassification === 'NOT_STARTED' || recoveryClassification === 'FAILED_BEFORE_EFFECT';
   return new JitLifecycleError(
     'REMOVE_FAILED',
     refusalCode
