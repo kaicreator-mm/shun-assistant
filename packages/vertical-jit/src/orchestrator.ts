@@ -1041,7 +1041,7 @@ function installFailure(
       // Refusal: the journal stops at RECEIVED (validation precedes any side
       // effect) ⇒ FAILED_BEFORE_EFFECT. UAC_DECLINED carries the NO_EFFECT
       // marker ⇒ NOT_STARTED (L2 §9.4).
-      recoveryClassification: terminal === 'UAC_DECLINED' ? 'NOT_STARTED' : 'FAILED_BEFORE_EFFECT',
+      recoveryClassification: 'FAILED_BEFORE_EFFECT',
       detail: `install terminal ${terminal}; no automatic retry — a declined elevation or refused grant is a decision, not a transport fault`,
     },
   );
@@ -1059,7 +1059,7 @@ function removalFailure(
       : `privileged removal ended ${terminal}`,
     {
       actionId,
-      recoveryClassification: terminal === 'UAC_DECLINED' ? 'NOT_STARTED' : 'FAILED_BEFORE_EFFECT',
+      recoveryClassification: 'FAILED_BEFORE_EFFECT',
       detail: `removal terminal ${terminal}`,
     },
   );
