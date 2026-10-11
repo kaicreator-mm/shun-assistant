@@ -49,7 +49,7 @@ const ANCHOR_RECORD_FILES = [
 ] as const;
 
 /** Record directories the attacker could add/replace records in. */
-const ANCHOR_RECORD_DIRS = ['grants', 'plans', 'programs', 'jobs'] as const;
+const ANCHOR_RECORD_DIRS = ['grants', 'programs', 'jobs'] as const;
 
 function fileReadable(path: string): boolean | undefined {
   try {
@@ -101,6 +101,31 @@ function ownerSid(authorityDir: string, path: string): string | undefined {
   } catch {
     return undefined;
   }
+}
+
+export function assessAnchorOwnership(
+  authorityDir: string,
+  hmacKeyFile: string = resolveGrantHmacKeyFile(authorityDir),
+): string[] {
+  if (process.platform !== 'win32') {
+    return ['authorization anchor ownership is only verifiable on Windows'];
+  }
+  const reasons: string[] = [];
+  const targets: Array<[string, string]> = [
+    ['authority store root', authorityDir],
+    ...ANCHOR_RECORD_DIRS.map((dir) => [`${dir}/ record directory`, join(authorityDir, dir)] as [string, string]),
+    ...ANCHOR_RECORD_FILES.map((file) => [file, join(authorityDir, file)] as [string, string]),
+    ['grant-hmac key', hmacKeyFile],
+  ];
+  for (const [name, path] of targets) {
+    const owner = ownerSid(authorityDir, path);
+    if (!owner || !PRIVILEGED_OWNER_SIDS.has(owner)) {
+      reasons.push(
+        `${name} owner is not Administrators/SYSTEM (${owner ?? 'unresolvable'})`,
+      );
+    }
+  }
+  return reasons;
 }
 
 function dirWritable(path: string): boolean | undefined {
@@ -182,18 +207,7 @@ export function assessAuthorityAnchors(
   // look protected, require privileged ownership as a second independent
   // fact. The query runs through the already pinned real system PowerShell.
   if (reasons.length === 0 && process.platform === 'win32') {
-    const rootOwner = ownerSid(authorityDir, authorityDir);
-    const keyOwner = ownerSid(authorityDir, hmacKeyFile);
-    if (!rootOwner || !PRIVILEGED_OWNER_SIDS.has(rootOwner)) {
-      reasons.push(
-        `authority store owner is not Administrators/SYSTEM (${rootOwner ?? 'unresolvable'})`,
-      );
-    }
-    if (!keyOwner || !PRIVILEGED_OWNER_SIDS.has(keyOwner)) {
-      reasons.push(
-        `grant-hmac key owner is not Administrators/SYSTEM (${keyOwner ?? 'unresolvable'})`,
-      );
-    }
+    reasons.push(...assessAnchorOwnership(authorityDir, hmacKeyFile));
   }
 
   return { forgeable: reasons.length > 0, keyReadable: keyReadable !== false, reasons };
