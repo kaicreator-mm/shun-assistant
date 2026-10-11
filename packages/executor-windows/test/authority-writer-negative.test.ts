@@ -69,6 +69,11 @@ function createFixture(): Fixture {
       policySnapshotRevision: 'policy-rev-1',
       authorityRevision: 'auth-rev-1',
       maxGrants: 10,
+      scopeBudget: {
+        riskClasses: ['R2'],
+        privilegeLevels: ['ELEVATED'],
+        maxGrantTtlMs: 86_400_000,
+      },
     }),
   );
   writeFileSync(
@@ -96,12 +101,14 @@ function createFixture(): Fixture {
   const grantJob = signWriterJob(anchorKey, {
     jobId: 'job-grant-1',
     jobType: 'issue-grant',
+    riskClass: 'R2',
     policyWindowRef: windowId,
     payload: grant,
   });
   const forgedJob = signWriterJob(attackerKey, {
     jobId: 'job-forged-1',
     jobType: 'issue-grant',
+    riskClass: 'R2',
     policyWindowRef: windowId,
     payload: grant,
   });
@@ -278,6 +285,96 @@ describe('ShunAnchorWriter core — unattended negative controls (L2 v0.2 delta 
     if (!r3.ok) expect(r3.code).toBe('PAYLOAD_INVALID');
   });
 
+  it('policy-window risk/privilege scope is enforced before grant issuance', () => {
+    const fx = createFixture();
+    writeFileSync(
+      join(fx.anchorRoot, 'jobs', `window-${fx.windowId}.json`),
+      JSON.stringify({
+        windowId: fx.windowId,
+        notBefore: '2020-01-01T00:00:00.000Z',
+        notAfter: '2099-01-01T00:00:00.000Z',
+        policySnapshotRevision: 'policy-rev-1',
+        authorityRevision: 'auth-rev-1',
+        maxGrants: 10,
+        scopeBudget: {
+          riskClasses: ['R1'],
+          privilegeLevels: ['USER'],
+          maxGrantTtlMs: 86_400_000,
+        },
+      }),
+    );
+    const result = applyWriterJob(
+      { anchorRoot: fx.anchorRoot, hmacKeyBase64: fx.anchorKey },
+      fx.grantJob,
+    );
+    expect(result.ok).toBe(false);
+    if (!result.ok) expect(result.code).toBe('PAYLOAD_INVALID');
+    expect(existsSync(grantTarget(fx.anchorRoot))).toBe(false);
+  });
+
+  it('policy-window filesystem scope refuses a broader grant', () => {
+    const fx = createFixture();
+    writeFileSync(
+      join(fx.anchorRoot, 'jobs', `window-${fx.windowId}.json`),
+      JSON.stringify({
+        windowId: fx.windowId,
+        notBefore: '2020-01-01T00:00:00.000Z',
+        notAfter: '2099-01-01T00:00:00.000Z',
+        policySnapshotRevision: 'policy-rev-1',
+        authorityRevision: 'auth-rev-1',
+        maxGrants: 10,
+        scopeBudget: {
+          riskClasses: ['R2'],
+          privilegeLevels: ['ELEVATED'],
+          filesystem: { read: [], write: ['C:\\approved'] },
+          maxGrantTtlMs: 86_400_000,
+        },
+      }),
+    );
+    const broader = signWriterJob(fx.anchorKey, {
+      jobId: 'job-broader-scope',
+      jobType: 'issue-grant',
+      riskClass: 'R2',
+      policyWindowRef: fx.windowId,
+      payload: {
+        ...(fx.grantJob.payload as Record<string, unknown>),
+        grantId: 'grant-broader-scope',
+        actionScope: {
+          actionIds: ['act-1'],
+          privilegeLevel: 'ELEVATED',
+          filesystem: { read: [], write: ['C:\\outside'] },
+        },
+      },
+    });
+    const result = applyWriterJob(
+      { anchorRoot: fx.anchorRoot, hmacKeyBase64: fx.anchorKey },
+      broader,
+    );
+    expect(result.ok).toBe(false);
+    if (!result.ok) expect(result.code).toBe('PAYLOAD_INVALID');
+  });
+
+  it('path-ambiguous jobId is rejected before it can name a ledger file', () => {
+    const fx = createFixture();
+    const unsafe = signWriterJob(
+      fx.anchorKey,
+      {
+        jobId: '../job-escape',
+        jobType: 'issue-grant',
+        riskClass: 'R2',
+        policyWindowRef: fx.windowId,
+        payload: fx.grantJob.payload,
+      } as Parameters<typeof signWriterJob>[1],
+    );
+    const result = applyWriterJob(
+      { anchorRoot: fx.anchorRoot, hmacKeyBase64: fx.anchorKey },
+      unsafe,
+    );
+    expect(result.ok).toBe(false);
+    if (!result.ok) expect(result.code).toBe('JOB_NOT_AUTHENTIC');
+    expect(existsSync(join(fx.anchorRoot, 'jobs', 'job-escape.consumed'))).toBe(false);
+  });
+
   it('maxGrants is an enforced issuance budget across distinct jobIds', () => {
     const fx = createFixture();
     writeFileSync(
@@ -289,6 +386,11 @@ describe('ShunAnchorWriter core — unattended negative controls (L2 v0.2 delta 
         policySnapshotRevision: 'policy-rev-1',
         authorityRevision: 'auth-rev-1',
         maxGrants: 1,
+        scopeBudget: {
+          riskClasses: ['R2'],
+          privilegeLevels: ['ELEVATED'],
+          maxGrantTtlMs: 86_400_000,
+        },
       }),
     );
     const first = applyWriterJob(
