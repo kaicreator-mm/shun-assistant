@@ -236,9 +236,7 @@ describe.skipIf(!ON_WINDOWS)('C13 — real Windows machine evidence', () => {
       mkdirSync(plantedSystem32, { recursive: true });
       writeFileSync(join(plantedSystem32, 'reg.exe'), 'MZ-fake-attacker-bytes');
       const lyingQuery: RegQuery = (regExe) =>
-        regExe.toLowerCase().startsWith(plantedDir.toLowerCase())
-          ? plantedDir
-          : real.systemRoot;
+        regExe.toLowerCase().startsWith(plantedDir.toLowerCase()) ? plantedDir : real.systemRoot;
       const r = resolveSystemRoot(
         { SystemRoot: plantedDir, windir: plantedDir },
         lyingQuery,

@@ -11,23 +11,33 @@
 // HKLM\SOFTWARE\Microsoft\Windows NT\CurrentVersion (SystemRoot value), which
 // requires elevation to modify — a same-user attacker at the caller's IL can
 // rewrite their own environment variables but NOT that registry key. We read
-// the machine record with reg.exe found from independent evidence (env hints
-// cross-checked against the pinned well-known root) and validate it as a
-// fixed point (the reported root's own reg.exe re-reports the same value and
-// the directory genuinely exists).
+// the machine record with reg.exe RANKED BY TRUST, never by attacker say-so:
+// the pinned well-known root's own reg.exe (C:\Windows\System32\reg.exe, the
+// MACHINE FIXED POINT) is consulted FIRST. When it exists and its HKLM report
+// validates as a fixed point, its answer IS the resolution — an inherited
+// SystemRoot/windir hint can never outrank it, so a planted real directory
+// whose self-written reg.exe re-reports the planted root (a forgery the old
+// hint-first ordering accepted) is rejected by construction. If the fixed
+// point SPEAKS but its report contradicts itself (fixed-point re-query
+// mismatch, reported directory absent), resolution FAILS CLOSED rather than
+// letting a validating attacker hint override readable machine evidence.
+// (This corrects the earlier header's overstatement that a planted fake
+// reg.exe could not forge the fixed point: it could, whenever attacker
+// hints were probed before machine evidence.)
 //
-// N-1 honest boundary of that fixed point: it constrains the REPORT, not the
-// REPORTER's bytes. A self-written reg.exe in a planted root can re-report
-// the planted root and satisfy the loop — so every resolved candidate binary
-// is additionally verified against the authority store's system-tools identity
-// pin (SystemToolsPinSchema, provisioned at the same trusted moment as the
-// helper pin): a FORGED binary is refused (sha mismatch) and a missing record
-// or digest fails closed. What identity CANNOT do is distinguish a real
-// binary COPIED into a planted root (equal bytes = equal sha256); the
-// machine-evidence path defeats copies by construction — a real reg.exe copy
-// reports the real root — and the pin store itself sits inside the C06
-// same-user boundary (an attacker who can rewrite the store can re-pin their
-// own tools; the complete fix stays escalated).
+// N-1 honest boundary of the fixed point: it constrains the REPORT, not the
+// REPORTER's bytes. In the DEGRADED tier — machine fixed point absent or
+// entirely unreadable — a self-written reg.exe in a planted root can still
+// satisfy the fixed-point loop with self-referential answers, so every
+// resolved candidate binary is additionally verified against the authority
+// store's system-tools identity pin (SystemToolsPinSchema, provisioned at
+// the same trusted moment as the helper pin): a FORGED binary is refused
+// (sha mismatch) and a missing record or digest fails closed. What identity
+// CANNOT do is distinguish a real binary COPIED into a planted root (equal
+// bytes = equal sha256) — but a copied real reg.exe still reports the real
+// HKLM root, so its report is honest by construction. The pin store itself
+// sits inside the C06 same-user boundary (an attacker who can rewrite the
+// store can re-pin their own tools; the complete fix stays escalated).
 //
 // Residual (documented, not hidden): if the registry is entirely unreadable,
 // resolution falls back to inherited env ONLY on unanimous SystemRoot/windir
@@ -93,27 +103,50 @@ export function resolveSystemRoot(
   const statFile = seam.isFile ?? isFile;
   const statDirectory = seam.isDirectory ?? isDirectory;
 
-  // 1. Machine evidence: the HKLM SystemRoot value, read with reg.exe from
-  //    every candidate root that actually has one. The first report that
-  //    validates as a fixed point wins. (N-1: the fixed point constrains the
-  //    REPORTED ROOT; the identity gate below constrains the BYTES.)
-  for (const hint of uniqueRoots([env.SystemRoot, env.windir, HARD_CODED_FALLBACK_ROOT])) {
+  // 1. Machine fixed point FIRST (P1): the pinned well-known root's own
+  //    reg.exe outranks every inherited hint. If it exists and its HKLM
+  //    report validates as a fixed point, its answer IS the resolution — a
+  //    planted root + self-written lying reg.exe can then never win by
+  //    candidate ordering, because attacker-controlled SystemRoot/windir
+  //    hints are only consulted when the machine evidence is absent or
+  //    entirely unreadable. (N-1: the fixed point constrains the REPORTED
+  //    ROOT; the identity gate below constrains the BYTES.)
+  const machineReg = join(HARD_CODED_FALLBACK_ROOT, 'System32', 'reg.exe');
+  if (statFile(machineReg)) {
+    const machineReport = query(machineReg, REG_QUERY_SYSTEMROOT_ARGS)?.trim();
+    if (machineReport) {
+      // The machine anchor SPOKE. Its report must be the answer: accept it
+      // only as a validated fixed point; if readable machine evidence
+      // contradicts itself (re-query mismatch / reported directory absent),
+      // fail closed instead of letting a self-consistent attacker hint
+      // override it.
+      const root = validatedFixedPoint(machineReport, query, statFile, statDirectory);
+      if (root) return { ok: true, systemRoot: root };
+      return {
+        ok: false,
+        reason:
+          'system directory unresolvable: the machine reg.exe reported a SystemRoot that failed the fixed-point consistency check — readable machine evidence is contradictory, refusing to fall back to inherited hints (fail closed)',
+      };
+    }
+    // Anchor entirely unreadable (query failed / no parseable value): honest
+    // degradation — fall through to the hint tier and the env fallback.
+  }
+
+  // 2. Inherited hints (attacker-controllable, so strictly behind the
+  //    machine fixed point): the first report that validates as a fixed
+  //    point wins. A self-written reg.exe CAN satisfy this loop with
+  //    self-referential answers — which is exactly why the candidate
+  //    binaries are identity-checked against the pin afterwards.
+  for (const hint of uniqueRoots([env.SystemRoot, env.windir])) {
     const hintReg = join(hint, 'System32', 'reg.exe');
     if (!statFile(hintReg)) continue;
     const reported = query(hintReg, REG_QUERY_SYSTEMROOT_ARGS)?.trim();
     if (!reported || !isAbsoluteWindowsPath(reported)) continue;
-    // Fixed point: the machine record must reference a real directory whose
-    // own reg.exe re-reports the same value. A self-written reg.exe CAN
-    // satisfy this loop with self-referential answers — which is exactly why
-    // the candidate binaries are identity-checked against the pin afterwards.
-    const reportedReg = join(reported, 'System32', 'reg.exe');
-    if (!statDirectory(reported) || !statFile(reportedReg)) continue;
-    const confirmed = query(reportedReg, REG_QUERY_SYSTEMROOT_ARGS)?.trim();
-    if (confirmed !== reported) continue;
-    return { ok: true, systemRoot: reported };
+    const root = validatedFixedPoint(reported, query, statFile, statDirectory);
+    if (root) return { ok: true, systemRoot: root };
   }
 
-  // 2. Degraded fallback: inherited env on unanimous agreement + existence.
+  // 3. Degraded fallback: inherited env on unanimous agreement + existence.
   const agreed = uniqueRoots([env.SystemRoot, env.windir]);
   if (agreed.length === 1 && statDirectory(join(agreed[0] as string, 'System32'))) {
     return { ok: true, systemRoot: agreed[0] as string };
@@ -218,6 +251,25 @@ function resolvePinnedSystemExe(
 }
 
 // ---- internals. ----
+
+/**
+ * A reported root is believed only when it is an absolute Windows path, the
+ * directory genuinely exists, and its own reg.exe re-reports the same value
+ * (fixed point). Returns the validated root, or undefined.
+ */
+function validatedFixedPoint(
+  reported: string,
+  query: RegQuery,
+  statFile: (path: string) => boolean,
+  statDirectory: (path: string) => boolean,
+): string | undefined {
+  if (!isAbsoluteWindowsPath(reported)) return undefined;
+  if (!statDirectory(reported)) return undefined;
+  const reportedReg = join(reported, 'System32', 'reg.exe');
+  if (!statFile(reportedReg)) return undefined;
+  const confirmed = query(reportedReg, REG_QUERY_SYSTEMROOT_ARGS)?.trim();
+  return confirmed === reported ? reported : undefined;
+}
 
 function queryRegistryValue(regExe: string, args: readonly string[]): string | undefined {
   try {
