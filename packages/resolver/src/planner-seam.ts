@@ -7,11 +7,11 @@
 // local-only policy it is ineligible, and the outcome is a typed
 // PLANNER_UNAVAILABLE — the policy is never silently relaxed.
 //
-// R2 (fresh review blocker 2): transport provenance is bound, not asserted.
-// The caller-supplied {planner, transport} pair form is removed, and LOCAL
-// adapters can only be minted for planners whose local provenance was
-// declared at the trusted composition boundary (declareLocalPlanner) — a
-// remote-backed planner can no longer run under a LOCAL label.
+// R3 security correction: a public declareLocalPlanner issuer cannot prove
+// local transport (it can brand arbitrary remote-backed implementations).
+// LOCAL PlannerPort invocation therefore fails closed at the seam until a
+// trusted host can enforce no-network execution. REMOTE remains eligible
+// only under explicit privacy/offline policy permissions.
 import {
   type GoalProposal,
   GoalProposalSchema,
@@ -211,6 +211,23 @@ export async function interpretGoalViaPlanner(
       status: 'PLANNER_UNAVAILABLE',
       reason:
         'LOCAL transport is bound to a planner without declared local provenance (declareLocalPlanner at the trusted composition boundary) — a possibly remote-backed planner is never invoked under a LOCAL label',
+    };
+  }
+
+  // R3 security disposition: this package has no non-user-mintable host
+  // principal that can attest a PlannerPort's actual egress behavior.
+  // In particular, declareLocalPlanner is public and can wrap a remote
+  // implementation. Module-private symbols only authenticate the factory,
+  // NOT the transport. Until the host supplies enforceable no-network
+  // composition, all LOCAL execution fails closed (including open policies,
+  // so an offline request cannot be routed remotely through this seam).
+  // Deterministic/structured normalization remains available, as does the
+  // explicit REMOTE adapter when disclosure and offline policy allow it.
+  if (transport === 'LOCAL') {
+    return {
+      status: 'PLANNER_UNAVAILABLE',
+      reason:
+        'LOCAL PlannerPort origin cannot be independently attested by this runtime; caller-declared local provenance is not proof of no network egress — refusing execution until an enforceable trusted host is provided',
     };
   }
 
