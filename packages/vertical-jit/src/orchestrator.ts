@@ -411,7 +411,10 @@ async function runLifecycle(
   };
 
   // ---- Install (R1 privileged) ----
-  const scopeRoots = await deps.acquisition.predictScope(candidate, deps.policy.machineScopeInstall);
+  const scopeRoots = await deps.acquisition.predictScope(
+    candidate,
+    deps.policy.machineScopeInstall,
+  );
   // Snapshot the predicted scope BEFORE any side effect: the install-owned
   // manifest is the post-install tree minus this pre-existing tree, so
   // content that predates the install (user files inside provider roots) can
@@ -824,7 +827,11 @@ const TREE_WALK_DEPTH = 8;
  * root. The removal preview must see NESTED content — a user file two levels
  * inside the install root is invisible to a one-level listing (VJ-P1-01).
  */
-async function treeUnder(deps: JitLifecycleDeps, root: string, depth = TREE_WALK_DEPTH): Promise<string[]> {
+async function treeUnder(
+  deps: JitLifecycleDeps,
+  root: string,
+  depth = TREE_WALK_DEPTH,
+): Promise<string[]> {
   const found: string[] = [];
   if (depth < 0 || !(await deps.fs.isDirectory(root))) {
     return found;

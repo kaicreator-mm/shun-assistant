@@ -79,7 +79,7 @@ export class CliTaskBackend implements EnvironmentBackend {
     // presentation the trusted ledger does not back.
     const refusal = await this.#ledgerRefusal(action);
     if (refusal) {
-      return this.#refusedReceipt(action, startedAt, refusal);
+      return this.#refusedReceipt(action, startedAt);
     }
     const parameters = action.action.parameters as { executable?: unknown; argv?: unknown };
     const executable = typeof parameters.executable === 'string' ? parameters.executable : '';
@@ -146,14 +146,17 @@ export class CliTaskBackend implements EnvironmentBackend {
     if (canonicalJson(planned) !== canonicalJson(action.action)) {
       return 'presented action body does not match the trusted plan ledger';
     }
-    if (action.expiresAt <= this.#deps.clock()) {
+    if (action.expiresAt !== undefined && action.expiresAt <= this.#deps.clock()) {
       return `authorization window expired at ${action.expiresAt}`;
     }
     return undefined;
   }
 
-  #refusedReceipt(action: AuthorizedAction, startedAt: string, refusal: string) {
+  #refusedReceipt(action: AuthorizedAction, startedAt: string) {
     // Refused before any effect: terminal REFUSED, fail-closed recovery.
+    // (The refusal reason is computed by #ledgerRefusal; the receipt schema
+    // carries no free-text field for it and the classification is what
+    // recovery consumes.)
     return ExecutionReceiptSchema.parse({
       actionId: action.actionId,
       environmentId: this.#deps.facts.environmentId,

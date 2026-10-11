@@ -23,7 +23,7 @@ import {
   type PlanAction,
   ShunContractError,
 } from '@shun/contracts';
-import { newJournalId, type JournalPort } from './journal.ts';
+import { type JournalPort, newJournalId } from './journal.ts';
 import type { LocalAuthority } from './local-authority.ts';
 
 /** Transport-level crash of the privileged worker (simulates a killed helper). */
@@ -143,7 +143,7 @@ export class LocalPrivilegedBackend implements ExecutionBackend {
       ts: this.#deps.clock(),
       phase: 'VALIDATED',
       actionId: action.actionId,
-      detail: `grant ${verdict.grantId}`,
+      detail: `grant ${verdict.grant.grantId}`,
       attemptId,
     });
 

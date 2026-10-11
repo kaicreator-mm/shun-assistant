@@ -9,12 +9,7 @@ import { describe, expect, it } from 'vitest';
 import { CliTaskBackend } from '../src/adapters/cli-backend.ts';
 import { isJitLifecycleError } from '../src/failures.ts';
 import { LocalAuthority } from '../src/local-authority.ts';
-import {
-  buildHarness,
-  MemoryFilesystem,
-  ScriptedProcessPort,
-  windowsFacts,
-} from '../src/mocks.ts';
+import { buildHarness, MemoryFilesystem, ScriptedProcessPort, windowsFacts } from '../src/mocks.ts';
 import { runJitLifecycle } from '../src/orchestrator.ts';
 import { buildActionPlan, taskAction } from '../src/plans.ts';
 import { INSTALL_DIR, installWorld, jitInput } from './helpers.ts';
@@ -89,7 +84,10 @@ describe('CLI task backend — trusted boundary validation (VJ-P1-03)', () => {
     const tampered = authorized({
       action: {
         ...genuine.action,
-        parameters: { ...genuine.action.parameters, argv: ['--steal', 'C:\\Users\\dev\\Documents'] },
+        parameters: {
+          ...genuine.action.parameters,
+          argv: ['--steal', 'C:\\Users\\dev\\Documents'],
+        },
       },
     });
 
