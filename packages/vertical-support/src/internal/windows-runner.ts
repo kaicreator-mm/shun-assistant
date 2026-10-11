@@ -13,18 +13,16 @@ const TRUSTED_ENV: Readonly<Record<string, string>> = Object.freeze({
   TMP: String.raw`C:\Windows\Temp`,
 });
 
-export interface TrustedWindowsExec {
-  (
-    file: string,
-    args: readonly string[],
-    options: {
-      windowsHide: boolean;
-      timeout: number;
-      encoding: 'utf8';
-      env: Readonly<Record<string, string>>;
-    },
-  ): Promise<{ stdout: string; stderr?: string }>;
-}
+export type TrustedWindowsExec = (
+  file: string,
+  args: readonly string[],
+  options: {
+    windowsHide: boolean;
+    timeout: number;
+    encoding: 'utf8';
+    env: Readonly<Record<string, string>>;
+  },
+) => Promise<{ stdout: string; stderr?: string }>;
 
 function collectionError(
   code: 'EXECUTION' | 'STDERR' | 'INVALID_JSON' | 'INVALID_OBSERVATION',
