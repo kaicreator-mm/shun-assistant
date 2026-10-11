@@ -1,5 +1,8 @@
 // T04 C06 — KNOWN-OPEN DEFECT RECORD (Audit-A #10 C06, P0 OPEN). This file is
-// a skipped RECORD, not a green test and not a fix.
+// an EXPECTED-FAILURE record (it.fails), not a green test and not a fix: the
+// attack recipe below RUNS on every suite invocation, currently fails exactly
+// as the defect predicts, and vitest reports it as an expected failure —
+// keeping a live regression signal instead of the silent describe.skip.
 //
 // The attack recipe (audit negative control), attacker = a malicious process
 // running as the SAME Windows user, controlling only ordinary user processes
@@ -18,7 +21,7 @@
 //      accepts the forged envelope.)
 //   5. Present the forged envelope to the real pinned helper.
 //
-// REQUIRED behavior (the skipped assertions below): the privileged boundary
+// REQUIRED behavior (the expected-to-fail assertions below): the privileged boundary
 // must REFUSE — no GRANT_OK in the journal, structured REFUSED receipt, no
 // effect — because a trust anchor an attacker can rewrite cannot authenticate
 // anything. TODAY (default deployment, key co-located in the same-user-writable
@@ -28,24 +31,33 @@
 // only the elevation dimension on a filtered-token host; the AUTHENTICITY of
 // the forged grant is (wrongly) accepted today.
 //
-// Why skipped: closing this requires an INDEPENDENTLY PROTECTED WRITER/TRUST
-// PRINCIPAL (privileged authority service owning issuance/revocation/
-// currentness/pin updates, or a store whose only writer is an elevated
-// principal) — an architecture decision outside the T04 write set
-// (packages/executor-windows/**). It must not be "closed" by asserting that
-// same-user ACLs protect the store (they do not — the attacker IS the user),
-// and T04 explicitly forbids evading with comment-level or ACL-theater
-// mitigations. The in-scope hardening that DID land (4502de8): tamper
-// detection without the key (authority-store-tamper.test.ts) and key
-// EXTERNALIZATION to a protected path (SHUN_EXECUTOR_HMAC_KEY_FILE) — which
-// closes the hole ONLY for deployments that actually protect the external key
-// path; the DEFAULT co-located deployment remains exposed and ESCALATED to
-// the Controller.
+// Why it.fails instead of describe.skip: closing this requires an
+// INDEPENDENTLY PROTECTED WRITER/TRUST PRINCIPAL (privileged authority
+// service owning issuance/revocation/currentness/pin updates, or a store
+// whose only writer is an elevated principal) — an architecture decision
+// outside the T04 write set (packages/executor-windows/**). It must not be
+// "closed" by asserting that same-user ACLs protect the store (they do not —
+// the attacker IS the user), and T04 explicitly forbids evading with
+// comment-level or ACL-theater mitigations. The in-scope hardening that DID
+// land (4502de8): tamper detection without the key
+// (authority-store-tamper.test.ts) and key EXTERNALIZATION to a protected
+// path (SHUN_EXECUTOR_HMAC_KEY_FILE) — which closes the hole ONLY for
+// deployments that actually protect the external key path; the DEFAULT
+// co-located deployment remains exposed and ESCALATED to the Controller.
+// While the defect is open, the assertions below FAIL (the helper accepts
+// the re-signed anchor); it.fails turns that predictable failure into a
+// tracked, per-run signal. The tradeoff is documented honesty: it.fails
+// cannot distinguish "failed for the predicted reason" from "failed for an
+// unrelated reason" — the receipt assertions below pin the expected refusal
+// reason so any change in failure shape is reviewable in the output.
 //
-// Un-skipping contract: when the trust principal lands, re-express steps 1-2
+// Un-skipping contract: when the trust principal lands, the assertions below
+// start PASSING and vitest flips this test to FAILED ("expected to fail but
+// passed") — that red IS the forced removal signal. Re-express steps 1-2
 // against the new seam (e.g. request the forged signature from the authority
-// service and expect rejection THERE, plus the helper refusing any anchor not
-// attested by the service), keep the recipe, and delete this paragraph.
+// service and expect rejection THERE, plus the helper refusing any anchor
+// not attested by the service), keep the recipe, drop the `.fails` marker,
+// and delete this paragraph.
 import { existsSync, mkdirSync } from 'node:fs';
 import { join } from 'node:path';
 import type { AuthorizationGrant } from '@shun/contracts';
@@ -66,7 +78,7 @@ import {
   type TestAuthority,
 } from './helpers.ts';
 
-describe.skip('C06 KNOWN-OPEN (P0, escalated): same-user re-signed anchors must NOT authenticate', () => {
+describe('C06 KNOWN-OPEN (P0, escalated): same-user re-signed anchors must NOT authenticate', () => {
   let authority: TestAuthority;
   let workspace: string;
 
@@ -78,7 +90,12 @@ describe.skip('C06 KNOWN-OPEN (P0, escalated): same-user re-signed anchors must 
 
   afterAll(() => disposeTestAuthority(authority));
 
-  it('a same-user attacker who replaces the co-located HMAC key and re-signs gets NOTHING through the boundary', () => {
+  // it.fails: the recipe below EXECUTES every run and is expected to fail
+  // while C06 is architecturally open (the helper accepts the re-signed
+  // anchor). When the trust principal lands and the boundary refuses, these
+  // assertions pass and vitest flips this test to FAILED — the forced
+  // de-listing signal (see the un-skipping contract in the header).
+  it.fails('a same-user attacker who replaces the co-located HMAC key and re-signs gets NOTHING through the boundary', () => {
     // Steps 1-2: attacker key in the store, grant re-signed under it.
     const attackerKey = generateGrantHmacKey();
     writeGrantHmacKey(authority.authorityDir, attackerKey);
