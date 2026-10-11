@@ -79,8 +79,7 @@ describe('B-040 support-context minimization', () => {
   });
 
   it('never copies attacker-controlled env key names into redaction metadata', () => {
-    const input = fixture();
-    input.env = { [fakeToken]: 'ordinary-value' };
+    const input = { ...fixture(), env: { [fakeToken]: 'ordinary-value' } };
     const result = minimizeSupportContext(input);
     expectNoCanaries(result);
     expect(result.report.redactions).toContainEqual({
