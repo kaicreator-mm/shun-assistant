@@ -8,6 +8,7 @@
 import { type Dirent, promises as fsp, type Stats } from 'node:fs';
 import * as path from 'node:path';
 import { z } from 'zod';
+import { StorageVerticalError } from './errors.ts';
 import type { ResolvedScope } from './scope.ts';
 
 export const DirectoryStatSchema = z.strictObject({
@@ -60,6 +61,15 @@ export async function observeStorage(
 
   for (const root of scope.roots) {
     const rootEntries = await safeReaddir(root);
+    if (rootEntries === null) {
+      // An unreadable scope root yields NO evidence at all: reporting a
+      // silently empty observation would fabricate measurement the plan and
+      // attribution would then trust. Fail the observation honestly.
+      throw new StorageVerticalError(
+        'ACTION_NOT_BOUNDED',
+        `scope root is unreadable (ACL denial or race): ${root}`,
+      );
+    }
     for (const entry of rootEntries) {
       const entryPath = path.join(root, entry.name);
       if (entry.isDirectory()) {
@@ -106,6 +116,12 @@ async function accumulate(dir: string, acc: SubtreeAccumulator, depth: number): 
     return;
   }
   const entries = await safeReaddir(dir);
+  if (entries === null) {
+    // Unreadable is NOT empty: record the gap so attribution and planning
+    // never treat unmeasured bytes as a measured zero (VS-P2-07).
+    acc.inaccessible.push(`${dir} (unreadable)`);
+    return;
+  }
   for (const entry of entries) {
     const entryPath = path.join(dir, entry.name);
     if (entry.isSymbolicLink()) {
@@ -131,11 +147,12 @@ async function accumulate(dir: string, acc: SubtreeAccumulator, depth: number): 
   }
 }
 
-async function safeReaddir(dir: string): Promise<Dirent[]> {
+/** readdir that distinguishes "empty" from "unreadable": null means the listing failed. */
+async function safeReaddir(dir: string): Promise<Dirent[] | null> {
   try {
     return await fsp.readdir(dir, { withFileTypes: true });
   } catch {
-    return [];
+    return null;
   }
 }
 

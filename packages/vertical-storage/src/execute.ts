@@ -6,7 +6,7 @@
 // under target directories carried by hashed plan actions; expected reclaim
 // bytes in a parameter can no more delete something than a size reading can.
 import { createHash } from 'node:crypto';
-import { type Dirent, promises as fsp } from 'node:fs';
+import { type Dirent, promises as fsp, type Stats } from 'node:fs';
 import * as path from 'node:path';
 import {
   type ActionPlan,
@@ -22,7 +22,7 @@ import {
   pathWithin,
 } from '@shun/contracts';
 import type { CleanupCategory } from './classify.ts';
-import { touchesProtectedAsset } from './classify.ts';
+import { classifyDirectory, touchesProtectedAsset } from './classify.ts';
 import { StorageVerticalError } from './errors.ts';
 import { classifyFromJournal, PhaseJournal, replayJournal } from './journal.ts';
 
@@ -56,6 +56,21 @@ export interface ExecuteCleanupInput {
   environmentId: string;
   providerId: string;
   providerVersion: string;
+  /**
+   * Deterministic race-injection seam for tests only: invoked synchronously
+   * around effect-time filesystem operations so Windows-native TOCTOU swaps
+   * (junction/reparse-point replacement mid-delete) can be reproduced
+   * repeatably. Never set in production wiring.
+   */
+  testHooks?: DeleteTestHooks;
+}
+
+/** Test-only seams around effect-time operations (see ExecuteCleanupInput.testHooks). */
+export interface DeleteTestHooks {
+  /** Runs immediately before a file's effect-time target re-check and deletion. */
+  beforeFileDelete?: (filePath: string) => void | Promise<void>;
+  /** Runs immediately before descending into a subdirectory of the target. */
+  beforeDirDescend?: (dirPath: string) => void | Promise<void>;
 }
 
 /**
@@ -68,6 +83,25 @@ export async function executeBoundedCleanup(
 ): Promise<CleanupExecutionResult> {
   const { authorizedAction, plan } = input;
   const startedAt = input.now;
+
+  // ---- Reconcile-first reentry guard (L2 §9.4): a same-action reentry whose
+  // prior journal state is uncertain (torn mid-effect) or already completed
+  // must never blindly re-execute — reconcile the checkpoint manifest first.
+  // Only a prior run that provably never started effects may be retried.
+  const priorClassification = classifyFromJournal(
+    (await replayJournal(input.journalPath)).entries,
+    authorizedAction.actionId,
+  );
+  if (
+    priorClassification === 'MAY_HAVE_EXECUTED_UNCERTAIN' ||
+    priorClassification === 'COMPLETED_VERIFIED'
+  ) {
+    throw new StorageVerticalError(
+      'ACTION_NOT_BOUNDED',
+      `action ${authorizedAction.actionId} was already executed (journal classification ${priorClassification}); reconcile against the checkpoint manifest first (reconcileAfterInterruption) instead of reentering`,
+    );
+  }
+
   const journal = await PhaseJournal.open(input.journalPath);
   await journal.append({
     at: startedAt,
@@ -141,6 +175,32 @@ export async function executeBoundedCleanup(
       `target ${targetPath} (realpath ${realTarget}) is outside the resolved scope`,
     );
   }
+  // ---- Effect-time independent classification (never the caller's label):
+  // the action parameter is attacker-controlled surface; the disposable
+  // verdict is re-derived here from the path policy at the moment of effect
+  // and must agree with the declared category, else nothing is deleted.
+  const independent = classifyDirectory(realTarget, {
+    protectedRealPaths: input.protectedRealPaths,
+    scopeRoots: input.scopeRoots,
+  });
+  if (
+    independent.cleanupCategory === null ||
+    !input.eligibleCategories.includes(independent.cleanupCategory) ||
+    independent.cleanupCategory !== classification
+  ) {
+    await journal.append({
+      at: new Date().toISOString(),
+      phase: 'TARGET_VALIDATED',
+      actionId: action.actionId,
+      errorKind: 'INDEPENDENT_CLASSIFICATION_MISMATCH',
+    });
+    const receipt = buildReceipt(input, startedAt, 'REFUSED', {
+      recoveryClassification: 'FAILED_BEFORE_EFFECT',
+      postStateVerified: false,
+      journalRef: `evidence://journal/${path.basename(input.journalPath)}`,
+    });
+    return { receipt, targets: {}, journalPath: input.journalPath };
+  }
   if (touchesProtectedAsset(realTarget, input.protectedRealPaths)) {
     await journal.append({
       at: new Date().toISOString(),
@@ -150,7 +210,7 @@ export async function executeBoundedCleanup(
     });
     const receipt = buildReceipt(input, startedAt, 'REFUSED', {
       recoveryClassification: 'FAILED_BEFORE_EFFECT',
-      postStateVerified: true,
+      postStateVerified: false,
       journalRef: `evidence://journal/${path.basename(input.journalPath)}`,
     });
     return { receipt, targets: {}, journalPath: input.journalPath };
@@ -168,31 +228,43 @@ export async function executeBoundedCleanup(
   let blockedFiles = 0;
   let reclaimedBytes = 0;
   const blockedErrors: string[] = [];
-  await deleteRecursively(realTarget, realTarget, action.actionId, journal, {
-    onDeleted: (bytes) => {
-      deletedFiles += 1;
-      reclaimedBytes += bytes;
-    },
-    onBlocked: (kind) => {
-      blockedFiles += 1;
-      blockedErrors.push(kind);
-    },
-  });
-
-  const terminal = blockedFiles === 0 ? 'SUCCEEDED' : 'FAILED';
-  const recovery = classifyFromJournal(
-    await (await replayJournal(input.journalPath)).entries,
+  await deleteRecursively(
+    realTarget,
+    realTarget,
     action.actionId,
+    journal,
+    {
+      onDeleted: (bytes) => {
+        deletedFiles += 1;
+        reclaimedBytes += bytes;
+      },
+      onBlocked: (kind) => {
+        blockedFiles += 1;
+        blockedErrors.push(kind);
+      },
+    },
+    input.testHooks,
   );
-  const receipt = buildReceipt(input, startedAt, terminal, {
-    recoveryClassification: recovery === 'NOT_STARTED' ? 'FAILED_BEFORE_EFFECT' : recovery,
-    postStateVerified: true,
-    journalRef: `evidence://journal/${path.basename(input.journalPath)}`,
-  });
+
+  // ---- Durable receipt BEFORE any completed-verified claim (L2 §9.4 state
+  // order: effects → durable RECEIPT_WRITTEN → classification). The receipt
+  // itself is built only after the journal proves durability, and it never
+  // claims post-state verification — that is the independent verifier's job
+  // (verify.ts), which runs after this function returns.
+  const terminal = blockedFiles === 0 ? 'SUCCEEDED' : 'FAILED';
   await journal.append({
     at: new Date().toISOString(),
     phase: 'RECEIPT_WRITTEN',
     actionId: action.actionId,
+  });
+  const recovery = classifyFromJournal(
+    (await replayJournal(input.journalPath)).entries,
+    action.actionId,
+  );
+  const receipt = buildReceipt(input, startedAt, terminal, {
+    recoveryClassification: recovery === 'NOT_STARTED' ? 'FAILED_BEFORE_EFFECT' : recovery,
+    postStateVerified: false,
+    journalRef: `evidence://journal/${path.basename(input.journalPath)}`,
   });
 
   return {
@@ -216,6 +288,7 @@ async function deleteRecursively(
   actionId: string,
   journal: PhaseJournal,
   counters: { onDeleted: (bytes: number) => void; onBlocked: (kind: string) => void },
+  hooks?: DeleteTestHooks,
   depth = 0,
 ): Promise<void> {
   if (depth > 16) return;
@@ -234,8 +307,18 @@ async function deleteRecursively(
       continue;
     }
     if (entry.isDirectory()) {
-      await deleteRecursively(root, entryPath, actionId, journal, counters, depth + 1);
-      await removeEmptyDir(entryPath, journal, actionId);
+      // TOCTOU re-check at descend time: between readdir and now the entry may
+      // have been swapped for a junction/reparse point (Windows descendant
+      // swap). Never descend into anything that is not still a plain directory.
+      await hooks?.beforeDirDescend?.(entryPath);
+      const dirStat: Stats | null = await fsp.lstat(entryPath).catch(() => null);
+      if (!dirStat) continue; // raced away before descent: nothing happened
+      if (dirStat.isSymbolicLink() || !dirStat.isDirectory()) {
+        counters.onBlocked(`REPARSE_POINT:${entryPath}`);
+        continue;
+      }
+      await deleteRecursively(root, entryPath, actionId, journal, counters, hooks, depth + 1);
+      await removeEmptyDir(root, entryPath, journal, actionId, counters.onBlocked);
       continue;
     }
     if (!entry.isFile()) continue;
@@ -252,6 +335,25 @@ async function deleteRecursively(
       file: entryPath,
       bytes: size,
     });
+    // TOCTOU re-check at effect time: the entry (or an ancestor directory)
+    // may have been swapped for a junction since enumeration. lstat does not
+    // follow intermediate reparse points, so verify the real target
+    // component-wise (attributes + resolved path inside the authorized
+    // target) immediately before every deletion — a swapped path is blocked,
+    // never deleted through.
+    await hooks?.beforeFileDelete?.(entryPath);
+    const target = await checkDeletionTarget(entryPath, root);
+    if (!target.ok) {
+      await journal.append({
+        at: new Date().toISOString(),
+        phase: 'EXEC_BLOCKED',
+        actionId,
+        file: entryPath,
+        errorKind: target.kind.split(':')[0] ?? 'BLOCKED',
+      });
+      counters.onBlocked(target.kind);
+      continue;
+    }
     try {
       await fsp.rm(entryPath, { force: false });
       await journal.append({
@@ -276,22 +378,132 @@ async function deleteRecursively(
   }
 }
 
-async function removeEmptyDir(dir: string, journal: PhaseJournal, actionId: string): Promise<void> {
+type DeletionTargetCheck = { ok: true } | { ok: false; kind: string };
+
+/**
+ * Effect-time verification of one deletion target, defeating the descendant
+ * junction/reparse swap (VS-P0-01): the final component must still be a plain
+ * file (lstat never follows it), and the fully resolved real path of its
+ * PARENT must still lie inside the authorized target tree — resolving the
+ * parent traverses every ancestor, so a swap of any ancestor (or of the
+ * parent itself) to a junction resolves outside and is blocked instead of
+ * deleted through. The parent is resolved rather than the file: realpath on
+ * the file would open a handle (failing under deny-Delete ACLs), while the
+ * parent resolution needs no access to the file itself.
+ */
+async function checkDeletionTarget(
+  entryPath: string,
+  rootReal: string,
+): Promise<DeletionTargetCheck> {
+  let st: Stats;
   try {
-    const remaining = await fsp.readdir(dir);
-    if (remaining.length === 0) {
-      await fsp.rmdir(dir);
-      await journal.append({
-        at: new Date().toISOString(),
-        phase: 'EXEC_DONE',
-        actionId,
-        file: `${dir}/(dir)`,
-        bytes: 0,
-      });
-    }
+    st = await fsp.lstat(entryPath);
   } catch {
-    // dir raced away or is gone: honest no-op
+    return { ok: false, kind: `VANISHED:${entryPath}` };
   }
+  if (st.isSymbolicLink() || !st.isFile()) {
+    return { ok: false, kind: `REPARSE_POINT:${entryPath}` };
+  }
+  let parentReal: string;
+  try {
+    parentReal = await fsp.realpath(path.dirname(entryPath));
+  } catch {
+    return { ok: false, kind: `VANISHED:${entryPath}` };
+  }
+  if (!pathWithin(parentReal, rootReal)) {
+    return { ok: false, kind: `OUTSIDE_SCOPE:${entryPath}` };
+  }
+  return { ok: true };
+}
+
+/**
+ * Post-recursion empty-directory removal, bound to the authorized target
+ * (rootReal). The gates, in order, immediately before the effect:
+ *   1. final component is still a plain directory (lstat never follows it —
+ *      a junction that replaced the directory itself is left untouched);
+ *   2. the directory is still empty (a foreign/nonempty directory is a safe
+ *      honest no-op — the ENOTEMPTY path);
+ *   3. resolved-parent AND resolved-directory containment: realpath resolves
+ *      the FULL ancestor chain, so an ancestor swapped to a junction since
+ *      enumeration lands the resolved path OUTSIDE the authorized target and
+ *      the rmdir is refused — mirroring checkDeletionTarget's file-side
+ *      effect-time re-check (VS-P0-01 class).
+ * Containment or resolution failures journal EXEC_BLOCKED honestly and are
+ * counted as blocked (the receipt can never present an out-of-scope
+ * environment as SUCCEEDED); only an actual in-scope rmdir journals EXEC_DONE.
+ * Residual declared honestly: the microseconds between resolution and rmdir
+ * remain a race window, as with the file-side check — no portable
+ * handle-relative rmdir exists on Node.
+ */
+async function removeEmptyDir(
+  rootReal: string,
+  dir: string,
+  journal: PhaseJournal,
+  actionId: string,
+  onBlocked: (kind: string) => void,
+): Promise<void> {
+  // Never rmdir through a swap: a junction that replaced the directory is
+  // left untouched (the executor never deletes reparse points).
+  let st: Stats;
+  try {
+    st = await fsp.lstat(dir);
+  } catch {
+    return; // raced away before the gate: nothing happened
+  }
+  if (st.isSymbolicLink() || !st.isDirectory()) return;
+  let remaining: string[];
+  try {
+    remaining = await fsp.readdir(dir);
+  } catch {
+    return; // raced away or unreadable: nothing deleted, honest no-op
+  }
+  if (remaining.length > 0) return;
+  const journalBlocked = async (errorKind: string): Promise<void> => {
+    await journal.append({
+      at: new Date().toISOString(),
+      phase: 'EXEC_BLOCKED',
+      actionId,
+      file: `${dir}/(dir)`,
+      errorKind,
+    });
+    onBlocked(`${errorKind}:${dir}`);
+  };
+  let parentReal: string;
+  try {
+    parentReal = await fsp.realpath(path.dirname(dir));
+  } catch (error) {
+    const code = (error as NodeJS.ErrnoException).code ?? 'UNKNOWN';
+    await journalBlocked(code === 'ENOENT' ? 'VANISHED' : code);
+    return;
+  }
+  if (!pathWithin(parentReal, rootReal)) {
+    await journalBlocked('OUTSIDE_SCOPE');
+    return;
+  }
+  let dirReal: string;
+  try {
+    dirReal = await fsp.realpath(dir);
+  } catch (error) {
+    const code = (error as NodeJS.ErrnoException).code ?? 'UNKNOWN';
+    await journalBlocked(code === 'ENOENT' ? 'VANISHED' : code);
+    return;
+  }
+  if (!pathWithin(dirReal, rootReal)) {
+    await journalBlocked('OUTSIDE_SCOPE');
+    return;
+  }
+  try {
+    await fsp.rmdir(dir);
+  } catch {
+    return; // raced away/nonempty at rmdir time: nothing deleted, honest no-op
+  }
+  await journal.append({
+    at: new Date().toISOString(),
+    phase: 'EXEC_DONE',
+    actionId,
+    file: `${dir}/(dir)`,
+    bytes: 0,
+  });
 }
 
 function buildReceipt(

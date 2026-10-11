@@ -22,6 +22,8 @@ export {
 export { StorageVerticalError } from './errors.ts';
 export {
   type CleanupExecutionResult,
+  type DeleteTestHooks,
+  type ExecuteCleanupInput,
   executeBoundedCleanup,
   reconcileAfterInterruption,
 } from './execute.ts';

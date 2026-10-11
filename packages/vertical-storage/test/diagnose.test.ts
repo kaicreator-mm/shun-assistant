@@ -214,6 +214,29 @@ d('B-039 — diagnose → bounded cleanup → verify (real Windows filesystem)',
     // The protected photos were never touched even though verification failed.
     expect(await fsp.readdir(ctx.protectedPhotos)).toHaveLength(2);
   });
+
+  it('fails the whole task when any multi-target receipt is refused, even if reclaim math matches (VS-P1-03)', async () => {
+    const ctx = await setupInScope('b039-multitarget-refused', { eligible: ['CACHE', 'TEMP'] });
+    // Deterministic mid-flow authority change: the first action executes with
+    // a valid grant; before the second action re-verifies, the grant is
+    // revoked, so its receipt is REFUSED. One refused target must fail the
+    // whole verification — never a task-level PASS on a partial execution.
+    let authorityCalls = 0;
+    const originalAuthority = ctx.runtime.ports.currentAuthority.bind(ctx.runtime.ports);
+    ctx.runtime.ports.currentAuthority = async () => {
+      authorityCalls += 1;
+      if (authorityCalls >= 2) ctx.authority.revokeLastGrant();
+      return originalAuthority();
+    };
+    await expect(runStorageDiagnose(ctx.runtime, ctx.productionInput)).rejects.toThrow(
+      /execution-receipts-terminal/,
+    );
+    // The first (valid-grant) action reclaimed its cache target; the refused
+    // action deleted nothing in its tmp target — and the partial execution
+    // failed the whole task instead of averaging into a PASS.
+    expect(await fsp.readdir(ctx.cacheDir)).toEqual([]);
+    expect((await fsp.readdir(ctx.tmpDir)).length).toBe(1);
+  });
 });
 
 d('B-040 — privacy / local-only canary', () => {

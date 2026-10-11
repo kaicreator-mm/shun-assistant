@@ -5,9 +5,11 @@
 // asset hash mismatch fails verification with PROTECTED_ASSET_TOUCHED — it is
 // never reported as a successful cleanup.
 import { createHash } from 'node:crypto';
-import { promises as fsp } from 'node:fs';
+import { createReadStream, promises as fsp } from 'node:fs';
 import * as path from 'node:path';
+import { finished } from 'node:stream/promises';
 import {
+  type ExecutionReceipt,
   type StorageDiagnoseInput,
   type StorageDiagnoseOutput,
   type VerificationInput,
@@ -61,8 +63,13 @@ export async function fingerprintPath(target: string): Promise<string> {
 }
 
 export async function hashFile(filePath: string): Promise<string> {
-  const contents = await fsp.readFile(filePath);
-  return createHash('sha256').update(contents).digest('hex');
+  // Streamed, never buffered whole: protected assets can be arbitrarily large
+  // and the verifier must not hold their full bytes in memory (VS-P2-06).
+  const hash = createHash('sha256');
+  const stream = createReadStream(filePath);
+  stream.on('data', (chunk: string | Buffer) => hash.update(chunk));
+  await finished(stream);
+  return hash.digest('hex');
 }
 
 async function fingerprintDirectory(dir: string, prefix = ''): Promise<string> {
@@ -137,6 +144,12 @@ export interface StorageVerificationContext {
   /** Post-action measurement of the attributed growth source (regrowth honesty). */
   postActionStateBytes: number;
   deps: StorageVerifierDeps;
+  /**
+   * Every execution receipt for this task's actions, in dispatch order. The
+   * verifier must see all of them: a failed/refused/partial receipt on ANY
+   * target can never verify PASS, no matter what the primary receipt claims.
+   */
+  receipts?: readonly ExecutionReceipt[];
 }
 
 export interface StorageVerificationOutcome {
@@ -236,6 +249,43 @@ export async function verifyStorageCleanup(
     detail: scopeOk
       ? 'execution scoped to declared roots'
       : 'scope roots missing from oracle inputs',
+  });
+
+  // 5. Every execution receipt must be a full success, and any
+  // COMPLETED_VERIFIED claim must be backed by a durable RECEIPT_WRITTEN
+  // phase in the privileged journal. A failed/refused/partial receipt on ANY
+  // target can never verify PASS, no matter what the reclaim math says.
+  const presented: readonly ExecutionReceipt[] =
+    context.receipts ??
+    (context.verificationInput.executionReceipt
+      ? [context.verificationInput.executionReceipt]
+      : []);
+  const receiptProblems: string[] = [];
+  if (presented.length === 0) {
+    receiptProblems.push('no execution receipts presented for verification');
+  }
+  for (const r of presented) {
+    if (r.terminal !== 'SUCCEEDED') {
+      receiptProblems.push(`${r.actionId}: terminal ${r.terminal}`);
+    }
+    if (r.sideEffectEvidence.recoveryClassification === 'COMPLETED_VERIFIED') {
+      const durable = replay.entries.some(
+        (e) => e.actionId === r.actionId && e.phase === 'RECEIPT_WRITTEN',
+      );
+      if (!durable) {
+        receiptProblems.push(
+          `${r.actionId}: claims COMPLETED_VERIFIED without durable RECEIPT_WRITTEN`,
+        );
+      }
+    }
+  }
+  checks.push({
+    checkId: 'execution-receipts-terminal',
+    status: receiptProblems.length === 0 ? 'PASS' : 'FAIL',
+    detail:
+      receiptProblems.length === 0
+        ? `${presented.length} execution receipt(s) all SUCCEEDED with durable journal evidence`
+        : `RECEIPTS_NOT_VERIFIED: ${receiptProblems.join('; ')}`,
   });
 
   const failed = checks.filter((c) => c.status === 'FAIL');

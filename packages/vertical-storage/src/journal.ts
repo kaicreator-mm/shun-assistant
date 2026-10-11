@@ -96,7 +96,10 @@ export type RecoveryClassification =
  * Classify what happened to one actionId from the journal alone (L2 §9.4).
  * An EXEC_START without its EXEC_DONE inside a torn tail means the process may
  * have died mid-deletion — the honest classification is uncertainty, resolved
- * only by reconcile-first against the checkpoint manifest.
+ * only by reconcile-first against the checkpoint manifest. COMPLETED_VERIFIED
+ * additionally requires a durable RECEIPT_WRITTEN phase: effects journaled
+ * without a durable receipt mean the run may have torn before its outcome was
+ * recorded, so an observer must never read them as verified completion.
  */
 export function classifyFromJournal(
   entries: JournalEntry[],
@@ -112,5 +115,7 @@ export function classifyFromJournal(
   const doneFiles = new Set(relevant.filter((e) => e.phase === 'EXEC_DONE').map((e) => e.file));
   const uncertain = startedFiles.some((e) => e.file !== undefined && !doneFiles.has(e.file));
   if (uncertain) return 'MAY_HAVE_EXECUTED_UNCERTAIN';
+  const receiptWritten = relevant.some((e) => e.phase === 'RECEIPT_WRITTEN');
+  if (!receiptWritten) return 'MAY_HAVE_EXECUTED_UNCERTAIN';
   return 'COMPLETED_VERIFIED';
 }
