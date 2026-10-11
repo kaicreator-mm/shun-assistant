@@ -9,7 +9,7 @@ import type {
   AuthorizationGrant,
   GrantIssueRequest,
 } from '@shun/contracts';
-import { computePlanHash } from '@shun/contracts';
+import { canonicalJson, computePlanHash } from '@shun/contracts';
 import type { StoredGrantRecord } from '../src/authority.ts';
 import { computeIssuanceProof } from '../src/issuance-proof.ts';
 import type { AuthorityRecord, PolicySnapshotRecord } from '../src/policy.ts';
@@ -66,6 +66,26 @@ export function memoryPolicyState(seed?: {
     },
     async savePolicySnapshot(snapshot: PolicySnapshotRecord) {
       state.policySlot = structuredClone(snapshot);
+    },
+    /**
+     * Optimistic-concurrency reference implementation (R1 P1-B): save only
+     * while the slot still holds exactly what the caller last read
+     * (canonical-JSON equality; a null/undefined expectation demands an empty
+     * slot). Returns false — writing nothing — when the record moved. The
+     * authority uses this whenever present so adversarial tests can drive
+     * deterministic lost-update races.
+     */
+    async compareAndSavePolicySnapshot(snapshot: PolicySnapshotRecord, expectedPrior: unknown) {
+      const stored = state.policySlot;
+      const matches =
+        expectedPrior === null || expectedPrior === undefined
+          ? stored === null || stored === undefined
+          : stored !== null &&
+            stored !== undefined &&
+            canonicalJson(stored) === canonicalJson(expectedPrior);
+      if (!matches) return false;
+      state.policySlot = structuredClone(snapshot);
+      return true;
     },
   };
   if (seed?.authority) state.authoritySlot = structuredClone(seed.authority);
