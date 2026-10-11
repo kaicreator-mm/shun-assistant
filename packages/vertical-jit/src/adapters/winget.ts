@@ -282,7 +282,13 @@ export class WingetPrivilegedBackend extends LocalPrivilegedBackend {
   async #perform(action: {
     op: string;
     parameters: Record<string, unknown>;
-  }): Promise<{ ok: boolean; exitCode?: number; note?: string; noEffect?: true; refusalTerminal?: 'REFUSED' }> {
+  }): Promise<{
+    ok: boolean;
+    exitCode?: number;
+    note?: string;
+    noEffect?: true;
+    refusalTerminal?: 'REFUSED';
+  }> {
     const packageId = String(action.parameters.packageId ?? '');
     const version = String(action.parameters.version ?? '');
     if (!packageId || !version) {
