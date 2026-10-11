@@ -48,6 +48,7 @@ function makeAuthority(
     grants,
     integritySecret: 'test-authority-secret',
     issuanceSecret: ISSUANCE_SECRET,
+    bootstrapAuthorizer: ({ proof }) => proof === 'trusted-one-shot-bootstrap',
     clock: clock.now,
   });
   return { authority, grants, state, clock };
@@ -129,7 +130,10 @@ describe('P1-A: a missing policy row in an initialized authority is storage loss
   it('P1→issue→revoke→policy-slot loss→adopt(P1) refuses and the revoked grant is not resurrected or revalidated', async () => {
     const state = memoryPolicyState({ authority: AUTHORITY });
     const { authority, grants } = makeAuthority(state);
-    await authority.adoptPolicy({ policySnapshotRevision: POLICY_REVISION, rules: [] });
+    await authority.bootstrapPolicy(
+      { policySnapshotRevision: POLICY_REVISION, rules: [] },
+      'trusted-one-shot-bootstrap',
+    );
     const grant = await grantOf(authority, buildPlan());
     await authority.revokeGrant(grant.grantId);
 
@@ -156,7 +160,10 @@ describe('P1-A: a missing policy row in an initialized authority is storage loss
   it('the first bootstrap adoption records a durable initialization marker outside the policy slot', async () => {
     const state = memoryPolicyState({ authority: AUTHORITY });
     const { authority } = makeAuthority(state);
-    await authority.adoptPolicy({ policySnapshotRevision: POLICY_REVISION, rules: [] });
+    await authority.bootstrapPolicy(
+      { policySnapshotRevision: POLICY_REVISION, rules: [] },
+      'trusted-one-shot-bootstrap',
+    );
 
     // The marker must live OUTSIDE the slot it guards: it survives exactly
     // the loss it makes detectable.
@@ -171,7 +178,10 @@ describe('P1-A: a missing policy row in an initialized authority is storage loss
   it('the initialization marker survives an authority rotation', async () => {
     const state = memoryPolicyState({ authority: AUTHORITY });
     const { authority } = makeAuthority(state);
-    await authority.adoptPolicy({ policySnapshotRevision: POLICY_REVISION, rules: [] });
+    await authority.bootstrapPolicy(
+      { policySnapshotRevision: POLICY_REVISION, rules: [] },
+      'trusted-one-shot-bootstrap',
+    );
     await authority.rotateAuthority({ authorityRevision: 'auth-rev-2' });
 
     expect(state.authoritySlot).toMatchObject({
@@ -280,14 +290,17 @@ describe('P1-B: concurrent authority events stay serializable (deterministic sto
     });
   });
 
-  it('a bootstrap that loses a concurrent same-revision bootstrap re-validates non-reuse and refuses (CAS)', async () => {
+  it('an explicit bootstrap that loses a concurrent bootstrap refuses without overwriting (CAS)', async () => {
     const state = memoryPolicyState({ authority: AUTHORITY });
     const { authority } = makeAuthority(state);
 
     const barrier = storeBarrier();
     gateFirstPolicyWrite(state, barrier);
 
-    const adopt = authority.adoptPolicy({ policySnapshotRevision: POLICY_REVISION, rules: [] });
+    const adopt = authority.bootstrapPolicy(
+      { policySnapshotRevision: POLICY_REVISION, rules: [] },
+      'trusted-one-shot-bootstrap',
+    );
     await barrier.entered;
     // Another process bootstrapped the SAME revision while this adoption's
     // write was parked: the fresh store already holds pol-snap-1.
@@ -299,7 +312,7 @@ describe('P1-B: concurrent authority events stay serializable (deterministic sto
     // non-reuse against the fresh lineage, and refuse.
     await expect(adopt).rejects.toMatchObject({
       name: 'ShunContractError',
-      code: 'GRANT_POLICY_STALE',
+      code: 'GRANT_CURRENTNESS_UNRESOLVABLE',
     });
     expect((state.policySlot as PolicySnapshotRecord).policySnapshotRevision).toBe(POLICY_REVISION);
     // The winner's record is untouched (it is the whole lineage so far).
