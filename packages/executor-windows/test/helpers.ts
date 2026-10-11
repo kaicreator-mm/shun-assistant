@@ -46,14 +46,28 @@ import {
  */
 export const ON_WINDOWS = process.platform === 'win32';
 
+/**
+ * P3a: probe with the MACHINE System32 whoami.exe, never whatever wins PATH
+ * resolution — under Git Bash a coreutils `whoami.exe` (which takes no
+ * /groups flag) can shadow the Windows one and the parse would fail; the
+ * catch below would then misreport the host as non-elevated and silently
+ * skip the elevation-negative cases. Falls back to PATH only when the
+ * well-known binary does not exist (non-standard install).
+ */
+const HOST_WHOAMI_EXE = 'C:\\Windows\\System32\\whoami.exe';
+
 export const IS_ELEVATED_HOST: boolean = (() => {
   if (!ON_WINDOWS) return false;
   try {
     return isElevatedToken(
-      execFileSync('whoami.exe', ['/groups', '/fo', 'csv'], {
-        encoding: 'utf8',
-        windowsHide: true,
-      }),
+      execFileSync(
+        existsSync(HOST_WHOAMI_EXE) ? HOST_WHOAMI_EXE : 'whoami.exe',
+        ['/groups', '/fo', 'csv'],
+        {
+          encoding: 'utf8',
+          windowsHide: true,
+        },
+      ),
     );
   } catch {
     return false;
