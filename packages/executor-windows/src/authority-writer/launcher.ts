@@ -14,7 +14,7 @@ import {
   sha256File,
 } from '../trusted-store.ts';
 import { verifyWriterIdentity } from './apply.ts';
-import { WriterJobSchema } from './job.ts';
+import { WriterJobProposalSchema } from './job.ts';
 
 export interface AnchorWriterLaunchOptions {
   authorityDir: string;
@@ -44,15 +44,15 @@ export async function launchAnchorWriterJob(
     };
   }
 
-  let rawJob: unknown;
+  let rawProposal: unknown;
   try {
-    rawJob = JSON.parse(readFileSync(options.jobFile, 'utf8')) as unknown;
+    rawProposal = JSON.parse(readFileSync(options.jobFile, 'utf8')) as unknown;
   } catch (error) {
     return { ok: false, code: 'JOB_UNREADABLE', reason: String(error) };
   }
-  const parsedJob = WriterJobSchema.safeParse(rawJob);
-  if (!parsedJob.success) {
-    return { ok: false, code: 'JOB_MALFORMED', reason: parsedJob.error.message };
+  const parsedProposal = WriterJobProposalSchema.safeParse(rawProposal);
+  if (!parsedProposal.success) {
+    return { ok: false, code: 'PROPOSAL_MALFORMED', reason: parsedProposal.error.message };
   }
 
   const writerPin = readWriterPin(options.authorityDir);
@@ -117,7 +117,7 @@ export async function launchAnchorWriterJob(
 
   const relayFile = join(
     options.workspaceRoot,
-    `anchor-writer-relay-${parsedJob.data.jobId}-${Date.now()}.json`,
+    `anchor-writer-relay-${parsedProposal.data.jobId}-${Date.now()}.json`,
   );
   const relay = await spawnRelay({
     powershellExe,
@@ -134,7 +134,7 @@ export async function launchAnchorWriterJob(
       ok: false,
       code: 'UAC_DECLINED',
       reason: 'operator declined the one-shot writer elevation',
-      jobId: parsedJob.data.jobId,
+      jobId: parsedProposal.data.jobId,
     };
   }
   if (relay.kind !== 'RAN' || relay.exitCode !== 0) {
@@ -142,7 +142,7 @@ export async function launchAnchorWriterJob(
       ok: false,
       code: 'WRITER_FAILED',
       reason: `writer relay ended ${relay.kind} exit=${relay.exitCode ?? 'none'}`,
-      jobId: parsedJob.data.jobId,
+      jobId: parsedProposal.data.jobId,
     };
   }
 
@@ -150,20 +150,20 @@ export async function launchAnchorWriterJob(
     options.authorityDir,
     'jobs',
     'receipts',
-    `${parsedJob.data.jobId}.json`,
+    `${parsedProposal.data.jobId}.json`,
   );
   if (!existsSync(receiptFile)) {
     return {
       ok: false,
       code: 'WRITER_RECEIPT_MISSING',
       reason: 'writer exited success without its protected receipt',
-      jobId: parsedJob.data.jobId,
+      jobId: parsedProposal.data.jobId,
     };
   }
   try {
     return {
       ok: true,
-      jobId: parsedJob.data.jobId,
+      jobId: parsedProposal.data.jobId,
       receipt: JSON.parse(readFileSync(receiptFile, 'utf8')) as unknown,
     };
   } catch (error) {
@@ -171,7 +171,7 @@ export async function launchAnchorWriterJob(
       ok: false,
       code: 'WRITER_RECEIPT_CORRUPT',
       reason: String(error),
-      jobId: parsedJob.data.jobId,
+      jobId: parsedProposal.data.jobId,
     };
   }
 }
