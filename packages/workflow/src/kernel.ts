@@ -138,6 +138,18 @@ interface MessageRow {
   processed_at: string | null;
 }
 
+/**
+ * Lifetime-scoped identity for ONE task-lock acquisition (Issue #36 C03).
+ * A fresh lease object is minted per acquisition; ownership is validated
+ * LIVE against the active-lease registry, so an async context that merely
+ * carries a former holder's lease (a detached descendant or deferred
+ * subscriber callback that outlived its holder) holds an expired token that
+ * no longer matches and queues like any unrelated caller.
+ */
+interface LockLease {
+  readonly taskId: string;
+}
+
 export class DurableWorkflowKernel implements WorkflowKernelPort {
   /** Exposed for store-separation tests (runtime.db holds mechanics tables only). */
   readonly database: DatabaseSync;
@@ -148,12 +160,19 @@ export class DurableWorkflowKernel implements WorkflowKernelPort {
   private readonly subscribers = new Map<string, Set<(state: TaskWorkflowState) => void>>();
   private readonly locks = new Map<string, Promise<unknown>>();
   /**
-   * The async context (if any) that currently holds each task's lock.
-   * Re-entrancy is decided by OWNERSHIP of this context, not by a shared
-   * counter: an unrelated flow that calls into the kernel while a lock is
-   * held must queue, never join the holder's critical section (Issue #36 C03).
+   * Async context carrying the CURRENT holder's lease while it runs. The
+   * stored value is a per-acquisition lease object (NOT a bare task id):
+   * re-entrancy is decided by OWNERSHIP of the live lease, never by context
+   * equality on a value that survives across holder generations (Issue #36
+   * C03).
    */
-  private readonly lockOwner = new AsyncLocalStorage<string>();
+  private readonly lockOwner = new AsyncLocalStorage<LockLease>();
+  /**
+   * taskId → lease of the current lock holder. Revoked the moment the
+   * holder's critical section settles, so any context still carrying the
+   * expired lease fails the live check in withLock and queues.
+   */
+  private readonly activeLeases = new Map<string, LockLease>();
   private closed = false;
 
   private readonly statements: {
@@ -897,26 +916,61 @@ export class DurableWorkflowKernel implements WorkflowKernelPort {
   }
 
   /**
-   * Per-task serialized execution. Re-entrant ONLY for the async context
-   * that already holds this task's lock: a nested withLock call made from
-   * inside the locked flow (e.g. a message handler calling
-   * transition/applyStoreEffect) joins the current holder instead of
-   * deadlocking on the queue. An unrelated concurrent invocation for the
-   * same task always queues behind the holder, even if it arrives while the
-   * holder is suspended at an await inside its critical section.
+   * Per-task serialized execution. Re-entrant ONLY for the async context of
+   * the CURRENT live lease holder: a nested withLock call made from inside
+   * the locked flow (e.g. a message handler calling transition or
+   * applyStoreEffect) joins the live holder instead of deadlocking on the
+   * queue. Ownership is lifetime-scoped and validated LIVE against the
+   * active-lease registry — a context that merely carries a former holder's
+   * lease (a detached descendant or deferred subscriber callback that
+   * outlived its holder) does not match the active lease and queues like any
+   * unrelated caller, so it can never mutate the instance inside another
+   * holder's critical section (Issue #36 C03). An unrelated concurrent
+   * invocation for the same task always queues behind the holder, even if it
+   * arrives while the holder is suspended at an await inside its critical
+   * section.
    */
   private withLock<T>(taskId: string, fn: () => Promise<T> | T): Promise<T> {
-    if (this.lockOwner.getStore() === taskId) {
+    const ambient = this.lockOwner.getStore();
+    if (
+      ambient !== undefined &&
+      ambient.taskId === taskId &&
+      this.activeLeases.get(taskId) === ambient
+    ) {
       return Promise.resolve(fn());
     }
     const previous = this.locks.get(taskId) ?? Promise.resolve();
-    const run = (): Promise<T> | T => this.lockOwner.run(taskId, fn);
-    const next = previous.then(run, run);
+    const next = previous.then(
+      () => this.holdAndRun(taskId, fn),
+      () => this.holdAndRun(taskId, fn),
+    );
     this.locks.set(
       taskId,
       next.catch(() => undefined),
     );
     return next;
+  }
+
+  /**
+   * Acquire-scoped execution: mint a fresh lease, run the critical section
+   * under it, and revoke it the moment the section settles — including when
+   * the section's promise rejects or fn throws synchronously. The revocation
+   * (finally) strictly precedes the queued successor's start, so the lease
+   * lifetime exactly bounds the critical section. Anything still carrying
+   * the lease's context afterwards holds an EXPIRED token: the live check in
+   * withLock fails and the call queues behind the next holder instead of
+   * joining it (Issue #36 C03).
+   */
+  private async holdAndRun<T>(taskId: string, fn: () => Promise<T> | T): Promise<T> {
+    const lease: LockLease = { taskId };
+    this.activeLeases.set(taskId, lease);
+    try {
+      return await this.lockOwner.run(lease, fn);
+    } finally {
+      if (this.activeLeases.get(taskId) === lease) {
+        this.activeLeases.delete(taskId);
+      }
+    }
   }
 
   private notify(state: TaskWorkflowState): void {
