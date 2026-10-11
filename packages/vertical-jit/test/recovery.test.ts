@@ -1,5 +1,5 @@
 // Declined-elevation and interrupted-removal scenarios (B-038 negatives):
-// UAC_DECLINED leaves the journal at NOT_STARTED with no side effect and no
+// UAC_DECLINED follows RECEIVED, so it is FAILED_BEFORE_EFFECT with no side effect and no
 // automatic retry; a mid-effect interruption classifies
 // MAY_HAVE_EXECUTED_UNCERTAIN from the journal and resolves reconcile-first
 // against the SAME stable actionId.
@@ -30,7 +30,7 @@ function durablePolicy() {
 }
 
 describe('JIT lifecycle — declined elevation (UAC)', () => {
-  it('fails the install with NOT_STARTED recovery and never retries', async () => {
+  it('fails the install with FAILED_BEFORE_EFFECT recovery and never retries', async () => {
     const harness = buildHarness({
       backendFaults: [
         { kind: 'UAC_DECLINED', when: (action) => action.action.op === 'software.install' },
@@ -44,13 +44,13 @@ describe('JIT lifecycle — declined elevation (UAC)', () => {
 
     expect(error).toMatchObject({ code: 'INSTALL_FAILED' });
     expect((error as { recovery?: { recoveryClassification: string } }).recovery).toMatchObject({
-      recoveryClassification: 'NOT_STARTED',
+      recoveryClassification: 'FAILED_BEFORE_EFFECT',
     });
     expect(await harness.fs.exists(INSTALL_DIR)).toBe(false);
     // The journal carries the explicit NO_EFFECT marker.
     const entries = await harness.deps.journals('task-2026-10-10-002-install').replay();
     expect(entries.some((entry) => entry.detail?.startsWith('NO_EFFECT:'))).toBe(true);
-    expect(classifyFromJournal(entries, 'task-2026-10-10-002-install')).toBe('NOT_STARTED');
+    expect(classifyFromJournal(entries, 'task-2026-10-10-002-install')).toBe('FAILED_BEFORE_EFFECT');
   });
 
   it('fails the removal with the provider retained when elevation is declined at uninstall', async () => {
@@ -68,7 +68,7 @@ describe('JIT lifecycle — declined elevation (UAC)', () => {
 
     expect(error).toMatchObject({ code: 'REMOVE_FAILED' });
     expect((error as { recovery?: { recoveryClassification: string } }).recovery).toMatchObject({
-      recoveryClassification: 'NOT_STARTED',
+      recoveryClassification: 'FAILED_BEFORE_EFFECT',
     });
     expect(await harness.fs.exists(INSTALL_DIR)).toBe(true);
   });
