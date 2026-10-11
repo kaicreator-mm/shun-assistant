@@ -430,9 +430,15 @@ describe('ShunAnchorWriter core — unattended negative controls (L2 v0.2 delta 
     );
     expect(first.ok).toBe(true);
 
-    const payload = {
-      ...(fx.grantJob.payload as Record<string, unknown>),
+    const firstGrant = fx.grantJob.payload as AuthorizationGrant;
+    const secondUnsigned: AuthorizationGrant = {
+      ...firstGrant,
       grantId: 'grant-writer-2',
+      integrity: { scheme: 'HMAC_SHA256', value: 're-sign-below' },
+    };
+    const payload: AuthorizationGrant = {
+      ...secondUnsigned,
+      integrity: signGrantWithHmac(fx.anchorKey, secondUnsigned),
     };
     const secondJob = signWriterJob(fx.anchorKey, {
       jobId: 'job-grant-2',
