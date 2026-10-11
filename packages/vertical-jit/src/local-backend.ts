@@ -212,7 +212,17 @@ export class LocalPrivilegedBackend implements ExecutionBackend {
         phase: 'RECEIPT_WRITTEN',
         actionId: action.actionId,
       });
-      return this.#receipt(action, startedAt, 'FAILED', 'COMPLETED_VERIFIED', true, 1, []);
+      return this.#receipt(
+        action,
+        startedAt,
+        'FAILED',
+        // VJ-P2-06: the worker self-reports failure; the expected post-state
+        // was NOT independently verified — no COMPLETED_VERIFIED claim.
+        'MAY_HAVE_EXECUTED_UNCERTAIN',
+        false,
+        1,
+        [],
+      );
     }
 
     const outcome = await this.#deps.perform(action.action);
@@ -255,8 +265,14 @@ export class LocalPrivilegedBackend implements ExecutionBackend {
       action,
       startedAt,
       outcome.ok ? 'SUCCEEDED' : 'FAILED',
-      'COMPLETED_VERIFIED',
-      true,
+      // VJ-P2-06: a whole journal plus a worker's ok self-report is effect
+      // completion, NOT verification. Independent post-state verification
+      // happens upstream (orchestrator providerPresent / R2 verify). Until
+      // it lands, claiming COMPLETED_VERIFIED or postStateVerified=true is a
+      // fabricated claim; the frozen taxonomy has no "completed-unverified"
+      // value, so the conservative non-claim is MAY_HAVE_EXECUTED_UNCERTAIN.
+      'MAY_HAVE_EXECUTED_UNCERTAIN',
+      false,
       outcome.exitCode,
       [...(outcome.outputRefs ?? [])],
       `journal:${action.actionId}`,

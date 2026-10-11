@@ -530,7 +530,8 @@ export class MemoryTaskBackend implements EnvironmentBackend {
         sideEffectEvidence: {
           sideEffectClass: action.action.sideEffectClass,
           recoveryClassification: 'FAILED_BEFORE_EFFECT',
-          postStateVerified: true,
+          // VJ-P2-06: nothing ran — nothing is verified.
+          postStateVerified: false,
         },
       });
       this.receipts.push(receipt);
@@ -552,8 +553,10 @@ export class MemoryTaskBackend implements EnvironmentBackend {
       stdoutRef: stdoutPath,
       sideEffectEvidence: {
         sideEffectClass: action.action.sideEffectClass,
-        recoveryClassification: 'COMPLETED_VERIFIED',
-        postStateVerified: true,
+        // VJ-P2-06: harness mirrors the honest real backend — completion is
+        // not verification; the oracle performs verification downstream.
+        recoveryClassification: 'MAY_HAVE_EXECUTED_UNCERTAIN',
+        postStateVerified: false,
       },
     });
     this.receipts.push(receipt);

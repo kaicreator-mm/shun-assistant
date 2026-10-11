@@ -111,8 +111,14 @@ export class CliTaskBackend implements EnvironmentBackend {
       stdoutRef: stdoutPath,
       sideEffectEvidence: {
         sideEffectClass: action.action.sideEffectClass,
-        recoveryClassification: 'COMPLETED_VERIFIED',
-        postStateVerified: await this.#deps.fs.exists(stdoutPath),
+        // VJ-P2-06: exit-0 is effect completion, not verification. The
+        // expected post-state is verified independently downstream (the
+        // precommitted oracle / orchestrator post-state checks); until then
+        // the receipt must not claim COMPLETED_VERIFIED. The frozen taxonomy
+        // has no "completed-unverified" value, so the conservative non-claim
+        // is MAY_HAVE_EXECUTED_UNCERTAIN with postStateVerified=false.
+        recoveryClassification: 'MAY_HAVE_EXECUTED_UNCERTAIN',
+        postStateVerified: false,
       },
     });
   }
@@ -178,7 +184,8 @@ export class CliTaskBackend implements EnvironmentBackend {
       sideEffectEvidence: {
         sideEffectClass: action.action.sideEffectClass,
         recoveryClassification: 'FAILED_BEFORE_EFFECT',
-        postStateVerified: true,
+        // VJ-P2-06: nothing was verified — the executable was never spawned.
+        postStateVerified: false,
       },
     });
   }
