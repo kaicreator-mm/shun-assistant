@@ -316,11 +316,16 @@ export class MemoryAcquisition implements AcquisitionPort {
   async uninstallByPlan(
     packageId: string,
     deletion: ManifestDeletionSpec,
-  ): Promise<{ ok: boolean; note: string; noEffect?: true }> {
+  ): Promise<{ ok: boolean; note: string; noEffect?: true; refusalTerminal?: 'REFUSED' }> {
     this.#require(packageId);
     const refusal = await effectTimeScopeRefusal(this.#fs, deletion);
     if (refusal) {
-      return { ok: false, note: `removal refused before any effect — ${refusal}`, noEffect: true };
+      return {
+        ok: false,
+        note: `removal refused before any effect — ${refusal}`,
+        noEffect: true,
+        refusalTerminal: 'REFUSED',
+      };
     }
     const { removed, retained } = await removeManifestEntries(this.#fs, this.#fs, deletion);
     return {
