@@ -5,26 +5,22 @@
 // pinned), and the interpreter merely statSync+spawn: bytes swapped at the
 // same path after the grant would run elevated untouched.
 //
-// Division of labor:
-//   - pinProgram: LAUNCHER-side preflight, before any UAC work — canonical
-//     real path + measured sha256 recorded in the authority store. A missing
-//     or non-file program refuses here (no UAC prompt burned).
-//   - verifyPinnedProgram: HELPER-side, PRE-JOURNAL (privileged boundary
-//     re-verifies, never on the launcher's say-so §4.6.1) — the same
-//     canonicalization + measurement, then a REQUIRED matching pin: no pin,
-//     unreadable file, or byte change ⇒ refusal with nothing written.
+// Division of labor after C06 R5:
+//   - pinProgram: TRUSTED PROVISIONING / authority-event helper only. A normal
+//     runtime launcher MUST NOT call it because the protected anchor is
+//     read-only to that token.
+//   - verifyPinnedProgram: runtime launcher AND HELPER pre-journal check — both
+//     canonicalize/re-measure and REQUIRE an already-provisioned matching pin.
+//     No pin or byte change => refusal with no privileged effect.
 //
 // Scope honesty: this gates the PRIVILEGED surface (the elevated helper and
 // its launcher preflight). The unprivileged in-process backend executes as
 // the same user without elevation — no privilege gain is possible there, and
 // its program identity remains plan-path-pinned as before.
 //
-// Honest boundary (documented, not hidden): bytes swapped BEFORE the launcher
-// preflight are pinned AS-SWAPPED — the pin attests what was measured at
-// provisioning time and the measured identity is recorded in the journal
-// evidence. Winning that race requires writing the program file AND the
-// authority store as the same user: the C06 open boundary, escalated; nothing
-// in this module claims to close it.
+// Honest boundary: pin creation/rotation is an explicit trusted provisioning
+// event. Runtime code only verifies the protected record. Replacing program
+// bytes after provisioning is detected both before UAC and inside the helper.
 
 import { createHash } from 'node:crypto';
 import { readFileSync, realpathSync, statSync } from 'node:fs';
@@ -57,10 +53,10 @@ export function canonicalProgramPath(
 }
 
 /**
- * LAUNCHER preflight: measure the program's bytes and record the identity
- * pin (keyed by canonical path). Re-pins on every privileged launch — an
- * intentional program update is picked up by the NEXT launch's preflight,
- * never by a mid-flight swap.
+ * TRUSTED PROVISIONING helper: measure the program's bytes and record the
+ * identity pin (keyed by canonical path). Production runtime launchers never
+ * call this against the elevated-only anchor; updates require an authority
+ * event/provisioning step.
  */
 export function pinProgram(
   authorityDir: string,
