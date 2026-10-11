@@ -32,7 +32,7 @@ import { verifyPinnedHelper } from './helper-pinning.ts';
 import type { InterpreterScope } from './interpreter.ts';
 import { JournalWriter, journalDigest, readJournal } from './journal.ts';
 import { reconcileExpectedState, rerunVerifyStep } from './poststate.ts';
-import { pinProgram } from './program-pinning.ts';
+import { verifyPinnedProgram } from './program-pinning.ts';
 import {
   type ClassificationResult,
   classifyRecovery,
@@ -235,14 +235,16 @@ export class PrivilegedWindowsExecutionBackend implements ExecutionBackend {
         return await launchRefused(`plan ${action.planHash} not found in the authority store`);
 
       // ---- N-2 program identity preflight, BEFORE any UAC work. ----
-      // The plan hash binds only the proc.exec program PATH; the launcher
-      // pins its BYTES (canonical path + measured sha256) into the authority
-      // store so the privileged helper's pre-journal re-measurement has an
-      // anchor. A missing/non-file/unreadable program refuses here — no UAC
-      // prompt, no relay artifact.
+      // A protected authority root is runtime READ-ONLY: an unprivileged
+      // launcher must NEVER create/update program pins. Program identity is a
+      // provisioning/authority event. Here we only verify the already-pinned
+      // canonical path + bytes; the elevated helper repeats this check.
       const preflightStep = resolveActionStep(action);
       if (preflightStep?.op === 'windows.proc.exec') {
-        const programPin = pinProgram(this.options.authorityDir, preflightStep.args.program);
+        const programPin = verifyPinnedProgram(
+          this.options.authorityDir,
+          preflightStep.args.program,
+        );
         if (!programPin.ok) {
           return await launchRefused(
             `program identity preflight failed: ${programPin.reason}`,
