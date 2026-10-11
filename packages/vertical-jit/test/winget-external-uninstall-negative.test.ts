@@ -120,6 +120,7 @@ describe('VJ R5: external WinGet removal is not authorized by a pre-spawn snapsh
     expect(result.receipt.sideEffectEvidence.postStateVerified).toBe(false);
     expect(await result.fs.readText(result.owned)).toBe('original vendor bytes');
     expect(result.entries.some((entry) => entry.detail?.includes('NO_EFFECT:'))).toBe(true);
+    expect(result.entries.some((entry) => entry.phase === 'EXEC_START')).toBe(false);
     expect(result.entries.some((entry) => entry.phase === 'EXEC_DONE')).toBe(false);
   });
 
@@ -129,8 +130,10 @@ describe('VJ R5: external WinGet removal is not authorized by a pre-spawn snapsh
     expect(result.process.calls).toHaveLength(0);
     expect(result.receipt.terminal).toBe('REFUSED');
     expect(await result.fs.readText(result.owned)).toBe('original vendor bytes');
-    // The production guard must stop the external process, not race a
-    // post-uninstall check against a file already deleted by that process.
+    // The production guard must stop the external process before the durable
+    // effect window begins, not race a post-uninstall check against data that
+    // an external remover could already have deleted.
+    expect(result.entries.some((entry) => entry.phase === 'EXEC_START')).toBe(false);
     expect(result.entries.some((entry) => entry.phase === 'EXEC_DONE')).toBe(false);
   });
 });
