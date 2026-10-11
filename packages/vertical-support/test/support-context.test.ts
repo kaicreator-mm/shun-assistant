@@ -6,7 +6,8 @@ import {
 } from '../src/index.ts';
 
 const fakeToken = 'SHUN_FAKE_TOKEN_DO_NOT_EXPORT_7a9f3';
-const fakeKey = '-----BEGIN PRIVATE KEY-----\nSHUN_FAKE_PRIVATE_KEY_24c87\n-----END PRIVATE KEY-----';
+const fakeKey =
+  '-----BEGIN PRIVATE KEY-----\nSHUN_FAKE_PRIVATE_KEY_24c87\n-----END PRIVATE KEY-----';
 const fakePath = String.raw`C:\Users\FixtureOwner\Private\secret-document.txt`;
 const unrelated = 'SHUN_UNRELATED_DOCUMENT_TEXT_29fa0';
 
@@ -42,7 +43,13 @@ describe('B-040 support-context minimization', () => {
     ]);
 
     const serialized = JSON.stringify(result);
-    for (const forbidden of [fakeToken, fakeKey, fakePath, unrelated, 'SHUN_FAKE_PRIVATE_KEY_24c87']) {
+    for (const forbidden of [
+      fakeToken,
+      fakeKey,
+      fakePath,
+      unrelated,
+      'SHUN_FAKE_PRIVATE_KEY_24c87',
+    ]) {
       expect(serialized).not.toContain(forbidden);
     }
   });
