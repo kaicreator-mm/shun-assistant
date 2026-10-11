@@ -43,7 +43,12 @@ function outbound(value: string, field: string, redactions: RedactionRecord[]): 
  * the report; only bounded structural audit IDs survive.
  */
 export function minimizeSupportContext(raw: unknown): SupportContextResult {
-  const parsed = SupportObservationSchema.safeParse(raw);
+  let parsed: ReturnType<typeof SupportObservationSchema.safeParse>;
+  try {
+    parsed = SupportObservationSchema.safeParse(raw);
+  } catch {
+    throw new Error('SUPPORT_CONTEXT_INVALID: OBSERVATION');
+  }
   if (!parsed.success) {
     throw new Error('SUPPORT_CONTEXT_INVALID: OBSERVATION');
   }
