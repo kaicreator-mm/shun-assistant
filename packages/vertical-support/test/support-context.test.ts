@@ -109,17 +109,59 @@ describe('B-040 support-context minimization', () => {
     expect((caught as Error).message).not.toContain(fakeToken);
   });
 
+  it('maps throwing getters and Proxy traps during schema evaluation to the fixed error code', () => {
+    const getterInput = fixture();
+    Object.defineProperty(getterInput, 'os', {
+      enumerable: true,
+      get() {
+        throw new Error(fakeToken);
+      },
+    });
+
+    const proxyInput = new Proxy(fixture(), {
+      get(target, property, receiver) {
+        if (property === 'device') {
+          throw new Error(fakeKey);
+        }
+        return Reflect.get(target, property, receiver);
+      },
+    });
+
+    for (const input of [getterInput, proxyInput]) {
+      let caught: unknown;
+      try {
+        minimizeSupportContext(input);
+      } catch (error) {
+        caught = error;
+      }
+      expect(caught).toBeInstanceOf(Error);
+      expect((caught as Error).message).toBe('SUPPORT_CONTEXT_INVALID: OBSERVATION');
+      expectNoCanaries({ message: (caught as Error).message });
+    }
+  });
+
   it('fails closed on malformed required sections', () => {
-    expect(() => minimizeSupportContext({ ...fixture(), os: { name: '', build: '' } })).toThrow();
+    expect(() => minimizeSupportContext({ ...fixture(), os: { name: '', build: '' } })).toThrow(
+      'SUPPORT_CONTEXT_INVALID: OBSERVATION',
+    );
   });
 });
 
 describe('real Windows collector boundary', () => {
   it('runs the fixed System32 PowerShell path and returns local-only structured output', async () => {
-    const calls: Array<{ file: string; args: readonly string[] }> = [];
+    const calls: Array<{
+      file: string;
+      args: readonly string[];
+      options: {
+        windowsHide: boolean;
+        timeout: number;
+        encoding: 'utf8';
+        env: Readonly<Record<string, string>>;
+      };
+    }> = [];
     const result = await collectWindowsSupportContext({
-      execFile: async (file, args) => {
-        calls.push({ file, args });
+      execFile: async (file, args, options) => {
+        calls.push({ file, args, options });
         return {
           stdout: JSON.stringify({
             os: { name: 'Microsoft Windows 11 Pro', build: '26300' },
@@ -136,8 +178,22 @@ describe('real Windows collector boundary', () => {
       String.raw`C:\Windows\System32\WindowsPowerShell\v1.0\powershell.exe`,
     );
     expect(calls[0]?.args).toContain('-NonInteractive');
-    expect(calls[0]?.args.join(' ')).toContain('Get-CimInstance Win32_OperatingSystem');
-    expect(calls[0]?.args.join(' ')).toContain('Get-HotFix');
+    const script = calls[0]?.args.join(' ') ?? '';
+    expect(script).toContain('CimCmdlets\\Get-CimInstance Win32_OperatingSystem');
+    expect(script).toContain('Microsoft.PowerShell.Management\\Get-HotFix');
+    expect(script).toContain('Microsoft.PowerShell.Utility\\Sort-Object');
+    expect(script).toContain('Microsoft.PowerShell.Utility\\Select-Object');
+    expect(script).toContain('Microsoft.PowerShell.Utility\\ConvertTo-Json');
+    expect(calls[0]?.options.env).toEqual({
+      SystemRoot: String.raw`C:\Windows`,
+      WINDIR: String.raw`C:\Windows`,
+      PATH: String.raw`C:\Windows\System32;C:\Windows\System32\WindowsPowerShell\v1.0`,
+      PSModulePath: String.raw`C:\Windows\System32\WindowsPowerShell\v1.0\Modules`,
+      ComSpec: String.raw`C:\Windows\System32\cmd.exe`,
+      TEMP: String.raw`C:\Windows\Temp`,
+      TMP: String.raw`C:\Windows\Temp`,
+    });
+    expect(Object.keys(calls[0]?.options.env ?? {})).not.toContain('NODE_OPTIONS');
     expect(result.localOnly).toBe(true);
     expect(result.externalDisclosures).toEqual([]);
     expect(result.report.redactions).toEqual([]);
