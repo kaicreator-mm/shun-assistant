@@ -14,6 +14,7 @@
 // The positive control proves the removal path still completes when no
 // injection happens.
 import { describe, expect, it } from 'vitest';
+import { classifyFromJournal } from '../src/journal.ts';
 import { buildHarness, type JitHarness } from '../src/mocks.ts';
 import type { ImportableAuthorizationPort } from '../src/orchestrator.ts';
 import { runJitLifecycle } from '../src/orchestrator.ts';
@@ -57,7 +58,7 @@ async function assertInjectionSurvived(
 ): Promise<void> {
   expect(error).toMatchObject({ code: 'REMOVE_FAILED' });
   expect((error as { recovery?: { recoveryClassification: string } }).recovery).toMatchObject({
-    recoveryClassification: 'NOT_STARTED',
+    recoveryClassification: 'FAILED_BEFORE_EFFECT',
   });
   // Byte-exact canary survival.
   expect(await harness.fs.exists(LATE_USER_FILE)).toBe(true);
@@ -79,6 +80,7 @@ async function assertInjectionSurvived(
   // executor opened the effect (EXEC_START) and refused before destroying
   // anything, with the canary named in the honest NO_EFFECT journal marker.
   const entries = await harness.deps.journals(UNINSTALL_ACTION_ID).replay();
+  expect(classifyFromJournal(entries, UNINSTALL_ACTION_ID)).toBe('FAILED_BEFORE_EFFECT');
   const expectedExecStarts = options.viaRetry ? 2 : 1;
   expect(entries.filter((entry) => entry.phase === 'EXEC_START')).toHaveLength(expectedExecStarts);
   const noEffect = entries.filter(
