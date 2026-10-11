@@ -9,8 +9,9 @@ import type {
   AuthorizationGrant,
   GrantIssueRequest,
 } from '@shun/contracts';
-import { computePlanHash } from '@shun/contracts';
+import { canonicalJson, computePlanHash } from '@shun/contracts';
 import type { StoredGrantRecord } from '../src/authority.ts';
+import { computeIssuanceProof } from '../src/issuance-proof.ts';
 import type { AuthorityRecord, PolicySnapshotRecord } from '../src/policy.ts';
 
 export const AUTHORITY: AuthorityRecord = {
@@ -20,6 +21,13 @@ export const AUTHORITY: AuthorityRecord = {
 };
 
 export const POLICY_REVISION = 'pol-snap-1';
+
+/**
+ * Trusted local issuance secret shared by the authority and the controller in
+ * every test world (P1-04): grants are issued only with a per-request proof
+ * minted under this secret.
+ */
+export const ISSUANCE_SECRET = 'test-issuance-secret';
 
 /** Controllable ISO clock. */
 export function fixedClock(start = '2026-10-10T12:00:00.000Z') {
@@ -40,6 +48,8 @@ export function memoryPolicyState(seed?: {
   authority?: AuthorityRecord;
   policy?: PolicySnapshotRecord;
 }) {
+  /** R2 (P1-C): durable one-shot issuance-nonce ledger, shared by every authority over this state. */
+  const consumedNonces = new Map<string, number>();
   const state = {
     authoritySlot: undefined as unknown,
     policySlot: undefined as unknown,
@@ -59,6 +69,60 @@ export function memoryPolicyState(seed?: {
     async savePolicySnapshot(snapshot: PolicySnapshotRecord) {
       state.policySlot = structuredClone(snapshot);
     },
+    /**
+     * Optimistic-concurrency reference implementation (R1 P1-B, mandatory R2):
+     * save only while the slot still holds exactly what the caller last read
+     * (canonical-JSON equality; a null/undefined expectation demands an empty
+     * slot). Returns false — writing nothing — when the record moved, so
+     * adversarial tests can drive deterministic lost-update races.
+     */
+    async compareAndSavePolicySnapshot(snapshot: PolicySnapshotRecord, expectedPrior: unknown) {
+      const stored = state.policySlot;
+      const matches =
+        expectedPrior === null || expectedPrior === undefined
+          ? stored === null || stored === undefined
+          : stored !== null &&
+            stored !== undefined &&
+            canonicalJson(stored) === canonicalJson(expectedPrior);
+      if (!matches) return false;
+      state.policySlot = structuredClone(snapshot);
+      return true;
+    },
+    /**
+     * R2 (P1-B): compare-and-save twin for the authority record (marker,
+     * rotation) — same equality semantics, so a parked write can never
+     * overwrite an intervening record move.
+     */
+    async compareAndSaveAuthorityRecord(record: AuthorityRecord, expectedPrior: unknown) {
+      const stored = state.authoritySlot;
+      const matches =
+        expectedPrior === null || expectedPrior === undefined
+          ? stored === null || stored === undefined
+          : stored !== null &&
+            stored !== undefined &&
+            canonicalJson(stored) === canonicalJson(expectedPrior);
+      if (!matches) return false;
+      state.authoritySlot = structuredClone(record);
+      return true;
+    },
+    /**
+     * R2 (P1-C): atomic shared one-shot consumption. The check-and-set is
+     * synchronous within the async method, so no two authorities over this
+     * state can both consume one nonce. Expired entries are pruned
+     * opportunistically so the ledger stays bounded by the live proof window.
+     */
+    async consumeIssuanceNonce(nonce: string, expiresAtMs: number, nowMs: number) {
+      if (consumedNonces.size > 0) {
+        for (const [seen, expiry] of consumedNonces) {
+          if (expiry < nowMs) consumedNonces.delete(seen);
+        }
+      }
+      if (consumedNonces.has(nonce)) return false;
+      consumedNonces.set(nonce, expiresAtMs);
+      return true;
+    },
+    /** Test observability into the shared consumption ledger. */
+    consumedNonces,
   };
   if (seed?.authority) state.authoritySlot = structuredClone(seed.authority);
   if (seed?.policy) state.policySlot = structuredClone(seed.policy);
@@ -73,6 +137,10 @@ export function memoryGrantStore() {
     },
     async get(grantId: string) {
       return records.get(grantId) ?? null;
+    },
+    /** R2 (P1-A): grant records are the evidence that a policy once existed. */
+    async hasAnyGrant() {
+      return records.size > 0;
     },
     snapshot(): StoredGrantRecord[] {
       return [...records.values()];
@@ -167,6 +235,8 @@ export function approvingSurface(options?: {
   decidedPlanHash?: string;
   decidedTaskId?: string;
   approved?: boolean;
+  /** Approval origin recorded on the decision; defaults to real user approval. */
+  approvedBy?: ApprovalDecision['approvedBy'];
 }) {
   const requests: ApprovalRequest[] = [];
   const surface: ApprovalPort = {
@@ -177,11 +247,48 @@ export function approvingSurface(options?: {
         taskId: options?.decidedTaskId ?? request.taskId,
         planHash: options?.decidedPlanHash ?? request.planHash,
         approved: options?.approved ?? true,
-        approvedBy: 'USER_APPROVAL',
+        approvedBy: options?.approvedBy ?? 'USER_APPROVAL',
       };
     },
   };
   return { surface, requests };
+}
+
+/**
+ * Simulate a policy move/corruption between the currentness resolution and the
+ * controller's guarded second policy read: the first `loadCurrentPolicy` read
+ * returns the real slot, every later read returns `replacement()` instead.
+ */
+export function secondPolicyReadReturns(
+  state: import('../src/policy.ts').PolicyStateStore,
+  replacement: () => unknown,
+): import('../src/policy.ts').PolicyStateStore {
+  let reads = 0;
+  return {
+    async loadAuthorityRecord() {
+      return state.loadAuthorityRecord();
+    },
+    async loadCurrentPolicy() {
+      reads += 1;
+      if (reads >= 2) return replacement();
+      return state.loadCurrentPolicy();
+    },
+    async saveAuthorityRecord(record) {
+      return state.saveAuthorityRecord(record);
+    },
+    async savePolicySnapshot(snapshot) {
+      return state.savePolicySnapshot(snapshot);
+    },
+    async compareAndSavePolicySnapshot(snapshot, expectedPrior) {
+      return state.compareAndSavePolicySnapshot(snapshot, expectedPrior);
+    },
+    async compareAndSaveAuthorityRecord(record, expectedPrior) {
+      return state.compareAndSaveAuthorityRecord(record, expectedPrior);
+    },
+    async consumeIssuanceNonce(nonce, expiresAtMs, nowMs) {
+      return state.consumeIssuanceNonce(nonce, expiresAtMs, nowMs);
+    },
+  };
 }
 
 export function issueRequestFor(
@@ -214,9 +321,12 @@ export function issueRequestFor(
 }
 
 export function grantOf(
-  authority: { issue(request: GrantIssueRequest): Promise<AuthorizationGrant> },
+  authority: { issue(request: GrantIssueRequest, proof?: string): Promise<AuthorizationGrant> },
   plan: ActionPlan,
   extra?: Partial<GrantIssueRequest>,
 ) {
-  return authority.issue(issueRequestFor(plan, extra));
+  // The test helper mints the controller-issuance proof the way the trusted
+  // composition root does (P1-04): issuance without a proof is refused.
+  const request = issueRequestFor(plan, extra);
+  return authority.issue(request, computeIssuanceProof(ISSUANCE_SECRET, request));
 }

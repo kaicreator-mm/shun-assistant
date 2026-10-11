@@ -16,4 +16,5 @@ export * from './authority.ts';
 export * from './controller.ts';
 export * from './failures.ts';
 export * from './integrity.ts';
+export * from './issuance-proof.ts';
 export * from './policy.ts';

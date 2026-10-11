@@ -103,6 +103,25 @@ export const AuthorityRecordSchema = z.strictObject({
   authorityId: z.string().min(1),
   authorityRevision: z.string().min(1),
   updatedAt: IsoDateTimeSchema,
+  /**
+   * R1 (P1-A) durable lineage marker: set to true by the FIRST successful
+   * policy adoption and carried forward by every subsequent authority-record
+   * write. True proves at least one policy snapshot has existed, so a MISSING
+   * current policy slot is durable-state loss — never a first bootstrap — and
+   * adoption over the absent predecessor refuses fail-closed. The marker
+   * deliberately lives outside the policy slot so it survives exactly the
+   * loss it makes detectable.
+   */
+  policyInitialized: z.boolean().optional(),
+  /**
+   * R2 (P1-D) durable authority-revision lineage: every authority revision
+   * superseded before the current one, carried forward by each rotation.
+   * Authority identities are non-reusable — rotating back to a used revision
+   * would re-cohere the policy bound to it and re-current its stale grants.
+   * Records from before this field cannot prove rotations older than the
+   * field's introduction (bounded, documented limitation).
+   */
+  priorAuthorityRevisions: z.array(z.string().min(1)).optional(),
 });
 export type AuthorityRecord = z.infer<typeof AuthorityRecordSchema>;
 
@@ -120,6 +139,14 @@ export const PolicySnapshotRecordSchema = z.strictObject({
   authorityRevision: z.string().min(1),
   /** Grant ids revoked under this policy revision; checked before every effect. */
   revokedGrantIds: z.array(z.string().min(1)),
+  /**
+   * Revisions superseded by this snapshot's lineage (P1-02): every revision id
+   * ever adopted before the current one, carried forward by each adoption.
+   * This is what keeps revocation and staleness durable — a revision can never
+   * be re-adopted, so its revocation list can never be reset and grants bound
+   * to it can never be re-activated.
+   */
+  priorRevisions: z.array(z.string().min(1)).optional(),
   rules: z.array(DurablePolicyRuleSchema),
   riskGuards: z.array(PolicyRiskGuardSchema),
   updatedAt: IsoDateTimeSchema,
@@ -132,12 +159,50 @@ export type PolicySnapshotRecord = z.infer<typeof PolicySnapshotRecordSchema>;
  * schema-validated by `resolveCurrentAuthorityState`, so corrupt or foreign
  * records fail closed instead of being trusted. The workflow/store package
  * provides the durable ShunStore adapter; tests provide an in-memory one.
+ *
+ * R2 (P1-B/P1-C): the atomic shared-durable primitives are MANDATORY — a
+ * store that cannot provide them is an unsafe implementation and the
+ * authority refuses to construct over it. The R1 optional CAS let a no-CAS
+ * shared store silently degrade to unconditional saves, which a second
+ * Authority instance could drive a policy/authority rollback through.
  */
 export interface PolicyStateStore {
   loadAuthorityRecord(): Promise<unknown>;
   loadCurrentPolicy(): Promise<unknown>;
   saveAuthorityRecord(record: AuthorityRecord): Promise<void>;
   savePolicySnapshot(snapshot: PolicySnapshotRecord): Promise<void>;
+  /**
+   * R1 (P1-B) / R2 (P1-B, mandatory): atomically save the policy snapshot
+   * ONLY IF the currently stored policy record still equals `expectedPrior` —
+   * the exact record (or absence of one) the caller last read; equality is
+   * canonical-JSON equality, and null/undefined demands an empty slot.
+   * Returns false — writing nothing — when the record moved, so the caller
+   * can reload, re-apply and retry (bounded) or refuse typed.
+   */
+  compareAndSavePolicySnapshot(
+    snapshot: PolicySnapshotRecord,
+    expectedPrior: unknown,
+  ): Promise<boolean>;
+  /**
+   * R2 (P1-B, mandatory): the compare-and-save twin for the AUTHORITY record
+   * (initialization marker, rotation). Same equality semantics as
+   * {@link compareAndSavePolicySnapshot}: save only while the stored record
+   * still equals `expectedPrior`; return false — writing nothing — when it
+   * moved, so a parked marker write can never overwrite an intervening
+   * rotation from another instance/process.
+   */
+  compareAndSaveAuthorityRecord(record: AuthorityRecord, expectedPrior: unknown): Promise<boolean>;
+  /**
+   * R2 (P1-C, mandatory): atomically consume one issuance-proof nonce across
+   * EVERY authority instance (and process/restart, once the durable adapter
+   * persists the ledger) sharing this state. Returns true exactly when the
+   * nonce had not been consumed before — the check-and-set must be atomic,
+   * so two concurrent presentations of one proof cannot both succeed.
+   * `expiresAtMs` lets the ledger prune expired entries; `nowMs` is the
+   * presentation instant. The durable adapter must persist consumed nonces
+   * so consumption survives restarts (store-adapter obligation).
+   */
+  consumeIssuanceNonce(nonce: string, expiresAtMs: number, nowMs: number): Promise<boolean>;
 }
 
 function unresolvable(reason: string) {
@@ -211,9 +276,17 @@ export function ruleCoversScope(
   if (!covered(declaredRead, ruleRead)) return false;
   if (scope.network?.allowed) {
     if (!rule.network?.allowed) return false;
-    const domains = scope.network.domains ?? [];
+    // P1-03: automatic policy covers network actions only within the rule's
+    // EXPLICIT domain allowlist. Omitted or empty declared domains mean
+    // "domain-unbounded", never "no domains" — `[].every(...)` on an empty
+    // list would otherwise let a domain-limited rule authorize an unbounded
+    // network action. A rule without its own allowlist is equally unbounded
+    // and covers nothing. Both refuse here and fall back to explicit approval.
     const allowed = rule.network.domains;
-    if (allowed !== undefined && !domains.every((d) => allowed.includes(d))) return false;
+    if (allowed === undefined || allowed.length === 0) return false;
+    const declared = scope.network.domains ?? [];
+    if (declared.length === 0) return false;
+    if (!declared.every((d) => allowed.includes(d))) return false;
   }
   const registryWrite = scope.registry?.write ?? [];
   if (!covered(registryWrite, rule.registry?.write)) return false;

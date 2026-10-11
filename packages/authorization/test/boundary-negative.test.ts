@@ -21,6 +21,7 @@ import {
   buildPlan,
   fixedClock,
   grantOf,
+  ISSUANCE_SECRET,
   memoryGrantStore,
   memoryPolicyState,
 } from './helpers.ts';
@@ -36,6 +37,7 @@ function makeWorld() {
     state,
     grants,
     integritySecret: SECRET,
+    issuanceSecret: ISSUANCE_SECRET,
     clock: clock.now,
   });
   return { state, grants, clock, authority };
