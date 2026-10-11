@@ -69,7 +69,7 @@ export {
 } from './privileged-backend.ts';
 export type { ClassificationInput, ClassificationResult, PostStateOutcome } from './recovery.ts';
 export { classifyRecovery, terminalForClassification } from './recovery.ts';
-export type { HelperPin } from './trusted-store.ts';
+export type { HelperPin, ProgramPin, SystemToolsPin } from './trusted-store.ts';
 export {
   FileCurrentnessSource,
   FileGrantSource,
@@ -78,8 +78,14 @@ export {
   HELPER_PIN_SCHEMA_VERSION,
   HelperPinSchema,
   hmacGrantIntegrityVerifier,
+  PROGRAM_PIN_SCHEMA_VERSION,
+  ProgramPinSchema,
   readHelperPin,
+  readProgramPin,
+  readSystemToolsPin,
   resolveGrantHmacKeyFile,
+  SYSTEM_TOOLS_PIN_SCHEMA_VERSION,
+  SystemToolsPinSchema,
   sha256File,
   sha256Text,
   signGrantWithHmac,
@@ -88,4 +94,6 @@ export {
   writeGrantRecord,
   writeHelperPin,
   writePlanRecord,
+  writeProgramPin,
+  writeSystemToolsPin,
 } from './trusted-store.ts';

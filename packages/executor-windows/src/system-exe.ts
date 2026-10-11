@@ -44,6 +44,19 @@
 // agreement plus existence — a degraded, honest mode, never a silent guess
 // from a single attacker-set variable; even there the binary identity gate
 // still applies to whatever this module hands out.
+//
+// PROBE BOUNDARY (F-1): resolution itself SPAWNS reg.exe candidates, so the
+// module's own spawn surface is gated by the same pin. Every security caller
+// enters through resolvePinnedSystemExe, which loads the system-tools pin
+// FIRST and threads regSha256 into the resolution; with a digest supplied,
+// EVERY candidate is identity-checked BEFORE execFileSync — the machine
+// anchor must match the pinned digest (a mismatch means this host is not the
+// pinned machine: fail closed, never a fallback to executing hints), and
+// hint/reported candidates failing the gate are never executed at all. Only
+// the bare, pin-less entry (tests, non-Windows constants) skips the gate,
+// and then only the machine anchor at its admin-owned well-known path is
+// involved; hint candidates in that mode are a documented degraded-tier
+// residual whose outputs are still identity-gated downstream (N-1).
 
 import { execFileSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
@@ -59,10 +72,12 @@ export type RegQuery = (regExe: string, args: readonly string[]) => string | und
 /**
  * Injectable filesystem gates so candidate probing runs against a virtual
  * filesystem on any host (the negative controls never touch the real disk).
+ * `shaFile` feeds the F-1 execution gate the same bytes view.
  */
 export type SystemRootFsSeam = {
   isFile?: (path: string) => boolean;
   isDirectory?: (path: string) => boolean;
+  shaFile?: (path: string) => string | undefined;
 };
 
 /** The security-relevant system tools whose bytes are pinned (N-1). */
@@ -86,14 +101,21 @@ const HARD_CODED_FALLBACK_ROOT = 'C:\\Windows';
 
 /**
  * Resolve the Windows system directory per machine evidence, not caller
- * say-so. `env` and `query` are injectable so the resolution logic is
- * testable on any host without real elevation.
+ * say-so. `env`, `query`, `platform` and the fs `seam` are injectable so the
+ * resolution logic is testable on any host without real elevation.
+ *
+ * F-1: `expectedRegSha256` (the pinned reg.exe digest, threaded by
+ * resolvePinnedSystemExe from the pin it loads FIRST) turns on the probe
+ * execution gate — no candidate is spawned unless its bytes hash to the
+ * pinned digest; the machine anchor failing the gate is a fail-closed
+ * "not the pinned machine" verdict, never a fallback to hints.
  */
 export function resolveSystemRoot(
   env: NodeJS.ProcessEnv = process.env,
   query: RegQuery = queryRegistryValue,
   platform: NodeJS.Platform = process.platform,
   seam: SystemRootFsSeam = {},
+  expectedRegSha256?: string,
 ): SystemRootResolution {
   if (platform !== 'win32') {
     // Best-effort constant for non-Windows hosts; every spawn site degrades
@@ -102,6 +124,12 @@ export function resolveSystemRoot(
   }
   const statFile = seam.isFile ?? isFile;
   const statDirectory = seam.isDirectory ?? isDirectory;
+  const shaOf = seam.shaFile ?? shaFileOf;
+  // F-1 execution gate: with a pinned digest, a candidate is executed ONLY
+  // when its bytes hash to the pin. Without a pin (bare/test path) the gate
+  // is open — documented residual; security callers never use that path.
+  const executeAllowed = (candidate: string): boolean =>
+    expectedRegSha256 === undefined || shaOf(candidate) === expectedRegSha256;
 
   // 1. Machine fixed point FIRST (P1): the pinned well-known root's own
   //    reg.exe outranks every inherited hint. If it exists and its HKLM
@@ -113,6 +141,17 @@ export function resolveSystemRoot(
   //    ROOT; the identity gate below constrains the BYTES.)
   const machineReg = join(HARD_CODED_FALLBACK_ROOT, 'System32', 'reg.exe');
   if (statFile(machineReg)) {
+    // F-1: verify the anchor's bytes BEFORE executing it. A readable anchor
+    // that fails the pinned identity is readable contradicting evidence —
+    // "this host is not the pinned machine" — and must fail closed rather
+    // than degrade into executing attacker-gated hints.
+    if (!executeAllowed(machineReg)) {
+      return {
+        ok: false,
+        reason:
+          'system directory unresolvable: the machine reg.exe bytes do not match the pinned system-tool identity — this host is not the pinned machine, refusing to resolve and refusing to fall back to inherited hints (fail closed)',
+      };
+    }
     const machineReport = query(machineReg, REG_QUERY_SYSTEMROOT_ARGS)?.trim();
     if (machineReport) {
       // The machine anchor SPOKE. Its report must be the answer: accept it
@@ -120,7 +159,13 @@ export function resolveSystemRoot(
       // contradicts itself (re-query mismatch / reported directory absent),
       // fail closed instead of letting a self-consistent attacker hint
       // override it.
-      const root = validatedFixedPoint(machineReport, query, statFile, statDirectory);
+      const root = validatedFixedPoint(
+        machineReport,
+        query,
+        statFile,
+        statDirectory,
+        executeAllowed,
+      );
       if (root) return { ok: true, systemRoot: root };
       return {
         ok: false,
@@ -135,14 +180,16 @@ export function resolveSystemRoot(
   // 2. Inherited hints (attacker-controllable, so strictly behind the
   //    machine fixed point): the first report that validates as a fixed
   //    point wins. A self-written reg.exe CAN satisfy this loop with
-  //    self-referential answers — which is exactly why the candidate
-  //    binaries are identity-checked against the pin afterwards.
+  //    self-referential answers — which is why (F-1) a candidate is executed
+  //    only after its bytes pass the pin gate, and why the binaries handed
+  //    out are identity-checked against the pin afterwards.
   for (const hint of uniqueRoots([env.SystemRoot, env.windir])) {
     const hintReg = join(hint, 'System32', 'reg.exe');
     if (!statFile(hintReg)) continue;
+    if (!executeAllowed(hintReg)) continue; // never EXECUTE an unpinned candidate
     const reported = query(hintReg, REG_QUERY_SYSTEMROOT_ARGS)?.trim();
     if (!reported || !isAbsoluteWindowsPath(reported)) continue;
-    const root = validatedFixedPoint(reported, query, statFile, statDirectory);
+    const root = validatedFixedPoint(reported, query, statFile, statDirectory, executeAllowed);
     if (root) return { ok: true, systemRoot: root };
   }
 
@@ -158,12 +205,18 @@ export function resolveSystemRoot(
   };
 }
 
-let cached: SystemRootResolution | undefined;
+const rootCache = new Map<string | undefined, SystemRootResolution>();
 
-/** Cached process-wide resolution; undefined result means fail closed. */
-export function systemRoot(): string | undefined {
-  cached ??= resolveSystemRoot();
-  return cached.ok ? cached.systemRoot : undefined;
+/** Cached process-wide resolution (keyed by the pinned digest, F-1); undefined result means fail closed. */
+export function systemRoot(expectedRegSha256?: string): string | undefined {
+  if (!rootCache.has(expectedRegSha256)) {
+    rootCache.set(
+      expectedRegSha256,
+      resolveSystemRoot(undefined, undefined, undefined, {}, expectedRegSha256),
+    );
+  }
+  const cached = rootCache.get(expectedRegSha256);
+  return cached?.ok ? cached.systemRoot : undefined;
 }
 
 /**
@@ -228,6 +281,10 @@ export function systemTaskkillExe(authorityDir?: string): string | undefined {
  * digests; WITHOUT it there is no trust anchor to verify against and the
  * resolution fails closed — callers degrade honestly (empty token
  * observation, refused step, refused relay spawn).
+ *
+ * F-1: the pin is loaded BEFORE the resolution and its regSha256 is threaded
+ * into it, so the probe itself never spawns a candidate that fails the
+ * pinned identity (see the module header's PROBE BOUNDARY).
  */
 function resolvePinnedSystemExe(
   tool: SystemToolKey,
@@ -236,7 +293,7 @@ function resolvePinnedSystemExe(
   if (!authorityDir) return undefined;
   const pin = readSystemToolsPin(authorityDir);
   if (!pin) return undefined;
-  const root = systemRoot();
+  const root = systemRoot(pin.regSha256);
   if (!root) return undefined;
   const expected =
     tool === 'whoami'
@@ -255,18 +312,22 @@ function resolvePinnedSystemExe(
 /**
  * A reported root is believed only when it is an absolute Windows path, the
  * directory genuinely exists, and its own reg.exe re-reports the same value
- * (fixed point). Returns the validated root, or undefined.
+ * (fixed point). `executeAllowed` is the F-1 gate: the re-probe binary is
+ * executed only when the gate accepts its bytes. Returns the validated root,
+ * or undefined.
  */
 function validatedFixedPoint(
   reported: string,
   query: RegQuery,
   statFile: (path: string) => boolean,
   statDirectory: (path: string) => boolean,
+  executeAllowed: (candidate: string) => boolean,
 ): string | undefined {
   if (!isAbsoluteWindowsPath(reported)) return undefined;
   if (!statDirectory(reported)) return undefined;
   const reportedReg = join(reported, 'System32', 'reg.exe');
   if (!statFile(reportedReg)) return undefined;
+  if (!executeAllowed(reportedReg)) return undefined;
   const confirmed = query(reportedReg, REG_QUERY_SYSTEMROOT_ARGS)?.trim();
   return confirmed === reported ? reported : undefined;
 }
@@ -305,6 +366,14 @@ function uniqueRoots(candidates: Array<string | undefined>): string[] {
     roots.push(trimmed);
   }
   return roots;
+}
+
+function shaFileOf(path: string): string | undefined {
+  try {
+    return createHash('sha256').update(readFileSync(path)).digest('hex');
+  } catch {
+    return undefined;
+  }
 }
 
 function isFile(path: string): boolean {

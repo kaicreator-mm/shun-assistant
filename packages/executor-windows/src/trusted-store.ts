@@ -148,7 +148,14 @@ export function programPinKey(canonicalProgramPath: string): string {
   return createHash('sha256').update(canonicalProgramPath.toLowerCase(), 'utf8').digest('hex');
 }
 
-/** Reads the pin for one canonical program path; absence/corruption fails closed (undefined). */
+/**
+ * Reads the pin for one canonical program path; absence, corruption, or a
+ * record that does not NAME the requested path fails closed (undefined, F-3):
+ * the store key is only an addressing digest — a record is trusted for a path
+ * solely when its own `programPath` field cross-checks against the request
+ * (case-insensitive, like Win32 paths). A key collision or a crafted record
+ * therefore never authenticates a path it does not name.
+ */
 export function readProgramPin(
   authorityDir: string,
   canonicalPath: string,
@@ -156,7 +163,9 @@ export function readProgramPin(
   const file = join(authorityDir, 'programs', `${programPinKey(canonicalPath)}.json`);
   if (!existsSync(file)) return undefined;
   try {
-    return ProgramPinSchema.parse(JSON.parse(readFileSync(file, 'utf8')));
+    const pin = ProgramPinSchema.parse(JSON.parse(readFileSync(file, 'utf8')));
+    if (pin.programPath.toLowerCase() !== canonicalPath.toLowerCase()) return undefined;
+    return pin;
   } catch {
     return undefined;
   }
