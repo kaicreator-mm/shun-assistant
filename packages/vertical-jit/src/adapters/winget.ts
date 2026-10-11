@@ -11,11 +11,9 @@
 // is read-only resolution/observation.
 import { homedir } from 'node:os';
 import { join } from 'node:path';
-import type { PlanAction } from '@shun/contracts';
 import type { JournalPort } from '../journal.ts';
 import type { LocalAuthority } from '../local-authority.ts';
 import { LocalPrivilegedBackend, type PrivilegedFault } from '../local-backend.ts';
-import { effectTimeScopeRefusal, manifestDeletionSpec } from '../manifest-removal.ts';
 import type {
   AcquisitionCandidate,
   AcquisitionPort,
@@ -246,11 +244,9 @@ export interface WingetBackendDeps {
   readonly journals: (actionId: string) => JournalPort;
   readonly process: ProcessPort;
   /**
-   * Read-only filesystem observation for the uninstall effect-time exclusivity
-   * gate (VJ-P1-01 R4): the external uninstaller's deletion set cannot be
-   * bounded by the manifest, so scope exclusivity must be PROVEN inside the
-   * executor immediately before any spawn. Unwiring it is a wiring fault —
-   * uninstall refuses fail-closed.
+   * Host observation seam retained for consistent acquisition/backend wiring.
+   * No filesystem census can authorize raw external WinGet uninstall until
+   * lifetime-wide exclusive ownership of the deletion scope is provable.
    */
   readonly fs: FilesystemPort;
   readonly timeoutMs?: number;
@@ -286,38 +282,32 @@ export class WingetPrivilegedBackend extends LocalPrivilegedBackend {
   async #perform(action: {
     op: string;
     parameters: Record<string, unknown>;
-  }): Promise<{ ok: boolean; exitCode?: number; note?: string; noEffect?: true }> {
+  }): Promise<{ ok: boolean; exitCode?: number; note?: string; noEffect?: true; refusalTerminal?: 'REFUSED' }> {
     const packageId = String(action.parameters.packageId ?? '');
     const version = String(action.parameters.version ?? '');
     if (!packageId || !version) {
       return { ok: false, note: 'plan parameters lack packageId/version' };
     }
     if (action.op === 'software.uninstall') {
-      // VJ-P1-01 R4: winget spawns the package's OWN removal program, whose
-      // deletion set cannot be bounded by the manifest — it may remove the
-      // whole tree, including user files written after every census. Two
-      // fail-closed gates precede any spawn, INSIDE the trusted executor
-      // after the last caller-reachable seam: (1) the action must be
-      // manifest-bound (a whole-root shape refuses outright); (2) scope
-      // exclusivity must be proven at effect time — unrecorded content
-      // refuses the effect with the provider retained and an honest
-      // NO_EFFECT journal marker, never a REMOVED claim.
-      const deletion = manifestDeletionSpec(action as PlanAction);
-      if (!deletion) {
-        return {
-          ok: false,
-          note: 'software.uninstall plan carries no manifest-restricted deletion set — refusing an external uninstaller of unprovable scope',
-          noEffect: true,
-        };
-      }
-      const refusal = await effectTimeScopeRefusal(this.#deps.fs, deletion);
-      if (refusal) {
-        return {
-          ok: false,
-          note: `removal refused before any effect — ${refusal}`,
-          noEffect: true,
-        };
-      }
+      // VJ-P1-01 R5 security gate. An external winget uninstaller controls
+      // its own deletion traversal for the ENTIRE lifetime of process.run.
+      // A point-in-time manifest census cannot prevent another process from
+      // placing user-owned files immediately after the census or during the
+      // uninstaller's minutes-long execution. The manifest's existence or a
+      // clean pre-spawn scope is NOT proof of exclusive write authority.
+      //
+      // Until a trusted manifest-bound removal mechanism or enforceable
+      // lifetime-wide exclusion is implemented, refuse this backend's raw
+      // external uninstall unconditionally. The provider remains installed;
+      // no process is spawned, no removal/REMOVED claim is permitted.
+      // The in-process manifest-restricted MemoryCatalog is a different
+      // destructive owner and remains usable for its tested bounded path.
+      return {
+        ok: false,
+        note: 'POLICY_BLOCKED: external WinGet uninstall cannot guarantee user-asset preservation for the lifetime of the uninstaller; retain provider and require manual intervention',
+        noEffect: true,
+        refusalTerminal: 'REFUSED',
+      };
     }
     const argv =
       action.op === 'software.install'
