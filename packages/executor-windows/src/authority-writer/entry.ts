@@ -61,7 +61,11 @@ function main(): never {
     nodeHash = sha256File(process.execPath);
   } catch (error) {
     return emitAndExit(
-      { ok: false, code: 'WRITER_IDENTITY_MISMATCH', reason: `node.exe unreadable: ${String(error)}` },
+      {
+        ok: false,
+        code: 'WRITER_IDENTITY_MISMATCH',
+        reason: `node.exe unreadable: ${String(error)}`,
+      },
       2,
     );
   }
