@@ -43,7 +43,11 @@ function outbound(value: string, field: string, redactions: RedactionRecord[]): 
  * the report; only bounded structural audit IDs survive.
  */
 export function minimizeSupportContext(raw: unknown): SupportContextResult {
-  const observed = SupportObservationSchema.parse(raw);
+  const parsed = SupportObservationSchema.safeParse(raw);
+  if (!parsed.success) {
+    throw new Error('SUPPORT_CONTEXT_INVALID: OBSERVATION');
+  }
+  const observed = parsed.data;
   const redactions: RedactionRecord[] = [];
 
   const envCount = Object.keys(observed.env ?? {}).length;
@@ -60,7 +64,7 @@ export function minimizeSupportContext(raw: unknown): SupportContextResult {
     redactions.push(marker('unrelated_document'));
   }
 
-  return SupportContextResultSchema.parse({
+  const result = SupportContextResultSchema.safeParse({
     report: {
       schema: 'shun.support-context.v1',
       os: {
@@ -78,4 +82,8 @@ export function minimizeSupportContext(raw: unknown): SupportContextResult {
     localOnly: true,
     externalDisclosures: [],
   });
+  if (!result.success) {
+    throw new Error('SUPPORT_CONTEXT_INVALID: OUTPUT');
+  }
+  return result.data;
 }
