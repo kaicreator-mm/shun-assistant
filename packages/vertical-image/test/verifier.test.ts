@@ -167,7 +167,8 @@ describe('verifyBatch', () => {
     expect(receipt.status).not.toBe('PASS');
   });
 
-  it('stays honest when the metric cannot be produced (INCOMPLETE, never PASS)', async () => {    const { input, records } = await runStandardBatch();
+  it('stays honest when the metric cannot be produced (INCOMPLETE, never PASS)', async () => {
+    const { input, records } = await runStandardBatch();
     const oracle = await freshOracle(input);
     const deadMetric: SsimMetric = () => null;
     const receipt = await verifyBatch({

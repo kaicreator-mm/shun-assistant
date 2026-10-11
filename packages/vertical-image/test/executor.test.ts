@@ -285,11 +285,12 @@ describe('runImageBatchProcess — per-record failures', () => {
     expect(byPath.get(c)?.status).toBe('WRITTEN');
     // VI-P1-04: the two pre-rejected files are committed ELIGIBLE oracle
     // samples with no output — a coverage gap. Verification must not claim
-    // PASS on the surviving samples alone.
+    // PASS on the surviving samples alone: the oracle check degrades to
+    // NOT_RUN and the receipt to INCOMPLETE.
     const ssimCheck = result.output.verification.checks.find((c) => c.checkId === 'ssim-oracle');
-    expect(ssimCheck?.status).toBe('FAIL');
+    expect(ssimCheck?.status).toBe('NOT_RUN');
     expect(ssimCheck?.detail).toContain('coverage gap');
-    expect(result.output.verification.status).toBe('FAIL');
+    expect(result.output.verification.status).toBe('INCOMPLETE');
   });
 
   it('routes formats to another registered provider when the selected one lacks them', async () => {
@@ -341,10 +342,7 @@ describe('runImageBatchProcess — per-record failures', () => {
         throw new Error('rogue provider must never be invoked');
       },
     };
-    const jpg = await src.write(
-      'ok.jpg',
-      await jpegBytes({ width: 600, height: 400, seed: 171 }),
-    );
+    const jpg = await src.write('ok.jpg', await jpegBytes({ width: 600, height: 400, seed: 171 }));
     const png = await src.write('ok.png', await pngBytes({ width: 600, height: 400, seed: 172 }));
     const result = await runImageBatchProcess(
       input([
@@ -394,10 +392,7 @@ describe('runImageBatchProcess — per-record failures', () => {
         throw new Error('infeasible provider must never be invoked');
       },
     };
-    const jpg = await src.write(
-      'ok.jpg',
-      await jpegBytes({ width: 600, height: 400, seed: 173 }),
-    );
+    const jpg = await src.write('ok.jpg', await jpegBytes({ width: 600, height: 400, seed: 173 }));
     const png = await src.write('ok.png', await pngBytes({ width: 600, height: 400, seed: 174 }));
     const result = await runImageBatchProcess(
       input([
@@ -463,7 +458,8 @@ describe('runImageBatchProcess — per-record failures', () => {
     expect(result.diagnostics[pngRecord?.inputPath ?? '']).toContain('binding-png-only');
   });
 
-  it('marks PNG records UNSUPPORTED_INPUT when no provider covers PNG', async () => {    const limited: BindingView = {
+  it('marks PNG records UNSUPPORTED_INPUT when no provider covers PNG', async () => {
+    const limited: BindingView = {
       bindingId: 'binding-jpg-only',
       providerId: 'provider-jpg-only',
       providerVersion: '0.0.1',

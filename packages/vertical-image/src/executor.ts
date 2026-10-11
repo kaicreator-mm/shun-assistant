@@ -22,8 +22,12 @@ import { scaledDims } from './dims.ts';
 import { inspectBytes, sha256Hex } from './inspect.ts';
 import { type CommittedOracle, commitOracle } from './oracle.ts';
 import { type ImageFormat, type ImageProvider, ImageProviderError } from './provider.ts';
-import { type BindingCandidate, type BindingSelection, feasiblePool } from './selector.ts';
-import { selectBinding } from './selector.ts';
+import {
+  type BindingCandidate,
+  type BindingSelection,
+  feasiblePool,
+  selectBinding,
+} from './selector.ts';
 import type { BatchRecord, SsimMetric } from './verifier.ts';
 import { verifyBatch } from './verifier.ts';
 
@@ -262,8 +266,12 @@ export async function runImageBatchProcess(
     if (picked.viaFallback) {
       const record = records.find((r) => r.inputPath === file.path);
       if (record?.status === 'WRITTEN') {
+        const fallbackBindingId = picked.provider.binding.bindingId;
         diagnostics[file.path] =
-          `executed via binding ${picked.provider.binding.bindingId} (selected binding ${selection.selected?.bindingId ?? 'none'} does not support ${file.format})`;
+          `executed via binding ${fallbackBindingId} (selected binding ${selection.selected?.bindingId ?? 'none'} does not support ${file.format})`;
+        selection.rankingEvidence.reasons.push(
+          `record ${file.path} executed via fallback binding ${fallbackBindingId} (selected binding does not support ${file.format})`,
+        );
       }
     }
   }
@@ -324,7 +332,11 @@ async function captureIdentity(path: string): Promise<FileIdentity> {
 
 async function removeIfIdentityMatches(path: string, identity: FileIdentity): Promise<void> {
   try {
-    if (await captureIdentity(path).then((live) => live.dev === identity.dev && live.ino === identity.ino)) {
+    if (
+      await captureIdentity(path).then(
+        (live) => live.dev === identity.dev && live.ino === identity.ino,
+      )
+    ) {
       await rm(path, { force: true });
     }
   } catch {

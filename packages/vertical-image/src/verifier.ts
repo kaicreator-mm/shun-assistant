@@ -184,10 +184,9 @@ export async function verifyBatch(args: VerifyBatchArgs): Promise<VerificationRe
       continue;
     }
     // A committed ELIGIBLE sample that produced no written output is a
-    // coverage gap, not a skip: perfect scores on the other samples must
-    // never launder it into an overall PASS.
+    // coverage gap, not a comparison failure and not a skip: perfect scores
+    // on the other samples must never launder it into an overall PASS.
     if (record?.status !== 'WRITTEN' || !record.outputPath) {
-      ssimFailed += 1;
       coverageGaps += 1;
       ssimResults.push({
         inputPath: sample.inputPath,
@@ -250,20 +249,22 @@ export async function verifyBatch(args: VerifyBatchArgs): Promise<VerificationRe
       ? `${coverageGaps} committed eligible sample(s) produced no output (coverage gap)`
       : '';
   if (evaluated === 0) {
-    oracleStatus = coverageGaps > 0 ? 'FAIL' : 'NOT_RUN';
-    oracleDetail =
-      coverageGaps > 0
-        ? gapNote
-        : 'no eligible sample produced an output';
+    oracleStatus = 'NOT_RUN';
+    oracleDetail = coverageGaps > 0 ? gapNote : 'no eligible sample produced an output';
   } else if (metricUnavailable > 0) {
     oracleStatus = 'NOT_RUN';
     oracleDetail = `metric unavailable for ${metricUnavailable}/${evaluated} evaluated samples — no PASS-equivalent status`;
+  } else if (ssimFailed > 0) {
+    oracleStatus = 'FAIL';
+    oracleDetail = `${ssimFailed}/${evaluated} sample(s) below ${args.oracle.ssimThreshold}${gapNote ? `; ${gapNote}` : ''}`;
+  } else if (coverageGaps > 0) {
+    // The surviving samples scored perfectly, but the committed oracle did
+    // not run to completion — degrade to NOT_RUN, never a PASS.
+    oracleStatus = 'NOT_RUN';
+    oracleDetail = `${gapNote}; ${evaluated} sample(s) evaluated clean`;
   } else {
-    oracleStatus = ssimFailed > 0 ? 'FAIL' : 'PASS';
-    oracleDetail =
-      ssimFailed > 0
-        ? `${ssimFailed}/${evaluated} sample(s) below ${args.oracle.ssimThreshold}${gapNote ? `; ${gapNote}` : ''}`
-        : `min SSIM ${minSsim.toFixed(5)} >= ${args.oracle.ssimThreshold} over ${evaluated} sample(s)`;
+    oracleStatus = 'PASS';
+    oracleDetail = `min SSIM ${minSsim.toFixed(5)} >= ${args.oracle.ssimThreshold} over ${evaluated} sample(s)`;
   }
   checks.push({ checkId: 'ssim-oracle', status: oracleStatus, detail: oracleDetail });
 
