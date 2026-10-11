@@ -5,8 +5,6 @@ import { existsSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { assessAuthorityAnchors } from '../anchor-protection.ts';
 import { resolveAgainstRoot } from '../fs-safety.ts';
-import { verifyWriterIdentity } from './apply.ts';
-import { WriterJobSchema } from './job.ts';
 import { spawnRelay } from '../privileged-backend.ts';
 import { systemPowershellExe, systemTaskkillExe } from '../system-exe.ts';
 import {
@@ -15,6 +13,8 @@ import {
   resolveGrantHmacKeyFile,
   sha256File,
 } from '../trusted-store.ts';
+import { verifyWriterIdentity } from './apply.ts';
+import { WriterJobSchema } from './job.ts';
 
 export interface AnchorWriterLaunchOptions {
   authorityDir: string;
