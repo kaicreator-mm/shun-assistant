@@ -83,10 +83,10 @@ export type RecoveryClassification =
  * resolving it to a concrete outcome requires post-state reconciliation —
  * this function deliberately cannot resolve it.
  *
- * A `NO_EFFECT:` detail marker (written by the privileged backend when the
- * elevation seam refuses before any effect phase, e.g. UAC_DECLINED) proves
- * the helper never started, which classifies NOT_STARTED exactly like the
- * empty-journal case.
+ * A `NO_EFFECT:` detail marker is authoritative evidence that the effect
+ * did not occur; it does NOT erase a durable RECEIVED. After RECEIVED, a
+ * refusal with no effect classifies FAILED_BEFORE_EFFECT (frozen §9.4).
+ * NOT_STARTED is reserved for a helper that never emitted RECEIVED.
  *
  * Attempt isolation (VJ-P1-04): one actionId may carry MULTIPLE attempts —
  * the reconcile-first retry keeps the SAME actionId and starts a new
@@ -108,11 +108,13 @@ export function classifyFromJournal(
   const latestAttemptId = mine[mine.length - 1]?.attemptId ?? 'legacy';
   const attempt = mine.filter((entry) => (entry.attemptId ?? 'legacy') === latestAttemptId);
   const phases = new Set(attempt.map((entry) => entry.phase));
-  if (attempt.some((entry) => entry.detail?.startsWith('NO_EFFECT:'))) {
-    return 'NOT_STARTED';
-  }
   if (!phases.has('RECEIVED')) {
     return 'NO_ENTRIES';
+  }
+  if (attempt.some((entry) => entry.detail?.startsWith('NO_EFFECT:'))) {
+    // If a contradictory EXEC_DONE also exists, proof is incoherent;
+    // fail closed as uncertain rather than trusting the no-effect marker.
+    return phases.has('EXEC_DONE') ? 'MAY_HAVE_EXECUTED_UNCERTAIN' : 'FAILED_BEFORE_EFFECT';
   }
   if (!phases.has('EXEC_START')) {
     return 'FAILED_BEFORE_EFFECT';
