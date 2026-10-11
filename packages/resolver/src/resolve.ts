@@ -91,12 +91,12 @@ export function resolveGoal(input: ResolveGoalInput): GoalResolution {
 
   const bindings = registry.bindingsForCapability(capability.capabilityId);
 
-  // Registry currentness before any gate (P1-06): a registry collected via
-  // sequential async reads without a verified snapshot seal has unverifiable
-  // currentness — reads-between-changed cannot be excluded, so resolution
-  // fails closed instead of trusting an unbound snapshot. The
-  // observationRevision string alone is a durable identity input, never
-  // freshness proof.
+  // Registry currentness before any gate (P1-06, R1): a registry whose
+  // snapshot is not bound to a trusted source-issued currentness authority
+  // revision has unverifiable currentness — reads-between-changed cannot be
+  // excluded, so resolution fails closed instead of trusting an unbound
+  // snapshot. The observationRevision string alone is a durable identity
+  // input, never freshness proof.
   if (!registry.currentnessAttested) {
     return {
       stage: 'RESOLUTION',
@@ -117,8 +117,7 @@ export function resolveGoal(input: ResolveGoalInput): GoalResolution {
         privacyDisclosurePlan,
         failureDisposition: {
           failureCode: 'REGISTRY_CURRENTNESS_INSUFFICIENT',
-          detail:
-            'registry currentness unverifiable — the snapshot was collected through sequential async reads without a trusted snapshot seal binding the collected facts (P1-06); reads-between-changed cannot be excluded, fail closed',
+          detail: `registry currentness unverifiable — ${registry.currentnessExplanation} (P1-06); reads-between-changed cannot be excluded, fail closed`,
         },
       }),
     };

@@ -5,6 +5,16 @@
 // part of the P0 resolver input). Snapshot entries are re-parsed with the
 // frozen contract parsers, so malformed registry data fails closed at
 // construction instead of leaking into resolution.
+//
+// R1 (Issue #33 review blocker 1): a caller-computable content digest is NOT
+// currentness evidence — it proves self-consistency only, never source
+// authority, atomicity or freshness. Attestation therefore requires a trusted
+// source-issued revision/currentness authority whose CURRENT revision binds to
+// the exact collected facts; anything else is unattested and resolution fails
+// closed with REGISTRY_CURRENTNESS_INSUFFICIENT.
+//
+// R1 (review blocker 2): validated facts are deeply frozen at construction —
+// an attested registry can no longer be mutated after attestation.
 import { createHash } from 'node:crypto';
 import {
   type CapabilityDefinition,
@@ -25,24 +35,33 @@ import { matchCapabilityIds, OBJECTIVE_MATCHERS, type ObjectiveMatcherTable } fr
 export const RESOLVER_REVISION = 'shun.resolver/0.1';
 
 /**
- * Prefix of a verifiable snapshot seal revision (P1-06): the suffix is a
- * SHA-256 content digest over the exact sealed facts, computed by
- * sealRegistrySnapshot — the seal binds to the facts, it is not a label a
- * caller can assert independently.
+ * Prefix of a registry snapshot fact revision (P1-06, R1): the suffix is a
+ * SHA-256 content digest over the exact snapshot facts. This revision is the
+ * unit the trusted authority ISSUES — deriving it locally proves nothing
+ * about currentness; only the authority's confirmation does.
  */
-export const REGISTRY_SNAPSHOT_SEAL_REVISION_PREFIX = 'shun.registry-snapshot/1:sha256:';
+export const REGISTRY_SNAPSHOT_REVISION_PREFIX = 'shun.registry-snapshot/1:sha256:';
 
 /**
- * Trusted currentness seam for registry snapshots (P1-06). The frozen
- * RegistryReadModelPort collects its fact classes through separate async
- * calls and cannot express an atomic read, so the resolver requires an
- * explicit seal whose revision verifiably binds to the collected facts.
+ * Trusted currentness authority seam (P1-06, R1). The frozen
+ * RegistryReadModelPort collects its fact classes through separate async calls
+ * and cannot express an atomic read, so the resolver requires a source-side
+ * authority that issues revision identities. A snapshot is currentness-attested
+ * ONLY when the authority's current revision binds to the exact collected
+ * facts — attestation is always a comparison against the authority's current
+ * state, so a stale-but-self-consistent snapshot fails closed.
+ *
+ * The trust anchor is the wiring of this port: the integration layer is
+ * responsible for injecting a genuine authority (the same trust boundary as
+ * injecting the RegistryReadModelPort itself).
  */
-export interface RegistrySnapshotSeal {
-  readonly snapshotRevision: string;
+export interface RegistryCurrentnessAuthority {
+  /** Revision identity the trusted authority currently serves for the registry fact classes. */
+  currentRevision(): Promise<string>;
 }
 
-function snapshotFactsRevision(snapshot: RegistrySnapshot): string {
+/** Deterministic content revision of a snapshot (the unit an authority issues). */
+export function snapshotFactsRevision(snapshot: RegistrySnapshot): string {
   const digest = createHash('sha256')
     .update(
       canonicalJson({
@@ -54,12 +73,18 @@ function snapshotFactsRevision(snapshot: RegistrySnapshot): string {
       'utf8',
     )
     .digest('hex');
-  return `${REGISTRY_SNAPSHOT_SEAL_REVISION_PREFIX}${digest}`;
+  return `${REGISTRY_SNAPSHOT_REVISION_PREFIX}${digest}`;
 }
 
-/** Seal a collected snapshot: the returned revision binds to these exact facts. */
-export function sealRegistrySnapshot(snapshot: RegistrySnapshot): RegistrySnapshotSeal {
-  return { snapshotRevision: snapshotFactsRevision(snapshot) };
+/** Deeply freeze a validated fact object; mutation attempts throw in strict mode. */
+function deepFreeze<T>(value: T): T {
+  if (value !== null && typeof value === 'object') {
+    for (const entry of Object.values(value as Record<string, unknown>)) {
+      deepFreeze(entry);
+    }
+    Object.freeze(value);
+  }
+  return value;
 }
 
 export type { ObjectiveMatcherTable };
@@ -80,14 +105,26 @@ export interface RegistryOptions {
    */
   additionalObjectiveMatchers?: ObjectiveMatcherTable;
   /**
-   * Optional trusted snapshot seal (P1-06). When provided it is verified
-   * against the snapshot facts; a mismatch means the snapshot is stale or was
-   * altered after sealing and construction fails closed.
+   * Source-issued revision of the trusted registry authority for the
+   * synchronous snapshot path (P1-06, R1). Present and binding to the exact
+   * snapshot facts → currentness-attested; present but NOT binding → the
+   * snapshot is stale or was altered and construction fails closed; absent →
+   * the snapshot is a local view with unverifiable currentness and resolution
+   * fails closed (REGISTRY_CURRENTNESS_INSUFFICIENT).
    */
-  snapshotSeal?: RegistrySnapshotSeal;
+  authorityRevision?: string;
 }
 
-export interface RegistryFromPortOptions extends RegistryOptions {}
+export interface RegistryFromPortOptions extends RegistryOptions {
+  /**
+   * Trusted source-side currentness authority (P1-06, R1). After collecting
+   * the fact classes, the computed content revision is compared against the
+   * authority's CURRENT revision: only a binding revision attests. An
+   * unreachable or disagreeing authority leaves the registry unattested —
+   * resolution fails closed instead of trusting an unbound collection.
+   */
+  currentnessAuthority?: RegistryCurrentnessAuthority;
+}
 
 export class ShunRegistry {
   private readonly matchers: ObjectiveMatcherTable;
@@ -99,23 +136,30 @@ export class ShunRegistry {
     private readonly environment: EnvironmentFacts,
     matchers: ObjectiveMatcherTable,
     /**
-     * True when the snapshot's currentness is verifiably attested: either the
-     * synchronous in-memory path (atomic by construction) or an async port
-     * collection bound by a verified snapshot seal (P1-06). Resolution over
-     * an unattested registry fails closed in resolveGoal.
+     * True when the snapshot's currentness is verifiably attested: the
+     * snapshot's content revision is confirmed current by a trusted
+     * source-issued authority revision (P1-06, R1). Resolution over an
+     * unattested registry fails closed in resolveGoal.
      */
     private readonly attested: boolean,
+    /** Audit note stating why currentness is (un)attested; carried into resolution records. */
+    private readonly currentnessNote: string,
   ) {
     this.matchers = { ...matchers };
   }
 
   /**
    * Whether this registry's snapshot currentness is verifiably attested
-   * (P1-06). Unattested registries (sequential async reads without a
-   * snapshot seal) fail closed at resolution.
+   * (P1-06, R1): the source-issued authority revision binds to the exact
+   * facts. Unattested registries fail closed at resolution.
    */
   get currentnessAttested(): boolean {
     return this.attested;
+  }
+
+  /** Why currentness is (un)attested — resolution failure details carry this verbatim. */
+  get currentnessExplanation(): string {
+    return this.currentnessNote;
   }
 
   /** Build from the async T00 read model port (the async boundary of resolution). */
@@ -131,34 +175,70 @@ export class ShunRegistry {
       ).then((lists) => lists.flat()),
       port.observedFacts(),
     ]);
-    return ShunRegistry.fromSnapshot(
-      { capabilities, providers, bindings, environment },
-      {
-        additionalObjectiveMatchers: options?.additionalObjectiveMatchers,
-        snapshotSeal: options?.snapshotSeal,
-        // Sequential async reads are only currentness-attested when a
-        // verifiable snapshot seal binds the collected facts (P1-06).
-        asyncCollectionAttested: options?.snapshotSeal !== undefined,
-      },
-    );
+    const snapshot: RegistrySnapshot = { capabilities, providers, bindings, environment };
+    // Currentness attestation (P1-06, R1): compare the collected facts against
+    // the authority's CURRENT revision. A content match with an outdated
+    // revision (stale-but-self-consistent snapshot) does not attest.
+    let attested = false;
+    let note: string;
+    if (options?.currentnessAuthority !== undefined) {
+      try {
+        const authorityRevision = await options.currentnessAuthority.currentRevision();
+        const collectedRevision = snapshotFactsRevision(snapshot);
+        attested = authorityRevision === collectedRevision;
+        note = attested
+          ? `the trusted registry authority confirms revision ${authorityRevision} is current for the collected facts`
+          : `the trusted registry authority serves revision ${authorityRevision}, which does not bind the collected facts (${collectedRevision}) — reads-between-changed: the collection is stale`;
+      } catch (error) {
+        note = `the trusted registry currentness authority could not be consulted: ${
+          error instanceof Error ? error.message : String(error)
+        }`;
+      }
+    } else {
+      note =
+        'snapshot collected through sequential async reads without a trusted currentness authority — no source-issued revision binds the collected facts';
+    }
+    return ShunRegistry.fromSnapshot(snapshot, {
+      additionalObjectiveMatchers: options?.additionalObjectiveMatchers,
+      // Sequential async reads are only currentness-attested when the trusted
+      // authority's current revision binds the collected facts (P1-06, R1).
+      asyncCollectionAttested: attested,
+      asyncCollectionNote: note,
+    });
   }
 
   /** Synchronous construction from already-collected facts (tests, callers holding a snapshot). */
   static fromSnapshot(
     snapshot: RegistrySnapshot,
-    options?: RegistryOptions & { asyncCollectionAttested?: boolean },
+    options?: RegistryOptions & {
+      /** Internal: attestation pre-verified by the async port path. */
+      asyncCollectionAttested?: boolean;
+      /** Internal: audit note from the async port path. */
+      asyncCollectionNote?: string;
+    },
   ): ShunRegistry {
-    // Seal verification binds the trusted currentness facts (P1-06): a seal
-    // whose revision does not bind to THESE facts means the snapshot is stale
-    // or was altered after sealing — fail closed at construction.
-    if (options?.snapshotSeal !== undefined) {
-      const expected = snapshotFactsRevision(snapshot);
-      if (options.snapshotSeal.snapshotRevision !== expected) {
+    // Authority revision binding (P1-06, R1): a provided source-issued
+    // revision that does not bind to THESE facts proves the snapshot is stale
+    // or was altered — fail closed at construction. Without any authority
+    // revision the snapshot is a local view: it is NOT attested by default and
+    // resolution fails closed.
+    let attested: boolean;
+    let note: string;
+    const collectedRevision = snapshotFactsRevision(snapshot);
+    if (options?.authorityRevision !== undefined) {
+      if (options.authorityRevision !== collectedRevision) {
         throw new ShunContractError(
           'SCHEMA_VIOLATION',
-          `registry snapshot seal does not bind to the provided facts (seal ${options.snapshotSeal.snapshotRevision}, expected ${expected}) — the snapshot is stale or was altered after sealing; fail closed`,
+          `registry snapshot is not the revision the trusted authority issued (source-issued ${options.authorityRevision}, snapshot binds ${collectedRevision}) — the snapshot is stale or was altered; fail closed`,
         );
       }
+      attested = true;
+      note = `snapshot binds the source-issued authority revision ${options.authorityRevision}`;
+    } else {
+      attested = options?.asyncCollectionAttested ?? false;
+      note =
+        options?.asyncCollectionNote ??
+        'synchronous snapshot not bound to a trusted registry currentness authority — no source-issued revision proves these facts current';
     }
     // Identity uniqueness fails closed (P1-05): one stable identity must
     // designate exactly one fact. A duplicate capabilityId/providerId would
@@ -175,7 +255,7 @@ export class ShunRegistry {
           `duplicate capabilityId "${parsed.capabilityId}" in registry snapshot (existing revision ${existing.revision}, duplicate revision ${parsed.revision}) — one stable identity must designate exactly one capability; fail closed`,
         );
       }
-      capabilities.set(parsed.capabilityId, parsed);
+      capabilities.set(parsed.capabilityId, deepFreeze(parsed));
     }
     const providers = new Map<string, ProviderDefinition>();
     for (const provider of snapshot.providers) {
@@ -187,7 +267,7 @@ export class ShunRegistry {
           `duplicate providerId "${parsed.providerId}" in registry snapshot (existing revision ${existing.revision}, duplicate revision ${parsed.revision}) — a repeated identity with a conflicting revision must not be silently accepted; fail closed`,
         );
       }
-      providers.set(parsed.providerId, parsed);
+      providers.set(parsed.providerId, deepFreeze(parsed));
     }
     const bindingsByCapability = new Map<string, ProviderCapabilityBinding[]>();
     const seenBindingIds = new Set<string>();
@@ -201,27 +281,22 @@ export class ShunRegistry {
       }
       seenBindingIds.add(parsed.bindingId);
       const list = bindingsByCapability.get(parsed.capabilityId) ?? [];
-      list.push(parsed);
+      list.push(deepFreeze(parsed));
       bindingsByCapability.set(parsed.capabilityId, list);
     }
-    const environment = parseEnvironmentFacts(snapshot.environment);
+    for (const list of bindingsByCapability.values()) {
+      Object.freeze(list);
+    }
+    // R1 (review blocker 2): the validated environment facts are frozen with
+    // the rest of the attested snapshot.
+    const environment = deepFreeze(parseEnvironmentFacts(snapshot.environment));
     const matchers: Record<string, readonly RegExp[]> = { ...OBJECTIVE_MATCHERS };
     for (const [capabilityId, patterns] of Object.entries(
       options?.additionalObjectiveMatchers ?? {},
     )) {
       matchers[capabilityId] = [...(matchers[capabilityId] ?? []), ...patterns];
     }
-    return new ShunRegistry(
-      capabilities,
-      providers,
-      bindingsByCapability,
-      environment,
-      matchers,
-      // Synchronous construction over an in-memory snapshot is atomic by
-      // construction (attested by default); the async port path overrides
-      // this with its seal-based attestation.
-      options?.asyncCollectionAttested ?? true,
-    );
+    return new ShunRegistry(capabilities, providers, bindingsByCapability, environment, matchers, attested, note);
   }
 
   capability(capabilityId: string): CapabilityDefinition | undefined {
