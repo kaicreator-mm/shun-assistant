@@ -1,0 +1,121 @@
+// Production entry for the bounded one-shot ShunAnchorWriter (L2 v0.2 delta).
+// Build-time constants pin the only writable authority root and key path.
+// argv names ONE signed job file to READ; no caller-controlled output path
+// ever becomes an elevated write primitive.
+import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { join } from 'node:path';
+import { fileURLToPath } from 'node:url';
+import { applyWriterJob, verifyWriterIdentity } from './apply.ts';
+import { WriterJobSchema } from './job.ts';
+import { readWriterPin, sha256File } from '../trusted-store.ts';
+
+declare const SHUN_ANCHOR_WRITER_ROOT: string | undefined;
+declare const SHUN_ANCHOR_WRITER_HMAC_KEY_FILE: string | undefined;
+
+function builtPath(value: string | undefined, name: string): string {
+  const trimmed = value?.trim();
+  if (!trimmed) throw new Error(`${name} was not baked into this writer build; refusing`);
+  return trimmed;
+}
+
+function emitAndExit(payload: Record<string, unknown>, code: number): never {
+  process.stdout.write(`${JSON.stringify(payload)}\n`);
+  process.exit(code);
+}
+
+function protectedReceiptPath(root: string, jobId: string): string {
+  return join(root, 'jobs', 'receipts', `${jobId}.json`);
+}
+
+function main(): never {
+  if (process.argv.length !== 3) {
+    return emitAndExit({ ok: false, code: 'USAGE', reason: 'expected exactly one signed job file' }, 2);
+  }
+
+  const anchorRoot = builtPath(
+    typeof SHUN_ANCHOR_WRITER_ROOT === 'string' ? SHUN_ANCHOR_WRITER_ROOT : undefined,
+    'SHUN_ANCHOR_WRITER_ROOT',
+  );
+  const keyFile = builtPath(
+    typeof SHUN_ANCHOR_WRITER_HMAC_KEY_FILE === 'string'
+      ? SHUN_ANCHOR_WRITER_HMAC_KEY_FILE
+      : undefined,
+    'SHUN_ANCHOR_WRITER_HMAC_KEY_FILE',
+  );
+  const selfPath = fileURLToPath(import.meta.url);
+  const pin = readWriterPin(anchorRoot);
+  if (!pin) {
+    return emitAndExit(
+      { ok: false, code: 'WRITER_IDENTITY_MISMATCH', reason: 'writer-pin.json missing/corrupt' },
+      2,
+    );
+  }
+  const self = verifyWriterIdentity(selfPath, pin.writerSha256);
+  if (!self.ok) return emitAndExit(self, 2);
+  let nodeHash: string;
+  try {
+    nodeHash = sha256File(process.execPath);
+  } catch (error) {
+    return emitAndExit(
+      { ok: false, code: 'WRITER_IDENTITY_MISMATCH', reason: `node.exe unreadable: ${String(error)}` },
+      2,
+    );
+  }
+  if (nodeHash !== pin.nodeExeSha256) {
+    return emitAndExit(
+      {
+        ok: false,
+        code: 'WRITER_IDENTITY_MISMATCH',
+        reason: `node.exe bytes differ from writer pin (${nodeHash} != ${pin.nodeExeSha256})`,
+      },
+      2,
+    );
+  }
+
+  let key: string;
+  let raw: unknown;
+  try {
+    key = readFileSync(keyFile, 'utf8').trim();
+    if (!key) throw new Error('empty HMAC key');
+    raw = JSON.parse(readFileSync(process.argv[2]!, 'utf8')) as unknown;
+  } catch (error) {
+    return emitAndExit(
+      { ok: false, code: 'INPUT_UNREADABLE', reason: `writer input unavailable: ${String(error)}` },
+      2,
+    );
+  }
+
+  const parsed = WriterJobSchema.safeParse(raw);
+  const result = applyWriterJob({ anchorRoot, hmacKeyBase64: key }, raw);
+  const receipt = {
+    ...result,
+    writerSha256: pin.writerSha256,
+    nodeExeSha256: pin.nodeExeSha256,
+    finishedAt: new Date().toISOString(),
+  };
+  if (parsed.success) {
+    try {
+      const dir = join(anchorRoot, 'jobs', 'receipts');
+      mkdirSync(dir, { recursive: true });
+      // Path derives only from AnchorIdSchema-validated jobId.
+      writeFileSync(
+        protectedReceiptPath(anchorRoot, parsed.data.jobId),
+        `${JSON.stringify(receipt, null, 2)}\n`,
+        { encoding: 'utf8', flag: 'wx' },
+      );
+    } catch (error) {
+      return emitAndExit(
+        {
+          ok: false,
+          code: 'ANCHOR_WRITE_DENIED',
+          reason: `protected writer receipt could not be persisted: ${String(error)}`,
+          applyResult: result,
+        },
+        3,
+      );
+    }
+  }
+  return emitAndExit(receipt, result.ok ? 0 : 2);
+}
+
+main();
