@@ -103,6 +103,16 @@ export const AuthorityRecordSchema = z.strictObject({
   authorityId: z.string().min(1),
   authorityRevision: z.string().min(1),
   updatedAt: IsoDateTimeSchema,
+  /**
+   * R1 (P1-A) durable lineage marker: set to true by the FIRST successful
+   * policy adoption and carried forward by every subsequent authority-record
+   * write. True proves at least one policy snapshot has existed, so a MISSING
+   * current policy slot is durable-state loss — never a first bootstrap — and
+   * adoption over the absent predecessor refuses fail-closed. The marker
+   * deliberately lives outside the policy slot so it survives exactly the
+   * loss it makes detectable.
+   */
+  policyInitialized: z.boolean().optional(),
 });
 export type AuthorityRecord = z.infer<typeof AuthorityRecordSchema>;
 
@@ -146,6 +156,21 @@ export interface PolicyStateStore {
   loadCurrentPolicy(): Promise<unknown>;
   saveAuthorityRecord(record: AuthorityRecord): Promise<void>;
   savePolicySnapshot(snapshot: PolicySnapshotRecord): Promise<void>;
+  /**
+   * R1 (P1-B) optimistic-concurrency extension: atomically save the policy
+   * snapshot ONLY IF the currently stored policy record still equals
+   * `expectedPrior` — the exact record (or absence of one) the caller last
+   * read; equality is canonical-JSON equality, and null/undefined demands an
+   * empty slot. Returns false — writing nothing — when the record moved, so
+   * the caller can reload, re-apply and retry (bounded) or refuse typed.
+   * Stores that cannot provide this atomicity omit the method; the authority
+   * then relies on its in-instance single-writer mutation lock alone, and a
+   * cross-process atomic store remains a Controller disposition item.
+   */
+  compareAndSavePolicySnapshot?(
+    snapshot: PolicySnapshotRecord,
+    expectedPrior: unknown,
+  ): Promise<boolean>;
 }
 
 function unresolvable(reason: string) {

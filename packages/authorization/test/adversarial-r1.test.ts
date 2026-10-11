@@ -280,6 +280,32 @@ describe('P1-B: concurrent authority events stay serializable (deterministic sto
     });
   });
 
+  it('a bootstrap that loses a concurrent same-revision bootstrap re-validates non-reuse and refuses (CAS)', async () => {
+    const state = memoryPolicyState({ authority: AUTHORITY });
+    const { authority } = makeAuthority(state);
+
+    const barrier = storeBarrier();
+    gateFirstPolicyWrite(state, barrier);
+
+    const adopt = authority.adoptPolicy({ policySnapshotRevision: POLICY_REVISION, rules: [] });
+    await barrier.entered;
+    // Another process bootstrapped the SAME revision while this adoption's
+    // write was parked: the fresh store already holds pol-snap-1.
+    state.policySlot = activePolicy();
+    barrier.release();
+
+    // The stale bootstrap may not land a second, lineage-empty pol-snap-1
+    // over the winner's record: the retry must re-read, re-validate revision
+    // non-reuse against the fresh lineage, and refuse.
+    await expect(adopt).rejects.toMatchObject({
+      name: 'ShunContractError',
+      code: 'GRANT_POLICY_STALE',
+    });
+    expect((state.policySlot as PolicySnapshotRecord).policySnapshotRevision).toBe(POLICY_REVISION);
+    // The winner's record is untouched (it is the whole lineage so far).
+    expect((state.policySlot as PolicySnapshotRecord).priorRevisions ?? []).toEqual([]);
+  });
+
   it('a policy mutation that cannot win its compare-and-save refuses typed, leaving the store untouched', async () => {
     const state = memoryPolicyState({ authority: AUTHORITY, policy: activePolicy() });
     const { authority } = makeAuthority(state);

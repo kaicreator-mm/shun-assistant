@@ -302,7 +302,11 @@ export class ActionController {
     // 6. One grant per distinct required privilege level; the grant scope is
     // the union of the group's declared scopes. Every issuance request carries
     // a per-request controller-approval proof (P1-04): the authority refuses
-    // any issuance that did not pass this controller route.
+    // any issuance that did not pass this controller route. R1 (P1-C): each
+    // proof mints a FRESH one-use nonce and a bounded validity window anchored
+    // at this controller's trusted clock; the authority consumes every proof
+    // exactly once, so no observed (request, proof) pair can ever re-mint a
+    // grant that escapes an earlier grant's revocation.
     const groups = this.#groupByPrivilege(plan);
     const grants: AuthorizationGrant[] = [];
     for (const group of groups) {
@@ -323,7 +327,9 @@ export class ActionController {
         };
         const grant = await this.#config.authority.issue(
           request,
-          computeIssuanceProof(this.#config.issuanceSecret, request),
+          computeIssuanceProof(this.#config.issuanceSecret, request, {
+            issuedAt: this.#config.clock(),
+          }),
         );
         grants.push(grant);
         group.grant = grant;
