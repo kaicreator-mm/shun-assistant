@@ -7,7 +7,8 @@ import { createHash } from 'node:crypto';
 import { existsSync, statfsSync } from 'node:fs';
 import { cpus, hostname, version as osVersion, platform, release, totalmem } from 'node:os';
 import { canonicalJson, type EnvironmentFacts, type PrivilegeMode } from '@shun/contracts';
-import { systemPowershellExe, systemWhoamiExe } from './system-exe.ts';
+import { resolveWithinScope } from './fs-safety.ts';
+import { systemPowershellExe, systemRoot, systemWhoamiExe } from './system-exe.ts';
 
 export interface ObserveOptions {
   /** Disk free is reported for this root (the executor workspace). */
@@ -80,13 +81,58 @@ function runtimeCapabilities(authorityDir: string | undefined): string[] {
   // anchor the capability degrades honestly (not reported).
   const ps = systemPowershellExe(authorityDir);
   if (ps && existsSync(ps)) caps.push('powershell');
-  if (findOnPath('winget.exe')) caps.push('winget');
+  // N-R2-3 (P2 honesty): winget is reported ONLY through machine-owned
+  // evidence. The inherited PATH is attacker-settable — a same-user attacker
+  // planting 'winget.exe' anywhere on it (or pointing a PATH entry at their
+  // own directory) must not fabricate a capability the planner would trust.
+  // The probe therefore accepts a PATH hit only when the containing
+  // directory natively resolves INSIDE a machine-owned root (the
+  // machine-evidenced system root or the well-known Program Files
+  // locations); everything else — user-profile alias dirs, TEMP, any
+  // attacker dir — degrades honestly to "not reported". Machine roots are
+  // admin-owned, so planting there is out of the same-user threat model.
+  // Residual (documented): non-default Program Files installs on other
+  // drives are simply not reported — capability reporting stays honest.
+  if (wingetFromMachineOwnedPath()) caps.push('winget');
   return caps;
 }
 
-function findOnPath(exe: string): boolean {
-  const pathDirs = (process.env.Path ?? process.env.PATH ?? '').split(';');
-  return pathDirs.some((d) => d && existsSync(`${d.trim()}\\${exe}`));
+const WINGET_EXE = 'winget.exe';
+
+/** Machine-owned roots a same-user (non-elevated) attacker cannot write. */
+function machineOwnedRoots(): string[] {
+  const roots: string[] = [];
+  const root = systemRoot();
+  if (root) roots.push(root);
+  roots.push('C:\\Program Files', 'C:\\Program Files (x86)');
+  return roots;
+}
+
+/**
+ * N-R2-3 winget honesty probe. Accepts a PATH hit only when the containing
+ * directory natively resolves INSIDE a machine-owned root; everything else
+ * (user-profile alias dirs, TEMP, any attacker-planted directory) reports
+ * nothing. `pathValue` and `fileExists` are injectable so the negative
+ * controls run on any host without touching the real machine roots.
+ */
+export function wingetFromMachineOwnedPath(
+  pathValue: string = process.env.Path ?? process.env.PATH ?? '',
+  fileExists: (candidate: string) => boolean = (candidate) => existsSync(candidate),
+): boolean {
+  const pathDirs = pathValue.split(';');
+  for (const entry of pathDirs) {
+    const dir = entry.trim();
+    if (!dir) continue;
+    if (!fileExists(`${dir}\\${WINGET_EXE}`)) continue;
+    for (const root of machineOwnedRoots()) {
+      // Native realpath containment (C07 surface): a junction planted inside
+      // a machine-rooted PATH entry that redirects OUTSIDE the root is
+      // refused, and sibling-name prefixes ('C:\Program Files-Evil') do not
+      // pass pathWithin's boundary check.
+      if (resolveWithinScope(dir, [root]).ok) return true;
+    }
+  }
+  return false;
 }
 
 export async function whoamiGroups(authorityDir?: string): Promise<string> {
