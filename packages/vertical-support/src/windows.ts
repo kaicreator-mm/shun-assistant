@@ -4,6 +4,8 @@ import { minimizeSupportContext } from './minimize.ts';
 import type { SupportContextResult } from './schema.ts';
 
 const execFile = promisify(execFileCallback);
+const SYSTEM_POWERSHELL =
+  String.raw`C:\Windows\System32\WindowsPowerShell\v1.0\powershell.exe`;
 
 export interface WindowsCollectorDeps {
   execFile?: (
@@ -13,11 +15,14 @@ export interface WindowsCollectorDeps {
   ) => Promise<{ stdout: string; stderr?: string }>;
 }
 
+function collectionError(code: 'EXECUTION' | 'STDERR' | 'INVALID_JSON' | 'INVALID_OBSERVATION'): Error {
+  return new Error(`SUPPORT_COLLECTION_FAILED: ${code}`);
+}
+
 /**
  * Real Windows R0 collector. It executes only fixed local PowerShell/CIM
- * queries and has no URL/network/client surface. Collection itself is already
- * allowlisted to the three B-040 report sections; minimization runs again
- * before the value leaves this module.
+ * queries through the pinned System32 executable path and has no URL/network/
+ * client surface. Raw subprocess/parser diagnostics never cross this boundary.
  */
 export async function collectWindowsSupportContext(
   deps: WindowsCollectorDeps = {},
@@ -36,21 +41,30 @@ export async function collectWindowsSupportContext(
     '[pscustomobject]@{os=@{name=[string]$os.Caption;build=[string]$os.BuildNumber};device=@{model=[string]$cs.Model};updates=@{last_check=[string]$last}} | ConvertTo-Json -Compress -Depth 5',
   ].join(';');
 
-  const result = await run(
-    'powershell.exe',
-    ['-NoProfile', '-NonInteractive', '-Command', script],
-    { windowsHide: true, timeout: 30_000, encoding: 'utf8' },
-  );
-  if (result.stderr?.trim()) {
-    throw new Error(`SUPPORT_COLLECTION_FAILED: PowerShell stderr: ${result.stderr.trim()}`);
+  let result: { stdout: string; stderr?: string };
+  try {
+    result = await run(
+      SYSTEM_POWERSHELL,
+      ['-NoProfile', '-NonInteractive', '-Command', script],
+      { windowsHide: true, timeout: 30_000, encoding: 'utf8' },
+    );
+  } catch {
+    throw collectionError('EXECUTION');
   }
+  if (result.stderr?.trim()) {
+    throw collectionError('STDERR');
+  }
+
   let parsed: unknown;
   try {
     parsed = JSON.parse(result.stdout.trim()) as unknown;
-  } catch (error) {
-    throw new Error(
-      `SUPPORT_COLLECTION_FAILED: invalid structured PowerShell output: ${String(error)}`,
-    );
+  } catch {
+    throw collectionError('INVALID_JSON');
   }
-  return minimizeSupportContext(parsed);
+
+  try {
+    return minimizeSupportContext(parsed);
+  } catch {
+    throw collectionError('INVALID_OBSERVATION');
+  }
 }
