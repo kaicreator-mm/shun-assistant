@@ -11,7 +11,9 @@
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "build:helper": "node scripts/build-helper.ts",
-    "test:evidence": "vitest run --config vitest.evidence.config.ts"
+    "test:evidence": "vitest run --config vitest.evidence.config.ts",
+    "build:anchor-writer": "node scripts/build-anchor-writer.ts",
+    "provision:anchor": "powershell.exe -NoProfile -ExecutionPolicy Bypass -File src/authority-writer/provision-anchor.ps1"
   },
   "dependencies": {
     "@shun/contracts": "workspace:*",
