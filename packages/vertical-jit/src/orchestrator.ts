@@ -388,10 +388,17 @@ async function runLifecycle(
   };
 
   // ---- Install (R1 privileged) ----
-  const scopeRoots = await deps.acquisition.predictScope(
-    candidate,
-    deps.policy.machineScopeInstall,
-  );
+  const scopeRoots = await deps.acquisition.predictScope(candidate, deps.policy.machineScopeInstall);
+  // Snapshot the predicted scope BEFORE any side effect: the install-owned
+  // manifest is the post-install tree minus this pre-existing tree, so
+  // content that predates the install (user files inside provider roots) can
+  // never be claimed as program-owned (VJ-P1-01).
+  const preInstallTree = new Set<string>();
+  for (const root of scopeRoots) {
+    for (const path of await treeUnder(deps, root)) {
+      preInstallTree.add(canonicalKey(path));
+    }
+  }
   const officialSources = await deps.acquisition.officialSources();
   const installActionSpec = installAction({
     actionId: `${input.taskId}-install`,
@@ -433,6 +440,11 @@ async function runLifecycle(
       },
     );
   }
+  // The exact install-owned manifest, recorded at install time and persisted
+  // with the lifecycle state. The removal preview classifies in strict mode
+  // against it: any path inside an install root that the installer did not
+  // create is USER_CREATED_UNKNOWN and fails closed (VJ-P1-01).
+  const ownedManifest = await recordedOwnedManifest(deps, layout.installDirs, preInstallTree);
 
   // ---- Task execute (bounded R1 use of the acquired provider) ----
   const executable = layout.executables[0];
@@ -488,7 +500,7 @@ async function runLifecycle(
   trace(deps, 'TASK_VERIFIED', `status=${verification.status}`);
 
   // ---- Lifecycle-state persistence ----
-  await persistLifecycle(deps, input, provenance, layout, 'INSTALLED');
+  await persistLifecycle(deps, input, provenance, layout, 'INSTALLED', ownedManifest);
 
   if (verification.status !== 'PASS') {
     throw new JitLifecycleError(
@@ -514,7 +526,17 @@ async function runLifecycle(
   }
 
   // ---- R2 removal gate (any removal is R2, Product C-002) ----
-  return runRemovalGate(deps, input, binding, candidate, layout, provenance, verification, hints);
+  return runRemovalGate(
+    deps,
+    input,
+    binding,
+    candidate,
+    layout,
+    provenance,
+    verification,
+    ownedManifest,
+    hints,
+  );
 }
 
 async function buildAndRegisterPlan(
@@ -556,6 +578,7 @@ async function runRemovalGate(
   layout: ProviderInstallLayout,
   provenance: ReturnType<typeof provenanceRecord>,
   verification: VerificationReceipt,
+  ownedManifest: readonly string[],
   hints?: RemovalPreviewHints,
 ): Promise<JitLifecycleOutput> {
   const actionId = `${input.taskId}-uninstall`;
@@ -589,12 +612,15 @@ async function runRemovalGate(
   });
 
   // (2) PREVIEW — classify every candidate with fail-closed dispositions.
+  // Benchmark hints (harness truth) win; the production path classifies in
+  // strict mode against the install-time owned manifest recorded above, so
+  // any unrecorded nested content is USER_CREATED_UNKNOWN (VJ-P1-01).
   const candidates: ResidueCandidate[] = classifyResidue({
     layout,
     observed,
     protectedRoots: deps.policy.protectedRoots,
     ...(hints?.preExisting ? { preExisting: hints.preExisting } : {}),
-    ...(hints?.providerOwnedFiles ? { providerOwnedFiles: hints.providerOwnedFiles } : {}),
+    providerOwnedFiles: hints?.providerOwnedFiles ?? ownedManifest,
   });
   assertNoProtectedDeletions(candidates);
   // Fail-closed asset gate (C-002 step 2): anything user-created/unknown or
@@ -622,7 +648,14 @@ async function runRemovalGate(
   );
 
   // (3) CHECKPOINT — record exact version/source so reinstall is possible.
-  const checkpointRef = await persistLifecycle(deps, input, provenance, layout, 'CHECKPOINT');
+  const checkpointRef = await persistLifecycle(
+    deps,
+    input,
+    provenance,
+    layout,
+    'CHECKPOINT',
+    ownedManifest,
+  );
 
   // (4) APPROVAL CONDITION — explicit approval or a sufficiently specific
   // durable policy. Provenance passed earlier; this gate decides removal only.
@@ -741,6 +774,59 @@ async function providerPresent(
   return false;
 }
 
+/** Depth bound for the recursive pre/post-install enumeration. */
+const TREE_WALK_DEPTH = 8;
+
+/**
+ * Recursively enumerate every descendant path (directories and files) of a
+ * root. The removal preview must see NESTED content — a user file two levels
+ * inside the install root is invisible to a one-level listing (VJ-P1-01).
+ */
+async function treeUnder(deps: JitLifecycleDeps, root: string, depth = TREE_WALK_DEPTH): Promise<string[]> {
+  const found: string[] = [];
+  if (depth < 0 || !(await deps.fs.isDirectory(root))) {
+    return found;
+  }
+  for (const child of await deps.fs.listChildren(root)) {
+    const path = joinPath(root, child);
+    found.push(path);
+    if (await deps.fs.isDirectory(path)) {
+      found.push(...(await treeUnder(deps, path, depth - 1)));
+    }
+  }
+  return found;
+}
+
+/** Canonical comparison key: separator-normalized, case-insensitive (Windows truth). */
+function canonicalKey(path: string): string {
+  return path
+    .replaceAll('\\', '/')
+    .replace(/^\/+|\/+$/g, '')
+    .toLowerCase();
+}
+
+/**
+ * The exact install-owned manifest: everything under the install roots that
+ * was NOT on disk before the install ran. The provider root claim cannot
+ * cover paths the installer never created — pre-existing or later-dropped
+ * user content stays unknown, and unknown is never deleted.
+ */
+async function recordedOwnedManifest(
+  deps: JitLifecycleDeps,
+  installDirs: readonly string[],
+  preInstallTree: ReadonlySet<string>,
+): Promise<string[]> {
+  const owned: string[] = [];
+  for (const root of installDirs) {
+    for (const path of await treeUnder(deps, root)) {
+      if (!preInstallTree.has(canonicalKey(path))) {
+        owned.push(path);
+      }
+    }
+  }
+  return owned;
+}
+
 async function collectCandidates(
   deps: JitLifecycleDeps,
   layout: ProviderInstallLayout,
@@ -748,11 +834,7 @@ async function collectCandidates(
   const observed: string[] = [];
   for (const root of [...layout.installDirs, ...layout.cacheDirs, ...layout.configDirs]) {
     observed.push(root);
-    if (await deps.fs.isDirectory(root)) {
-      for (const child of await deps.fs.listChildren(root)) {
-        observed.push(joinPath(root, child));
-      }
-    }
+    observed.push(...(await treeUnder(deps, root)));
   }
   return observed;
 }
