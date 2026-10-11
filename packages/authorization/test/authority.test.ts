@@ -30,6 +30,7 @@ function makeAuthority(
     grants,
     integritySecret: 'test-authority-secret',
     issuanceSecret: ISSUANCE_SECRET,
+    bootstrapAuthorizer: ({ proof }) => proof === 'trusted-one-shot-bootstrap',
     clock: clock.now,
   });
   return { authority, grants, state, clock };
@@ -273,10 +274,13 @@ describe('policy revision non-reuse and durable revocation (P1-02)', () => {
     ).rejects.toMatchObject({ code: 'GRANT_CURRENTNESS_UNRESOLVABLE' });
   });
 
-  it('first-ever adoption still bootstraps an empty store (positive control)', async () => {
+  it('first-ever policy requires the explicit trusted bootstrap ceremony (positive control)', async () => {
     const { authority } = makeAuthority(memoryPolicyState({ authority: AUTHORITY }));
     await expect(
-      authority.adoptPolicy({ policySnapshotRevision: POLICY_REVISION, rules: [] }),
+      authority.bootstrapPolicy(
+        { policySnapshotRevision: POLICY_REVISION, rules: [] },
+        'trusted-one-shot-bootstrap',
+      ),
     ).resolves.toBeUndefined();
     expect(await authority.currentAuthority()).toMatchObject({
       kind: 'CURRENT',
