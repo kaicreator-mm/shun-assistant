@@ -174,8 +174,7 @@ class Helper {
     // trusted provisioning/authority event pins its BYTES; the runtime
     // launcher is verify-only and this boundary RE-MEASURES pre-journal.
     // No pin or bytes replaced after provisioning refuse with NOTHING
-    // written. The measured identity is carried into EXEC_START evidence.nned AS-SWAPPED — that
-    // same-user race is the C06 open boundary.
+    // written. The measured identity is carried into EXEC_START evidence.
     const preflightStep = resolveActionStep(this.envelope.action);
     if (preflightStep?.op === 'windows.proc.exec') {
       const programIdentity = verifyPinnedProgram(authorityDirectory(), preflightStep.args.program);
