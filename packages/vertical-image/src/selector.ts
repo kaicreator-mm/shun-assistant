@@ -80,6 +80,25 @@ function compareBindings(a: BindingView, b: BindingView): number {
 }
 
 /**
+ * The exact pool selection draws from: registered candidates that are
+ * feasible against the observed machine facts, in policy ranking order
+ * (interface-class preference, bindingId tiebreak). Per-record format
+ * fallback routing is only allowed inside this pool — an unregistered or
+ * environment-infeasible provider must never execute, no matter what else is
+ * present in the process.
+ */
+export function feasiblePool(
+  candidates: readonly BindingCandidate[],
+  facts: EnvironmentFacts,
+): BindingView[] {
+  return candidates
+    .filter((c) => c.registered)
+    .filter((c) => infeasibilityReasons(c.binding, facts).length === 0)
+    .map((c) => c.binding)
+    .sort(compareBindings);
+}
+
+/**
  * Selects exactly one binding for the batch. `preferredBindingId` wins only
  * when it is registered and feasible; otherwise selection falls back to the
  * frozen ranking and the deviation is recorded in the reasons.

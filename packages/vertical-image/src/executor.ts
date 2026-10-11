@@ -22,7 +22,7 @@ import { scaledDims } from './dims.ts';
 import { inspectBytes, sha256Hex } from './inspect.ts';
 import { type CommittedOracle, commitOracle } from './oracle.ts';
 import { type ImageFormat, type ImageProvider, ImageProviderError } from './provider.ts';
-import type { BindingCandidate, BindingSelection } from './selector.ts';
+import { type BindingCandidate, type BindingSelection, feasiblePool } from './selector.ts';
 import { selectBinding } from './selector.ts';
 import type { BatchRecord, SsimMetric } from './verifier.ts';
 import { verifyBatch } from './verifier.ts';
@@ -204,8 +204,8 @@ export async function runImageBatchProcess(
       records.push(reject(file.path, 'DECODE_FAILED'));
       continue;
     }
-    const provider = pickProvider(deps.providers, selection, file.format);
-    if (!provider) {
+    const picked = pickProvider(deps.providers, selection, candidates, deps.facts, file.format);
+    if (!picked) {
       records.push(reject(file.path, 'UNSUPPORTED_INPUT'));
       diagnostics[file.path] = 'no registered provider supports this format';
       continue;
@@ -215,12 +215,22 @@ export async function runImageBatchProcess(
       file.path,
       bytes,
       file.format,
-      provider,
+      picked.provider,
       targetPath,
       input.operation.maxLongEdgePx,
       records,
       diagnostics,
     );
+    // A record routed away from the selected binding must disclose the real
+    // executing binding in the receipt — never let the batch claim the
+    // selected binding produced outputs it did not produce.
+    if (picked.viaFallback) {
+      const record = records.find((r) => r.inputPath === file.path);
+      if (record?.status === 'WRITTEN') {
+        diagnostics[file.path] =
+          `executed via binding ${picked.provider.binding.bindingId} (selected binding ${selection.selected?.bindingId ?? 'none'} does not support ${file.format})`;
+      }
+    }
   }
 
   // Post-state: re-hash every input (preservation covers all inputs, not only
@@ -355,19 +365,30 @@ async function executeOne(
 function pickProvider(
   providers: readonly ImageProvider[],
   selection: BindingSelection,
+  candidates: readonly BindingCandidate[],
+  facts: EnvironmentFacts,
   format: ImageFormat,
-): ImageProvider | null {
+): { provider: ImageProvider; viaFallback: boolean } | null {
   if (selection.selected === null) {
     return null;
   }
   const primary = providers.find((p) => p.binding.bindingId === selection.selected?.bindingId);
   if (primary && !primary.binding.unsupportedFormats.includes(format)) {
-    return primary;
+    return { provider: primary, viaFallback: false };
   }
-  const fallback = providers.find(
-    (p) =>
-      p.binding.bindingId !== selection.selected?.bindingId &&
-      !p.binding.unsupportedFormats.includes(format),
-  );
-  return fallback ?? null;
+  // Format fallback is only allowed through the same registered, feasible pool
+  // the selection drew from — never an arbitrary provider in the process.
+  for (const binding of feasiblePool(candidates, facts)) {
+    if (binding.bindingId === selection.selected?.bindingId) {
+      continue;
+    }
+    if (binding.unsupportedFormats.includes(format)) {
+      continue;
+    }
+    const provider = providers.find((p) => p.binding.bindingId === binding.bindingId);
+    if (provider) {
+      return { provider, viaFallback: true };
+    }
+  }
+  return null;
 }
