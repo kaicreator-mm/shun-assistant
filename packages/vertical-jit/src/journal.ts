@@ -91,9 +91,11 @@ export type RecoveryClassification =
  * Attempt isolation (VJ-P1-04): one actionId may carry MULTIPLE attempts —
  * the reconcile-first retry keeps the SAME actionId and starts a new
  * attempt. Only the LATEST attempt describes the current recovery
- * situation: an earlier attempt's RECEIPT_WRITTEN must not turn a torn new
- * attempt into COMPLETED_VERIFIED, and an earlier NO_EFFECT marker must not
- * dominate a later attempt that did reach the effect phase. Entries without
+ * situation: an earlier attempt's receipt must not mask a torn new attempt,
+ * and an earlier NO_EFFECT marker must not dominate a later attempt that did
+ * reach the effect phase. Critically, a journal can prove phase completion
+ * but cannot independently verify post-state, so journal replay alone NEVER
+ * upgrades an effectful attempt to COMPLETED_VERIFIED. Entries without
  * an attemptId form a single legacy attempt (replay order is the order
  * truth: the attempt of the LAST replayed entry wins).
  */
@@ -122,5 +124,8 @@ export function classifyFromJournal(
   if (!phases.has('EXEC_DONE')) {
     return 'MAY_HAVE_EXECUTED_UNCERTAIN';
   }
-  return phases.has('RECEIPT_WRITTEN') ? 'COMPLETED_VERIFIED' : 'MAY_HAVE_EXECUTED_UNCERTAIN';
+  // EXEC_DONE proves the worker left the effect phase; it does not prove
+  // the declared post-state. Only the orchestrator's independent verifier
+  // may promote an action to COMPLETED_VERIFIED.
+  return 'MAY_HAVE_EXECUTED_UNCERTAIN';
 }
