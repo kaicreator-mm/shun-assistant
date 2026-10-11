@@ -277,7 +277,7 @@ export class LocalPrivilegedBackend implements ExecutionBackend {
       return this.#receipt(
         action,
         startedAt,
-        outcome.refusalTerminal ?? 'UAC_DECLINED',
+        outcome.refusalTerminal ?? 'REFUSED',
         'FAILED_BEFORE_EFFECT',
         false,
         outcome.exitCode,
