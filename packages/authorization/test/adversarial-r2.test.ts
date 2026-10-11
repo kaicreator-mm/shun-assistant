@@ -225,7 +225,10 @@ describe('R3: missing policy is never implicit proof of a virgin authority', () 
         return true;
       },
     });
-    const candidate = { policySnapshotRevision: POLICY_REVISION, rules: [] as PolicySnapshotRecord['rules'] };
+    const candidate = {
+      policySnapshotRevision: POLICY_REVISION,
+      rules: [] as PolicySnapshotRecord['rules'],
+    };
     const pending = authority.bootstrapPolicy(candidate, 'trusted-one-shot-bootstrap');
     await entered;
     // Independent review R3 P1: mutate the caller-owned object while the
