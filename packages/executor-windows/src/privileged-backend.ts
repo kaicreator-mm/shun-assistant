@@ -16,6 +16,7 @@ import { fileURLToPath } from 'node:url';
 import {
   type AuthorizationGrantPresentationInput,
   type AuthorizedAction,
+  canonicalJson,
   type ExecutionBackend,
   type ExecutionReceipt,
   ExecutionReceiptSchema,
@@ -175,6 +176,26 @@ export class PrivilegedWindowsExecutionBackend implements ExecutionBackend {
             'ANCHOR_FORGEABLE_SAME_USER',
           );
         }
+      }
+
+      // The presented grant crosses an untrusted caller boundary. Even a
+      // caller who somehow learns the symmetric HMAC key cannot mint a new
+      // privileged presentation unless the exact grant record was first
+      // committed by the elevated-only anchor writer.
+      const storedGrant = new FileGrantSource(
+        join(this.options.authorityDir, 'grants'),
+      ).byGrantId(action.authorizationRef);
+      if (!storedGrant) {
+        return await launchRefused(
+          `grant ${action.authorizationRef} is absent from the protected authority store`,
+          'GRANT_NOT_AUTHENTIC',
+        );
+      }
+      if (canonicalJson(storedGrant) !== canonicalJson(grant)) {
+        return await launchRefused(
+          'presented grant does not byte-canonically match the protected pre-issued record',
+          'GRANT_NOT_AUTHENTIC',
+        );
       }
 
       // ---- launch-side pin verification (the helper re-checks its own). ----
