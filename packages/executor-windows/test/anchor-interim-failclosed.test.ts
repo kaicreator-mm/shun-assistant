@@ -163,9 +163,9 @@ describe('P2-2 — the privileged launcher refuses side effects under forgeable 
 });
 
 describe.skipIf(!ON_WINDOWS)(
-  'P2-2 — an anchor set the token cannot write passes the gate (real deny-ACE simulation)',
+  'C06 R5 — deny-to-self ACL theater is not a protected deployment',
   () => {
-    it('protected anchors are NOT forgeable — externalized-protected deployments stay usable', () => {
+    it('a runtime-owned root stays forgeable even after it denies itself data writes', () => {
       const machinePs = join(process.env.SystemRoot ?? 'C:\\Windows', 'System32');
       const dir = join(tmpdir(), `shun-p22-protected-${Date.now()}`);
       mkdirSync(join(dir, 'grants'), { recursive: true });
@@ -196,8 +196,9 @@ describe.skipIf(!ON_WINDOWS)(
           { windowsHide: true },
         );
         const assessment = assessAuthorityAnchors(dir);
-        expect(assessment.forgeable).toBe(false);
+        expect(assessment.forgeable).toBe(true);
         expect(assessment.keyReadable).toBe(false);
+        expect(assessment.reasons.join('\n')).toMatch(/owner|owner scan/i);
       } finally {
         try {
           execFileSync(
