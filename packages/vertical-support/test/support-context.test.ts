@@ -10,6 +10,7 @@ const fakeKey =
   '-----BEGIN PRIVATE KEY-----\nSHUN_FAKE_PRIVATE_KEY_24c87\n-----END PRIVATE KEY-----';
 const fakePath = String.raw`C:\Users\FixtureOwner\Private\secret-document.txt`;
 const unrelated = 'SHUN_UNRELATED_DOCUMENT_TEXT_29fa0';
+const canaries = [fakeToken, fakeKey, fakePath, unrelated] as const;
 
 function fixture() {
   return {
@@ -22,8 +23,16 @@ function fixture() {
   };
 }
 
+function expectNoCanaries(value: unknown): void {
+  const serialized = JSON.stringify(value);
+  for (const forbidden of canaries) {
+    expect(serialized).not.toContain(forbidden);
+  }
+  expect(serialized).not.toContain('SHUN_FAKE_PRIVATE_KEY_24c87');
+}
+
 describe('B-040 support-context minimization', () => {
-  it('keeps only required structured sections and auditable redaction markers', () => {
+  it('keeps only required structured sections and bounded auditable redaction markers', () => {
     const result = minimizeSupportContext(fixture());
 
     expect(result.localOnly).toBe(true);
@@ -35,23 +44,49 @@ describe('B-040 support-context minimization', () => {
       updates: { last_check: 'fixture-date' },
     });
     expect(result.report.redactions).toEqual([
-      { field: 'env.API_TOKEN', marker: '[REDACTED]' },
-      { field: 'env.USERPROFILE', marker: '[REDACTED]' },
+      { field: 'env[0].value', marker: '[REDACTED]' },
+      { field: 'env[1].value', marker: '[REDACTED]' },
       { field: 'processes[0].name', marker: '[REDACTED]' },
       { field: 'processes[0].command_line', marker: '[REDACTED]' },
       { field: 'unrelated_document', marker: '[REDACTED]' },
     ]);
+    expectNoCanaries(result);
+  });
 
-    const serialized = JSON.stringify(result);
-    for (const forbidden of [
-      fakeToken,
-      fakeKey,
-      fakePath,
-      unrelated,
-      'SHUN_FAKE_PRIVATE_KEY_24c87',
-    ]) {
-      expect(serialized).not.toContain(forbidden);
+  it('redacts every allowlisted outbound string when it becomes secret/path/unrelated-shaped', () => {
+    const channels = [
+      ['os.name', (base: ReturnType<typeof fixture>, value: string) => (base.os.name = value)],
+      ['os.build', (base: ReturnType<typeof fixture>, value: string) => (base.os.build = value)],
+      [
+        'device.model',
+        (base: ReturnType<typeof fixture>, value: string) => (base.device.model = value),
+      ],
+      [
+        'updates.last_check',
+        (base: ReturnType<typeof fixture>, value: string) => (base.updates.last_check = value),
+      ],
+    ] as const;
+
+    for (const [field, set] of channels) {
+      for (const canary of canaries) {
+        const input = fixture();
+        set(input, canary);
+        const result = minimizeSupportContext(input);
+        expectNoCanaries(result);
+        expect(result.report.redactions).toContainEqual({ field, marker: '[REDACTED]' });
+      }
     }
+  });
+
+  it('never copies attacker-controlled env key names into redaction metadata', () => {
+    const input = fixture();
+    input.env = { [fakeToken]: 'ordinary-value' };
+    const result = minimizeSupportContext(input);
+    expectNoCanaries(result);
+    expect(result.report.redactions).toContainEqual({
+      field: 'env[0].value',
+      marker: '[REDACTED]',
+    });
   });
 
   it('strictly rejects unreviewed context fields instead of silently exporting them', () => {
@@ -69,7 +104,7 @@ describe('B-040 support-context minimization', () => {
 });
 
 describe('real Windows collector boundary', () => {
-  it('runs a fixed local PowerShell shape and returns local-only structured output', async () => {
+  it('runs the fixed System32 PowerShell path and returns local-only structured output', async () => {
     const calls: Array<{ file: string; args: readonly string[] }> = [];
     const result = await collectWindowsSupportContext({
       execFile: async (file, args) => {
@@ -86,7 +121,9 @@ describe('real Windows collector boundary', () => {
     });
 
     expect(calls).toHaveLength(1);
-    expect(calls[0]?.file).toBe('powershell.exe');
+    expect(calls[0]?.file).toBe(
+      String.raw`C:\Windows\System32\WindowsPowerShell\v1.0\powershell.exe`,
+    );
     expect(calls[0]?.args).toContain('-NonInteractive');
     expect(calls[0]?.args.join(' ')).toContain('Get-CimInstance Win32_OperatingSystem');
     expect(calls[0]?.args.join(' ')).toContain('Get-HotFix');
@@ -95,17 +132,36 @@ describe('real Windows collector boundary', () => {
     expect(result.report.redactions).toEqual([]);
   });
 
-  it('refuses stderr and malformed collector output rather than degrading to partial success', async () => {
-    await expect(
-      collectWindowsSupportContext({
-        execFile: async () => ({ stdout: '{}', stderr: 'access denied' }),
-      }),
-    ).rejects.toThrow('SUPPORT_COLLECTION_FAILED');
+  it('maps stderr, invalid JSON and execution failures to bounded errors with no raw canaries', async () => {
+    const probes = [
+      () =>
+        collectWindowsSupportContext({
+          execFile: async () => ({ stdout: '{}', stderr: fakeToken }),
+        }),
+      () =>
+        collectWindowsSupportContext({
+          execFile: async () => ({ stdout: fakeKey, stderr: '' }),
+        }),
+      () =>
+        collectWindowsSupportContext({
+          execFile: async () => {
+            throw new Error(fakePath);
+          },
+        }),
+    ];
 
-    await expect(
-      collectWindowsSupportContext({
-        execFile: async () => ({ stdout: 'not-json', stderr: '' }),
-      }),
-    ).rejects.toThrow('SUPPORT_COLLECTION_FAILED');
+    for (const probe of probes) {
+      let caught: unknown;
+      try {
+        await probe();
+      } catch (error) {
+        caught = error;
+      }
+      expect(caught).toBeInstanceOf(Error);
+      expect((caught as Error).message).toContain('SUPPORT_COLLECTION_FAILED');
+      for (const canary of canaries) {
+        expect((caught as Error).message).not.toContain(canary);
+      }
+    }
   });
 });
