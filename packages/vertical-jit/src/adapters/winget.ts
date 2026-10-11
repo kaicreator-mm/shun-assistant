@@ -284,9 +284,10 @@ export class WingetPrivilegedBackend extends LocalPrivilegedBackend {
 
   readonly #deps: WingetBackendDeps;
 
-  async #preflight(
-    action: { op: string; parameters: Record<string, unknown> },
-  ): Promise<(PerformOutcome & { readonly noEffect: true }) | undefined> {
+  async #preflight(action: {
+    op: string;
+    parameters: Record<string, unknown>;
+  }): Promise<(PerformOutcome & { readonly noEffect: true }) | undefined> {
     if (action.op !== 'software.uninstall') return undefined;
     // R5b: this refusal is an EFFECT PRECONDITION, so it must be decided
     // before LocalPrivilegedBackend appends EXEC_START. A durable EXEC_START
