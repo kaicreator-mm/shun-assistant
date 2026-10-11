@@ -318,7 +318,7 @@ async function deleteRecursively(
         continue;
       }
       await deleteRecursively(root, entryPath, actionId, journal, counters, hooks, depth + 1);
-      await removeEmptyDir(entryPath, journal, actionId);
+      await removeEmptyDir(root, entryPath, journal, actionId, counters.onBlocked);
       continue;
     }
     if (!entry.isFile()) continue;
@@ -416,26 +416,94 @@ async function checkDeletionTarget(
   return { ok: true };
 }
 
-async function removeEmptyDir(dir: string, journal: PhaseJournal, actionId: string): Promise<void> {
+/**
+ * Post-recursion empty-directory removal, bound to the authorized target
+ * (rootReal). The gates, in order, immediately before the effect:
+ *   1. final component is still a plain directory (lstat never follows it —
+ *      a junction that replaced the directory itself is left untouched);
+ *   2. the directory is still empty (a foreign/nonempty directory is a safe
+ *      honest no-op — the ENOTEMPTY path);
+ *   3. resolved-parent AND resolved-directory containment: realpath resolves
+ *      the FULL ancestor chain, so an ancestor swapped to a junction since
+ *      enumeration lands the resolved path OUTSIDE the authorized target and
+ *      the rmdir is refused — mirroring checkDeletionTarget's file-side
+ *      effect-time re-check (VS-P0-01 class).
+ * Containment or resolution failures journal EXEC_BLOCKED honestly and are
+ * counted as blocked (the receipt can never present an out-of-scope
+ * environment as SUCCEEDED); only an actual in-scope rmdir journals EXEC_DONE.
+ * Residual declared honestly: the microseconds between resolution and rmdir
+ * remain a race window, as with the file-side check — no portable
+ * handle-relative rmdir exists on Node.
+ */
+async function removeEmptyDir(
+  rootReal: string,
+  dir: string,
+  journal: PhaseJournal,
+  actionId: string,
+  onBlocked: (kind: string) => void,
+): Promise<void> {
+  // Never rmdir through a swap: a junction that replaced the directory is
+  // left untouched (the executor never deletes reparse points).
+  let st: Stats;
   try {
-    // Never rmdir through a swap: a junction that replaced the directory is
-    // left untouched (the executor never deletes reparse points).
-    const st = await fsp.lstat(dir);
-    if (st.isSymbolicLink() || !st.isDirectory()) return;
-    const remaining = await fsp.readdir(dir);
-    if (remaining.length === 0) {
-      await fsp.rmdir(dir);
-      await journal.append({
-        at: new Date().toISOString(),
-        phase: 'EXEC_DONE',
-        actionId,
-        file: `${dir}/(dir)`,
-        bytes: 0,
-      });
-    }
+    st = await fsp.lstat(dir);
   } catch {
-    // dir raced away or is gone: honest no-op
+    return; // raced away before the gate: nothing happened
   }
+  if (st.isSymbolicLink() || !st.isDirectory()) return;
+  let remaining: string[];
+  try {
+    remaining = await fsp.readdir(dir);
+  } catch {
+    return; // raced away or unreadable: nothing deleted, honest no-op
+  }
+  if (remaining.length > 0) return;
+  const journalBlocked = async (errorKind: string): Promise<void> => {
+    await journal.append({
+      at: new Date().toISOString(),
+      phase: 'EXEC_BLOCKED',
+      actionId,
+      file: `${dir}/(dir)`,
+      errorKind,
+    });
+    onBlocked(`${errorKind}:${dir}`);
+  };
+  let parentReal: string;
+  try {
+    parentReal = await fsp.realpath(path.dirname(dir));
+  } catch (error) {
+    const code = (error as NodeJS.ErrnoException).code ?? 'UNKNOWN';
+    await journalBlocked(code === 'ENOENT' ? 'VANISHED' : code);
+    return;
+  }
+  if (!pathWithin(parentReal, rootReal)) {
+    await journalBlocked('OUTSIDE_SCOPE');
+    return;
+  }
+  let dirReal: string;
+  try {
+    dirReal = await fsp.realpath(dir);
+  } catch (error) {
+    const code = (error as NodeJS.ErrnoException).code ?? 'UNKNOWN';
+    await journalBlocked(code === 'ENOENT' ? 'VANISHED' : code);
+    return;
+  }
+  if (!pathWithin(dirReal, rootReal)) {
+    await journalBlocked('OUTSIDE_SCOPE');
+    return;
+  }
+  try {
+    await fsp.rmdir(dir);
+  } catch {
+    return; // raced away/nonempty at rmdir time: nothing deleted, honest no-op
+  }
+  await journal.append({
+    at: new Date().toISOString(),
+    phase: 'EXEC_DONE',
+    actionId,
+    file: `${dir}/(dir)`,
+    bytes: 0,
+  });
 }
 
 function buildReceipt(
