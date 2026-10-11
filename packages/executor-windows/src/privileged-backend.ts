@@ -22,9 +22,11 @@ import {
 } from '@shun/contracts';
 import { assertSafeActionId } from './action-id.ts';
 import { resolveActionStep } from './action-surface.ts';
+import { assessAuthorityAnchors } from './anchor-protection.ts';
 import { PROVIDER_ID, PROVIDER_VERSION } from './backend.ts';
 import { type HelperReceiptFile, HelperReceiptFileSchema, writeEnvelopeFile } from './envelope.ts';
 import { resolveAgainstRoot } from './fs-safety.ts';
+import { grantHmacKeyFileOverride } from './helper/authority-dir.ts';
 import { verifyPinnedHelper } from './helper-pinning.ts';
 import type { InterpreterScope } from './interpreter.ts';
 import { JournalWriter, journalDigest, readJournal } from './journal.ts';
@@ -35,8 +37,14 @@ import {
   classifyRecovery,
   terminalForClassification,
 } from './recovery.ts';
+import { privilegedSpawnEnv } from './safe-env.ts';
 import { systemPowershellExe, systemTaskkillExe } from './system-exe.ts';
-import { FileGrantSource, FilePlanSource, readHelperPin } from './trusted-store.ts';
+import {
+  FileGrantSource,
+  FilePlanSource,
+  readHelperPin,
+  resolveGrantHmacKeyFile,
+} from './trusted-store.ts';
 
 export interface PrivilegedBackendOptions {
   /** Trusted authority store (helper pin, plans, currentness, HMAC key). */
@@ -52,6 +60,12 @@ export interface PrivilegedBackendOptions {
   /** Grace for the secure-desktop prompt + helper run, over the action deadline. */
   uacGraceMs?: number;
   defaultTimeoutMs?: number;
+  /**
+   * Externalized HMAC key path this deployment trusts (P2-2 anchor probing).
+   * Falls back to the build-time define (grantHmacKeyFileOverride); the
+   * co-located default is probed in addition, never instead.
+   */
+  grantHmacKeyFileOverride?: string;
 }
 
 interface InFlightElevation {
@@ -136,6 +150,31 @@ export class PrivilegedWindowsExecutionBackend implements ExecutionBackend {
           `privileged backend only accepts ELEVATED actions; ${action.action.requiredPrivilege} actions must run on the unprivileged surface`,
           'PRIVILEGE_LEVEL_MISMATCH',
         );
+      }
+
+      // P2-2 / N-R2-4: interim fail-closed default for the open C06
+      // architecture — no privileged side effect under anchors a same-user
+      // attacker could have forged. Read-only (R0) observations are untouched;
+      // deployments that externalize the HMAC key to a genuinely protected
+      // path keep working (the probes reflect what the OS actually enforces
+      // for this token). This refusal happens BEFORE any UAC work: no consent
+      // is ever requested, so no elevated effect can occur. The readable-key
+      // re-sign attack is NOT this gate's trigger — it stays the known-open
+      // C06 defect for the L2 v0.2 privileged writer (see anchor-protection.ts).
+      if (action.action.sideEffectClass !== 'R0') {
+        const anchors = assessAuthorityAnchors(
+          this.options.authorityDir,
+          resolveGrantHmacKeyFile(
+            this.options.authorityDir,
+            grantHmacKeyFileOverride() ?? this.options.grantHmacKeyFileOverride,
+          ),
+        );
+        if (anchors.forgeable) {
+          return await launchRefused(
+            `authorization anchors are same-user-writable (interim fail-closed default while the privileged writer architecture is open): ${anchors.reasons.join('; ')}`,
+            'ANCHOR_FORGEABLE_SAME_USER',
+          );
+        }
       }
 
       // ---- launch-side pin verification (the helper re-checks its own). ----
@@ -448,7 +487,10 @@ type RelayResult = {
   timedOut?: boolean;
 };
 
-async function spawnRelay(params: {
+// Exported for the N-R2-1 negative controls (test/evidence tooling): the
+// privileged-path relay spawn must demonstrably carry a sterilized
+// environment. Security callers still enter through PrivilegedWindowsExecutionBackend.
+export async function spawnRelay(params: {
   powershellExe: string;
   taskkillExe: string;
   nodeExe: string;
@@ -460,6 +502,11 @@ async function spawnRelay(params: {
   onRelayPid?: (pid: number) => void;
 }): Promise<RelayResult> {
   const helperArgsJson = JSON.stringify(params.helperArgs);
+  // N-R2-1: the relay host is the spawn UAC consents FOR — an inherited
+  // NODE_OPTIONS here becomes attacker JS inside the pinned elevated node
+  // before any self-check. Both spawns below (relay + tree-kill) pass the
+  // explicit minimal environment; the pinned relay re-scrubs on top.
+  const sterileEnv = privilegedSpawnEnv();
   const child = spawn(
     params.powershellExe,
     [
@@ -478,7 +525,7 @@ async function spawnRelay(params: {
       '-RelayFile',
       params.relayFile,
     ],
-    { shell: false, windowsHide: true },
+    { shell: false, windowsHide: true, env: sterileEnv },
   );
   params.onRelayPid?.(child.pid ?? -1);
   return new Promise((resolve) => {
@@ -492,6 +539,7 @@ async function spawnRelay(params: {
         spawn(params.taskkillExe, ['/PID', String(child.pid), '/T', '/F'], {
           shell: false,
           windowsHide: true,
+          env: sterileEnv,
         });
       }
     }, params.timeoutMs);

@@ -1,0 +1,129 @@
+// Interim fail-closed default for the C06 open architecture (N-R2-4, P2).
+//
+// The architecture terminal (SHUN_T04_C06_PROTECTED_TRUST_PRINCIPAL_
+// ARCHITECTURE_R0, adjudicated by the Controller) requires that privileged
+// side effects are REFUSED while the authorization anchors live on paths the
+// same-user attacker can write — the default co-located deployment — instead
+// of executing elevated effects under an anchor the attacker could have
+// forged. Deployments that externalize the HMAC key to a genuinely protected
+// path (and keep the store records out of same-user reach) keep working.
+//
+// Detection is a REAL access probe, not ACL theater: the guard attempts the
+// actual same-user write (create/delete inside directories, open-for-write
+// on files) and trusts only what the OS currently enforces for this token.
+// Every probe error fails CLOSED (treated as forgeable). The writability
+// trigger is exactly the adjudicated interim default; the readable-key
+// re-sign attack remains the known-open C06 defect (the it.fails record)
+// because under frozen HMAC any verifying principal is also a signing
+// principal — that closure belongs to the L2 v0.2 privileged writer, not to
+// this interim gate.
+//
+// Enforcement point (honest boundary): the launcher — the process that owns
+// the UAC decision. A refusal here means no UAC consent is ever requested,
+// so no elevated effect can occur. The elevated helper cannot mirror this
+// check faithfully: its probes would run with the ADMIN token (over-reporting
+// access) and a filtered-token view would need linked-token machinery that
+// does not exist in this package; helper-side refusal semantics stay with the
+// writer architecture.
+import { closeSync, mkdirSync, openSync, rmSync, unlinkSync, writeFileSync } from 'node:fs';
+import { join } from 'node:path';
+import { resolveGrantHmacKeyFile } from './trusted-store.ts';
+
+export interface AnchorAssessment {
+  /** true = at least one trust anchor is same-user-writable (or a probe failed). */
+  forgeable: boolean;
+  reasons: string[];
+}
+
+/** Record files whose content the attacker could rewrite to forge the chain. */
+const ANCHOR_RECORD_FILES = [
+  'current-authority.json',
+  'helper-pin.json',
+  'system-tools-pin.json',
+] as const;
+
+/** Record directories the attacker could add/replace records in. */
+const ANCHOR_RECORD_DIRS = ['grants', 'plans'] as const;
+
+function fileWritable(path: string): boolean | undefined {
+  // undefined = probe failed ⇒ callers must fail closed.
+  try {
+    const fd = openSync(path, 'r+');
+    closeSync(fd);
+    return true;
+  } catch (e) {
+    const code = (e as NodeJS.ErrnoException).code;
+    if (code === 'ENOENT') return false;
+    if (code === 'EACCES' || code === 'EPERM') return false;
+    return undefined;
+  }
+}
+
+function dirWritable(path: string): boolean | undefined {
+  const probe = join(
+    path,
+    `.shun-anchor-probe-${process.pid}-${Math.random().toString(36).slice(2)}`,
+  );
+  try {
+    mkdirSync(path, { recursive: false });
+    // Freshly creatable directory — attacker-equivalent create access.
+    try {
+      rmSync(path);
+    } catch {
+      // Creation is the forgeability signal; leave cleanup to the caller.
+    }
+    return true;
+  } catch (e) {
+    const code = (e as NodeJS.ErrnoException).code;
+    if (code === 'EACCES' || code === 'EPERM') return false;
+    if (code !== 'EEXIST') return undefined;
+  }
+  try {
+    writeFileSync(probe, '', { flag: 'wx' });
+    try {
+      unlinkSync(probe);
+    } catch {
+      // Created but not deletable — write access was still demonstrated.
+    }
+    return true;
+  } catch (e) {
+    const code = (e as NodeJS.ErrnoException).code;
+    if (code === 'EACCES' || code === 'EPERM') return false;
+    return undefined;
+  }
+}
+
+/**
+ * Assess whether the authority store's trust chain is forgeable by a
+ * same-user attacker. `hmacKeyFile` is the RESOLVED key path (the caller
+ * resolves the co-located default and any externalized override it trusts —
+ * resolveGrantHmacKeyFile); when omitted the co-located default is probed.
+ */
+export function assessAuthorityAnchors(
+  authorityDir: string,
+  hmacKeyFile: string = resolveGrantHmacKeyFile(authorityDir),
+): AnchorAssessment {
+  const reasons: string[] = [];
+  const note = (what: string, writable: boolean | undefined): void => {
+    if (writable !== false) {
+      reasons.push(
+        writable === true
+          ? `${what} is same-user-writable`
+          : `${what} writability probe failed (fail closed)`,
+      );
+    }
+  };
+
+  // The store root itself: whoever can create files here can replace every
+  // record regardless of the individual files' state.
+  note(`authority store root ${authorityDir}`, dirWritable(authorityDir));
+  for (const dir of ANCHOR_RECORD_DIRS) {
+    note(`${dir}/ record directory`, dirWritable(join(authorityDir, dir)));
+  }
+  for (const file of ANCHOR_RECORD_FILES) {
+    note(file, fileWritable(join(authorityDir, file)));
+  }
+  note('grant-hmac key', fileWritable(hmacKeyFile));
+
+  return { forgeable: reasons.length > 0, reasons };
+}
