@@ -5,9 +5,9 @@
 import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { readWriterPin, sha256File } from '../trusted-store.ts';
 import { applyWriterJob, verifyWriterIdentity } from './apply.ts';
 import { WriterJobSchema } from './job.ts';
-import { readWriterPin, sha256File } from '../trusted-store.ts';
 
 declare const SHUN_ANCHOR_WRITER_ROOT: string | undefined;
 declare const SHUN_ANCHOR_WRITER_HMAC_KEY_FILE: string | undefined;
@@ -28,8 +28,12 @@ function protectedReceiptPath(root: string, jobId: string): string {
 }
 
 function main(): never {
-  if (process.argv.length !== 3) {
-    return emitAndExit({ ok: false, code: 'USAGE', reason: 'expected exactly one signed job file' }, 2);
+  const jobFile = process.argv.at(2);
+  if (process.argv.length !== 3 || !jobFile) {
+    return emitAndExit(
+      { ok: false, code: 'USAGE', reason: 'expected exactly one signed job file' },
+      2,
+    );
   }
 
   const anchorRoot = builtPath(
@@ -77,7 +81,7 @@ function main(): never {
   try {
     key = readFileSync(keyFile, 'utf8').trim();
     if (!key) throw new Error('empty HMAC key');
-    raw = JSON.parse(readFileSync(process.argv[2]!, 'utf8')) as unknown;
+    raw = JSON.parse(readFileSync(jobFile, 'utf8')) as unknown;
   } catch (error) {
     return emitAndExit(
       { ok: false, code: 'INPUT_UNREADABLE', reason: `writer input unavailable: ${String(error)}` },
@@ -101,7 +105,7 @@ function main(): never {
       writeFileSync(
         protectedReceiptPath(anchorRoot, parsed.data.jobId),
         `${JSON.stringify(receipt, null, 2)}\n`,
-        { encoding: 'utf8', flag: 'wx' },
+        { encoding: 'utf8' },
       );
     } catch (error) {
       return emitAndExit(
