@@ -7,7 +7,7 @@
 // Per-input problems become explicit REJECTED records; original inputs are
 // never modified and failed outputs are removed again.
 import { readdirSync } from 'node:fs';
-import { mkdir, mkdtemp, readFile, rm } from 'node:fs/promises';
+import { lstat, mkdir, mkdtemp, readFile, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { basename, dirname, join, resolve } from 'node:path';
 import {
@@ -261,6 +261,33 @@ export async function runImageBatchProcess(
 const SENTINEL_MISSING: Sha256Hex =
   'ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff';
 
+/**
+ * Filesystem identity of a path, captured without following links. Cleanup is
+ * only allowed on a path whose live identity still matches the captured one —
+ * the executor never unlinks a file a provider (or a racing actor) created
+ * outside its own verified write.
+ */
+interface FileIdentity {
+  dev: number;
+  ino: number;
+}
+
+async function captureIdentity(path: string): Promise<FileIdentity> {
+  const stat = await lstat(path);
+  return { dev: stat.dev, ino: stat.ino };
+}
+
+async function removeIfIdentityMatches(path: string, identity: FileIdentity): Promise<void> {
+  try {
+    if (await captureIdentity(path).then((live) => live.dev === identity.dev && live.ino === identity.ino)) {
+      await rm(path, { force: true });
+    }
+  } catch {
+    // Vanished (or unreadable) between capture and cleanup: nothing of ours to
+    // remove, and never the caller's business to force it.
+  }
+}
+
 async function executeOne(
   inputPath: string,
   bytes: Buffer,
@@ -271,6 +298,10 @@ async function executeOne(
   records: BatchRecord[],
   diagnostics: Record<string, string>,
 ): Promise<void> {
+  // Ownership is only established after the provider reports success AND the
+  // file's identity at the target is captured; everything the executor removes
+  // must be that same file.
+  let owned: FileIdentity | null = null;
   try {
     const facts = await inspectBytes(bytes).catch((cause: unknown) => {
       throw new ImageProviderError(
@@ -281,20 +312,21 @@ async function executeOne(
     });
     const targetDims = scaledDims(facts.width, facts.height, maxLongEdgePx);
     await provider.resizeTo({ bytes, declaredFormat: format, targetDims, targetPath });
+    owned = await captureIdentity(targetPath);
     // Post-write self-check against the file actually on disk.
     const outputFacts = await inspectBytes(await readFile(targetPath));
     const dimsOk =
       outputFacts.width === targetDims.width && outputFacts.height === targetDims.height;
     const dateOk = facts.captureDate === null || outputFacts.captureDate === facts.captureDate;
     if (!dimsOk) {
-      await rm(targetPath, { force: true });
+      await removeIfIdentityMatches(targetPath, owned);
       records.push(reject(inputPath, 'OUTPUT_VERIFY_FAILED'));
       diagnostics[inputPath] =
         `written dims ${outputFacts.width}x${outputFacts.height} != target ${targetDims.width}x${targetDims.height}`;
       return;
     }
     if (!dateOk) {
-      await rm(targetPath, { force: true });
+      await removeIfIdentityMatches(targetPath, owned);
       records.push(reject(inputPath, 'METADATA_LOST'));
       diagnostics[inputPath] = `capture date "${facts.captureDate}" lost on write`;
       return;
@@ -311,7 +343,11 @@ async function executeOne(
         ? (cause as { code: ImageBatchFailure }).code
         : 'OUTPUT_VERIFY_FAILED';
     diagnostics[inputPath] = cause instanceof Error ? cause.message : String(cause);
-    await rm(targetPath, { force: true });
+    // A provider that threw may have collided with (or raced) a file it did
+    // not create — only ever clean up a path whose identity we verified.
+    if (owned) {
+      await removeIfIdentityMatches(targetPath, owned);
+    }
     records.push(reject(inputPath, code));
   }
 }
