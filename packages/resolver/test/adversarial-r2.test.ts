@@ -233,7 +233,9 @@ describe('R2 blocker 2 — LOCAL planner provenance is bound only at the trusted
     // PlannerPort — the private brand proved only that the wrapper ran, not
     // that the planner is local. Minting now requires the composition-root
     // provenance declaration.
-    const planner = spyPlanner(validProposal(goalRequest({ goal: 'make my vacation photos smaller please' })));
+    const planner = spyPlanner(
+      validProposal(goalRequest({ goal: 'make my vacation photos smaller please' })),
+    );
     expect(() => localPlannerAdapter(planner)).toThrow(/local provenance/);
     expect(planner.calls).toBe(0);
   });
@@ -279,9 +281,9 @@ describe('R2 blocker 3 — mandatory descriptive constraints never PASS unevalua
 
   it('a resource-limited goal cannot select a binding end-to-end', async () => {
     const snapshot = baseSnapshot();
-    const registry = ShunRegistry.fromSnapshot(snapshot, {
-      authorityRevision: snapshotFactsRevision(snapshot),
-    } as unknown as Parameters<typeof ShunRegistry.fromSnapshot>[1]);
+    const registry = await ShunRegistry.fromAttestedSnapshot(snapshot, {
+      currentnessAuthority: authorityFor(snapshot),
+    });
     const request = goalRequest({ goal: 'image.batch_process: batch resize my photos offline' });
     request.constraints.other = { offline: true };
     request.constraints.resourceLimits = 'keep under 2 GB disk';

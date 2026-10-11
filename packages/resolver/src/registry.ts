@@ -15,6 +15,12 @@
 //
 // R1 (review blocker 2): validated facts are deeply frozen at construction —
 // an attested registry can no longer be mutated after attestation.
+//
+// R2 (fresh review blocker 1): synchronous self-attestation is impossible —
+// fromSnapshot accepts no attestation input at all (a caller-computed revision
+// is self-attestation; a pre-attestation flag is a bypass), and the only
+// attested snapshot path is fromAttestedSnapshot, which compares the snapshot
+// against a trusted RegistryCurrentnessAuthority's CURRENT revision.
 import { createHash } from 'node:crypto';
 import {
   type CapabilityDefinition,
@@ -102,17 +108,15 @@ export interface RegistryOptions {
    * registry is data-driven, so a curated registry may register the
    * vocabulary of capabilities it ships (e.g. benchmark fixture
    * capabilities). Entries extend, never silently replace, the built-ins.
+   *
+   * R2 (review blocker 1): this is the ONLY synchronous-snapshot option.
+   * There is no caller-supplied attestation input of any kind — a revision
+   * string the caller computes or asserts is self-attestation, and a boolean
+   * pre-attestation flag is a bypass. A snapshot attests exclusively through
+   * {@link ShunRegistry.fromAttestedSnapshot} against a trusted
+   * {@link RegistryCurrentnessAuthority}.
    */
   additionalObjectiveMatchers?: ObjectiveMatcherTable;
-  /**
-   * Source-issued revision of the trusted registry authority for the
-   * synchronous snapshot path (P1-06, R1). Present and binding to the exact
-   * snapshot facts → currentness-attested; present but NOT binding → the
-   * snapshot is stale or was altered and construction fails closed; absent →
-   * the snapshot is a local view with unverifiable currentness and resolution
-   * fails closed (REGISTRY_CURRENTNESS_INSUFFICIENT).
-   */
-  authorityRevision?: string;
 }
 
 export interface RegistryFromPortOptions extends RegistryOptions {
@@ -176,70 +180,22 @@ export class ShunRegistry {
       port.observedFacts(),
     ]);
     const snapshot: RegistrySnapshot = { capabilities, providers, bindings, environment };
-    // Currentness attestation (P1-06, R1): compare the collected facts against
-    // the authority's CURRENT revision. A content match with an outdated
-    // revision (stale-but-self-consistent snapshot) does not attest.
-    let attested = false;
-    let note: string;
-    if (options?.currentnessAuthority !== undefined) {
-      try {
-        const authorityRevision = await options.currentnessAuthority.currentRevision();
-        const collectedRevision = snapshotFactsRevision(snapshot);
-        attested = authorityRevision === collectedRevision;
-        note = attested
-          ? `the trusted registry authority confirms revision ${authorityRevision} is current for the collected facts`
-          : `the trusted registry authority serves revision ${authorityRevision}, which does not bind the collected facts (${collectedRevision}) — reads-between-changed: the collection is stale`;
-      } catch (error) {
-        note = `the trusted registry currentness authority could not be consulted: ${
-          error instanceof Error ? error.message : String(error)
-        }`;
-      }
-    } else {
-      note =
-        'snapshot collected through sequential async reads without a trusted currentness authority — no source-issued revision binds the collected facts';
-    }
-    return ShunRegistry.fromSnapshot(snapshot, {
-      additionalObjectiveMatchers: options?.additionalObjectiveMatchers,
-      // Sequential async reads are only currentness-attested when the trusted
-      // authority's current revision binds the collected facts (P1-06, R1).
-      asyncCollectionAttested: attested,
-      asyncCollectionNote: note,
-    });
+    // Currentness attestation (P1-06, R1; R2 blocker 1): the collected facts
+    // attest only against the trusted authority's CURRENT revision, through
+    // the same trusted path as an explicitly held snapshot.
+    return ShunRegistry.fromAttestedSnapshot(snapshot, options);
   }
 
-  /** Synchronous construction from already-collected facts (tests, callers holding a snapshot). */
-  static fromSnapshot(
-    snapshot: RegistrySnapshot,
-    options?: RegistryOptions & {
-      /** Internal: attestation pre-verified by the async port path. */
-      asyncCollectionAttested?: boolean;
-      /** Internal: audit note from the async port path. */
-      asyncCollectionNote?: string;
-    },
-  ): ShunRegistry {
-    // Authority revision binding (P1-06, R1): a provided source-issued
-    // revision that does not bind to THESE facts proves the snapshot is stale
-    // or was altered — fail closed at construction. Without any authority
-    // revision the snapshot is a local view: it is NOT attested by default and
-    // resolution fails closed.
-    let attested: boolean;
-    let note: string;
-    const collectedRevision = snapshotFactsRevision(snapshot);
-    if (options?.authorityRevision !== undefined) {
-      if (options.authorityRevision !== collectedRevision) {
-        throw new ShunContractError(
-          'SCHEMA_VIOLATION',
-          `registry snapshot is not the revision the trusted authority issued (source-issued ${options.authorityRevision}, snapshot binds ${collectedRevision}) — the snapshot is stale or was altered; fail closed`,
-        );
-      }
-      attested = true;
-      note = `snapshot binds the source-issued authority revision ${options.authorityRevision}`;
-    } else {
-      attested = options?.asyncCollectionAttested ?? false;
-      note =
-        options?.asyncCollectionNote ??
-        'synchronous snapshot not bound to a trusted registry currentness authority — no source-issued revision proves these facts current';
-    }
+  /**
+   * Synchronous construction from already-collected facts (tests, callers
+   * holding a snapshot). R2 (review blocker 1): a synchronous snapshot is
+   * ALWAYS a local view — there is no caller-supplied attestation input
+   * (revision string or pre-attestation flag), because a caller-computed
+   * revision is self-attestation. Resolution over it fails closed with
+   * REGISTRY_CURRENTNESS_INSUFFICIENT; attest through
+   * {@link ShunRegistry.fromAttestedSnapshot} instead.
+   */
+  static fromSnapshot(snapshot: RegistrySnapshot, options?: RegistryOptions): ShunRegistry {
     // Identity uniqueness fails closed (P1-05): one stable identity must
     // designate exactly one fact. A duplicate capabilityId/providerId would
     // silently overwrite its predecessor here, and a duplicate bindingId
@@ -302,6 +258,59 @@ export class ShunRegistry {
       bindingsByCapability,
       environment,
       matchers,
+      // R2 (review blocker 1): an unattested local view by construction — no
+      // caller-supplied input can flip this.
+      false,
+      'synchronous snapshot not bound to a trusted registry currentness authority — no source-issued revision proves these facts current',
+    );
+  }
+
+  /**
+   * Trusted snapshot attestation (R2, review blocker 1): the ONLY way a
+   * synchronously-held snapshot becomes currentness-attested. The computed
+   * content revision of the exact snapshot facts is compared against the
+   * trusted authority's CURRENT revision — attestation is always a comparison
+   * against live authority state, so a stale-but-self-consistent snapshot
+   * (or one altered after collection) never attests, and an unreachable
+   * authority leaves the registry unattested. The trust anchor is the wiring
+   * of the authority: the integration layer injects it exactly like the
+   * RegistryReadModelPort itself.
+   */
+  static async fromAttestedSnapshot(
+    snapshot: RegistrySnapshot,
+    options?: RegistryFromPortOptions,
+  ): Promise<ShunRegistry> {
+    let attested = false;
+    let note: string;
+    if (options?.currentnessAuthority !== undefined) {
+      try {
+        const authorityRevision = await options.currentnessAuthority.currentRevision();
+        const collectedRevision = snapshotFactsRevision(snapshot);
+        attested = authorityRevision === collectedRevision;
+        note = attested
+          ? `the trusted registry authority confirms revision ${authorityRevision} is current for the collected facts`
+          : `the trusted registry authority serves revision ${authorityRevision}, which does not bind the collected facts (${collectedRevision}) — reads-between-changed: the collection is stale or was altered`;
+      } catch (error) {
+        note = `the trusted registry currentness authority could not be consulted: ${
+          error instanceof Error ? error.message : String(error)
+        }`;
+      }
+    } else {
+      note =
+        'no trusted registry currentness authority provided — attestation requires a comparison against the authority’s current revision, not a caller-asserted one';
+    }
+    const registry = ShunRegistry.fromSnapshot(snapshot, {
+      additionalObjectiveMatchers: options?.additionalObjectiveMatchers,
+    });
+    // Re-wrap with the computed attestation state: fromSnapshot always builds
+    // the unattested local view; this method owns the trusted attestation
+    // verdict derived from the authority comparison above.
+    return new ShunRegistry(
+      registry.capabilities,
+      registry.providers,
+      registry.bindingsByCapability,
+      registry.environment,
+      registry.matchers,
       attested,
       note,
     );

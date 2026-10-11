@@ -237,10 +237,14 @@ describe('trusted currentness authority seam (P1-06, R1 blocker 1)', () => {
     expect(result.record.failureDisposition?.failureCode).toBe('REGISTRY_CURRENTNESS_INSUFFICIENT');
   });
 
-  it('a matching source-issued authorityRevision attests a synchronous snapshot and resolution proceeds', () => {
+  it('a trusted authority confirming the collected facts attests a synchronous snapshot and resolution proceeds (R2 — trusted path replaces the removed self-attestation option)', async () => {
+    // Premise migrated (R2 review blocker 1): the R1
+    // `fromSnapshot(snapshot, {authorityRevision: <caller-computed>})` form
+    // was self-attestation and is gone. A snapshot attests only through
+    // fromAttestedSnapshot against the trusted authority's CURRENT revision.
     const snapshot = baseSnapshot();
-    const registry = ShunRegistry.fromSnapshot(snapshot, {
-      authorityRevision: snapshotFactsRevision(snapshot),
+    const registry = await ShunRegistry.fromAttestedSnapshot(snapshot, {
+      currentnessAuthority: authorityFor(snapshot),
     });
     expect(registry.currentnessAttested).toBe(true);
     const result = resolveGoal({
@@ -253,33 +257,40 @@ describe('trusted currentness authority seam (P1-06, R1 blocker 1)', () => {
     expect(result.record.selectedBindingId).toBe('b-im');
   });
 
-  it('stale snapshot: facts mutated after the authority issued its revision are rejected by fromSnapshot', () => {
+  it('stale snapshot: facts mutated after the authority confirmed the original facts are no longer attested (R2)', () => {
+    // Premise migrated (R2 review blocker 1): the R1 form threw at
+    // construction on a caller-passed revision mismatch. Under the trusted
+    // path the mismatch is a currentness verdict: the mutated snapshot never
+    // attests and resolution fails closed (see the stale-A/current-B
+    // regression in adversarial-r2.test.ts for the end-to-end form).
     const snapshot = baseSnapshot();
     const issued = snapshotFactsRevision(snapshot);
     snapshot.environment = { ...snapshot.environment, networkPolicy: 'OPEN' };
-    expect(() => ShunRegistry.fromSnapshot(snapshot, { authorityRevision: issued })).toThrow(
-      ShunContractError,
-    );
-    expect(() => ShunRegistry.fromSnapshot(snapshot, { authorityRevision: issued })).toThrow(
-      /stale or was altered/,
-    );
+    // Content mutation changes the exact revision the facts bind — and no
+    // caller-supplied revision string can attest the mutated snapshot anyway.
+    expect(snapshotFactsRevision(snapshot)).not.toBe(issued);
+    const registry = ShunRegistry.fromSnapshot(snapshot);
+    expect(registry.currentnessAttested).toBe(false);
+    expect(registry.currentnessExplanation).toContain('currentness authority');
   });
 });
 
 describe('attested registry facts are immutable after construction (R1 blocker 2)', () => {
-  function attestedRegistry(snapshot: RegistrySnapshot): ShunRegistry {
-    return ShunRegistry.fromSnapshot(snapshot, {
-      authorityRevision: snapshotFactsRevision(snapshot),
+  async function attestedRegistry(snapshot: RegistrySnapshot): Promise<ShunRegistry> {
+    // R2 (review blocker 1): attestation goes through the trusted authority
+    // comparison — the self-computed authorityRevision option is removed.
+    return ShunRegistry.fromAttestedSnapshot(snapshot, {
+      currentnessAuthority: authorityFor(snapshot),
     });
   }
 
-  it('the review counterexample: a post-construction trust upgrade is refused — resolution still fails the provider closed', () => {
+  it('the review counterexample: a post-construction trust upgrade is refused — resolution still fails the provider closed', async () => {
     const snapshot = baseSnapshot();
     snapshot.providers[0] = providerDef({
       providerId: 'imageProvider.imagemagick',
       provenanceFacts: { trustState: 'UNKNOWN', formatSupport: ['JPG'] },
     });
-    const registry = attestedRegistry(snapshot);
+    const registry = await attestedRegistry(snapshot);
     const provider = registry.provider('imageProvider.imagemagick');
     expect(provider?.provenanceFacts.trustState).toBe('UNKNOWN');
     expect(() => {
@@ -300,13 +311,13 @@ describe('attested registry facts are immutable after construction (R1 blocker 2
     expect(result.record.failureDisposition?.failureCode).toBe('NO_TRUSTED_PROVIDER');
   });
 
-  it('observed environment facts, bindings and capability policy declarations are equally frozen', () => {
+  it('observed environment facts, bindings and capability policy declarations are equally frozen', async () => {
     const snapshot = baseSnapshot();
     snapshot.capabilities[0] = capabilityDef({
       capabilityId: 'image.batch_process',
       requiredPolicyFacts: ['userApprovedDelete'],
     });
-    const registry = attestedRegistry(snapshot);
+    const registry = await attestedRegistry(snapshot);
     expect(() => {
       (registry.observedEnvironment() as { observationRevision: string }).observationRevision =
         'obs-forged';

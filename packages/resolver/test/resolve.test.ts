@@ -41,7 +41,7 @@ import {
   requirements,
 } from './scenarios.ts';
 
-function registryOf(parts: {
+async function registryOf(parts: {
   capabilities?: ReturnType<typeof capabilityDef>[];
   providers?: ReturnType<typeof providerDef>[];
   bindings?: ReturnType<typeof bindingDef>[];
@@ -54,12 +54,13 @@ function registryOf(parts: {
     bindings: parts.bindings ?? [],
     environment: parts.env ?? ENV_LOCAL,
   };
-  return ShunRegistry.fromSnapshot(snapshot, {
+  // R2 (review blocker 1): attestation is a comparison against a trusted
+  // currentness authority's CURRENT revision — the harness authority stands
+  // in for the trusted integration wiring; a caller-computed revision string
+  // is no longer an accepted attestation input.
+  return ShunRegistry.fromAttestedSnapshot(snapshot, {
     additionalObjectiveMatchers: parts.additionalObjectiveMatchers,
-    // R1 (review blocker 1): resolution only runs over currentness-attested
-    // registries — the harness derives the source-issued revision from the
-    // exact assembled facts, standing in for the trusted authority.
-    authorityRevision: snapshotFactsRevision(snapshot),
+    currentnessAuthority: { currentRevision: async () => snapshotFactsRevision(snapshot) },
   });
 }
 
@@ -70,10 +71,10 @@ function resolve(registry: ShunRegistry, scoreFacts?: BindingScoreFacts[]) {
 }
 
 describe('resolution records over scenario registries', () => {
-  it('produces a frozen-contract record with explainable selection on the happy path', () => {
+  it('produces a frozen-contract record with explainable selection on the happy path', async () => {
     const capability = capabilityDef({ capabilityId: 'image.batch_process' });
     const provider = providerDef({ providerId: 'imageProvider.imagemagick' });
-    const registry = registryOf({
+    const registry = await registryOf({
       capabilities: [capability],
       providers: [provider],
       bindings: [
@@ -102,9 +103,9 @@ describe('resolution records over scenario registries', () => {
     expect(record.selectionReasons.join(' ')).toContain('single trusted binding');
   });
 
-  it('B-033: top-1 matches the gold record ranking under batch/offline constraints (synthetic agreement)', () => {
+  it('B-033: top-1 matches the gold record ranking under batch/offline constraints (synthetic agreement)', async () => {
     const gold = goldEvidenceFor('B-033');
-    const result = resolve(b033Registry(), B033_FACTS);
+    const result = resolve(await b033Registry(), B033_FACTS);
     expect(result.stage).toBe('RESOLUTION');
     if (result.stage !== 'RESOLUTION') return;
     const record = result.record;
@@ -114,8 +115,8 @@ describe('resolution records over scenario registries', () => {
     expect(record.selectionReasons.join(' ')).toContain('ranked #1 of 3');
   });
 
-  it('B-033: full resolver order agrees with the gold record order (top-k synthetic agreement)', () => {
-    const registry = b033Registry();
+  it('B-033: full resolver order agrees with the gold record order (top-k synthetic agreement)', async () => {
+    const registry = await b033Registry();
     const gold = goldEvidenceFor('B-033');
     const bindings = registry.bindingsForCapability('image.batch_process');
     const ranked = rankFeasibleBindings({
@@ -125,11 +126,15 @@ describe('resolution records over scenario registries', () => {
     expect(ranked.map((entry) => entry.bindingId)).toEqual([...gold.goldRanking]);
   });
 
-  it('B-034: default policy selects the safer uninstaller and records the explicit escalation reason', () => {
+  it('B-034: default policy selects the safer uninstaller and records the explicit escalation reason', async () => {
     const request = goalRequest({
       goal: 'software.uninstall_safe: uninstall a normal desktop app',
     });
-    const result = resolveGoal({ request, registry: b034Registry(), objectExists: () => true });
+    const result = resolveGoal({
+      request,
+      registry: await b034Registry(),
+      objectExists: () => true,
+    });
     expect(result.stage).toBe('RESOLUTION');
     if (result.stage !== 'RESOLUTION') return;
     const record = result.record;
@@ -146,14 +151,14 @@ describe('resolution records over scenario registries', () => {
     });
   });
 
-  it('B-034: with explicitly acknowledged escalation the stronger tool may win — but only with its upgrade reason surfaced', () => {
+  it('B-034: with explicitly acknowledged escalation the stronger tool may win — but only with its upgrade reason surfaced', async () => {
     const request = goalRequest({
       goal: 'software.uninstall_safe: uninstall a normal desktop app',
     });
     request.constraints.other = { riskEscalationAcknowledged: true };
     const result = resolveGoal({
       request,
-      registry: b034Registry(),
+      registry: await b034Registry(),
       scoreFacts: B034_ACKNOWLEDGED_FACTS,
       objectExists: () => true,
     });
@@ -167,16 +172,16 @@ describe('resolution records over scenario registries', () => {
     );
   });
 
-  it('B-035: a structured CLI provider beats a pretty GUI despite the GUI being more human-friendly (synthetic agreement)', () => {
+  it('B-035: a structured CLI provider beats a pretty GUI despite the GUI being more human-friendly (synthetic agreement)', async () => {
     const gold = goldEvidenceFor('B-035');
-    const result = resolve(b035Registry(), B035_FACTS);
+    const result = resolve(await b035Registry(), B035_FACTS);
     expect(result.stage).toBe('RESOLUTION');
     if (result.stage !== 'RESOLUTION') return;
     expect(result.record.selectedBindingId).toBe(gold.goldRanking[0]);
     expect(result.record.feasibleBindings).toContain('b-pretty');
   });
 
-  it('native-only Loop C: a single trusted native binding is selected directly, without manufactured competition', () => {
+  it('native-only Loop C: a single trusted native binding is selected directly, without manufactured competition', async () => {
     const capability = capabilityDef({
       capabilityId: 'system.storage.diagnose_bounded_action',
       sideEffectClass: 'R0',
@@ -188,7 +193,7 @@ describe('resolution records over scenario registries', () => {
         { interfaceId: 'win-obs', interfaceClass: 'I0', invocation: 'Win32 StorageRelocationAPI' },
       ],
     });
-    const registry = registryOf({
+    const registry = await registryOf({
       capabilities: [capability],
       providers: [native],
       bindings: [
@@ -218,11 +223,11 @@ describe('resolution records over scenario registries', () => {
     expect(record.riskClass).toBe('R0');
   });
 
-  it('local-only privacy makes the network-transferring alternative ineligible while the local one resolves', () => {
+  it('local-only privacy makes the network-transferring alternative ineligible while the local one resolves', async () => {
     const capability = capabilityDef({ capabilityId: 'image.batch_process' });
     const local = providerDef({ providerId: 'imageProvider.localcli' });
     const cloud = providerDef({ providerId: 'imageProvider.cloudsvc' });
-    const registry = registryOf({
+    const registry = await registryOf({
       capabilities: [capability],
       providers: [local, cloud],
       bindings: [
@@ -257,10 +262,10 @@ describe('resolution records over scenario registries', () => {
     expect(record.privacyDisclosurePlan.externalDisclosure).toBe('FORBIDDEN');
   });
 
-  it('no feasible binding yields an explicit NO_FEASIBLE_BINDING failure disposition', () => {
+  it('no feasible binding yields an explicit NO_FEASIBLE_BINDING failure disposition', async () => {
     const capability = capabilityDef({ capabilityId: 'image.batch_process' });
     const provider = providerDef({ providerId: 'imageProvider.armonly' });
-    const registry = registryOf({
+    const registry = await registryOf({
       capabilities: [capability],
       providers: [provider],
       bindings: [
@@ -284,13 +289,13 @@ describe('resolution records over scenario registries', () => {
     });
   });
 
-  it('an all-UNKNOWN candidate set fails closed with NO_TRUSTED_PROVIDER', () => {
+  it('an all-UNKNOWN candidate set fails closed with NO_TRUSTED_PROVIDER', async () => {
     const capability = capabilityDef({ capabilityId: 'image.batch_process' });
     const shady = providerDef({
       providerId: 'imageProvider.shady',
       provenanceFacts: { trustState: 'UNKNOWN' },
     });
-    const registry = registryOf({
+    const registry = await registryOf({
       capabilities: [capability],
       providers: [shady],
       bindings: [
@@ -308,14 +313,14 @@ describe('resolution records over scenario registries', () => {
     expect(result.record.failureDisposition?.failureCode).toBe('NO_TRUSTED_PROVIDER');
   });
 
-  it('untrusted alternatives are rejected while the trusted one resolves (missing alternatives)', () => {
+  it('untrusted alternatives are rejected while the trusted one resolves (missing alternatives)', async () => {
     const capability = capabilityDef({ capabilityId: 'image.batch_process' });
     const trusted = providerDef({ providerId: 'imageProvider.trusted' });
     const untrusted = providerDef({
       providerId: 'imageProvider.untrusted',
       provenanceFacts: { trustState: 'UNTRUSTED' },
     });
-    const registry = registryOf({
+    const registry = await registryOf({
       capabilities: [capability],
       providers: [trusted, untrusted],
       bindings: [
@@ -344,8 +349,8 @@ describe('resolution records over scenario registries', () => {
     expect(trustRow?.outcome).toBe('REJECT');
   });
 
-  it('a capability with zero discovered providers fails with NO_TRUSTED_PROVIDER', () => {
-    const registry = registryOf({
+  it('a capability with zero discovered providers fails with NO_TRUSTED_PROVIDER', async () => {
+    const registry = await registryOf({
       capabilities: [capabilityDef({ capabilityId: 'image.batch_process' })],
     });
     const result = resolve(registry);
@@ -355,8 +360,8 @@ describe('resolution records over scenario registries', () => {
     expect(result.record.failureDisposition?.detail).toContain('no discovered provider');
   });
 
-  it('a binding referencing a missing provider fails closed with REGISTRY_CURRENTNESS_INSUFFICIENT', () => {
-    const registry = registryOf({
+  it('a binding referencing a missing provider fails closed with REGISTRY_CURRENTNESS_INSUFFICIENT', async () => {
+    const registry = await registryOf({
       capabilities: [capabilityDef({ capabilityId: 'image.batch_process' })],
       bindings: [
         bindingDef({
@@ -376,10 +381,10 @@ describe('resolution records over scenario registries', () => {
     expect(record.failureDisposition?.detail).toContain('imageProvider.evaporated');
   });
 
-  it('a policy-blocked candidate set yields POLICY_BLOCKED, not a generic infeasible', () => {
+  it('a policy-blocked candidate set yields POLICY_BLOCKED, not a generic infeasible', async () => {
     const capability = capabilityDef({ capabilityId: 'image.batch_process' });
     const cloud = providerDef({ providerId: 'imageProvider.cloudonly' });
-    const registry = registryOf({
+    const registry = await registryOf({
       capabilities: [capability],
       providers: [cloud],
       bindings: [
@@ -397,13 +402,13 @@ describe('resolution records over scenario registries', () => {
     expect(result.record.failureDisposition?.failureCode).toBe('POLICY_BLOCKED');
   });
 
-  it('a requested format the provider format facts do not cover is policy-blocked with dispositions kept (P1-04)', () => {
+  it('a requested format the provider format facts do not cover is policy-blocked with dispositions kept (P1-04)', async () => {
     const capability = capabilityDef({ capabilityId: 'image.batch_process' });
     const pngOnly = providerDef({
       providerId: 'imageProvider.pngonly',
       provenanceFacts: { trustState: 'TRUSTED', formatSupport: ['PNG'] },
     });
-    const registry = registryOf({
+    const registry = await registryOf({
       capabilities: [capability],
       providers: [pngOnly],
       bindings: [
@@ -431,14 +436,14 @@ describe('resolution records over scenario registries', () => {
     });
   });
 
-  it('resolution is deterministic: identical input produces an identical record', () => {
-    const once = resolve(b033Registry(), B033_FACTS);
-    const twice = resolve(b033Registry(), B033_FACTS);
+  it('resolution is deterministic: identical input produces an identical record', async () => {
+    const once = resolve(await b033Registry(), B033_FACTS);
+    const twice = resolve(await b033Registry(), B033_FACTS);
     expect(once).toEqual(twice);
   });
 
-  it('referenced objects without an observed-object proof source fail closed before resolution (P2-01)', () => {
-    const registry = registryOf({
+  it('referenced objects without an observed-object proof source fail closed before resolution (P2-01)', async () => {
+    const registry = await registryOf({
       capabilities: [capabilityDef({ capabilityId: 'image.batch_process' })],
     });
     const request = goalRequest({ goal: 'image.batch_process: resize photos' });
@@ -455,10 +460,10 @@ describe('resolution records over scenario registries', () => {
     expect(normalization.detail).toContain('observed-object proof source');
   });
 
-  it('an early capability-fit failure is classified NO_FEASIBLE_BINDING, not NO_TRUSTED_PROVIDER (P2-02)', () => {
+  it('an early capability-fit failure is classified NO_FEASIBLE_BINDING, not NO_TRUSTED_PROVIDER (P2-02)', async () => {
     const capability = capabilityDef({ capabilityId: 'image.batch_process', revision: 'r2' });
     const provider = providerDef({ providerId: 'imageProvider.stale' });
-    const registry = registryOf({
+    const registry = await registryOf({
       capabilities: [capability],
       providers: [provider],
       bindings: [
@@ -490,14 +495,14 @@ describe('resolution records over scenario registries', () => {
     });
   });
 
-  it('mixed terminal gates are classified deterministically with an accurate terminal summary (P2-02)', () => {
+  it('mixed terminal gates are classified deterministically with an accurate terminal summary (P2-02)', async () => {
     const capability = capabilityDef({ capabilityId: 'image.batch_process', revision: 'r2' });
     const trusted = providerDef({ providerId: 'imageProvider.stale-trusted' });
     const shady = providerDef({
       providerId: 'imageProvider.shady',
       provenanceFacts: { trustState: 'UNKNOWN' },
     });
-    const registry = registryOf({
+    const registry = await registryOf({
       capabilities: [capability],
       providers: [trusted, shady],
       bindings: [
@@ -527,8 +532,8 @@ describe('resolution records over scenario registries', () => {
     expect(result.record.failureDisposition?.detail).toContain('TRUST_SUPPLY_CHAIN');
   });
 
-  it('an ambiguous goal surfaces the typed normalization outcome, never a record', () => {
-    const registry = registryOf({
+  it('an ambiguous goal surfaces the typed normalization outcome, never a record', async () => {
+    const registry = await registryOf({
       capabilities: [
         capabilityDef({ capabilityId: 'image.batch_process' }),
         capabilityDef({ capabilityId: 'system.storage.diagnose_bounded_action' }),
@@ -553,12 +558,12 @@ describe('resolution records over scenario registries', () => {
 });
 
 describe('R1 fresh-review negatives (end-to-end resolution, Issue #33)', () => {
-  function registryWithBinding(networkAccess: 'REQUIRED' | 'OPTIONAL' | 'FORBIDDEN') {
+  async function registryWithBinding(networkAccess: 'REQUIRED' | 'OPTIONAL' | 'FORBIDDEN') {
     const capability = capabilityDef({ capabilityId: 'image.batch_process' });
     const provider = providerDef({ providerId: 'imageProvider.imagemagick' });
     return {
       capability,
-      registry: registryOf({
+      registry: await registryOf({
         capabilities: [capability],
         providers: [provider],
         bindings: [
@@ -573,7 +578,7 @@ describe('R1 fresh-review negatives (end-to-end resolution, Issue #33)', () => {
     };
   }
 
-  it('a fabricated caller policy fact cannot unlock a capability end-to-end — POLICY_BLOCKED without a trusted evaluator (P1-04 R1)', () => {
+  it('a fabricated caller policy fact cannot unlock a capability end-to-end — POLICY_BLOCKED without a trusted evaluator (P1-04 R1)', async () => {
     // The review counterexample: capability requires userApprovedDelete and
     // the request carries constraints.other = { userApprovedDelete: true }.
     // Without a trusted policy evaluator this must never select a binding.
@@ -582,7 +587,7 @@ describe('R1 fresh-review negatives (end-to-end resolution, Issue #33)', () => {
       requiredPolicyFacts: ['userApprovedDelete'],
     });
     const provider = providerDef({ providerId: 'imageProvider.imagemagick' });
-    const registry = registryOf({
+    const registry = await registryOf({
       capabilities: [capability],
       providers: [provider],
       bindings: [
@@ -606,8 +611,8 @@ describe('R1 fresh-review negatives (end-to-end resolution, Issue #33)', () => {
     expect(policyRow).toMatchObject({ outcome: 'REJECT' });
   });
 
-  it('an offline goal whose only binding is networkAccess OPTIONAL is policy-blocked end-to-end (P1 supplemental R1)', () => {
-    const { registry } = registryWithBinding('OPTIONAL');
+  it('an offline goal whose only binding is networkAccess OPTIONAL is policy-blocked end-to-end (P1 supplemental R1)', async () => {
+    const { registry } = await registryWithBinding('OPTIONAL');
     const request = goalRequest({ goal: 'image.batch_process: resize photos' });
     request.constraints.other = { offline: true };
     request.policyContext.privacyPolicy = { localOnly: false, externalDisclosure: 'ALLOWED' };
@@ -625,8 +630,8 @@ describe('R1 fresh-review negatives (end-to-end resolution, Issue #33)', () => {
     });
   });
 
-  it('an offline goal over an explicitly no-network binding still resolves (P1 supplemental R1 — legitimate scenario stays eligible)', () => {
-    const { registry } = registryWithBinding('FORBIDDEN');
+  it('an offline goal over an explicitly no-network binding still resolves (P1 supplemental R1 — legitimate scenario stays eligible)', async () => {
+    const { registry } = await registryWithBinding('FORBIDDEN');
     const request = goalRequest({ goal: 'image.batch_process: resize photos' });
     request.constraints.other = { offline: true };
     request.policyContext.privacyPolicy = { localOnly: false, externalDisclosure: 'ALLOWED' };

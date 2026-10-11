@@ -3,7 +3,13 @@
 
 import type { GoalProposal, GoalRequest, PlannerPort } from '@shun/contracts';
 import { describe, expect, it } from 'vitest';
-import { type InterpretGoalViaPlannerInput, interpretGoalViaPlanner } from '../src/planner-seam.ts';
+import {
+  declareLocalPlanner,
+  type InterpretGoalViaPlannerInput,
+  interpretGoalViaPlanner,
+  localPlannerAdapter,
+  remotePlannerAdapter,
+} from '../src/planner-seam.ts';
 import { ShunRegistry } from '../src/registry.ts';
 import { bindingDef, capabilityDef, goalRequest, providerDef } from './scenarios.ts';
 
@@ -76,8 +82,7 @@ describe('PlannerPort seam stays proposal-only and policy-bounded', () => {
     const result = await interpretGoalViaPlanner({
       request: request(),
       registry: registry(),
-      planner,
-      transport: 'REMOTE',
+      adapter: remotePlannerAdapter(planner),
     });
     expect(result).toMatchObject({
       status: 'PLANNER_UNAVAILABLE',
@@ -99,8 +104,7 @@ describe('PlannerPort seam stays proposal-only and policy-bounded', () => {
     const result = await interpretGoalViaPlanner({
       request: input,
       registry: registry(),
-      planner: spyPlanner(validProposal(input)),
-      transport: 'LOCAL',
+      adapter: localPlannerAdapter(declareLocalPlanner(spyPlanner(validProposal(input)))),
       objectExists: () => true,
     });
     expect(result.status).toBe('PROPOSAL_ACCEPTED');
@@ -117,8 +121,7 @@ describe('PlannerPort seam stays proposal-only and policy-bounded', () => {
     const result = await interpretGoalViaPlanner({
       request: input,
       registry: registry(),
-      planner: spyPlanner(proposal),
-      transport: 'LOCAL',
+      adapter: localPlannerAdapter(declareLocalPlanner(spyPlanner(proposal))),
       objectExists: () => true,
     });
     expect(result.status).toBe('PROPOSAL_ACCEPTED');
@@ -136,8 +139,7 @@ describe('PlannerPort seam stays proposal-only and policy-bounded', () => {
     const result = await interpretGoalViaPlanner({
       request: input,
       registry: registry(),
-      planner: spyPlanner(proposal),
-      transport: 'LOCAL',
+      adapter: localPlannerAdapter(declareLocalPlanner(spyPlanner(proposal))),
     });
     expect(result).toMatchObject({
       status: 'PROPOSAL_REJECTED',
@@ -152,8 +154,7 @@ describe('PlannerPort seam stays proposal-only and policy-bounded', () => {
     const result = await interpretGoalViaPlanner({
       request: input,
       registry: registry(),
-      planner: spyPlanner(proposal),
-      transport: 'LOCAL',
+      adapter: localPlannerAdapter(declareLocalPlanner(spyPlanner(proposal))),
     });
     expect(result).toMatchObject({
       status: 'PROPOSAL_REJECTED',
@@ -172,8 +173,7 @@ describe('PlannerPort seam stays proposal-only and policy-bounded', () => {
     const result = await interpretGoalViaPlanner({
       request: openRequest,
       registry: registry(),
-      planner: spyPlanner(proposal),
-      transport: 'REMOTE',
+      adapter: remotePlannerAdapter(spyPlanner(proposal)),
     });
     expect(result).toMatchObject({
       status: 'PROPOSAL_REJECTED',
@@ -188,8 +188,7 @@ describe('PlannerPort seam stays proposal-only and policy-bounded', () => {
     const result = await interpretGoalViaPlanner({
       request: input,
       registry: registry(),
-      planner: spyPlanner(malformed),
-      transport: 'LOCAL',
+      adapter: localPlannerAdapter(declareLocalPlanner(spyPlanner(malformed))),
     });
     expect(result).toMatchObject({
       status: 'PROPOSAL_REJECTED',
@@ -207,8 +206,7 @@ describe('PlannerPort seam stays proposal-only and policy-bounded', () => {
     const result = await interpretGoalViaPlanner({
       request: input,
       registry: registry(),
-      planner: failing,
-      transport: 'LOCAL',
+      adapter: localPlannerAdapter(declareLocalPlanner(failing)),
     });
     expect(result).toMatchObject({
       status: 'PROPOSAL_REJECTED',
@@ -262,8 +260,7 @@ describe('PlannerPort seam stays proposal-only and policy-bounded', () => {
     const result = await interpretGoalViaPlanner({
       request: input,
       registry: registry(),
-      planner,
-      transport: 'REMOTE',
+      adapter: remotePlannerAdapter(planner),
     });
     expect(result).toMatchObject({
       status: 'PLANNER_UNAVAILABLE',
@@ -279,8 +276,7 @@ describe('PlannerPort seam stays proposal-only and policy-bounded', () => {
     const result = await interpretGoalViaPlanner({
       request: input,
       registry: registry(),
-      planner: spyPlanner(validProposal(input)),
-      transport: 'LOCAL',
+      adapter: localPlannerAdapter(declareLocalPlanner(spyPlanner(validProposal(input)))),
       objectExists: () => true,
     });
     expect(result.status).toBe('PROPOSAL_ACCEPTED');

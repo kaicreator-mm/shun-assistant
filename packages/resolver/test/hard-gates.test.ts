@@ -368,6 +368,10 @@ describe('hard gates execute before ranking, in frozen order', () => {
       }),
       constraints: requestWithFact.constraints,
       policyFacts: {
+        // R2 (fresh review P2): the evaluator carries its trusted provenance
+        // identity — who issued the verdicts and for which policy revision.
+        evaluatorId: 'policy-authority-primary',
+        policyRevision: 'ps-7',
         evaluate: (factKey) =>
           factKey === 'maxDeleteBytesPerRun'
             ? { status: 'SATISFIED', evidence: 'policy snapshot ps-7 current' }
@@ -544,6 +548,8 @@ describe('R1 fresh-review negatives (hard gates, Issue #33)', () => {
       }),
       constraints: fabricated.constraints,
       policyFacts: {
+        evaluatorId: 'policy-authority-primary',
+        policyRevision: 'ps-7',
         evaluate: (factKey) => ({
           status: 'UNVERIFIABLE',
           reason: `no current observation for ${factKey}`,
@@ -569,6 +575,8 @@ describe('R1 fresh-review negatives (hard gates, Issue #33)', () => {
       }),
       constraints: approving.constraints,
       policyFacts: {
+        evaluatorId: 'policy-authority-primary',
+        policyRevision: 'ps-7',
         evaluate: () => ({ status: 'UNSATISFIED', reason: 'approval ap-1 was revoked' }),
       },
     });

@@ -116,6 +116,12 @@ export interface BindingGateOutcome {
  * requester supplies is a claim, not proof. The integration layer injects an
  * evaluator backed by the trusted policy source; where the evaluator cannot
  * verify a required fact, the gate fails closed.
+ *
+ * R2 (fresh review P2): the evaluator carries a provenance identity — who
+ * issued the verdicts (evaluatorId, the composition-root wiring) and for
+ * which policy-state revision (policyRevision, currentness). The composition
+ * layer owns both; the resolver records them in the gate evidence so a PASS
+ * is auditable instead of resting on an anonymous callable.
  */
 export type PolicyFactVerdict =
   | { status: 'SATISFIED'; evidence: string }
@@ -123,6 +129,10 @@ export type PolicyFactVerdict =
   | { status: 'UNVERIFIABLE'; reason: string };
 
 export interface PolicyFactEvaluator {
+  /** Stable identity of the trusted evaluator wiring (composition root). */
+  readonly evaluatorId: string;
+  /** Policy-state revision the evaluator's verdicts are current for. */
+  readonly policyRevision: string;
   /** Evaluate one capability-required policy fact key against the trusted current policy state. */
   evaluate(factKey: string): PolicyFactVerdict;
 }
@@ -139,6 +149,29 @@ export interface GateContext {
    * constraints is not verification.
    */
   policyFacts?: PolicyFactEvaluator;
+}
+
+/**
+ * Evaluate one required policy fact through a provenance-identified trusted
+ * evaluator (R2, fresh review P2). A verdict is returned only when the
+ * evaluator exists AND carries a non-empty provenance identity — an anonymous
+ * callable is not a trusted authority. The identity strings are returned for
+ * gate-evidence recording.
+ */
+function evaluateWithProvenance(
+  evaluator: PolicyFactEvaluator | undefined,
+  factKey: string,
+): { verdict?: PolicyFactVerdict; evaluatorId: string; policyRevision: string } {
+  if (evaluator === undefined) {
+    return { evaluatorId: '', policyRevision: '' };
+  }
+  const evaluatorId = typeof evaluator.evaluatorId === 'string' ? evaluator.evaluatorId.trim() : '';
+  const policyRevision =
+    typeof evaluator.policyRevision === 'string' ? evaluator.policyRevision.trim() : '';
+  if (evaluatorId.length === 0 || policyRevision.length === 0) {
+    return { evaluatorId, policyRevision };
+  }
+  return { verdict: evaluator.evaluate(factKey), evaluatorId, policyRevision };
 }
 
 function disposition(
@@ -313,17 +346,23 @@ export function runHardGates(
   // Capability-required policy facts (P1-04, R1): requiredPolicyFacts are
   // CURRENT facts owned by a policy authority. They are evaluated exclusively
   // through the trusted evaluator — key presence (or any value) in the
-  // caller-supplied constraints is never proof. Where no evaluator is
-  // configured, or the verdict is UNSATISFIED/UNVERIFIABLE, the gate fails
-  // closed.
+  // caller-supplied constraints is never proof. R2 (fresh review P2): the
+  // evaluator itself must carry a provenance identity (evaluatorId +
+  // policyRevision); an anonymous callable is not a trusted authority and
+  // fails closed. Where no evaluator is configured, the identity is missing,
+  // or the verdict is UNSATISFIED/UNVERIFIABLE, the gate fails closed.
   for (const factKey of context.capability.requiredPolicyFacts) {
-    const verdict = context.policyFacts?.evaluate(factKey);
-    if (verdict?.status === 'SATISFIED') {
+    const evaluation = evaluateWithProvenance(context.policyFacts, factKey);
+    if (evaluation.verdict?.status === 'SATISFIED') {
       policyNotes.push(
-        `policy fact "${factKey}" verified current by the trusted policy evaluator (${verdict.evidence})`,
+        `policy fact "${factKey}" verified by trusted policy evaluator "${evaluation.evaluatorId}" at policy revision "${evaluation.policyRevision}" (${evaluation.verdict.evidence})`,
       );
     } else {
-      const detail = verdict ? verdict.reason : 'no trusted policy fact evaluator is configured';
+      const detail = evaluation.verdict
+        ? evaluation.verdict.reason
+        : context.policyFacts === undefined
+          ? 'no trusted policy fact evaluator is configured'
+          : 'the configured policy evaluator carries no trusted provenance identity (evaluatorId / policyRevision)';
       policyProblems.push(
         `capability requires policy fact "${factKey}" current per trusted policy authority — ${detail}; caller-provided constraint values are not verification — fail closed`,
       );
@@ -372,11 +411,16 @@ export function runHardGates(
     }
   }
 
-  // Descriptive constraints (P1-04, R1): these remain descriptive at the
-  // frozen contract layer (no curated fact class can evaluate them at resolver
-  // v0.1). They receive an explicit deterministic disposition in the gate
-  // reason — surfaced, carried to downstream verification, and never silently
-  // certified here.
+  // Descriptive constraints (P1-04, R1; tightened R2 review blocker 3): the
+  // frozen contract layer carries these as descriptive strings and no curated
+  // fact class can evaluate them at resolver v0.1. The R1 record surfaced
+  // them as a PASS note and allowed selection — a free-text disclaimer is NOT
+  // a typed unresolved mandatory condition (frozen Product resolver v0.1
+  // requires necessary user constraints before ranking; C-000 lists
+  // resource/time and retain/remove constraints). A present descriptive
+  // constraint therefore REJECTs the binding: when the frozen schema lacks
+  // the proof, the typed outcome is a REJECT — never a successful selection
+  // under an unevaluated mandatory condition.
   const descriptiveConstraints: readonly (keyof Constraints)[] = [
     'privacy',
     'executionEnvironment',
@@ -386,8 +430,8 @@ export function runHardGates(
   for (const key of descriptiveConstraints) {
     const value = context.constraints[key];
     if (value !== undefined) {
-      policyNotes.push(
-        `descriptive constraint "${key}" ("${String(value)}") declared — no curated gate evaluation at resolver v0.1, explicitly not certified here and carried to downstream verification`,
+      policyProblems.push(
+        `mandatory descriptive constraint "${key}" ("${String(value)}") cannot be evaluated against curated facts at resolver v0.1 — an unevaluated mandatory user constraint is never a policy PASS; fail closed (typed REJECT; resolvable only after the constraint is expressed in gate-evaluable contracts)`,
       );
     }
   }

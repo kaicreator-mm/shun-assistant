@@ -2,9 +2,15 @@
 // and pinned by the trusted adapter factory, not asserted by callers. A
 // caller-supplied `transport: 'LOCAL'` string next to an arbitrary
 // PlannerPort is a caller assertion, not a transport attestation.
+//
+// R2 (fresh review blocker 2): the factory no longer binds LOCAL for an
+// arbitrary PlannerPort — LOCAL requires the composition-root provenance
+// declaration (declareLocalPlanner), and the caller-supplied pair form is
+// removed from the seam input entirely.
 import type { GoalProposal, GoalRequest, PlannerPort } from '@shun/contracts';
 import { describe, expect, it } from 'vitest';
 import {
+  declareLocalPlanner,
   type InterpretGoalViaPlannerInput,
   interpretGoalViaPlanner,
   localPlannerAdapter,
@@ -105,12 +111,34 @@ describe('trusted planner adapter factory pins transport provenance (P2 R1)', ()
   });
 
   it('a factory-minted adapter is frozen — transport cannot be re-asserted after minting', () => {
-    const adapter = localPlannerAdapter(spyPlanner(validProposal(request())));
+    const adapter = localPlannerAdapter(declareLocalPlanner(spyPlanner(validProposal(request()))));
     expect(Object.isFrozen(adapter)).toBe(true);
     expect(() => {
       (adapter as { transport: string }).transport = 'REMOTE';
     }).toThrow(TypeError);
     expect(adapter.transport).toBe('LOCAL');
+  });
+
+  it('localPlannerAdapter refuses to bind a planner whose local provenance was never declared (R2 blocker 2)', () => {
+    // The R1 counterexample: the factory minted LOCAL for any PlannerPort —
+    // the private brand proved only that the wrapper ran. Minting now throws
+    // unless the composition root declared the planner local.
+    const planner = spyPlanner(validProposal(request()));
+    expect(() => localPlannerAdapter(planner)).toThrow(/declareLocalPlanner/);
+    expect(planner.calls).toBe(0);
+  });
+
+  it('a provenance-declared local planner is bound by the factory and accepted under a local-only policy (R2 positive control)', async () => {
+    const input = request();
+    const planner = spyPlanner(validProposal(input));
+    const result = await interpretGoalViaPlanner({
+      request: input,
+      registry: registry(),
+      adapter: localPlannerAdapter(declareLocalPlanner(planner)),
+      objectExists: () => true,
+    });
+    expect(result.status).toBe('PROPOSAL_ACCEPTED');
+    expect(planner.calls).toBe(1);
   });
 
   it('the adapter-bound transport drives policy: a remote adapter under the offline constraint is unavailable without invocation', async () => {

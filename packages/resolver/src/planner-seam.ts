@@ -6,6 +6,12 @@
 // validation. A remote planner is an external-model disclosure: under a
 // local-only policy it is ineligible, and the outcome is a typed
 // PLANNER_UNAVAILABLE — the policy is never silently relaxed.
+//
+// R2 (fresh review blocker 2): transport provenance is bound, not asserted.
+// The caller-supplied {planner, transport} pair form is removed, and LOCAL
+// adapters can only be minted for planners whose local provenance was
+// declared at the trusted composition boundary (declareLocalPlanner) — a
+// remote-backed planner can no longer run under a LOCAL label.
 import {
   type GoalProposal,
   GoalProposalSchema,
@@ -26,6 +32,46 @@ export type PlannerTransport = 'LOCAL' | 'REMOTE';
 const TRUSTED_PLANNER_ADAPTER_BRAND = Symbol('shun.trusted-planner-adapter');
 
 /**
+ * Module-private brand minted ONLY by declareLocalPlanner (R2, review
+ * blocker 2): the proof that a PlannerPort was declared LOCAL at the trusted
+ * composition boundary. `localPlannerAdapter` refuses any planner without
+ * this brand, so the publicly callable factory can no longer bind an
+ * arbitrary (remote-backed) planner to LOCAL transport.
+ */
+const LOCAL_PLANNER_PROVENANCE_BRAND = Symbol('shun.local-planner-provenance');
+
+/**
+ * A PlannerPort whose LOCAL provenance was declared at the trusted
+ * composition boundary (R2, review blocker 2). The composition/integration
+ * layer is the only actor entitled to assert that a planner executes
+ * in-process — the same trust boundary that wires the registry port and the
+ * policy-fact evaluator. Declaring a remote-backed planner local here is a
+ * wiring-level lie outside the resolver's enforcement model, exactly like
+ * forging any other injected port.
+ */
+export interface LocalProvenancePlannerPort extends PlannerPort {
+  readonly [LOCAL_PLANNER_PROVENANCE_BRAND]: true;
+}
+
+/**
+ * Declare, at the trusted composition boundary, that a PlannerPort executes
+ * locally (in-process, no network round trip). This is the single trust
+ * anchor for LOCAL transport: without it `localPlannerAdapter` refuses to
+ * mint, so a remote-backed planner cannot be smuggled through the LOCAL path
+ * under local-only/offline policy.
+ */
+export function declareLocalPlanner(planner: PlannerPort): LocalProvenancePlannerPort {
+  return new Proxy(planner, {
+    get(target, property, receiver) {
+      if (property === LOCAL_PLANNER_PROVENANCE_BRAND) {
+        return true as const;
+      }
+      return Reflect.get(target, property, receiver);
+    },
+  }) as LocalProvenancePlannerPort;
+}
+
+/**
  * A PlannerPort bound to its transport provenance by the trusted adapter
  * factory (P2, R1). The transport value is pinned at minting (frozen): the
  * policy seam reads it from the adapter instead of accepting a parallel
@@ -38,8 +84,22 @@ export interface TrustedPlannerAdapter {
   readonly [TRUSTED_PLANNER_ADAPTER_BRAND]: true;
 }
 
-/** Bind a PlannerPort to LOCAL transport provenance at the trust boundary. */
+/**
+ * Bind a PlannerPort to LOCAL transport provenance at the trust boundary.
+ * R2 (review blocker 2): only a planner whose local provenance was declared
+ * via {@link declareLocalPlanner} can be bound — minting throws for any
+ * other planner, so a remote-backed planner can no longer be wrapped into a
+ * LOCAL adapter by a caller.
+ */
 export function localPlannerAdapter(planner: PlannerPort): TrustedPlannerAdapter {
+  if (
+    (planner as unknown as Partial<Record<symbol, unknown>>)[LOCAL_PLANNER_PROVENANCE_BRAND] !==
+    true
+  ) {
+    throw new TypeError(
+      'localPlannerAdapter requires a planner whose local provenance was declared at the trusted composition boundary via declareLocalPlanner — an arbitrary PlannerPort (possibly remote-backed) cannot be bound to LOCAL transport',
+    );
+  }
   return Object.freeze({
     planner,
     transport: 'LOCAL',
@@ -58,36 +118,26 @@ export function remotePlannerAdapter(planner: PlannerPort): TrustedPlannerAdapte
 
 /**
  * Input of the planner seam. Transport provenance is a required trusted fact
- * (P1-01): a configured PlannerPort MUST be declared LOCAL or REMOTE by the
- * caller. Since R1 (P2) the provenance is pinned by the trusted adapter
- * factory — pass `adapter` minted via localPlannerAdapter/remotePlannerAdapter
- * so the transport value cannot be asserted independently of the planner
- * instance. The explicit `{ planner, transport }` pair form remains for the
- * P1-01 fail-closed path: an adapter that omits its transport declaration has
- * unknown provenance — it is never silently treated as LOCAL, because a
- * remote-backed adapter without the flag would otherwise bypass local-only /
- * no-disclosure policy. The discriminated union makes the type system reject
- * a planner without transport; the seam additionally fails closed at runtime
- * for untyped callers and for forged adapters.
+ * (P1-01) bound by the trusted adapter factory (P2, R1) — pass `adapter`
+ * minted via localPlannerAdapter/remotePlannerAdapter. R2 (review blocker 2):
+ * the caller-supplied `{ planner, transport }` pair form is REMOVED — a
+ * caller-labeled LOCAL transport let a remote-backed planner run under
+ * local-only/offline policy, and the label is an assertion, not provenance.
+ * Untyped callers that still pass a planner/transport pair fail closed at
+ * runtime and are never invoked.
  */
 export type InterpretGoalViaPlannerInput =
   | {
       request: GoalRequest;
       registry: ShunRegistry;
-      /** Planner + transport bound together by the trusted adapter factory (preferred form). */
+      /** Planner + transport bound together by the trusted adapter factory. */
       adapter: TrustedPlannerAdapter;
       objectExists?: (ref: string) => boolean;
     }
   | {
       request: GoalRequest;
       registry: ShunRegistry;
-      planner: PlannerPort;
-      transport: PlannerTransport;
-      objectExists?: (ref: string) => boolean;
-    }
-  | {
-      request: GoalRequest;
-      registry: ShunRegistry;
+      /** No planner configured — typed PLANNER_UNAVAILABLE, deterministic paths remain usable. */
       planner?: undefined;
       transport?: PlannerTransport;
       objectExists?: (ref: string) => boolean;
@@ -116,36 +166,51 @@ export async function interpretGoalViaPlanner(
 ): Promise<PlannerInterpretation> {
   const { request, registry, objectExists } = input;
 
-  // Resolve the planner + transport provenance (P2, R1): the adapter form is
-  // the trusted path — only adapters minted by the module-private factory
-  // brand reach the PlannerPort, so the transport value is pinned to the
-  // verified source rather than asserted next to it. The explicit pair form
-  // keeps the P1-01 fail-closed semantics.
-  let planner: PlannerPort | undefined;
-  let transport: PlannerTransport | undefined;
-  if ('adapter' in input) {
-    if (input.adapter[TRUSTED_PLANNER_ADAPTER_BRAND] !== true) {
+  // Resolve the planner + transport provenance (P2, R1; R2 blocker 2): ONLY
+  // the adapter path reaches a PlannerPort. A caller-supplied planner/transport
+  // pair is never accepted — the transport label is an assertion, not
+  // provenance, and a remote-backed planner labeled 'LOCAL' previously ran
+  // under local-only/offline policy. Fail closed with zero invocations.
+  if (!('adapter' in input)) {
+    if ('planner' in input || 'transport' in input) {
       return {
         status: 'PLANNER_UNAVAILABLE',
         reason:
-          'planner adapter transport provenance is not minted by the trusted adapter factory (localPlannerAdapter / remotePlannerAdapter) — a forged adapter is never invoked',
+          'caller-supplied planner/transport inputs are not accepted: transport provenance must be bound by the trusted adapter factory (localPlannerAdapter / remotePlannerAdapter) at the composition boundary; a caller label is not provenance and the planner is never invoked',
       };
     }
-    planner = input.adapter.planner;
-    transport = input.adapter.transport;
-  } else {
-    planner = input.planner;
-    transport = input.transport;
+    return {
+      status: 'PLANNER_UNAVAILABLE',
+      reason: 'no PlannerPort configured; deterministic and structured paths remain usable',
+    };
   }
 
+  const adapter = input.adapter;
   // P1-01 fail-closed provenance check, ahead of any policy evaluation or
-  // adapter invocation: a configured planner without an explicit LOCAL/REMOTE
-  // transport declaration has unknown provenance and is never invoked.
-  if (planner !== undefined && transport !== 'LOCAL' && transport !== 'REMOTE') {
+  // adapter invocation: a forged adapter (not minted by the factory) is never
+  // invoked.
+  if (adapter[TRUSTED_PLANNER_ADAPTER_BRAND] !== true) {
     return {
       status: 'PLANNER_UNAVAILABLE',
       reason:
-        'planner transport provenance is required: a configured PlannerPort must declare LOCAL or REMOTE explicitly; a missing or unknown transport fails closed instead of defaulting to LOCAL',
+        'planner adapter transport provenance is not minted by the trusted adapter factory (localPlannerAdapter / remotePlannerAdapter) — a forged adapter is never invoked',
+    };
+  }
+  const planner: PlannerPort | undefined = adapter.planner;
+  const transport: PlannerTransport | undefined = adapter.transport;
+  // R2 (review blocker 2), defense in depth: a LOCAL adapter must carry a
+  // planner whose local provenance was declared at the composition boundary.
+  // The factory already refuses to mint such an adapter; this seam-side check
+  // keeps the invariant independently of the factory.
+  if (
+    transport === 'LOCAL' &&
+    (planner as unknown as Partial<Record<symbol, unknown>>)[LOCAL_PLANNER_PROVENANCE_BRAND] !==
+      true
+  ) {
+    return {
+      status: 'PLANNER_UNAVAILABLE',
+      reason:
+        'LOCAL transport is bound to a planner without declared local provenance (declareLocalPlanner at the trusted composition boundary) — a possibly remote-backed planner is never invoked under a LOCAL label',
     };
   }
 

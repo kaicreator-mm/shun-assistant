@@ -30,7 +30,7 @@ function resolvingRequest(goal: string) {
 }
 
 describe('gold evidence record integrity (P1-07)', () => {
-  it('a versioned evidence record exists for every ranking benchmark', () => {
+  it('a versioned evidence record exists for every ranking benchmark', async () => {
     expect(GOLD_RANKING_EVIDENCE_REVISION).toBe('shun.resolver.gold-ranking-evidence/0.1');
     expect(GOLD_RANKING_EVIDENCE.map((record) => record.benchmarkId)).toEqual([
       'B-033',
@@ -39,7 +39,7 @@ describe('gold evidence record integrity (P1-07)', () => {
     ]);
   });
 
-  it('every record carries provenance, hard-requirement derivation and explicit limitations', () => {
+  it('every record carries provenance, hard-requirement derivation and explicit limitations', async () => {
     for (const record of GOLD_RANKING_EVIDENCE) {
       expect(record.evidenceRevision, record.benchmarkId).toMatch(/^\d+$/);
       expect(record.goldProcedure, record.benchmarkId).toContain('benchmark-v0.1.md');
@@ -56,7 +56,7 @@ describe('gold evidence record integrity (P1-07)', () => {
     }
   });
 
-  it('no record claims independent validation — synthetic agreement is explicitly disclaimed', () => {
+  it('no record claims independent validation — synthetic agreement is explicitly disclaimed', async () => {
     for (const record of GOLD_RANKING_EVIDENCE) {
       expect(record.independentValidation).toBe(false);
     }
@@ -65,13 +65,13 @@ describe('gold evidence record integrity (P1-07)', () => {
 });
 
 describe('resolver outcome agrees with the gold records on the frozen fixtures (synthetic agreement)', () => {
-  it('B-033: top-1 and feasible order match the gold ranking on the offline/batch scenario', () => {
+  it('B-033: top-1 and feasible order match the gold ranking on the offline/batch scenario', async () => {
     const request = resolvingRequest('image.batch_process: batch resize my photos offline');
     request.constraints.other = { offline: true };
     const gold = goldEvidenceFor('B-033');
     const result = resolveGoal({
       request,
-      registry: b033Registry(),
+      registry: await b033Registry(),
       objectExists: () => true,
       scoreFacts: B033_FACTS,
     });
@@ -81,11 +81,11 @@ describe('resolver outcome agrees with the gold records on the frozen fixtures (
     expect(result.record.feasibleBindings).toEqual([...gold.goldRanking]);
   });
 
-  it('B-034: default policy selects the gold safer uninstaller and surfaces the escalation reason', () => {
+  it('B-034: default policy selects the gold safer uninstaller and surfaces the escalation reason', async () => {
     const gold = goldEvidenceFor('B-034');
     const result = resolveGoal({
       request: resolvingRequest('software.uninstall_safe: uninstall a normal desktop app'),
-      registry: b034Registry(),
+      registry: await b034Registry(),
       objectExists: () => true,
     });
     expect(result.stage).toBe('RESOLUTION');
@@ -101,11 +101,11 @@ describe('resolver outcome agrees with the gold records on the frozen fixtures (
     });
   });
 
-  it('B-035: the structured CLI beats the pretty GUI, matching the gold order', () => {
+  it('B-035: the structured CLI beats the pretty GUI, matching the gold order', async () => {
     const gold = goldEvidenceFor('B-035');
     const result = resolveGoal({
       request: resolvingRequest('image.batch_process: batch resize my photos offline'),
-      registry: b035Registry(),
+      registry: await b035Registry(),
       objectExists: () => true,
       scoreFacts: B035_FACTS,
     });

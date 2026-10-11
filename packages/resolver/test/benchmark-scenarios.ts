@@ -14,7 +14,7 @@ import {
 } from '../src/registry.ts';
 import { bindingDef, capabilityDef, ENV_LOCAL, providerDef, requirements } from './scenarios.ts';
 
-function registryOf(parts: {
+async function registryOf(parts: {
   capabilities?: ReturnType<typeof capabilityDef>[];
   providers?: ReturnType<typeof providerDef>[];
   bindings?: ReturnType<typeof bindingDef>[];
@@ -27,12 +27,13 @@ function registryOf(parts: {
     bindings: parts.bindings ?? [],
     environment: parts.env ?? ENV_LOCAL,
   };
-  return ShunRegistry.fromSnapshot(snapshot, {
+  // R2 (review blocker 1): snapshot currentness attests only against a
+  // trusted currentness authority's CURRENT revision — the harness authority
+  // stands in for the trusted integration wiring; a caller-computed revision
+  // string is no longer an accepted attestation input.
+  return ShunRegistry.fromAttestedSnapshot(snapshot, {
     additionalObjectiveMatchers: parts.additionalObjectiveMatchers,
-    // R1 (review blocker 1): snapshot currentness must be bound to a
-    // source-issued authority revision — the test harness derives it from the
-    // exact assembled facts, standing in for the trusted registry authority.
-    authorityRevision: snapshotFactsRevision(snapshot),
+    currentnessAuthority: { currentRevision: async () => snapshotFactsRevision(snapshot) },
   });
 }
 
@@ -42,7 +43,7 @@ function registryOf(parts: {
 // offline-capable on purpose: this isolates RANKING from policy rejection.
 // ---------------------------------------------------------------------------
 
-export function b033Registry() {
+export async function b033Registry() {
   // The scenario capability permits the I3 fallback class so the GUI converter
   // is a *feasible ranking candidate* — its loss must come from agent
   // usability, not from a contract mismatch (B-033 isolates ranking).
@@ -141,7 +142,7 @@ export const UNINSTALL_MATCHERS: ObjectiveMatcherTable = {
   'software.uninstall_safe': [/\bsoftware\.uninstall_safe\b/],
 };
 
-export function b034Registry() {
+export async function b034Registry() {
   const capability = capabilityDef({
     capabilityId: 'software.uninstall_safe',
     sideEffectClass: 'R2',
@@ -187,7 +188,7 @@ export function b034Registry() {
 // B-035 scenario: structured CLI provider vs pretty GUI converter.
 // ---------------------------------------------------------------------------
 
-export function b035Registry() {
+export async function b035Registry() {
   const capability = capabilityDef({
     capabilityId: 'image.batch_process',
     allowedInterfaceClasses: ['I0', 'I1', 'I2', 'I3'],
