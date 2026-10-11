@@ -4,8 +4,7 @@ import { minimizeSupportContext } from './minimize.ts';
 import type { SupportContextResult } from './schema.ts';
 
 const execFile = promisify(execFileCallback);
-const SYSTEM_POWERSHELL =
-  String.raw`C:\Windows\System32\WindowsPowerShell\v1.0\powershell.exe`;
+const SYSTEM_POWERSHELL = String.raw`C:\Windows\System32\WindowsPowerShell\v1.0\powershell.exe`;
 
 export interface WindowsCollectorDeps {
   execFile?: (
@@ -15,7 +14,9 @@ export interface WindowsCollectorDeps {
   ) => Promise<{ stdout: string; stderr?: string }>;
 }
 
-function collectionError(code: 'EXECUTION' | 'STDERR' | 'INVALID_JSON' | 'INVALID_OBSERVATION'): Error {
+function collectionError(
+  code: 'EXECUTION' | 'STDERR' | 'INVALID_JSON' | 'INVALID_OBSERVATION',
+): Error {
   return new Error(`SUPPORT_COLLECTION_FAILED: ${code}`);
 }
 
@@ -43,11 +44,11 @@ export async function collectWindowsSupportContext(
 
   let result: { stdout: string; stderr?: string };
   try {
-    result = await run(
-      SYSTEM_POWERSHELL,
-      ['-NoProfile', '-NonInteractive', '-Command', script],
-      { windowsHide: true, timeout: 30_000, encoding: 'utf8' },
-    );
+    result = await run(SYSTEM_POWERSHELL, ['-NoProfile', '-NonInteractive', '-Command', script], {
+      windowsHide: true,
+      timeout: 30_000,
+      encoding: 'utf8',
+    });
   } catch {
     throw collectionError('EXECUTION');
   }
