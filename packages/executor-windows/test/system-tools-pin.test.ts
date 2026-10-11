@@ -137,4 +137,27 @@ describe.skipIf(!ON_WINDOWS)('N-1 — resolver wrappers verify against the autho
     expect(pin.regSha256).toBe(sha256File(join(realRoot, 'System32', 'reg.exe')));
     expect(pin.whoamiSha256).toBe(sha256File(join(realRoot, 'System32', 'whoami.exe')));
   });
+
+  it('F-4: the package index exports the pin provisioning API (compile-level check)', async () => {
+    const index = await import('../src/index.ts');
+    // Deploy tooling provisions pins through the package root, never a
+    // deep import into src/.
+    expect(typeof index.writeSystemToolsPin).toBe('function');
+    expect(typeof index.readSystemToolsPin).toBe('function');
+    expect(index.SYSTEM_TOOLS_PIN_SCHEMA_VERSION).toBe('shun.executor-windows.system-tools-pin/1');
+    expect(
+      index.SystemToolsPinSchema.safeParse({
+        schemaVersion: 'shun.executor-windows.system-tools-pin/1',
+        whoamiSha256: 'a'.repeat(64),
+        regSha256: 'b'.repeat(64),
+        powershellSha256: 'c'.repeat(64),
+        taskkillSha256: 'd'.repeat(64),
+        pinnedAt: new Date().toISOString(),
+      }).success,
+    ).toBe(true);
+    // Same provisioning class: program byte-identity pins (N-2).
+    expect(typeof index.writeProgramPin).toBe('function');
+    expect(typeof index.readProgramPin).toBe('function');
+    expect(index.PROGRAM_PIN_SCHEMA_VERSION).toBe('shun.executor-windows.program-pin/1');
+  });
 });

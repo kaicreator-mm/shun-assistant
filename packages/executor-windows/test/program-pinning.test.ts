@@ -19,7 +19,15 @@
 // evidence. Attackers who can win that race are same-user attackers who can
 // also rewrite the authority store itself: the C06 open boundary, escalated;
 // no in-write-set mechanism claims to close it.
-import { copyFileSync, existsSync, mkdirSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
+import {
+  copyFileSync,
+  existsSync,
+  mkdirSync,
+  readdirSync,
+  readFileSync,
+  rmSync,
+  writeFileSync,
+} from 'node:fs';
 import { join } from 'node:path';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { writeEnvelopeFile } from '../src/envelope.ts';
@@ -86,6 +94,28 @@ describe('N-2 — program identity pin core (canonical path + measured bytes)', 
     created.push(authority.root);
     const program = join(authority.workspaceRoot, 'unpinned.exe');
     writeFileSync(program, 'never-pinned', 'utf8');
+    const verdict = verifyPinnedProgram(authority.authorityDir, program);
+    expect(verdict.ok).toBe(false);
+    if (!verdict.ok) expect(verdict.reason).toContain('pin');
+  });
+
+  it('F-3: a pin stored under the right KEY but naming a DIFFERENT path is refused (cross-check)', async () => {
+    // The store key is the digest of the canonical path, but the RECORD also
+    // carries programPath; a pin whose key happens to collide (or was
+    // crafted) must never authenticate a path it does not name. Cross-check
+    // in readProgramPin: mismatch ⇒ no pin (fail closed).
+    const authority = await createTestAuthority('shun-f3-path-');
+    created.push(authority.root);
+    const program = join(authority.workspaceRoot, 'tool.exe');
+    writeFileSync(program, 'version-1-bytes', 'utf8');
+    expect(pinProgram(authority.authorityDir, program).ok).toBe(true);
+    const { programPinKey, readProgramPin: readPin } = await import('../src/trusted-store.ts');
+    const pinFile = join(authority.authorityDir, 'programs', `${programPinKey(program)}.json`);
+    const record = JSON.parse(readFileSync(pinFile, 'utf8')) as { programPath: string };
+    record.programPath = 'C:\\elsewhere\\tool.exe'; // right key, wrong path
+    writeFileSync(pinFile, `${JSON.stringify(record, null, 2)}\n`, 'utf8');
+
+    expect(readPin(authority.authorityDir, program)).toBeUndefined();
     const verdict = verifyPinnedProgram(authority.authorityDir, program);
     expect(verdict.ok).toBe(false);
     if (!verdict.ok) expect(verdict.reason).toContain('pin');

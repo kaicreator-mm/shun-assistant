@@ -160,6 +160,110 @@ describe('C13 P1 — a lying planted reg.exe cannot forge the machine fixed poin
   });
 });
 
+describe('F-1 — the resolver never EXECUTES an unpinned reg.exe candidate (probe identity gate)', () => {
+  // F-1 (Reviewer): resolution itself SPAWNS reg.exe probes, and the hint
+  // tier executes attacker-planted candidates WITHOUT any identity check —
+  // an elevated helper reaching that tier would run attacker bytes once per
+  // UAC consent. The fix threads the system-tools pin digest (loaded FIRST
+  // in resolvePinnedSystemExe) into the resolution: every candidate is
+  // identity-gated BEFORE execFileSync. These controls run on the virtual
+  // seam; the query spy records what WOULD have been executed.
+  const MACHINE = 'C:\\Windows';
+  const PLANTED = 'D:\\shun-planted-root';
+  const PINNED_REG_SHA = 'b'.repeat(64);
+  const ATTACKER_REG_SHA = 'f'.repeat(64);
+  const lower = (p: string): string => p.toLowerCase();
+  const machineReg = `${MACHINE}\\System32\\reg.exe`;
+  const plantedReg = `${PLANTED}\\System32\\reg.exe`;
+
+  /**
+   * Virtual filesystem with per-file DIGESTS: isFile is true exactly when a
+   * digest is listed, and shaFile returns it — the same gate the resolver
+   * must apply before executing a candidate.
+   */
+  function digestSeam(
+    digests: Record<string, string | undefined>,
+    extraDirs: string[] = [],
+  ): SystemRootFsSeam {
+    const files = new Set(
+      Object.keys(digests)
+        .filter((k) => digests[k] !== undefined)
+        .map(lower),
+    );
+    const dirs = new Set(
+      [MACHINE, `${MACHINE}\\System32`, PLANTED, `${PLANTED}\\System32`, ...extraDirs].map(lower),
+    );
+    return {
+      isFile: (p: string) => files.has(lower(p)),
+      isDirectory: (p: string) => dirs.has(lower(p)),
+      shaFile: (p: string) =>
+        digests[Object.keys(digests).find((k) => lower(k) === lower(p)) ?? ''],
+    };
+  }
+
+  /** The planted reg.exe lies (self-consistent planted root); the machine anchor tells the truth. */
+  const spyingQuery =
+    (calls: string[], machineSpeaks = true): RegQuery =>
+    (regExe) => {
+      calls.push(regExe);
+      if (lower(regExe).startsWith(lower(PLANTED))) return PLANTED;
+      return machineSpeaks ? MACHINE : undefined;
+    };
+
+  it('in the degraded tier a planted reg.exe whose bytes FAIL the pin is NEVER executed', () => {
+    // Machine anchor ABSENT (degraded tier reached), attacker env → planted,
+    // planted reg.exe bytes ≠ pin. Pre-fix the probe execFileSync'd it (the
+    // query spy below WOULD record the call) — RED on the unfixed ordering
+    // of checks; post-fix the gate skips the candidate before any spawn.
+    const calls: string[] = [];
+    const r = resolveSystemRoot(
+      { SystemRoot: PLANTED, windir: PLANTED },
+      spyingQuery(calls),
+      'win32',
+      digestSeam({ [plantedReg]: ATTACKER_REG_SHA }),
+      PINNED_REG_SHA,
+    );
+    expect(calls.map(lower)).not.toContain(lower(plantedReg));
+    // Whatever the resolution answers (the no-execution env tier may still
+    // name a root), the handed-out binaries stay gated downstream (N-1).
+    void r;
+  });
+
+  it('a machine anchor whose bytes mismatch the pin FAILS CLOSED — a pin-forged planted lie never executes', () => {
+    // Strongest shape: the planted candidate's bytes MATCH the pin (a copied
+    // real reg.exe the attacker re-pinned the store for) and would answer a
+    // self-consistent lie. The machine anchor's bytes DON'T match the pin —
+    // readable evidence this host is not the pinned machine — so resolution
+    // must fail closed and the planted reg.exe must never be executed.
+    const calls: string[] = [];
+    const r = resolveSystemRoot(
+      { SystemRoot: PLANTED, windir: PLANTED },
+      spyingQuery(calls),
+      'win32',
+      digestSeam({ [machineReg]: ATTACKER_REG_SHA, [plantedReg]: PINNED_REG_SHA }),
+      PINNED_REG_SHA,
+    );
+    expect(r.ok).toBe(false);
+    if (!r.ok) expect(r.reason).toContain('fail closed');
+    expect(calls.map(lower)).not.toContain(lower(plantedReg));
+  });
+
+  it('a machine anchor matching the pin is executed and resolves normally (gate is not a blocker)', () => {
+    const calls: string[] = [];
+    const r = resolveSystemRoot(
+      { SystemRoot: PLANTED, windir: PLANTED },
+      spyingQuery(calls),
+      'win32',
+      digestSeam({ [machineReg]: PINNED_REG_SHA }),
+      PINNED_REG_SHA,
+    );
+    expect(r.ok).toBe(true);
+    if (r.ok) expect(lower(r.systemRoot)).toBe(lower(MACHINE));
+    expect(calls.map(lower)).toContain(lower(machineReg));
+    expect(calls.map(lower)).not.toContain(lower(plantedReg));
+  });
+});
+
 describe.skipIf(!ON_WINDOWS)('C13 — real Windows machine evidence', () => {
   const real = resolveSystemRoot();
   const envRoot = (process.env.SystemRoot ?? '').trim().toLowerCase();
