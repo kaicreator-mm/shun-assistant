@@ -66,6 +66,14 @@ export interface LocalBackendDeps {
   readonly environmentId: string;
   readonly providerId: (action: AuthorizedAction) => string;
   readonly providerVersion: (action: AuthorizedAction) => string;
+  /**
+   * Trusted mechanism gate executed after grant validation but before
+   * EXEC_START. It may only produce a proven no-effect refusal; actual effects
+   * belong in perform(), after EXEC_START is durably journaled.
+   */
+  preflight?(
+    action: PlanAction,
+  ): Promise<(PerformOutcome & { readonly noEffect: true }) | undefined>;
   perform(action: PlanAction): Promise<PerformOutcome>;
   /** Fault injection for negative scenarios; production adapters pass none. */
   faults?: readonly PrivilegedFault[];
@@ -175,6 +183,28 @@ export class LocalPrivilegedBackend implements ExecutionBackend {
         'NOT_STARTED',
         false,
         undefined,
+        [],
+        `journal:${action.actionId}`,
+      );
+    }
+
+    const preflight = await this.#deps.preflight?.(action.action);
+    if (preflight) {
+      await journal.append({
+        seq: 2,
+        ts: this.#deps.clock(),
+        phase: 'RECEIPT_WRITTEN',
+        actionId: action.actionId,
+        detail: `NO_EFFECT:${preflight.note ?? 'mechanism preflight refused before effect'}`,
+        attemptId,
+      });
+      return this.#receipt(
+        action,
+        startedAt,
+        preflight.refusalTerminal ?? 'REFUSED',
+        'NOT_STARTED',
+        false,
+        preflight.exitCode,
         [],
         `journal:${action.actionId}`,
       );
