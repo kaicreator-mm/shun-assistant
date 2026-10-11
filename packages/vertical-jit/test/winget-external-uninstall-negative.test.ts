@@ -4,7 +4,7 @@
 // the full lifetime of the external process (VJ-P1-01 / R5).
 import { describe, expect, it } from 'vitest';
 import { WingetPrivilegedBackend } from '../src/adapters/winget.ts';
-import { MemoryJournal } from '../src/journal.ts';
+import { classifyFromJournal, MemoryJournal } from '../src/journal.ts';
 import { LocalAuthority } from '../src/local-authority.ts';
 import { MemoryFilesystem, ScriptedProcessPort } from '../src/mocks.ts';
 import { buildActionPlan, uninstallAction } from '../src/plans.ts';
@@ -116,12 +116,15 @@ describe('VJ R5: external WinGet removal is not authorized by a pre-spawn snapsh
     expect(result.process.calls).toHaveLength(0);
     expect(result.invokedExternalUninstaller).toBe(false);
     expect(result.receipt.terminal).toBe('REFUSED');
-    expect(result.receipt.sideEffectEvidence.recoveryClassification).toBe('NOT_STARTED');
+    expect(result.receipt.sideEffectEvidence.recoveryClassification).toBe('FAILED_BEFORE_EFFECT');
     expect(result.receipt.sideEffectEvidence.postStateVerified).toBe(false);
     expect(await result.fs.readText(result.owned)).toBe('original vendor bytes');
     expect(result.entries.some((entry) => entry.detail?.includes('NO_EFFECT:'))).toBe(true);
     expect(result.entries.some((entry) => entry.phase === 'EXEC_START')).toBe(false);
     expect(result.entries.some((entry) => entry.phase === 'EXEC_DONE')).toBe(false);
+    expect(classifyFromJournal(result.entries, 'external-winget-uninstall')).toBe(
+      'FAILED_BEFORE_EFFECT',
+    );
   });
 
   it('never gives the external process a chance to delete a late user-owned file', async () => {
