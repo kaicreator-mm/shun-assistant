@@ -5,8 +5,7 @@ import type { SupportContextResult } from './schema.ts';
 
 const execFile = promisify(execFileCallback);
 const SYSTEM_ROOT = String.raw`C:\Windows`;
-const SYSTEM_POWERSHELL =
-  String.raw`C:\Windows\System32\WindowsPowerShell\v1.0\powershell.exe`;
+const SYSTEM_POWERSHELL = String.raw`C:\Windows\System32\WindowsPowerShell\v1.0\powershell.exe`;
 const TRUSTED_ENV: Readonly<Record<string, string>> = Object.freeze({
   SystemRoot: SYSTEM_ROOT,
   WINDIR: SYSTEM_ROOT,
