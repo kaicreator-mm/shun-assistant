@@ -50,6 +50,12 @@ import {
 export interface PrivilegedBackendOptions {
   /** Trusted authority store (helper pin, plans, currentness, HMAC key). */
   authorityDir: string;
+  /**
+   * Content-addressed ActionPlan ledger. The launcher may read this from a
+   * runtime-writable cache because the protected grant binds planHash and the
+   * helper re-derives the hash/action identity before any effect.
+   */
+  planDir?: string;
   /** Root for per-action run artifacts; MUST equal the pin's workspaceRoot. */
   workspaceRoot: string;
   /** Package root containing dist/executor-helper.mjs and the relay script. */
@@ -228,9 +234,9 @@ export class PrivilegedWindowsExecutionBackend implements ExecutionBackend {
       }
 
       // ---- trusted plan source; a missing plan fails closed. ----
-      const plan = new FilePlanSource(join(this.options.authorityDir, 'plans')).byPlanHash(
-        action.planHash,
-      );
+      const plan = new FilePlanSource(
+        this.options.planDir ?? join(this.options.authorityDir, 'plans'),
+      ).byPlanHash(action.planHash);
       if (!plan)
         return await launchRefused(`plan ${action.planHash} not found in the authority store`);
 
