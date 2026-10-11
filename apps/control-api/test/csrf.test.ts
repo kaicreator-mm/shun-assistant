@@ -100,4 +100,46 @@ describe('cross-site mutations are refused (CSRF, VC-P1-04)', () => {
     const read = await h.raw('/api/health', { host: '127.0.0.1', origin: ATTACKER_ORIGIN }, {});
     expect(read.status).toBe(200);
   });
+
+  // Audit recipe (VC-P1-04): ALL mutation routes must refuse the cross-site
+  // attack with zero state change — the guard is per-request, not per-route.
+  // Every route below is one an attacker's page could aim a simple (no
+  // preflight) form-style POST at: text/plain body, hostile Origin.
+  it('refuses the attack on every mutation route with zero state change', async () => {
+    const created = await h.post('/api/tasks', cleanupGoalRequest());
+    const snapshot = created.body as TaskSnapshot;
+    const taskId = snapshot.taskId;
+    const approvalId = snapshot.approval!.approvalId;
+    const planHash = snapshot.approval!.planHash;
+
+    const attacks: [path: string, payload: Record<string, unknown>][] = [
+      [`/api/tasks/${taskId}/cancel`, {}],
+      [`/api/tasks/${taskId}/clarification`, { answer: 'attacker-supplied answer' }],
+      [`/api/tasks/${taskId}/recovery`, {}],
+      [`/api/tasks/${taskId}/retry`, {}],
+      [`/api/approvals/${approvalId}/decision`, { approved: true, planHash }],
+    ];
+    for (const [path, payload] of attacks) {
+      const attack = await h.raw(
+        path,
+        { host: '127.0.0.1', 'content-type': 'text/plain', origin: ATTACKER_ORIGIN },
+        { method: 'POST', body: JSON.stringify(payload) },
+      );
+      expect(attack.status, `${path} must refuse the attack`).toBe(403);
+      expect(
+        (attack.body as { error: { code: string } }).error.code,
+        `${path} must report CSRF_REFUSED`,
+      ).toBe('CSRF_REFUSED');
+    }
+
+    // Zero state change anywhere: the task was not cancelled, no clarification
+    // was recorded, nothing was reconciled or retried, and the approval is
+    // still pending with the plan never executed.
+    const after = (await h.get(`/api/tasks/${taskId}`)).body as TaskSnapshot;
+    expect(after.state).toBe('AWAITING_AUTHORIZATION');
+    expect(after.approval?.status).toBe('PENDING');
+    expect(after.recovery).toBeUndefined();
+    expect(after.title).toBe(snapshot.title);
+    expect(after.revision).toBe(snapshot.revision);
+  });
 });

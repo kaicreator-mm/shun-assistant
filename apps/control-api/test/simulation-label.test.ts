@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { cleanupGoalRequest, startHarness, type TestHarness } from './helpers.ts';
+import { cleanupGoalRequest, startHarness } from './helpers.ts';
 
 // Negative control for Issue #41 / VC-P2-06: the surface must prominently
 // disclose that it runs DemoShunBackend — a scripted simulation, not the real
