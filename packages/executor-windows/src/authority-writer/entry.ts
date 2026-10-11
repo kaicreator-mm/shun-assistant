@@ -5,6 +5,7 @@
 import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { assessAnchorOwnership } from '../anchor-protection.ts';
 import { readWriterPin, sha256File } from '../trusted-store.ts';
 import { applyWriterJob, verifyWriterIdentity } from './apply.ts';
 import { WriterJobSchema } from './job.ts';
@@ -95,8 +96,18 @@ function main(): never {
 
   const parsed = WriterJobSchema.safeParse(raw);
   const result = applyWriterJob({ anchorRoot, hmacKeyBase64: key }, raw);
+  const ownership = assessAnchorOwnership(anchorRoot, keyFile);
+  const guardedResult =
+    result.ok && ownership.length > 0
+      ? {
+          ok: false as const,
+          code: 'ANCHOR_WRITE_DENIED',
+          reason: `writer produced authority objects without privileged ownership: ${ownership.join('; ')}`,
+          target: result.target,
+        }
+      : result;
   const receipt = {
-    ...result,
+    ...guardedResult,
     writerSha256: pin.writerSha256,
     nodeExeSha256: pin.nodeExeSha256,
     finishedAt: new Date().toISOString(),
@@ -117,13 +128,13 @@ function main(): never {
           ok: false,
           code: 'ANCHOR_WRITE_DENIED',
           reason: `protected writer receipt could not be persisted: ${String(error)}`,
-          applyResult: result,
+          applyResult: guardedResult,
         },
         3,
       );
     }
   }
-  return emitAndExit(receipt, result.ok ? 0 : 2);
+  return emitAndExit(receipt, guardedResult.ok ? 0 : 2);
 }
 
 main();
