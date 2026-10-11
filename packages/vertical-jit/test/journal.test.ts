@@ -70,7 +70,7 @@ describe('journal-only recovery classification', () => {
         [entry('RECEIVED'), entry('EXEC_START'), entry('EXEC_DONE'), entry('RECEIPT_WRITTEN')],
         'a1',
       ),
-    ).toBe('COMPLETED_VERIFIED');
+    ).toBe('MAY_HAVE_EXECUTED_UNCERTAIN');
   });
 
   it('classifies NO_EFFECT after RECEIVED as FAILED_BEFORE_EFFECT', () => {
