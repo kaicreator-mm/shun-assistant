@@ -112,9 +112,7 @@ export interface AuthorizationAuthorityConfig {
    * protected one-shot writer is the intended composition); a caller-visible
    * "state is empty" observation is never sufficient authority.
    */
-  bootstrapAuthorizer?: (
-    input: PolicyBootstrapAuthorizationInput,
-  ) => boolean | Promise<boolean>;
+  bootstrapAuthorizer?: (input: PolicyBootstrapAuthorizationInput) => boolean | Promise<boolean>;
   /** ISO 8601 UTC clock; injected so issuance stays deterministic in tests. */
   clock: () => string;
   grantTtlMs?: number;
