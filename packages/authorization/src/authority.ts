@@ -534,7 +534,10 @@ export class AuthorizationAuthority implements AuthorizationPort {
     // nested arrays/objects), before the mutation queue may await its turn.
     const parsedCandidate = PolicyBootstrapSnapshotSchema.safeParse(snapshot);
     if (!parsedCandidate.success) {
-      issueFailure('SCHEMA_VIOLATION', 'initial policy bootstrap candidate violates the policy schema');
+      issueFailure(
+        'SCHEMA_VIOLATION',
+        'initial policy bootstrap candidate violates the policy schema',
+      );
     }
     const candidate = parsedCandidate.data;
     await this.#serializeEvent(async () => {
