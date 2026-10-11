@@ -44,7 +44,7 @@ export function localPlannerAdapter(planner: PlannerPort): TrustedPlannerAdapter
     planner,
     transport: 'LOCAL',
     [TRUSTED_PLANNER_ADAPTER_BRAND]: true,
-  });
+  } satisfies TrustedPlannerAdapter);
 }
 
 /** Bind a PlannerPort to REMOTE transport provenance at the trust boundary. */
@@ -53,7 +53,7 @@ export function remotePlannerAdapter(planner: PlannerPort): TrustedPlannerAdapte
     planner,
     transport: 'REMOTE',
     [TRUSTED_PLANNER_ADAPTER_BRAND]: true,
-  });
+  } satisfies TrustedPlannerAdapter);
 }
 
 /**

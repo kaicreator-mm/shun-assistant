@@ -311,9 +311,10 @@ describe('attested registry facts are immutable after construction (R1 blocker 2
       (registry.observedEnvironment() as { observationRevision: string }).observationRevision =
         'obs-forged';
     }).toThrow(TypeError);
+    const binding = registry.bindingsForCapability('image.batch_process')[0];
     expect(() => {
-      const requirement = registry.bindingsForCapability('image.batch_process')[0]
-        .environmentRequirements as { networkAccess: string };
+      if (!binding) throw new Error('binding missing from registry');
+      const requirement = binding.environmentRequirements as { networkAccess: string };
       requirement.networkAccess = 'REQUIRED';
     }).toThrow(TypeError);
     expect(() => {
@@ -322,10 +323,7 @@ describe('attested registry facts are immutable after construction (R1 blocker 2
       capability.requiredPolicyFacts.push('another-fact');
     }).toThrow(TypeError);
     expect(registry.observedEnvironment().observationRevision).toBe('obs-0042');
-    expect(
-      registry.bindingsForCapability('image.batch_process')[0].environmentRequirements
-        .networkAccess,
-    ).toBe('FORBIDDEN');
+    expect(binding?.environmentRequirements.networkAccess).toBe('FORBIDDEN');
     expect(registry.capability('image.batch_process')?.requiredPolicyFacts).toEqual([
       'userApprovedDelete',
     ]);
