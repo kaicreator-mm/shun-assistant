@@ -26,13 +26,20 @@ import {
   writeSync,
 } from 'node:fs';
 import { join } from 'node:path';
-import { type CurrentAuthorityState, CurrentAuthorityStateSchema } from '@shun/contracts';
 import {
+  type AuthorizationGrant,
+  type CurrentAuthorityState,
+  CurrentAuthorityStateSchema,
+  pathWithin,
+} from '@shun/contracts';
+import {
+  isSafeAnchorId,
   jobPayloadAsCurrentness,
   jobPayloadAsGrant,
   type PolicyWindow,
   PolicyWindowSchema,
   verifyWriterJob,
+  type WriterJob,
   type WriterJob,
 } from './job.ts';
 
@@ -42,6 +49,7 @@ export type WriterRefusalCode =
   | 'JOB_MALFORMED'
   | 'WINDOW_NOT_CURRENT'
   | 'WINDOW_NOT_ACTIVE'
+  | 'WINDOW_BUDGET_EXHAUSTED'
   | 'JOB_REPLAYED'
   | 'PAYLOAD_INVALID'
   | 'ANCHOR_WRITE_DENIED';
@@ -133,10 +141,16 @@ export function applyWriterJob(ctx: ApplyContext, rawJob: unknown): ApplyResult 
   }
   const currency = readCurrentness(ctx.anchorRoot);
   if (!currency.ok) return currency;
+  if (currency.state.kind !== 'CURRENT') {
+    return {
+      ok: false,
+      code: 'WINDOW_NOT_CURRENT',
+      reason: `current authority/policy state is UNRESOLVABLE — policy window ${job.policyWindowRef} cannot authorize issuance`,
+    };
+  }
   if (
-    currency.state.kind === 'CURRENT' &&
-    (currency.state.authorityRevision !== window.window.authorityRevision ||
-      currency.state.policySnapshotRevision !== window.window.policySnapshotRevision)
+    currency.state.authorityRevision !== window.window.authorityRevision ||
+    currency.state.policySnapshotRevision !== window.window.policySnapshotRevision
   ) {
     return {
       ok: false,
@@ -148,22 +162,45 @@ export function applyWriterJob(ctx: ApplyContext, rawJob: unknown): ApplyResult 
   // 3. Payload validation BEFORE any anchor write.
   let target: string;
   let text: string;
+  let grantForBudget: AuthorizationGrant | undefined;
   if (job.jobType === 'issue-grant') {
     const grant = jobPayloadAsGrant(job);
-    if (!grant?.grantId)
-      return { ok: false, code: 'PAYLOAD_INVALID', reason: 'issue-grant payload is not a grant' };
-    target = join(ctx.anchorRoot, 'grants', `${grant.grantId}.json`);
-    text = `${JSON.stringify(grant, null, 2)}\n`;
-  } else {
-    const parsed = CurrentAuthorityStateSchema.safeParse(jobPayloadAsCurrentness(job));
-    if (!parsed.success) {
+    if (!grant) {
       return {
         ok: false,
         code: 'PAYLOAD_INVALID',
-        reason: `write-currentness payload rejected: ${parsed.error.message}`,
+        reason: 'issue-grant payload is not a valid frozen AuthorizationGrant',
       };
     }
-    const state: CurrentAuthorityState = parsed.data;
+    if (!isSafeAnchorId(grant.grantId)) {
+      return {
+        ok: false,
+        code: 'PAYLOAD_INVALID',
+        reason: `grantId ${JSON.stringify(grant.grantId)} is not a canonical Windows-safe anchor identifier`,
+      };
+    }
+    const grantViolation = grantWindowViolation(
+      grant,
+      job.riskClass,
+      window.window,
+      currency.state,
+      clock,
+    );
+    if (grantViolation) {
+      return { ok: false, code: 'PAYLOAD_INVALID', reason: grantViolation };
+    }
+    grantForBudget = grant;
+    target = join(ctx.anchorRoot, 'grants', `${grant.grantId}.json`);
+    text = `${JSON.stringify(grant, null, 2)}\n`;
+  } else {
+    const state = jobPayloadAsCurrentness(job);
+    if (!state) {
+      return {
+        ok: false,
+        code: 'PAYLOAD_INVALID',
+        reason: 'write-currentness payload is not a valid frozen CurrentAuthorityState',
+      };
+    }
     target = join(ctx.anchorRoot, 'current-authority.json');
     text = `${JSON.stringify(state, null, 2)}\n`;
   }
@@ -186,6 +223,10 @@ export function applyWriterJob(ctx: ApplyContext, rawJob: unknown): ApplyResult 
       code: 'JOB_REPLAYED',
       reason: `job ${job.jobId} was already consumed — replay refused`,
     };
+  }
+  if (grantForBudget) {
+    const reservation = reserveWindowGrantSlot(ctx.anchorRoot, window.window, job.jobId);
+    if (!reservation.ok) return reservation;
   }
   const appliedAt = now().toISOString();
   try {
@@ -217,6 +258,147 @@ export function applyWriterJob(ctx: ApplyContext, rawJob: unknown): ApplyResult 
   return { ok: true, appliedAt, target };
 }
 
+function grantWindowViolation(
+  grant: AuthorizationGrant,
+  riskClass: WriterJob['riskClass'],
+  window: PolicyWindow,
+  current: Extract<CurrentAuthorityState, { kind: 'CURRENT' }>,
+  now: Date,
+): string | undefined {
+  if (!riskClass || !window.scopeBudget.riskClasses.includes(riskClass)) {
+    return `grant risk class ${riskClass ?? '(missing)'} is outside policy-window scopeBudget`;
+  }
+  if (!window.scopeBudget.privilegeLevels.includes(grant.actionScope.privilegeLevel)) {
+    return `grant privilege ${grant.actionScope.privilegeLevel} is outside policy-window scopeBudget`;
+  }
+  if (
+    grant.issuer.authorityId !== current.authorityId ||
+    grant.issuer.authorityRevision !== window.authorityRevision ||
+    grant.policySnapshotRevision !== window.policySnapshotRevision
+  ) {
+    return 'grant issuer/policy revision is outside the CURRENT policy window';
+  }
+
+  const issuedMs = Date.parse(grant.issuedAt);
+  const expiresMs = Date.parse(grant.expiresAt);
+  const startMs = Date.parse(window.notBefore);
+  const endMs = Date.parse(window.notAfter);
+  if (
+    issuedMs < startMs ||
+    issuedMs > now.getTime() ||
+    expiresMs <= issuedMs ||
+    expiresMs > endMs ||
+    expiresMs <= now.getTime() ||
+    expiresMs - issuedMs > window.scopeBudget.maxGrantTtlMs
+  ) {
+    return 'grant issuedAt/expiresAt exceeds the approved policy-window time/TTL budget';
+  }
+
+  const covered = (paths: readonly string[], prefixes: readonly string[] | undefined): boolean =>
+    paths.length === 0 ||
+    (prefixes !== undefined &&
+      prefixes.length > 0 &&
+      paths.every((path) => prefixes.some((prefix) => pathWithin(path, prefix))));
+
+  const grantFs = grant.actionScope.filesystem;
+  if (grantFs) {
+    const budgetFs = window.scopeBudget.filesystem;
+    if (!covered(grantFs.write, budgetFs?.write)) {
+      return 'grant filesystem write scope exceeds policy-window scopeBudget';
+    }
+    if (!covered(grantFs.read, [...(budgetFs?.read ?? []), ...(budgetFs?.write ?? [])])) {
+      return 'grant filesystem read scope exceeds policy-window scopeBudget';
+    }
+  }
+
+  if (grant.actionScope.network?.allowed) {
+    const budgetNetwork = window.scopeBudget.network;
+    if (!budgetNetwork?.allowed) return 'grant network access exceeds policy-window scopeBudget';
+    const grantDomains = grant.actionScope.network.domains;
+    const budgetDomains = budgetNetwork.domains;
+    if (budgetDomains !== undefined) {
+      if (!grantDomains || grantDomains.length === 0) {
+        return 'domain-unbounded grant network scope exceeds bounded policy-window domains';
+      }
+      if (!grantDomains.every((domain) => budgetDomains.includes(domain))) {
+        return 'grant network domains exceed policy-window scopeBudget';
+      }
+    }
+  }
+
+  const grantRegistry = grant.actionScope.registry?.write ?? [];
+  if (!covered(grantRegistry, window.scopeBudget.registry?.write)) {
+    return 'grant registry write scope exceeds policy-window scopeBudget';
+  }
+  return undefined;
+}
+
+function reserveWindowGrantSlot(
+  anchorRoot: string,
+  window: PolicyWindow,
+  jobId: string,
+): { ok: true } | { ok: false; code: WriterRefusalCode; reason: string } {
+  const dir = join(anchorRoot, 'jobs', 'window-budget', window.windowId);
+  try {
+    mkdirSync(dir, { recursive: true });
+  } catch (error) {
+    return {
+      ok: false,
+      code: 'ANCHOR_WRITE_DENIED',
+      reason: `window budget ledger unusable: ${String(error)}`,
+    };
+  }
+
+  let slot = 0;
+  while (slot < window.maxGrants) {
+    const file = join(dir, `${slot}.slot`);
+    try {
+      const existing = readFileSync(file, 'utf8').trim();
+      if (existing === jobId) {
+        return {
+          ok: false,
+          code: 'JOB_REPLAYED',
+          reason: `job ${jobId} already reserved grant budget — replay refused`,
+        };
+      }
+      slot += 1;
+      continue;
+    } catch (error) {
+      const code = (error as NodeJS.ErrnoException).code;
+      if (code !== 'ENOENT') {
+        return {
+          ok: false,
+          code: 'ANCHOR_WRITE_DENIED',
+          reason: `window budget slot unreadable: ${String(error)}`,
+        };
+      }
+    }
+
+    let fd: number | undefined;
+    try {
+      fd = openSync(file, 'wx');
+      writeSync(fd, `${jobId}\n`, null, 'utf8');
+      fsyncSync(fd);
+      closeSync(fd);
+      return { ok: true };
+    } catch (error) {
+      if (fd !== undefined) closeSync(fd);
+      const code = (error as NodeJS.ErrnoException).code;
+      if (code === 'EEXIST') continue;
+      return {
+        ok: false,
+        code: 'ANCHOR_WRITE_DENIED',
+        reason: `window budget reservation failed: ${String(error)}`,
+      };
+    }
+  }
+  return {
+    ok: false,
+    code: 'WINDOW_BUDGET_EXHAUSTED',
+    reason: `policy window ${window.windowId} exhausted maxGrants=${window.maxGrants}`,
+  };
+}
+
 function readPolicyWindow(
   anchorRoot: string,
   windowId: string,
@@ -232,7 +414,17 @@ function readPolicyWindow(
       reason: `policy window record unreadable: ${windowId}`,
     };
   }
-  const parsed = PolicyWindowSchema.safeParse(JSON.parse(raw));
+  let decoded: unknown;
+  try {
+    decoded = JSON.parse(raw);
+  } catch {
+    return {
+      ok: false,
+      code: 'WINDOW_NOT_CURRENT',
+      reason: `policy window record corrupt: ${windowId}`,
+    };
+  }
+  const parsed = PolicyWindowSchema.safeParse(decoded);
   if (!parsed.success) {
     return {
       ok: false,
@@ -259,7 +451,17 @@ function readCurrentness(
       reason: 'currentness record unreadable (fail closed)',
     };
   }
-  const parsed = CurrentAuthorityStateSchema.safeParse(JSON.parse(raw));
+  let decoded: unknown;
+  try {
+    decoded = JSON.parse(raw);
+  } catch {
+    return {
+      ok: false,
+      code: 'WINDOW_NOT_CURRENT',
+      reason: 'currentness record corrupt (fail closed)',
+    };
+  }
+  const parsed = CurrentAuthorityStateSchema.safeParse(decoded);
   if (!parsed.success) {
     return {
       ok: false,
