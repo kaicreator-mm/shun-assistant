@@ -15,7 +15,7 @@ import {
   type ResolutionRecord,
   type VerificationPlan,
 } from '@shun/contracts';
-import { type BindingGateOutcome, runHardGates } from './gates.ts';
+import { type BindingGateOutcome, type PolicyFactEvaluator, runHardGates } from './gates.ts';
 import { type GoalNormalization, normalizeGoal } from './normalize.ts';
 import {
   type BindingScoreFacts,
@@ -36,6 +36,12 @@ export interface ResolveGoalInput {
   objectExists?: (ref: string) => boolean;
   /** Curated per-binding score facts; absence selects the deterministic fallback ranking. */
   scoreFacts?: readonly BindingScoreFacts[];
+  /**
+   * Trusted policy-fact evaluator (P1-04, R1) backed by the policy authority.
+   * Required by capabilities that declare requiredPolicyFacts — without it
+   * those capabilities fail the policy gate closed.
+   */
+  policyFacts?: PolicyFactEvaluator;
   /** Planning layer actually used (planner seam sets PLANNER_INTERPRETED). */
   planClass?: ExecutionPlanClass;
 }
@@ -59,6 +65,7 @@ export function resolveGoal(input: ResolveGoalInput): GoalResolution {
     registry,
     objectExists,
     scoreFacts,
+    policyFacts,
     planClass = 'KNOWN_CAPABILITY_DETERMINISTIC',
   } = input;
 
@@ -80,7 +87,9 @@ export function resolveGoal(input: ResolveGoalInput): GoalResolution {
     );
   }
   if (goalContract.constraints.other?.offline === true) {
-    privacyNotes.push('offline constraint: network-required bindings are policy-rejected');
+    privacyNotes.push(
+      'offline constraint: bindings without a proven no-network posture are policy-rejected',
+    );
   }
   const privacyDisclosurePlan = {
     externalDisclosure: goalContract.privacyPolicy.localOnly
@@ -179,6 +188,7 @@ export function resolveGoal(input: ResolveGoalInput): GoalResolution {
         privacyPolicy: goalContract.privacyPolicy,
         environmentPolicy: goalContract.environmentPolicy,
         constraints: goalContract.constraints,
+        policyFacts,
       }),
     );
   }

@@ -88,6 +88,17 @@ export async function interpretGoalViaPlanner(
         'local-only / no-disclosure policy makes a remote AI Runtime ineligible (external-model disclosure forbidden, L2 §6.3); deterministic and structured paths remain usable',
     };
   }
+  // Offline constraint (P1 supplemental, R1): a required offline execution is
+  // independent of the disclosure posture — an allowed external disclosure
+  // never authorizes network traffic against an offline goal. A remote planner
+  // is a network round trip, so it is unavailable with zero invocations.
+  if (transport === 'REMOTE' && request.constraints.other?.offline === true) {
+    return {
+      status: 'PLANNER_UNAVAILABLE',
+      reason:
+        'offline execution constraint makes a remote AI Runtime ineligible (a remote interpretation is network traffic regardless of the disclosure posture); deterministic and structured paths remain usable',
+    };
+  }
   if (!planner) {
     return {
       status: 'PLANNER_UNAVAILABLE',

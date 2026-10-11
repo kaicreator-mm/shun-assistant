@@ -109,12 +109,36 @@ export interface BindingGateOutcome {
   escalation?: SafetyProfile & { acknowledged: boolean };
 }
 
+/**
+ * Trusted policy-fact evaluation seam (P1-04, R1): capability-required policy
+ * facts (e.g. userApprovedDelete) are CURRENT facts owned by a policy
+ * authority, never derivable from the caller's goal constraints — a value the
+ * requester supplies is a claim, not proof. The integration layer injects an
+ * evaluator backed by the trusted policy source; where the evaluator cannot
+ * verify a required fact, the gate fails closed.
+ */
+export type PolicyFactVerdict =
+  | { status: 'SATISFIED'; evidence: string }
+  | { status: 'UNSATISFIED'; reason: string }
+  | { status: 'UNVERIFIABLE'; reason: string };
+
+export interface PolicyFactEvaluator {
+  /** Evaluate one capability-required policy fact key against the trusted current policy state. */
+  evaluate(factKey: string): PolicyFactVerdict;
+}
+
 export interface GateContext {
   capability: CapabilityDefinition;
   environment: EnvironmentFacts;
   privacyPolicy: PrivacyPolicy;
   environmentPolicy: EnvironmentPolicy;
   constraints: Constraints;
+  /**
+   * Trusted policy-fact evaluator (P1-04, R1). Absent whenever a capability
+   * requires policy facts → the gate REJECTs: key presence in caller-supplied
+   * constraints is not verification.
+   */
+  policyFacts?: PolicyFactEvaluator;
 }
 
 function disposition(
@@ -232,6 +256,10 @@ export function runHardGates(
   // Gate 4 — User / organization policy: user constraints precede ranking.
   const requirements = binding.environmentRequirements;
   const policyProblems: string[] = [];
+  // Explicit deterministic dispositions recorded on a PASS: verified facts and
+  // declared-but-unevaluated constraints are surfaced in the gate reason, so
+  // the record never silently certifies an unevaluated condition.
+  const policyNotes: string[] = [];
 
   // Disclosure dimension (P1-02): a no-disclosure privacy policy (localOnly,
   // or externalDisclosure FORBIDDEN) admits only bindings whose requirements
@@ -258,8 +286,25 @@ export function runHardGates(
       );
     }
   }
-  if (context.constraints.other?.offline === true && requirements.networkAccess === 'REQUIRED') {
-    policyProblems.push('offline constraint forbids network access');
+
+  // Offline constraint (P1 supplemental, R1): an offline execution requirement
+  // admits only bindings whose requirements explicitly declare networkAccess
+  // FORBIDDEN — the binding-level no-network declaration is the trusted
+  // machine-checkable offline evidence in the frozen binding contract.
+  // REQUIRED (network transfer), OPTIONAL (unproven offline mode) and an
+  // absent declaration all fail closed; an explicit FORBIDDEN posture stays
+  // eligible.
+  if (
+    context.constraints.other?.offline === true &&
+    requirements.networkAccess !== 'FORBIDDEN'
+  ) {
+    if (requirements.networkAccess === 'REQUIRED') {
+      policyProblems.push('offline constraint forbids network access');
+    } else {
+      policyProblems.push(
+        'offline constraint requires a proven no-network execution mode: networkAccess OPTIONAL / undeclared is an unproven offline posture — fail closed',
+      );
+    }
   }
   if (
     !context.environmentPolicy.allowElevation &&
@@ -268,15 +313,24 @@ export function runHardGates(
     policyProblems.push('goal policy disallows elevated execution');
   }
 
-  // Capability-required policy facts (P1-04): requiredPolicyFacts are keys
-  // that must be current in the goal constraints before side-effecting
-  // execution. A key absent from constraints.other cannot be proven current —
-  // fail closed instead of ranking a binding whose required policy facts are
-  // unevaluated.
+  // Capability-required policy facts (P1-04, R1): requiredPolicyFacts are
+  // CURRENT facts owned by a policy authority. They are evaluated exclusively
+  // through the trusted evaluator — key presence (or any value) in the
+  // caller-supplied constraints is never proof. Where no evaluator is
+  // configured, or the verdict is UNSATISFIED/UNVERIFIABLE, the gate fails
+  // closed.
   for (const factKey of context.capability.requiredPolicyFacts) {
-    if (context.constraints.other?.[factKey] === undefined) {
+    const verdict = context.policyFacts?.evaluate(factKey);
+    if (verdict?.status === 'SATISFIED') {
+      policyNotes.push(
+        `policy fact "${factKey}" verified current by the trusted policy evaluator (${verdict.evidence})`,
+      );
+    } else {
+      const detail = verdict
+        ? verdict.reason
+        : 'no trusted policy fact evaluator is configured';
       policyProblems.push(
-        `capability requires policy fact "${factKey}" to be current; it is missing from the goal constraints — fail closed`,
+        `capability requires policy fact "${factKey}" current per trusted policy authority — ${detail}; caller-provided constraint values are not verification — fail closed`,
       );
     }
   }
@@ -297,19 +351,20 @@ export function runHardGates(
     }
   }
 
-  // Format constraint (P1-04): evaluated only against explicit curated
-  // formatSupport facts. A covered-but-different requested format is a REJECT;
-  // with no curated facts the constraint is not silently certified — the PASS
-  // reason records the explicit deferral to downstream verification.
-  const formatDeferredNotes: string[] = [];
+  // Format constraint (P1-04, R1): a REQUIRED output format is a necessary
+  // condition (frozen Product resolver v0.1: necessary output format before
+  // ranking). It is evaluated only against explicit curated formatSupport
+  // facts: a covered-but-different requested format is a REJECT, and a format
+  // that cannot be proven (no curated facts, or malformed facts) is a REJECT —
+  // an unprovable mandatory format is never a deferred PASS.
   const format = context.constraints.format;
   if (format !== undefined) {
     const formatSupport = readFormatSupport(provider);
     if (formatSupport.status === 'MALFORMED') {
       policyProblems.push(`malformed curated format facts — fail closed: ${formatSupport.reason}`);
     } else if (formatSupport.status === 'ABSENT') {
-      formatDeferredNotes.push(
-        `requested format "${format}" is not gate-evaluable for this binding (no curated format facts on the provider); deferred to downstream verification`,
+      policyProblems.push(
+        `required format "${format}" cannot be proven for this binding: the provider declares no curated format facts — an unprovable mandatory format is never a deferred PASS`,
       );
     } else if (
       !formatSupport.formats.some(
@@ -318,6 +373,26 @@ export function runHardGates(
     ) {
       policyProblems.push(
         `provider does not declare support for the requested format "${format}" (curated format facts: ${formatSupport.formats.join(', ')})`,
+      );
+    }
+  }
+
+  // Descriptive constraints (P1-04, R1): these remain descriptive at the
+  // frozen contract layer (no curated fact class can evaluate them at resolver
+  // v0.1). They receive an explicit deterministic disposition in the gate
+  // reason — surfaced, carried to downstream verification, and never silently
+  // certified here.
+  const descriptiveConstraints: readonly (keyof Constraints)[] = [
+    'privacy',
+    'executionEnvironment',
+    'resourceLimits',
+    'retainRemove',
+  ];
+  for (const key of descriptiveConstraints) {
+    const value = context.constraints[key];
+    if (value !== undefined) {
+      policyNotes.push(
+        `descriptive constraint "${key}" ("${String(value)}") declared — no curated gate evaluation at resolver v0.1, explicitly not certified here and carried to downstream verification`,
       );
     }
   }
@@ -333,8 +408,8 @@ export function runHardGates(
       'USER_ORG_POLICY',
       binding.bindingId,
       'PASS',
-      formatDeferredNotes.length > 0
-        ? `no user/org policy violation; ${formatDeferredNotes.join('; ')}`
+      policyNotes.length > 0
+        ? `no user/org policy violation — ${policyNotes.join('; ')}`
         : 'no user/org policy violation',
     ),
   );
