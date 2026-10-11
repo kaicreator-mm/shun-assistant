@@ -5,8 +5,6 @@
 //
 // Changing the location changes the bundle hash → the helper must be re-pinned
 // → an explicit authority event (§4.6.1).
-import { homedir } from 'node:os';
-import { join } from 'node:path';
 
 // Build-time constant injected by scripts/build-helper.ts (JSON.stringify'd,
 // so a production build without SHUN_EXECUTOR_BUILD_AUTHORITY_DIR yields '').
@@ -40,7 +38,7 @@ export function grantHmacKeyFileOverride(): string | undefined {
 
 /**
  * Empty define == production build without the override env var: it means the
- * documented default (<USERPROFILE>\.shun\authority), NOT the empty string.
+ * protected Windows default (C:\\ProgramData\\Shun\\authority), NOT the empty string.
  * Honoring '' would degrade every trust anchor (helper-pin.json,
  * current-authority.json, grant-hmac.key, plans/) to CWD-relative resolution —
  * and the helper CWD is inherited from the untrusted launcher, which could
@@ -49,5 +47,5 @@ export function grantHmacKeyFileOverride(): string | undefined {
  */
 export function resolveAuthorityDirectory(defined: string | undefined): string {
   const trusted = defined?.trim();
-  return trusted && trusted.length > 0 ? trusted : join(homedir(), '.shun', 'authority');
+  return trusted && trusted.length > 0 ? trusted : 'C:\\ProgramData\\Shun\\authority';
 }
