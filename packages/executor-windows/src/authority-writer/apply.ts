@@ -40,7 +40,6 @@ import {
   PolicyWindowSchema,
   verifyWriterJob,
   type WriterJob,
-  type WriterJob,
 } from './job.ts';
 
 export type WriterRefusalCode =
