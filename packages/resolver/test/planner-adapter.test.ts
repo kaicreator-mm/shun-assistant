@@ -128,7 +128,7 @@ describe('trusted planner adapter factory pins transport provenance (P2 R1)', ()
     expect(planner.calls).toBe(0);
   });
 
-  it('a provenance-declared local planner is bound by the factory and accepted under a local-only policy (R2 positive control)', async () => {
+  it('declared LOCAL provenance remains untrusted at the execution seam despite factory minting (R3)', async () => {
     const input = request();
     const planner = spyPlanner(validProposal(input));
     const result = await interpretGoalViaPlanner({
@@ -137,8 +137,8 @@ describe('trusted planner adapter factory pins transport provenance (P2 R1)', ()
       adapter: localPlannerAdapter(declareLocalPlanner(planner)),
       objectExists: () => true,
     });
-    expect(result.status).toBe('PROPOSAL_ACCEPTED');
-    expect(planner.calls).toBe(1);
+    expect(result.status).toBe('PLANNER_UNAVAILABLE');
+    expect(planner.calls).toBe(0);
   });
 
   it('the adapter-bound transport drives policy: a remote adapter under the offline constraint is unavailable without invocation', async () => {
