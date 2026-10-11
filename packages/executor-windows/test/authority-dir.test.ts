@@ -89,6 +89,7 @@ describe.skipIf(!ON_WINDOWS)(
         helperRevision: 'shun.executor-windows.helper/planted',
         helperSha256: sha256File(emptyDefineBundle),
         relaySha256: sha256File(authority.relayScript),
+        nodeExeSha256: sha256File(process.execPath),
         workspaceRoot: plantedCwd,
         pinnedAt: new Date().toISOString(),
       });

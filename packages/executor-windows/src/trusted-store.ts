@@ -41,6 +41,15 @@ export const HelperPinSchema = z.strictObject({
   /** SHA-256 of the elevation relay script content (lowercase hex). */
   relaySha256: z.string().regex(/^[0-9a-f]{64}$/),
   /**
+   * SHA-256 of the node.exe interpreter the helper runs on (lowercase hex,
+   * C12). The launcher chooses the interpreter path and an attacker-run
+   * launcher could point it at its own node; without this pin the bundle
+   * hash would be measured theater — a substituted interpreter can ignore
+   * the bundle entirely. An interpreter update is an authority event: it
+   * changes this pin exactly like a helper revision.
+   */
+  nodeExeSha256: z.string().regex(/^[0-9a-f]{64}$/),
+  /**
    * The only directory root inside which the helper accepts its I/O channel
    * paths (journal/receipt/cancel/evidence). The helper runs elevated: an
    * unbounded journal/receipt path from the launcher would be an elevated

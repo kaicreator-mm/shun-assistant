@@ -140,6 +140,23 @@ describe('helper pin', () => {
     expect(readHelperPin(dir)).toBeUndefined();
   });
 
+  it('pre-C12 pin without the node.exe digest reads as undefined (fail closed, no legacy downgrade)', () => {
+    const dir = tmpDir();
+    writeFileSync(
+      join(dir, 'helper-pin.json'),
+      JSON.stringify({
+        schemaVersion: 'shun.executor-windows.helper-pin/1',
+        helperRevision: 'rev-0',
+        helperSha256: 'a'.repeat(64),
+        relaySha256: 'b'.repeat(64),
+        workspaceRoot: 'C:\\shun\\workspace',
+        pinnedAt: '2026-01-01T00:00:00.000Z',
+      }),
+      'utf8',
+    );
+    expect(readHelperPin(dir)).toBeUndefined();
+  });
+
   it('pin roundtrips and carries the workspace root anchor', () => {
     const dir = tmpDir();
     const pin = {
@@ -147,6 +164,7 @@ describe('helper pin', () => {
       helperRevision: 'rev-1',
       helperSha256: 'a'.repeat(64),
       relaySha256: 'b'.repeat(64),
+      nodeExeSha256: 'c'.repeat(64),
       workspaceRoot: 'C:\\shun\\workspace',
       pinnedAt: '2026-01-01T00:00:00.000Z',
     };

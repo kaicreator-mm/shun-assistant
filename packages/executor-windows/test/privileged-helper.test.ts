@@ -325,7 +325,7 @@ describe.skipIf(!ON_WINDOWS)(
         define: { SHUN_EXECUTOR_AUTHORITY_DIR: JSON.stringify(join(authority.root, 'elsewhere')) },
       });
       const pin = readHelperPin(authority.authorityDir);
-      const check = verifyPinnedHelper(impostor, authority.relayScript, pin);
+      const check = verifyPinnedHelper(impostor, authority.relayScript, process.execPath, pin);
       expect(check.ok).toBe(false);
       if (!check.ok) expect(check.reason).toContain('helper identity mismatch');
 

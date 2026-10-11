@@ -71,6 +71,23 @@ export interface TestAuthority {
   relayScript: string;
 }
 
+/** Build a helper bundle with the GIVEN authority dir baked in. */
+export async function buildHelperBundle(
+  authorityDir: string,
+  outfile: string,
+  extraDefines: Record<string, string> = {},
+): Promise<void> {
+  await build({
+    entryPoints: [join(import.meta.dirname, '..', 'src', 'helper', 'executor-helper.ts')],
+    bundle: true,
+    platform: 'node',
+    format: 'esm',
+    target: 'node24',
+    outfile,
+    define: { SHUN_EXECUTOR_AUTHORITY_DIR: JSON.stringify(authorityDir), ...extraDefines },
+  });
+}
+
 /** Build the helper bundle with the TEST authority dir baked in + a full pin. */
 export async function createTestAuthority(basename = 'shun-exec-'): Promise<TestAuthority> {
   const root = mkdtempSync(join(tmpdir(), basename));
@@ -82,15 +99,7 @@ export async function createTestAuthority(basename = 'shun-exec-'): Promise<Test
   mkdirSync(distDir, { recursive: true });
 
   const helperBundle = join(distDir, 'executor-helper.mjs');
-  await build({
-    entryPoints: [join(import.meta.dirname, '..', 'src', 'helper', 'executor-helper.ts')],
-    bundle: true,
-    platform: 'node',
-    format: 'esm',
-    target: 'node24',
-    outfile: helperBundle,
-    define: { SHUN_EXECUTOR_AUTHORITY_DIR: JSON.stringify(authorityDir) },
-  });
+  await buildHelperBundle(authorityDir, helperBundle);
 
   const relayScript = join(import.meta.dirname, '..', 'src', 'relay', 'elevate-relay.ps1');
   const hmacKey = generateGrantHmacKey();
@@ -102,6 +111,9 @@ export async function createTestAuthority(basename = 'shun-exec-'): Promise<Test
     helperRevision: 'shun.executor-windows.helper/test',
     helperSha256: sha256File(helperBundle),
     relaySha256: sha256File(relayScript),
+    // C12: the interpreter running the helper is pinned like the bundle; the
+    // test host's node IS the pinned interpreter.
+    nodeExeSha256: sha256File(process.execPath),
     workspaceRoot,
     pinnedAt: new Date().toISOString(),
   };

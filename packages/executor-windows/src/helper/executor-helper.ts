@@ -14,7 +14,8 @@
 // inside the privileged boundary.
 //
 // Independently re-verified here, never on the launcher's say-so (§4.6.1):
-// envelope schema → own-bundle pin self-check → I/O containment → currentness
+// envelope schema → own-bundle pin self-check → own-interpreter pin self-check
+// → I/O containment → currentness
 // (trusted store, UNRESOLVABLE fails closed) → grant authenticity (HMAC) →
 // grant currentness/expiry → plan-hash re-derivation → action↔plan exact
 // identity → op allowlist + typed surface + declared scope → privilege
@@ -127,6 +128,25 @@ class Helper {
     if (selfSha256 !== pin.helperSha256) {
       process.stderr.write(
         `helper bundle hash ${selfSha256} != pinned ${pin.helperSha256} — substitution refused\n`,
+      );
+      return HELPER_EXIT_CODES.REFUSED;
+    }
+    // C12: the interpreter is part of the pinned identity. The launcher
+    // chooses WHICH node.exe runs this bundle; without this re-measure a
+    // launcher that slipped a substitute interpreter past the launch-side
+    // check would still get an elevated arbitrary-code primitive (the
+    // substitute can ignore this bundle entirely). Pre-journal: nothing
+    // written, REFUSED via the relay exit code only.
+    let nodeSha256: string;
+    try {
+      nodeSha256 = sha256File(process.execPath);
+    } catch {
+      process.stderr.write('helper cannot measure its own node.exe for the pin self-check\n');
+      return HELPER_EXIT_CODES.REFUSED;
+    }
+    if (nodeSha256 !== pin.nodeExeSha256) {
+      process.stderr.write(
+        `node.exe identity mismatch: measured sha256 ${nodeSha256} != pinned ${pin.nodeExeSha256} — refusing to run on an unpinned interpreter\n`,
       );
       return HELPER_EXIT_CODES.REFUSED;
     }
@@ -477,6 +497,8 @@ export function toContractsReceipt(helper: unknown): ExecutionReceipt {
   return ExecutionReceiptSchema.parse(rest);
 }
 
-await new Helper().run(process.argv).then((code) => {
-  process.exit(code);
-});
+// Natural exit (exitCode, not process.exit): an explicit process.exit can
+// truncate pending stderr pipe writes on Windows, and the pre-journal refusal
+// messages ARE the negative evidence channel.
+const exitCode = await new Helper().run(process.argv);
+process.exitCode = exitCode;

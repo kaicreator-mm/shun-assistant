@@ -148,7 +148,14 @@ export class PrivilegedWindowsExecutionBackend implements ExecutionBackend {
 
       // ---- launch-side pin verification (the helper re-checks its own). ----
       const pin = readHelperPin(this.options.authorityDir);
-      const identity = verifyPinnedHelper(this.helperBundlePath(), this.relayScriptPath(), pin);
+      // C12: the pin covers the interpreter too — the launcher measures
+      // node.exe (the very binary the relay will elevate) before any spawn.
+      const identity = verifyPinnedHelper(
+        this.helperBundlePath(),
+        this.relayScriptPath(),
+        process.execPath,
+        pin,
+      );
       if (!identity.ok) return await launchRefused(identity.reason);
       if (!pin)
         return await launchRefused(
