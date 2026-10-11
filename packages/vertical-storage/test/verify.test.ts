@@ -160,6 +160,27 @@ describe('VS-P1-03 — failed/refused/partial multi-target receipts never verify
     expect(check?.detail).toContain('a2');
   });
 
+  it('fails when the FIRST receipt is REFUSED and a later one succeeded (audit recipe ordering)', async () => {
+    const dir = await tmpDir('receipt-refused-first');
+    const journalPath = await writeProvenJournal(dir);
+    const outcome = await verifyStorageCleanup({
+      verificationInput: fakeVerificationInput('task-refused-first', {
+        scopeRoots: ['C:\\scope'],
+        reclaimed: { grossBytes: 100, postActionStateBytes: 0 },
+      }),
+      storageInput: fakeStorageInput('task-refused-first', []),
+      protectedRealPaths: [],
+      journal: { path: journalPath },
+      postActionStateBytes: 0,
+      deps: { preActionFingerprints: new Map() },
+      receipts: [fakeReceipt('a1', 'REFUSED'), fakeReceipt('a2', 'SUCCEEDED')],
+    });
+    expect(outcome.receipt.status).toBe('FAIL');
+    const check = outcome.receipt.checks.find((c) => c.checkId === 'execution-receipts-terminal');
+    expect(check?.status).toBe('FAIL');
+    expect(check?.detail).toContain('a1');
+  });
+
   it('fails when any presented receipt is a partial FAILED execution', async () => {
     const dir = await tmpDir('receipt-partial');
     const journalPath = await writeProvenJournal(dir);
