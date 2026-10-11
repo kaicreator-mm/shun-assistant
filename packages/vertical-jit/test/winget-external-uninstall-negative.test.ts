@@ -86,18 +86,28 @@ async function attemptExternalUninstall(options: { plantLateUserFile: boolean })
     fs,
     machineScope: true,
   });
-  const receipt = await backend.execute({
-    taskId: plan.taskId,
-    actionId: action.actionId,
-    planHash: plan.planHash,
-    policySnapshotRevision: plan.policySnapshotRevision,
-    authorizationKind: 'AUTOMATIC',
-    authorizationRef: grant.grantId,
-    expiresAt: grant.expiresAt,
-    action,
-  }, grant);
-  return { fs, process, receipt, owned, userFile, invokedExternalUninstaller,
-    entries: await journalFor(action.actionId).replay() };
+  const receipt = await backend.execute(
+    {
+      taskId: plan.taskId,
+      actionId: action.actionId,
+      planHash: plan.planHash,
+      policySnapshotRevision: plan.policySnapshotRevision,
+      authorizationKind: 'AUTOMATIC',
+      authorizationRef: grant.grantId,
+      expiresAt: grant.expiresAt,
+      action,
+    },
+    grant,
+  );
+  return {
+    fs,
+    process,
+    receipt,
+    owned,
+    userFile,
+    invokedExternalUninstaller,
+    entries: await journalFor(action.actionId).replay(),
+  };
 }
 
 describe('VJ R5: external WinGet removal is not authorized by a pre-spawn snapshot', () => {
