@@ -26,11 +26,12 @@ export interface CliTaskBackendDeps {
   readonly taskOutputDir: string;
   readonly timeoutMs?: number;
   /**
-   * Trusted plan ledger (L2 §9.3). When provided, every presented action is
-   * re-validated against the ledger BEFORE any process spawn: a plan that
-   * never entered the ledger, an action body that diverges from the ledger's
-   * copy, or an expired authorization window is refused with zero side
-   * effects (VJ-P1-03). Production wiring MUST provide it.
+   * Trusted plan ledger (L2 §9.3). Every presented action is re-validated
+   * against the ledger BEFORE any process spawn: a plan that never entered
+   * the ledger, an action body that diverges from the ledger's copy, or an
+   * expired authorization window is refused with zero side effects
+   * (VJ-P1-03). An unwired ledger is a wiring fault and fails closed — this
+   * backend refuses to spawn argv on the caller's presentation alone.
    */
   readonly ledger?: PlanLedgerPort;
 }
@@ -131,9 +132,10 @@ export class CliTaskBackend implements EnvironmentBackend {
   async #ledgerRefusal(action: AuthorizedAction): Promise<string | undefined> {
     const ledger = this.#deps.ledger;
     if (!ledger) {
-      // No ledger wired: this backend is a non-authoritative plan-only seam
-      // and must not be used for executable steps in production.
-      return undefined;
+      // Fail-closed (VJ-P1-03): no trusted ledger wired means argv cannot be
+      // re-validated against anything — spawn nothing and refuse. An
+      // unwired ledger is a wiring fault, never consent.
+      return 'trusted plan ledger is not wired — refusing to spawn argv on the caller presentation alone';
     }
     const plan = await ledger.byHash(action.planHash);
     if (!plan) {

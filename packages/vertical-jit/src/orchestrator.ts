@@ -71,9 +71,10 @@ export interface JitLifecycleDeps {
   readonly planLedger: PlanLedgerPort;
   /**
    * Trusted gate the task grant presentation must cross before the
-   * environment executes (VJ-P1-03). Optional so plan-only harnesses can
-   * compose, but production wiring MUST provide it — executing argv without
-   * a validated presentation is the bypass this gate closes.
+   * environment executes (VJ-P1-03). Typed optional only so non-executable
+   * composition type-checks; both public lifecycle entries enforce its
+   * presence at runtime — executing argv without a validated presentation
+   * is the bypass this gate closes.
    */
   readonly taskPresentationGate?: TaskPresentationGate;
   /** Journal accessor per actionId — transport failures classify from it (L2 §9.4). */
@@ -106,8 +107,8 @@ export type ImportableAuthorizationPort = Pick<AuthorizationPort, 'issue' | 'cur
  * issued grant must be PRESENTED for validation against the trusted plan
  * ledger and CURRENT authority/policy state — the environment backend is
  * never invoked on the caller's say-so. Wired to the same authority that
- * signs grants; absent ⇒ the caller explicitly runs a non-authoritative
- * plan-only seam and the orchestrator refuses task side effects.
+ * signs grants; both public lifecycle entries refuse to run when it is
+ * absent, so an unwired gate is a wiring fault, never a silent fail-open.
  */
 export type TaskPresentationGate = {
   validate(input: {
@@ -322,7 +323,24 @@ export async function runJitLifecycle(
   // hidden-harness truth and is refused here — fixture-only fields are never
   // production inputs (C-002 / L2 §4.2).
   const input: JitLifecycleInput = parseJitLifecycleInput(rawInput);
+  requireTaskPresentationGate(deps);
   return runLifecycle(input, deps);
+}
+
+/**
+ * Executable entries fail closed on the VJ-P1-03 seam: both public entries
+ * run argv through the environment backend, so both must present the task
+ * grant to the trusted gate. An unwired gate is a wiring fault, never an
+ * implicit opt-out — plan-only composition uses the plan seams, not an
+ * executable lifecycle entry.
+ */
+function requireTaskPresentationGate(deps: JitLifecycleDeps): void {
+  if (!deps.taskPresentationGate) {
+    throw new JitLifecycleError(
+      'POLICY_BLOCKED',
+      'task presentation gate is not wired — refusing to run an executable JIT lifecycle whose task grant is never validated at the trusted boundary (VJ-P1-03)',
+    );
+  }
 }
 
 /** Preview hints threaded into the R2 residue classification (benchmark only). */
@@ -343,6 +361,7 @@ export async function runJitBenchmarkLifecycle(
   options: { providerOwnedFiles?: readonly string[] } = {},
 ): Promise<JitLifecycleOutput> {
   const input: JitBenchmarkInput = JitBenchmarkInputSchema.parse(rawInput);
+  requireTaskPresentationGate(deps);
   const preExisting = input.preExistingUserAssets.map((asset) => asset.path);
   const canaryHashes = new Map<string, string>();
   for (const [index, path] of preExisting.entries()) {
@@ -468,9 +487,13 @@ async function runLifecycle(
   }
   // The exact install-owned manifest, recorded at install time and persisted
   // with the lifecycle state. The removal preview classifies in strict mode
-  // against it: any path inside an install root that the installer did not
-  // create is USER_CREATED_UNKNOWN and fails closed (VJ-P1-01).
-  const ownedManifest = await recordedOwnedManifest(deps, layout.installDirs, preInstallTree);
+  // against it: any path inside an install or cache root that the installer
+  // did not create is USER_CREATED_UNKNOWN and fails closed (VJ-P1-01).
+  const ownedManifest = await recordedOwnedManifest(
+    deps,
+    [...layout.installDirs, ...layout.cacheDirs],
+    preInstallTree,
+  );
 
   // ---- Task execute (bounded R1 use of the acquired provider) ----
   const executable = layout.executables[0];
@@ -819,30 +842,29 @@ async function providerPresent(
   return false;
 }
 
-/** Depth bound for the recursive pre/post-install enumeration. */
-const TREE_WALK_DEPTH = 8;
-
 /**
  * Recursively enumerate every descendant path (directories and files) of a
- * root. The removal preview must see NESTED content — a user file two levels
- * inside the install root is invisible to a one-level listing (VJ-P1-01).
+ * root, with NO depth cap: a fixed depth bound would make content deeper
+ * than the bound invisible to the removal preview, and content the preview
+ * cannot see cannot block deletion (VJ-P1-01). A visited set keyed on the
+ * canonical path guards against symlink/reparse-point cycles — a directory
+ * graph that is not a tree — so the walk always terminates.
  */
-async function treeUnder(
-  deps: JitLifecycleDeps,
-  root: string,
-  depth = TREE_WALK_DEPTH,
-): Promise<string[]> {
+async function treeUnder(deps: JitLifecycleDeps, root: string): Promise<string[]> {
   const found: string[] = [];
-  if (depth < 0 || !(await deps.fs.isDirectory(root))) {
-    return found;
-  }
-  for (const child of await deps.fs.listChildren(root)) {
-    const path = joinPath(root, child);
-    found.push(path);
-    if (await deps.fs.isDirectory(path)) {
-      found.push(...(await treeUnder(deps, path, depth - 1)));
+  const visited = new Set<string>();
+  const walk = async (dir: string): Promise<void> => {
+    const key = canonicalKey(dir);
+    if (visited.has(key)) return;
+    visited.add(key);
+    if (!(await deps.fs.isDirectory(dir))) return;
+    for (const child of await deps.fs.listChildren(dir)) {
+      const path = joinPath(dir, child);
+      found.push(path);
+      await walk(path);
     }
-  }
+  };
+  await walk(root);
   return found;
 }
 
@@ -855,18 +877,25 @@ function canonicalKey(path: string): string {
 }
 
 /**
- * The exact install-owned manifest: everything under the install roots that
- * was NOT on disk before the install ran. The provider root claim cannot
- * cover paths the installer never created — pre-existing or later-dropped
- * user content stays unknown, and unknown is never deleted.
+ * The exact install-owned manifest: every path — census roots included —
+ * that the install created and that was NOT on disk before the install ran,
+ * across BOTH install roots and cache roots (VJ-P1-01 cache census: cache
+ * roots sit inside the deletion scope, so installer-written cache content
+ * must be claimed explicitly, and everything else inside a cache root stays
+ * unknown). The provider root claim cannot cover paths the installer never
+ * created — pre-existing or later-dropped user content stays unknown, and
+ * unknown is never deleted.
  */
 async function recordedOwnedManifest(
   deps: JitLifecycleDeps,
-  installDirs: readonly string[],
+  censusRoots: readonly string[],
   preInstallTree: ReadonlySet<string>,
 ): Promise<string[]> {
   const owned: string[] = [];
-  for (const root of installDirs) {
+  for (const root of censusRoots) {
+    if (!preInstallTree.has(canonicalKey(root))) {
+      owned.push(root);
+    }
     for (const path of await treeUnder(deps, root)) {
       if (!preInstallTree.has(canonicalKey(path))) {
         owned.push(path);

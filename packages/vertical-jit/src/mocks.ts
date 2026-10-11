@@ -332,7 +332,12 @@ export function trustedProviderDefinition(
       official: true,
       version: entry.version,
       hash: entry.installerSha256,
-      signature: `authenticode:${entry.publisher}`,
+      // VJ-P2-05: NO fabricated signature field here. The schema makes it
+      // optional, and this catalog fixture performs no Authenticode
+      // verification — mirroring the honest real adapter (winget.ts), a
+      // signature claim may only be recorded after independent verification.
+      // The field stays absent so it can never be mistaken for verification
+      // evidence or flow into provenance output.
     },
     provenanceFacts: { publisher: entry.publisher, catalog: 'winget-official' },
     licenseFacts: { license: entry.license },
