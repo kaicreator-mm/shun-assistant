@@ -27,6 +27,7 @@ import {
 } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+import type { AuthorizationGrant } from '@shun/contracts';
 import { afterAll, describe, expect, it } from 'vitest';
 import {
   applyWriterJob,
@@ -34,7 +35,7 @@ import {
   verifyWriterIdentity,
 } from '../src/authority-writer/apply.ts';
 import { signWriterJob } from '../src/authority-writer/job.ts';
-import { generateGrantHmacKey } from '../src/trusted-store.ts';
+import { generateGrantHmacKey, signGrantWithHmac } from '../src/trusted-store.ts';
 import { ON_WINDOWS } from './helpers.ts';
 
 const roots: string[] = [];
@@ -87,7 +88,7 @@ function createFixture(): Fixture {
       revokedGrantIds: [],
     }),
   );
-  const grant = {
+  const unsignedGrant: AuthorizationGrant = {
     grantId: 'grant-writer-1',
     issuer: { authorityId: 'shun.action-controller.test', authorityRevision: 'auth-rev-1' },
     taskId: 'task-1',
@@ -96,7 +97,11 @@ function createFixture(): Fixture {
     actionScope: { actionIds: ['act-1'], privilegeLevel: 'ELEVATED' },
     issuedAt: '2026-10-11T00:00:00.000Z',
     expiresAt: '2026-10-12T00:00:00.000Z',
-    integrity: { scheme: 'HMAC_SHA256', value: 'fixture-integrity' },
+    integrity: { scheme: 'HMAC_SHA256', value: 'unsigned-fixture' },
+  };
+  const grant: AuthorizationGrant = {
+    ...unsignedGrant,
+    integrity: signGrantWithHmac(anchorKey, unsignedGrant),
   };
   const grantJob = signWriterJob(anchorKey, {
     jobId: 'job-grant-1',
@@ -209,6 +214,33 @@ describe('ShunAnchorWriter core — unattended negative controls (L2 v0.2 delta 
     expect(result.ok).toBe(false);
     if (!result.ok) expect(result.code).toBe('PAYLOAD_INVALID');
     expect(existsSync(join(fx.anchorRoot, 'grants', 'grant-malformed-only-id.json'))).toBe(false);
+  });
+
+  it('a writer-authentic job cannot store a grant with an invalid inner HMAC envelope', () => {
+    const fx = createFixture();
+    const base = fx.grantJob.payload as AuthorizationGrant;
+    const badGrant: AuthorizationGrant = {
+      ...base,
+      grantId: 'grant-bad-inner-hmac',
+      integrity: { scheme: 'HMAC_SHA256', value: 'attacker-invalid-envelope' },
+    };
+    const job = signWriterJob(fx.anchorKey, {
+      jobId: 'job-bad-inner-hmac',
+      jobType: 'issue-grant',
+      riskClass: 'R2',
+      policyWindowRef: fx.windowId,
+      payload: badGrant,
+    });
+    const result = applyWriterJob(
+      { anchorRoot: fx.anchorRoot, hmacKeyBase64: fx.anchorKey },
+      job,
+    );
+    expect(result.ok).toBe(false);
+    if (!result.ok) expect(result.code).toBe('PAYLOAD_INVALID');
+    expect(
+      existsSync(join(fx.anchorRoot, 'jobs', 'ledger', 'job-bad-inner-hmac.consumed')),
+    ).toBe(false);
+    expect(existsSync(join(fx.anchorRoot, 'grants', 'grant-bad-inner-hmac.json'))).toBe(false);
   });
 
   it('path-ambiguous grantId is refused and cannot escape the grants directory', () => {
