@@ -7,7 +7,7 @@
 // Per-input problems become explicit REJECTED records; original inputs are
 // never modified and failed outputs are removed again.
 import { readdirSync } from 'node:fs';
-import { mkdir, mkdtemp, readFile, rm } from 'node:fs/promises';
+import { lstat, mkdir, mkdtemp, readFile, realpath, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { basename, dirname, join, resolve } from 'node:path';
 import {
@@ -22,8 +22,12 @@ import { scaledDims } from './dims.ts';
 import { inspectBytes, sha256Hex } from './inspect.ts';
 import { type CommittedOracle, commitOracle } from './oracle.ts';
 import { type ImageFormat, type ImageProvider, ImageProviderError } from './provider.ts';
-import type { BindingCandidate, BindingSelection } from './selector.ts';
-import { selectBinding } from './selector.ts';
+import {
+  type BindingCandidate,
+  type BindingSelection,
+  feasiblePool,
+  selectBinding,
+} from './selector.ts';
 import type { BatchRecord, SsimMetric } from './verifier.ts';
 import { verifyBatch } from './verifier.ts';
 
@@ -62,6 +66,28 @@ function reject(inputPath: string, code: ImageBatchFailure): BatchRecord {
   return { inputPath, status: 'REJECTED', rejectionCode: code };
 }
 
+/**
+ * Canonical (symlink/junction-resolved) form of `path`. For a path that does
+ * not exist yet, canonicalizes the nearest existing ancestor and appends the
+ * remaining segments — so an alias planted on a parent directory is still
+ * unmasked before anything is created through it.
+ */
+async function canonicalPath(path: string): Promise<string> {
+  try {
+    return await realpath(path);
+  } catch {
+    const parent = dirname(path);
+    if (parent === path) {
+      return path;
+    }
+    return join(await canonicalPath(parent), basename(path));
+  }
+}
+
+function rejectPolicyBlocked(detail: string): BatchRunResult {
+  return { ok: false, failure: { code: 'POLICY_BLOCKED', detail } };
+}
+
 export async function runImageBatchProcess(
   rawInput: unknown,
   deps: RunDeps,
@@ -78,16 +104,17 @@ export async function runImageBatchProcess(
   const diagnostics: Record<string, string> = {};
 
   // Safety precheck: the output location must differ from every input dir.
+  // Comparison is on canonical (link-resolved) paths — a symlink/junction
+  // alias of an input directory must not slip through lexical resolve().
   const outputDir = resolve(input.outputDirectory);
-  const inputDirs = new Set(input.inputFiles.map((f) => resolve(dirname(f.path))));
-  if (inputDirs.has(outputDir)) {
-    return {
-      ok: false,
-      failure: {
-        code: 'POLICY_BLOCKED',
-        detail: `outputDirectory ${outputDir} must differ from every input directory`,
-      },
-    };
+  const outputDirReal = await canonicalPath(outputDir);
+  const inputDirs = [...new Set(input.inputFiles.map((f) => resolve(dirname(f.path))))];
+  for (const inputDir of inputDirs) {
+    if ((await canonicalPath(inputDir)) === outputDirReal) {
+      return rejectPolicyBlocked(
+        `outputDirectory ${outputDir} aliases input directory ${inputDir} (canonical paths must differ)`,
+      );
+    }
   }
 
   // Collision detection happens BEFORE any write: duplicates inside the batch
@@ -163,6 +190,18 @@ export async function runImageBatchProcess(
     };
   }
 
+  // The output path may have been a not-yet-existing symlink/junction before
+  // mkdir: recursive mkdir succeeds on it and writes would flow through the
+  // alias. Re-canonicalize AFTER creation and re-check before any write.
+  const outputDirAfterMkdir = await canonicalPath(outputDir);
+  for (const inputDir of inputDirs) {
+    if ((await canonicalPath(inputDir)) === outputDirAfterMkdir) {
+      return rejectPolicyBlocked(
+        `outputDirectory ${outputDir} resolves to input directory ${inputDir} after creation (canonical paths must differ)`,
+      );
+    }
+  }
+
   // Read + hash every input once (before execution) for the oracle and for
   // the post-run preservation check. Unreadable inputs reject individually.
   const sourceBytes = new Map<string, Buffer>();
@@ -204,8 +243,8 @@ export async function runImageBatchProcess(
       records.push(reject(file.path, 'DECODE_FAILED'));
       continue;
     }
-    const provider = pickProvider(deps.providers, selection, file.format);
-    if (!provider) {
+    const picked = pickProvider(deps.providers, selection, candidates, deps.facts, file.format);
+    if (!picked) {
       records.push(reject(file.path, 'UNSUPPORTED_INPUT'));
       diagnostics[file.path] = 'no registered provider supports this format';
       continue;
@@ -215,12 +254,26 @@ export async function runImageBatchProcess(
       file.path,
       bytes,
       file.format,
-      provider,
+      picked.provider,
       targetPath,
       input.operation.maxLongEdgePx,
       records,
       diagnostics,
     );
+    // A record routed away from the selected binding must disclose the real
+    // executing binding in the receipt — never let the batch claim the
+    // selected binding produced outputs it did not produce.
+    if (picked.viaFallback) {
+      const record = records.find((r) => r.inputPath === file.path);
+      if (record?.status === 'WRITTEN') {
+        const fallbackBindingId = picked.provider.binding.bindingId;
+        diagnostics[file.path] =
+          `executed via binding ${fallbackBindingId} (selected binding ${selection.selected?.bindingId ?? 'none'} does not support ${file.format})`;
+        selection.rankingEvidence.reasons.push(
+          `record ${file.path} executed via fallback binding ${fallbackBindingId} (selected binding does not support ${file.format})`,
+        );
+      }
+    }
   }
 
   // Post-state: re-hash every input (preservation covers all inputs, not only
@@ -261,6 +314,37 @@ export async function runImageBatchProcess(
 const SENTINEL_MISSING: Sha256Hex =
   'ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff';
 
+/**
+ * Filesystem identity of a path, captured without following links. Cleanup is
+ * only allowed on a path whose live identity still matches the captured one —
+ * the executor never unlinks a file a provider (or a racing actor) created
+ * outside its own verified write.
+ */
+interface FileIdentity {
+  dev: number;
+  ino: number;
+}
+
+async function captureIdentity(path: string): Promise<FileIdentity> {
+  const stat = await lstat(path);
+  return { dev: stat.dev, ino: stat.ino };
+}
+
+async function removeIfIdentityMatches(path: string, identity: FileIdentity): Promise<void> {
+  try {
+    if (
+      await captureIdentity(path).then(
+        (live) => live.dev === identity.dev && live.ino === identity.ino,
+      )
+    ) {
+      await rm(path, { force: true });
+    }
+  } catch {
+    // Vanished (or unreadable) between capture and cleanup: nothing of ours to
+    // remove, and never the caller's business to force it.
+  }
+}
+
 async function executeOne(
   inputPath: string,
   bytes: Buffer,
@@ -271,6 +355,10 @@ async function executeOne(
   records: BatchRecord[],
   diagnostics: Record<string, string>,
 ): Promise<void> {
+  // Ownership is only established after the provider reports success AND the
+  // file's identity at the target is captured; everything the executor removes
+  // must be that same file.
+  let owned: FileIdentity | null = null;
   try {
     const facts = await inspectBytes(bytes).catch((cause: unknown) => {
       throw new ImageProviderError(
@@ -281,20 +369,21 @@ async function executeOne(
     });
     const targetDims = scaledDims(facts.width, facts.height, maxLongEdgePx);
     await provider.resizeTo({ bytes, declaredFormat: format, targetDims, targetPath });
+    owned = await captureIdentity(targetPath);
     // Post-write self-check against the file actually on disk.
     const outputFacts = await inspectBytes(await readFile(targetPath));
     const dimsOk =
       outputFacts.width === targetDims.width && outputFacts.height === targetDims.height;
     const dateOk = facts.captureDate === null || outputFacts.captureDate === facts.captureDate;
     if (!dimsOk) {
-      await rm(targetPath, { force: true });
+      await removeIfIdentityMatches(targetPath, owned);
       records.push(reject(inputPath, 'OUTPUT_VERIFY_FAILED'));
       diagnostics[inputPath] =
         `written dims ${outputFacts.width}x${outputFacts.height} != target ${targetDims.width}x${targetDims.height}`;
       return;
     }
     if (!dateOk) {
-      await rm(targetPath, { force: true });
+      await removeIfIdentityMatches(targetPath, owned);
       records.push(reject(inputPath, 'METADATA_LOST'));
       diagnostics[inputPath] = `capture date "${facts.captureDate}" lost on write`;
       return;
@@ -311,7 +400,11 @@ async function executeOne(
         ? (cause as { code: ImageBatchFailure }).code
         : 'OUTPUT_VERIFY_FAILED';
     diagnostics[inputPath] = cause instanceof Error ? cause.message : String(cause);
-    await rm(targetPath, { force: true });
+    // A provider that threw may have collided with (or raced) a file it did
+    // not create — only ever clean up a path whose identity we verified.
+    if (owned) {
+      await removeIfIdentityMatches(targetPath, owned);
+    }
     records.push(reject(inputPath, code));
   }
 }
@@ -319,19 +412,30 @@ async function executeOne(
 function pickProvider(
   providers: readonly ImageProvider[],
   selection: BindingSelection,
+  candidates: readonly BindingCandidate[],
+  facts: EnvironmentFacts,
   format: ImageFormat,
-): ImageProvider | null {
+): { provider: ImageProvider; viaFallback: boolean } | null {
   if (selection.selected === null) {
     return null;
   }
   const primary = providers.find((p) => p.binding.bindingId === selection.selected?.bindingId);
   if (primary && !primary.binding.unsupportedFormats.includes(format)) {
-    return primary;
+    return { provider: primary, viaFallback: false };
   }
-  const fallback = providers.find(
-    (p) =>
-      p.binding.bindingId !== selection.selected?.bindingId &&
-      !p.binding.unsupportedFormats.includes(format),
-  );
-  return fallback ?? null;
+  // Format fallback is only allowed through the same registered, feasible pool
+  // the selection drew from — never an arbitrary provider in the process.
+  for (const binding of feasiblePool(candidates, facts)) {
+    if (binding.bindingId === selection.selected?.bindingId) {
+      continue;
+    }
+    if (binding.unsupportedFormats.includes(format)) {
+      continue;
+    }
+    const provider = providers.find((p) => p.binding.bindingId === binding.bindingId);
+    if (provider) {
+      return { provider, viaFallback: true };
+    }
+  }
+  return null;
 }

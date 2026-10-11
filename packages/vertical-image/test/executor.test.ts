@@ -1,12 +1,12 @@
 import { existsSync } from 'node:fs';
-import { mkdir, readdir, readFile, stat, truncate, writeFile } from 'node:fs/promises';
+import { mkdir, readdir, readFile, stat, symlink, truncate, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { ShunContractError } from '@shun/contracts';
 import sharp from 'sharp';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { runImageBatchProcess } from '../src/executor.ts';
-import { type BindingView, ImageProviderError } from '../src/provider.ts';
-import { makeSharpImageProvider, SHARP_BINDING_ID } from '../src/sharp-engine.ts';
+import { type BindingView, type ImageProvider, ImageProviderError } from '../src/provider.ts';
+import { makeSharpImageProvider, SHARP_BINDING_ID, sharpBindingView } from '../src/sharp-engine.ts';
 import { type FixtureDir, fixtureDir, jpegBytes, pngBytes, testFacts } from './helpers.ts';
 
 let src: FixtureDir;
@@ -133,6 +133,37 @@ describe('runImageBatchProcess — task-level failures', () => {
     expect((await readdir(src.path)).filter((f) => f.endsWith('.tmp')).length).toBe(0);
   });
 
+  it('blocks an output directory that aliases an input directory via a junction (VI-P1-03)', async () => {
+    const files = await standardBatch();
+    const before = await readdir(src.path);
+    const alias = join(out.path, 'alias-to-src');
+    // A junction/reparse alias of the input dir: lexically a different path,
+    // canonically the input directory itself.
+    await symlink(src.path, alias, 'junction');
+    const result = await runImageBatchProcess(input(files, alias), deps());
+    expect(result.ok).toBe(false);
+    if (!result.ok) {
+      expect(result.failure.code).toBe('POLICY_BLOCKED');
+    }
+    // No effects: the input directory is untouched, no outputs were written.
+    expect((await readdir(src.path)).sort()).toEqual(before.sort());
+  });
+
+  it('blocks an output directory symlink planted after precheck but before mkdir (VI-P1-03)', async () => {
+    const files = await standardBatch();
+    const before = await readdir(src.path);
+    const target = join(out.path, 'created-out');
+    // Plant a symlink AT the not-yet-created output path: mkdir succeeds on
+    // it and writes would land in the input dir unless re-canonicalized.
+    await symlink(src.path, target, 'junction');
+    const result = await runImageBatchProcess(input(files, target), deps());
+    expect(result.ok).toBe(false);
+    if (!result.ok) {
+      expect(result.failure.code).toBe('POLICY_BLOCKED');
+    }
+    expect((await readdir(src.path)).sort()).toEqual(before.sort());
+  });
+
   it('returns NO_TRUSTED_PROVIDER with no provider and writes nothing', async () => {
     const files = await standardBatch();
     const result = await runImageBatchProcess(input(files, out.path), {
@@ -252,7 +283,14 @@ describe('runImageBatchProcess — per-record failures', () => {
     expect(byPath.get(dup)?.rejectionCode).toBe('OUTPUT_COLLISION');
     expect(byPath.get(b)?.status).toBe('WRITTEN');
     expect(byPath.get(c)?.status).toBe('WRITTEN');
-    expect(result.output.verification.status).toBe('PASS');
+    // VI-P1-04: the two pre-rejected files are committed ELIGIBLE oracle
+    // samples with no output — a coverage gap. Verification must not claim
+    // PASS on the surviving samples alone: the oracle check degrades to
+    // NOT_RUN and the receipt to INCOMPLETE.
+    const ssimCheck = result.output.verification.checks.find((c) => c.checkId === 'ssim-oracle');
+    expect(ssimCheck?.status).toBe('NOT_RUN');
+    expect(ssimCheck?.detail).toContain('coverage gap');
+    expect(result.output.verification.status).toBe('INCOMPLETE');
   });
 
   it('routes formats to another registered provider when the selected one lacks them', async () => {
@@ -278,6 +316,146 @@ describe('runImageBatchProcess — per-record failures', () => {
     // The format-complete binding wins over the preferred-class partial one.
     expect(result.output.selectedBindingId).not.toBe('binding-jpg-only');
     expect(result.output.records.filter((r) => r.status === 'WRITTEN')).toHaveLength(4);
+  });
+
+  it('never falls back to an unregistered provider for an uncovered format (VI-P0-02)', async () => {
+    const trustedJpgOnly: BindingView = {
+      bindingId: 'binding-jpg-only-trusted',
+      providerId: 'provider-jpg-only',
+      providerVersion: '0.0.1',
+      adapterId: 'adapter-jpg-only',
+      interfaceClass: 'I1',
+      verifierId: 'verifier.image-c001',
+      environmentRequirements: { backendKind: 'LOCAL_WINDOWS' },
+      unsupportedFormats: ['PNG'],
+    };
+    const rogue: BindingView = {
+      ...trustedJpgOnly,
+      bindingId: 'binding-rogue-unregistered',
+      unsupportedFormats: [],
+    };
+    let rogueCalls = 0;
+    const rogueProvider: ImageProvider = {
+      binding: rogue,
+      async resizeTo() {
+        rogueCalls += 1;
+        throw new Error('rogue provider must never be invoked');
+      },
+    };
+    const jpg = await src.write('ok.jpg', await jpegBytes({ width: 600, height: 400, seed: 171 }));
+    const png = await src.write('ok.png', await pngBytes({ width: 600, height: 400, seed: 172 }));
+    const result = await runImageBatchProcess(
+      input([
+        { path: jpg, format: 'JPG' },
+        { path: png, format: 'PNG' },
+      ]),
+      {
+        facts: testFacts(),
+        providers: [makeSharpImageProvider(trustedJpgOnly), rogueProvider],
+        // Only the trusted binding is a registered candidate; the rogue is
+        // deliberately absent from the candidate set.
+        candidates: [{ binding: trustedJpgOnly, registered: true }],
+      },
+    );
+    expect(result.ok).toBe(true);
+    expect(rogueCalls).toBe(0);
+    if (!result.ok) {
+      return;
+    }
+    const byPath = new Map(result.output.records.map((r) => [r.inputPath, r]));
+    expect(byPath.get(jpg)?.status).toBe('WRITTEN');
+    expect(byPath.get(png)?.rejectionCode).toBe('UNSUPPORTED_INPUT');
+  });
+
+  it('never falls back to a registered-but-infeasible provider for an uncovered format (VI-P0-02)', async () => {
+    const trustedJpgOnly: BindingView = {
+      bindingId: 'binding-jpg-only-trusted',
+      providerId: 'provider-jpg-only',
+      providerVersion: '0.0.1',
+      adapterId: 'adapter-jpg-only',
+      interfaceClass: 'I1',
+      verifierId: 'verifier.image-c001',
+      environmentRequirements: { backendKind: 'LOCAL_WINDOWS' },
+      unsupportedFormats: ['PNG'],
+    };
+    const infeasible: BindingView = {
+      ...trustedJpgOnly,
+      bindingId: 'binding-rogue-infeasible',
+      unsupportedFormats: [],
+      environmentRequirements: { backendKind: 'LOCAL_POSIX' },
+    };
+    let infeasibleCalls = 0;
+    const infeasibleProvider: ImageProvider = {
+      binding: infeasible,
+      async resizeTo() {
+        infeasibleCalls += 1;
+        throw new Error('infeasible provider must never be invoked');
+      },
+    };
+    const jpg = await src.write('ok.jpg', await jpegBytes({ width: 600, height: 400, seed: 173 }));
+    const png = await src.write('ok.png', await pngBytes({ width: 600, height: 400, seed: 174 }));
+    const result = await runImageBatchProcess(
+      input([
+        { path: jpg, format: 'JPG' },
+        { path: png, format: 'PNG' },
+      ]),
+      {
+        facts: testFacts(),
+        providers: [makeSharpImageProvider(trustedJpgOnly), infeasibleProvider],
+        candidates: [
+          { binding: trustedJpgOnly, registered: true },
+          { binding: infeasible, registered: true },
+        ],
+      },
+    );
+    expect(result.ok).toBe(true);
+    expect(infeasibleCalls).toBe(0);
+    if (!result.ok) {
+      return;
+    }
+    const byPath = new Map(result.output.records.map((r) => [r.inputPath, r]));
+    expect(byPath.get(png)?.rejectionCode).toBe('UNSUPPORTED_INPUT');
+  });
+
+  it('records the real executing binding when a registered feasible fallback is used (VI-P0-02)', async () => {
+    const jpgOnly: BindingView = {
+      bindingId: 'binding-jpg-only',
+      providerId: 'provider-jpg-only',
+      providerVersion: '0.0.1',
+      adapterId: 'adapter-jpg-only',
+      interfaceClass: 'I0',
+      verifierId: 'verifier.image-c001',
+      environmentRequirements: { backendKind: 'LOCAL_WINDOWS' },
+      unsupportedFormats: ['PNG'],
+    };
+    const pngOnly: BindingView = {
+      ...jpgOnly,
+      bindingId: 'binding-png-only',
+      unsupportedFormats: ['JPG'],
+    };
+    const files = await standardBatch();
+    const result = await runImageBatchProcess(input(files), {
+      facts: testFacts(),
+      providers: [makeSharpImageProvider(jpgOnly), makeSharpImageProvider(pngOnly)],
+      candidates: [
+        { binding: jpgOnly, registered: true },
+        { binding: pngOnly, registered: true },
+      ],
+    });
+    expect(result.ok).toBe(true);
+    if (!result.ok) {
+      return;
+    }
+    // Neither binding covers the whole batch, so the I0 jpg-only binding is
+    // selected and PNG records must route to the registered feasible png-only
+    // binding — never to an arbitrary provider.
+    expect(result.output.selectedBindingId).toBe('binding-jpg-only');
+    const byPath = new Map(result.output.records.map((r) => [r.inputPath, r]));
+    expect(byPath.get(files[0]?.path ?? '')?.status).toBe('WRITTEN');
+    const pngRecord = byPath.get(files[2]?.path ?? '');
+    expect(pngRecord?.status).toBe('WRITTEN');
+    // The receipt must disclose the binding that actually executed the record.
+    expect(result.diagnostics[pngRecord?.inputPath ?? '']).toContain('binding-png-only');
   });
 
   it('marks PNG records UNSUPPORTED_INPUT when no provider covers PNG', async () => {
@@ -347,6 +525,61 @@ describe('runImageBatchProcess — per-record failures', () => {
     const result = await runImageBatchProcess(input([{ path: a, format: 'JPG' }]), {
       facts: testFacts(),
       providers: [exploding],
+    });
+    expect(result.ok).toBe(true);
+    if (!result.ok) {
+      return;
+    }
+    expect(result.output.records[0]?.status).toBe('REJECTED');
+    expect(existsSync(join(out.path, 'a.jpg'))).toBe(false);
+  });
+
+  it('never deletes a foreign file planted at the target path before a collision (VI-P0-01)', async () => {
+    const a = await src.write('a.jpg', await jpegBytes({ width: 300, height: 200, seed: 161 }));
+    const canary = Buffer.from('foreign canary — planted by another actor, not ours');
+    // Simulated race: between the precheck and the provider call another actor
+    // creates a file at the target path; the provider then reports the
+    // collision. The executor must not unlink a file it did not create.
+    const racer: ImageProvider = {
+      binding: sharpBindingView(),
+      async resizeTo(request) {
+        await writeFile(request.targetPath, canary, { flag: 'wx' });
+        throw new ImageProviderError(
+          'OUTPUT_COLLISION',
+          sharpBindingView().bindingId,
+          'output appeared between precheck and write',
+        );
+      },
+    };
+    const result = await runImageBatchProcess(input([{ path: a, format: 'JPG' }]), {
+      facts: testFacts(),
+      providers: [racer],
+    });
+    expect(result.ok).toBe(true);
+    if (!result.ok) {
+      return;
+    }
+    expect(result.output.records[0]?.status).toBe('REJECTED');
+    expect(result.output.records[0]?.rejectionCode).toBe('OUTPUT_COLLISION');
+    // The canary must survive byte-identical: ownership was never established.
+    expect(await readFile(join(out.path, 'a.jpg'))).toEqual(canary);
+  });
+
+  it('still removes its own malformed output after a dims self-check failure (VI-P0-01)', async () => {
+    const a = await src.write('a.jpg', await jpegBytes({ width: 600, height: 400, seed: 162 }));
+    // Provider writes a WRONG-dims output itself, then the executor's
+    // post-write self-check must reject and clean up the file it owns.
+    const sloppy: ImageProvider = {
+      binding: sharpBindingView(),
+      async resizeTo(request) {
+        const wrong = await jpegBytes({ width: 111, height: 77, seed: 163 });
+        await writeFile(request.targetPath, wrong, { flag: 'wx' });
+        return { captureDate: null, width: 111, height: 77, byteLength: wrong.length };
+      },
+    };
+    const result = await runImageBatchProcess(input([{ path: a, format: 'JPG' }]), {
+      facts: testFacts(),
+      providers: [sloppy],
     });
     expect(result.ok).toBe(true);
     if (!result.ok) {
