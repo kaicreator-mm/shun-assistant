@@ -2,9 +2,9 @@ import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import {
+  type AuthorityRecord,
   AuthorizationAuthority,
   computeIssuanceProof,
-  type AuthorityRecord,
   type PolicySnapshotRecord,
   type StoredGrantRecord,
 } from '@shun/authorization';
@@ -187,9 +187,7 @@ describe('durable ShunStore authorization adapter', () => {
       ...stored,
       storedAt: '2026-10-12T03:00:01.000Z',
     };
-    await expect(adapter.put(conflict)).rejects.toBeInstanceOf(
-      ShunStoreAuthorizationConflictError,
-    );
+    await expect(adapter.put(conflict)).rejects.toBeInstanceOf(ShunStoreAuthorizationConflictError);
     await store.close();
   });
 
