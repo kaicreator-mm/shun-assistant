@@ -8,6 +8,8 @@ importers:
 
   .: {}
 
+  tests/integration: {}
+
   apps/control-api:
     dependencies:
       '@shun/contracts':
