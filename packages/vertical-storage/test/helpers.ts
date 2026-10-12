@@ -9,7 +9,7 @@ import * as os from 'node:os';
 import * as path from 'node:path';
 import { type CurrentAuthorityState, canonicalJson } from '@shun/contracts';
 import { afterEach } from 'vitest';
-import type { StorageDiagnoseRuntime } from '../src/index.ts';
+import type { StorageDiagnosePorts, StorageDiagnoseRuntime } from '../src/index.ts';
 
 const FIXTURE_ROOTS: string[] = [];
 
@@ -227,6 +227,7 @@ export function makeRuntime(options: {
   authority: AuthorityDouble;
   clock: { now: () => string };
 }): StorageDiagnoseRuntime & {
+  ports: StorageDiagnosePorts;
   approvals: { planHash: string; summary: string }[];
   decision: { approved: boolean };
 } {
