@@ -80,8 +80,13 @@ export class SpawnProcess implements ProcessPort {
         env: spec.env ? { ...process.env, ...spec.env } : process.env,
         windowsHide: true,
         shell: false,
-        stdio: ['ignore', 'pipe', 'pipe'],
+        stdio: spec.input === undefined ? ['ignore', 'pipe', 'pipe'] : ['pipe', 'pipe', 'pipe'],
       });
+      if (spec.input !== undefined && child.stdin) {
+        child.stdin.on('error', () => undefined);
+        child.stdin.write(spec.input);
+        child.stdin.end();
+      }
       let stdout = '';
       let stderr = '';
       let timedOut = false;
@@ -92,10 +97,10 @@ export class SpawnProcess implements ProcessPort {
               child.kill();
             }, spec.timeoutMs)
           : undefined;
-      child.stdout.on('data', (chunk: Buffer) => {
+      child.stdout?.on('data', (chunk: Buffer) => {
         stdout += chunk.toString('utf8');
       });
-      child.stderr.on('data', (chunk: Buffer) => {
+      child.stderr?.on('data', (chunk: Buffer) => {
         stderr += chunk.toString('utf8');
       });
       child.on('error', (error) => {

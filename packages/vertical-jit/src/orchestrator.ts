@@ -83,6 +83,24 @@ const LifecycleCheckpointPayloadSchema = z.strictObject({
   }),
   state: z.literal('CHECKPOINT'),
   providerOwnedFiles: z.array(z.string().min(1)).min(1),
+  providerOwnedObjectIdentities: z
+    .array(
+      z.discriminatedUnion('kind', [
+        z.strictObject({
+          path: z.string().min(1),
+          kind: z.literal('file'),
+          fileId: z.string().regex(/^[0-9a-f]{48}$/),
+          sha256: z.string().regex(/^[0-9a-f]{64}$/),
+        }),
+        z.strictObject({
+          path: z.string().min(1),
+          kind: z.literal('dir'),
+          fileId: z.string().regex(/^[0-9a-f]{48}$/),
+        }),
+      ]),
+    )
+    .min(1)
+    .optional(),
   verification: VerificationReceiptSchema,
   recordedAt: z.string().min(1),
 });
@@ -444,6 +462,9 @@ export async function resumeJitRemovalFromCheckpoint(
     configDirs: checkpoint.layout.configDirs,
     executables: checkpoint.layout.executables,
     ownedPaths: checkpoint.providerOwnedFiles,
+    ...(checkpoint.providerOwnedObjectIdentities
+      ? { ownedObjectIdentities: checkpoint.providerOwnedObjectIdentities }
+      : {}),
   };
   const expectedRoots = (
     await deps.acquisition.predictScope(candidate, deps.policy.machineScopeInstall)
@@ -856,6 +877,7 @@ async function runRemovalGate(
     // install-recorded entries, so a post-census injection can never enter
     // the deletion set and an unrecorded asset refuses the whole effect.
     deletionManifest: ownedManifest,
+    ...(layout.ownedObjectIdentities ? { deletionIdentities: layout.ownedObjectIdentities } : {}),
     elevated: binding.elevated,
     timeoutMs: UNINSTALL_TIMEOUT_MS,
   });
@@ -1209,6 +1231,16 @@ async function persistLifecycle(
       },
       state,
       ...(providerOwnedFiles ? { providerOwnedFiles: [...providerOwnedFiles] } : {}),
+      ...(layout.ownedObjectIdentities
+        ? {
+            providerOwnedObjectIdentities: layout.ownedObjectIdentities.map((entry) => ({
+              path: entry.path,
+              kind: entry.kind,
+              fileId: entry.fileId,
+              ...(entry.sha256 ? { sha256: entry.sha256 } : {}),
+            })),
+          }
+        : {}),
       ...(verification ? { verification } : {}),
       recordedAt: deps.clock(),
     },

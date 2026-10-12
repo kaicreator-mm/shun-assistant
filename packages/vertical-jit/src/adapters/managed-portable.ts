@@ -1,176 +1,37 @@
 import { createHash } from 'node:crypto';
-import { lstat, mkdir, readdir, readFile, realpath, rmdir, unlink } from 'node:fs/promises';
+import { lstat, mkdir, readdir, readFile, realpath } from 'node:fs/promises';
 import { basename, dirname, isAbsolute, join, relative, resolve, sep } from 'node:path';
 import type { PlanAction } from '@shun/contracts';
 import type { JournalPort } from '../journal.ts';
 import type { LocalAuthority } from '../local-authority.ts';
 import { LocalPrivilegedBackend, type PerformOutcome } from '../local-backend.ts';
-import {
-  effectTimeScopeRefusal,
-  manifestDeletionSpec,
-  removeManifestEntries,
-} from '../manifest-removal.ts';
+import { effectTimeScopeRefusal, manifestDeletionSpec } from '../manifest-removal.ts';
 import type {
   AcquisitionCandidate,
   AcquisitionPort,
   FilesystemPort,
   ProcessPort,
   ProviderInstallLayout,
+  ProviderOwnedObjectIdentity,
 } from '../ports.ts';
 import { AcquisitionError } from '../ports.ts';
+import type { ExtractedEntry, NativeDeletionPort } from './native-win.ts';
 import { WINGET_SOURCE_NAME, WingetAcquisition } from './winget.ts';
 
+export type { ExtractedEntry, NativeRemovalResult } from './native-win.ts';
+export { SafePowerShellZipExtractor } from './native-win.ts';
+
 export interface ZipExtractorPort {
-  /** Exact archive entry targets accepted and extracted under destination. */
+  /**
+   * Extract exact archive entries under destination through the native
+   * handle-relative primitive, reporting per-entry content identity so the
+   * removal gate can pin deletion to install-time content.
+   */
   extractZip(
     archivePath: string,
     destination: string,
     expectedSha256: string,
-  ): Promise<readonly string[]>;
-}
-
-// Fixed-script PowerShell ZIP extractor. The executable path is injected by
-// trusted host composition and must be absolute; no PATH lookup is performed.
-export class SafePowerShellZipExtractor implements ZipExtractorPort {
-  readonly #process: ProcessPort;
-  readonly #powershellExe: string;
-  readonly #timeoutMs: number;
-
-  constructor(process: ProcessPort, powershellExe: string, options: { timeoutMs?: number } = {}) {
-    if (!isAbsolute(powershellExe)) {
-      throw new Error('portable ZIP extractor requires an absolute PowerShell path');
-    }
-    this.#process = process;
-    this.#powershellExe = powershellExe;
-    this.#timeoutMs = options.timeoutMs ?? 120_000;
-  }
-
-  async extractZip(
-    archivePath: string,
-    destination: string,
-    expectedSha256: string,
-  ): Promise<readonly string[]> {
-    if (!/^[0-9a-f]{64}$/i.test(expectedSha256)) {
-      throw new AcquisitionError('INSTALL_FAILED', 'portable ZIP expected SHA256 is malformed');
-    }
-    // PowerShell 5.1 may dequote/join tokens following -Command. Embed only
-    // base64 data literals in the single command argument so spaces and
-    // parentheses in real winget filenames can never become PowerShell syntax.
-    const archiveB64 = Buffer.from(archivePath, 'utf8').toString('base64');
-    const destinationB64 = Buffer.from(destination, 'utf8').toString('base64');
-    const script = [
-      `$archive=[Text.Encoding]::UTF8.GetString([Convert]::FromBase64String('${archiveB64}'))`,
-      `$dest=[Text.Encoding]::UTF8.GetString([Convert]::FromBase64String('${destinationB64}'))`,
-      `$expectedSha256='${expectedSha256.toLowerCase()}'`,
-      '$ErrorActionPreference = "Stop"',
-      '[void][Reflection.Assembly]::LoadWithPartialName("System.IO.Compression")',
-      '$destFull = [IO.Path]::GetFullPath($dest).TrimEnd([IO.Path]::DirectorySeparatorChar)',
-      '$destPrefix = $destFull + [IO.Path]::DirectorySeparatorChar',
-      '$stream = [IO.File]::Open($archive,[IO.FileMode]::Open,[IO.FileAccess]::Read,[IO.FileShare]::None)',
-      '$sha = [Security.Cryptography.SHA256]::Create()',
-      'try { $actualSha256 = ([BitConverter]::ToString($sha.ComputeHash($stream))).Replace("-","").ToLowerInvariant() } finally { $sha.Dispose() }',
-      'if ($actualSha256 -ne $expectedSha256.ToLowerInvariant()) { $stream.Dispose(); throw "ZIP_SHA_MISMATCH" }',
-      '$stream.Position = 0',
-      '$zip = [IO.Compression.ZipArchive]::new($stream,[IO.Compression.ZipArchiveMode]::Read,$false)',
-      '$targets = [Collections.Generic.List[string]]::new()',
-      '$maxEntries = 4096',
-      '$maxArchiveBytes = [long]536870912',
-      '$maxEntryBytes = [long]268435456',
-      '$maxExpandedBytes = [long]1073741824',
-      '$maxRatio = 400.0',
-      '$declaredTotal = [long]0',
-      '$writtenTotal = [long]0',
-      'try {',
-      '  if ($stream.Length -gt $maxArchiveBytes) { throw "ZIP_ARCHIVE_LIMIT" }',
-      '  if ($zip.Entries.Count -gt $maxEntries) { throw "ZIP_ENTRY_LIMIT" }',
-      '  foreach ($entry in $zip.Entries) {',
-      '    if ($entry.Length -gt $maxEntryBytes) { throw "ZIP_EXPANDED_LIMIT" }',
-      '    $declaredTotal += $entry.Length',
-      '    if ($declaredTotal -gt $maxExpandedBytes) { throw "ZIP_EXPANDED_LIMIT" }',
-      '    if ($entry.Length -gt 0 -and (($entry.CompressedLength -eq 0) -or (([double]$entry.Length / [Math]::Max(1.0,[double]$entry.CompressedLength)) -gt $maxRatio))) { throw "ZIP_COMPRESSION_RATIO_LIMIT" }',
-      '    if ($entry.FullName.Contains(":")) { throw "ZIP_ALTERNATE_STREAM" }',
-      '    $target = [IO.Path]::GetFullPath([IO.Path]::Combine($destFull, $entry.FullName))',
-      '    if (-not $target.StartsWith($destPrefix, [StringComparison]::OrdinalIgnoreCase)) { throw "ZIP_PATH_ESCAPE" }',
-      '  }',
-      '  foreach ($entry in $zip.Entries) {',
-      '    if ($entry.FullName.Contains(":")) { throw "ZIP_ALTERNATE_STREAM" }',
-      '    $target = [IO.Path]::GetFullPath([IO.Path]::Combine($destFull, $entry.FullName))',
-      '    if (-not $target.StartsWith($destPrefix, [StringComparison]::OrdinalIgnoreCase)) { throw "ZIP_PATH_ESCAPE" }',
-      '    if ([string]::IsNullOrEmpty($entry.Name)) {',
-      '      [void][IO.Directory]::CreateDirectory($target)',
-      '    } else {',
-      '      $parent = [IO.Path]::GetDirectoryName($target)',
-      '      [void][IO.Directory]::CreateDirectory($parent)',
-      '      $input = $entry.Open()',
-      '      try {',
-      '        $output = [IO.File]::Open($target,[IO.FileMode]::CreateNew,[IO.FileAccess]::Write,[IO.FileShare]::None)',
-      '        try {',
-      '          $buffer = New-Object byte[] 65536',
-      '          $entryWritten = [long]0',
-      '          while (($n = $input.Read($buffer,0,$buffer.Length)) -gt 0) {',
-      '            $entryWritten += $n',
-      '            $writtenTotal += $n',
-      '            if ($entryWritten -gt $maxEntryBytes -or $writtenTotal -gt $maxExpandedBytes) { throw "ZIP_RUNTIME_EXPANDED_LIMIT" }',
-      '            $output.Write($buffer,0,$n)',
-      '          }',
-      '          if ($entryWritten -ne $entry.Length) { throw "ZIP_LENGTH_MISMATCH" }',
-      '        } finally { $output.Dispose() }',
-      '      } finally { $input.Dispose() }',
-      '    }',
-      '    $cursor = $target',
-      '    while ($cursor.StartsWith($destPrefix,[StringComparison]::OrdinalIgnoreCase)) {',
-      '      $attrs = [IO.File]::GetAttributes($cursor)',
-      '      if (($attrs -band [IO.FileAttributes]::ReparsePoint) -ne 0) { throw "ZIP_REPARSE_POINT" }',
-      '      $cursor = [IO.Path]::GetDirectoryName($cursor)',
-      '    }',
-      '    $targets.Add($target)',
-      '  }',
-      '  foreach ($target in $targets) {',
-      '    [Console]::Out.WriteLine([Convert]::ToBase64String([Text.Encoding]::UTF8.GetBytes($target)))',
-      '  }',
-      '} finally { $zip.Dispose(); $stream.Dispose() }',
-    ].join('; ');
-    const result = await this.#process.run({
-      argv: [this.#powershellExe, '-NoProfile', '-NonInteractive', '-Command', `& { ${script} }`],
-      timeoutMs: this.#timeoutMs,
-    });
-    if (result.exitCode !== 0 || result.timedOut) {
-      throw new AcquisitionError(
-        'INSTALL_FAILED',
-        `portable ZIP extraction failed (${result.exitCode}${result.timedOut ? ', timed out' : ''})`,
-        result.exitCode,
-      );
-    }
-
-    const encodedTargets = result.stdout
-      .split(/\r?\n/)
-      .map((line) => line.trim())
-      .filter(Boolean);
-    if (encodedTargets.length === 0) {
-      throw new AcquisitionError(
-        'INSTALL_FAILED',
-        'portable ZIP extractor returned no exact-entry manifest',
-      );
-    }
-    const targets: string[] = [];
-    for (const encoded of encodedTargets) {
-      if (!/^[A-Za-z0-9+/]+={0,2}$/.test(encoded) || encoded.length % 4 !== 0) {
-        throw new AcquisitionError(
-          'INSTALL_FAILED',
-          'portable ZIP extractor manifest is malformed',
-        );
-      }
-      const decoded = Buffer.from(encoded, 'base64').toString('utf8');
-      if (Buffer.from(decoded, 'utf8').toString('base64') !== encoded || decoded.length === 0) {
-        throw new AcquisitionError(
-          'INSTALL_FAILED',
-          'portable ZIP extractor manifest is malformed',
-        );
-      }
-      targets.push(decoded);
-    }
-    return targets;
-  }
+  ): Promise<readonly ExtractedEntry[]>;
 }
 
 export interface ManagedPortableOptions {
@@ -178,6 +39,11 @@ export interface ManagedPortableOptions {
   wingetExe: string;
   executableName: string;
   extractor: ZipExtractorPort;
+  /**
+   * Native identity-pinned deletion primitive. Removal fails closed when it
+   * is not wired: pathname-based lstat→unlink/rmdir is never a fallback.
+   */
+  nativeDeleter?: NativeDeletionPort;
   timeoutMs?: number;
 }
 
@@ -187,6 +53,8 @@ interface ManagedRecord {
   downloadRoot: string;
   executable?: string;
   ownedPaths?: readonly string[];
+  /** Complete install-time NT object identities for restart-safe deletion. */
+  ownedObjectIdentities?: ReadonlyMap<string, ProviderOwnedObjectIdentity>;
 }
 
 function recordKey(packageId: string, version: string): string {
@@ -255,6 +123,82 @@ async function reparseRefusal(root: string, target: string): Promise<string | un
     }
   }
   return undefined;
+}
+
+function actionDeletionIdentities(
+  parameters: Record<string, unknown>,
+  manifest: readonly string[],
+  managedRoots: readonly string[],
+  localIdentities?: ReadonlyMap<string, ProviderOwnedObjectIdentity>,
+): {
+  identities?: Map<string, ProviderOwnedObjectIdentity>;
+  refusal?: string;
+} {
+  const raw = parameters.deletionIdentities;
+  if (!Array.isArray(raw) || raw.length === 0)
+    return {
+      refusal:
+        'managed portable removal requires install-time NT object identities bound into the authorized ActionPlan',
+    };
+  const manifestKeys = new Set(manifest.map((path) => resolve(path).toLowerCase()));
+  const identities = new Map<string, ProviderOwnedObjectIdentity>();
+  for (const value of raw) {
+    if (!value || typeof value !== 'object')
+      return { refusal: 'managed portable deletion identity is malformed' };
+    const entry = value as {
+      path?: unknown;
+      kind?: unknown;
+      fileId?: unknown;
+      sha256?: unknown;
+    };
+    if (
+      typeof entry.path !== 'string' ||
+      !isAbsolute(entry.path) ||
+      (entry.kind !== 'file' && entry.kind !== 'dir') ||
+      typeof entry.fileId !== 'string' ||
+      !/^[0-9a-f]{48}$/.test(entry.fileId) ||
+      (entry.kind === 'file' &&
+        (typeof entry.sha256 !== 'string' || !/^[0-9a-f]{64}$/.test(entry.sha256))) ||
+      (entry.kind === 'dir' && entry.sha256 !== undefined)
+    ) {
+      return { refusal: 'managed portable deletion identity is malformed' };
+    }
+    const canonical = resolve(entry.path);
+    const key = canonical.toLowerCase();
+    if (!manifestKeys.has(key) || !managedRoots.some((root) => within(canonical, root))) {
+      return {
+        refusal: `managed portable deletion identity escaped the authorized manifest: ${entry.path}`,
+      };
+    }
+    if (identities.has(key))
+      return { refusal: `managed portable deletion identity is duplicated: ${entry.path}` };
+    const identity: ProviderOwnedObjectIdentity = {
+      path: canonical,
+      kind: entry.kind,
+      fileId: entry.fileId,
+      ...(entry.kind === 'file' ? { sha256: entry.sha256 as string } : {}),
+    };
+    const local = localIdentities?.get(key);
+    if (
+      local !== undefined &&
+      (local.kind !== identity.kind ||
+        local.fileId !== identity.fileId ||
+        local.sha256 !== identity.sha256)
+    ) {
+      return {
+        refusal: `authorized deletion identity disagrees with install-time process evidence: ${entry.path}`,
+      };
+    }
+    identities.set(key, identity);
+  }
+  return { identities };
+}
+
+function identityEntries(
+  record: ManagedRecord,
+): readonly ProviderOwnedObjectIdentity[] | undefined {
+  if (!record.ownedObjectIdentities || record.ownedObjectIdentities.size === 0) return undefined;
+  return [...record.ownedObjectIdentities.values()];
 }
 
 export class ManagedPortableAcquisition implements AcquisitionPort {
@@ -330,7 +274,17 @@ export class ManagedPortableAcquisition implements AcquisitionPort {
       ...raw,
       source: `${WINGET_SOURCE_NAME}:${raw.installerUrl}`,
     };
-    this.#records.set(recordKey(candidate.packageId, candidate.version), {
+    // Re-resolving the same provider must not forget what a previous install
+    // recorded (executable, ownership manifest, content identities): the
+    // identity-pinned removal effect depends on them surviving later
+    // resolveExact calls in the same process composition.
+    const keyString = recordKey(candidate.packageId, candidate.version);
+    const existing = this.#records.get(keyString);
+    if (existing) {
+      existing.candidate = candidate;
+      return candidate;
+    }
+    this.#records.set(keyString, {
       candidate,
       packageRoot,
       downloadRoot,
@@ -358,6 +312,7 @@ export class ManagedPortableAcquisition implements AcquisitionPort {
       configDirs: [],
       executables: executable ? [executable] : [],
       ...(record.ownedPaths ? { ownedPaths: record.ownedPaths } : {}),
+      ...(identityEntries(record) ? { ownedObjectIdentities: identityEntries(record) } : {}),
     };
   }
 
@@ -488,7 +443,7 @@ export class ManagedPortableAcquisition implements AcquisitionPort {
     const owned = this.#ownedHierarchy(
       record.packageRoot,
       payloadDir,
-      extracted,
+      extracted.map((entry) => entry.path),
       record.downloadRoot,
       files,
     );
@@ -510,6 +465,38 @@ export class ManagedPortableAcquisition implements AcquisitionPort {
       };
     }
     record.executable = executable;
+
+    const snapshotter = this.#options.nativeDeleter;
+    if (snapshotter) {
+      const objectIdentities = new Map<string, ProviderOwnedObjectIdentity>();
+      for (const root of [record.packageRoot, record.downloadRoot]) {
+        const rootResolved = resolve(root);
+        const rootManifest = owned.filter(
+          (path) => resolve(path) === rootResolved || within(path, root),
+        );
+        const snapshot = await snapshotter.snapshotTreePinned(root, rootManifest);
+        for (const identity of snapshot) {
+          const key = resolve(identity.path).toLowerCase();
+          if (objectIdentities.has(key)) {
+            return { ok: false, note: `native identity snapshot duplicated ${identity.path}` };
+          }
+          objectIdentities.set(key, {
+            path: resolve(identity.path),
+            kind: identity.kind,
+            fileId: identity.fileId,
+            ...(identity.sha256 ? { sha256: identity.sha256 } : {}),
+          });
+        }
+      }
+      if (objectIdentities.size !== owned.length) {
+        return {
+          ok: false,
+          note: `native identity snapshot covered ${objectIdentities.size}/${owned.length} owned paths`,
+        };
+      }
+      record.ownedObjectIdentities = objectIdentities;
+    }
+
     return {
       ok: true,
       exitCode: 0,
@@ -535,6 +522,20 @@ export class ManagedPortableAcquisition implements AcquisitionPort {
       String(parameters.version ?? ''),
     );
     const managedRoots = [record.packageRoot, record.downloadRoot];
+    const identityCheck = actionDeletionIdentities(
+      parameters,
+      spec.manifest,
+      managedRoots,
+      record.ownedObjectIdentities,
+    );
+    if (!identityCheck.identities) {
+      return {
+        ok: false,
+        note: identityCheck.refusal ?? 'managed portable deletion identities are unavailable',
+        noEffect: true,
+        refusalTerminal: 'REFUSED',
+      };
+    }
     const expectedRoots = managedRoots.map((root) => resolve(root).toLowerCase()).sort();
     const actualRoots = spec.scopeRoots.map((root) => resolve(root).toLowerCase()).sort();
     if (
@@ -583,7 +584,30 @@ export class ManagedPortableAcquisition implements AcquisitionPort {
       String(parameters.packageId ?? ''),
       String(parameters.version ?? ''),
     );
+    const deleter = this.#options.nativeDeleter;
+    if (!deleter) {
+      return {
+        ok: false,
+        note: 'managed removal requires the native identity-pinned deletion primitive; none is wired (fail closed)',
+        noEffect: true,
+        refusalTerminal: 'REFUSED',
+      };
+    }
     const managedRoots = [record.packageRoot, record.downloadRoot];
+    const identityCheck = actionDeletionIdentities(
+      parameters,
+      spec.manifest,
+      managedRoots,
+      record.ownedObjectIdentities,
+    );
+    if (!identityCheck.identities) {
+      return {
+        ok: false,
+        note: identityCheck.refusal ?? 'managed portable deletion identities are unavailable',
+        noEffect: true,
+        refusalTerminal: 'REFUSED',
+      };
+    }
     for (const path of spec.manifest) {
       const managedRoot = managedRoots.find((root) => within(path, root));
       if (!managedRoot) {
@@ -608,41 +632,47 @@ export class ManagedPortableAcquisition implements AcquisitionPort {
     if (refusal) {
       return { ok: false, note: refusal, noEffect: true, refusalTerminal: 'REFUSED' };
     }
-    const result = await removeManifestEntries(
-      {
-        removeEntry: async (path) => {
-          // Re-check immediately before EACH destructive primitive. A
-          // same-user race that swaps any manifest ancestor to a junction
-          // must turn into retention/refusal, never an outside-root unlink.
-          const managedRoot = managedRoots.find((root) => within(path, root));
-          if (!managedRoot) return false;
-          const identityRefusal = await reparseRefusal(managedRoot, path);
-          if (identityRefusal) return false;
-          const stat = await lstat(path);
-          if (stat.isSymbolicLink()) return false;
-          if (stat.isDirectory()) {
-            const children = await readdir(path);
-            if (children.length > 0) return false;
-            await rmdir(path);
-            return true;
-          }
-          await unlink(path);
-          return true;
-        },
-      },
-      this.#fs,
-      spec,
-    );
-    if (result.retained.length > 0) {
-      return {
-        ok: false,
-        note: `managed removal retained ${result.retained.length} path(s); provider state requires reconciliation`,
-      };
+
+    // Destructive effect: per-root native identity-pinned deletion. The
+    // primitive pins the root chain and every census object BY HANDLE
+    // (no-follow opens, NT FileId + content identity re-verification, POSIX
+    // delete-by-handle), so a same-path replacement or parent-junction swap
+    // between census and delete retains/refuses instead of deleting foreign
+    // content. There is no pathname unlink/rmdir path here at all.
+    let removedTotal = 0;
+    for (const root of managedRoots) {
+      const rootResolved = resolve(root);
+      const entries = spec.manifest.filter(
+        (path) => resolve(path) === rootResolved || within(path, root),
+      );
+      if (entries.length === 0) continue;
+      const identities = new Map<string, ProviderOwnedObjectIdentity>();
+      for (const [key, identity] of identityCheck.identities) {
+        const original = spec.manifest.find((path) => resolve(path).toLowerCase() === key);
+        if (original && (resolve(original) === rootResolved || within(original, root))) {
+          identities.set(resolve(original), { ...identity, path: resolve(original) });
+        }
+      }
+      const result = await deleter.removeTreePinned(root, entries, identities);
+      if (result.absentRoot) continue;
+      if (!result.ok) {
+        const refusalNote = result.refusal
+          ? `native pinned removal refused (${result.refusal}${result.detail ? `: ${result.detail}` : ''})`
+          : `native pinned removal retained ${result.retained.length} path(s)`;
+        return {
+          ok: false,
+          note: `${refusalNote}; root=${root}; removedBeforeRefusal=${removedTotal}; reconciliation required`,
+          ...(removedTotal === 0
+            ? { noEffect: true as const, refusalTerminal: 'REFUSED' as const }
+            : {}),
+        };
+      }
+      removedTotal += result.removed.length;
     }
     return {
       ok: true,
       exitCode: 0,
-      note: `manifest-owned portable provider removed (${result.removed.length} exact entries)`,
+      note: `identity-pinned native removal completed (${removedTotal} exact entries)`,
     };
   }
 

@@ -1,13 +1,20 @@
 import { createHash } from 'node:crypto';
-import { lstat, mkdir, mkdtemp, rm, symlink, unlink, writeFile } from 'node:fs/promises';
+import { lstat, mkdir, mkdtemp, readFile, rm, symlink, unlink, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
-import { basename, dirname, join, resolve } from 'node:path';
+import { basename, dirname, join, resolve, sep } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { afterEach, describe, expect, it } from 'vitest';
 import {
+  type ExtractedEntry,
   ManagedPortableAcquisition,
-  SafePowerShellZipExtractor,
   type ZipExtractorPort,
 } from '../src/adapters/managed-portable.ts';
+import type {
+  NativeDeletionPort,
+  NativeObjectIdentity,
+  NativeRemovalResult,
+} from '../src/adapters/native-win.ts';
+import { SafePowerShellZipExtractor } from '../src/adapters/native-win.ts';
 import { NodeFilesystem } from '../src/adapters/node.ts';
 import { uninstallAction } from '../src/plans.ts';
 import type { ProcessPort, ProcessResult, ProcessRunSpec } from '../src/ports.ts';
@@ -79,7 +86,7 @@ class FakeExtractor implements ZipExtractorPort {
     _archivePath: string,
     destination: string,
     _expectedSha256: string,
-  ): Promise<readonly string[]> {
+  ): Promise<readonly ExtractedEntry[]> {
     this.calls += 1;
     const bin = join(destination, 'node-v24.13.1-win-x64');
     const executable = join(bin, 'node.exe');
@@ -87,7 +94,65 @@ class FakeExtractor implements ZipExtractorPort {
     await mkdir(bin, { recursive: true });
     await writeFile(executable, 'trusted portable executable');
     await writeFile(license, 'MIT');
-    return [executable, license];
+    return [
+      { path: bin, kind: 'dir', bytes: 0 },
+      {
+        path: executable,
+        kind: 'file',
+        sha256: sha256(Buffer.from('trusted portable executable')),
+        bytes: 'trusted portable executable'.length,
+      },
+      { path: license, kind: 'file', sha256: sha256(Buffer.from('MIT')), bytes: 3 },
+    ];
+  }
+}
+
+/** Scripted stand-in for the native identity-pinned deleter (transport logic only). */
+class ScriptedDeleter implements NativeDeletionPort {
+  readonly calls: {
+    root: string;
+    manifest: readonly string[];
+    identities?: ReadonlyMap<string, NativeObjectIdentity>;
+  }[] = [];
+  #outcome: (root: string) => NativeRemovalResult = () => ({ ok: true, removed: [], retained: [] });
+
+  outcome(fn: (root: string) => NativeRemovalResult): void {
+    this.#outcome = fn;
+  }
+
+  async snapshotTreePinned(
+    _root: string,
+    manifest: readonly string[],
+  ): Promise<readonly NativeObjectIdentity[]> {
+    const identities: NativeObjectIdentity[] = [];
+    for (const path of manifest) {
+      const stat = await lstat(path);
+      const fileId = sha256(Buffer.from(`test-file-id:${resolve(path)}`)).slice(0, 48);
+      if (stat.isDirectory()) {
+        identities.push({ path: resolve(path), kind: 'dir', fileId });
+      } else {
+        identities.push({
+          path: resolve(path),
+          kind: 'file',
+          fileId,
+          sha256: sha256(await readFile(path)),
+        });
+      }
+    }
+    return identities;
+  }
+
+  async removeTreePinned(
+    root: string,
+    manifest: readonly string[],
+    identities?: ReadonlyMap<string, NativeObjectIdentity>,
+  ): Promise<NativeRemovalResult> {
+    const call = { root, manifest: [...manifest], identities };
+    this.calls.push(call);
+    const result = this.#outcome(root);
+    return call.manifest.length > 0 && result.ok
+      ? { ...result, removed: [...call.manifest] }
+      : result;
   }
 }
 
@@ -100,11 +165,21 @@ async function exists(path: string): Promise<boolean> {
   }
 }
 
-// The command-shape assertions are source-only controls. Real ZIP bomb,
-// junction-swap and native handle behavior require independent Windows runs.
+// The command-shape assertions are source-only transport controls. Real ZIP
+// bomb, junction-swap and native handle behavior run in native-safety.win.test
+// on genuine Windows hosts (no skip) against the same committed C# primitive.
 describe('T10 safe portable ZIP extraction command', () => {
-  it('requires an absolute PowerShell path and keeps archive/destination as argv data', async () => {
-    const process = new DownloadingProcess(Buffer.from('unused'));
+  class CapturingProcess implements ProcessPort {
+    readonly calls: ProcessRunSpec[] = [];
+
+    async run(spec: ProcessRunSpec): Promise<ProcessResult> {
+      this.calls.push(spec);
+      return { exitCode: 1, stdout: '', stderr: 'stopped-after-capture', timedOut: false };
+    }
+  }
+
+  it('requires an absolute PowerShell path and keeps archive/destination out of argv entirely', async () => {
+    const process = new CapturingProcess();
     expect(() => new SafePowerShellZipExtractor(process, 'powershell.exe')).toThrow(
       /absolute PowerShell path/,
     );
@@ -114,28 +189,82 @@ describe('T10 safe portable ZIP extraction command', () => {
     await extractor
       .extractZip('C:\\downloads\\artifact.zip', 'C:\\managed\\payload', 'a'.repeat(64))
       .catch(() => undefined);
-    const call = process.calls.at(-1);
-    expect(call?.argv[0]).toBe(powershell);
-    expect(call?.argv).toHaveLength(5);
-    expect(call?.argv).not.toContain('C:\\downloads\\artifact.zip');
-    expect(call?.argv).not.toContain('C:\\managed\\payload');
-    const command = call?.argv[4] ?? '';
-    expect(command).toContain(
+    await extractor
+      .extractZip(
+        'C:\\other\\some dir (x64)\\ar(t).zip',
+        'C:\\managed\\other payload',
+        'b'.repeat(64),
+      )
+      .catch(() => undefined);
+    expect(process.calls).toHaveLength(2);
+    for (const call of process.calls) {
+      expect(call.argv[0]).toBe(powershell);
+      expect(call.argv).toHaveLength(5);
+      expect(call.argv).not.toContain('C:\\downloads\\artifact.zip');
+      expect(call.argv).not.toContain('C:\\managed\\payload');
+      expect(call.argv[4]).toContain('Add-Type');
+      expect(call.argv[4]).toContain('[Shun.Native]::Extract');
+      expect(call.argv[4]).not.toContain('Expand-Archive');
+    }
+    // The bootstrap command is FIXED: only base64 stdin payloads vary.
+    expect(process.calls[0]?.argv[4]).toBe(process.calls[1]?.argv[4]);
+
+    const input = process.calls[0]?.input ?? '';
+    const lines = input.split('\n');
+    expect(lines[0]?.trim()).toBe('extract');
+    expect(lines[1]?.trim()).toBe(
+      Buffer.from(
+        await readFile(
+          fileURLToPath(new URL('../src/adapters/ShunNative.cs', import.meta.url)),
+          'utf8',
+        ),
+        'utf8',
+      ).toString('base64'),
+    );
+    expect(lines[2]?.trim()).toBe(
       Buffer.from('C:\\downloads\\artifact.zip', 'utf8').toString('base64'),
     );
-    expect(command).toContain(Buffer.from('C:\\managed\\payload', 'utf8').toString('base64'));
-    expect(command).toContain('ZIP_PATH_ESCAPE');
-    expect(command).toContain('ReparsePoint');
-    expect(command).toContain('[IO.FileShare]::None');
-    expect(command).toContain('ComputeHash($stream)');
-    expect(command).toContain('ZIP_SHA_MISMATCH');
-    expect(command).toContain('a'.repeat(64));
-    expect(command).toContain('ZIP_ENTRY_LIMIT');
-    expect(command).toContain('ZIP_EXPANDED_LIMIT');
-    expect(command).toContain('ZIP_COMPRESSION_RATIO_LIMIT');
-    expect(command).toContain('ZIP_RUNTIME_EXPANDED_LIMIT');
-    expect(command).toContain('[IO.FileMode]::CreateNew');
-    expect(command).not.toContain('Expand-Archive');
+    expect(lines[3]?.trim()).toBe(Buffer.from('C:\\managed\\payload', 'utf8').toString('base64'));
+    expect(lines[4]?.trim()).toBe(Buffer.from('a'.repeat(64), 'utf8').toString('base64'));
+    expect(input).not.toContain('C:\\downloads\\artifact.zip');
+  });
+
+  it('commits the native no-follow/identity-pinned primitive source with the required markers', async () => {
+    const source = await readFile(
+      fileURLToPath(new URL('../src/adapters/ShunNative.cs', import.meta.url)),
+      'utf8',
+    );
+    // handle-relative no-follow primitives (not pathname re-checks)
+    expect(source).toContain('NtCreateFile');
+    expect(source).toContain('FILE_OPEN_REPARSE_POINT');
+    expect(source).toContain('NtQueryDirectoryFile');
+    expect(source).toContain('FileDispositionInformationEx');
+    expect(source).toContain('FILE_DISPOSITION_FLAG_POSIX_SEMANTICS');
+    expect(source).toContain('FileIdInformation');
+    expect(source).toContain('MaxEntries = 4096');
+    expect(source).toContain('MaxArchiveBytes = 536870912L');
+    expect(source).toContain('MaxEntryBytes = 268435456L');
+    expect(source).toContain('MaxExpandedBytes = 1073741824L');
+    expect(source).toContain('MaxRatio = 400.0');
+    // fail-closed refusals
+    for (const marker of [
+      'ZIP_SHA_MISMATCH',
+      'ZIP_PATH_ESCAPE',
+      'ZIP_ALTERNATE_STREAM',
+      'ZIP_ENTRY_COLLISION',
+      'ZIP_ENTRY_LIMIT',
+      'ZIP_EXPANDED_LIMIT',
+      'ZIP_COMPRESSION_RATIO_LIMIT',
+      'ZIP_RUNTIME_EXPANDED_LIMIT',
+      'ZIP_REPARSE_POINT',
+      'ZIP_LENGTH_MISMATCH',
+      'FOREIGN_CONTENT',
+      'FOREIGN_REPARSE',
+    ]) {
+      expect(source).toContain(marker);
+    }
+    // pathname deletion primitives are structurally absent
+    expect(source).not.toMatch(/DeleteFileW|RemoveDirectoryW/);
   });
 });
 
@@ -156,18 +285,20 @@ describe('T10 managed portable acquisition', () => {
     ).toThrow(/absolute winget\.exe path/);
   });
 
-  it('uses official ZIP catalog metadata, verifies the downloaded SHA and removes only its exact manifest', async () => {
+  it('uses official ZIP catalog metadata, verifies the downloaded SHA and removes only through the native pinned deleter', async () => {
     const root = await mkdtemp(join(tmpdir(), 'shun-portable-'));
     roots.push(root);
     const archive = Buffer.from('catalog-pinned-portable-archive');
     const process = new DownloadingProcess(archive);
     const extractor = new FakeExtractor();
     const fs = new NodeFilesystem();
+    const deleter = new ScriptedDeleter();
     const acquisition = new ManagedPortableAcquisition(process, fs, {
       root: join(root, 'managed'),
       wingetExe: resolve(root, 'winget.exe'),
       executableName: 'node.exe',
       extractor,
+      nativeDeleter: deleter,
     });
 
     const candidate = await acquisition.resolveExact({ packageId: 'OpenJS.NodeJS.LTS' });
@@ -209,6 +340,12 @@ describe('T10 managed portable acquisition', () => {
     expect(manifest).toContain(packageRoot);
     expect(manifest).toContain(downloadRoot);
     expect(manifest.some((path) => path.startsWith(downloadRoot))).toBe(true);
+    expect(layout.ownedObjectIdentities?.some((entry) => basename(entry.path) === 'node.exe')).toBe(
+      true,
+    );
+    expect(
+      layout.ownedObjectIdentities?.some((entry) => entry.path.toLowerCase().endsWith('.yaml')),
+    ).toBe(true);
     const foreign = join(packageRoot, 'user-created.txt');
     const foreignDownload = join(downloadRoot, 'user-created-download.txt');
     await writeFile(foreign, 'must survive/refuse');
@@ -221,6 +358,7 @@ describe('T10 managed portable acquisition', () => {
       version: candidate.version,
       deleteRoots: [packageRoot, downloadRoot],
       deletionManifest: manifest,
+      deletionIdentities: layout.ownedObjectIdentities,
       elevated: false,
       timeoutMs: 30_000,
     });
@@ -232,11 +370,123 @@ describe('T10 managed portable acquisition', () => {
 
     await unlink(foreign);
     await unlink(foreignDownload);
-    expect(await acquisition.removalPreflight(action)).toBeUndefined();
-    const removed = await acquisition.remove(action);
+    // Fresh process composition: resolve the catalog again but carry no in-memory
+    // install ownership state. The authorized ActionPlan must be sufficient.
+    const restarted = new ManagedPortableAcquisition(process, fs, {
+      root: join(root, 'managed'),
+      wingetExe: resolve(root, 'winget.exe'),
+      executableName: 'node.exe',
+      extractor,
+      nativeDeleter: deleter,
+    });
+    await restarted.resolveExact({ packageId: candidate.packageId, version: candidate.version });
+    expect(await restarted.removalPreflight(action)).toBeUndefined();
+    const removed = await restarted.remove(action);
     expect(removed.ok).toBe(true);
-    expect(await exists(packageRoot)).toBe(false);
-    expect(await exists(downloadRoot)).toBe(false);
+    // Exactly one native pinned-removal call per managed root, each scoped to
+    // that root's manifest subset and carrying install-time content identities.
+    expect(deleter.calls).toHaveLength(2);
+    const rootsCalled = deleter.calls.map((call) => resolve(call.root));
+    expect(rootsCalled).toContain(resolve(packageRoot));
+    expect(rootsCalled).toContain(resolve(downloadRoot));
+    for (const call of deleter.calls) {
+      expect(call.manifest.length).toBeGreaterThan(0);
+      for (const path of call.manifest) {
+        expect(
+          resolve(path) === resolve(call.root) ||
+            resolve(path).startsWith(`${resolve(call.root)}${sep}`),
+        ).toBe(true);
+      }
+    }
+    const identities = deleter.calls.flatMap((call) => [...(call.identities ?? new Map()).keys()]);
+    expect(identities.some((path) => basename(path) === 'node.exe')).toBe(true);
+    expect(identities.some((path) => path.toLowerCase().endsWith('.yaml'))).toBe(true);
+  });
+
+  it('fails removal closed when no native identity-pinned deleter is wired', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'shun-portable-nodeleter-'));
+    roots.push(root);
+    const archive = Buffer.from('catalog-pinned-portable-archive');
+    const acquisition = new ManagedPortableAcquisition(
+      new DownloadingProcess(archive),
+      new NodeFilesystem(),
+      {
+        root: join(root, 'managed'),
+        wingetExe: resolve(root, 'winget.exe'),
+        executableName: 'node.exe',
+        extractor: new FakeExtractor(),
+      },
+    );
+    const candidate = await acquisition.resolveExact({ packageId: 'OpenJS.NodeJS.LTS' });
+    expect((await acquisition.install(candidate.packageId, candidate.version)).ok).toBe(true);
+    const layout = await acquisition.layoutOf(candidate);
+    const packageRoot = layout.installDirs[0];
+    const downloadRoot = layout.cacheDirs[0];
+    const manifest = layout.ownedPaths;
+    if (!packageRoot || !downloadRoot || !manifest) throw new Error('managed layout incomplete');
+    const action = uninstallAction({
+      actionId: 'b038-remove-nodeleter',
+      bindingId: 'binding-portable-node',
+      packageId: candidate.packageId,
+      version: candidate.version,
+      deleteRoots: [packageRoot, downloadRoot],
+      deletionManifest: manifest,
+      deletionIdentities: layout.ownedObjectIdentities,
+      elevated: false,
+      timeoutMs: 30_000,
+    });
+    const outcome = await acquisition.remove(action);
+    expect(outcome).toMatchObject({ ok: false, noEffect: true, refusalTerminal: 'REFUSED' });
+    expect(outcome.note).toMatch(/native identity-pinned deletion primitive/i);
+    expect(await exists(packageRoot)).toBe(true);
+    expect(await exists(downloadRoot)).toBe(true);
+  });
+
+  it('surfaces a native pinned-removal refusal with zero deletion as REFUSED/noEffect', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'shun-portable-refuse-'));
+    roots.push(root);
+    const archive = Buffer.from('catalog-pinned-portable-archive');
+    const deleter = new ScriptedDeleter();
+    deleter.outcome((root) => ({
+      ok: false,
+      removed: [],
+      retained: [join(root, 'payload')],
+      refusal: 'FOREIGN_CONTENT',
+      detail: 'same-path replacement detected',
+    }));
+    const acquisition = new ManagedPortableAcquisition(
+      new DownloadingProcess(archive),
+      new NodeFilesystem(),
+      {
+        root: join(root, 'managed'),
+        wingetExe: resolve(root, 'winget.exe'),
+        executableName: 'node.exe',
+        extractor: new FakeExtractor(),
+        nativeDeleter: deleter,
+      },
+    );
+    const candidate = await acquisition.resolveExact({ packageId: 'OpenJS.NodeJS.LTS' });
+    expect((await acquisition.install(candidate.packageId, candidate.version)).ok).toBe(true);
+    const layout = await acquisition.layoutOf(candidate);
+    const packageRoot = layout.installDirs[0];
+    const downloadRoot = layout.cacheDirs[0];
+    const manifest = layout.ownedPaths;
+    if (!packageRoot || !downloadRoot || !manifest) throw new Error('managed layout incomplete');
+    const action = uninstallAction({
+      actionId: 'b038-remove-refuse',
+      bindingId: 'binding-portable-node',
+      packageId: candidate.packageId,
+      version: candidate.version,
+      deleteRoots: [packageRoot, downloadRoot],
+      deletionManifest: manifest,
+      deletionIdentities: layout.ownedObjectIdentities,
+      elevated: false,
+      timeoutMs: 30_000,
+    });
+    const outcome = await acquisition.remove(action);
+    expect(outcome).toMatchObject({ ok: false, noEffect: true, refusalTerminal: 'REFUSED' });
+    expect(outcome.note).toContain('FOREIGN_CONTENT');
+    expect(await exists(packageRoot)).toBe(true);
   });
 
   const itSymlink = process.platform === 'win32' ? it.skip : it;
@@ -246,6 +496,7 @@ describe('T10 managed portable acquisition', () => {
       const root = await mkdtemp(join(tmpdir(), 'shun-portable-symlink-'));
       roots.push(root);
       const archive = Buffer.from('catalog-pinned-portable-archive');
+      const deleter = new ScriptedDeleter();
       const acquisition = new ManagedPortableAcquisition(
         new DownloadingProcess(archive),
         new NodeFilesystem(),
@@ -254,6 +505,7 @@ describe('T10 managed portable acquisition', () => {
           wingetExe: resolve(root, 'winget.exe'),
           executableName: 'node.exe',
           extractor: new FakeExtractor(),
+          nativeDeleter: deleter,
         },
       );
 
@@ -282,6 +534,7 @@ describe('T10 managed portable acquisition', () => {
         version: candidate.version,
         deleteRoots: [packageRoot, downloadRoot],
         deletionManifest: manifest,
+        deletionIdentities: layout.ownedObjectIdentities,
         elevated: false,
         timeoutMs: 30_000,
       });
