@@ -16,7 +16,7 @@ if (tests.length === 0) {
 for (const name of tests) {
   const file = join(here, name);
   console.log(`[t10-integration] RUN ${basename(file)}`);
-  const result = spawnSync(process.execPath, ['--test', file], {
+  const result = spawnSync(process.execPath, ['--experimental-transform-types', '--test', file], {
     cwd: process.cwd(),
     stdio: 'inherit',
     env: process.env,
