@@ -1,0 +1,10 @@
+{
+  "name": "@shun/t10-integration-tests",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "lint": "node --check run-tests.mjs",
+    "test": "node run-tests.mjs"
+  }
+}
