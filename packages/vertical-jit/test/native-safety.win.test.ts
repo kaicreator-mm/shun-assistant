@@ -567,7 +567,7 @@ real(
       resolve(providerRoot),
     ];
     const identities = await identityMapFor(providerRoot, manifest);
-    expect(identities.size).toBe(4);
+    expect(identities.size).toBe(manifest.length);
     const missing = await deleter().removeTreePinned(providerRoot, manifest);
     expect(missing.ok).toBe(false);
     expect(missing.refusal).toBe('IDENTITY_MISSING');
@@ -704,7 +704,7 @@ real(
     const result = await deleter().removeTreePinned(providerRoot, manifest, identities);
     expect(result.ok).toBe(false);
     expect(result.refusal).toBe('FOREIGN_CONTENT');
-    expect(result.detail).toContain('same-path replacement');
+    expect(result.detail).toMatch(/same-path (object|content) replacement/);
     expect(await exists(join(dest, 'bin', 'node.exe'))).toBe(true);
     expect(await exists(join(dest, 'bin', 'lib.js'))).toBe(true);
   },
@@ -798,10 +798,10 @@ real(
         { name: 'bin/node.exe', data: originalExe, method: 8 as const },
         { name: 'bin/lib.js', data: Buffer.from('lib data'), method: 8 as const },
       ]);
-      const archive = join(base, `round${round}`, 'a.zip');
+      const archive = await freshArchivePath();
       await writeFile(archive, zip);
       const extracted = await extractor().extractZip(archive, dest, sha256(zip));
-      const providerRoot = dirname(dirname(dest));
+      const providerRoot = dirname(dest);
       const manifest = [
         ...manifestFor(
           dest,
