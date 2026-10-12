@@ -4,6 +4,7 @@ export type ShunStoreErrorCode =
   | 'STORE_INVALID_MUTATION'
   | 'STORE_EFFECT_CONFLICT'
   | 'STORE_WRITE_FAILED'
+  | 'STORE_AUTHORIZATION_CONFLICT'
   | 'STORE_CLOSED';
 
 export class ShunStoreError extends Error {
@@ -34,6 +35,13 @@ export class ShunStoreEffectConflictError extends ShunStoreError {
     );
     this.name = 'ShunStoreEffectConflictError';
     this.effectId = effectId;
+  }
+}
+
+export class ShunStoreAuthorizationConflictError extends ShunStoreError {
+  constructor(message: string) {
+    super('STORE_AUTHORIZATION_CONFLICT', message);
+    this.name = 'ShunStoreAuthorizationConflictError';
   }
 }
 

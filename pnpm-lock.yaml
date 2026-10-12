@@ -140,6 +140,9 @@ importers:
 
   packages/store:
     dependencies:
+      '@shun/authorization':
+        specifier: workspace:*
+        version: link:../authorization
       '@shun/contracts':
         specifier: workspace:*
         version: link:../contracts
