@@ -9,6 +9,7 @@
 // issuance nonces are not mislabeled as unrelated generic ShunStoreRecordKind
 // values. All compare-and-save and nonce check-and-set operations use
 // BEGIN IMMEDIATE so distinct SQLite connections serialize the decision+write.
+import type { StatementSync } from 'node:sqlite';
 import {
   type AuthorityRecord,
   AuthorityRecordSchema,
@@ -20,7 +21,6 @@ import {
   StoredGrantRecordSchema,
 } from '@shun/authorization';
 import { canonicalJson } from '@shun/contracts';
-import type { StatementSync } from 'node:sqlite';
 import {
   ShunStoreAuthorizationConflictError,
   ShunStoreInvalidMutationError,
@@ -72,9 +72,7 @@ export class ShunStoreAuthorizationAdapter implements PolicyStateStore, GrantRec
         )
       `);
       this.#statements = {
-        readState: store.database.prepare(
-          'SELECT payload FROM authorization_state WHERE slot = ?',
-        ),
+        readState: store.database.prepare('SELECT payload FROM authorization_state WHERE slot = ?'),
         upsertState: store.database.prepare(`
           INSERT INTO authorization_state (slot, payload)
           VALUES (?, ?)
@@ -159,11 +157,7 @@ export class ShunStoreAuthorizationAdapter implements PolicyStateStore, GrantRec
     return this.#compareAndSave('authority', parsed.data, expectedPrior);
   }
 
-  async consumeIssuanceNonce(
-    nonce: string,
-    expiresAtMs: number,
-    nowMs: number,
-  ): Promise<boolean> {
+  async consumeIssuanceNonce(nonce: string, expiresAtMs: number, nowMs: number): Promise<boolean> {
     if (
       typeof nonce !== 'string' ||
       nonce.length === 0 ||
