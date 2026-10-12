@@ -71,7 +71,7 @@ export async function resolveSharpForB037(facts) {
   const sharp = sharpBindingView();
   const capability = {
     capabilityId: 'image.batch_process',
-    revision: 'c001-v0.1',
+    revision: 'r1',
     inputSchema: { type: 'object' },
     outputSchema: { type: 'object' },
     sideEffectClass: 'R1',
