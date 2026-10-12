@@ -843,8 +843,12 @@ real(
       if (result.ok) {
         expect(await exists(providerRoot)).toBe(false);
       } else {
+        // A racing handle open may fail at the NT boundary before the helper
+        // can classify the observed object as foreign/reparse content. That
+        // is still a fail-closed refusal; the canary/zero-external-effect
+        // invariants above remain the authoritative safety assertions.
         expect(result.refusal ?? 'RETAINED').toMatch(
-          /FOREIGN_CONTENT|FOREIGN_REPARSE|RETAINED|ZIP_REPARSE_POINT/,
+          /FOREIGN_CONTENT|FOREIGN_REPARSE|RETAINED|ZIP_REPARSE_POINT|NATIVE_STATUS/,
         );
       }
     }
