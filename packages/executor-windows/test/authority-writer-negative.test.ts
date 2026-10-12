@@ -30,13 +30,26 @@ import { join } from 'node:path';
 import type { AuthorizationGrant } from '@shun/contracts';
 import { afterAll, describe, expect, it } from 'vitest';
 import {
-  applyWriterJob,
+  applyWriterJob as applyWriterJobCore,
   cleanupWriterTemp,
   verifyWriterIdentity,
 } from '../src/authority-writer/apply.ts';
 import { signWriterJob } from '../src/authority-writer/job.ts';
 import { generateGrantHmacKey, signGrantWithHmac } from '../src/trusted-store.ts';
 import { ON_WINDOWS } from './helpers.ts';
+
+// The grant/TTL policy-window oracle is anchored to a deterministic instant,
+// not wall-clock time. Explicit negative-test now overrides retain precedence.
+const FIXTURE_INSTANT = '2026-10-11T12:00:00.000Z';
+function applyWriterJob(
+  ctx: Parameters<typeof applyWriterJobCore>[0],
+  job: Parameters<typeof applyWriterJobCore>[1],
+): ReturnType<typeof applyWriterJobCore> {
+  return applyWriterJobCore(
+    { ...ctx, now: ctx.now ?? (() => new Date(FIXTURE_INSTANT)) },
+    job,
+  );
+}
 
 const roots: string[] = [];
 afterAll(() => {
