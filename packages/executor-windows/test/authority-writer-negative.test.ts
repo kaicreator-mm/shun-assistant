@@ -45,10 +45,7 @@ function applyWriterJob(
   ctx: Parameters<typeof applyWriterJobCore>[0],
   job: Parameters<typeof applyWriterJobCore>[1],
 ): ReturnType<typeof applyWriterJobCore> {
-  return applyWriterJobCore(
-    { ...ctx, now: ctx.now ?? (() => new Date(FIXTURE_INSTANT)) },
-    job,
-  );
+  return applyWriterJobCore({ ...ctx, now: ctx.now ?? (() => new Date(FIXTURE_INSTANT)) }, job);
 }
 
 const roots: string[] = [];
