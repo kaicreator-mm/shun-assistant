@@ -2,12 +2,14 @@ import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import {
+  ActionController,
   type AuthorityRecord,
   AuthorizationAuthority,
   computeIssuanceProof,
   type PolicySnapshotRecord,
   type StoredGrantRecord,
 } from '@shun/authorization';
+import { type ActionPlan, type ApprovalPort, computePlanHash } from '@shun/contracts';
 import { afterEach, describe, expect, it } from 'vitest';
 import {
   ShunStore,
@@ -87,6 +89,59 @@ function request() {
     authorizationKind: 'EXPLICIT_APPROVAL' as const,
     approvalRef: 'approval-i58-1',
   };
+}
+
+function approvalPort(): ApprovalPort {
+  return {
+    async requestApproval(approval) {
+      return {
+        approvalId: 'approval-i58-controller',
+        taskId: approval.taskId,
+        planHash: approval.planHash,
+        approved: true,
+        approvedBy: 'USER_APPROVAL',
+      };
+    },
+  };
+}
+
+function actionPlan(): ActionPlan {
+  const draft: Omit<ActionPlan, 'planHash'> = {
+    taskId: 'task-i58-controller',
+    capabilityId: 'system.storage.diagnose_bounded_action',
+    bindingRefs: ['binding/shun-storage-local-windows'],
+    rankingPolicyRevision: 'rank-i58-1',
+    policySnapshotRevision: 'policy-r1',
+    actions: [
+      {
+        actionId: 'action-i58-controller-1',
+        bindingRef: 'binding/shun-storage-local-windows',
+        op: 'storage.delete_classified_directory',
+        parameters: { classification: 'CACHE' },
+        sideEffectClass: 'R2',
+        requiredPrivilege: 'NONE',
+        filesystemScope: {
+          read: ['C:\\managed\\cache'],
+          write: ['C:\\managed\\cache'],
+        },
+        networkScope: { allowed: false },
+        timeoutMs: 60_000,
+        cancellation: { supported: true, mode: 'COOPERATIVE' },
+        expectedState: { absent: true },
+      },
+    ],
+    verificationPlan: {
+      verifierId: 'verifier.storage',
+      verifierRevision: 'r1',
+      checks: [{ checkId: 'post-state' }],
+    },
+    recoveryPlan: {
+      classificationStrategy: 'JOURNAL_AND_POST_STATE',
+      reconcileBeforeRetry: true,
+      retryAllowedWhen: 'PROVEN_NOT_EXECUTED',
+    },
+  };
+  return { ...draft, planHash: computePlanHash(draft as ActionPlan) };
 }
 
 describe('durable ShunStore authorization adapter', () => {
@@ -213,5 +268,52 @@ describe('durable ShunStore authorization adapter', () => {
       }),
     ).rejects.toBeInstanceOf(ShunStoreInvalidMutationError);
     await store.close();
+  });
+
+  it('runs the real ActionController across restart and enforces persisted revocation', async () => {
+    const file = dbFile('controller-restart');
+    const firstStore = new ShunStore({ file });
+    const first = new ShunStoreAuthorizationAdapter(firstStore);
+    await seed(first);
+
+    const firstAuthority = authority(first);
+    const firstController = new ActionController({
+      authority: firstAuthority,
+      policyState: first,
+      approvals: approvalPort(),
+      issuanceSecret: ISSUANCE_SECRET,
+      clock: () => CLOCK,
+    });
+    const plan = actionPlan();
+    const authorized = await firstController.authorizePlan({ plan });
+    if (!authorized.ok) {
+      throw new Error(`controller authorization failed: ${authorized.code}`);
+    }
+    const action = authorized.authorization.actions[0];
+    const grant = authorized.authorization.grants[0];
+    if (!action || !grant) throw new Error('controller returned no action/grant');
+    expect(await firstController.authorizeEffect({ plan, action, grant })).toMatchObject({
+      ok: true,
+    });
+    await firstStore.close();
+
+    const reopenedStore = new ShunStore({ file });
+    const reopened = new ShunStoreAuthorizationAdapter(reopenedStore);
+    const restartedAuthority = authority(reopened);
+    expect((await restartedAuthority.storedGrant(grant.grantId))?.grant).toEqual(grant);
+    await restartedAuthority.revokeGrant(grant.grantId);
+
+    const restartedController = new ActionController({
+      authority: restartedAuthority,
+      policyState: reopened,
+      approvals: approvalPort(),
+      issuanceSecret: ISSUANCE_SECRET,
+      clock: () => CLOCK,
+    });
+    expect(await restartedController.authorizeEffect({ plan, action, grant })).toMatchObject({
+      ok: false,
+      code: 'GRANT_REVOKED',
+    });
+    await reopenedStore.close();
   });
 });
