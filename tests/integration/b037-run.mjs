@@ -18,6 +18,18 @@ const execFileAsync = promisify(execFile);
 export const REPORT_CASE = 'B-037';
 export const OUTPUT_RELATIVE = 'candidate/B-037';
 
+export function buildObservationPayload({ outputs, selectedBindingId, hardGateEvidence }) {
+  return {
+    outputs,
+    provider_selection: {
+      selected_binding_id: selectedBindingId,
+      hard_gates_evidence: [...hardGateEvidence],
+    },
+    real_host_validation: 'NOT_RUN',
+    fixture_oracle_status: 'NOT_RUN',
+  };
+}
+
 function scoped(root, target) {
   const rel = relative(root, target);
   return rel.length > 0 && rel.split(/[\\/]/)[0] !== '..' && !isAbsolute(rel);
@@ -227,13 +239,11 @@ export async function runB037({ fixtureRoot, observationFile }) {
   }
   if (Object.keys(outputs).length !== 200) throw new Error('B037_OUTPUT_COUNT_MISMATCH');
 
-  const observationPayload = {
+  const observationPayload = buildObservationPayload({
     outputs,
-    provider_selection: { selected_binding_id: resolution.selectedBindingId },
-    hard_gates_evidence: hardGateEvidence,
-    real_host_validation: 'NOT_RUN',
-    fixture_oracle_status: 'NOT_RUN',
-  };
+    selectedBindingId: resolution.selectedBindingId,
+    hardGateEvidence,
+  });
   await writeFile(observation, `${JSON.stringify(observationPayload, null, 2)}\n`, { flag: 'wx' });
   return { observation, selectedBindingId: resolution.selectedBindingId };
 }
