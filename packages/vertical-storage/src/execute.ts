@@ -19,6 +19,7 @@ import {
   ExecutionReceiptSchema,
   type GrantIntegrity,
   type GrantIntegrityVerifier,
+  type GrantValidationResult,
   pathWithin,
 } from '@shun/contracts';
 import type { CleanupCategory } from './classify.ts';
@@ -46,9 +47,19 @@ export interface ExecuteCleanupInput {
   authorizedAction: AuthorizedAction;
   plan: ActionPlan;
   grant: unknown;
-  currentAuthority: CurrentAuthorityState;
+  /**
+   * Exactly one authorization boundary must be wired:
+   * - legacy/current-authority + integrity verifier (unit/reference mode), or
+   * - a controller presentation gate (production integrated mode).
+   */
+  currentAuthority?: CurrentAuthorityState;
+  verifyIntegrity?: GrantIntegrityVerifier;
+  validatePresentation?: (input: {
+    grant: unknown;
+    plan: ActionPlan;
+    action: AuthorizedAction;
+  }) => Promise<GrantValidationResult> | GrantValidationResult;
   now: string;
-  verifyIntegrity: GrantIntegrityVerifier;
   scopeRoots: readonly string[];
   protectedRealPaths: readonly string[];
   eligibleCategories: readonly CleanupCategory[];
@@ -110,22 +121,51 @@ export async function executeBoundedCleanup(
   });
 
   // ---- Privileged-boundary re-verification (never on the caller's say-so). ----
-  try {
-    assertGrantPresentation({
-      grant: input.grant,
-      plan,
-      action: authorizedAction,
-      currentAuthority: input.currentAuthority,
-      now: input.now,
-      verifyIntegrity: input.verifyIntegrity,
-    });
-  } catch (error) {
-    const detail = error instanceof Error ? error.message : String(error);
+  const controllerGateWired = input.validatePresentation !== undefined;
+  const legacyGateWired =
+    input.currentAuthority !== undefined && input.verifyIntegrity !== undefined;
+  if (controllerGateWired === legacyGateWired) {
+    throw new StorageVerticalError(
+      'R2_GATE_MISSING',
+      'storage executor requires exactly one presentation-validation boundary',
+    );
+  }
+
+  let validationFailure: string | undefined;
+  if (input.validatePresentation) {
+    try {
+      const result = await input.validatePresentation({
+        grant: input.grant,
+        plan,
+        action: authorizedAction,
+      });
+      if (!result.ok) {
+        validationFailure = `${result.code}: ${result.detail}`;
+      }
+    } catch (error) {
+      validationFailure = error instanceof Error ? error.message : String(error);
+    }
+  } else {
+    try {
+      assertGrantPresentation({
+        grant: input.grant,
+        plan,
+        action: authorizedAction,
+        currentAuthority: input.currentAuthority as CurrentAuthorityState,
+        now: input.now,
+        verifyIntegrity: input.verifyIntegrity as GrantIntegrityVerifier,
+      });
+    } catch (error) {
+      validationFailure = error instanceof Error ? error.message : String(error);
+    }
+  }
+
+  if (validationFailure !== undefined) {
     await journal.append({
       at: new Date().toISOString(),
       phase: 'GRANT_VALIDATED',
       actionId: authorizedAction.actionId,
-      errorKind: detail.slice(0, 200),
+      errorKind: validationFailure.slice(0, 200),
     });
     const receipt = buildReceipt(input, startedAt, 'REFUSED', {
       recoveryClassification: 'NOT_STARTED',

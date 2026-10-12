@@ -12,6 +12,7 @@
     "test": "vitest run"
   },
   "dependencies": {
+    "@shun/authorization": "workspace:*",
     "@shun/contracts": "workspace:*",
     "zod": "^4.1.13"
   },

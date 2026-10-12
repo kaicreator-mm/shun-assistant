@@ -10,6 +10,7 @@
 // change here (mock-seams-first per the DAG row).
 import { promises as fsp } from 'node:fs';
 import * as path from 'node:path';
+import type { ActionController, AuthorizedPlan } from '@shun/authorization';
 import {
   type AuthorizedAction,
   type CurrentAuthorityState,
@@ -57,8 +58,16 @@ export interface StorageDiagnosePorts {
   verifyIntegrity: GrantIntegrityVerifier;
 }
 
+export type StorageActionController = Pick<ActionController, 'authorizePlan' | 'authorizeEffect'>;
+
 export interface StorageDiagnoseRuntime {
-  ports: StorageDiagnosePorts;
+  /**
+   * Legacy/reference seam retained for package tests and compatibility.
+   * T10 production integration must use controller instead.
+   */
+  ports?: StorageDiagnosePorts;
+  /** Real production authorization path: plan intake + per-effect currentness gate. */
+  controller?: StorageActionController;
   /** Declared disposable-candidate roots on the target volume (bounded scope policy). */
   scope: StorageScope;
   /** Local directory for observation/journal/checkpoint evidence (never leaves the machine). */
@@ -97,6 +106,14 @@ export async function runStorageDiagnose(
   rawInput: unknown,
 ): Promise<StorageDiagnoseResult> {
   const input: StorageDiagnoseInput = StorageDiagnoseInputSchema.parse(rawInput);
+  const legacyPorts = runtime.ports;
+  const controller = runtime.controller;
+  if ((legacyPorts === undefined) === (controller === undefined)) {
+    throw new StorageVerticalError(
+      'R2_GATE_MISSING',
+      'storage runtime requires exactly one authorization wiring: legacy ports or ActionController',
+    );
+  }
   const scope = await resolveScope(input.targetVolume, runtime.scope);
   await fsp.mkdir(runtime.evidenceDir, { recursive: true });
 
@@ -142,15 +159,7 @@ export async function runStorageDiagnose(
     clock: runtime.clock,
   });
 
-  // ---- APPROVAL (R2 gate; refusal means no execution at all). ----
-  const approval = await runtime.ports.requestApproval({
-    taskId: input.taskId,
-    planHash: proposal.plan.planHash,
-    summary: proposal.preview,
-    evidenceRefs: attribution.evidenceRefs,
-  });
-
-  if (!approval.approved) {
+  const noActionResult = async (): Promise<StorageDiagnoseResult> => {
     const verifiedProtected = await verifyNoActionProtectedAssets(
       input,
       protectedRealPaths,
@@ -167,47 +176,162 @@ export async function runStorageDiagnose(
       protectedAssetVerification: verifiedProtected,
     });
     return { output, preview: proposal.preview, proposal, scope, receipts: [] };
-  }
+  };
 
-  // ---- AUTHORIZATION (grant issuance bound to the exact plan hash). ----
-  const grant = await runtime.ports.issueGrant({
-    taskId: input.taskId,
-    planHash: proposal.plan.planHash,
-    policySnapshotRevision: runtime.policySnapshotRevision,
-    actionScope: {
-      actionIds: proposal.plan.actions.map((a) => a.actionId),
-      privilegeLevel: 'USER',
-      filesystem: {
-        read: proposal.targets.map((t) => t.path),
-        write: proposal.targets.map((t) => t.path),
+  // ---- AUTHORIZATION. Production mode delegates the complete plan to the
+  // real ActionController; legacy ports remain only for package tests/reference
+  // composition and are not T10 integration evidence. ----
+  let controllerAuthorization: AuthorizedPlan | undefined;
+  let legacyGrant: unknown;
+  let r2ApprovedBy: 'USER_APPROVAL' | 'DURABLE_POLICY' = 'USER_APPROVAL';
+
+  if (controller) {
+    const authorization = await controller.authorizePlan({ plan: proposal.plan });
+    if (!authorization.ok) {
+      if (authorization.code === 'APPROVAL_REJECTED') {
+        return noActionResult();
+      }
+      throw new StorageVerticalError(
+        'R2_GATE_MISSING',
+        `ActionController refused storage plan: ${authorization.code} — ${authorization.detail}`,
+      );
+    }
+    controllerAuthorization = authorization.authorization;
+    if (controllerAuthorization.plan.planHash !== proposal.plan.planHash) {
+      throw new StorageVerticalError(
+        'R2_GATE_MISSING',
+        'ActionController returned authorization for a different plan hash',
+      );
+    }
+    if (controllerAuthorization.disposition.kind === 'AUTOMATIC') {
+      throw new StorageVerticalError(
+        'R2_GATE_MISSING',
+        'destructive storage R2 plan cannot execute under AUTOMATIC authorization',
+      );
+    }
+    r2ApprovedBy =
+      controllerAuthorization.disposition.kind === 'DURABLE_POLICY'
+        ? 'DURABLE_POLICY'
+        : 'USER_APPROVAL';
+  } else {
+    if (!legacyPorts) {
+      throw new StorageVerticalError(
+        'R2_GATE_MISSING',
+        'legacy storage authorization is not wired',
+      );
+    }
+    const approval = await legacyPorts.requestApproval({
+      taskId: input.taskId,
+      planHash: proposal.plan.planHash,
+      summary: proposal.preview,
+      evidenceRefs: attribution.evidenceRefs,
+    });
+
+    if (!approval.approved) {
+      return noActionResult();
+    }
+
+    legacyGrant = await legacyPorts.issueGrant({
+      taskId: input.taskId,
+      planHash: proposal.plan.planHash,
+      policySnapshotRevision: runtime.policySnapshotRevision,
+      actionScope: {
+        actionIds: proposal.plan.actions.map((a) => a.actionId),
+        privilegeLevel: 'USER',
+        filesystem: {
+          read: proposal.targets.map((t) => t.path),
+          write: proposal.targets.map((t) => t.path),
+        },
+        network: { allowed: false },
       },
-      network: { allowed: false },
-    },
-    authorizationKind: 'EXPLICIT_APPROVAL',
-    approvalRef: approval.approvalId,
-  });
+      authorizationKind: 'EXPLICIT_APPROVAL',
+      approvalRef: approval.approvalId,
+    });
+  }
 
   // ---- EXECUTE per bounded target (one AuthorizedAction per target). ----
   const journalPath = path.join(runtime.evidenceDir, `journal-${sanitize(input.taskId)}.jsonl`);
   const receipts: ExecutionReceipt[] = [];
   const perActionReclaim = new Map<string, number>();
   for (const planAction of proposal.plan.actions) {
-    const authorizedAction: AuthorizedAction = {
-      taskId: input.taskId,
-      actionId: planAction.actionId,
-      planHash: proposal.plan.planHash,
-      policySnapshotRevision: runtime.policySnapshotRevision,
-      authorizationKind: 'EXPLICIT_APPROVAL',
-      authorizationRef: (grant as { grantId: string }).grantId,
-      action: planAction,
-    };
+    let authorizedAction: AuthorizedAction;
+    let grant: unknown;
+    let controllerGate:
+      | ((gateInput: {
+          grant: unknown;
+          plan: typeof proposal.plan;
+          action: AuthorizedAction;
+        }) => ReturnType<StorageActionController['authorizeEffect']>)
+      | undefined;
+
+    if (controllerAuthorization && controller) {
+      const action = controllerAuthorization.actions.find(
+        (candidate) => candidate.actionId === planAction.actionId,
+      );
+      if (!action || action.planHash !== proposal.plan.planHash) {
+        throw new StorageVerticalError(
+          'R2_GATE_MISSING',
+          `ActionController did not authorize exact storage action ${planAction.actionId}`,
+        );
+      }
+      const matchingGrant = controllerAuthorization.grants.find(
+        (candidate) => candidate.grantId === action.authorizationRef,
+      );
+      if (!matchingGrant) {
+        throw new StorageVerticalError(
+          'R2_GATE_MISSING',
+          `ActionController authorization for ${planAction.actionId} has no matching grant`,
+        );
+      }
+      authorizedAction = action;
+      grant = matchingGrant;
+      controllerGate = (gateInput) => controller.authorizeEffect(gateInput);
+    } else {
+      if (!legacyPorts || legacyGrant === undefined) {
+        throw new StorageVerticalError(
+          'R2_GATE_MISSING',
+          'legacy storage grant is unavailable at execution boundary',
+        );
+      }
+      authorizedAction = {
+        taskId: input.taskId,
+        actionId: planAction.actionId,
+        planHash: proposal.plan.planHash,
+        policySnapshotRevision: runtime.policySnapshotRevision,
+        authorizationKind: 'EXPLICIT_APPROVAL',
+        authorizationRef: (legacyGrant as { grantId: string }).grantId,
+        action: planAction,
+      };
+      grant = legacyGrant;
+    }
+
+    let authorizationBoundary:
+      | { validatePresentation: NonNullable<typeof controllerGate> }
+      | {
+          currentAuthority: Awaited<ReturnType<StorageDiagnosePorts['currentAuthority']>>;
+          verifyIntegrity: StorageDiagnosePorts['verifyIntegrity'];
+        };
+    if (controllerGate) {
+      authorizationBoundary = { validatePresentation: controllerGate };
+    } else {
+      if (!legacyPorts) {
+        throw new StorageVerticalError(
+          'R2_GATE_MISSING',
+          'legacy storage authorization disappeared before the effect boundary',
+        );
+      }
+      authorizationBoundary = {
+        currentAuthority: await legacyPorts.currentAuthority(),
+        verifyIntegrity: legacyPorts.verifyIntegrity,
+      };
+    }
+
     const result = await executeBoundedCleanup({
       authorizedAction,
       plan: proposal.plan,
       grant,
-      currentAuthority: await runtime.ports.currentAuthority(),
+      ...authorizationBoundary,
       now: runtime.clock(),
-      verifyIntegrity: runtime.ports.verifyIntegrity,
       scopeRoots: scope.roots,
       protectedRealPaths,
       eligibleCategories: input.cleanupPolicy.eligibleCategories,
@@ -275,7 +399,7 @@ export async function runStorageDiagnose(
       })),
       r2Gate: R2GateRecordSchema.parse({
         phases: [...R2_GATE_PHASES],
-        approvedBy: 'USER_APPROVAL',
+        approvedBy: r2ApprovedBy,
       }),
     },
     executionEvidence: pickPrimaryReceipt(receipts),
