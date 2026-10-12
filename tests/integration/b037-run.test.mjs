@@ -1,6 +1,11 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { resolveSharpForB037, OUTPUT_RELATIVE, REPORT_CASE } from './b037-run.mjs';
+import {
+  buildObservationPayload,
+  resolveSharpForB037,
+  OUTPUT_RELATIVE,
+  REPORT_CASE,
+} from './b037-run.mjs';
 
 function facts(overrides = {}) {
   return {
@@ -39,4 +44,18 @@ test('resolver fails closed when the observed backend is not local Windows', asy
 test('integration constants remain tied to the frozen T09 case', () => {
   assert.equal(REPORT_CASE, 'B-037');
   assert.equal(OUTPUT_RELATIVE, 'candidate/B-037');
+});
+
+
+test('T09 observation nests hard-gate evidence inside provider_selection', () => {
+  const payload = buildObservationPayload({
+    outputs: { 'sample.jpg': 'candidate/B-037/sample.jpg' },
+    selectedBindingId: 'binding-image-sharp-i0-local',
+    hardGateEvidence: ['network:binding-image-sharp-i0-local:PASS:offline'],
+  });
+  assert.deepEqual(payload.provider_selection, {
+    selected_binding_id: 'binding-image-sharp-i0-local',
+    hard_gates_evidence: ['network:binding-image-sharp-i0-local:PASS:offline'],
+  });
+  assert.equal(Object.hasOwn(payload, 'hard_gates_evidence'), false);
 });
