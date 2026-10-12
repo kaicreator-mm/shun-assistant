@@ -3,9 +3,10 @@
 Authority: Issue #21; frozen B-040, T09 fixture lock and independent semantic
 oracle. This is **not** an integration/real-Windows/release PASS certificate.
 
-The exact runtime test command below is an explicit T10 gate; existing root
-`pnpm test` does **not** discover files in `tests/integration/**` automatically.
-CI success alone must never be reported as this adapter's own test PASS.
+Root `pnpm test` now executes `tests/integration/*.test.mjs` via its workspace
+runner with Node 24 `--experimental-transform-types`. Its passing source tests
+are **not** evidence of a real Windows host, external zero-egress monitoring,
+or T10 acceptance.
 
 This adapter uses the real production `@shun/vertical-support` public
 collector (zero injection argument, actual Windows platform gate), then
@@ -25,8 +26,8 @@ before invoking any candidate; record the precommit SHA outside the fixture:
 python -m pip install -r tests/harness/requirements.txt
 python -m tests.fixtures.generate prepare --root .\t09-run
 python -m tests.fixtures.lock verify --root .\t09-run
-node --test tests/integration/b040-run.test.mjs
-node tests/integration/b040-run.mjs --root .\t09-run --observation .\observed-B-040.json
+node --experimental-transform-types --test tests/integration/b040-run.test.mjs
+node --experimental-transform-types tests/integration/b040-run.mjs --root .\t09-run --observation .\observed-B-040.json
 python -m tests.harness.run --root .\t09-run --case B-040 --observation .\observed-B-040.json --out .\evidence\B-040.json
 ```
 
