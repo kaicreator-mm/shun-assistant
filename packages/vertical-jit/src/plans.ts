@@ -79,6 +79,8 @@ export function taskAction(input: {
   bindingId: string;
   executable: string;
   argv: readonly string[];
+  /** Exact task input paths the acquired provider may read. */
+  readPaths?: readonly string[];
   outputDir: string;
   timeoutMs: number;
 }): PlanAction {
@@ -90,7 +92,7 @@ export function taskAction(input: {
     sideEffectClass: 'R1',
     requiredPrivilege: 'USER',
     filesystemScope: {
-      read: [input.executable],
+      read: [...new Set([input.executable, ...(input.readPaths ?? [])])],
       write: [input.outputDir],
     },
     timeoutMs: input.timeoutMs,

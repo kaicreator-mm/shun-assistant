@@ -3,7 +3,7 @@
 
 import { spawn } from 'node:child_process';
 import { createHash } from 'node:crypto';
-import { mkdir, readdir, readFile, stat, writeFile } from 'node:fs/promises';
+import { lstat, mkdir, readdir, readFile, stat, writeFile } from 'node:fs/promises';
 import { dirname } from 'node:path';
 import type { JournalEntry, JournalPort } from '../journal.ts';
 import type { FilesystemPort, ProcessPort, ProcessResult, ProcessRunSpec } from '../ports.ts';
@@ -11,7 +11,7 @@ import type { FilesystemPort, ProcessPort, ProcessResult, ProcessRunSpec } from 
 export class NodeFilesystem implements FilesystemPort {
   async exists(path: string): Promise<boolean> {
     try {
-      await stat(path);
+      await lstat(path);
       return true;
     } catch {
       return false;
@@ -20,7 +20,7 @@ export class NodeFilesystem implements FilesystemPort {
 
   async isDirectory(path: string): Promise<boolean> {
     try {
-      return (await stat(path)).isDirectory();
+      return (await lstat(path)).isDirectory();
     } catch {
       return false;
     }

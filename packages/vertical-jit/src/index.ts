@@ -5,6 +5,14 @@
 // gated R2 removal with fail-closed residue classification — all behind the
 // frozen contracts ports.
 
+export {
+  ManagedPortableAcquisition,
+  type ManagedPortableBackendDeps,
+  type ManagedPortableOptions,
+  ManagedPortablePrivilegedBackend,
+  SafePowerShellZipExtractor,
+  type ZipExtractorPort,
+} from './adapters/managed-portable.ts';
 export { FileJournal, NodeFilesystem, SpawnProcess } from './adapters/node.ts';
 export {
   WINGET_SOURCE_NAME,

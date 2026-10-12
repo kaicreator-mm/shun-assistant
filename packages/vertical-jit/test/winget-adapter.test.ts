@@ -64,6 +64,17 @@ describe('WingetAcquisition — official source gate', () => {
       kind: 'OFFICIAL_SOURCE_UNAVAILABLE',
     });
   });
+
+  it('refuses an allowlisted host when the configured source is not HTTPS', async () => {
+    const insecure = SOURCE_LIST_OK.replace(
+      'https://cdn.winget.microsoft.com',
+      'http://cdn.winget.microsoft.com',
+    );
+    const acquisition = new WingetAcquisition(scripted([ok(insecure)]), new MemoryFilesystem());
+    await expect(acquisition.officialSources()).rejects.toMatchObject({
+      kind: 'OFFICIAL_SOURCE_UNAVAILABLE',
+    });
+  });
 });
 
 describe('WingetAcquisition — exact provenance resolution', () => {
