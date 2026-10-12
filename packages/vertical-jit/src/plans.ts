@@ -12,6 +12,7 @@ import {
   type RecoveryPlan,
   type VerificationPlan,
 } from '@shun/contracts';
+import type { ProviderOwnedObjectIdentity } from './ports.ts';
 
 /** Post-state expectation recorded on privileged actions (L2 §9.4 reconcile-first). */
 export type ProviderExpectedState =
@@ -79,6 +80,8 @@ export function taskAction(input: {
   bindingId: string;
   executable: string;
   argv: readonly string[];
+  /** Exact task input paths the acquired provider may read. */
+  readPaths?: readonly string[];
   outputDir: string;
   timeoutMs: number;
 }): PlanAction {
@@ -90,7 +93,7 @@ export function taskAction(input: {
     sideEffectClass: 'R1',
     requiredPrivilege: 'USER',
     filesystemScope: {
-      read: [input.executable],
+      read: [...new Set([input.executable, ...(input.readPaths ?? [])])],
       write: [input.outputDir],
     },
     timeoutMs: input.timeoutMs,
@@ -115,6 +118,8 @@ export function uninstallAction(input: {
    * unrecorded content is present.
    */
   deletionManifest: readonly string[];
+  /** Install-time file identities carried inside the signed ActionPlan. */
+  deletionIdentities?: readonly ProviderOwnedObjectIdentity[];
   elevated: boolean;
   timeoutMs: number;
 }): PlanAction {
@@ -126,6 +131,16 @@ export function uninstallAction(input: {
       packageId: input.packageId,
       version: input.version,
       deletionManifest: [...input.deletionManifest],
+      ...(input.deletionIdentities
+        ? {
+            deletionIdentities: input.deletionIdentities.map((entry) => ({
+              path: entry.path,
+              kind: entry.kind,
+              fileId: entry.fileId,
+              ...(entry.sha256 ? { sha256: entry.sha256 } : {}),
+            })),
+          }
+        : {}),
     },
     sideEffectClass: 'R2',
     requiredPrivilege: input.elevated ? 'ELEVATED' : 'USER',

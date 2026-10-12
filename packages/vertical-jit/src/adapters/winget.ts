@@ -35,8 +35,8 @@ const OFFICIAL_ENDPOINT_HOSTS = new Set([
 
 export const WINGET_SOURCE_NAME = 'winget';
 
-function wingetArgv(...args: string[]): string[] {
-  return ['winget', ...args];
+function wingetArgv(program: string, ...args: string[]): string[] {
+  return [program, ...args];
 }
 
 interface LabeledFields {
@@ -61,16 +61,24 @@ export class WingetAcquisition implements AcquisitionPort {
   readonly #process: ProcessPort;
   readonly #fs: FilesystemPort;
   readonly #timeoutMs: number;
+  readonly #program: string;
+  readonly #installerType?: string;
 
-  constructor(process: ProcessPort, fs: FilesystemPort, options: { timeoutMs?: number } = {}) {
+  constructor(
+    process: ProcessPort,
+    fs: FilesystemPort,
+    options: { timeoutMs?: number; program?: string; installerType?: string } = {},
+  ) {
     this.#process = process;
     this.#fs = fs;
     this.#timeoutMs = options.timeoutMs ?? 120_000;
+    this.#program = options.program ?? 'winget';
+    this.#installerType = options.installerType;
   }
 
   async officialSources(): Promise<ReadonlyArray<{ name: string; url: string }>> {
     const result = await this.#process.run({
-      argv: wingetArgv('source', 'list', '--name', WINGET_SOURCE_NAME),
+      argv: wingetArgv(this.#program, 'source', 'list', '--name', WINGET_SOURCE_NAME),
       timeoutMs: this.#timeoutMs,
     });
     if (result.exitCode !== 0) {
@@ -82,19 +90,19 @@ export class WingetAcquisition implements AcquisitionPort {
       );
     }
     const url = /https?:\/\/[^\s]+/.exec(result.stdout)?.[0] ?? '';
-    let host = '';
+    let endpoint: URL | undefined;
     try {
-      host = new URL(url).hostname;
+      endpoint = new URL(url);
     } catch {
-      host = '';
+      endpoint = undefined;
     }
-    if (!OFFICIAL_ENDPOINT_HOSTS.has(host)) {
+    if (endpoint?.protocol !== 'https:' || !OFFICIAL_ENDPOINT_HOSTS.has(endpoint.hostname)) {
       throw new AcquisitionError(
         'OFFICIAL_SOURCE_UNAVAILABLE',
-        `configured "winget" source endpoint "${url}" is not an official endpoint — refusing acquisition`,
+        `configured "winget" source endpoint "${url}" is not an official HTTPS endpoint — refusing acquisition`,
       );
     }
-    return [{ name: WINGET_SOURCE_NAME, url }];
+    return [{ name: WINGET_SOURCE_NAME, url: endpoint.toString().replace(/\/$/, '') }];
   }
 
   async resolveExact(request: {
@@ -104,6 +112,7 @@ export class WingetAcquisition implements AcquisitionPort {
     // Pre-flight: the official source must be the one this adapter resolves from.
     await this.officialSources();
     const argv = wingetArgv(
+      this.#program,
       'show',
       '--id',
       request.packageId,
@@ -111,6 +120,7 @@ export class WingetAcquisition implements AcquisitionPort {
       '--source',
       WINGET_SOURCE_NAME,
       ...(request.version ? ['--version', request.version] : []),
+      ...(this.#installerType ? ['--installer-type', this.#installerType] : []),
       '--disable-interactivity',
     );
     const result = await this.#process.run({ argv, timeoutMs: this.#timeoutMs });
@@ -159,6 +169,8 @@ export class WingetAcquisition implements AcquisitionPort {
       ...(fields['installer sha256']
         ? { installerSha256: fields['installer sha256'].toLowerCase() }
         : {}),
+      ...(fields['installer type'] ? { installerType: fields['installer type'] } : {}),
+      ...(fields['installer url'] ? { installerUrl: fields['installer url'] } : {}),
       ...(publisher ? { publisher } : {}),
       ...(fields.license ? { license: fields.license } : {}),
       // VJ-P2-05: the publisher string is UNVERIFIED text output. A
@@ -325,6 +337,7 @@ export class WingetPrivilegedBackend extends LocalPrivilegedBackend {
     const argv =
       action.op === 'software.install'
         ? wingetArgv(
+            'winget',
             'install',
             '--id',
             packageId,
@@ -341,6 +354,7 @@ export class WingetPrivilegedBackend extends LocalPrivilegedBackend {
           )
         : action.op === 'software.uninstall'
           ? wingetArgv(
+              'winget',
               'uninstall',
               '--id',
               packageId,

@@ -37,6 +37,11 @@ export interface ProcessRunSpec {
   readonly timeoutMs?: number;
   /** Environment additions; secrets pass by reference only at plan level. */
   readonly env?: Readonly<Record<string, string>>;
+  /**
+   * Optional stdin payload (base64/ASCII-safe text for the native-safety
+   * bootstrap; argv never carries archive/destination/manifest data).
+   */
+  readonly input?: string;
 }
 
 /** Process seam. Real impl spawns without a shell; tests script outcomes. */
@@ -80,6 +85,9 @@ export interface AcquisitionCandidate {
   readonly official: boolean;
   readonly version: string;
   readonly installerSha256?: string;
+  /** Catalog-reported installer shape; informational unless an adapter requires it. */
+  readonly installerType?: string;
+  readonly installerUrl?: string;
   readonly publisher?: string;
   readonly license?: string;
   readonly signature?: string;
@@ -90,6 +98,15 @@ export interface AcquisitionCandidate {
  * classification and to install/uninstall filesystem scopes. Roots are
  * exhaustive declarations: anything outside them is not the provider's.
  */
+export interface ProviderOwnedObjectIdentity {
+  readonly path: string;
+  readonly kind: 'file' | 'dir';
+  /** NT FILE_ID_INFORMATION (volume serial + FILE_ID_128), lower-case hex. */
+  readonly fileId: string;
+  /** Present for regular files; absent for directories. */
+  readonly sha256?: string;
+}
+
 export interface ProviderInstallLayout {
   readonly providerId: string;
   readonly version: string;
@@ -98,6 +115,14 @@ export interface ProviderInstallLayout {
   readonly configDirs: readonly string[];
   /** Executable entry points used by the task step (typed argv targets). */
   readonly executables: readonly string[];
+  /**
+   * Optional trusted install-mechanism ownership manifest. When present, the
+   * orchestrator MUST use this exact set instead of inferring ownership from
+   * an install-time filesystem diff.
+   */
+  readonly ownedPaths?: readonly string[];
+  /** Install-time content identities persisted for restart-safe managed deletion. */
+  readonly ownedObjectIdentities?: readonly ProviderOwnedObjectIdentity[];
 }
 
 export interface AcquisitionPort {
@@ -142,4 +167,20 @@ export interface JitDurablePolicy {
 export interface PlanLedgerPort {
   register(plan: ActionPlan): Promise<void>;
   byHash(planHash: string): Promise<ActionPlan | undefined>;
+}
+
+/**
+ * Vertical-local read seam over the authoritative durable lifecycle records.
+ * The shared frozen StorePort stays write-only; composition may adapt the
+ * concrete ShunStore.getRecord('lifecycle_record', recordId) into this seam.
+ * Callers cannot supply arbitrary filesystem manifests as recovery truth.
+ */
+export interface LifecycleCheckpointRecord {
+  readonly recordId: string;
+  readonly payload: Record<string, unknown>;
+  readonly revision?: number;
+}
+
+export interface LifecycleCheckpointReader {
+  getLifecycleRecord(recordId: string): Promise<LifecycleCheckpointRecord | null>;
 }
