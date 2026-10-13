@@ -1,6 +1,6 @@
 # Shun v0.2 — Minimal open-source Provider shortlist (L1 RESEARCH DRAFT)
 
-> **v0.2 product scope updated 2026-10-14:** Real LLM + high-ROI Windows stewardship/verified optimization + generated script/Recipe reuse + usable UI. **Minimal curated, ON-DEMAND downloadable Provider payloads; no optional Provider binaries bundled in Shun Core.** Not a deep Provider platform or app8 integration release. All new OSS binaries must pass exact-version, Windows packaging, provenance, runtime ABI, license and safe-recovery checks. See #80, `docs/product/PRD-v0.2-DRAFT.md` and `docs/product/script-recipe-v0.2-DRAFT.md`.
+> **v0.2 product scope updated 2026-10-14:** Real LLM + high-ROI Windows stewardship/verified optimization + generated script/Recipe reuse + usable UI. **Minimal curated, ON-DEMAND downloadable Provider payloads; no optional Provider binaries bundled in Shun Core.** Not a deep Provider platform or app8 integration release. All new OSS binaries must pass exact-version, Windows packaging, provenance, runtime ABI, license and safe-recovery checks. See #80, `docs/product/PRD-v0.2.md` and `docs/product/script-recipe-v0.2-DRAFT.md`.
 
 ## 1. Rule: minimum Provider breadth
 
