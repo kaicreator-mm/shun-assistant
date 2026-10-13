@@ -11,11 +11,11 @@ v0.2 is a **usable Windows AI computer steward**, not a universal Provider ecosy
 The six v0.2 product pillars:
 
 1. **Real LLM integration**, both explicitly configured remote OpenAI-compatible and attested local on-device endpoints; no mock-only proof.
-2. **High-ROI computer stewardship** based primarily on built-in Windows/Node functionality and carefully reviewed OSS libraries, not new general Provider breadth.
+2. **High-ROI Windows diagnosis and bounded system optimization**: identify evidence-supported performance problems, propose reversible optimizations, execute only admitted typed operations and measure before/after changes. Use Node/Windows built-ins first.
 3. **LLM script creation + safe approval + reusable parameterized Recipes**; verified replay should be deterministic and generally model-free.
 4. **A narrow, explicit multi-language script policy**; not arbitrary executable text running with the user's full rights.
 5. **User-friendly Windows-first UI**, simple onboarding, real progress, explanations and recoverable task history.
-6. **Minimal fixed OSS Provider set only**, reused from v0.1 and a few mature libraries; deep app8 Provider Factory, automatic multi-Provider discovery/benchmarking and marketplace deferred.
+6. **Minimal allowlisted Provider set, distributed on demand**: lean core installer with provider catalog/loader metadata, acquire optional signed/version-pinned Provider payloads only when a user-approved capability is needed; reuse v0.1 JIT lifecycle. Deep app8 Provider Factory, dynamic untrusted tool discovery and marketplace are deferred.
 
 ## 2. MVP task catalog (candidate P0)
 
@@ -26,13 +26,14 @@ Order by reuse of v0.1 kernel, repeat frequency and independently checkable outc
 | P0-A | **System overview and diagnosis**: CPU, RAM, disk usage, OS, uptime, top resource-consuming processes, installed software, startup entries (read-only) | Windows native APIs/PowerShell read-only commands, Node fs/os | Selectively gathered data with PII minimization; never infer a root cause from one snapshot; show evidence and uncertainty |
 | P0-A | **Storage explanation and conservative cleanup**: which approved folder uses space, cache/temp classification, bounded cleanup | Reuse `vertical-storage`; typed native actions | Operator-approved roots; protected assets immutable; R2 preview+consent; verify bytes and canaries |
 | P0-A | **File search / bulk organization**: find by name/type/content, report duplicates (read-only), group/copy/move/rename selected files | Native fs/approved `fd`/`ripgrep`, parameterized Recipe and typed I/O | First preview actual manifest; input untouched when copy-only; no overwrite/alias; R2 explicit approval for destructive/move/rename; crash recovery |
-| P0-A | **Maintenance report**: disk/temporary files/software install state, relevant update and Windows Event data **read-only summaries** | native Windows diagnostics and curated read-only PowerShell; no direct OS repair | Privacy and volume boundaries; evidence citations; no unsupported “fixed your PC” claims |
-| P0-B | **Re-use proven image batch and bounded software lifecycle** through the same UI | Reuse `sharp` and `WinGet` verticals | User selects scope/provider; preserve originals and managed user assets; maintain v0.1 authorization/verification |
+| P0-A | **Maintenance report**: disk/temporary files/software install state, relevant update and Windows Event data **read-only summaries** | native Windows diagnostics and curated read-only PowerShell | Privacy and volume boundaries; no unsupported root-cause or fix claim |
+| P0-A | **System optimization**: bounded storage/cache improvement, explain startup/background pressure; optionally disable/re-enable explicitly selected **known reversible per-user startup entries** after preview | Existing vertical-storage + typed approved Windows actions via Node and fixed PowerShell/CIM; no raw script/elevation | Evidence-backed hypothesis → baseline → preview/approval → verified post-state → restore of exact prior setting. Never touch security software, protected OS/critical services, drivers, generic registry cleaners, pagefile or unverified startup mechanisms |
+| P0-B | **Re-use proven image batch and bounded software lifecycle** through the same UI | Reuse `sharp` and `WinGet` verticals; optional Provider payloads loaded only after curated JIT acquire | User selects scope/provider; preserve originals and managed user assets; maintain v0.1 authorization/verification |
 | P0-B | **Scripted routine**: user says “every time I download invoices, organize them by month” → propose preview-able parameterized Recipe and perform **manual replay** when asked | LLM proposes script/typed plan, Recipe verifier/store, constrained host | No unattended background schedule; execution on selected root only, diff+parameter display, cached script rechecked before each replay |
 
 P0-A are the indispensable initial user journeys; P0-B limited to reuse existing v0.1 capabilities and demonstrate explicit replay. If delivery time is constrained, postpone PDF/archive breadth, not LLM trust or safe script reuse.
 
-**P1 if evidence and packaging are inexpensive:** PDF page merge/split via `pdf-lib` (one library), archive ZIP inspect/create/extract (one library), simple network connectivity diagnostic (read-only), Python generated-script run mode with pinned embedded runtime, explicit user-approved scheduling. OCR, FFmpeg video, software-driver manipulation, background autonomous maintenance and deep app8 integration **defer**.
+**P1 if evidence and packaging are inexpensive:** PDF page merge/split via on-demand `pdf-lib` (one library), archive ZIP inspect/create/extract (one on-demand library), simple network connectivity diagnostic (read-only), power mode recommendation/explicit reversible configuration, limited startup-task/service optimization after independent safety proof, Python generated-script run mode with pinned embedded runtime. OCR, FFmpeg video, driver/firmware changes, invasive registry cleaners, unsupported service tweaks, unattended scheduling and deep app8 integration **defer**.
 
 ## 3. Real LLM system (P0)
 
@@ -63,8 +64,8 @@ The v0.2 definition is in [Script Recipe v0.2 draft](./script-recipe-v0.2-DRAFT.
 
 ## 5. Minimal Provider set and app8 boundary
 
-- **REUSE** existing v0.1 `sharp` and `WinGet` only on already supported scope, and built-in Node/Windows APIs. **Add** `fd` + `ripgrep` for bounded search if needed; `pdf-lib` / one archival utility are P1 opt-ins only after ROI and Windows deployment review. No obligation to integrate qpdf+pdfcpu+libarchive+7-Zip simultaneously.
-- v0.2 runtime remains capable of running typed Provider adapters, but **does not** deepen Provider discovery, automatic Provider generation, multi-Provider substitution benchmarks or catalog marketplace.
+- **REUSE** existing v0.1 `sharp` and `WinGet` only on already supported scope, and built-in Node/Windows APIs. **Add** `fd` + `ripgrep` for bounded search only if needed; `pdf-lib` / one archival utility remain P1 options. Except platform-provided native APIs and the trusted Shun bootstrap/executor, external Provider payloads are **not required to ship inside the core installer**. They are cached and activated from approved manifests on demand; no obligation to integrate qpdf+pdfcpu+libarchive+7-Zip simultaneously.
+- v0.2 adds a **bounded lazy Provider acquisition/activation lifecycle** atop the v0.1 JIT, not deep Provider discovery: `CATALOG_APPROVED → ABSENT → DOWNLOAD_REQUESTED → VERIFIED → INSTALLED → READY → RETAINED/REMOVED`, with `BLOCKED/OFFLINE/DRIFT` typed states. Trust comes from a previously approved signed/pinned catalog, not the LLM or download result. No automatic Provider generation, multi-Provider substitution benchmarks or catalog marketplace.
 - **app8 remains independent, deferred.** Reserve schema import/admission compatibility only; no dependency on app8 v0.4 empirical release, no App8CapabilityImportAdapter required for v0.2 P0 and no automatic export-ready assertion. See candidate archive at `docs/research/v0.2/open-source-provider-candidates.md`.
 - No mature library functionality reinvented gratuitously. Windows native tools are still runtime capabilities even if not branded an external Provider.
 
@@ -72,7 +73,7 @@ The v0.2 definition is in [Script Recipe v0.2 draft](./script-recipe-v0.2-DRAFT.
 
 - One local Windows UI, plain Chinese and English, **real LLM chat/task input** with clarification and selected-root file picker, task intent explanation, bounded scope, preview of script/effects (non-expert view first), manual approval/decline, status, independent verification details, recoverable history.
 - **Recipe library**: “Saved tasks” with human labels, parameter fields and scope, last verified date, last model use/cost, run/edit/delete/disable, policy-drift warning, script inspection as advanced disclosure. A script run must clearly state `SIMULATED`, `DRY_RUN`, `EXECUTED`, `VERIFIED`, `BLOCKED` without conflating.
-- Real Windows portable delivery with bundled pinned JS runtime or documented checked OS dependency and one-step bootstrap. First run checks model endpoints, permission profile, allowed folders, network and bundled library hashes. No development checkout/pnpm, no mandatory administrator login. A full MSI not needed if portable route is actual end-user usable.
+- Real Windows portable delivery with pinned Shun **core** JS runtime or documented checked OS dependency and one-step bootstrap, **without bundling optional external Provider binaries/libraries/models**. First run checks model endpoints, permission profile, allowed folders, catalog trust/signing metadata and core library hashes. A needed Provider is clearly described (size, source, permission, license and offline alternatives), downloaded only after suitable user consent, then independently verified and loaded. No development checkout/pnpm or mandatory administrator login. A full MSI is not required if portable route is usable.
 - Elevated actions remain explicit pre-existing *typed* executor flows with authentic UAC; generated scripts are not a new privilege boundary. LLM configuration/external data permission must be visible at request time.
 
 ## 7. P0 must-pass journeys / acceptance
@@ -83,8 +84,10 @@ The v0.2 definition is in [Script Recipe v0.2 draft](./script-recipe-v0.2-DRAFT.
 4. **Script creation:** real model generates structured JS and a PowerShell diagnostic proposal from a user instruction; Python and CMD modes correctly preview/defer. Safe sandbox/mediation rejects file deletion, network egress, child spawn, encoded obfuscation, COM and credential access; any script requiring direct unverified host mutation is NOT_RUN/BLOCKED.
 5. **Repeated Recipe:** two manual executions of same approved parametric script, second with **zero LLM calls**, equivalent verified output, exact hash/runtime/policy/scope checks; body tamper, policy drift, endpoint change, new destination outside grant or fixture mismatch causes revalidation or BLOCKED, no silent reuse.
 6. **Existing vertical:** image and managed software lifecycle real UI integration without changing v0.1 product safety/ownership; bounded storage R2 approval, crash/uncertain-recovery and protected canaries.
-7. **UI/package:** fresh Windows 11 end-user user-profile install/start without dev toolchain; distinct simulated and real labels, understandable consent, recipe history and clean removal. Support Windows Home and Pro or explicitly limit/downgrade features when isolation unavailable; don't silently assume Windows Sandbox is present.
-8. **Release:** independent Windows negative/adversarial validation and full regression/hidden; install/run/restore, LLM privacy and actual model/cost evidence, script output and user-file invariant, release notes honest about safety proof bounds. CI/PR PASS never substituted for Release PASS.
+7. **UI/package:** fresh Windows 11 end-user user-profile install/start without dev toolchain or preinstalled optional providers; distinct simulated/real and provider-missing/offline/download labels, understandable consent, recipe history and clean removal. Support Windows Home and Pro or explicitly limit/downgrade features when isolation unavailable; don't silently assume Windows Sandbox is present.
+8. **Optimization:** captured baseline → bounded signed-plan cleanup/startup action → observable post-state and exact-state restore path; retained protections and startup service dependencies, no invented speedup percentage. Negative cases: system/AV/driver task target, unknown startup mechanism, restored policy drift and boot-pending effects.
+9. **On-demand Provider:** fresh package starts without external Provider payload; user-approved first-use acquisition from exact pinned trusted source, binary/package hash verified, no duplicate concurrent downloads, cache reuse after restart, corrupt/signature/architecture mismatch BLOCKED, offline absence yields actionable error without breaking core; user-owned assets not deleted on Provider removal.
+10. **Release:** independent Windows negative/adversarial validation and full regression/hidden; install/run/restore, LLM privacy and actual model/cost evidence, script output and user-file invariant, release notes honest about safety proof bounds. CI/PR PASS never substituted for Release PASS.
 
 ## 8. Research / L2 decision list
 
@@ -149,4 +152,36 @@ NODE_API_DOTNET=EXCLUDED_V02
 KOFFI=EXCLUDED_V02
 NODE_WIN32_API=EXCLUDED_V02
 LLM_RECIPE_RAW_FFI=FORBIDDEN
+```
+
+## 11. Windows optimization and on-demand Provider delivery (owner additions, 2026-10-14)
+
+### 11.1 Optimization is a verified effect, not a performance marketing claim
+
+- **P0 user outcomes**: explain significant storage consumers (within approved roots), perform already proven scope-bounded temp/cache cleanup, identify startup and background app pressure from factual observations, and support one small subset of user-level startup toggles **only when the exact mechanism has a tested rollback and post-state verifier**. A read-only recommendation is a valid result when unsafe or unsupported.
+- Workflow: `OBSERVE baseline → RECOMMEND alternatives + likely impact + evidence confidence → PLAN typed concrete target → R2 preview/authorize for user-state mutations → APPLY limited change → VERIFY actual Windows state → RECORD before/after + RESTORE handle`. Verification of a disabled startup entry can confirm a configuration change immediately; reduced boot delay is **NOT proven** until a comparable subsequent boot is observed. CPU/memory readings are noisy and must not be misrepresented as causal improvement.
+- Do **not** conflate Windows built-in Storage Sense, Shun's existing private workspace cleanup and full system-drive cleaning. Storage Sense has documented scope and user-specific Downloads/Recycle Bin policies; Shun must not imply its C003 workspace cleaner can cleanse all of `C:\` or delete user Downloads.
+- Protected system/AV/security software, core services, drivers, registry "optimization" bundles, event log clearing, prefetch deletion, pagefile edits, bcdedit, disk partition operations, forced service disable, hidden Defender/Windows Update downgrade, and arbitrary LLM-authored elevated PowerShell **OUT OF SCOPE** for P0. Prefer offering a safe native Windows Settings deep-link instead of pretending Shun did a privileged change.
+- P1 may consider narrowly defined power policy or per-user scheduled-task configurations only with machine-specific reversible evidence and explicit permissions. A recommendation and safe official-UI handoff remains available without claiming automatic repair.
+
+### 11.2 Tiny core, fixed approved catalog, lazy Provider payloads
+
+- **Core package** includes UI/LLM mediation, trusted updater/download verifier, pinned Provider **catalog metadata**, typed adapters (or minimal trusted adapter bootstrap), ActionController/Resolver/ShunStore/Recipe runtime, and the runtime required to start Shun. No optional Provider tool binary, large language model weights or optional `sharp` native payload is **assumed bundled**. If an adapter requires native Node ABI or dynamic JS module files, L2 must design a reviewed compatible signed module artifact and verify it before import; code loading is a privileged boundary.
+- **On-demand path:** goal resolves an already registered capability → core checks user/host environment and existing installed binding → if absent and network allowed, show exact package, size, version, license/source, required permissions and optional retention → user consents to acquisition if required → download from catalog-owned pinned origin to staging without executing → SHA256/signature and dependency/architecture checks against a trust root that **preceded** the download → atomic install/activation, controlled typed adapter execution, independent output verification → cache/retain or provenance-safe removal. Catalog updates are a separate authenticated, reviewable process, not a task-time LLM suggestion.
+- **Failure paths:** absent provider + offline/network denied `PROVIDER_NOT_AVAILABLE` with download-once/manual-install alternatives; tamper or bad signature `PROVIDER_TRUST_FAILED`; unexpected artifact/version/OS `PROVIDER_BINDING_MISMATCH`; interrupted download `ACQUIRE_INCOMPLETE`; install / effect uncertainty → journal-first reconcile, never blind retry. Respect metered networks and disk quotas, and never depend on a remote endpoint to fulfill LOCAL_ONLY execution.
+- **Cache and Recipe semantics:** each Recipe pins a logical capability + provider compatibility/version bounds and exact approved runtime/binary evidence; provider absent on replay leads to explicit reacquisition and revalidation (not auto-autorun from untrusted state). Provider removed only if not in active use; known user-owned assets/config are preserved. Module hot reload inside a busy Node process is **not** an acceptance requirement; on-demand availability across tasks or bounded worker process restarts is sufficient.
+- **Out of scope:** provider marketplace, arbitrary GitHub URL downloads, self-authored manifest trust, LLM-generated installation commands, every task scanning the internet for tools, enterprise auto-update orchestration and full app8 factory integration. The minimal allowlisted collection remains the v0.2 boundary.
+
+### 11.3 L2 / release questions
+
+- `CORE_VS_OPTIONAL_ARTIFACT` manifest; build/runtime compatibility for `sharp` and any optional native modules; pinned catalog signature keys and update policy; offline-first-run behavior; provider cache/GC rules; resolver waiting vs approval UX; separation of acquire permission from target write permission; measured installer footprint/download speed. These are implementation decisions, **not preconditions for making the product-scope decision**.
+- Real Windows Home/Pro release qualification must include initial core-only launch, native optimization with no external Provider download, one on-demand external Provider install/use/reuse/remove, tamper/error negatives, and no protected file loss. No unverified `WINDOWS_OPTIMIZATION_PASS` or `DYNAMIC_PROVIDER_PASS` claims in L1.
+
+```ini
+WINDOWS_OPTIMIZATION=V02_P0_BOUNDED_REVERSIBLE
+PROVIDER_DELIVERY=V02_P0_MINIMAL_ALLOWLIST_JIT
+OPTIONAL_PROVIDER_BINARIES_IN_CORE=NO
+PROVIDER_MARKETPLACE=DEFERRED
+APP8_DEEP_INTEGRATION=DEFERRED
+PRODUCT_FREEZE=NOT_YET
 ```
