@@ -4,6 +4,17 @@
 // automatically retried.
 import type { TaskSnapshot } from '../ports.ts';
 
+/** A verified terminal must be freshly committed for this run. An existing
+ * idempotent effect receipt is historical evidence, not permission to mark
+ * the current in-flight task SUCCEEDED or COMPLETED_VERIFIED. This assertion
+ * runs while the in-memory task is VERIFYING; failure remains uncertain.
+ */
+export function assertFreshVerifiedTerminalCommit(receipt: { applied: boolean }): void {
+  if (receipt.applied !== true) {
+    throw new Error('REAL_STORAGE_VERIFIED_TERMINAL_REPLAY_REFUSED');
+  }
+}
+
 export interface PersistedStorageRecord {
   recordId: string;
   createdAt: string;
