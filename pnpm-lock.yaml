@@ -8,11 +8,25 @@ importers:
 
   .: {}
 
+  tests/integration: {}
+
   apps/control-api:
     dependencies:
+      '@shun/authorization':
+        specifier: workspace:*
+        version: link:../../packages/authorization
       '@shun/contracts':
         specifier: workspace:*
         version: link:../../packages/contracts
+      '@shun/resolver':
+        specifier: workspace:*
+        version: link:../../packages/resolver
+      '@shun/store':
+        specifier: workspace:*
+        version: link:../../packages/store
+      '@shun/vertical-storage':
+        specifier: workspace:*
+        version: link:../../packages/vertical-storage
       zod:
         specifier: ^4.1.13
         version: 4.6.5
@@ -198,9 +212,6 @@ importers:
         specifier: ^4.1.13
         version: 4.6.5
     devDependencies:
-      '@shun/store':
-        specifier: workspace:*
-        version: link:../store
       '@biomejs/biome':
         specifier: ^2.3.8
         version: 2.5.15
@@ -282,8 +293,6 @@ importers:
       vitest:
         specifier: ^3.2.4
         version: 3.2.7(@types/node@24.19.2)
-
-  tests/integration: {}
 
 packages:
 
