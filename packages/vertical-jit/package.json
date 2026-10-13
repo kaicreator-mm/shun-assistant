@@ -16,6 +16,7 @@
     "zod": "^4.1.13"
   },
   "devDependencies": {
+    "@shun/store": "workspace:*",
     "@biomejs/biome": "^2.3.8",
     "@types/node": "^24.7.0",
     "typescript": "^5.9.3",

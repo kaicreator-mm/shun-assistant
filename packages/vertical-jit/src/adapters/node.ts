@@ -3,7 +3,7 @@
 
 import { spawn } from 'node:child_process';
 import { createHash } from 'node:crypto';
-import { mkdir, readdir, readFile, stat, writeFile } from 'node:fs/promises';
+import { lstat, mkdir, readdir, readFile, stat, writeFile } from 'node:fs/promises';
 import { dirname } from 'node:path';
 import type { JournalEntry, JournalPort } from '../journal.ts';
 import type { FilesystemPort, ProcessPort, ProcessResult, ProcessRunSpec } from '../ports.ts';
@@ -11,7 +11,7 @@ import type { FilesystemPort, ProcessPort, ProcessResult, ProcessRunSpec } from 
 export class NodeFilesystem implements FilesystemPort {
   async exists(path: string): Promise<boolean> {
     try {
-      await stat(path);
+      await lstat(path);
       return true;
     } catch {
       return false;
@@ -20,7 +20,7 @@ export class NodeFilesystem implements FilesystemPort {
 
   async isDirectory(path: string): Promise<boolean> {
     try {
-      return (await stat(path)).isDirectory();
+      return (await lstat(path)).isDirectory();
     } catch {
       return false;
     }
@@ -80,8 +80,13 @@ export class SpawnProcess implements ProcessPort {
         env: spec.env ? { ...process.env, ...spec.env } : process.env,
         windowsHide: true,
         shell: false,
-        stdio: ['ignore', 'pipe', 'pipe'],
+        stdio: spec.input === undefined ? ['ignore', 'pipe', 'pipe'] : ['pipe', 'pipe', 'pipe'],
       });
+      if (spec.input !== undefined && child.stdin) {
+        child.stdin.on('error', () => undefined);
+        child.stdin.write(spec.input);
+        child.stdin.end();
+      }
       let stdout = '';
       let stderr = '';
       let timedOut = false;
@@ -92,10 +97,10 @@ export class SpawnProcess implements ProcessPort {
               child.kill();
             }, spec.timeoutMs)
           : undefined;
-      child.stdout.on('data', (chunk: Buffer) => {
+      child.stdout?.on('data', (chunk: Buffer) => {
         stdout += chunk.toString('utf8');
       });
-      child.stderr.on('data', (chunk: Buffer) => {
+      child.stderr?.on('data', (chunk: Buffer) => {
         stderr += chunk.toString('utf8');
       });
       child.on('error', (error) => {

@@ -41,6 +41,7 @@ import type {
   AcquisitionCandidate,
   AcquisitionPort,
   FilesystemPort,
+  LifecycleCheckpointRecord,
   ProcessPort,
   ProcessResult,
   ProcessRunSpec,
@@ -490,6 +491,14 @@ export class MemoryStore implements StorePort {
   readonly #applied = new Map<string, StoreApplicationReceipt>();
   readonly records = new Map<string, ShunStoreMutation>();
 
+  async getLifecycleRecord(recordId: string): Promise<LifecycleCheckpointRecord | null> {
+    const mutation = this.records.get(recordId);
+    if (mutation?.recordKind !== 'lifecycle_record' || mutation.recordId !== recordId) {
+      return null;
+    }
+    return { recordId, payload: { ...mutation.payload }, revision: 1 };
+  }
+
   async apply(effectId: string, mutation: ShunStoreMutation): Promise<StoreApplicationReceipt> {
     const existing = this.#applied.get(effectId);
     if (existing) return { ...existing, applied: false };
@@ -662,6 +671,7 @@ export interface JitHarness {
 
 export interface HarnessOptions {
   readonly fs?: MemoryFilesystem;
+  readonly store?: MemoryStore;
   readonly approvalMode?: 'approve' | 'deny';
   readonly backendFaults?: readonly PrivilegedFault[];
   readonly protectedRoots?: readonly string[];
@@ -733,7 +743,7 @@ export function buildHarness(options: HarnessOptions = {}): JitHarness {
   const taskBackend = new MemoryTaskBackend(fs, acquisition);
   const backend = buildBackend(authority, journalFor, options.backendFaults, acquisition, clock);
   const approval = new MockApproval(options.approvalMode ?? 'approve');
-  const store = new MemoryStore();
+  const store = options.store ?? new MemoryStore();
   const verifier = new PatternVerifier();
   const traces: { at: string; kind: string; detail?: string }[] = [];
   const taskOutputDir = options.taskOutputDir ?? 'C:\\work\\jit-task-out';
@@ -748,6 +758,7 @@ export function buildHarness(options: HarnessOptions = {}): JitHarness {
     verifier,
     store,
     planLedger: ledger,
+    lifecycleReader: store,
     // The task grant is presented to the SAME trusted authority that signed
     // it — the environment backend never runs on the caller's say-so
     // (VJ-P1-03).

@@ -39,8 +39,10 @@ import {
   type StorePort,
   type VerificationPlan,
   type VerificationReceipt,
+  VerificationReceiptSchema,
   type VerifierPort,
 } from '@shun/contracts';
+import { z } from 'zod';
 import { JitLifecycleError } from './failures.ts';
 import { classifyFromJournal, type JournalPort, type RecoveryClassification } from './journal.ts';
 import { canonicalKey, treeUnder } from './manifest-removal.ts';
@@ -50,6 +52,7 @@ import type {
   AcquisitionPort,
   FilesystemPort,
   JitDurablePolicy,
+  LifecycleCheckpointReader,
   PlanLedgerPort,
   ProviderInstallLayout,
 } from './ports.ts';
@@ -59,6 +62,48 @@ import { assertNoProtectedDeletions, classifyResidue, type ResidueCandidate } fr
 const INSTALL_TIMEOUT_MS = 15 * 60_000;
 const TASK_TIMEOUT_MS = 5 * 60_000;
 const UNINSTALL_TIMEOUT_MS = 15 * 60_000;
+
+const LifecycleCheckpointPayloadSchema = z.strictObject({
+  taskId: z.string().min(1),
+  providerId: z.string().min(1),
+  version: z.string().min(1),
+  provenance: z.strictObject({
+    source: z.string().min(1),
+    official: z.literal(true),
+    version: z.string().min(1),
+    hash: z.string().min(1).optional(),
+    signature: z.string().min(1).optional(),
+    licenseDisposition: z.string().min(1),
+  }),
+  layout: z.strictObject({
+    installDirs: z.array(z.string().min(1)).min(1),
+    cacheDirs: z.array(z.string().min(1)),
+    configDirs: z.array(z.string().min(1)),
+    executables: z.array(z.string().min(1)).min(1),
+  }),
+  state: z.literal('CHECKPOINT'),
+  providerOwnedFiles: z.array(z.string().min(1)).min(1),
+  providerOwnedObjectIdentities: z
+    .array(
+      z.discriminatedUnion('kind', [
+        z.strictObject({
+          path: z.string().min(1),
+          kind: z.literal('file'),
+          fileId: z.string().regex(/^[0-9a-f]{48}$/),
+          sha256: z.string().regex(/^[0-9a-f]{64}$/),
+        }),
+        z.strictObject({
+          path: z.string().min(1),
+          kind: z.literal('dir'),
+          fileId: z.string().regex(/^[0-9a-f]{48}$/),
+        }),
+      ]),
+    )
+    .min(1)
+    .optional(),
+  verification: VerificationReceiptSchema,
+  recordedAt: z.string().min(1),
+});
 
 export interface JitLifecycleDeps {
   readonly registry: RegistryReadModelPort;
@@ -70,6 +115,8 @@ export interface JitLifecycleDeps {
   readonly verifier: VerifierPort;
   readonly store: StorePort;
   readonly planLedger: PlanLedgerPort;
+  /** Trusted read-only adapter over authoritative durable lifecycle records. */
+  readonly lifecycleReader?: LifecycleCheckpointReader;
   /**
    * Trusted gate the task grant presentation must cross before the
    * environment executes (VJ-P1-03). Typed optional only so non-executable
@@ -329,6 +376,143 @@ async function runPrivileged(
   }
 }
 
+/**
+ * Resume only the destructive half of a previously verified JIT lifecycle
+ * from an authoritative durable CHECKPOINT. This entry never trusts a local
+ * manifest or caller-supplied layout: it reloads the exact checkpoint,
+ * re-resolves current trusted provider/catalog facts, validates layout +
+ * ownership scope, and rebuilds the R2 plan/approval/effect chain.
+ */
+export async function resumeJitRemovalFromCheckpoint(
+  rawInput: unknown,
+  deps: JitLifecycleDeps,
+): Promise<JitLifecycleOutput> {
+  const input = parseJitLifecycleInput(rawInput);
+  requireTaskPresentationGate(deps);
+  if (input.lifecyclePolicy.retention !== 'JIT_REMOVE_AFTER_VERIFIED_USE') {
+    throw new JitLifecycleError(
+      'POLICY_BLOCKED',
+      'restart removal requires JIT_REMOVE_AFTER_VERIFIED_USE',
+    );
+  }
+  if (!deps.lifecycleReader) {
+    throw new JitLifecycleError(
+      'POLICY_BLOCKED',
+      'no trusted lifecycle checkpoint reader is wired — refusing destructive restart recovery',
+    );
+  }
+
+  const recordId = `jit:${input.taskId}:lifecycle:checkpoint`;
+  const stored = await deps.lifecycleReader.getLifecycleRecord(recordId);
+  if (!stored || stored.recordId !== recordId) {
+    throw new JitLifecycleError(
+      'POLICY_BLOCKED',
+      'authoritative durable CHECKPOINT is missing — retain provider and require intervention',
+    );
+  }
+  const parsed = LifecycleCheckpointPayloadSchema.safeParse(stored.payload);
+  if (!parsed.success) {
+    throw new JitLifecycleError(
+      'POLICY_BLOCKED',
+      'authoritative durable CHECKPOINT is malformed — retain provider and require intervention',
+    );
+  }
+  const checkpoint = parsed.data;
+  if (checkpoint.taskId !== input.taskId) {
+    throw new JitLifecycleError('POLICY_BLOCKED', 'durable CHECKPOINT task identity mismatch');
+  }
+
+  const binding = await selectTrustedBinding(input, deps);
+  if (binding.providerId !== checkpoint.providerId) {
+    throw new JitLifecycleError(
+      'POLICY_BLOCKED',
+      'current trusted binding no longer matches the durable CHECKPOINT provider',
+    );
+  }
+
+  const candidate = await deps.acquisition.resolveExact({
+    packageId: binding.packageId,
+    version: checkpoint.version,
+  });
+  const currentProvenance = provenanceRecord(
+    candidate,
+    `${candidate.license ?? binding.license} accepted for task use`,
+  );
+  const provenanceFields: Array<keyof typeof currentProvenance> = [
+    'source',
+    'official',
+    'version',
+    'hash',
+    'signature',
+  ];
+  for (const field of provenanceFields) {
+    if (currentProvenance[field] !== checkpoint.provenance[field]) {
+      throw new JitLifecycleError(
+        'PROVENANCE_UNKNOWN',
+        `current catalog provenance no longer matches durable CHECKPOINT field ${field}`,
+      );
+    }
+  }
+
+  const layout: ProviderInstallLayout = {
+    providerId: checkpoint.providerId,
+    version: checkpoint.version,
+    installDirs: checkpoint.layout.installDirs,
+    cacheDirs: checkpoint.layout.cacheDirs,
+    configDirs: checkpoint.layout.configDirs,
+    executables: checkpoint.layout.executables,
+    ownedPaths: checkpoint.providerOwnedFiles,
+    ...(checkpoint.providerOwnedObjectIdentities
+      ? { ownedObjectIdentities: checkpoint.providerOwnedObjectIdentities }
+      : {}),
+  };
+  const expectedRoots = (
+    await deps.acquisition.predictScope(candidate, deps.policy.machineScopeInstall)
+  )
+    .map(canonicalKey)
+    .sort();
+  const checkpointRoots = [...layout.installDirs, ...layout.cacheDirs].map(canonicalKey).sort();
+  if (
+    expectedRoots.length !== checkpointRoots.length ||
+    expectedRoots.some((root, index) => root !== checkpointRoots[index])
+  ) {
+    throw new JitLifecycleError(
+      'POLICY_BLOCKED',
+      'durable CHECKPOINT roots no longer match the current acquisition scope',
+    );
+  }
+  const ownedManifest = trustedOwnedManifest(layout);
+  if (!(await providerPresent(deps, layout))) {
+    throw new JitLifecycleError(
+      'REMOVE_FAILED',
+      'restart checkpoint exists but provider post-state is absent/uncertain — refusing to invent a removal PASS',
+      {
+        actionId: `${input.taskId}-uninstall`,
+        recoveryClassification: 'MAY_HAVE_EXECUTED_UNCERTAIN',
+        detail: 'manual reconciliation required before declaring the provider removed',
+      },
+    );
+  }
+
+  trace(
+    deps,
+    'RESTART_CHECKPOINT_REHYDRATED',
+    `${recordId} revision=${stored.revision ?? 'unknown'}`,
+  );
+  return runRemovalGate(
+    deps,
+    input,
+    binding,
+    candidate,
+    layout,
+    checkpoint.provenance,
+    checkpoint.verification,
+    ownedManifest,
+    undefined,
+    `store://lifecycle_record/${recordId}`,
+  );
+}
+
 export async function runJitLifecycle(
   rawInput: unknown,
   deps: JitLifecycleDeps,
@@ -509,11 +693,14 @@ async function runLifecycle(
   // with the lifecycle state. The removal preview classifies in strict mode
   // against it: any path inside an install or cache root that the installer
   // did not create is USER_CREATED_UNKNOWN and fails closed (VJ-P1-01).
-  const ownedManifest = await recordedOwnedManifest(
-    deps,
-    [...layout.installDirs, ...layout.cacheDirs],
-    preInstallTree,
-  );
+  const ownedManifest =
+    layout.ownedPaths !== undefined
+      ? trustedOwnedManifest(layout)
+      : await recordedOwnedManifest(
+          deps,
+          [...layout.installDirs, ...layout.cacheDirs],
+          preInstallTree,
+        );
 
   // ---- Task execute (bounded R1 use of the acquired provider) ----
   const executable = layout.executables[0];
@@ -529,6 +716,7 @@ async function runLifecycle(
     bindingId: binding.bindingId,
     executable,
     argv,
+    readPaths: taskReadPaths(input),
     outputDir: deps.policy.taskOutputDir,
     timeoutMs: TASK_TIMEOUT_MS,
   });
@@ -668,6 +856,7 @@ async function runRemovalGate(
   verification: VerificationReceipt,
   ownedManifest: readonly string[],
   hints?: RemovalPreviewHints,
+  existingCheckpointRef?: string,
 ): Promise<JitLifecycleOutput> {
   const actionId = `${input.taskId}-uninstall`;
   trace(deps, 'R2_PLAN', `gate opens for ${binding.providerId}`);
@@ -688,6 +877,7 @@ async function runRemovalGate(
     // install-recorded entries, so a post-census injection can never enter
     // the deletion set and an unrecorded asset refuses the whole effect.
     deletionManifest: ownedManifest,
+    ...(layout.ownedObjectIdentities ? { deletionIdentities: layout.ownedObjectIdentities } : {}),
     elevated: binding.elevated,
     timeoutMs: UNINSTALL_TIMEOUT_MS,
   });
@@ -741,14 +931,17 @@ async function runRemovalGate(
   );
 
   // (3) CHECKPOINT — record exact version/source so reinstall is possible.
-  const checkpointRef = await persistLifecycle(
-    deps,
-    input,
-    provenance,
-    layout,
-    'CHECKPOINT',
-    ownedManifest,
-  );
+  const checkpointRef =
+    existingCheckpointRef ??
+    (await persistLifecycle(
+      deps,
+      input,
+      provenance,
+      layout,
+      'CHECKPOINT',
+      ownedManifest,
+      verification,
+    ));
 
   // (4) APPROVAL CONDITION — explicit approval or a sufficiently specific
   // durable policy. Provenance passed earlier; this gate decides removal only.
@@ -901,6 +1094,34 @@ async function providerPresent(
  * created — pre-existing or later-dropped user content stays unknown, and
  * unknown is never deleted.
  */
+function trustedOwnedManifest(layout: ProviderInstallLayout): string[] {
+  const roots = [...layout.installDirs, ...layout.cacheDirs];
+  const owned = [...new Set(layout.ownedPaths ?? [])];
+  if (roots.length === 0 || owned.length === 0) {
+    throw new JitLifecycleError(
+      'POLICY_BLOCKED',
+      'trusted provider ownership manifest is empty or has no declared provider root',
+    );
+  }
+  for (const root of roots) {
+    if (!owned.some((path) => canonicalKey(path) === canonicalKey(root))) {
+      throw new JitLifecycleError(
+        'POLICY_BLOCKED',
+        `trusted ownership manifest omits declared provider root ${root}`,
+      );
+    }
+  }
+  for (const path of owned) {
+    if (!roots.some((root) => pathWithin(path, root))) {
+      throw new JitLifecycleError(
+        'POLICY_BLOCKED',
+        `trusted ownership manifest escapes declared provider roots: ${path}`,
+      );
+    }
+  }
+  return owned;
+}
+
 async function recordedOwnedManifest(
   deps: JitLifecycleDeps,
   censusRoots: readonly string[],
@@ -986,6 +1207,7 @@ async function persistLifecycle(
   layout: ProviderInstallLayout,
   state: string,
   providerOwnedFiles?: readonly string[],
+  verification?: VerificationReceipt,
 ): Promise<string> {
   // Each state transition is its own append-only revision: the store's
   // idempotent replay keys on effectId, so a shared identity would let the
@@ -1009,6 +1231,17 @@ async function persistLifecycle(
       },
       state,
       ...(providerOwnedFiles ? { providerOwnedFiles: [...providerOwnedFiles] } : {}),
+      ...(layout.ownedObjectIdentities
+        ? {
+            providerOwnedObjectIdentities: layout.ownedObjectIdentities.map((entry) => ({
+              path: entry.path,
+              kind: entry.kind,
+              fileId: entry.fileId,
+              ...(entry.sha256 ? { sha256: entry.sha256 } : {}),
+            })),
+          }
+        : {}),
+      ...(verification ? { verification } : {}),
       recordedAt: deps.clock(),
     },
   });
@@ -1033,6 +1266,14 @@ function taskArgv(input: JitLifecycleInput): string[] {
   }
   // Reference "use" of an acquired CLI provider: the observable version echo.
   return ['--version'];
+}
+
+function taskReadPaths(input: JitLifecycleInput): string[] {
+  const parameters = input.targetTask.parameters as { readPaths?: unknown } | undefined;
+  if (!Array.isArray(parameters?.readPaths)) return [];
+  return parameters.readPaths.filter(
+    (entry): entry is string => typeof entry === 'string' && entry.length > 0,
+  );
 }
 
 function removalSummary(

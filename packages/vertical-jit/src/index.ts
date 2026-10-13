@@ -5,6 +5,23 @@
 // gated R2 removal with fail-closed residue classification — all behind the
 // frozen contracts ports.
 
+export {
+  ManagedPortableAcquisition,
+  type ManagedPortableBackendDeps,
+  type ManagedPortableOptions,
+  ManagedPortablePrivilegedBackend,
+  type ZipExtractorPort,
+} from './adapters/managed-portable.ts';
+export {
+  type ExtractedEntry,
+  type NativeDeleterOptions,
+  type NativeDeletionPort,
+  type NativeObjectIdentity,
+  type NativeRemovalResult,
+  NativeSafetyError,
+  PowerShellNativeDeleter,
+  SafePowerShellZipExtractor,
+} from './adapters/native-win.ts';
 export { FileJournal, NodeFilesystem, SpawnProcess } from './adapters/node.ts';
 export {
   WINGET_SOURCE_NAME,
@@ -61,6 +78,7 @@ export {
   type ProcessResult,
   type ProcessRunSpec,
   type ProviderInstallLayout,
+  type ProviderOwnedObjectIdentity,
 } from './ports.ts';
 export {
   evaluateProviderProvenance,
