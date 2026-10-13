@@ -10,9 +10,21 @@ importers:
 
   apps/control-api:
     dependencies:
+      '@shun/authorization':
+        specifier: workspace:*
+        version: link:../../packages/authorization
       '@shun/contracts':
         specifier: workspace:*
         version: link:../../packages/contracts
+      '@shun/resolver':
+        specifier: workspace:*
+        version: link:../../packages/resolver
+      '@shun/store':
+        specifier: workspace:*
+        version: link:../../packages/store
+      '@shun/vertical-storage':
+        specifier: workspace:*
+        version: link:../../packages/vertical-storage
       zod:
         specifier: ^4.1.13
         version: 4.6.5
