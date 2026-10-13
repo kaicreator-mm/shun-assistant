@@ -3,3 +3,4 @@
 export * from './authorization-adapter.ts';
 export * from './errors.ts';
 export * from './shun-store.ts';
+export * from './ui-approval-bridge.ts';
