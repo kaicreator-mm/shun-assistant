@@ -98,25 +98,37 @@ The v0.2 definition is in [Script Recipe v0.2 draft](./script-recipe-v0.2-DRAFT.
 
 L1 Product Evidence and draft product review → scope/risk closure and freeze → L2 Architecture and environment feasibility → bounded Task DAG (LLM integration, host script security and Recipe identity before UI workflows) → L3 tests/contracts/implementation → exact-SHA independent security review → full Windows build-host qualification, hidden and packaging → Release qualification/tag. No new demo factory when v0.1 evidence can be reused; don't freeze a misleading acceptance before Windows script isolation feasibility is proven.
 
-## 10. Windows System API sourcing decision (Owner direction, 2026-10-14)
+## 10. Windows System API implementation decision — **two tiers only** (Owner direction, 2026-10-14)
 
-**Explicitly EXCLUDE `Koffi` and `node-win32-api` from v0.2 runtime dependencies, experiments and default architecture.** This is a scope/risk/maintenance decision, not a blanket claim that the projects are broken. Do not reintroduce a general-purpose JS FFI surface or a model-selected native DLL/function gateway as a substitute.
+**Decision:** v0.2 uses exactly TWO trusted Windows System API implementation tiers. **Explicitly exclude** `dynwinrt`, `node-api-dotnet`, `Koffi` and `node-win32-api` from the v0.2 dependency graph, integration milestones, packaging and L2 implementation requirements. This is a scope, deployment and maintenance choice, not a universal claim of instability. No hidden third managed-interoperability layer, generic DLL/FFI gateway or speculative adapter abstraction is permitted.
 
-**Preferred three tier capability-adapter stack** (call these **tiers A/B/C**, distinct from project lifecycle L1 Product / L2 Architecture / L3 Implementation):
+These are **system adapter implementation tiers**, distinct from development-phase L1 Product, L2 Architecture and L3 Implementation.
 
-| Tier | Technology | Responsibility | v0.2 adoption |
+| Tier | Technology | Responsibilities | Inclusion and gate |
 | --- | --- | --- | --- |
-| **A — foundational** | Native Node.js `fs/os`, trusted Windows PowerShell/CIM **fixed audited functions** | file-safe operations, storage/system info, service/event/startup inventory, bounded troubleshooting | **P0 actual host implementation.** Start here; avoid dynamic PowerShell assembled from a model. |
-| **B — native platform interop** | **dynwinrt** (WinRT) and **node-api-dotnet** (.NET) | modern Windows notifications, pickers/device/app APIs; richer .NET management APIs when native/PowerShell contracts are insufficient | **P0 interface seam only; P1/conditional implementation per proven P0 user journey.** Both projects currently have preview-status surfaces; exact version and target API must pass native Windows host smoke/packaging. |
-| **C — reviewed native module** | **napi-rs + windows-rs** | narrowly implemented Win32/COM/WinRT calls requiring precise lifetime, handle, memory, system service or special Windows access | **Only when A/B cannot support a specific high-ROI task safely; no generic native API gateway.** Pin Rust/Node-API/target architecture; test crashes, disposal and Node runtime versions. |
+| **Tier 1 — built-in Windows/Node** | Node.js native `fs`/`os`/`process` and other reviewed standard APIs, plus **fixed audited** PowerShell and CIM queries/host functions | Windows process/memory/disk/OS/software/startup/service/event read-only diagnosis; safe file inspect, find and operation-plan preparation; hand off mutations to typed v0.1 executor | **P0 mandatory default.** Implement the v0.2 computer-steward MVP here whenever credible. Run Windows Home/Pro and localized filesystem negative tests. |
+| **Tier 2 — scoped native module** | **napi-rs + windows-rs** (Rust ↔ Node-API; reviewed Win32/COM/WinRT API wrappers) | Only specific high-ROI Windows APIs where Tier 1 cannot meet required functionality, correctness, controllability, privilege boundary, or latency | **Conditional only** and **not a blanket P0 install dependency**. Named user job + API-level gap justification + exact dependency pin + independent Windows host test required before accepting each native module. |
 
-Select the narrowest supported binding per Capability. Multiple tiers are complementary, **not mandatory sequential dependencies**. A product that meets all P0 tasks using Tier A is allowed to ship without building Tier B or Tier C. If UI requires Windows native pickers/notifications, assess Tier B without forcing A/B/C everywhere.
+**No implementation-depth obligation:** v0.2 may reach Product Release using Tier 1 alone. Tier 2 is the approved escape hatch for individually demonstrated requirements, not an infrastructure milestone or a commitment to write Rust. Avoid building a framework that merely wraps hypothetical native features.
 
-**Maturity and trust caveats:**
-- `dynwinrt` internally relies on a native Rust/libffi runtime; avoiding Koffi does **not** eliminate FFI/memory hazards. Its WinRT projection is the main candidate; experimental Classic COM/Flat Win32 projections cannot be assumed production-stable. Assess version/API-level support and Windows packaged/unpackaged identity.
-- `node-api-dotnet` is a Microsoft-maintained public preview and can dynamically host .NET in process; Native AOT removes client .NET dependency **only for statically exported compatible APIs** and does not permit arbitrary reflection/dynamic assembly loading. Verify runtime footprint and installer identity.
-- `napi-rs/windows-rs` isolates pointer/COM/Win32 complexity into a **reviewed native module**, but in-process native faults can still terminate Shun; where risk warrants, run sensitive native operations in a separate bounded helper process. Node-API ABI stability does not prove Shun's C/Rust/Windows calls are memory safe or security sandboxes.
-- **LLM-authored JS/TS Recipes may call only Shun's approved typed SystemCapability interface.** Raw `powershell.exe`, `dotnet`, generated WinRT binding loading, `require('*.node')`, DLL names, pointer values, registry/service mutation, network and elevation are never model-provided authority. The same authorization, R2, scope,currentness and verifier gates apply whichever adapter tier executes the trusted tool.
-- Do not use vendor identity as substitute for tests. Each admitted adapter requires exact package/dependency pin and supply-chain/license review, Win11 Home+Pro host observations, Unicode/locale cases, installation/upgrade/uninstall proof, failures and concurrency/resource-release tests.
+**Technical scope caveats:**
+- `windows-rs` supports Win32, COM and WinRT bindings, so removal of dynwinrt/node-api-dotnet **does not inherently rule out** such APIs. It does mean explicitly authoring, reviewing, testing and packaging each needed Rust native bridge. No general runtime .NET bridge is supported in v0.2.
+- `napi-rs`/Node-API module ABI support is not a safety sandbox. Raw native code loaded in the main process can crash it; a bounded, separate helper process and trusted IPC may be warranted for potentially crashing/sensitive APIs. A process boundary by itself does not authorize additional privileges.
+- Powershell/CIM reads are executed using reviewed command templates/typed parameters; user goal text and LLM output never become raw `-Command`, shell, cmdlet/function names, arbitrary WMI method calls or elevated scripts. Avoid source-generated unrestricted host PowerShell.
+- An LLM-authored `JS/TS Recipe` sees only Shun's typed `SystemCapability` interface; it cannot import `.node` native modules, invoke raw PowerShell or choose DLL/FFI entrypoints. All host mutations route through ActionController (planHash, risk R0/R1/R2, bounded scope/currentness, protected assets, independent verifier, durable journal/receipt).
+- Native Windows UI functions such as file picker/notification should first use a trusted UI framework/Windows shell integration supported by the chosen package. Introduce a focused Tier 2 Rust bridge **only if** a specific accepted P0 journey requires it; do not create a dependency on removed middleware.
+- A plain user-confirmation dialog is not equivalent to OS isolation of arbitrary generated code. The v0.2 script/Recipe confinement requirements remain in `script-recipe-v0.2-DRAFT.md`.
 
-**Validation before L2 freeze:** Tier A must demonstrate disk/memory/process/startup read-only diagnostics and bounded file plan; Tier B needs an API-specific independent smoke only if an accepted task truly needs its feature; Tier C is excluded until a named, demonstrable gap. This decision replaces any prior broad adoption advice for Koffi+node-win32-api. Relevant research and version verification: https://github.com/microsoft/dynwinrt , https://github.com/microsoft/node-api-dotnet , https://github.com/napi-rs/napi-rs , https://github.com/microsoft/windows-rs .
+**L2 readiness criterion:** demonstrate Tier 1 native host-backed Windows report, actual scoped files + dry-run manifest, real LLM → approved action, and second Recipe replay without a new LLM call. For any proposed Tier 2 binding, L2 documents the unsatisfied Tier 1 case, exact Rust/Windows API surface and privilege model; the implementation gate includes signed/pinned provenance, input/error schema, handle/resource lifetime, invalid pointer/COM apartment/threading failure cases, clean startup/uninstall and release Windows host evidence. If no gap exists, mark `TIER_2_NOT_NEEDED` and do not add speculative issue dependencies.
+
+**Product direction tags**:
+```ini
+WINDOWS_API_STACK=TWO_TIERS_ONLY
+TIER_1=NODE_NATIVE_AND_REVIEWED_POWERSHELL_CIM
+TIER_2=NAPI_RS_WINDOWS_RS_CONDITIONAL
+DYNWINRT=EXCLUDED_V02
+NODE_API_DOTNET=EXCLUDED_V02
+KOFFI=EXCLUDED_V02
+NODE_WIN32_API=EXCLUDED_V02
+LLM_RECIPE_HOST_ACCESS=MEDIATED_TYPED_CAPABILITIES_ONLY
+```
