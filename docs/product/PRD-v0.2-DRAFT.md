@@ -98,37 +98,55 @@ The v0.2 definition is in [Script Recipe v0.2 draft](./script-recipe-v0.2-DRAFT.
 
 L1 Product Evidence and draft product review → scope/risk closure and freeze → L2 Architecture and environment feasibility → bounded Task DAG (LLM integration, host script security and Recipe identity before UI workflows) → L3 tests/contracts/implementation → exact-SHA independent security review → full Windows build-host qualification, hidden and packaging → Release qualification/tag. No new demo factory when v0.1 evidence can be reused; don't freeze a misleading acceptance before Windows script isolation feasibility is proven.
 
-## 10. Windows System API implementation decision — **two tiers only** (Owner direction, 2026-10-14)
+## 10. Windows system access and Rust FFI/performance module — **two implementation layers** (Owner direction, 2026-10-14)
 
-**Decision:** v0.2 uses exactly TWO trusted Windows System API implementation tiers. **Explicitly exclude** `dynwinrt`, `node-api-dotnet`, `Koffi` and `node-win32-api` from the v0.2 dependency graph, integration milestones, packaging and L2 implementation requirements. This is a scope, deployment and maintenance choice, not a universal claim of instability. No hidden third managed-interoperability layer, generic DLL/FFI gateway or speculative adapter abstraction is permitted.
+**Decision:** Retain exactly TWO trusted implementation layers. The second layer is **not just a Win32 API adapter**: it is Shun's **native Rust module for external FFI interoperability, performance-intensive algorithms and operations cumbersome/unsafe/unreliable to implement directly in JS**. It is conditional on demonstrated requirements; it must not become a universal foreign-function execution gateway.
 
-These are **system adapter implementation tiers**, distinct from development-phase L1 Product, L2 Architecture and L3 Implementation.
+**Exclude v0.2 dependencies:** `dynwinrt`, `node-api-dotnet`, `Koffi`, `node-win32-api`. No third managed interop layer or model-selected native symbol/DLL invocation. These are **implementation layers**, different from development gates Product L1 / Architecture L2 / Implementation L3.
 
-| Tier | Technology | Responsibilities | Inclusion and gate |
+| Layer | Technology | Role | Delivery gate |
 | --- | --- | --- | --- |
-| **Tier 1 — built-in Windows/Node** | Node.js native `fs`/`os`/`process` and other reviewed standard APIs, plus **fixed audited** PowerShell and CIM queries/host functions | Windows process/memory/disk/OS/software/startup/service/event read-only diagnosis; safe file inspect, find and operation-plan preparation; hand off mutations to typed v0.1 executor | **P0 mandatory default.** Implement the v0.2 computer-steward MVP here whenever credible. Run Windows Home/Pro and localized filesystem negative tests. |
-| **Tier 2 — scoped native module** | **napi-rs + windows-rs** (Rust ↔ Node-API; reviewed Win32/COM/WinRT API wrappers) | Only specific high-ROI Windows APIs where Tier 1 cannot meet required functionality, correctness, controllability, privilege boundary, or latency | **Conditional only** and **not a blanket P0 install dependency**. Named user job + API-level gap justification + exact dependency pin + independent Windows host test required before accepting each native module. |
+| **Layer 1 — TypeScript/Node + Windows built-ins** | Node.js native `fs/os/process` and bounded built-in Windows interfaces; **reviewed, fixed-function** PowerShell/CIM | All ordinary business orchestration, file operations, machine diagnostics and bounded system actions through existing Shun ActionController. The primary and default v0.2 implementation. | **P0 mandatory.** Confirm real Windows support (including Home, Pro), end-user packaging, source/file scope, privacy, verifier and recovery. |
+| **Layer 2 — trusted Rust Native/FFI** | **Rust + napi-rs** for Node-API bindings; **windows-rs** when Win32/COM/WinRT is needed; reviewed Rust `extern "C"`/library bindings to third-party native APIs as needed | **(a)** wrap approved external FFI libraries / native C ABI / OS API, **(b)** accelerate measured CPU/memory intensive workloads, **(c)** implement features awkward in JS (complex handles, unsafe buffer lifetimes, highly concurrent native state, typed low-level OS APIs). | **Conditional** — no forced Rust work or binary dependency if Layer 1 suffices. Each Rust addition names user value, unmet Layer 1 constraint, FFI/library provenance or measured benchmark, semantic tests and security ownership. |
 
-**No implementation-depth obligation:** v0.2 may reach Product Release using Tier 1 alone. Tier 2 is the approved escape hatch for individually demonstrated requirements, not an infrastructure milestone or a commitment to write Rust. Avoid building a framework that merely wraps hypothetical native features.
+### Direction of FFI and ownership
 
-**Technical scope caveats:**
-- `windows-rs` supports Win32, COM and WinRT bindings, so removal of dynwinrt/node-api-dotnet **does not inherently rule out** such APIs. It does mean explicitly authoring, reviewing, testing and packaging each needed Rust native bridge. No general runtime .NET bridge is supported in v0.2.
-- `napi-rs`/Node-API module ABI support is not a safety sandbox. Raw native code loaded in the main process can crash it; a bounded, separate helper process and trusted IPC may be warranted for potentially crashing/sensitive APIs. A process boundary by itself does not authorize additional privileges.
-- Powershell/CIM reads are executed using reviewed command templates/typed parameters; user goal text and LLM output never become raw `-Command`, shell, cmdlet/function names, arbitrary WMI method calls or elevated scripts. Avoid source-generated unrestricted host PowerShell.
-- An LLM-authored `JS/TS Recipe` sees only Shun's typed `SystemCapability` interface; it cannot import `.node` native modules, invoke raw PowerShell or choose DLL/FFI entrypoints. All host mutations route through ActionController (planHash, risk R0/R1/R2, bounded scope/currentness, protected assets, independent verifier, durable journal/receipt).
-- Native Windows UI functions such as file picker/notification should first use a trusted UI framework/Windows shell integration supported by the chosen package. Introduce a focused Tier 2 Rust bridge **only if** a specific accepted P0 journey requires it; do not create a dependency on removed middleware.
-- A plain user-confirmation dialog is not equivalent to OS isolation of arbitrary generated code. The v0.2 script/Recipe confinement requirements remain in `script-recipe-v0.2-DRAFT.md`.
+```text
+  LLM Goal / vetted JS-TS Recipe
+               ↓ (only typed, mediated SystemCapability calls)
+  Shun Resolver / ActionController / verifier
+       ├── Layer 1: Node.js + fixed-function PowerShell/CIM
+       └── Layer 2: trusted Rust module
+                      ↑ Node.js ↔ Rust: N-API via napi-rs
+                      ↓ Rust → Windows: Win32/COM/WinRT via windows-rs
+                      ↓ Rust → approved native libraries: typed FFI/C ABI
+                      ↔ optional Rust → external clients: explicit versioned C ABI
+                          (ONLY if a real independent consumer requires one)
+```
 
-**L2 readiness criterion:** demonstrate Tier 1 native host-backed Windows report, actual scoped files + dry-run manifest, real LLM → approved action, and second Recipe replay without a new LLM call. For any proposed Tier 2 binding, L2 documents the unsatisfied Tier 1 case, exact Rust/Windows API surface and privilege model; the implementation gate includes signed/pinned provenance, input/error schema, handle/resource lifetime, invalid pointer/COM apartment/threading failure cases, clean startup/uninstall and release Windows host evidence. If no gap exists, mark `TIER_2_NOT_NEEDED` and do not add speculative issue dependencies.
+- The **primary external-facing boundary for Shun's Node host** is the **typed N-API interface** exposed by `napi-rs`. Rust may **consume** foreign FFI from pinned/trusted native libraries and Windows OS interfaces. If later other languages/processes must **call into** Rust, a separate narrowly defined, versioned `extern "C"` API is allowed after demonstrated demand; it is **not** mandatory for v0.2 and must not expose generic invocation by symbol name.
+- **Performance is evidence-led.** First compare a representative Node.js implementation against Rust on real host workloads (time, p95 latency, CPU, memory, data-transfer/copy overhead, packaging cost and failure modes). Include Rust only when correctness, system API coverage or measured benefit justifies native maintenance; no arbitrary performance PASS threshold asserted before benchmarking.
+- **Strict native boundary:** small typed input/output contracts; validate lengths, encodings, ownership, overflow, handles, nulls, thread/apartment affinity and cancellation; bound memory/CPU/timeout. Catch/contain Rust panics at FFI boundaries where feasible; never unwind across a C ABI. A crash in an in-process native module can still take down Node; use a separate signed bounded helper with structured IPC for high-risk or unstable native operations, not just wishful try/catch.
+- **Supply-chain:** pin exact Rust module/target architecture and external library versions/hashes, licenses and distribution obligations; verify Windows 11 Home/Pro and native packaging/uninstall. No unreviewed dynamically loaded DLL paths, arbitrary `GetProcAddress`, or user/LLM-selected FFI entrypoints. Revocation or drift makes binding unavailable.
+- **Permissions unchanged:** Rust/native FFI does **not** carry independent execution authority. A JS/TS Recipe can call only Shun's approved `SystemCapability` tools; it cannot import `.node` modules, pass raw DLL pointers, spawn arbitrary PowerShell, perform network activity or elevate. All mutating effects still require v0.1 policy/currentness, bounded target, R0/R1/R2, independent oracle and journal.
+- **Keep Layer 1 generic but controlled:** audited PowerShell/CIM commands must never be assembled from model-generated raw text; fixed functions with validated parameters only. The Windows shell/GUI framework may supply its own supported file pickers and notifications without creating a new native bridge; only make Layer 2 when a concrete missing functionality requires it.
+
+### L2 entry and test requirements
+
+- **Layer 1** delivers a real host-observed Windows inventory, user-selected scoped file plan, real LLM proposal and at least one repeatable validated Recipe with no LLM call on exact replay.
+- **Layer 2** is triggered ONLY for one documented capability gap, an approved external FFI library integration, or a measured performance bottleneck. For each use record `WHY_NOT_NODE`, `WHY_RUST`, `FFI_BOUNDARY`, exact native dependency provenance, risk/OS permissions, benchmark methodology (if speed is the reason), separate tests/rollback and run receipts. If no such use case exists in v0.2, `RUST_NATIVE_MODULE=NOT_REQUIRED`.
+- Avoid creating a generic cross-language/plugin framework, compiler, scripting VM or provider-discovery layer just to accommodate Rust; defer broad Provider/app8 integration and retain two-layer simplicity.
 
 **Product direction tags**:
 ```ini
-WINDOWS_API_STACK=TWO_TIERS_ONLY
-TIER_1=NODE_NATIVE_AND_REVIEWED_POWERSHELL_CIM
-TIER_2=NAPI_RS_WINDOWS_RS_CONDITIONAL
+WINDOWS_IMPL_LAYERS=TWO
+LAYER_1=NODE_NATIVE_PLUS_FIXED_POWERSHELL_CIM
+LAYER_2=RUST_NAPI_FFI_PERFORMANCE_OPTIONAL
+RUST_EXTERNAL_NATIVE_LIB_FFI=SCOPED_PINNED_BINDINGS
+RUST_EXPORT_C_ABI=ONLY_ON_DEMONSTRATED_EXTERNAL_CONSUMER
 DYNWINRT=EXCLUDED_V02
 NODE_API_DOTNET=EXCLUDED_V02
 KOFFI=EXCLUDED_V02
 NODE_WIN32_API=EXCLUDED_V02
-LLM_RECIPE_HOST_ACCESS=MEDIATED_TYPED_CAPABILITIES_ONLY
+LLM_RECIPE_RAW_FFI=FORBIDDEN
 ```
