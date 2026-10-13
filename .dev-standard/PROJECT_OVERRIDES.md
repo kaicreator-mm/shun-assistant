@@ -9,12 +9,13 @@
 
 ## Current lifecycle state
 
-- Current phase: **Product/L1 candidate**.
-- Product authority candidate: `docs/product/PRD-v0.1.md` plus the Product/L1 evidence and decision documents.
-- Product Freeze: **NOT YET CLAIMED**.
-- L2 Architecture: **NOT STARTED**.
-- Task DAG / implementation authorization: **NOT STARTED**.
-- Existing benchmark runs are product-validation evidence only; they do not authorize implementation scope.
+- **v0.1.0 historical release:** exact tagged commit `2313ba2773dac7aa535570e22760147d9b383b65` / immutable v0.1 product/security/implementation artifacts; version 0.1.0 closed with documented qualifications. Do not retroactively rewrite historical candidate posture.
+- **Current active version:** v0.2.0, Stage 1 Product Review **CANDIDATE / UNFROZEN**.
+- Current PRD candidate: `docs/product/PRD-v0.2.md`; supporting `docs/product/L1-product-evidence-v0.2.md`, `docs/product/script-recipe-v0.2-DRAFT.md`, `docs/research/v0.2/open-source-provider-candidates.md`; controller #80 and PR #81.
+- v0.2 integration target: `version/v0.2.0` (version branch), based initially on `main@217364b0c308e6089ea884ef7cb84eda752f7102`.
+- v0.2 Product Freeze: **NOT_YET**; independent exact-SHA Product Adversarial Review is **REQUIRED** per this file.
+- v0.2 L2 Architecture: **NOT_STARTED**; Task DAG / v0.2 implementation: **NOT_AUTHORIZED**.
+- v0.1 evidence is reusable by exact source identity; it never substitutes for v0.2 host tests, generic dynamic code loading, local model egress or other new semantics.
 
 ## v4 Adoption / Compatibility Profile
 
@@ -31,7 +32,7 @@ Rationale: the project is at Product/L1 and uses GitHub durable facts, exact-SHA
 
 ## Repository / execution profile
 
-- Integration mode: `main` plus one-concern candidate branches while Product/L1 is being established.
+- v0.2 Integration mode: `version/v0.2.0` plus one-concern branches/PRs; PR #81 is the stage-1 candidate. v0.1 main/tag baseline remains immutable.
 - GitHub Issues are durable work items.
 - One concern -> one branch -> one PR.
 - Chat history is not project authority.
@@ -52,7 +53,11 @@ Rationale: the project is at Product/L1 and uses GitHub durable facts, exact-SHA
 - P0 collection follows data minimization: exclude credentials/tokens/private keys/session secrets and unrelated content by default; external disclosure is distinct from local collection and is constrained by user/policy requirements.
 - Provider trust is fail-closed by default: unknown provenance cannot be converted to trusted by user confirmation alone.
 
-## P0 MVP closure loops
+## Historical v0.1 P0 MVP closure loops
+
+> Retained as the v0.1 baseline; does not independently define v0.2 acceptance. v0.2 requirements are in the separately reviewed/frozen PRD candidate.
+
+### P0 MVP closure loops
 
 1. **Process an object** — file/document/media -> verified result.
 2. **Acquire and use capability** — resolve Provider -> trusted acquire/configure -> execute -> verify -> retain/remove.
