@@ -1,5 +1,8 @@
 import { describe, expect, it } from 'vitest';
-import { restoreStorageTask } from '../src/real-storage/recovery.ts';
+import {
+  assertFreshVerifiedTerminalCommit,
+  restoreStorageTask,
+} from '../src/real-storage/recovery.ts';
 
 const base = {
   recordId: 'task-persisted-001',
@@ -11,6 +14,24 @@ const root = 'C:\\safe\\test-root';
 const row = (payload: Record<string, unknown>) => ({
   ...base,
   payload: { workspace: root, ...payload },
+});
+
+describe('C-003 verified terminal commit acknowledgement', () => {
+  it('only newly applied terminal receipts authorize an in-memory verified success', () => {
+    expect(() => assertFreshVerifiedTerminalCommit({ applied: true })).not.toThrow();
+  });
+
+  it('rejects a resolved applied=false replay instead of promoting a task to PASS', () => {
+    expect(() => assertFreshVerifiedTerminalCommit({ applied: false })).toThrow(
+      'REAL_STORAGE_VERIFIED_TERMINAL_REPLAY_REFUSED',
+    );
+    const prior = restoreStorageTask(row({ status: 'EFFECT_AUTHORIZED' }), root);
+    expect(prior.recovery).toMatchObject({
+      classification: 'MAY_HAVE_EXECUTED_UNCERTAIN',
+      reconciled: false,
+    });
+    expect(prior.state).toBe('NEEDS_INTERVENTION');
+  });
 });
 
 describe('C-003 restart safety of persisted task read model', () => {
