@@ -69,3 +69,39 @@ Each **approved** Provider version gets:
 ### Narrow initial Provider milestone
 
 Use existing sharp/WinGet/Windows fs/store and integrate **fd, ripgrep, pdf-lib, one archive tool**, plus one real local inference runtime and one remote connector. `qpdf` is the first alternate Provider to benchmark; OCRmyPDF/FFmpeg are not needed to establish v0.2 Usable MVP. Product review may prune by actual evidence.
+
+## app8 as a Provider factory and evidence service (integration candidate)
+
+**Candidate:** [kaicreator-mm/app8](https://github.com/kaicreator-mm/app8) (current consulted `main@7803594b38a959c3c5d8cf2ca2a7d8149a08db1a`). **Not** an approved ready-to-run Shun Provider. Treat app8's cross-tool compiler as an **upstream Producer** of prospective capability definitions and evidence, distinct from the runtime Provider executing tasks.
+
+### Roles, boundaries and trust
+
+```text
+Upstream OSS → app8 discovery/hypotheses/falsification/evidence/projections
+                    ↓ signed, pinned, independently accepted export artifact
+           Shun import adapter / evidence-policy gate
+                    ↓ schema mapping + user-scoped trusted registry revision
+       Shun Capability → ProviderBinding → ActionController
+                    ↓
+       Shun typed execution adapter → actual OSS executable/API
+                    ↓
+       independent verifier + receipts → ShunStore
+```
+
+- app8 **does not** get to mint an `AuthorizationGrant`, choose filesystem scopes, write Shun's authoritative policy, mark product success or execute arbitrary tools by emitting its CLI/MCP/Skill projection.
+- app8 may also be a narrow **meta-provider** for `provider.discover`, `provider.inspect_evidence`, `provider.propose_binding` — read-only/metadata-oriented operations; any new on-demand compilation/real target probing requires a separately approved sandbox and never shares ordinary user filesystem privileges.
+- Its current Python CLI outputs `ILLUSTRATIVE_UNVERIFIED`, `real_execution_status=NOT_RUN`, `release_ready=false`; projected MCP/CLI/Skill currently represent **metadata**, not functioning tool servers/adapters. app8's v0.3 Docker/CPython JSON P01/N01 pilot is a *scoped* real capability, not general software coverage. As of inspected main its v0.4 SE10/SE11 product-breadth evaluation is still open (defined 19/22 tasks closed; Product Release NO). These cannot be promoted wholesale into Shun's trusted provider catalog.
+- app8 `app8-capability-v1` has `capability_id`, semantic, source, target, bindings, evidence refs and readiness; Shun's own `CapabilityDefinition`/`ProviderDefinition`/`ProviderEnvironmentBinding` adds execution hard gates, verifier contract and risk/privilege policies. Identity classes differ: app8's `cap:...` IDs are not automatically Shun's capability IDs. Use an explicit **versioned mapping**, never naïve schema copy.
+- Evidence must be actually cryptographically and independently verified. `EXPORT_READY` is a **necessary input but not sufficient** for Shun admission: require Shun-target platform compatibility, exact binary/SDK hash, approved source/license, observed host facts, at least one negative probe, scoped semantic oracle, Shun authorization/risk gates and trusted local installer availability. If `REFUTED/BLOCKED/STALE/NOT_RUN` → disabled; don't silently search and download other tools.
+- For v0.2 do **not** invoke app8 in the hot path for every user task; precompile/approve a *small* batch offline. Runtimes remain v0.1 Shun contracts + controlled WinGet/sharp/pdf-lib/etc adapters; app8 enriches registry with verifiable, cacheable knowledge.
+- Keep app8's Docker sandbox as **evidence-test execution infrastructure**, not Shun's Windows privileged executor. The two have distinct trust, user-asset and consent boundaries.
+
+### Proposed lightweight bridge proof (not yet built)
+
+1. From one pinned app8 `EXPORT_READY` Capability with independently verified source/target/identity, export a **read-only snapshot**: semantic contract, binding kind, version/OS, evidence digest and negative boundaries; a signed envelope or verifiable immutable manifest. If app8 can currently produce only a scoped pilot export, treat it as demo/reference, not generalized admission.
+2. Map to one known, allowlisted Shun Capability and `ProviderEnvironmentBinding` via a reviewed `App8CapabilityImportAdapter` (working name); reject unknown operations, ambiguous versions, environment mismatch, stale evidence and hash drift. A public app8 search result is not authority.
+3. Wire a **separate hand-written/bounded runtime adapter** to the actual approved open-source Provider (e.g., pdf-lib or qpdf) using typed inputs, protected root and execution receipts. The app8 projection cannot directly supply a shell command.
+4. Run a same-contract cross-Provider comparison (e.g. PDF merge, pdf-lib ↔ qpdf) and independently verify output and negative cases. Simulate app8-origin forged readiness and stale target to prove Shun fail closed and fall back to a previously approved binding without broad download.
+5. Measure offline import time / revision checking, runtime latency, operator maintenance saved vs manually authored Provider catalog. Stop if integration increases complexity without evidence of tangible value.
+
+**Suggested sequencing:** v0.2 **Product/L2 contract** should reserve this bridge and at most one bounded pilot. Do not make app8 v0.4 empirical Product Release a blocking dependency for all Shun v0.2 P0 tools. Shun may ship vetted manual Provider adapters first, gradually replace metadata provenance with app8-compiled catalogs as the app8 execution/evidence export surface matures. Do not imply either product's Release PASS from a narrow bridge test.
