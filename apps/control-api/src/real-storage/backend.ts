@@ -30,7 +30,7 @@ import type {
   TaskSnapshot,
 } from '../ports.ts';
 import { previewForPlan } from '../preview.ts';
-import { restoreStorageTask } from './recovery.ts';
+import { assertFreshVerifiedTerminalCommit, restoreStorageTask } from './recovery.ts';
 import { assertSignedHostFactsCurrent } from './registry-host-facts.ts';
 import { verifyRegistryIssuance } from './registry-issuance.ts';
 import { verifyPinnedRegistryPublicKey } from './registry-key-pin.ts';
@@ -566,7 +566,7 @@ export class RealStorageControlBackend implements ControlBackend {
     if (!task.plan) throw new Error('REAL_STORAGE_MISSING_AUTHORIZED_PLAN');
     // Commit the verified terminal before presenting SUCCEEDED to the UI.
     // A failed commit or process death is conservatively uncertain.
-    await this.#store.apply('real-storage-result-' + task.taskId, {
+    const verifiedTerminal = await this.#store.apply('real-storage-result-' + task.taskId, {
       recordKind: 'task',
       recordId: task.taskId,
       payload: {
@@ -579,6 +579,10 @@ export class RealStorageControlBackend implements ControlBackend {
         receiptCount: result.receipts.length,
       },
     });
+    // A replayed/equivalent receipt is not a freshly committed terminal for
+    // this execution. Refuse optimistic UI PASS and enter the uncertainty path
+    // while the task is still VERIFYING, even when apply() resolves normally.
+    assertFreshVerifiedTerminalCommit(verifiedTerminal);
     task.verification = {
       status: 'PASS',
       checks: [
