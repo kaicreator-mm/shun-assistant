@@ -1,6 +1,9 @@
 // i85-U01 step 4b child probe (runs under node.exe, possibly inside an
 // AppContainer). Attempts: (1) loopback TCP connect to a live local listener,
-// (2) outbound TCP connect to TEST-NET-1 192.0.2.1:9 (safe, non-routable).
+// (2) TEST-NET-1 192.0.2.1:9 (non-routable) diagnostic ONLY.
+// IMPORTANT: timeout/denial of a non-routable IP is NOT OS no-egress proof.
+// A separate positive-control reachable destination, blocked AppContainer
+// attempt, and independent OS/network observation are mandatory.
 // Writes one JSON result line to the output file given as argv[3] — no
 // stdout dependency, because the isolated child's stdio is not inherited.
 'use strict';
