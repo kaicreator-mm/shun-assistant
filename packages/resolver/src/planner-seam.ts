@@ -262,10 +262,10 @@ export async function interpretGoalViaPlanner(
   let raw: GoalProposal;
   try {
     raw = await planner.interpretGoal(request);
-  } catch (error) {
+  } catch {
     return {
       status: 'PROPOSAL_REJECTED',
-      reason: `planner raised ${error instanceof Error ? error.name : 'unknown error'}: ${error instanceof Error ? error.message : String(error)}`,
+      reason: 'PLANNER_EXECUTION_REFUSED',
     };
   }
 
@@ -281,7 +281,7 @@ export async function interpretGoalViaPlanner(
   if (proposal.goalContract.taskId !== request.taskId) {
     return {
       status: 'PROPOSAL_REJECTED',
-      reason: `proposal taskId ${proposal.goalContract.taskId} does not match request ${request.taskId}`,
+      reason: 'PLANNER_TASK_SCOPE_MISMATCH',
     };
   }
 
@@ -291,7 +291,7 @@ export async function interpretGoalViaPlanner(
     if (!requestedObjects.has(`${object.kind}:${object.ref}`)) {
       return {
         status: 'PROPOSAL_REJECTED',
-        reason: `planner proposed object outside the request scope: ${object.kind} ${object.ref}`,
+        reason: 'PLANNER_OBJECT_SCOPE_MISMATCH',
       };
     }
   }
