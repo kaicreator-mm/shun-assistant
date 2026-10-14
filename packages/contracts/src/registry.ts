@@ -117,6 +117,50 @@ export function v02ContractByName(name: string): ContractEntry | undefined {
   return V02_CONTRACTS.find((entry) => entry.name === name);
 }
 
+/**
+ * Runtime validation boundary for the v0.2 public JSON Schema contract.
+ *
+ * JSON Schema artifacts are **structural-only** for constraints that cannot be
+ * encoded in draft 2020-12 (cross-field hashes, graph cycles, duplicate IDs).
+ * Its x-semantic-validation annotations are documentation, not executable Ajv
+ * rules. Ajv-only acceptance MUST NEVER authorize consent, Recipe execution,
+ * provider acquisition or any other effect.
+ *
+ * Callers pass the Ajv validator compiled from the version-pinned artifact.
+ * We require its result to be literal true AND independently run the Zod
+ * semantic validator for the named v0.2 contract. Neither an absent callback,
+ * a Promise/truthy value, a thrown error, nor an unknown name may pass.
+ * This is a data contract gate, NOT a trusted-broker signature verifier,
+ * authorization grant, durable reservation or provider signature check.
+ */
+export type V02PublicValidationResult =
+  | { ok: true; value: unknown }
+  | { ok: false; code: 'UNKNOWN_CONTRACT' | 'STRUCTURAL_REFUSED' | 'SEMANTIC_REFUSED' };
+
+export function validateV02PublicContract(
+  name: string,
+  value: unknown,
+  validateStructural: (value: unknown) => boolean,
+): V02PublicValidationResult {
+  const entry = v02ContractByName(name);
+  if (!entry) return { ok: false, code: 'UNKNOWN_CONTRACT' };
+  try {
+    if (typeof validateStructural !== 'function' || validateStructural(value) !== true) {
+      return { ok: false, code: 'STRUCTURAL_REFUSED' };
+    }
+  } catch {
+    return { ok: false, code: 'STRUCTURAL_REFUSED' };
+  }
+  try {
+    const parsed = entry.schema.safeParse(value);
+    return parsed.success
+      ? { ok: true, value: parsed.data }
+      : { ok: false, code: 'SEMANTIC_REFUSED' };
+  } catch {
+    return { ok: false, code: 'SEMANTIC_REFUSED' };
+  }
+}
+
 export function contractByName(name: string): ContractEntry | undefined {
   return CONTRACTS.find((entry) => entry.name === name);
 }
