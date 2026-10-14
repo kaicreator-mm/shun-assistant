@@ -99,7 +99,6 @@ export const CONTRACTS: readonly ContractEntry[] = [
   { name: 'c002-jit-lifecycle-output', schema: JitLifecycleOutputSchema },
   { name: 'c003-storage-diagnose-input', schema: StorageDiagnoseInputSchema },
   { name: 'c003-storage-diagnose-output', schema: StorageDiagnoseOutputSchema },
-
 ];
 
 /** Separate v0.2 public contract surface; frozen v0.1 CONTRACTS never grows. */
