@@ -1,0 +1,65 @@
+{
+  "issue": "i87",
+  "unit": "U05 core-only portable boot preflight (real Windows, non-admin)",
+  "generatedAt": "2026-10-14T07:25:00Z",
+  "baselineSha": "d812ca2f5d5e48dd637c5580cb4c30ecf4116663",
+  "host": {
+    "os": "Windows 11 Pro 26H2",
+    "build": "10.0.26300.9457",
+    "arch": "x64",
+    "user": "nilar\\15549",
+    "integrityLevel": "Medium (S-1-16-8192), never elevated (no S-1-16-12288)",
+    "isAdminRole": false,
+    "accountInAdministratorsGroup": true,
+    "productTokenClass": "FILTERED_ADMIN (observed by the product itself via whoami /groups)"
+  },
+  "staging": {
+    "root": "C:\\xDev\\kAiCreator\\_tmp\\i87-u05\\staging",
+    "totals": { "files": 7, "bytes": 94672411, "mib": 90.28 },
+    "files": [
+      { "path": "server.mjs", "size": 1058288, "note": "esbuild bundle of apps/control-api/src/main.ts, zod + @shun/* inlined" },
+      { "path": "runtime/node.exe", "size": 93580104, "sha256": "ba4e6d110e8c1592a1ecd390f6b05f3da124b13871a5be62b341a07a853c6c32", "note": "pinned Node v24.21.0, explicitly bundled" },
+      { "path": "launch.cmd", "size": 624 },
+      { "path": "app-ui/index.html", "size": 2336 },
+      { "path": "app-ui/app.js", "size": 15012 },
+      { "path": "app-ui/view-model.js", "size": 12720 },
+      { "path": "app-ui/styles.css", "size": 3327 }
+    ],
+    "manifestSha256SelfExcluded": "bc9ea8a4e28faa45ee8f04b7b23cfd5de5dbfb9face951b7d7218d5e50d2cf6b",
+    "manifest": "staging/manifest.json lists every shipped file with size + sha256"
+  },
+  "claims": [
+    { "id": "clean-nondeveloper-env", "verdict": "PASS", "evidence": "restricted PATH=C:\\Windows\\System32;C:\\Windows; where pnpm/npm/node/npx all exit 1; server boots via staging launch.cmd with bundled runtime" },
+    { "id": "process-identity-is-bundled-runtime", "verdict": "PASS", "evidence": "PowerShell Win32_Process ExecutablePath == <staging>\\runtime\\node.exe (normal dir and unicode dir), CommandLine runs server.mjs, parent is launch.cmd cmd.exe" },
+    { "id": "loopback-only-no-external-connections", "verdict": "PASS", "evidence": "netstat -ano -p tcp before/after: only 127.0.0.1:<port> LISTENING + own loopback client ephemeral; no non-loopback remote endpoints. Limitation: non-admin cannot force network isolation; supported by code audit (loopback bind + Host gate, networkAccess FORBIDDEN resolver gate, storage vertical local-fs only)" },
+    { "id": "writes-stay-inside-declared-roots", "verdict": "PASS", "evidence": "tree snapshots pre/post full round: staging 0 changes, redirected TEMP 0, APPDATA level-1 0, HKCU\\Environment unchanged; workspace diff == exactly the 5 deleted cache files; backend writes only sandbox state/evidence/registry" },
+    { "id": "protected-canary", "verdict": "PASS", "evidence": "protected canary SHA-256 unchanged after real cleanup; decoy 'cache' dir inside protected tree survived (PROTECTED beats marker); goal targeting canary refused REAL_STORAGE_GOAL_SCOPE_OR_PRIVACY_REFUSED" },
+    { "id": "real-c003-task", "verdict": "PASS", "evidence": "task u05-c003-main-4 and unicode u05-uni-1: submit->RESOLVING->AWAITING_AUTHORIZATION->preview(R2, planHash, expiresAt)->explicit approval->SUCCEEDED, verification PASS (protected-assets-unchanged, reclaimed-bytes-verified); 5/5 cache files deleted; conservative fail-closed kept npm-cache lookalike and temp (eligibleCategories=[CACHE])" },
+    { "id": "clean-exit-restart-restore", "verdict": "PASS", "evidence": "quiescent stop then restart: task restored SUCCEEDED/COMPLETED_VERIFIED with 'Historical verified result ... not a new post-restart measurement'" },
+    { "id": "hard-kill-pre-effect-recovery", "verdict": "PASS", "evidence": "taskkill /F /T at AWAITING_AUTHORIZATION -> restart -> FAILED / NOT_STARTED 'never crossed the effect-authorization boundary'" },
+    { "id": "hard-kill-post-boundary-recovery", "verdict": "PASS", "evidence": "kill at EXECUTING (durable EFFECT_AUTHORIZED committed) -> restart -> NEEDS_INTERVENTION / MAY_HAVE_EXECUTED_UNCERTAIN reconciled:false; POST recovery -> 409 RECOVERY_NOT_APPLICABLE; POST retry -> 409 RETRY_BLOCKED_UNCERTAIN" },
+    { "id": "non-admin-no-uac", "verdict": "PASS", "evidence": "entire run Medium integrity, IsAdmin=false; launch.cmd has no elevation manifest; allowElevation:true goal refused; signed pin STANDARD_USER vs observed FILTERED_ADMIN was REFUSED by the host-facts drift gate (fail-closed), correct FILTERED_ADMIN pin passed the product's own gate" },
+    { "id": "unicode-space-paths", "verdict": "PASS", "evidence": "full round from staging copy '便 携 包 拷贝' into sandbox '用 户 沙 箱': boot, process identity from unicode runtime path (UTF-8 sidecar proof), real task SUCCEEDED with identical fs truth. Harness note: cmd argv must stay ASCII (cwd+launch.cmd, %~dp0 resolves the wide path)" },
+    { "id": "unc-path", "verdict": "BLOCKED (honest)", "evidence": "over \\\\wsl.localhost\\Ubuntu: provision + ed25519 issuance chain SUCCEEDED; server boot fails at ShunStore 'PRAGMA journal_mode=WAL' -> SQLITE_BUSY 'database is locked' (WAL unsupported on Plan9 network FS). State-on-UNC unsupported today; exact error recorded in events.ndjson" },
+    { "id": "real-windows-system-observation", "verdict": "BLOCKED_BY_NOT_YET_IMPLEMENTED", "evidence": "real mode exposes only C003 storage; no user-facing read-only system observation endpoint exists; residue/evidence endpoints return typed 404s. Internal OS observations (token class, statfs, cpu/mem) exist only as enforcement inputs" },
+    { "id": "no-model-provider-assumed", "verdict": "PASS", "evidence": "no model/provider config of any kind; image-model goal refused (REAL_STORAGE_ONLY_C003_SUPPORTED); demo contrast boot shows health.simulated=true vs real simulated=false" },
+    { "id": "cold-start", "verdict": "MEASURED", "evidence": "3 runs via launch.cmd: 173 / 195 / 206 ms from process spawn to first HTTP 200 on /api/health (UI fetch also 200)" },
+    { "id": "core-size", "verdict": "MEASURED", "evidence": "94,672,411 bytes (90.3 MiB) in 7 files; 89.2 MiB of that is the explicitly bundled pinned Node runtime; application bundle 1.01 MiB; UI 33 KiB" }
+  ],
+  "operationalFindings": [
+    "Issuance lifetime is 60s and the effect gate requires exact currentRevision equality with the revision bound at submit; observationRevision is part of the revision, so ANY re-issuance between submit and approve is refused by design. On this host (MB-level C: churn), two tasks fail-closed before the correct single-envelope flow was used. Product behaved fail-closed throughout.",
+    "A cleanup task on an already-clean workspace correctly fails with GROWTH_NOT_ATTRIBUTED (no eligible bytes) instead of faking work.",
+    "Windows phantom port reservations (bind EADDRINUSE while netstat shows nothing) affected harness port selection; handled by probe-binding. Harness concern only.",
+    "taskkill without /F cannot terminate a console node (OS refuses, exit 128): a Windows 'graceful stop' requires an in-app handler v0.2 does not implement; restart recovery (WAL + synchronous=FULL) was consistent in every scenario."
+  ],
+  "limitations": [
+    "Offline behavior evidenced by observation + code audit; a non-admin cannot force network isolation.",
+    "State directory on UNC is not supported today (SQLite WAL on network FS).",
+    "User-facing Windows system observation is not implemented in v0.2 real mode (BLOCKED_BY_NOT_YET_IMPLEMENTED).",
+    "Pilot on one machine; issuer ran operator-side on the same host (real deployments run it on a trusted build host).",
+    "This is an architecture feasibility pilot, NOT a release-quality user package: no installer, no auto-start, secrets/env provisioned by the research harness."
+  ],
+  "eventsNdjsonLines": 231,
+  "researchDir": "research/i87-u05/",
+  "tmpDir": "C:\\xDev\\kAiCreator\\_tmp\\i87-u05\\"
+}
