@@ -46,7 +46,7 @@ After L2 Freeze:
                 T11 (version closure)
 ```
 
-L2 pilots #85–#87 are **not duplicated** as implementation DAG nodes: consume their exact evidence/decisions in T02/T05/T09. **#85 remains BLOCKED**: no real local model or demonstrated process egress restriction; corrected AppContainer research source awaits real host retest. **#86 is CLOSED** with bounded ripgrep/Sharp ABI architecture evidence, **not** a production loader PASS. **#87 is CLOSED** with a narrow C003 portable local-disk core result, **not** standard-user/inventory-UI or UNC-state qualification. Their release obligations remain in T02/T05/T09/T10/T11. A pilot FAIL changes architecture, and `BLOCKED` stays blocked, never a fake PASS.
+L2 pilots #85–#87 are **not duplicated** as implementation DAG nodes: consume their exact evidence/decisions in T02/T05/T09. **#85 remains BLOCKED for the actual model leg only**: the Windows research rt1f child launch/true AppContainer token and controlled-network no-egress probe are **PASS** at `task/i85-rt1-zc@3cc6733ccfd3e3da8c6704e3f5e6941852a1f16c`. No real local model/inference/IPC yet; no automatic T02 completion or LOCAL release claim. **#86 is CLOSED** with bounded ripgrep/Sharp ABI architecture evidence, **not** a production loader PASS. **#87 is CLOSED** with a narrow C003 portable local-disk core result, **not** standard-user/inventory-UI or UNC-state qualification. Their release obligations remain in T02/T05/T09/T10/T11. A pilot FAIL changes architecture, and `BLOCKED` stays blocked, never a fake PASS.
 
 ## 2. Inputs, outputs and task handoff contract
 
@@ -70,7 +70,7 @@ TASK_DAG_FREEZE=NO
 EXECUTION_DAG_ISSUES=NOT_CREATED
 PLANNED_TASK_COUNT=12
 COMPLETED_V02_IMPLEMENTATION_TASKS=0
-HOST_L2_HYPOTHESES=#85_BLOCKED_REAL_RETEST,#86_ARCH_EVIDENCE_COMPLETE,#87_PARTIAL_FEASIBILITY_CLOSED
+HOST_L2_HYPOTHESES=#85_ISOLATION_PROBE_PASS_MODEL_INFERENCE_BLOCKED,#86_ARCH_EVIDENCE_COMPLETE,#87_PARTIAL_FEASIBILITY_CLOSED
 ```
 
 **Next:** incorporate exact Windows outcomes into L2 unknown matrix; fresh architecture-security review of changed exact candidate; explicit L2 Freeze; then review/freeze this planning DAG and materialize GitHub Issue dependencies. Nothing in this draft authorizes implementation.
