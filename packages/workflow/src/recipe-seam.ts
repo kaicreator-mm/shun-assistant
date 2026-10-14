@@ -12,8 +12,8 @@ import type {
   RecipeDefinition,
   RecipeResolverPort,
 } from '@shun/contracts';
-import { RecipeSeamUnavailableError } from './errors.ts';
 import type { SavedRecipeRevision } from '@shun/store';
+import { RecipeSeamUnavailableError } from './errors.ts';
 
 export class FailClosedRecipeResolver implements RecipeResolverPort {
   async match(_intent: {
