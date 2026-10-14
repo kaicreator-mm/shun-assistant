@@ -1,0 +1,7 @@
+{
+  "algorithm": "ed25519-spki-sha256",
+  "publicKeyFingerprint": "e7a7aefec55f743053f93dd099dfdf0830b84ec06d7a0067eb4f443a8f8c7bac",
+  "publicKeyPem": "-----BEGIN PUBLIC KEY-----\nMCowBQYDK2VwAyEAao3yOVsrJChSiK2dMTOmMP0rfpl6nO9RJyF5wgWvBd4=\n-----END PUBLIC KEY-----\n",
+  "activeCatalogRevision": "R2",
+  "note": "trust anchor for the i86-U04 pilot: only this pinned key can authorize acquisition; downloadable content is never trusted because it is listed here"
+}

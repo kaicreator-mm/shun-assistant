@@ -1,0 +1,65 @@
+{
+  "cases": [
+    {
+      "id": "n1-tamper-artifact",
+      "status": "PASS",
+      "detail": "tampered byte at offset 1029446 -> typed HASH_MISMATCH; cache+staging purged; provider root never created; zero rg spawns"
+    },
+    {
+      "id": "n2-tamper-catalog",
+      "status": "PASS",
+      "detail": "single digest edit in a signed catalog -> ed25519 verification fails -> CATALOG_SIGNATURE_INVALID, zero effects"
+    },
+    {
+      "id": "n3-os-arch",
+      "status": "PASS",
+      "detail": "catalog declaring linux/x86_64 -> OS_MISMATCH; declaring win32/arm64 -> ARCH_MISMATCH; both before any download"
+    },
+    {
+      "id": "n4-forged-abi",
+      "status": "PASS",
+      "detail": "N-API requirement forged to 99 (host provides 10) -> typed NODE_ABI_MISMATCH before any fetch or require"
+    },
+    {
+      "id": "n5-redirect",
+      "status": "PASS",
+      "detail": "origin 302 -> evil.example.invalid refused by manual-redirect host allowlist; zero body bytes fetched"
+    },
+    {
+      "id": "n6-hijack",
+      "status": "PASS",
+      "detail": "controls prove PATH/CWD planting executes a fake rg; the pipeline resolves ONLY the absolute verified path (fake never runs, marker absent) and real rg answers"
+    },
+    {
+      "id": "n7-sharp-tamper",
+      "status": "PASS",
+      "detail": "staged sharp zip byte-flipped at offset 4179806 -> HASH_MISMATCH; .node never installed, never required"
+    },
+    {
+      "id": "n8-stale-revision",
+      "status": "PASS",
+      "detail": "signed R1 catalog reuse after trust root moved to R2 -> CATALOG_REVISION_REVOKED (a valid signature alone is not enough)"
+    },
+    {
+      "id": "n9-offline-first-use",
+      "status": "PASS",
+      "detail": "dead origin (port 62159) on first use -> typed ORIGIN_UNREACHABLE; providers/ and staging/ empty (no half activation)"
+    },
+    {
+      "id": "n10-concurrent",
+      "status": "PASS",
+      "detail": "two concurrent acquires -> READY(downloaded, effect window journaled) + READY(adopted, zero effect window); origin served exactly 1 byte-stream; lock ordering proven by journal timestamps"
+    },
+    {
+      "id": "n11-zipslip",
+      "status": "PASS",
+      "detail": "traversal+absolute-path zips refused (ZIP_PATH_ESCAPE / ZIP_ALTERNATE_STREAM); symlink entry neutralized to a plain file (no reparse, no escape); junction-crossing extraction refused ZIP_REPARSE_POINT; outside canary intact throughout"
+    },
+    {
+      "id": "n12-truncated",
+      "status": "PASS",
+      "detail": "origin truncated the artifact to 1MiB (catalog declares 2058893) -> typed INCOMPLETE_DOWNLOAD; cache + providers clean"
+    }
+  ],
+  "failures": []
+}

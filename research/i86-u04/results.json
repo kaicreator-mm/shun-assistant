@@ -1,0 +1,237 @@
+{
+  "issue": "kaicreator-mm/shun-assistant #86 — v0.2 L2 U04 minimal trusted Provider JIT payload pilot",
+  "generatedAt": "2026-10-14T07:26:55.202Z",
+  "baseline": "d812ca2f5d5e48dd637c5580cb4c30ecf4116663 (task/i86-u04-zc)",
+  "host": {
+    "os": "Windows_NT 10.0.26300 x64",
+    "hostname": "Nilar",
+    "nodeVersion": "v24.21.0",
+    "nodeAbi": 137,
+    "napiVersion": 10,
+    "nodeExePath": "C:\\Users\\15549\\AppData\\Local\\fnm_multishells\\33660_1791962814712\\node.exe",
+    "nodeExeSha256": "ba4e6d110e8c1592a1ecd390f6b05f3da124b13871a5be62b341a07a853c6c32",
+    "nodeExeBytes": 93580104
+  },
+  "trustRoot": {
+    "algorithm": "ed25519-spki-sha256",
+    "publicKeyFingerprint": "e7a7aefec55f743053f93dd099dfdf0830b84ec06d7a0067eb4f443a8f8c7bac",
+    "activeCatalogRevision": "R2"
+  },
+  "providers": {
+    "cli.ripgrep": {
+      "verdict": "PASS",
+      "version": "14.1.1 (ripgrep-14.1.1-x86_64-pc-windows-msvc.zip from github releases)",
+      "artifactSha256": "d0f534024c42afd6cb4d38907c25cd2b249b79bbe6cc1dbee8e3e37c2b6e25a1",
+      "artifactBytes": 2058893,
+      "downloadRedirectHops": [
+        "github.com",
+        "release-assets.githubusercontent.com"
+      ],
+      "rgExeSha256": "f162b54de2adfc72d78adb1dbada2dedda111ae0a5e2f6e9500f4f909664c5d2",
+      "rgExeBytes": 5407744,
+      "rgVersion": "ripgrep 14.1.1 (rev 4649aa9700)",
+      "legs": [
+        {
+          "id": "P1-consent-gate",
+          "status": "PASS",
+          "detail": "CONSENT_REQUIRED before any network/fs/journal effect (downloads dir entries: 0)"
+        },
+        {
+          "id": "P2-real-acquire-READY",
+          "status": "PASS",
+          "detail": "states ABSENT->PENDING_CONSENT->CONSENTED->ACQUIRING->HASH_VERIFIED->INSTALLED->READY; rg.exe 5407744B sha f162b54de2adfc72d78adb1dbada2dedda111ae0a5e2f6e9500f4f909664c5d2; journal phases RECEIVED,VALIDATED,EXEC_START,EXEC_START,EXEC_DONE,RECEIPT_WRITTEN"
+        },
+        {
+          "id": "P3-authorized-task-oracle",
+          "status": "PASS",
+          "detail": "expected 57 == actual 57 matched lines (independent line-scan oracle); rg --version: ripgrep 14.1.1 (rev 4649aa9700)"
+        },
+        {
+          "id": "P3-authz-separation",
+          "status": "PASS",
+          "detail": "download consent never granted run rights: refusal, expiry, and grant are typed and separate"
+        },
+        {
+          "id": "P4a-scope-refusal-canary",
+          "status": "PASS",
+          "detail": "refusal names the canary; zero deletions; canary + provider intact: deletion scope holds unrecorded content at effect time: C:\\xDev\\kAiCreator\\_tmp\\i86-u04\\sandbox\\providers\\5ce2a6c9fa094f8943e52296e359b555\\u"
+        },
+        {
+          "id": "P4b-junction-refusal",
+          "status": "PASS",
+          "detail": "native removal refuses reparse content; provider retained; junction sentinel untouched"
+        },
+        {
+          "id": "P4c-identity-pinned-removal",
+          "status": "PASS",
+          "detail": "provider + download roots removed by install-time NT identity; outside sentinel survives"
+        },
+        {
+          "id": "P4d-manifest-restricted-unit",
+          "status": "PASS",
+          "detail": "deepest-first manifest removal removes exactly recorded files; recorded dir holding a canary is RETAINED; canary survives"
+        },
+        {
+          "id": "P5-origin-cache-fill",
+          "status": "PASS",
+          "detail": "origin requests=1; READY; oracle re-verified on origin-served bytes (57 lines)"
+        },
+        {
+          "id": "P5-removal-retain-cache",
+          "status": "PASS",
+          "detail": "provider root removed, replay cache deliberately retained"
+        },
+        {
+          "id": "P6a-cache-replay-zero-download",
+          "status": "PASS",
+          "detail": "origin request count delta = 0; READY from verified cache (sha re-checked before use)"
+        },
+        {
+          "id": "P6b-offline-replay",
+          "status": "PASS",
+          "detail": "origin probe: down (ECONNREFUSED); READY from cache with zero network possibility"
+        },
+        {
+          "id": "P7-reconcile-interrupt",
+          "status": "PASS",
+          "detail": "torn=MAY_HAVE_EXECUTED_UNCERTAIN -> staging purged -> fresh attempt READY (cache hit); no half-activation at any point"
+        },
+        {
+          "id": "P7-final-cleanup",
+          "status": "PASS",
+          "detail": "final full removal (provider + cache) completed"
+        }
+      ],
+      "negatives": [
+        {
+          "id": "n1-tamper-artifact",
+          "status": "PASS",
+          "detail": "tampered byte at offset 1029446 -> typed HASH_MISMATCH; cache+staging purged; provider root never created; zero rg spawns"
+        },
+        {
+          "id": "n2-tamper-catalog",
+          "status": "PASS",
+          "detail": "single digest edit in a signed catalog -> ed25519 verification fails -> CATALOG_SIGNATURE_INVALID, zero effects"
+        },
+        {
+          "id": "n3-os-arch",
+          "status": "PASS",
+          "detail": "catalog declaring linux/x86_64 -> OS_MISMATCH; declaring win32/arm64 -> ARCH_MISMATCH; both before any download"
+        },
+        {
+          "id": "n4-forged-abi",
+          "status": "PASS",
+          "detail": "N-API requirement forged to 99 (host provides 10) -> typed NODE_ABI_MISMATCH before any fetch or require"
+        },
+        {
+          "id": "n5-redirect",
+          "status": "PASS",
+          "detail": "origin 302 -> evil.example.invalid refused by manual-redirect host allowlist; zero body bytes fetched"
+        },
+        {
+          "id": "n6-hijack",
+          "status": "PASS",
+          "detail": "controls prove PATH/CWD planting executes a fake rg; the pipeline resolves ONLY the absolute verified path (fake never runs, marker absent) and real rg answers"
+        },
+        {
+          "id": "n7-sharp-tamper",
+          "status": "PASS",
+          "detail": "staged sharp zip byte-flipped at offset 4179806 -> HASH_MISMATCH; .node never installed, never required"
+        },
+        {
+          "id": "n8-stale-revision",
+          "status": "PASS",
+          "detail": "signed R1 catalog reuse after trust root moved to R2 -> CATALOG_REVISION_REVOKED (a valid signature alone is not enough)"
+        },
+        {
+          "id": "n9-offline-first-use",
+          "status": "PASS",
+          "detail": "dead origin (port 62159) on first use -> typed ORIGIN_UNREACHABLE; providers/ and staging/ empty (no half activation)"
+        },
+        {
+          "id": "n10-concurrent",
+          "status": "PASS",
+          "detail": "two concurrent acquires -> READY(downloaded, effect window journaled) + READY(adopted, zero effect window); origin served exactly 1 byte-stream; lock ordering proven by journal timestamps"
+        },
+        {
+          "id": "n11-zipslip",
+          "status": "PASS",
+          "detail": "traversal+absolute-path zips refused (ZIP_PATH_ESCAPE / ZIP_ALTERNATE_STREAM); symlink entry neutralized to a plain file (no reparse, no escape); junction-crossing extraction refused ZIP_REPARSE_POINT; outside canary intact throughout"
+        },
+        {
+          "id": "n12-truncated",
+          "status": "PASS",
+          "detail": "origin truncated the artifact to 1MiB (catalog declares 2058893) -> typed INCOMPLETE_DOWNLOAD; cache + providers clean"
+        }
+      ]
+    },
+    "addon.sharp-win32-x64": {
+      "verdict": "PASS",
+      "version": "0.35.5 (@img/sharp-win32-x64, N-API 10 prebuilt)",
+      "acquiredNodeSha256": "971048779f9c8598df14641dfc03c625885c93f473a788e65ca2deb50d0b083e",
+      "acquiredNodeBytes": 443904,
+      "node24": {
+        "node": "v24.21.0",
+        "abi": 137,
+        "libvips": "{\"semver\":\"8.18.7\",\"isGlobal\":false,\"isWasm\":false}"
+      },
+      "node22": {
+        "node": "v22.23.3",
+        "abi": 127,
+        "libvips": "{\"semver\":\"8.18.7\",\"isGlobal\":false,\"isWasm\":false}"
+      },
+      "legs": [
+        {
+          "id": "S1-sharp-acquire-READY",
+          "status": "PASS",
+          "detail": "states ABSENT->PENDING_CONSENT->CONSENTED->ACQUIRING->HASH_VERIFIED->INSTALLED->READY; .node 443904B sha 971048779f9c8598… matches signed catalog and vetted store artifact"
+        },
+        {
+          "id": "S2-node24-abi137-resize",
+          "status": "PASS",
+          "detail": "node v24.21.0 ABI 137 N-API 10; libvips {\"semver\":\"8.18.7\",\"isGlobal\":false,\"isWasm\":false}; resize 64x48 -> 20x10 verified by independent IHDR+pixel parse"
+        },
+        {
+          "id": "S3-node22-abi127-resize",
+          "status": "PASS",
+          "detail": "node v22.23.3 ABI 127 N-API 10; same acquired .node loads and resizes (N-API ABI stability confirmed); IHDR verified 20x10"
+        },
+        {
+          "id": "S4-worker-crash-recovery",
+          "status": "PASS",
+          "detail": "worker process.exit(1) after native load -> parent alive (typed WORKER_CRASHED), recovery worker re-loaded and resized correctly, 0 lock/pid/tmp residue in provider root"
+        },
+        {
+          "id": "S5-hostile-cwd-dll",
+          "status": "PASS",
+          "detail": "junk libvips DLLs planted in the worker CWD: the acquired binding still loads the real DLLs from its own directory and the verified resize passes — CWD-planted DLLs were not used"
+        }
+      ]
+    }
+  },
+  "counts": {
+    "pipelineLegsPass": 14,
+    "pipelineLegsTotal": 14,
+    "negativeCasesPass": 12,
+    "negativeCasesTotal": 12,
+    "sharpLegsPass": 5,
+    "sharpLegsTotal": 5,
+    "eventsNdjsonLines": 223
+  },
+  "v01Reuse": {
+    "imported": [
+      "SafePowerShellZipExtractor (native handle-relative extractor, per-entry SHA)",
+      "PowerShellNativeDeleter (identity-pinned snapshot/removeTreePinned)",
+      "SpawnProcess / FileJournal / NodeFilesystem (adapters/node.ts)",
+      "classifyFromJournal (journal.ts recovery classification)",
+      "effectTimeScopeRefusal (manifest-removal.ts effect-time exclusivity)",
+      "AcquisitionError typed failures (ports.ts)",
+      "stableDirectoryName naming + exclusive-root creation semantics (managed-portable.ts)"
+    ],
+    "semanticsAdoptedWithoutImport": [
+      "consent/authorization phase journaling (RECEIVED→VALIDATED→EXEC_START→EXEC_DONE→RECEIPT_WRITTEN)",
+      "fail-closed refusal notes + no-effect journal markers",
+      "content-addressed cache is U04-new (v0.1 used winget transport + its own downloadRoot)"
+    ]
+  }
+}

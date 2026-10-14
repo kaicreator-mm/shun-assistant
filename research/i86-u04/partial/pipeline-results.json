@@ -1,0 +1,85 @@
+{
+  "legs": [
+    {
+      "id": "P1-consent-gate",
+      "status": "PASS",
+      "detail": "CONSENT_REQUIRED before any network/fs/journal effect (downloads dir entries: 0)"
+    },
+    {
+      "id": "P2-real-acquire-READY",
+      "status": "PASS",
+      "detail": "states ABSENT->PENDING_CONSENT->CONSENTED->ACQUIRING->HASH_VERIFIED->INSTALLED->READY; rg.exe 5407744B sha f162b54de2adfc72d78adb1dbada2dedda111ae0a5e2f6e9500f4f909664c5d2; journal phases RECEIVED,VALIDATED,EXEC_START,EXEC_START,EXEC_DONE,RECEIPT_WRITTEN"
+    },
+    {
+      "id": "P3-authorized-task-oracle",
+      "status": "PASS",
+      "detail": "expected 57 == actual 57 matched lines (independent line-scan oracle); rg --version: ripgrep 14.1.1 (rev 4649aa9700)"
+    },
+    {
+      "id": "P3-authz-separation",
+      "status": "PASS",
+      "detail": "download consent never granted run rights: refusal, expiry, and grant are typed and separate"
+    },
+    {
+      "id": "P4a-scope-refusal-canary",
+      "status": "PASS",
+      "detail": "refusal names the canary; zero deletions; canary + provider intact: deletion scope holds unrecorded content at effect time: C:\\xDev\\kAiCreator\\_tmp\\i86-u04\\sandbox\\providers\\5ce2a6c9fa094f8943e52296e359b555\\u"
+    },
+    {
+      "id": "P4b-junction-refusal",
+      "status": "PASS",
+      "detail": "native removal refuses reparse content; provider retained; junction sentinel untouched"
+    },
+    {
+      "id": "P4c-identity-pinned-removal",
+      "status": "PASS",
+      "detail": "provider + download roots removed by install-time NT identity; outside sentinel survives"
+    },
+    {
+      "id": "P4d-manifest-restricted-unit",
+      "status": "PASS",
+      "detail": "deepest-first manifest removal removes exactly recorded files; recorded dir holding a canary is RETAINED; canary survives"
+    },
+    {
+      "id": "P5-origin-cache-fill",
+      "status": "PASS",
+      "detail": "origin requests=1; READY; oracle re-verified on origin-served bytes (57 lines)"
+    },
+    {
+      "id": "P5-removal-retain-cache",
+      "status": "PASS",
+      "detail": "provider root removed, replay cache deliberately retained"
+    },
+    {
+      "id": "P6a-cache-replay-zero-download",
+      "status": "PASS",
+      "detail": "origin request count delta = 0; READY from verified cache (sha re-checked before use)"
+    },
+    {
+      "id": "P6b-offline-replay",
+      "status": "PASS",
+      "detail": "origin probe: down (ECONNREFUSED); READY from cache with zero network possibility"
+    },
+    {
+      "id": "P7-reconcile-interrupt",
+      "status": "PASS",
+      "detail": "torn=MAY_HAVE_EXECUTED_UNCERTAIN -> staging purged -> fresh attempt READY (cache hit); no half-activation at any point"
+    },
+    {
+      "id": "P7-final-cleanup",
+      "status": "PASS",
+      "detail": "final full removal (provider + cache) completed"
+    }
+  ],
+  "failures": [],
+  "rgExeSha256": "f162b54de2adfc72d78adb1dbada2dedda111ae0a5e2f6e9500f4f909664c5d2",
+  "rgExeBytes": 5407744,
+  "downloadSha256": "d0f534024c42afd6cb4d38907c25cd2b249b79bbe6cc1dbee8e3e37c2b6e25a1",
+  "downloadBytes": 2058893,
+  "downloadHops": [
+    "github.com",
+    "release-assets.githubusercontent.com"
+  ],
+  "rgVersion": "ripgrep 14.1.1 (rev 4649aa9700)",
+  "oracleExpected": 57
+}

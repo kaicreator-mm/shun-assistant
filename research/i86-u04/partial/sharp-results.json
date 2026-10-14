@@ -1,0 +1,46 @@
+{
+  "legs": [
+    {
+      "id": "S1-sharp-acquire-READY",
+      "status": "PASS",
+      "detail": "states ABSENT->PENDING_CONSENT->CONSENTED->ACQUIRING->HASH_VERIFIED->INSTALLED->READY; .node 443904B sha 971048779f9c8598… matches signed catalog and vetted store artifact"
+    },
+    {
+      "id": "S2-node24-abi137-resize",
+      "status": "PASS",
+      "detail": "node v24.21.0 ABI 137 N-API 10; libvips {\"semver\":\"8.18.7\",\"isGlobal\":false,\"isWasm\":false}; resize 64x48 -> 20x10 verified by independent IHDR+pixel parse"
+    },
+    {
+      "id": "S3-node22-abi127-resize",
+      "status": "PASS",
+      "detail": "node v22.23.3 ABI 127 N-API 10; same acquired .node loads and resizes (N-API ABI stability confirmed); IHDR verified 20x10"
+    },
+    {
+      "id": "S4-worker-crash-recovery",
+      "status": "PASS",
+      "detail": "worker process.exit(1) after native load -> parent alive (typed WORKER_CRASHED), recovery worker re-loaded and resized correctly, 0 lock/pid/tmp residue in provider root"
+    },
+    {
+      "id": "S5-hostile-cwd-dll",
+      "status": "PASS",
+      "detail": "junk libvips DLLs planted in the worker CWD: the acquired binding still loads the real DLLs from its own directory and the verified resize passes — CWD-planted DLLs were not used"
+    }
+  ],
+  "failures": [],
+  "sharpVerdict": "PASS",
+  "ripgrepVerdict": "see pipeline results",
+  "acquiredNodeSha256": "971048779f9c8598df14641dfc03c625885c93f473a788e65ca2deb50d0b083e",
+  "acquiredNodeSizeBytes": 443904,
+  "node24": {
+    "node": "v24.21.0",
+    "abi": 137,
+    "libvips": "{\"semver\":\"8.18.7\",\"isGlobal\":false,\"isWasm\":false}"
+  },
+  "node22": {
+    "node": "v22.23.3",
+    "abi": 127,
+    "libvips": "{\"semver\":\"8.18.7\",\"isGlobal\":false,\"isWasm\":false}"
+  },
+  "providerRoot": "C:\\xDev\\kAiCreator\\_tmp\\i86-u04\\sharp-sandbox\\providers\\3f04b83890d6e8733b09ef3d1717b3fe",
+  "originRequestsTotal": 1
+}

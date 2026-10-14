@@ -1,0 +1,88 @@
+{
+  "catalogRevision": "R2",
+  "generatedAt": "2026-10-14T07:25:59.541Z",
+  "curator": "research/i86-u04 pilot curator",
+  "note": "all artifact digests computed from real bytes by this tooling; trust lives in the pinned key fingerprint, not in this file",
+  "entries": [
+    {
+      "id": "cli.ripgrep",
+      "providerId": "tool.ripgrep",
+      "version": "14.1.1",
+      "kind": "cli",
+      "source": {
+        "url": "http://127.0.0.1:59960/ripgrep-14.1.1-x86_64-pc-windows-msvc.zip",
+        "approvedHosts": [
+          "127.0.0.1"
+        ]
+      },
+      "artifact": {
+        "sizeBytes": 2058893,
+        "sha256": "d0f534024c42afd6cb4d38907c25cd2b249b79bbe6cc1dbee8e3e37c2b6e25a1"
+      },
+      "requirements": {
+        "os": "win32",
+        "arch": "x64",
+        "node": null
+      },
+      "executable": {
+        "relativeName": "rg.exe"
+      },
+      "license": "MIT OR Unlicense",
+      "publisher": "BurntSushi",
+      "removal": {
+        "strategy": "identity-pinned-native",
+        "scope": "provider-and-download-roots"
+      },
+      "verifier": {
+        "hash": "sha256-whole-artifact",
+        "extractor": "native-handle-relative"
+      }
+    },
+    {
+      "id": "addon.sharp-win32-x64",
+      "providerId": "tool.sharp-win32-x64",
+      "version": "0.35.5",
+      "kind": "native-addon",
+      "source": {
+        "url": "http://127.0.0.1:59960/sharp-win32-x64-0.35.5.zip",
+        "approvedHosts": [
+          "127.0.0.1"
+        ]
+      },
+      "artifact": {
+        "sizeBytes": 8359613,
+        "sha256": "93b21d0dfc17436c39126baae103e48d4e9f35db939ee0e701c2e0ee87d4479a"
+      },
+      "requirements": {
+        "os": "win32",
+        "arch": "x64",
+        "node": {
+          "napiVersion": 10
+        }
+      },
+      "executable": null,
+      "license": "Apache-2.0 AND LGPL-3.0-or-later",
+      "publisher": "lovell/sharp (prebuilt @img/sharp-win32-x64)",
+      "removal": {
+        "strategy": "identity-pinned-native",
+        "scope": "provider-and-download-roots"
+      },
+      "verifier": {
+        "hash": "sha256-whole-artifact",
+        "extractor": "native-handle-relative"
+      },
+      "contents": {
+        "node": {
+          "relativePath": "lib/sharp-win32-x64-0.35.5.node",
+          "sha256": "971048779f9c8598df14641dfc03c625885c93f473a788e65ca2deb50d0b083e",
+          "sizeBytes": 443904
+        }
+      }
+    }
+  ],
+  "signature": {
+    "alg": "ed25519",
+    "keyFingerprint": "e7a7aefec55f743053f93dd099dfdf0830b84ec06d7a0067eb4f443a8f8c7bac",
+    "value": "YpaIrnySfScXlnKMBtiZhRzdgJF6fWMMicMnpyGc7DpG+YmaQA26hbqH3YUDe2NBzTfjbgE510eQdNbtVI/kAw=="
+  }
+}
