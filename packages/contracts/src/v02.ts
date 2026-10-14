@@ -246,38 +246,47 @@ export function mayRefundCloudAttempt(
 
 const RecipeOpSchema = z.discriminatedUnion('op', [
   z.strictObject({
+    actionId: Ref,
     op: z.literal('system.inventory'),
     parameters: z.strictObject({ includeProcesses: z.boolean().optional() }),
   }),
   z.strictObject({
+    actionId: Ref,
     op: z.literal('system.storage.diagnose'),
     parameters: z.strictObject({ volumeId: Ref }),
   }),
   z.strictObject({
+    actionId: Ref,
     op: z.literal('file.search'),
     parameters: z.strictObject({ root: Ref, query: Ref }),
   }),
   z.strictObject({
+    actionId: Ref,
     op: z.literal('file.copy'),
     parameters: z.strictObject({ sourcePath: Ref, destinationPath: Ref }),
   }),
   z.strictObject({
+    actionId: Ref,
     op: z.literal('file.move'),
     parameters: z.strictObject({ sourcePath: Ref, destinationPath: Ref }),
   }),
   z.strictObject({
+    actionId: Ref,
     op: z.literal('file.rename'),
     parameters: z.strictObject({ sourcePath: Ref, newName: Ref }),
   }),
   z.strictObject({
+    actionId: Ref,
     op: z.literal('file.duplicates.report'),
     parameters: z.strictObject({ root: Ref }),
   }),
   z.strictObject({
+    actionId: Ref,
     op: z.literal('image.batch_process'),
     parameters: z.strictObject({ sourceFolder: Ref, outputFolder: Ref }),
   }),
   z.strictObject({
+    actionId: Ref,
     op: z.literal('software.jit_capability_lifecycle'),
     parameters: z.strictObject({
       providerId: Ref,
@@ -285,9 +294,7 @@ const RecipeOpSchema = z.discriminatedUnion('op', [
     }),
   }),
 ]);
-export const RecipeActionNodeSchema = z.discriminatedUnion('op', [
-  ...RecipeOpSchema.options.map((option) => option.safeExtend({ actionId: Ref })),
-] as [(typeof RecipeOpSchema.options)[number], ...(typeof RecipeOpSchema.options)[number][]]);
+export const RecipeActionNodeSchema = RecipeOpSchema;
 export const RecipeActionGraphSchema = z
   .strictObject({
     nodes: z.array(RecipeActionNodeSchema).min(1),
