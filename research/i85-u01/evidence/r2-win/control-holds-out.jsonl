@@ -1,0 +1,1 @@
+{"type":"control-summary","pid":25604,"nodeVersion":"v24.21.0","results":[{"host":"127.0.0.1","port":61645,"outcome":"CONNECTED","heldMs":2000,"elapsedMs":2024},{"host":"192.168.100.245","port":61647,"outcome":"CONNECTED","heldMs":2000,"elapsedMs":2014},{"host":"api.deepseek.com","port":443,"outcome":"CONNECTED","heldMs":2000,"elapsedMs":2153}]}

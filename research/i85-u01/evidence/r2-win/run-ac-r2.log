@@ -1,0 +1,20 @@
+ACR2 capability-derived {"groupSid":"S-1-5-32-2779705173-1925339129-2667939958-2414465498-3395756507-4015878651-158944808-788332705","expected":"S-1-15-3-1","ntstatus":"0x00000000","capSid":"S-1-15-3-1"}
+ACR2 create-profile {"ok":true,"hr":"0x00000000"}
+ACR2 container-sid {"sid":"S-1-15-2-240989768-1242245891-536783053-1466827634-375481881-2718806897-3027949543"}
+ACR2 icacls-all-app-packages {"out":"已处理的文件: X:\\ | 已成功处理 1 个文件; 处理 0 个文件时失败","rc":0}
+ACR2 icacls-container-sid {"out":"已处理的文件: X:\\ | 已成功处理 1 个文件; 处理 0 个文件时失败","rc":0}
+ACR2 stdin-payload {"bytes":281}
+ACR2C pre-createprocess
+ACR2C post-createprocess
+ACR2C pre-stdinwrite
+ACR2C pre-wait
+ACR2C post-wait 0
+ACR2C pre-readout
+ACR2C mid-readout
+ACR2C post-readout
+ACR2 launch {"stdinBytesWritten":281,"rc":0,"pid":7248,"createError":0}
+ACR2 child-token {"isAppContainer":1,"appContainerSid":"S-1-15-2-240989768-1242245891-536783053-1466827634-375481881-2718806897-3027949543","capabilities":["S-1-15-3-1"]}
+ACR2 child-exit {"exitCode":0,"terminatedOnTimeout":false,"wait":0}
+ACR2 stdio-captured {"stdoutBytes":1829,"stderrBytes":0}
+ACR2 evidence-valid {"lan":"TIMEOUT","inferences":2,"note":"Final verdict remains broker-side with independent observation","loopback":"ERROR"}
+ACR2 delete-profile {"ok":true,"hr":"0x00000000"}

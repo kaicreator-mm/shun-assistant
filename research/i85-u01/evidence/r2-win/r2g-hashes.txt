@@ -1,0 +1,4 @@
+a8c46c7d1700ae6cb02f808cd330338053d49bff2b07e5a205048bdeb29ee883 */c/xDev/kAiCreator/_tmp/i85-r2/sbx/inference-child.js
+ba4e6d110e8c1592a1ecd390f6b05f3da124b13871a5be62b341a07a853c6c32 */c/xDev/kAiCreator/_tmp/i85-r2/sbx/node.exe
+d365aa0b457b85e6724e7a6ebea7ffeb42ff2ae6cc564944fae7549c4894bbfb */c/xDev/kAiCreator/shun-assistant/i85-r2-zc/research/i85-u01/appcontainer/run-ac-r2.ps1
+f501029be69d836b583a823076952e17202ae34cb0407f3655b83f3aa7b31337 */c/xDev/kAiCreator/shun-assistant/i85-r2-zc/research/i85-u01/appcontainer/observer-r2.ps1

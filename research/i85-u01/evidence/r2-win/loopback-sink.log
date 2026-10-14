@@ -1,0 +1,4 @@
+{"event":"ready","host":"127.0.0.1","port":61645,"pid":2184,"when":"2026-10-14T10:16:38.118Z"}
+{"event":"accepted","sequence":1,"remote":"127.0.0.1","local":"127.0.0.1","port":61645,"when":"2026-10-14T10:16:50.826Z"}
+{"event":"accepted","sequence":2,"remote":"127.0.0.1","local":"127.0.0.1","port":61645,"when":"2026-10-14T10:17:17.722Z"}
+{"event":"accepted","sequence":3,"remote":"127.0.0.1","local":"127.0.0.1","port":61645,"when":"2026-10-14T10:18:32.824Z"}
