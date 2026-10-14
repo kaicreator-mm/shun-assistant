@@ -207,7 +207,10 @@ describe('v0.2: exact Recipe identity and closed-world actions', () => {
     expect(
       RecipeActionGraphSchema.safeParse({
         ...graph,
-        edges: [{ from: 'one', to: 'two' }, { from: 'two', to: 'one' }],
+        edges: [
+          { from: 'one', to: 'two' },
+          { from: 'two', to: 'one' },
+        ],
       }).success,
     ).toBe(false);
   });
