@@ -12,6 +12,13 @@ const Ref = z.string().min(1);
 const NonNegative = z.number().int().nonnegative();
 const Positive = z.number().int().positive();
 
+const DisclosureCategoriesSchema = z.array(z.enum([
+  'GOAL_TEXT',
+  'SYSTEM_INVENTORY',
+  'FILE_METADATA',
+  'USER_SELECTED_CONTENT',
+])).min(1);
+
 export const CloudDisclosureScopeSchema = z
   .strictObject({
     taskId: Ref,
@@ -23,6 +30,9 @@ export const CloudDisclosureScopeSchema = z
     destination: z.literal('https://api.deepseek.com/chat/completions'),
     /** Digest of the EXACT approved disclosure-bearing projection, not a draft. */
     approvedProjectionSha256: Sha256HexSchema,
+    /** Stable revision of the exact approved consent scope. */
+    scopeRevision: Ref,
+    disclosureCategories: DisclosureCategoriesSchema,
     registryRevision: Ref,
     policyRevision: Ref,
     pricingRevision: Ref,
@@ -53,6 +63,7 @@ export const CloudConsentApprovalSchema = z
     scope: CloudDisclosureScopeSchema,
     confirmationNonce: Ref,
     displayedProjectionSha256: Sha256HexSchema,
+    displayedDisclosureCategories: DisclosureCategoriesSchema,
     issuer: z.strictObject({
       brokerId: Ref,
       brokerRevision: Ref,
@@ -66,6 +77,12 @@ export const CloudConsentApprovalSchema = z
     if (record.displayedProjectionSha256 !== record.scope.approvedProjectionSha256) {
       ctx.addIssue({ code: 'custom', message: 'displayed projection differs from approved scope' });
     }
+    if (
+      canonicalJson(record.displayedDisclosureCategories) !==
+      canonicalJson(record.scope.disclosureCategories)
+    ) {
+      ctx.addIssue({ code: 'custom', message: 'displayed categories differ from approved scope' });
+    }
   });
 export type CloudConsentApproval = z.infer<typeof CloudConsentApprovalSchema>;
 
@@ -77,6 +94,8 @@ export const CloudConsentCurrentnessSchema = z.discriminatedUnion('kind', [
     sessionId: Ref,
     registryRevision: Ref,
     policyRevision: Ref,
+    pricingRevision: Ref,
+    scopeRevision: Ref,
     revocationEpoch: NonNegative,
     /** Broker-sourced confirmation nonce that has not yet been consumed. */
     nonceIsUnused: z.boolean(),
@@ -110,6 +129,8 @@ export function validateCloudConsent(input: {
     state.sessionId !== approval.scope.sessionId ||
     state.registryRevision !== approval.scope.registryRevision ||
     state.policyRevision !== approval.scope.policyRevision ||
+    state.pricingRevision !== approval.scope.pricingRevision ||
+    state.scopeRevision !== approval.scope.scopeRevision ||
     state.revocationEpoch !== approval.scope.revocationEpoch ||
     !state.nonceIsUnused
   )
@@ -131,6 +152,9 @@ export const CloudCallReservationSchema = z.strictObject({
   attemptId: Ref,
   consentId: Ref,
   scopeRevision: Ref,
+  pricingRevision: Ref,
+  /** Stable per-transport-attempt idempotency binding; no free retries. */
+  idempotencyKey: Ref,
   taskId: Ref,
   callSequence: Positive,
   requestBytesSha256: Sha256HexSchema,
@@ -155,6 +179,8 @@ export const CloudCallReceiptSchema = z
     attemptId: Ref,
     consentId: Ref,
     status: z.enum(['NOT_SENT_PROVEN', 'SENT', 'SETTLED', 'UNKNOWN_COST']),
+    /** Only a trusted journal attestation can establish definitive no-send. */
+    noSendProofRef: Ref.optional(),
     sentAt: IsoDateTimeSchema.optional(),
     observedModel: Ref.optional(),
     /** May be absent for floating cloud model aliases; NEVER fabricate a model SHA. */
@@ -169,6 +195,25 @@ export const CloudCallReceiptSchema = z
     if (receipt.status === 'UNKNOWN_COST' && receipt.observedCostMicros !== undefined) {
       ctx.addIssue({ code: 'custom', message: 'unknown provider charge is not a settled cost' });
     }
+    if (receipt.status === 'NOT_SENT_PROVEN') {
+      if (
+        !receipt.noSendProofRef ||
+        receipt.sentAt !== undefined ||
+        receipt.observedCostMicros !== undefined ||
+        receipt.inputTokens !== undefined ||
+        receipt.outputTokens !== undefined ||
+        receipt.observedModel !== undefined ||
+        receipt.systemFingerprint !== undefined ||
+        receipt.responseId !== undefined
+      ) {
+        ctx.addIssue({
+          code: 'custom',
+          message: 'no-send receipt requires a proof and must not claim observed send or billing',
+        });
+      }
+    } else if (receipt.noSendProofRef !== undefined) {
+      ctx.addIssue({ code: 'custom', message: 'no-send proof only allowed on no-send receipt' });
+    }
   });
 export type CloudCallReceipt = z.infer<typeof CloudCallReceiptSchema>;
 
@@ -176,8 +221,22 @@ export type CloudCallReceipt = z.infer<typeof CloudCallReceiptSchema>;
 export function mayRefundCloudAttempt(
   reservation: CloudCallReservation,
   receipt: CloudCallReceipt,
+  /** Required independent durable-journal proof verifier, never caller self-attestation. */
+  verifyNoSendProof: (reservation: CloudCallReservation, proofRef: string) => boolean,
 ): boolean {
+  if (
+    !CloudCallReservationSchema.safeParse(reservation).success ||
+    !CloudCallReceiptSchema.safeParse(receipt).success ||
+    !receipt.noSendProofRef
+  ) return false;
+  let verified = false;
+  try {
+    verified = verifyNoSendProof(reservation, receipt.noSendProofRef);
+  } catch {
+    return false;
+  }
   return (
+    verified &&
     reservation.attemptId === receipt.attemptId &&
     reservation.consentId === receipt.consentId &&
     receipt.status === 'NOT_SENT_PROVEN' &&
@@ -187,22 +246,47 @@ export function mayRefundCloudAttempt(
   );
 }
 
-export const RecipeActionNodeSchema = z.strictObject({
-  actionId: Ref,
-  /** Closed-world vocabulary only. No shell/JS/eval/FFI code carriers. */
-  op: z.enum([
-    'system.inventory',
-    'system.storage.diagnose',
-    'file.search',
-    'file.copy',
-    'file.move',
-    'file.rename',
-    'file.duplicates.report',
-    'image.batch_process',
-    'software.jit_capability_lifecycle',
-  ]),
-  parameters: z.record(z.string(), z.unknown()),
-});
+const RecipeOpSchema = z.discriminatedUnion('op', [
+  z.strictObject({
+    op: z.literal('system.inventory'),
+    parameters: z.strictObject({ includeProcesses: z.boolean().optional() }),
+  }),
+  z.strictObject({
+    op: z.literal('system.storage.diagnose'),
+    parameters: z.strictObject({ volumeId: Ref }),
+  }),
+  z.strictObject({
+    op: z.literal('file.search'),
+    parameters: z.strictObject({ root: Ref, query: Ref }),
+  }),
+  z.strictObject({
+    op: z.literal('file.copy'),
+    parameters: z.strictObject({ sourcePath: Ref, destinationPath: Ref }),
+  }),
+  z.strictObject({
+    op: z.literal('file.move'),
+    parameters: z.strictObject({ sourcePath: Ref, destinationPath: Ref }),
+  }),
+  z.strictObject({
+    op: z.literal('file.rename'),
+    parameters: z.strictObject({ sourcePath: Ref, newName: Ref }),
+  }),
+  z.strictObject({
+    op: z.literal('file.duplicates.report'),
+    parameters: z.strictObject({ root: Ref }),
+  }),
+  z.strictObject({
+    op: z.literal('image.batch_process'),
+    parameters: z.strictObject({ sourceFolder: Ref, outputFolder: Ref }),
+  }),
+  z.strictObject({
+    op: z.literal('software.jit_capability_lifecycle'),
+    parameters: z.strictObject({ providerId: Ref, operation: z.enum(['ACQUIRE', 'ACTIVATE', 'RELEASE']) }),
+  }),
+]);
+export const RecipeActionNodeSchema = z.discriminatedUnion('op', [
+  ...RecipeOpSchema.options.map((option) => option.safeExtend({ actionId: Ref })),
+] as [typeof RecipeOpSchema.options[number], ...typeof RecipeOpSchema.options[number][]]);
 export const RecipeActionGraphSchema = z
   .strictObject({
     nodes: z.array(RecipeActionNodeSchema).min(1),
@@ -249,6 +333,9 @@ export const RecipeRevisionIdentitySchema = z
     compiledSha256: Sha256HexSchema,
     compilerRevision: Ref,
     contractRevision: Ref,
+    declaredEffectsSha256: Sha256HexSchema,
+    verifierId: Ref,
+    verifierRevision: Ref,
     /** Digest of all representation pins; mutable source/graph cannot inherit approval. */
     revisionSha256: Sha256HexSchema,
   })
@@ -269,6 +356,9 @@ export function computeRecipeRevision(
     compiledSha256,
     compilerRevision,
     contractRevision,
+    declaredEffectsSha256,
+    verifierId,
+    verifierRevision,
   } = identity;
   return createHash('sha256')
     .update(
@@ -279,6 +369,9 @@ export function computeRecipeRevision(
         compiledSha256,
         compilerRevision,
         contractRevision,
+        declaredEffectsSha256,
+        verifierId,
+        verifierRevision,
       }),
       'utf8',
     )
@@ -291,13 +384,24 @@ export function verifyRecipeRevision(identity: RecipeRevisionIdentity): boolean 
 
 export const ProviderCatalogArtifactSchema = z.strictObject({
   providerId: Ref,
+  catalogRevision: Ref,
+  bindingId: Ref,
+  scopedVerifierId: Ref,
   version: Ref,
   capabilityId: Ref,
   artifactKind: z.enum(['CLI', 'NATIVE_ADDON']),
   platform: z.literal('windows-x64'),
   artifactSha256: Sha256HexSchema,
-  origin: z.url(),
+  origin: z.url().refine((value) => {
+    try {
+      const u = new URL(value);
+      return u.protocol === 'https:' && u.username === '' && u.password === '';
+    } catch {
+      return false;
+    }
+  }, 'provider acquisition origin must be credential-free HTTPS'),
   entrypoint: Ref,
+  /** Explicit CLI sentinel or exact native ABI, never arbitrary executable ABI inference. */
   abiRevision: Ref,
   signerKeyId: Ref,
   /** Not a proof of trusted signing; T05 verifies against pinned curator roots. */
