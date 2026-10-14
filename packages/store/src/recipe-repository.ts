@@ -5,10 +5,10 @@ import { createHash } from 'node:crypto';
 import type { DatabaseSync } from 'node:sqlite';
 import {
   canonicalJson,
-  RecipeActionGraphSchema,
-  RecipeRevisionIdentitySchema,
   type RecipeActionGraph,
+  RecipeActionGraphSchema,
   type RecipeRevisionIdentity,
+  RecipeRevisionIdentitySchema,
   verifyRecipeRevision,
 } from '@shun/contracts';
 import type { ShunStore } from './shun-store.ts';
@@ -97,7 +97,8 @@ export class ImmutableRecipeRepository {
         candidate.compiledArtifact.length > 1024 * 1024 ||
         !Array.isArray(candidate.declaredEffects) ||
         candidate.declaredEffects.length > 32
-      ) throw new RecipeStoreError('RECIPE_INVALID');
+      )
+        throw new RecipeStoreError('RECIPE_INVALID');
 
       const graph = RecipeActionGraphSchema.safeParse(candidate.actionGraph);
       if (!graph.success || graph.data.nodes.length > 128 || graph.data.edges.length > 256) {
@@ -107,14 +108,16 @@ export class ImmutableRecipeRepository {
       if (
         candidate.declaredEffects.some((effect) => typeof effect !== 'string') ||
         canonicalJson(candidate.declaredEffects) !== canonicalJson(effects)
-      ) throw new RecipeStoreError('RECIPE_IDENTITY_MISMATCH');
+      )
+        throw new RecipeStoreError('RECIPE_IDENTITY_MISMATCH');
       const identity = candidate.identity;
       if (
         digest(candidate.sourceText) !== identity.sourceSha256 ||
         digest(canonicalJson(graph.data)) !== identity.actionGraphSha256 ||
         digest(candidate.compiledArtifact) !== identity.compiledSha256 ||
         digest(canonicalJson(effects)) !== identity.declaredEffectsSha256
-      ) throw new RecipeStoreError('RECIPE_IDENTITY_MISMATCH');
+      )
+        throw new RecipeStoreError('RECIPE_IDENTITY_MISMATCH');
       return {
         identity,
         sourceText: candidate.sourceText,
@@ -135,9 +138,11 @@ export class ImmutableRecipeRepository {
     const { recipeId, revisionSha256 } = record.identity;
     try {
       this.db.exec('BEGIN IMMEDIATE');
-      const existing = this.db.prepare(
-        'SELECT recipe_id, revision_sha256, payload, payload_sha256 FROM recipe_revisions_v02 WHERE recipe_id = ? AND revision_sha256 = ?',
-      ).get(recipeId, revisionSha256) as RecipeRow | undefined;
+      const existing = this.db
+        .prepare(
+          'SELECT recipe_id, revision_sha256, payload, payload_sha256 FROM recipe_revisions_v02 WHERE recipe_id = ? AND revision_sha256 = ?',
+        )
+        .get(recipeId, revisionSha256) as RecipeRow | undefined;
       if (existing) {
         if (existing.payload_sha256 !== payloadSha256 || existing.payload !== payload) {
           throw new RecipeStoreError('RECIPE_REVISION_CONFLICT');
@@ -145,13 +150,19 @@ export class ImmutableRecipeRepository {
         this.db.exec('COMMIT');
         return { recipeId, revisionSha256, inserted: false };
       }
-      this.db.prepare(
-        'INSERT INTO recipe_revisions_v02 (recipe_id, revision_sha256, payload, payload_sha256, created_at) VALUES (?, ?, ?, ?, ?)',
-      ).run(recipeId, revisionSha256, payload, payloadSha256, new Date().toISOString());
+      this.db
+        .prepare(
+          'INSERT INTO recipe_revisions_v02 (recipe_id, revision_sha256, payload, payload_sha256, created_at) VALUES (?, ?, ?, ?, ?)',
+        )
+        .run(recipeId, revisionSha256, payload, payloadSha256, new Date().toISOString());
       this.db.exec('COMMIT');
       return { recipeId, revisionSha256, inserted: true };
     } catch (error) {
-      try { this.db.exec('ROLLBACK'); } catch { /* no transaction if unavailable */ }
+      try {
+        this.db.exec('ROLLBACK');
+      } catch {
+        /* no transaction if unavailable */
+      }
       if (error instanceof RecipeStoreError) throw error;
       throw new RecipeStoreError('RECIPE_STORE_UNAVAILABLE');
     }
@@ -163,9 +174,11 @@ export class ImmutableRecipeRepository {
     }
     let row: RecipeRow | undefined;
     try {
-      row = this.db.prepare(
-        'SELECT recipe_id, revision_sha256, payload, payload_sha256 FROM recipe_revisions_v02 WHERE recipe_id = ? AND revision_sha256 = ?',
-      ).get(recipeId, revisionSha256) as RecipeRow | undefined;
+      row = this.db
+        .prepare(
+          'SELECT recipe_id, revision_sha256, payload, payload_sha256 FROM recipe_revisions_v02 WHERE recipe_id = ? AND revision_sha256 = ?',
+        )
+        .get(recipeId, revisionSha256) as RecipeRow | undefined;
     } catch {
       throw new RecipeStoreError('RECIPE_STORE_UNAVAILABLE');
     }
@@ -178,7 +191,8 @@ export class ImmutableRecipeRepository {
         result.identity.recipeId !== recipeId ||
         result.identity.revisionSha256 !== revisionSha256 ||
         canonicalJson(result) !== row.payload
-      ) throw new RecipeStoreError('RECIPE_CORRUPT');
+      )
+        throw new RecipeStoreError('RECIPE_CORRUPT');
       return result;
     } catch {
       throw new RecipeStoreError('RECIPE_CORRUPT');
