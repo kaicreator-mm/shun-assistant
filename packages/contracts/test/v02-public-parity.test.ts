@@ -222,7 +222,7 @@ describe('v0.2 public JSON Schema and typed Zod parity', () => {
       const source = join(import.meta.dirname, '../src/schema', `${fixture.name}.schema.json`);
       const emitted = JSON.parse(readFileSync(source, 'utf8'));
       expect(emitted['x-semantic-validation']).toBeDefined();
-      const jsonValidate = ajv.compile(emitted);
+      const jsonValidate = ajv.getSchema(emitted.$id) ?? ajv.compile(emitted);
       expect(entry.schema.safeParse(fixture.good).success).toBe(true);
       expect(jsonValidate(fixture.good)).toBe(true);
       expect(entry.schema.safeParse(fixture.bad).success).toBe(false);
