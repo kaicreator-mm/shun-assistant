@@ -5,12 +5,13 @@
 // Safety-invariant overlays: Zod `.superRefine` refinements do not survive JSON
 // Schema emission, so every safety invariant expressible in draft 2020-12 is
 // re-declared here as a declarative patch (if/then/const/enum/required). The
-// overlay is part of the emission, which keeps the drift test byte-exact while
-// making the committed artifacts themselves reject unsafe records — standalone
-// Ajv consumers get the same rejections as the Zod parsers. The few invariants
-// draft 2020-12 cannot express (array membership, cross-element identity) are
-// enforced by the shared semantic validators each artifact names in its
-// `x-semantic-validation` annotation.
+// overlay is part of the emission, which keeps the drift test byte-exact.
+// Only declarative JSON Schema constraints are enforced by standalone Ajv.
+// Cross-field digests, graph acyclicity and duplicate action IDs are NOT
+// enforced by Ajv or the `x-semantic-validation` annotation; the authoritative
+// public boundary is validateV02PublicContract(name, value, AjvValidator) from
+// the registry, which independently enforces the required Zod semantics.
+// Ajv-only success cannot grant consent, execute a Recipe or activate a Provider.
 import { mkdirSync, readdirSync, realpathSync, unlinkSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { pathToFileURL } from 'node:url';
