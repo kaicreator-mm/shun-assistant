@@ -1,18 +1,21 @@
 // i85-U01 step 4b child probe (runs under node.exe, possibly inside an
 // AppContainer). Attempts: (1) loopback TCP connect to a live local listener,
-// (2) TEST-NET-1 192.0.2.1:9 (non-routable) diagnostic ONLY.
-// IMPORTANT: timeout/denial of a non-routable IP is NOT OS no-egress proof.
-// A separate positive-control reachable destination, blocked AppContainer
-// attempt, and independent OS/network observation are mandatory.
-// Writes one JSON result line to the output file given as argv[3] — no
-// stdout dependency, because the isolated child's stdio is not inherited.
+// (2) connection to the explicitly selected reachable controlled sink.
+// An independent NON-sandboxed client MUST first connect to the same sink.
+// Only OS-enforced denial with token evidence and independent observation
+// supports an egress verdict; unreachable destinations are NOT an oracle.
+// Writes one JSON line to the fresh output path given as argv[3].
 'use strict';
 const net = require('node:net');
 const fs = require('node:fs');
 
 const localPort = Number(process.argv[2]);
 const outFile = process.argv[3];
-if (!Number.isInteger(localPort) || !outFile) {
+const controlledHost = process.argv[4];
+const controlledPort = Number(process.argv[5]);
+if (!(localPort > 0 && localPort <= 65535) || !outFile ||
+    !controlledHost || !Number.isInteger(controlledPort) ||
+    !(controlledPort > 0 && controlledPort <= 65535)) {
   process.exit(2);
 }
 
@@ -35,10 +38,10 @@ function tryConnect(host, port, timeoutMs) {
 
 (async () => {
   const loopback = await tryConnect('127.0.0.1', localPort, 4000);
-  const testnet = await tryConnect('192.0.2.1', 9, 6000);
-  fs.writeFileSync(outFile, `${JSON.stringify({ pid: process.pid, loopback, testnet })}\n`);
+  const controlled = await tryConnect(controlledHost, controlledPort, 6000);
+  fs.writeFileSync(outFile, `${JSON.stringify({ pid: process.pid, loopback, controlled })}\n`, { flag: 'wx' });
   process.exit(0);
 })().catch((e) => {
-  try { fs.writeFileSync(outFile, `${JSON.stringify({ fatal: String(e && e.message ? e.message : e) })}\n`); } catch {}
+  try { fs.writeFileSync(outFile, `${JSON.stringify({ fatal: String(e && e.message ? e.message : e) })}\n`, { flag: 'wx' }); } catch {}
   process.exit(1);
 });
