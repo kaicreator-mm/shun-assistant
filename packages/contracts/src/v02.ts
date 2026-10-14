@@ -12,31 +12,33 @@ const Ref = z.string().min(1);
 const NonNegative = z.number().int().nonnegative();
 const Positive = z.number().int().positive();
 
-export const CloudDisclosureScopeSchema = z.strictObject({
-  taskId: Ref,
-  principalId: Ref,
-  sessionId: Ref,
-  providerId: z.literal('deepseek'),
-  modelId: z.literal('deepseek-flash'),
-  /** Actual endpoint must also pass trusted host/path allowlisting at T01. */
-  destination: z.literal('https://api.deepseek.com/chat/completions'),
-  /** Digest of the EXACT approved disclosure-bearing projection, not a draft. */
-  approvedProjectionSha256: Sha256HexSchema,
-  registryRevision: Ref,
-  policyRevision: Ref,
-  pricingRevision: Ref,
-  revocationEpoch: NonNegative,
-  maxCalls: Positive,
-  maxInputTokens: Positive,
-  maxOutputTokens: Positive,
-  maxCostMicros: Positive,
-  issuedAt: IsoDateTimeSchema,
-  expiresAt: IsoDateTimeSchema,
-}).superRefine((scope, ctx) => {
-  if (Date.parse(scope.expiresAt) <= Date.parse(scope.issuedAt)) {
-    ctx.addIssue({ code: 'custom', message: 'consent expiry must follow issuance' });
-  }
-});
+export const CloudDisclosureScopeSchema = z
+  .strictObject({
+    taskId: Ref,
+    principalId: Ref,
+    sessionId: Ref,
+    providerId: z.literal('deepseek'),
+    modelId: z.literal('deepseek-flash'),
+    /** Actual endpoint must also pass trusted host/path allowlisting at T01. */
+    destination: z.literal('https://api.deepseek.com/chat/completions'),
+    /** Digest of the EXACT approved disclosure-bearing projection, not a draft. */
+    approvedProjectionSha256: Sha256HexSchema,
+    registryRevision: Ref,
+    policyRevision: Ref,
+    pricingRevision: Ref,
+    revocationEpoch: NonNegative,
+    maxCalls: Positive,
+    maxInputTokens: Positive,
+    maxOutputTokens: Positive,
+    maxCostMicros: Positive,
+    issuedAt: IsoDateTimeSchema,
+    expiresAt: IsoDateTimeSchema,
+  })
+  .superRefine((scope, ctx) => {
+    if (Date.parse(scope.expiresAt) <= Date.parse(scope.issuedAt)) {
+      ctx.addIssue({ code: 'custom', message: 'consent expiry must follow issuance' });
+    }
+  });
 export type CloudDisclosureScope = z.infer<typeof CloudDisclosureScopeSchema>;
 
 /**
@@ -45,24 +47,26 @@ export type CloudDisclosureScope = z.infer<typeof CloudDisclosureScopeSchema>;
  * current principal/session/nonce and source authority, and use an atomic
  * durable budget reservation. The public localhost API CANNOT mint this.
  */
-export const CloudConsentApprovalSchema = z.strictObject({
-  consentId: Ref,
-  scope: CloudDisclosureScopeSchema,
-  confirmationNonce: Ref,
-  displayedProjectionSha256: Sha256HexSchema,
-  issuer: z.strictObject({
-    brokerId: Ref,
-    brokerRevision: Ref,
-    assertionId: Ref,
-    channel: z.literal('AUTHENTICATED_PRIVATE_IPC'),
-    /** Cryptographic or private-channel proof; never an arbitrary HTTP token. */
-    proof: Ref,
-  }),
-}).superRefine((record, ctx) => {
-  if (record.displayedProjectionSha256 !== record.scope.approvedProjectionSha256) {
-    ctx.addIssue({ code: 'custom', message: 'displayed projection differs from approved scope' });
-  }
-});
+export const CloudConsentApprovalSchema = z
+  .strictObject({
+    consentId: Ref,
+    scope: CloudDisclosureScopeSchema,
+    confirmationNonce: Ref,
+    displayedProjectionSha256: Sha256HexSchema,
+    issuer: z.strictObject({
+      brokerId: Ref,
+      brokerRevision: Ref,
+      assertionId: Ref,
+      channel: z.literal('AUTHENTICATED_PRIVATE_IPC'),
+      /** Cryptographic or private-channel proof; never an arbitrary HTTP token. */
+      proof: Ref,
+    }),
+  })
+  .superRefine((record, ctx) => {
+    if (record.displayedProjectionSha256 !== record.scope.approvedProjectionSha256) {
+      ctx.addIssue({ code: 'custom', message: 'displayed projection differs from approved scope' });
+    }
+  });
 export type CloudConsentApproval = z.infer<typeof CloudConsentApprovalSchema>;
 
 export const CloudConsentCurrentnessSchema = z.discriminatedUnion('kind', [
@@ -108,11 +112,13 @@ export function validateCloudConsent(input: {
     state.policyRevision !== approval.scope.policyRevision ||
     state.revocationEpoch !== approval.scope.revocationEpoch ||
     !state.nonceIsUnused
-  ) return { ok: false, code: 'CONSENT_STALE' };
+  )
+    return { ok: false, code: 'CONSENT_STALE' };
   if (
     Date.parse(approval.scope.issuedAt) > Date.parse(input.now) ||
     Date.parse(approval.scope.expiresAt) <= Date.parse(input.now)
-  ) return { ok: false, code: 'CONSENT_EXPIRED' };
+  )
+    return { ok: false, code: 'CONSENT_EXPIRED' };
   try {
     if (!input.verifyBroker(approval)) return { ok: false, code: 'CONSENT_REFUSED' };
   } catch {
