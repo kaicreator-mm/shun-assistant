@@ -312,14 +312,21 @@ const SAFETY_INVARIANT_OVERLAYS: Record<string, (schema: EmittedSchema) => Emitt
     ...schema,
     'x-semantic-validation': ['verifyRecipeRevision', 'RecipeRevisionIdentitySchema.safeParse'],
   }),
-  'v02-provider-catalog-artifact': (schema) => ({
-    ...schema,
-    'x-semantic-validation': ['ProviderCatalogArtifactSchema.safeParse'],
-    properties: {
-      ...propertiesOf(schema),
-      origin: { ...((propertiesOf(schema).origin ?? {}) as EmittedSchema), pattern: '^https://' },
-    },
-  }),
+  'v02-provider-catalog-artifact': (schema) =>
+    withRootAllOf(
+      {
+        ...schema,
+        'x-semantic-validation': ['ProviderCatalogArtifactSchema.safeParse'],
+        properties: {
+          ...propertiesOf(schema),
+          origin: { ...((propertiesOf(schema).origin ?? {}) as EmittedSchema), pattern: '^https://' },
+        },
+      },
+      ifThen(
+        { properties: { artifactKind: { const: 'NATIVE_ADDON' } }, required: ['artifactKind'] },
+        { required: ['abiRevision'] },
+      ),
+    ),
 };
 
 /** The full public emission for one contract: identity header + Zod emission + safety overlay. */
