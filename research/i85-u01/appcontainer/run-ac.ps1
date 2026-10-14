@@ -13,6 +13,11 @@ param(
 )
 
 $ErrorActionPreference = 'Continue'
+# Each run must write fresh output. Stale result files cannot satisfy the probe.
+if (Test-Path -LiteralPath $OutFile) {
+  [Console]::Error.WriteLine('ACPROBE preflight OUTFILE_ALREADY_EXISTS; use a fresh disposable directory')
+  exit 17
+}
 
 Add-Type -TypeDefinition @"
 using System;
@@ -37,6 +42,9 @@ public static class AcProbe {
 
   [DllImport("kernel32.dll", SetLastError=true)]
   public static extern IntPtr LocalFree(IntPtr hMem);
+
+  [DllImport("advapi32.dll", SetLastError=true)]
+  public static extern IntPtr FreeSid(IntPtr sid);
 
   [StructLayout(LayoutKind.Sequential)]
   public struct SECURITY_CAPABILITIES {
@@ -82,6 +90,12 @@ public static class AcProbe {
   public static extern bool UpdateProcThreadAttribute(
     IntPtr lpAttributeList, uint dwFlags, IntPtr Attribute,
     ref SECURITY_CAPABILITIES lpValue, IntPtr cbSize, IntPtr lpPrevValue, IntPtr lpReturnSize);
+
+  [DllImport("kernel32.dll")]
+  public static extern void DeleteProcThreadAttributeList(IntPtr lpAttributeList);
+
+  [DllImport("kernel32.dll", SetLastError=true)]
+  public static extern bool TerminateProcess(IntPtr hProcess, uint uExitCode);
 
   [DllImport("kernel32.dll", SetLastError=true, CharSet=CharSet.Unicode)]
   public static extern bool CreateProcessW(
@@ -154,11 +168,13 @@ try {
   $attrSize = [IntPtr]::Zero
   [void][AcProbe]::InitializeProcThreadAttributeList([IntPtr]::Zero, 1, 0, [ref]$attrSize)
   $attrList = [Runtime.InteropServices.Marshal]::AllocHGlobal($attrSize)
+  $attrInitialized = $false
   try {
     if (-not [AcProbe]::InitializeProcThreadAttributeList($attrList, 1, 0, [ref]$attrSize)) {
       Write-Stage "init-attr-list" @{ ok = $false; lastError = [Runtime.InteropServices.Marshal]::GetLastWin32Error() }
       exit 12
     }
+    $attrInitialized = $true
     $sc = New-Object AcProbe+SECURITY_CAPABILITIES
     $sc.AppContainerSid = $sid
     $sc.Capabilities = [IntPtr]::Zero
@@ -183,12 +199,22 @@ try {
     Write-Stage "create-process" @{ ok = $true; pid = $pi.dwProcessId }
 
     $wait = [AcProbe]::WaitForSingleObject($pi.hProcess, 60000)
+    $terminatedOnTimeout = $false
+    if ($wait -eq 258) { # WAIT_TIMEOUT: never leave a probe child running
+      $terminatedOnTimeout = [AcProbe]::TerminateProcess($pi.hProcess, 124)
+      [void][AcProbe]::WaitForSingleObject($pi.hProcess, 5000)
+    }
     $exitCode = [uint32]4294967295
-    [void][AcProbe]::GetExitCodeProcess($pi.hProcess, [ref]$exitCode)
+    $exitRead = [AcProbe]::GetExitCodeProcess($pi.hProcess, [ref]$exitCode)
     [void][AcProbe]::CloseHandle($pi.hThread)
     [void][AcProbe]::CloseHandle($pi.hProcess)
-    Write-Stage "child-exit" @{ wait = $wait; exitCode = $exitCode }
+    Write-Stage "child-exit" @{ wait = $wait; exitRead = $exitRead; exitCode = $exitCode; terminatedOnTimeout = $terminatedOnTimeout }
+    # A launcher success is NOT proof that the child ran, completed or observed
+    # network controls. Missing/failed output is strictly non-PASS.
+    if (($wait -ne 0) -or (-not $exitRead) -or ($exitCode -ne 0)) { exit 15 }
+    if (-not (Test-Path -LiteralPath $OutFile -PathType Leaf)) { exit 16 }
   } finally {
+    if ($attrInitialized) { [AcProbe]::DeleteProcThreadAttributeList($attrList) }
     [Runtime.InteropServices.Marshal]::FreeHGlobal($attrList)
   }
   exit 0
@@ -197,4 +223,5 @@ try {
     $hrDel = [AcProbe]::DeleteAppContainerProfile($ContainerName)
     Write-Stage "delete-profile" @{ hr = ("0x{0:X8}" -f $hrDel); ok = ($hrDel -eq 0) }
   }
+  if ($sid -ne [IntPtr]::Zero) { [void][AcProbe]::FreeSid($sid) }
 }
