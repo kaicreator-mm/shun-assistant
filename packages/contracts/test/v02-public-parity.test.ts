@@ -267,23 +267,28 @@ describe('v0.2 public JSON Schema and typed Zod parity', () => {
       ok: false,
       code: 'UNKNOWN_CONTRACT',
     });
-    expect(validateV02PublicContract('v02-cloud-consent-approval', scopeApproval, () => false)).toEqual({
+    expect(
+      validateV02PublicContract('v02-cloud-consent-approval', scopeApproval, () => false),
+    ).toEqual({
       ok: false,
       code: 'STRUCTURAL_REFUSED',
     });
-    expect(validateV02PublicContract('v02-cloud-consent-approval', scopeApproval, () => {
-      throw new Error('secret client-side verifier error');
-    })).toEqual({ ok: false, code: 'STRUCTURAL_REFUSED' });
-    expect(validateV02PublicContract(
-      'v02-cloud-consent-approval',
-      scopeApproval,
-      (() => Promise.resolve(true)) as unknown as (value: unknown) => boolean,
-    )).toEqual({ ok: false, code: 'STRUCTURAL_REFUSED' });
-    expect(validateV02PublicContract(
-      'v02-cloud-consent-approval',
-      scopeApproval,
-      (() => 'truthy') as unknown as (value: unknown) => boolean,
-    )).toEqual({ ok: false, code: 'STRUCTURAL_REFUSED' });
+    expect(
+      validateV02PublicContract('v02-cloud-consent-approval', scopeApproval, () => {
+        throw new Error('secret client-side verifier error');
+      }),
+    ).toEqual({ ok: false, code: 'STRUCTURAL_REFUSED' });
+    expect(
+      validateV02PublicContract('v02-cloud-consent-approval', scopeApproval, (() =>
+        Promise.resolve(true)) as unknown as (value: unknown) => boolean),
+    ).toEqual({ ok: false, code: 'STRUCTURAL_REFUSED' });
+    expect(
+      validateV02PublicContract(
+        'v02-cloud-consent-approval',
+        scopeApproval,
+        (() => 'truthy') as unknown as (value: unknown) => boolean,
+      ),
+    ).toEqual({ ok: false, code: 'STRUCTURAL_REFUSED' });
   });
 
   for (const fixture of cases) {
