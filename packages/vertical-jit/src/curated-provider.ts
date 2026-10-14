@@ -149,7 +149,8 @@ export class CuratedProviderVerifier {
       typeof verified !== 'object' ||
       !verified.ok ||
       bytes.byteLength > 64 * 1024 * 1024
-    ) return false;
+    )
+      return false;
     // A caller-constructed { ok: true, artifact: { artifactSha256 } } is NEVER
     // evidence of signature verification. The private WeakMap binds this
     // immutable result to the exact digest confirmed by this instance.
