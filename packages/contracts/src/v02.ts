@@ -213,24 +213,50 @@ export const RecipeActionGraphSchema = z
     if (ids.size !== graph.nodes.length) {
       ctx.addIssue({ code: 'custom', message: 'duplicate actionId in Recipe graph' });
     }
+    const degree = new Map([...ids].map((id) => [id, 0]));
+    const out = new Map([...ids].map((id) => [id, [] as string[]]));
     for (const edge of graph.edges) {
       if (!ids.has(edge.from) || !ids.has(edge.to)) {
         ctx.addIssue({ code: 'custom', message: 'Recipe graph references unknown actionId' });
+        continue;
       }
+      degree.set(edge.to, (degree.get(edge.to) ?? 0) + 1);
+      out.get(edge.from)?.push(edge.to);
+    }
+    const ready = [...ids].filter((id) => degree.get(id) === 0);
+    let visited = 0;
+    while (ready.length > 0) {
+      const id = ready.pop();
+      if (!id) break;
+      visited++;
+      for (const next of out.get(id) ?? []) {
+        const remaining = (degree.get(next) ?? 0) - 1;
+        degree.set(next, remaining);
+        if (remaining === 0) ready.push(next);
+      }
+    }
+    if (visited !== ids.size) {
+      ctx.addIssue({ code: 'custom', message: 'Recipe action graph must be acyclic' });
     }
   });
 export type RecipeActionGraph = z.infer<typeof RecipeActionGraphSchema>;
 
-export const RecipeRevisionIdentitySchema = z.strictObject({
-  recipeId: Ref,
-  sourceSha256: Sha256HexSchema,
-  actionGraphSha256: Sha256HexSchema,
-  compiledSha256: Sha256HexSchema,
-  compilerRevision: Ref,
-  contractRevision: Ref,
-  /** Digest of all representation pins; mutable source/graph cannot inherit approval. */
-  revisionSha256: Sha256HexSchema,
-});
+export const RecipeRevisionIdentitySchema = z
+  .strictObject({
+    recipeId: Ref,
+    sourceSha256: Sha256HexSchema,
+    actionGraphSha256: Sha256HexSchema,
+    compiledSha256: Sha256HexSchema,
+    compilerRevision: Ref,
+    contractRevision: Ref,
+    /** Digest of all representation pins; mutable source/graph cannot inherit approval. */
+    revisionSha256: Sha256HexSchema,
+  })
+  .superRefine((identity, ctx) => {
+    if (identity.revisionSha256 !== computeRecipeRevision(identity)) {
+      ctx.addIssue({ code: 'custom', message: 'Recipe revision identity digest mismatch' });
+    }
+  });
 export type RecipeRevisionIdentity = z.infer<typeof RecipeRevisionIdentitySchema>;
 
 export function computeRecipeRevision(
