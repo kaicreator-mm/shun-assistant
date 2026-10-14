@@ -130,7 +130,10 @@ export class CuratedProviderVerifier {
       }
       const admitted = Object.freeze({
         ok: true as const,
-        artifact: Object.freeze({ ...value }),
+        artifact: Object.freeze({
+          ...value,
+          dependencySha256: Object.freeze([...value.dependencySha256]),
+        }),
       });
       this.verifiedDigests.set(admitted, value.artifactSha256);
       return admitted;
