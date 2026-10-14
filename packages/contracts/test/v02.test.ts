@@ -204,6 +204,12 @@ describe('v0.2: exact Recipe identity and closed-world actions', () => {
         edges: [{ from: 'one', to: 'third' }],
       }).success,
     ).toBe(false);
+    expect(
+      RecipeActionGraphSchema.safeParse({
+        ...graph,
+        edges: [{ from: 'one', to: 'two' }, { from: 'two', to: 'one' }],
+      }).success,
+    ).toBe(false);
   });
 
   it('binds source, graph and compiled representation in one immutable revision', () => {
@@ -221,6 +227,12 @@ describe('v0.2: exact Recipe identity and closed-world actions', () => {
     expect(computeRecipeRevision({ ...record, actionGraphSha256: SHA })).not.toBe(
       record.revisionSha256,
     );
+    expect(
+      RecipeRevisionIdentitySchema.safeParse({
+        ...record,
+        actionGraphSha256: SHA,
+      }).success,
+    ).toBe(false);
     expect(
       RecipeRevisionIdentitySchema.safeParse({
         ...record,
