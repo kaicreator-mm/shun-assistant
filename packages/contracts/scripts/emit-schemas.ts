@@ -17,7 +17,7 @@ import { pathToFileURL } from 'node:url';
 import { z } from 'zod';
 import { NEVER_AUTO_DELETE_CLASSIFICATIONS } from '../src/capabilities/c002.ts';
 import { R2_GATE_PHASES } from '../src/plan.ts';
-import { CONTRACTS } from '../src/registry.ts';
+import { CONTRACTS, V02_CONTRACTS } from '../src/registry.ts';
 import { CONTRACTS_REVISION, schemaId } from '../src/version.ts';
 
 type EmittedSchema = Record<string, unknown>;
@@ -328,11 +328,12 @@ export function emitPublicJsonSchema(name: string, schema: z.ZodType): EmittedSc
   const json = overlay
     ? overlay(z.toJSONSchema(schema) as EmittedSchema)
     : (z.toJSONSchema(schema) as EmittedSchema);
+  const v02 = name.startsWith('v02-');
   return {
     $schema: 'https://json-schema.org/draft/2020-12/schema',
-    $id: schemaId(name),
+    $id: v02 ? `urn:shun:contracts:0.2:${name}` : schemaId(name),
     title: name,
-    'x-contracts-revision': CONTRACTS_REVISION,
+    'x-contracts-revision': v02 ? 'shun.contracts/0.2' : CONTRACTS_REVISION,
     ...json,
   };
 }
@@ -342,7 +343,7 @@ function main(): void {
   mkdirSync(outDir, { recursive: true });
 
   const keep = new Set<string>();
-  for (const contract of CONTRACTS) {
+  for (const contract of [...CONTRACTS, ...V02_CONTRACTS]) {
     const json = emitPublicJsonSchema(contract.name, contract.schema);
     const file = join(outDir, `${contract.name}.schema.json`);
     writeFileSync(file, `${JSON.stringify(json, null, 2)}\n`, 'utf8');
