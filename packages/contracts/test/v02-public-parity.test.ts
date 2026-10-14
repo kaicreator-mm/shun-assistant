@@ -3,7 +3,7 @@ import { join } from 'node:path';
 import Ajv2020 from 'ajv/dist/2020';
 import addFormats from 'ajv-formats';
 import { describe, expect, it } from 'vitest';
-import { V02_CONTRACTS } from '../src/registry.ts';
+import { V02_CONTRACTS, validateV02PublicContract } from '../src/registry.ts';
 import { computeRecipeRevision } from '../src/v02.ts';
 
 const SHA = 'a'.repeat(64);
@@ -212,6 +212,78 @@ describe('v0.2 public JSON Schema and typed Zod parity', () => {
       expect(entry.schema.safeParse(candidate).success).toBe(false);
       expect(validate(candidate)).toBe(false);
     }
+  });
+
+  it('enforces consent projection, Recipe digest and graph uniqueness AFTER structural Ajv', () => {
+    const validRevision = { ...recipeBase, revisionSha256: computeRecipeRevision(recipeBase) };
+    const validGraph = {
+      nodes: [
+        { actionId: 'a', op: 'file.search', parameters: { root: 'C:/safe', query: '*.txt' } },
+        { actionId: 'b', op: 'system.inventory', parameters: {} },
+      ],
+      edges: [],
+    };
+    const mismatches = [
+      {
+        name: 'v02-cloud-consent-approval',
+        valid: scopeApproval,
+        invalid: { ...scopeApproval, displayedProjectionSha256: B },
+      },
+      {
+        name: 'v02-recipe-revision-identity',
+        valid: validRevision,
+        invalid: { ...validRevision, revisionSha256: '0'.repeat(64) },
+      },
+      {
+        name: 'v02-recipe-action-graph',
+        valid: validGraph,
+        invalid: {
+          ...validGraph,
+          nodes: [validGraph.nodes[0], { ...validGraph.nodes[1], actionId: 'a' }],
+        },
+      },
+    ];
+    for (const { name, valid, invalid } of mismatches) {
+      const entry = V02_CONTRACTS.find((x) => x.name === name);
+      expect(entry).toBeDefined();
+      if (!entry) continue;
+      const schemaFile = join(import.meta.dirname, '../src/schema', `${name}.schema.json`);
+      const schema = JSON.parse(readFileSync(schemaFile, 'utf8'));
+      const structural = ajv.getSchema(schema.$id) ?? ajv.compile(schema);
+      // Explicitly prove the original P1-06 vulnerability: Ajv alone accepts
+      // perfectly shaped, semantically malicious records.
+      expect(structural(invalid)).toBe(true);
+      expect(entry.schema.safeParse(invalid).success).toBe(false);
+      expect(validateV02PublicContract(name, valid, structural).ok).toBe(true);
+      expect(validateV02PublicContract(name, invalid, structural)).toEqual({
+        ok: false,
+        code: 'SEMANTIC_REFUSED',
+      });
+    }
+  });
+
+  it('fails closed when no trustworthy structural validation runs', () => {
+    expect(validateV02PublicContract('v02-nonexistent', scopeApproval, () => true)).toEqual({
+      ok: false,
+      code: 'UNKNOWN_CONTRACT',
+    });
+    expect(validateV02PublicContract('v02-cloud-consent-approval', scopeApproval, () => false)).toEqual({
+      ok: false,
+      code: 'STRUCTURAL_REFUSED',
+    });
+    expect(validateV02PublicContract('v02-cloud-consent-approval', scopeApproval, () => {
+      throw new Error('secret client-side verifier error');
+    })).toEqual({ ok: false, code: 'STRUCTURAL_REFUSED' });
+    expect(validateV02PublicContract(
+      'v02-cloud-consent-approval',
+      scopeApproval,
+      (() => Promise.resolve(true)) as unknown as (value: unknown) => boolean,
+    )).toEqual({ ok: false, code: 'STRUCTURAL_REFUSED' });
+    expect(validateV02PublicContract(
+      'v02-cloud-consent-approval',
+      scopeApproval,
+      (() => 'truthy') as unknown as (value: unknown) => boolean,
+    )).toEqual({ ok: false, code: 'STRUCTURAL_REFUSED' });
   });
 
   for (const fixture of cases) {
