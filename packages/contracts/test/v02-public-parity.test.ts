@@ -3,7 +3,7 @@ import { join } from 'node:path';
 import Ajv2020 from 'ajv/dist/2020';
 import addFormats from 'ajv-formats';
 import { describe, expect, it } from 'vitest';
-import { CONTRACTS } from '../src/registry.ts';
+import { V02_CONTRACTS } from '../src/registry.ts';
 import { computeRecipeRevision } from '../src/v02.ts';
 
 const SHA = 'a'.repeat(64);
@@ -191,7 +191,7 @@ describe('v0.2 public JSON Schema and typed Zod parity', () => {
   addFormats(ajv);
   for (const fixture of cases) {
     it(`${fixture.name} accepts valid and refuses structural attack in both validators`, () => {
-      const entry = CONTRACTS.find((c) => c.name === fixture.name);
+      const entry = V02_CONTRACTS.find((c) => c.name === fixture.name);
       expect(entry).toBeDefined();
       if (!entry) return;
       const source = join(import.meta.dirname, '../src/schema', `${fixture.name}.schema.json`);
