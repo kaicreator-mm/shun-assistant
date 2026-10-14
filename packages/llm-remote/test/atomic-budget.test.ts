@@ -55,7 +55,9 @@ function makeApproval(maxCalls = 1): CloudConsentApproval {
   };
 }
 
-function makeCurrent(approval: CloudConsentApproval): Extract<CloudConsentCurrentness, { kind: 'CURRENT' }> {
+function makeCurrent(
+  approval: CloudConsentApproval,
+): Extract<CloudConsentCurrentness, { kind: 'CURRENT' }> {
   const scope = approval.scope;
   return {
     kind: 'CURRENT',
