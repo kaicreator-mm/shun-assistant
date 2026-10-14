@@ -1,10 +1,10 @@
 import { describe, expect, it } from 'vitest';
-import { collectWindowsRuntimeCounts } from '../src/windows-runtime.ts';
 import {
   observeRuntimeCountsWithHost,
   PROCESS_COUNT_COMMAND,
   STARTUP_COUNT_COMMAND,
 } from '../src/internal/windows-counts.ts';
+import { collectWindowsRuntimeCounts } from '../src/windows-runtime.ts';
 
 describe('T06 fixed, readonly Windows process/startup observations', () => {
   it('reports counts only with fixed schema/provenance and no private names', () => {
