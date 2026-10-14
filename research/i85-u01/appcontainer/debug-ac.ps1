@@ -30,6 +30,7 @@ public static class AcDbg {
     public IntPtr AppContainerSid;
     public IntPtr Capabilities;
     public uint CapabilityCount;
+    public uint Reserved;
   }
 
   [DllImport("kernel32.dll", SetLastError=true)]
@@ -77,7 +78,7 @@ try {
     [Runtime.InteropServices.Marshal]::WriteIntPtr($ptr, $ptrSize, [IntPtr]::Zero)
     [Runtime.InteropServices.Marshal]::WriteInt32($ptr, 2 * $ptrSize, 0)
     foreach ($cb in @($sizeViaType, 20)) {
-      $ok = [AcDbg]::UpdateProcThreadAttribute($list, 0, [IntPtr]0x00020013, $ptr, [IntPtr]$cb, [IntPtr]::Zero, [IntPtr]::Zero)
+      $ok = [AcDbg]::UpdateProcThreadAttribute($list, 0, [IntPtr]0x00020009, $ptr, [IntPtr]$cb, [IntPtr]::Zero, [IntPtr]::Zero)
       $err = [Runtime.InteropServices.Marshal]::GetLastWin32Error()
       Say "update" @{ cbSize = $cb; ok = $ok; lastError = $err }
       if ($ok) { break }
