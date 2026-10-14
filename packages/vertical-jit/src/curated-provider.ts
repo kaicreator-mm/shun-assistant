@@ -37,8 +37,14 @@ export type ProviderVerificationRefusal =
   | 'CATALOG_SIGNATURE_INVALID'
   | 'ARTIFACT_HASH_MISMATCH';
 
+export type VerifiedProviderArtifact = Readonly<
+  Omit<ProviderCatalogArtifact, 'dependencySha256'> & {
+    dependencySha256: readonly string[];
+  }
+>;
+
 export type ProviderVerificationResult =
-  | { ok: true; artifact: ProviderCatalogArtifact }
+  | { ok: true; artifact: VerifiedProviderArtifact }
   | { ok: false; code: ProviderVerificationRefusal };
 
 function sha256Bytes(bytes: Uint8Array): Buffer {
