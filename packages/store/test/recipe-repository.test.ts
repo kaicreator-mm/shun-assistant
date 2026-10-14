@@ -126,7 +126,13 @@ describe('T03 immutable Recipe revisions', () => {
         .prepare(`INSERT OR REPLACE INTO recipe_revisions_v02
           (recipe_id, revision_sha256, payload, payload_sha256, created_at)
           VALUES (?, ?, ?, ?, ?)`)
-        .run(f.identity.recipeId, f.identity.revisionSha256, 'forged', '0'.repeat(64), '2026-10-15T00:00:00.000Z'),
+        .run(
+          f.identity.recipeId,
+          f.identity.revisionSha256,
+          'forged',
+          '0'.repeat(64),
+          '2026-10-15T00:00:00.000Z',
+        ),
     ).toThrow();
     expect(repo.get(f.identity.recipeId, f.identity.revisionSha256)).toEqual(f);
     expect(() =>
