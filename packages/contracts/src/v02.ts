@@ -262,8 +262,14 @@ export type RecipeRevisionIdentity = z.infer<typeof RecipeRevisionIdentitySchema
 export function computeRecipeRevision(
   identity: Omit<RecipeRevisionIdentity, 'revisionSha256'>,
 ): string {
-  const { recipeId, sourceSha256, actionGraphSha256, compiledSha256, compilerRevision, contractRevision } =
-    identity;
+  const {
+    recipeId,
+    sourceSha256,
+    actionGraphSha256,
+    compiledSha256,
+    compilerRevision,
+    contractRevision,
+  } = identity;
   return createHash('sha256')
     .update(
       canonicalJson({
