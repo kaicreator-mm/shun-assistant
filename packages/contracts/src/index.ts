@@ -20,5 +20,5 @@ export * from './provider.ts';
 export * from './receipts.ts';
 export * from './registry.ts';
 export * from './taxonomy.ts';
-export * from './version.ts';
 export * from './v02.ts';
+export * from './version.ts';
