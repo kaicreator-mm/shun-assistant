@@ -81,7 +81,8 @@ export class DurableCloudBudgetLedger {
       !Number.isSafeInteger(options.pricing.outputMicrosPerToken) ||
       options.pricing.inputMicrosPerToken <= 0 ||
       options.pricing.outputMicrosPerToken <= 0
-    ) throw new Error('LEDGER_CONFIGURATION_REFUSED');
+    )
+      throw new Error('LEDGER_CONFIGURATION_REFUSED');
     this.pricing = Object.freeze({ ...options.pricing });
     this.verifyBroker = options.verifyBroker;
     this.db = new DatabaseSync(options.file);
@@ -128,10 +129,8 @@ export class DurableCloudBudgetLedger {
     if (!requested.ok) return { ok: false, code: requested.code };
     const { scope, consentId } = requested.consent;
     const scopeSha256 = digest(Buffer.from(canonicalJson(scope), 'utf8'));
-    if (
-      input.currentness.kind !== 'CURRENT' ||
-      this.pricing.revision !== scope.pricingRevision
-    ) return { ok: false, code: 'PRICING_REVISION_STALE' };
+    if (input.currentness.kind !== 'CURRENT' || this.pricing.revision !== scope.pricingRevision)
+      return { ok: false, code: 'PRICING_REVISION_STALE' };
     if (
       typeof input.attemptId !== 'string' ||
       input.attemptId.length < 1 ||
@@ -141,7 +140,8 @@ export class DurableCloudBudgetLedger {
       input.outputTokenCeiling > scope.maxOutputTokens ||
       !(input.requestBytes instanceof Uint8Array) ||
       !(input.disclosureProjectionBytes instanceof Uint8Array)
-    ) return { ok: false, code: 'BUDGET_EXHAUSTED' };
+    )
+      return { ok: false, code: 'BUDGET_EXHAUSTED' };
     let requestHash: string;
     let projectionHash: string;
     try {
@@ -154,27 +154,28 @@ export class DurableCloudBudgetLedger {
       return { ok: false, code: 'DISCLOSURE_SCOPE_DRIFT' };
     }
     const conservativeInputTokens = input.requestBytes.byteLength;
-    if (
-      conservativeInputTokens < 1 ||
-      conservativeInputTokens > scope.maxInputTokens
-    ) return { ok: false, code: 'BUDGET_EXHAUSTED' };
-    const maxCost = BigInt(conservativeInputTokens) * BigInt(this.pricing.inputMicrosPerToken)
-      + BigInt(input.outputTokenCeiling) * BigInt(this.pricing.outputMicrosPerToken);
+    if (conservativeInputTokens < 1 || conservativeInputTokens > scope.maxInputTokens)
+      return { ok: false, code: 'BUDGET_EXHAUSTED' };
+    const maxCost =
+      BigInt(conservativeInputTokens) * BigInt(this.pricing.inputMicrosPerToken) +
+      BigInt(input.outputTokenCeiling) * BigInt(this.pricing.outputMicrosPerToken);
     if (maxCost > BigInt(scope.maxCostMicros) || maxCost > BigInt(Number.MAX_SAFE_INTEGER)) {
       return { ok: false, code: 'BUDGET_EXHAUSTED' };
     }
     try {
       this.db.exec('BEGIN IMMEDIATE');
-      const prior = this.db.prepare(
-        'SELECT attempt_id FROM v02_cloud_attempts WHERE attempt_id = ?',
-      ).get(input.attemptId);
+      const prior = this.db
+        .prepare('SELECT attempt_id FROM v02_cloud_attempts WHERE attempt_id = ?')
+        .get(input.attemptId);
       if (prior) {
         this.db.exec('ROLLBACK');
         return { ok: false, code: 'IDEMPOTENCY_REPLAY' };
       }
-      const tally = this.db.prepare(
-        'SELECT COUNT(*) AS calls, COALESCE(SUM(cost_micros), 0) AS cost FROM v02_cloud_attempts WHERE consent_id = ?',
-      ).get(consentId) as { calls: number; cost: number };
+      const tally = this.db
+        .prepare(
+          'SELECT COUNT(*) AS calls, COALESCE(SUM(cost_micros), 0) AS cost FROM v02_cloud_attempts WHERE consent_id = ?',
+        )
+        .get(consentId) as { calls: number; cost: number };
       if (
         tally.calls >= scope.maxCalls ||
         BigInt(tally.cost) + maxCost > BigInt(scope.maxCostMicros)
@@ -183,10 +184,17 @@ export class DurableCloudBudgetLedger {
         return { ok: false, code: 'BUDGET_EXHAUSTED' };
       }
       // Scope identity is frozen for a consentId at first reservation.
-      const priorScope = this.db.prepare(
-        'SELECT task_id, scope_revision, scope_sha256, pricing_revision FROM v02_cloud_attempts WHERE consent_id = ? LIMIT 1',
-      ).get(consentId) as
-        | { task_id: string; scope_revision: string; scope_sha256: string; pricing_revision: string }
+      const priorScope = this.db
+        .prepare(
+          'SELECT task_id, scope_revision, scope_sha256, pricing_revision FROM v02_cloud_attempts WHERE consent_id = ? LIMIT 1',
+        )
+        .get(consentId) as
+        | {
+            task_id: string;
+            scope_revision: string;
+            scope_sha256: string;
+            pricing_revision: string;
+          }
         | undefined;
       if (
         priorScope &&
@@ -198,23 +206,25 @@ export class DurableCloudBudgetLedger {
         this.db.exec('ROLLBACK');
         return { ok: false, code: 'CONSENT_STALE' };
       }
-      this.db.prepare(`
+      this.db
+        .prepare(`
         INSERT INTO v02_cloud_attempts
         (attempt_id, consent_id, task_id, scope_revision, scope_sha256, pricing_revision,
          request_sha256, projection_sha256, cost_micros, status, created_at)
         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'RESERVED', ?)
-      `).run(
-        input.attemptId,
-        consentId,
-        scope.taskId,
-        scope.scopeRevision,
-        scopeSha256,
-        scope.pricingRevision,
-        requestHash,
-        projectionHash,
-        Number(maxCost),
-        input.now,
-      );
+      `)
+        .run(
+          input.attemptId,
+          consentId,
+          scope.taskId,
+          scope.scopeRevision,
+          scopeSha256,
+          scope.pricingRevision,
+          requestHash,
+          projectionHash,
+          Number(maxCost),
+          input.now,
+        );
       this.db.exec('COMMIT');
       return {
         ok: true,
@@ -223,7 +233,11 @@ export class DurableCloudBudgetLedger {
         reservedCostMicros: Number(maxCost),
       };
     } catch {
-      try { this.db.exec('ROLLBACK'); } catch { /* transaction may have ended */ }
+      try {
+        this.db.exec('ROLLBACK');
+      } catch {
+        /* transaction may have ended */
+      }
       return { ok: false, code: 'LEDGER_UNAVAILABLE' };
     }
   }
@@ -260,11 +274,13 @@ export class DurableCloudBudgetLedger {
     const scopeHash = digest(Buffer.from(canonicalJson(scope), 'utf8'));
     try {
       this.db.exec('BEGIN IMMEDIATE');
-      const row = this.db.prepare(
-        `SELECT consent_id, task_id, scope_revision, scope_sha256,
+      const row = this.db
+        .prepare(
+          `SELECT consent_id, task_id, scope_revision, scope_sha256,
           pricing_revision, request_sha256, status
           FROM v02_cloud_attempts WHERE attempt_id = ?`,
-      ).get(input.attemptId) as
+        )
+        .get(input.attemptId) as
         | {
             consent_id: string;
             task_id: string;
