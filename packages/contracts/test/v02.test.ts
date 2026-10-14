@@ -68,9 +68,12 @@ describe('v0.2: cloud disclosure contracts', () => {
   it('accepts typed scope only with bounded issuer/session, projection and cost', () => {
     expect(CloudDisclosureScopeSchema.safeParse(scope).success).toBe(true);
     expect(CloudConsentApprovalSchema.safeParse(approval).success).toBe(true);
-    expect(CloudConsentApprovalSchema.safeParse({
-      ...approval, displayedDisclosureCategories: ['FILE_METADATA'],
-    }).success).toBe(false);
+    expect(
+      CloudConsentApprovalSchema.safeParse({
+        ...approval,
+        displayedDisclosureCategories: ['FILE_METADATA'],
+      }).success,
+    ).toBe(false);
     expect(CloudDisclosureScopeSchema.safeParse({ ...scope, maxCalls: 0 }).success).toBe(false);
     expect(CloudDisclosureScopeSchema.safeParse({ ...scope, endpoint: 'anything' }).success).toBe(
       false,
@@ -134,8 +137,12 @@ describe('v0.2: cloud disclosure contracts', () => {
     expect(validateCloudConsent({ ...input, currentness: { kind: 'UNRESOLVABLE' } }).ok).toBe(
       false,
     );
-    expect(validateCloudConsent({ ...input, currentness: { ...current, pricingRevision: 'old' } }).ok).toBe(false);
-    expect(validateCloudConsent({ ...input, currentness: { ...current, scopeRevision: 'old' } }).ok).toBe(false);
+    expect(
+      validateCloudConsent({ ...input, currentness: { ...current, pricingRevision: 'old' } }).ok,
+    ).toBe(false);
+    expect(
+      validateCloudConsent({ ...input, currentness: { ...current, scopeRevision: 'old' } }).ok,
+    ).toBe(false);
     expect(validateCloudConsent({ ...input, currentness: current, now: scope.expiresAt })).toEqual({
       ok: false,
       code: 'CONSENT_EXPIRED',
@@ -171,9 +178,15 @@ describe('v0.2: cloud reservation and uncertain charges', () => {
     expect(CloudCallReservationSchema.safeParse(reservation).success).toBe(true);
     expect(mayRefundCloudAttempt(reservation, notSent, () => true)).toBe(true);
     expect(mayRefundCloudAttempt(reservation, notSent, () => false)).toBe(false);
-    expect(mayRefundCloudAttempt(reservation, { ...notSent, status: 'UNKNOWN_COST' }, () => true)).toBe(false);
-    expect(mayRefundCloudAttempt(reservation, { ...notSent, attemptId: 'other' }, () => true)).toBe(false);
-    expect(mayRefundCloudAttempt({ ...reservation, state: 'SENT' }, notSent, () => true)).toBe(false);
+    expect(
+      mayRefundCloudAttempt(reservation, { ...notSent, status: 'UNKNOWN_COST' }, () => true),
+    ).toBe(false);
+    expect(mayRefundCloudAttempt(reservation, { ...notSent, attemptId: 'other' }, () => true)).toBe(
+      false,
+    );
+    expect(mayRefundCloudAttempt({ ...reservation, state: 'SENT' }, notSent, () => true)).toBe(
+      false,
+    );
   });
 
   it('rejects a fabricated cost under UNKNOWN_COST', () => {
@@ -185,8 +198,12 @@ describe('v0.2: cloud reservation and uncertain charges', () => {
       }).success,
     ).toBe(false);
     expect(CloudCallReceiptSchema.safeParse({ ...notSent, sentAt: NOW }).success).toBe(false);
-    expect(CloudCallReceiptSchema.safeParse({ ...notSent, observedCostMicros: 0 }).success).toBe(false);
-    expect(CloudCallReceiptSchema.safeParse({ ...notSent, noSendProofRef: undefined }).success).toBe(false);
+    expect(CloudCallReceiptSchema.safeParse({ ...notSent, observedCostMicros: 0 }).success).toBe(
+      false,
+    );
+    expect(
+      CloudCallReceiptSchema.safeParse({ ...notSent, noSendProofRef: undefined }).success,
+    ).toBe(false);
     expect(CloudCallReservationSchema.safeParse({ ...reservation, callSequence: 0 }).success).toBe(
       false,
     );
@@ -197,7 +214,11 @@ describe('v0.2: exact Recipe identity and closed-world actions', () => {
   const graph = {
     nodes: [
       { actionId: 'one', op: 'file.search', parameters: { root: 'C:/approved', query: '*.txt' } },
-      { actionId: 'two', op: 'file.copy', parameters: { sourcePath: 'C:/approved/a', destinationPath: 'C:/approved/copy' } },
+      {
+        actionId: 'two',
+        op: 'file.copy',
+        parameters: { sourcePath: 'C:/approved/a', destinationPath: 'C:/approved/copy' },
+      },
     ],
     edges: [{ from: 'one', to: 'two' }],
   };
@@ -209,11 +230,22 @@ describe('v0.2: exact Recipe identity and closed-world actions', () => {
         nodes: [{ actionId: 'one', op: 'node.eval', parameters: { code: 'process.exit()' } }],
       }).success,
     ).toBe(false);
-    expect(RecipeActionGraphSchema.safeParse({
-      ...graph, nodes: [{ actionId: 'danger', op: 'file.copy', parameters: {
-        sourcePath: 'C:/approved/a', destinationPath: 'C:/approved/b', command: 'powershell',
-      } }],
-    }).success).toBe(false);
+    expect(
+      RecipeActionGraphSchema.safeParse({
+        ...graph,
+        nodes: [
+          {
+            actionId: 'danger',
+            op: 'file.copy',
+            parameters: {
+              sourcePath: 'C:/approved/a',
+              destinationPath: 'C:/approved/b',
+              command: 'powershell',
+            },
+          },
+        ],
+      }).success,
+    ).toBe(false);
     expect(
       RecipeActionGraphSchema.safeParse({
         ...graph,
@@ -261,8 +293,12 @@ describe('v0.2: exact Recipe identity and closed-world actions', () => {
         actionGraphSha256: SHA,
       }).success,
     ).toBe(false);
-    expect(RecipeRevisionIdentitySchema.safeParse({ ...record, declaredEffectsSha256: SHA }).success).toBe(false);
-    expect(RecipeRevisionIdentitySchema.safeParse({ ...record, verifierRevision: 'v2' }).success).toBe(false);
+    expect(
+      RecipeRevisionIdentitySchema.safeParse({ ...record, declaredEffectsSha256: SHA }).success,
+    ).toBe(false);
+    expect(
+      RecipeRevisionIdentitySchema.safeParse({ ...record, verifierRevision: 'v2' }).success,
+    ).toBe(false);
     expect(
       RecipeRevisionIdentitySchema.safeParse({
         ...record,
@@ -298,7 +334,10 @@ describe('v0.2: curated signed Provider catalog is data only', () => {
         signerKeyId: '',
       }).success,
     ).toBe(false);
-    expect(ProviderCatalogArtifactSchema.safeParse({ ...artifact, origin: 'http://a.example/b' }).success).toBe(false);
+    expect(
+      ProviderCatalogArtifactSchema.safeParse({ ...artifact, origin: 'http://a.example/b' })
+        .success,
+    ).toBe(false);
     expect(
       ProviderCatalogArtifactSchema.safeParse({
         ...artifact,
