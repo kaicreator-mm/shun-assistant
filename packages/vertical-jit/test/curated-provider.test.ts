@@ -60,15 +60,27 @@ describe('T05 curated Provider trust-bound admission', () => {
 
   it('refuses a model-supplied URL or changed manifest hash even with a valid key', () => {
     const verifier = configured();
-    expect(verifier.verify(makeArtifact({
-      origin: 'https://attacker.invalid/rg.exe',
-    }))).toMatchObject({ ok: false, code: 'CATALOG_SCOPE_DRIFT' });
-    expect(verifier.verify(makeArtifact({
-      catalogManifestSha256: 'c'.repeat(64),
-    }))).toMatchObject({ ok: false, code: 'CATALOG_SCOPE_DRIFT' });
-    expect(verifier.verify(makeArtifact({
-      bindingEvidenceSha256: 'd'.repeat(64),
-    }))).toMatchObject({ ok: false, code: 'CATALOG_SCOPE_DRIFT' });
+    expect(
+      verifier.verify(
+        makeArtifact({
+          origin: 'https://attacker.invalid/rg.exe',
+        }),
+      ),
+    ).toMatchObject({ ok: false, code: 'CATALOG_SCOPE_DRIFT' });
+    expect(
+      verifier.verify(
+        makeArtifact({
+          catalogManifestSha256: 'c'.repeat(64),
+        }),
+      ),
+    ).toMatchObject({ ok: false, code: 'CATALOG_SCOPE_DRIFT' });
+    expect(
+      verifier.verify(
+        makeArtifact({
+          bindingEvidenceSha256: 'd'.repeat(64),
+        }),
+      ),
+    ).toMatchObject({ ok: false, code: 'CATALOG_SCOPE_DRIFT' });
   });
 
   it('rejects an attacker signature under a legitimate signer ID', () => {
@@ -80,7 +92,8 @@ describe('T05 curated Provider trust-bound admission', () => {
     const before = makeArtifact();
     const changed = { ...before, dependencySha256: ['f'.repeat(64)] };
     expect(configured().verify(changed)).toMatchObject({
-      ok: false, code: 'CATALOG_SIGNATURE_INVALID',
+      ok: false,
+      code: 'CATALOG_SIGNATURE_INVALID',
     });
   });
 
@@ -94,10 +107,17 @@ describe('T05 curated Provider trust-bound admission', () => {
     ]) {
       expect(verifier.verify(makeArtifact(input)).ok).toBe(false);
     }
-    expect(new CuratedProviderVerifier(
-      [{ keyId: 'attacker', publicKeyPem: attackerPub.export({ type: 'spki', format: 'pem' }).toString() }],
-      [scope],
-    ).verify(makeArtifact()).ok).toBe(false);
+    expect(
+      new CuratedProviderVerifier(
+        [
+          {
+            keyId: 'attacker',
+            publicKeyPem: attackerPub.export({ type: 'spki', format: 'pem' }).toString(),
+          },
+        ],
+        [scope],
+      ).verify(makeArtifact()).ok,
+    ).toBe(false);
   });
 
   it('throws only stable configuration errors for duplicate roots/bindings', () => {
