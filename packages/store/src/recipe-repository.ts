@@ -36,9 +36,11 @@ export type RecipeStoreRefusal =
   | 'RECIPE_STORE_UNAVAILABLE';
 
 export class RecipeStoreError extends Error {
-  constructor(readonly code: RecipeStoreRefusal) {
+  readonly code: RecipeStoreRefusal;
+  constructor(code: RecipeStoreRefusal) {
     super(code); // fixed code only, never leak source/paths/compiled content
     this.name = 'RecipeStoreError';
+    this.code = code;
   }
 }
 
