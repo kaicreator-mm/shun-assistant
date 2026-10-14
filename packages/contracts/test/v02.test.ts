@@ -115,6 +115,22 @@ describe('v0.2: cloud disclosure contracts', () => {
       code: 'CONSENT_REFUSED',
     });
     expect(validateCloudConsent({ ...input, verifyBroker: () => true }).ok).toBe(true);
+    expect(
+      validateCloudConsent({
+        ...input,
+        verifyBroker: (() => Promise.resolve(true)) as unknown as Parameters<
+          typeof validateCloudConsent
+        >[0]['verifyBroker'],
+      }).ok,
+    ).toBe(false);
+    expect(
+      validateCloudConsent({
+        ...input,
+        verifyBroker: (() => 'truthy') as unknown as Parameters<
+          typeof validateCloudConsent
+        >[0]['verifyBroker'],
+      }).ok,
+    ).toBe(false);
     // @ts-expect-error a caller must not omit the mandatory verifier port.
     const invalid: Parameters<typeof validateCloudConsent>[0] = input;
     expect(invalid.approval).toBe(approval);
@@ -178,6 +194,34 @@ describe('v0.2: cloud reservation and uncertain charges', () => {
     expect(CloudCallReservationSchema.safeParse(reservation).success).toBe(true);
     expect(mayRefundCloudAttempt(reservation, notSent, () => true)).toBe(true);
     expect(mayRefundCloudAttempt(reservation, notSent, () => false)).toBe(false);
+    expect(
+      mayRefundCloudAttempt(
+        reservation,
+        notSent,
+        (() => Promise.resolve(true)) as unknown as Parameters<
+          typeof mayRefundCloudAttempt
+        >[2],
+      ),
+    ).toBe(false);
+    expect(
+      mayRefundCloudAttempt(
+        reservation,
+        notSent,
+        (() => 'truthy') as unknown as Parameters<typeof mayRefundCloudAttempt>[2],
+      ),
+    ).toBe(false);
+    let wrongAttemptProofInvoked = false;
+    expect(
+      mayRefundCloudAttempt(
+        reservation,
+        { ...notSent, attemptId: 'other-attempt' },
+        () => {
+          wrongAttemptProofInvoked = true;
+          return true;
+        },
+      ),
+    ).toBe(false);
+    expect(wrongAttemptProofInvoked).toBe(false);
     expect(
       mayRefundCloudAttempt(reservation, { ...notSent, status: 'UNKNOWN_COST' }, () => true),
     ).toBe(false);
