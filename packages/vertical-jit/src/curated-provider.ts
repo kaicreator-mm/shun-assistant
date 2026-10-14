@@ -67,6 +67,8 @@ type PinnedRoot = Readonly<{ keyId: string; publicKeyPem: string }>;
 export class CuratedProviderVerifier {
   private readonly keys: ReadonlyMap<string, KeyObject>;
   private readonly scopes: ReadonlyMap<string, TrustedProviderScope>;
+  /** Only results minted by THIS verifier instance can attest artifact bytes. */
+  private readonly verifiedDigests = new WeakMap<object, string>();
 
   constructor(roots: readonly PinnedRoot[], trustedScopes: readonly TrustedProviderScope[]) {
     const keys = new Map<string, KeyObject>();
@@ -126,7 +128,12 @@ export class CuratedProviderVerifier {
       if (!verifySignature(null, bytes, key, sig)) {
         return { ok: false, code: 'CATALOG_SIGNATURE_INVALID' };
       }
-      return { ok: true, artifact: value };
+      const admitted = Object.freeze({
+        ok: true as const,
+        artifact: Object.freeze({ ...value }),
+      });
+      this.verifiedDigests.set(admitted, value.artifactSha256);
+      return admitted;
     } catch {
       return { ok: false, code: 'CATALOG_SIGNATURE_INVALID' };
     }
@@ -137,9 +144,19 @@ export class CuratedProviderVerifier {
    * Digest alone is never a signature or an execution grant.
    */
   verifyBytes(verified: ProviderVerificationResult, bytes: Uint8Array): boolean {
-    if (!verified.ok || bytes.byteLength > 64 * 1024 * 1024) return false;
+    if (
+      !verified ||
+      typeof verified !== 'object' ||
+      !verified.ok ||
+      bytes.byteLength > 64 * 1024 * 1024
+    ) return false;
+    // A caller-constructed { ok: true, artifact: { artifactSha256 } } is NEVER
+    // evidence of signature verification. The private WeakMap binds this
+    // immutable result to the exact digest confirmed by this instance.
+    const exactDigest = this.verifiedDigests.get(verified);
+    if (!exactDigest) return false;
     try {
-      return matchSha(verified.artifact.artifactSha256, sha256Bytes(bytes));
+      return matchSha(exactDigest, sha256Bytes(bytes));
     } catch {
       return false;
     }
