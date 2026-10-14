@@ -315,6 +315,8 @@ describe('v0.2: curated signed Provider catalog is data only', () => {
       catalogRevision: 'catalog-r2',
       bindingId: 'binding-rg-search',
       scopedVerifierId: 'rg-verified-1',
+      catalogManifestSha256: SHA,
+      bindingEvidenceSha256: B,
       version: '14.1',
       capabilityId: 'file.search',
       artifactKind: 'CLI',
@@ -322,12 +324,20 @@ describe('v0.2: curated signed Provider catalog is data only', () => {
       artifactSha256: SHA,
       origin: 'https://example.org/pinned.exe',
       entrypoint: 'rg.exe',
-      abiRevision: 'abi-r1',
       signerKeyId: 'curator-key-1',
       curatorSignature: 'base64-signature-value',
       dependencySha256: [B],
     };
     expect(ProviderCatalogArtifactSchema.safeParse(artifact).success).toBe(true);
+    expect(ProviderCatalogArtifactSchema.safeParse({
+      ...artifact, artifactKind: 'NATIVE_ADDON',
+    }).success).toBe(false);
+    expect(ProviderCatalogArtifactSchema.safeParse({
+      ...artifact, artifactKind: 'NATIVE_ADDON', abiRevision: 'node-v24-abi-1',
+    }).success).toBe(true);
+    expect(ProviderCatalogArtifactSchema.safeParse({
+      ...artifact, bindingEvidenceSha256: 'tampered',
+    }).success).toBe(false);
     expect(
       ProviderCatalogArtifactSchema.safeParse({
         ...artifact,
