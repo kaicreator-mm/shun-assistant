@@ -321,7 +321,7 @@ const SAFETY_INVARIANT_OVERLAYS: Record<string, (schema: EmittedSchema) => Emitt
           ...propertiesOf(schema),
           origin: {
             ...((propertiesOf(schema).origin ?? {}) as EmittedSchema),
-            pattern: '^https://',
+            pattern: '^https://(?![^/?#]*@)',
           },
         },
       },
