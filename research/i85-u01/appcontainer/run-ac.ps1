@@ -43,6 +43,7 @@ public static class AcProbe {
     public IntPtr AppContainerSid;
     public IntPtr Capabilities;
     public uint CapabilityCount;
+    public uint Reserved;
   }
 
   [StructLayout(LayoutKind.Sequential, CharSet=CharSet.Unicode)]
@@ -114,7 +115,7 @@ public static class AcProbe {
 
   public const uint EXTENDED_STARTUPINFO_PRESENT = 0x00080000;
   public const uint INFINITE = 0xFFFFFFFF;
-  public static readonly IntPtr PROC_THREAD_ATTRIBUTE_SECURITY_CAPABILITIES = (IntPtr)0x00020013;
+  public static readonly IntPtr PROC_THREAD_ATTRIBUTE_SECURITY_CAPABILITIES = (IntPtr)0x00020009;
 }
 "@
 
