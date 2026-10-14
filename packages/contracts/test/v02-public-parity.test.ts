@@ -3,8 +3,8 @@ import { join } from 'node:path';
 import Ajv2020 from 'ajv/dist/2020';
 import addFormats from 'ajv-formats';
 import { describe, expect, it } from 'vitest';
-import { computeRecipeRevision } from '../src/v02.ts';
 import { CONTRACTS } from '../src/registry.ts';
+import { computeRecipeRevision } from '../src/v02.ts';
 
 const SHA = 'a'.repeat(64);
 const B = 'b'.repeat(64);
@@ -128,13 +128,17 @@ const cases = [
       edges: [],
     },
     bad: {
-      nodes: [{
-        actionId: 'danger',
-        op: 'file.copy',
-        parameters: {
-          sourcePath: 'C:/safe/a', destinationPath: 'C:/safe/b', command: 'powershell',
+      nodes: [
+        {
+          actionId: 'danger',
+          op: 'file.copy',
+          parameters: {
+            sourcePath: 'C:/safe/a',
+            destinationPath: 'C:/safe/b',
+            command: 'powershell',
+          },
         },
-      }],
+      ],
       edges: [],
     },
   },
