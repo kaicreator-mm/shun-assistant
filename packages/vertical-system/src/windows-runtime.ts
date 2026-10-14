@@ -12,7 +12,7 @@ const COMMAND_TIMEOUT_MS = 5000;
 /** Never resolve powershell.exe through mutable PATH or the current directory. */
 function trustedPowerShellExe(): string | null {
   const root = process.env.SystemRoot;
-  if (!root || !/^[A-Za-z]:\\\\Windows\\?$/i.test(root)) return null;
+  if (!root || !/^[A-Za-z]:\\Windows\\?$/i.test(root)) return null;
   return win32.join(root, 'System32', 'WindowsPowerShell', 'v1.0', 'powershell.exe');
 }
 
