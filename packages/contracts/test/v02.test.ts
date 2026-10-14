@@ -23,6 +23,8 @@ const scope = {
   modelId: 'deepseek-flash',
   destination: 'https://api.deepseek.com/chat/completions',
   approvedProjectionSha256: SHA,
+  scopeRevision: 'scope-r1',
+  disclosureCategories: ['GOAL_TEXT'],
   registryRevision: 'registry-r3',
   policyRevision: 'policy-r9',
   pricingRevision: 'deepseek-price-r1',
@@ -40,6 +42,7 @@ const approval = {
   scope,
   confirmationNonce: 'single-use-nonce',
   displayedProjectionSha256: SHA,
+  displayedDisclosureCategories: ['GOAL_TEXT'],
   issuer: {
     brokerId: 'shun-trusted-broker',
     brokerRevision: 'broker-r1',
@@ -55,6 +58,8 @@ const current = {
   sessionId: scope.sessionId,
   registryRevision: scope.registryRevision,
   policyRevision: scope.policyRevision,
+  pricingRevision: scope.pricingRevision,
+  scopeRevision: scope.scopeRevision,
   revocationEpoch: scope.revocationEpoch,
   nonceIsUnused: true,
 } as const;
@@ -63,6 +68,9 @@ describe('v0.2: cloud disclosure contracts', () => {
   it('accepts typed scope only with bounded issuer/session, projection and cost', () => {
     expect(CloudDisclosureScopeSchema.safeParse(scope).success).toBe(true);
     expect(CloudConsentApprovalSchema.safeParse(approval).success).toBe(true);
+    expect(CloudConsentApprovalSchema.safeParse({
+      ...approval, displayedDisclosureCategories: ['FILE_METADATA'],
+    }).success).toBe(false);
     expect(CloudDisclosureScopeSchema.safeParse({ ...scope, maxCalls: 0 }).success).toBe(false);
     expect(CloudDisclosureScopeSchema.safeParse({ ...scope, endpoint: 'anything' }).success).toBe(
       false,
@@ -126,6 +134,8 @@ describe('v0.2: cloud disclosure contracts', () => {
     expect(validateCloudConsent({ ...input, currentness: { kind: 'UNRESOLVABLE' } }).ok).toBe(
       false,
     );
+    expect(validateCloudConsent({ ...input, currentness: { ...current, pricingRevision: 'old' } }).ok).toBe(false);
+    expect(validateCloudConsent({ ...input, currentness: { ...current, scopeRevision: 'old' } }).ok).toBe(false);
     expect(validateCloudConsent({ ...input, currentness: current, now: scope.expiresAt })).toEqual({
       ok: false,
       code: 'CONSENT_EXPIRED',
@@ -137,6 +147,8 @@ const reservation = CloudCallReservationSchema.parse({
   attemptId: 'attempt-1',
   consentId: 'consent-1',
   scopeRevision: 'scope-r1',
+  pricingRevision: 'deepseek-price-r1',
+  idempotencyKey: 'unique-attempt-1',
   taskId: 'task-1',
   callSequence: 1,
   requestBytesSha256: SHA,
@@ -150,16 +162,18 @@ const notSent = CloudCallReceiptSchema.parse({
   attemptId: reservation.attemptId,
   consentId: reservation.consentId,
   status: 'NOT_SENT_PROVEN',
+  noSendProofRef: 'journal-trusted-nosend-proof-1',
   recordedAt: NOW,
 });
 
 describe('v0.2: cloud reservation and uncertain charges', () => {
   it('accepts a durable typed reservation and proves refunds only on no-send', () => {
     expect(CloudCallReservationSchema.safeParse(reservation).success).toBe(true);
-    expect(mayRefundCloudAttempt(reservation, notSent)).toBe(true);
-    expect(mayRefundCloudAttempt(reservation, { ...notSent, status: 'UNKNOWN_COST' })).toBe(false);
-    expect(mayRefundCloudAttempt(reservation, { ...notSent, attemptId: 'other' })).toBe(false);
-    expect(mayRefundCloudAttempt({ ...reservation, state: 'SENT' }, notSent)).toBe(false);
+    expect(mayRefundCloudAttempt(reservation, notSent, () => true)).toBe(true);
+    expect(mayRefundCloudAttempt(reservation, notSent, () => false)).toBe(false);
+    expect(mayRefundCloudAttempt(reservation, { ...notSent, status: 'UNKNOWN_COST' }, () => true)).toBe(false);
+    expect(mayRefundCloudAttempt(reservation, { ...notSent, attemptId: 'other' }, () => true)).toBe(false);
+    expect(mayRefundCloudAttempt({ ...reservation, state: 'SENT' }, notSent, () => true)).toBe(false);
   });
 
   it('rejects a fabricated cost under UNKNOWN_COST', () => {
@@ -170,6 +184,9 @@ describe('v0.2: cloud reservation and uncertain charges', () => {
         observedCostMicros: 100,
       }).success,
     ).toBe(false);
+    expect(CloudCallReceiptSchema.safeParse({ ...notSent, sentAt: NOW }).success).toBe(false);
+    expect(CloudCallReceiptSchema.safeParse({ ...notSent, observedCostMicros: 0 }).success).toBe(false);
+    expect(CloudCallReceiptSchema.safeParse({ ...notSent, noSendProofRef: undefined }).success).toBe(false);
     expect(CloudCallReservationSchema.safeParse({ ...reservation, callSequence: 0 }).success).toBe(
       false,
     );
@@ -179,8 +196,8 @@ describe('v0.2: cloud reservation and uncertain charges', () => {
 describe('v0.2: exact Recipe identity and closed-world actions', () => {
   const graph = {
     nodes: [
-      { actionId: 'one', op: 'file.search', parameters: { root: 'C:/approved' } },
-      { actionId: 'two', op: 'file.copy', parameters: { target: 'C:/approved/copy' } },
+      { actionId: 'one', op: 'file.search', parameters: { root: 'C:/approved', query: '*.txt' } },
+      { actionId: 'two', op: 'file.copy', parameters: { sourcePath: 'C:/approved/a', destinationPath: 'C:/approved/copy' } },
     ],
     edges: [{ from: 'one', to: 'two' }],
   };
@@ -192,6 +209,11 @@ describe('v0.2: exact Recipe identity and closed-world actions', () => {
         nodes: [{ actionId: 'one', op: 'node.eval', parameters: { code: 'process.exit()' } }],
       }).success,
     ).toBe(false);
+    expect(RecipeActionGraphSchema.safeParse({
+      ...graph, nodes: [{ actionId: 'danger', op: 'file.copy', parameters: {
+        sourcePath: 'C:/approved/a', destinationPath: 'C:/approved/b', command: 'powershell',
+      } }],
+    }).success).toBe(false);
     expect(
       RecipeActionGraphSchema.safeParse({
         ...graph,
@@ -223,6 +245,9 @@ describe('v0.2: exact Recipe identity and closed-world actions', () => {
       compiledSha256: SHA,
       compilerRevision: 'compiler-r1',
       contractRevision: 'contract-r2',
+      declaredEffectsSha256: B,
+      verifierId: 'safe-verifier',
+      verifierRevision: 'v1',
     };
     const revisionSha256 = computeRecipeRevision(base);
     const record = RecipeRevisionIdentitySchema.parse({ ...base, revisionSha256 });
@@ -236,6 +261,8 @@ describe('v0.2: exact Recipe identity and closed-world actions', () => {
         actionGraphSha256: SHA,
       }).success,
     ).toBe(false);
+    expect(RecipeRevisionIdentitySchema.safeParse({ ...record, declaredEffectsSha256: SHA }).success).toBe(false);
+    expect(RecipeRevisionIdentitySchema.safeParse({ ...record, verifierRevision: 'v2' }).success).toBe(false);
     expect(
       RecipeRevisionIdentitySchema.safeParse({
         ...record,
@@ -249,6 +276,9 @@ describe('v0.2: curated signed Provider catalog is data only', () => {
   it('rejects missing signer, wrong hash, arbitrary OS and unknown carrier type', () => {
     const artifact = {
       providerId: 'rg',
+      catalogRevision: 'catalog-r2',
+      bindingId: 'binding-rg-search',
+      scopedVerifierId: 'rg-verified-1',
       version: '14.1',
       capabilityId: 'file.search',
       artifactKind: 'CLI',
@@ -268,6 +298,7 @@ describe('v0.2: curated signed Provider catalog is data only', () => {
         signerKeyId: '',
       }).success,
     ).toBe(false);
+    expect(ProviderCatalogArtifactSchema.safeParse({ ...artifact, origin: 'http://a.example/b' }).success).toBe(false);
     expect(
       ProviderCatalogArtifactSchema.safeParse({
         ...artifact,
