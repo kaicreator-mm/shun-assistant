@@ -240,45 +240,77 @@ const SAFETY_INVARIANT_OVERLAYS: Record<string, (schema: EmittedSchema) => Emitt
   'c002-jit-lifecycle-output': overlayJitLifecycleOutput,
   'c003-storage-diagnose-output': overlayStorageDiagnoseOutput,
   'v02-cloud-disclosure-scope': (schema) => ({
-    ...schema, 'x-semantic-validation': ['CloudDisclosureScopeSchema.safeParse'],
+    ...schema,
+    'x-semantic-validation': ['CloudDisclosureScopeSchema.safeParse'],
   }),
   'v02-cloud-consent-approval': (schema) => ({
-    ...schema, 'x-semantic-validation': ['CloudConsentApprovalSchema.safeParse', 'validateCloudConsent'],
+    ...schema,
+    'x-semantic-validation': ['CloudConsentApprovalSchema.safeParse', 'validateCloudConsent'],
   }),
   'v02-cloud-consent-currentness': (schema) => ({
-    ...schema, 'x-semantic-validation': ['validateCloudConsent'],
+    ...schema,
+    'x-semantic-validation': ['validateCloudConsent'],
   }),
   'v02-cloud-call-reservation': (schema) => ({
-    ...schema, 'x-semantic-validation': ['CloudCallReservationSchema.safeParse'],
+    ...schema,
+    'x-semantic-validation': ['CloudCallReservationSchema.safeParse'],
   }),
   'v02-cloud-call-receipt': (schema) => {
     let result: EmittedSchema = {
-      ...schema, 'x-semantic-validation': ['CloudCallReceiptSchema.safeParse', 'mayRefundCloudAttempt'],
+      ...schema,
+      'x-semantic-validation': ['CloudCallReceiptSchema.safeParse', 'mayRefundCloudAttempt'],
     };
-    result = withRootAllOf(result, ifThen({
-      properties: { status: { const: 'NOT_SENT_PROVEN' } }, required: ['status'],
-    }, {
-      required: ['noSendProofRef'],
-      not: { anyOf: [
-        { required: ['sentAt'] }, { required: ['observedCostMicros'] },
-        { required: ['inputTokens'] }, { required: ['outputTokens'] },
-        { required: ['observedModel'] }, { required: ['systemFingerprint'] },
-        { required: ['responseId'] },
-      ] },
-    }));
-    result = withRootAllOf(result, ifThen({
-      properties: { status: { enum: ['SENT', 'SETTLED', 'UNKNOWN_COST'] } },
-      required: ['status'],
-    }, { not: { required: ['noSendProofRef'] } }));
-    return withRootAllOf(result, ifThen({
-      properties: { status: { const: 'UNKNOWN_COST' } }, required: ['status'],
-    }, { not: { required: ['observedCostMicros'] } }));
+    result = withRootAllOf(
+      result,
+      ifThen(
+        {
+          properties: { status: { const: 'NOT_SENT_PROVEN' } },
+          required: ['status'],
+        },
+        {
+          required: ['noSendProofRef'],
+          not: {
+            anyOf: [
+              { required: ['sentAt'] },
+              { required: ['observedCostMicros'] },
+              { required: ['inputTokens'] },
+              { required: ['outputTokens'] },
+              { required: ['observedModel'] },
+              { required: ['systemFingerprint'] },
+              { required: ['responseId'] },
+            ],
+          },
+        },
+      ),
+    );
+    result = withRootAllOf(
+      result,
+      ifThen(
+        {
+          properties: { status: { enum: ['SENT', 'SETTLED', 'UNKNOWN_COST'] } },
+          required: ['status'],
+        },
+        { not: { required: ['noSendProofRef'] } },
+      ),
+    );
+    return withRootAllOf(
+      result,
+      ifThen(
+        {
+          properties: { status: { const: 'UNKNOWN_COST' } },
+          required: ['status'],
+        },
+        { not: { required: ['observedCostMicros'] } },
+      ),
+    );
   },
   'v02-recipe-action-graph': (schema) => ({
-    ...schema, 'x-semantic-validation': ['RecipeActionGraphSchema.safeParse'],
+    ...schema,
+    'x-semantic-validation': ['RecipeActionGraphSchema.safeParse'],
   }),
   'v02-recipe-revision-identity': (schema) => ({
-    ...schema, 'x-semantic-validation': ['verifyRecipeRevision', 'RecipeRevisionIdentitySchema.safeParse'],
+    ...schema,
+    'x-semantic-validation': ['verifyRecipeRevision', 'RecipeRevisionIdentitySchema.safeParse'],
   }),
   'v02-provider-catalog-artifact': (schema) => ({
     ...schema,
