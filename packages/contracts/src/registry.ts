@@ -61,6 +61,16 @@ import {
   VerificationReceiptSchema,
 } from './receipts.ts';
 import { ShunContractError } from './taxonomy.ts';
+import {
+  CloudCallReceiptSchema,
+  CloudCallReservationSchema,
+  CloudConsentApprovalSchema,
+  CloudConsentCurrentnessSchema,
+  CloudDisclosureScopeSchema,
+  ProviderCatalogArtifactSchema,
+  RecipeActionGraphSchema,
+  RecipeRevisionIdentitySchema,
+} from './v02.ts';
 
 export type ContractEntry = {
   readonly name: string;
@@ -89,6 +99,14 @@ export const CONTRACTS: readonly ContractEntry[] = [
   { name: 'c002-jit-lifecycle-output', schema: JitLifecycleOutputSchema },
   { name: 'c003-storage-diagnose-input', schema: StorageDiagnoseInputSchema },
   { name: 'c003-storage-diagnose-output', schema: StorageDiagnoseOutputSchema },
+  { name: 'v02-cloud-disclosure-scope', schema: CloudDisclosureScopeSchema },
+  { name: 'v02-cloud-consent-approval', schema: CloudConsentApprovalSchema },
+  { name: 'v02-cloud-consent-currentness', schema: CloudConsentCurrentnessSchema },
+  { name: 'v02-cloud-call-reservation', schema: CloudCallReservationSchema },
+  { name: 'v02-cloud-call-receipt', schema: CloudCallReceiptSchema },
+  { name: 'v02-recipe-action-graph', schema: RecipeActionGraphSchema },
+  { name: 'v02-recipe-revision-identity', schema: RecipeRevisionIdentitySchema },
+  { name: 'v02-provider-catalog-artifact', schema: ProviderCatalogArtifactSchema },
 ];
 
 export function contractByName(name: string): ContractEntry | undefined {
