@@ -150,24 +150,26 @@ export const CloudCallReservationSchema = z.strictObject({
 });
 export type CloudCallReservation = z.infer<typeof CloudCallReservationSchema>;
 
-export const CloudCallReceiptSchema = z.strictObject({
-  attemptId: Ref,
-  consentId: Ref,
-  status: z.enum(['NOT_SENT_PROVEN', 'SENT', 'SETTLED', 'UNKNOWN_COST']),
-  sentAt: IsoDateTimeSchema.optional(),
-  observedModel: Ref.optional(),
-  /** May be absent for floating cloud model aliases; NEVER fabricate a model SHA. */
-  systemFingerprint: Ref.optional(),
-  responseId: Ref.optional(),
-  inputTokens: NonNegative.optional(),
-  outputTokens: NonNegative.optional(),
-  observedCostMicros: NonNegative.optional(),
-  recordedAt: IsoDateTimeSchema,
-}).superRefine((receipt, ctx) => {
-  if (receipt.status === 'UNKNOWN_COST' && receipt.observedCostMicros !== undefined) {
-    ctx.addIssue({ code: 'custom', message: 'unknown provider charge is not a settled cost' });
-  }
-});
+export const CloudCallReceiptSchema = z
+  .strictObject({
+    attemptId: Ref,
+    consentId: Ref,
+    status: z.enum(['NOT_SENT_PROVEN', 'SENT', 'SETTLED', 'UNKNOWN_COST']),
+    sentAt: IsoDateTimeSchema.optional(),
+    observedModel: Ref.optional(),
+    /** May be absent for floating cloud model aliases; NEVER fabricate a model SHA. */
+    systemFingerprint: Ref.optional(),
+    responseId: Ref.optional(),
+    inputTokens: NonNegative.optional(),
+    outputTokens: NonNegative.optional(),
+    observedCostMicros: NonNegative.optional(),
+    recordedAt: IsoDateTimeSchema,
+  })
+  .superRefine((receipt, ctx) => {
+    if (receipt.status === 'UNKNOWN_COST' && receipt.observedCostMicros !== undefined) {
+      ctx.addIssue({ code: 'custom', message: 'unknown provider charge is not a settled cost' });
+    }
+  });
 export type CloudCallReceipt = z.infer<typeof CloudCallReceiptSchema>;
 
 /** Only a proven no-send can release a reserved slot, never UNKNOWN_COST. */
@@ -175,12 +177,14 @@ export function mayRefundCloudAttempt(
   reservation: CloudCallReservation,
   receipt: CloudCallReceipt,
 ): boolean {
-  return reservation.attemptId === receipt.attemptId &&
+  return (
+    reservation.attemptId === receipt.attemptId &&
     reservation.consentId === receipt.consentId &&
     receipt.status === 'NOT_SENT_PROVEN' &&
     (reservation.state === 'RESERVED' ||
       reservation.state === 'NOT_SENT_PROVEN' ||
-      reservation.state === 'CANCELLED_BEFORE_SEND');
+      reservation.state === 'CANCELLED_BEFORE_SEND')
+  );
 }
 
 export const RecipeActionNodeSchema = z.strictObject({
@@ -199,20 +203,22 @@ export const RecipeActionNodeSchema = z.strictObject({
   ]),
   parameters: z.record(z.string(), z.unknown()),
 });
-export const RecipeActionGraphSchema = z.strictObject({
-  nodes: z.array(RecipeActionNodeSchema).min(1),
-  edges: z.array(z.strictObject({ from: Ref, to: Ref })),
-}).superRefine((graph, ctx) => {
-  const ids = new Set(graph.nodes.map((node) => node.actionId));
-  if (ids.size !== graph.nodes.length) {
-    ctx.addIssue({ code: 'custom', message: 'duplicate actionId in Recipe graph' });
-  }
-  for (const edge of graph.edges) {
-    if (!ids.has(edge.from) || !ids.has(edge.to)) {
-      ctx.addIssue({ code: 'custom', message: 'Recipe graph references unknown actionId' });
+export const RecipeActionGraphSchema = z
+  .strictObject({
+    nodes: z.array(RecipeActionNodeSchema).min(1),
+    edges: z.array(z.strictObject({ from: Ref, to: Ref })),
+  })
+  .superRefine((graph, ctx) => {
+    const ids = new Set(graph.nodes.map((node) => node.actionId));
+    if (ids.size !== graph.nodes.length) {
+      ctx.addIssue({ code: 'custom', message: 'duplicate actionId in Recipe graph' });
     }
-  }
-});
+    for (const edge of graph.edges) {
+      if (!ids.has(edge.from) || !ids.has(edge.to)) {
+        ctx.addIssue({ code: 'custom', message: 'Recipe graph references unknown actionId' });
+      }
+    }
+  });
 export type RecipeActionGraph = z.infer<typeof RecipeActionGraphSchema>;
 
 export const RecipeRevisionIdentitySchema = z.strictObject({
