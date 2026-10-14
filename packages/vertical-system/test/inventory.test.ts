@@ -1,10 +1,12 @@
 import { describe, expect, it } from 'vitest';
 import {
-  collectSystemInventoryWithTrustedHost,
   collectWindowsSystemInventory,
-  type SystemInventoryHost,
   suggestReadonlyOptimizations,
 } from '../src/index.ts';
+import {
+  collectSystemInventoryWithTrustedHost,
+  type SystemInventoryHost,
+} from '../src/internal/collector.ts';
 
 function trustedHost(): SystemInventoryHost {
   return {
