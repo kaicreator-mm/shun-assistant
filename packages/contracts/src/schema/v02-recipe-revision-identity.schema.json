@@ -1,0 +1,66 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:shun:contracts:0.1:v02-recipe-revision-identity",
+  "title": "v02-recipe-revision-identity",
+  "x-contracts-revision": "shun.contracts/0.1",
+  "type": "object",
+  "properties": {
+    "recipeId": {
+      "type": "string",
+      "minLength": 1
+    },
+    "sourceSha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "actionGraphSha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "compiledSha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "compilerRevision": {
+      "type": "string",
+      "minLength": 1
+    },
+    "contractRevision": {
+      "type": "string",
+      "minLength": 1
+    },
+    "declaredEffectsSha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "verifierId": {
+      "type": "string",
+      "minLength": 1
+    },
+    "verifierRevision": {
+      "type": "string",
+      "minLength": 1
+    },
+    "revisionSha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    }
+  },
+  "required": [
+    "recipeId",
+    "sourceSha256",
+    "actionGraphSha256",
+    "compiledSha256",
+    "compilerRevision",
+    "contractRevision",
+    "declaredEffectsSha256",
+    "verifierId",
+    "verifierRevision",
+    "revisionSha256"
+  ],
+  "additionalProperties": false,
+  "x-semantic-validation": [
+    "verifyRecipeRevision",
+    "RecipeRevisionIdentitySchema.safeParse"
+  ]
+}
