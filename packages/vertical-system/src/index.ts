@@ -73,7 +73,8 @@ export function collectSystemInventoryWithTrustedHost(
     !safeInteger(diskFreeBytes, false) ||
     diskFreeBytes > diskTotalBytes ||
     !safeInteger(uptimeSeconds, false)
-  ) return { ok: false, code: 'SYSTEM_OBSERVATION_INVALID' };
+  )
+    return { ok: false, code: 'SYSTEM_OBSERVATION_INVALID' };
   return {
     ok: true,
     snapshot: {
