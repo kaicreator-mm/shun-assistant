@@ -407,7 +407,12 @@ export const ProviderCatalogArtifactSchema = z
     origin: z.url().refine((value) => {
       try {
         const u = new URL(value);
-        return value.startsWith('https://') && u.protocol === 'https:' && u.username === '' && u.password === '';
+        return (
+          value.startsWith('https://') &&
+          u.protocol === 'https:' &&
+          u.username === '' &&
+          u.password === ''
+        );
       } catch {
         return false;
       }
