@@ -239,7 +239,8 @@ export function mayRefundCloudAttempt(
     (reservation.state !== 'RESERVED' &&
       reservation.state !== 'NOT_SENT_PROVEN' &&
       reservation.state !== 'CANCELLED_BEFORE_SEND')
-  ) return false;
+  )
+    return false;
   try {
     return verifyNoSendProof(reservation, receipt.noSendProofRef) === true;
   } catch {
