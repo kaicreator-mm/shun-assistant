@@ -1,0 +1,247 @@
+{
+  "issue": "kaicreator-mm/shun-assistant #85 (v0.2 L2 U01)",
+  "task": "Real Windows LOCAL LLM origin and zero-egress falsification",
+  "pinnedBaseSha": "d812ca2f5d5e48dd637c5580cb4c30ecf4116663",
+  "plannerSeam": {
+    "path": "packages\\resolver\\src\\planner-seam.ts",
+    "sha256": "f80c72abf77b43df927cfd144e2ed0e7422d218b8299a02ac437a63d08d69f0a",
+    "bytes": 14257
+  },
+  "host": {
+    "windowsVerRaw": "Microsoft Windows [�汾 10.0.26300.9457]",
+    "win32Os": "{\"Caption\":\"Microsoft Windows 11 רҵ��\",\"Version\":\"10.0.26300\",\"BuildNumber\":\"26300\",\"OSArchitecture\":\"64 λ\"}",
+    "user": "15549",
+    "inAdministratorsGroup": false,
+    "integrityLevelHigh": false,
+    "netSessionRc": 2,
+    "netSessionDenied": true,
+    "privilegeVerdict": "STANDARD_USER",
+    "nodeVersion": "v24.21.0",
+    "nodeAbi": "137",
+    "nodePath": "C:\\Users\\15549\\AppData\\Local\\fnm_multishells\\24848_1791958697462\\node.exe\r"
+  },
+  "overallVerdict": "BLOCKED",
+  "overallReason": [
+    "Positive leg impossible: no user-provided local model runtime exists (every scanner ABSENT) and the contract forbids silent installation/download, so 2 real local inferences cannot happen.",
+    "Isolation enforcement not demonstrated: non-admin cannot add firewall rules (netsh denied) and the AppContainer capability-less launcher path was rejected by UpdateProcThreadAttribute with ERROR_BAD_LENGTH on this build, so no OS-enforced zero-egress proof exists for a model process on this host.",
+    "Everything runnable without a model was run for real: the planner-seam hostile matrix (H1-H7) refused every hostile path with zero planner invocations and zero socket-level egress (positive controls prove the observation apparatus detects real traffic), H8 and the currentness-before-planner sub-item are recorded BLOCKED_NOT_RUNNABLE with precise causes, and the v0.1 R3 LOCAL fail-closed behavior was preserved (no source file modified)."
+  ],
+  "subItems": [
+    {
+      "id": "host-and-model-fact-collection",
+      "verdict": "PASS",
+      "detail": {
+        "windows": "{\"Caption\":\"Microsoft Windows 11 רҵ��\",\"Version\":\"10.0.26300\",\"BuildNumber\":\"26300\",\"OSArchitecture\":\"64 λ\"}",
+        "privilege": "STANDARD_USER (whoami=15549, net session rc=2)",
+        "node": "v24.21.0 ABI 137",
+        "plannerSeamSha256": "f80c72abf77b43df927cfd144e2ed0e7422d218b8299a02ac437a63d08d69f0a",
+        "modelAbsenceScans": 25,
+        "allScansAbsent": true
+      },
+      "evidence": "evidence/fact-collection.json"
+    },
+    {
+      "id": "H1-caller-labeled-LOCAL-pair",
+      "verdict": "SEAM_REFUSED_ZERO_EGRESS",
+      "status": "PLANNER_UNAVAILABLE",
+      "invocations": 0,
+      "evidence": "evidence/hostile-matrix.json#H1"
+    },
+    {
+      "id": "H2-forged-adapter-lookalike-brand",
+      "verdict": "SEAM_REFUSED_ZERO_EGRESS",
+      "status": "PLANNER_UNAVAILABLE",
+      "invocations": 0,
+      "evidence": "evidence/hostile-matrix.json#H2"
+    },
+    {
+      "id": "H3-localPlannerAdapter-undeclared-planner",
+      "verdict": "FACTORY_REFUSED",
+      "thrown": {
+        "name": "TypeError",
+        "message": "localPlannerAdapter requires a planner whose local provenance was declared at the trusted composition boundary via declareLocalPlanner — an arbitrary PlannerPort (possibly remote-backed) cannot be bound to LOCAL transport"
+      },
+      "evidence": "evidence/hostile-matrix.json#H3"
+    },
+    {
+      "id": "H4-declareLocalPlanner-wrapping-loopback-forwarder",
+      "verdict": "SEAM_REFUSED_ZERO_EGRESS",
+      "observationApparatusValidated": true,
+      "controls": {
+        "directInvocationProxyForwarding": {
+          "description": "direct call (no seam): proxy hit then forwarded to origin",
+          "socketDeltas": {
+            "proxy": {
+              "connections": 1,
+              "requests": 1
+            },
+            "origin": {
+              "connections": 1,
+              "requests": 1
+            },
+            "sink": {
+              "connections": 0,
+              "requests": 0
+            }
+          },
+          "expected": {
+            "proxy": {
+              "connections": 1,
+              "requests": 1
+            },
+            "origin": {
+              "connections": 1,
+              "requests": 1
+            },
+            "sink": {
+              "connections": 0,
+              "requests": 0
+            }
+          },
+          "observedAsExpected": true
+        },
+        "directInvocationHttpProxySink": {
+          "description": "direct call with HTTP_PROXY set: traffic reached the sink listener",
+          "socketDeltas": {
+            "proxy": {
+              "connections": 0,
+              "requests": 0
+            },
+            "origin": {
+              "connections": 0,
+              "requests": 0
+            },
+            "sink": {
+              "connections": 1,
+              "requests": 1
+            }
+          },
+          "expected": {
+            "sink": {
+              "connections": 1,
+              "requests": 1
+            }
+          },
+          "observedAsExpected": true
+        }
+      },
+      "seamReason": "LOCAL PlannerPort origin cannot be independently attested by this runtime; caller-declared local provenance is not proof of no network egress — refusing execution until an enforceable trusted host is provided",
+      "invocationsUnderSeam": 0,
+      "socketDeltasUnderSeam": {
+        "proxy": {
+          "connections": 0,
+          "requests": 0
+        },
+        "origin": {
+          "connections": 0,
+          "requests": 0
+        },
+        "sink": {
+          "connections": 0,
+          "requests": 0
+        }
+      },
+      "evidence": "evidence/hostile-matrix.json#H4"
+    },
+    {
+      "id": "H5-REMOTE-under-frozen-LOCAL_ONLY-policy",
+      "verdict": "SEAM_REFUSED_ZERO_EGRESS",
+      "status": "PLANNER_UNAVAILABLE",
+      "invocations": 0,
+      "evidence": "evidence/hostile-matrix.json#H5"
+    },
+    {
+      "id": "H6-REMOTE-with-offline-constraint",
+      "verdict": "SEAM_REFUSED_ZERO_EGRESS",
+      "status": "PLANNER_UNAVAILABLE",
+      "invocations": 0,
+      "evidence": "evidence/hostile-matrix.json#H6"
+    },
+    {
+      "id": "H7-dead-remote-endpoint-typed-rejection",
+      "status": "PROPOSAL_REJECTED",
+      "reason": "planner raised TypeError: fetch failed",
+      "typedSemantics": "TYPED_PROPOSAL_REJECTED_PLANNER_RAISED",
+      "evidence": "evidence/hostile-matrix.json#H7"
+    },
+    {
+      "id": "H8-wrong-binary-currentness-model-swap",
+      "verdict": "BLOCKED_NOT_RUNNABLE",
+      "reason": "U01 requires a real, user-provided local model runtime to attack (swap its binary, feed it invalid currentness, replace its process). fact-collection.json records every scanner (tasklist process filter, where <exe> for ollama/llama-server/lmstudio/koboldcpp/gpt4all, 15 model directories, netstat listening ports 11434/8080/1234/7860/5000/1337/4891, docker images filter, HTTP probe of 127.0.0.1:11434/api/tags) returning ABSENT on this host, and the U01 contract forbids silent installation/download of models. With no model process there is nothing whose binary could be swapped or whose currentness could be invalidated; the case is recorded as not runnable rather than simulated.",
+      "evidence": "evidence/hostile-matrix.json#H8 + evidence/fact-collection.json"
+    },
+    {
+      "id": "currentness-gate-before-planner-call",
+      "verdict": "BLOCKED_NOT_RUNNABLE",
+      "empiricalFinding": {
+        "C1_plannerInvokedOnUnattestedRegistry": true,
+        "C2_deterministicGateFailureCode": "REGISTRY_CURRENTNESS_INSUFFICIENT",
+        "C3_attestedRegistryResolves": "b-im",
+        "C4_declaredLocalStillFailClosed": "PLANNER_UNAVAILABLE"
+      },
+      "conclusion": "v0.1 has NO currentness gate ahead of the planner invocation: interpretGoalViaPlanner consumes no currentness record (C1 shows a planner call succeeding against an unattested registry). The real currentness gates sit (a) in deterministic resolveGoal (C2/C3, REGISTRY_CURRENTNESS_INSUFFICIENT) — a path with no model call at all — and (b) in authorization currentAuthority/authorizePlan/authorizeEffect, downstream of planning. Therefore \"invalid currentness -> zero model calls\" cannot be exercised against the planner path in v0.1; the planner-gate sub-item is BLOCKED_NOT_RUNNABLE, recorded without modifying any code.",
+      "evidence": "evidence/currentness-probe.json"
+    },
+    {
+      "id": "real-local-model-inference-x2 (positive leg)",
+      "verdict": "BLOCKED_NOT_RUNNABLE",
+      "reason": "No local model runtime exists on this host (all ABSENT scans) and the U01 contract forbids silent installation/download of models. Zero real inferences were therefore possible; this is recorded as the honest blocker of the whole U01 acceptance, not worked around.",
+      "evidence": "evidence/fact-collection.json"
+    },
+    {
+      "id": "isolation-mechanism-firewall-rule (exploration)",
+      "verdict": "PASS_AS_EXPECTED_DENIED",
+      "ruleName": "SHUN-U01-PROBE-60ca4f091da8",
+      "addRuleRc": 1,
+      "addRuleOutput": "请求的操作需要提升(作为管理员运行)。",
+      "ruleCreated": false,
+      "verdictText": "ENFORCEMENT_DENY_CONFIRMED: non-admin cannot add firewall rules; no rule leaked; no cleanup required",
+      "evidence": "evidence/isolation-netsh.json"
+    },
+    {
+      "id": "isolation-mechanism-appcontainer (exploration)",
+      "verdict": "ATTEMPTED_NOT_DEMONSTRABLE",
+      "controlLoopback": "CONNECTED",
+      "profileCreateHr": "0x00000000 (unelevated, works)",
+      "profileDeleteHr": "0x00000000 (all runs)",
+      "launcherFailure": {
+        "profileLifecycleWorksUnelevated": true,
+        "securityCapabilitiesAttributeUpdateFails": true,
+        "windowsError": "ERROR_BAD_LENGTH (24)",
+        "controlAttributeThatSucceeds": "PROC_THREAD_ATTRIBUTE_PARENT_PROCESS (0x00020000)",
+        "meaning": "The failure is specific to the SECURITY_CAPABILITIES attribute on this Windows build (10.0.26300.9457) and this standard-user token, not to the attribute-list mechanics or PowerShell marshaling (pure C# reproduces it; cbSize sweep 24/28/32/40/48 all rejected). The capability-less AppContainer child therefore could NOT be launched via this P/Invoke path here. Recorded as mechanism ATTEMPTED / NOT DEMONSTRABLE — explicitly not evidence that AppContainer isolation is unavailable on Windows, only that this launcher path failed in this environment."
+      },
+      "leftovers": {
+        "registry": 0,
+        "packagesDirs": 0
+      },
+      "evidence": "evidence/appcontainer-probe.json"
+    }
+  ],
+  "evidenceIntegrity": {
+    "sha256": {
+      "events.ndjson": "480bd1a53525e421a7f4013cc3b8e9a96a94fa6c9eb3777d1eca6f9d316fbb16",
+      "fact-collection.json": "fd202da14dc572f2c87af55c8e9d0c7cd7aaf4910485687a86fcdc2b7cd47884",
+      "currentness-probe.json": "156a9219090ec094161d312d57c814f2eaf26a802ba46a29e87478ac6554c5ba",
+      "hostile-matrix.json": "1c621142b907e14fa861873d04e22d4d6a8430f2c9044ecbe9ae37cdeabfd5b6",
+      "isolation-netsh.json": "c50a7160f4a46201ffba9d167b6642dc200791d0ffea125183ed751cd13ae0ad",
+      "appcontainer-probe.json": "bb42dc8f19f16bcb1a9075bd03179c1a1b2bab6d72bce7d9856f480605aaa9c8",
+      "results.json": "80195b6be9b2779136f1b616054fdf9bbecdac244886c2150af3187399eec365"
+    },
+    "eventsLines": 77,
+    "note": "recomputed over the final on-disk evidence bytes, including this fixup event itself (nothing appends to events.ndjson after this point)"
+  },
+  "cleanup": {
+    "firewallRulesCreated": 0,
+    "appContainerProfilesLeft": 0,
+    "trackedFilesModified": 0,
+    "registryModified": false
+  },
+  "mustNotClaim": [
+    "that a real LOCAL model origin ever executed or that U01 passed",
+    "that Windows architecture-level isolation for model processes is ready — only that one non-admin launcher path failed here",
+    "complete end-user privacy guarantees or absence of unobserved telemetry",
+    "that loopback-only HTTP by itself proves no egress",
+    "that the Shun product feature is PASS / ready"
+  ]
+}

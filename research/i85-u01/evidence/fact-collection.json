@@ -1,0 +1,187 @@
+{
+  "host": {
+    "windowsVerRaw": "Microsoft Windows [�汾 10.0.26300.9457]",
+    "win32Os": "{\"Caption\":\"Microsoft Windows 11 רҵ��\",\"Version\":\"10.0.26300\",\"BuildNumber\":\"26300\",\"OSArchitecture\":\"64 λ\"}",
+    "user": "15549",
+    "inAdministratorsGroup": false,
+    "integrityLevelHigh": false,
+    "netSessionRc": 2,
+    "netSessionDenied": true,
+    "privilegeVerdict": "STANDARD_USER",
+    "nodeVersion": "v24.21.0",
+    "nodeAbi": "137",
+    "nodePath": "C:\\Users\\15549\\AppData\\Local\\fnm_multishells\\24848_1791958697462\\node.exe\r"
+  },
+  "plannerSeam": {
+    "path": "packages\\resolver\\src\\planner-seam.ts",
+    "sha256": "f80c72abf77b43df927cfd144e2ed0e7422d218b8299a02ac437a63d08d69f0a",
+    "bytes": 14257
+  },
+  "modelAbsence": [
+    {
+      "scan": "tasklist process-name filter",
+      "command": "tasklist /FO CSV (full capture in _tmp/s1-tasklist-full.csv), filtered in harness",
+      "processesScanned": 337,
+      "hits": [],
+      "verdict": "ABSENT"
+    },
+    {
+      "scan": "where ollama.exe",
+      "command": "where ollama.exe",
+      "hits": [],
+      "rawTail": "��Ϣ: ���ṩ��ģʽ�޷��ҵ��ļ���",
+      "verdict": "ABSENT"
+    },
+    {
+      "scan": "where llama-server.exe",
+      "command": "where llama-server.exe",
+      "hits": [],
+      "rawTail": "��Ϣ: ���ṩ��ģʽ�޷��ҵ��ļ���",
+      "verdict": "ABSENT"
+    },
+    {
+      "scan": "where llama-cli.exe",
+      "command": "where llama-cli.exe",
+      "hits": [],
+      "rawTail": "��Ϣ: ���ṩ��ģʽ�޷��ҵ��ļ���",
+      "verdict": "ABSENT"
+    },
+    {
+      "scan": "where lmstudio.exe",
+      "command": "where lmstudio.exe",
+      "hits": [],
+      "rawTail": "��Ϣ: ���ṩ��ģʽ�޷��ҵ��ļ���",
+      "verdict": "ABSENT"
+    },
+    {
+      "scan": "where koboldcpp.exe",
+      "command": "where koboldcpp.exe",
+      "hits": [],
+      "rawTail": "��Ϣ: ���ṩ��ģʽ�޷��ҵ��ļ���",
+      "verdict": "ABSENT"
+    },
+    {
+      "scan": "where gpt4all.exe",
+      "command": "where gpt4all.exe",
+      "hits": [],
+      "rawTail": "��Ϣ: ���ṩ��ģʽ�޷��ҵ��ļ���",
+      "verdict": "ABSENT"
+    },
+    {
+      "scan": "directory C:\\Users\\15549\\.ollama",
+      "command": "existsSync C:\\Users\\15549\\.ollama",
+      "hits": [],
+      "verdict": "ABSENT"
+    },
+    {
+      "scan": "directory C:\\Users\\15549\\AppData\\Local\\Ollama",
+      "command": "existsSync C:\\Users\\15549\\AppData\\Local\\Ollama",
+      "hits": [],
+      "verdict": "ABSENT"
+    },
+    {
+      "scan": "directory C:\\Users\\15549\\AppData\\Local\\Programs\\Ollama",
+      "command": "existsSync C:\\Users\\15549\\AppData\\Local\\Programs\\Ollama",
+      "hits": [],
+      "verdict": "ABSENT"
+    },
+    {
+      "scan": "directory C:\\Users\\15549\\AppData\\Local\\LM-Studio",
+      "command": "existsSync C:\\Users\\15549\\AppData\\Local\\LM-Studio",
+      "hits": [],
+      "verdict": "ABSENT"
+    },
+    {
+      "scan": "directory C:\\Users\\15549\\AppData\\Roaming\\LM Studio",
+      "command": "existsSync C:\\Users\\15549\\AppData\\Roaming\\LM Studio",
+      "hits": [],
+      "verdict": "ABSENT"
+    },
+    {
+      "scan": "directory C:\\Users\\15549\\.lmstudio",
+      "command": "existsSync C:\\Users\\15549\\.lmstudio",
+      "hits": [],
+      "verdict": "ABSENT"
+    },
+    {
+      "scan": "directory C:\\Users\\15549\\.cache\\lm-studio",
+      "command": "existsSync C:\\Users\\15549\\.cache\\lm-studio",
+      "hits": [],
+      "verdict": "ABSENT"
+    },
+    {
+      "scan": "directory C:\\Users\\15549\\AppData\\Roaming\\gpt4all",
+      "command": "existsSync C:\\Users\\15549\\AppData\\Roaming\\gpt4all",
+      "hits": [],
+      "verdict": "ABSENT"
+    },
+    {
+      "scan": "directory C:\\Users\\15549\\AppData\\Local\\gpt4all",
+      "command": "existsSync C:\\Users\\15549\\AppData\\Local\\gpt4all",
+      "hits": [],
+      "verdict": "ABSENT"
+    },
+    {
+      "scan": "directory C:\\Users\\15549\\.jan",
+      "command": "existsSync C:\\Users\\15549\\.jan",
+      "hits": [],
+      "verdict": "ABSENT"
+    },
+    {
+      "scan": "directory C:\\Program Files\\Ollama",
+      "command": "existsSync C:\\Program Files\\Ollama",
+      "hits": [],
+      "verdict": "ABSENT"
+    },
+    {
+      "scan": "directory C:\\Program Files (x86)\\Ollama",
+      "command": "existsSync C:\\Program Files (x86)\\Ollama",
+      "hits": [],
+      "verdict": "ABSENT"
+    },
+    {
+      "scan": "directory C:\\Program Files\\LM Studio",
+      "command": "existsSync C:\\Program Files\\LM Studio",
+      "hits": [],
+      "verdict": "ABSENT"
+    },
+    {
+      "scan": "directory C:\\Program Files\\llama.cpp",
+      "command": "existsSync C:\\Program Files\\llama.cpp",
+      "hits": [],
+      "verdict": "ABSENT"
+    },
+    {
+      "scan": "directory C:\\Users\\15549\\AppData\\Local\\Temp\\ollama",
+      "command": "existsSync C:\\Users\\15549\\AppData\\Local\\Temp\\ollama",
+      "hits": [],
+      "verdict": "ABSENT"
+    },
+    {
+      "scan": "netstat listening model-service ports",
+      "command": "netstat -ano -p tcp (full capture in _tmp/s1-netstat-full.txt), LISTENING lines filtered in harness",
+      "listeningLinesTotal": 18,
+      "hits": [],
+      "verdict": "ABSENT"
+    },
+    {
+      "scan": "docker images model filter",
+      "command": "docker images --format {{.Repository}}:{{.Tag}}",
+      "hits": [],
+      "note": "docker reachable",
+      "verdict": "ABSENT"
+    },
+    {
+      "scan": "HTTP GET http://127.0.0.1:11434/api/tags",
+      "command": "node -e fetch with AbortSignal.timeout(2000)",
+      "output": "FETCH_ERR ECONNREFUSED",
+      "verdict": "ABSENT (connection refused)"
+    }
+  ],
+  "baseSha": "d812ca2f5d5e48dd637c5580cb4c30ecf4116663",
+  "gitStatusAtStart": [
+    "?? .codegraph/",
+    "?? research/"
+  ],
+  "trackedDiffClean": true
+}

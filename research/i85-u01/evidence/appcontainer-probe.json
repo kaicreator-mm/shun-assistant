@@ -1,0 +1,79 @@
+{
+  "mechanism": "AppContainer (CreateAppContainerProfile + PROC_THREAD_ATTRIBUTE_SECURITY_CAPABILITIES, no capabilities)",
+  "steps": {
+    "staging": {
+      "stageDir": "C:\\xDev\\kAiCreator\\_tmp\\i85-u01\\ac-stage",
+      "nodeExeCopied": true,
+      "childCopied": true
+    },
+    "control": {
+      "label": "control-plain-process",
+      "rc": 0,
+      "outputTail": "",
+      "childResultFile": {
+        "pid": 12844,
+        "loopback": {
+          "host": "127.0.0.1",
+          "port": 49977,
+          "outcome": "CONNECTED",
+          "detail": "tcp established",
+          "elapsedMs": 9
+        },
+        "testnet": {
+          "host": "192.0.2.1",
+          "port": 9,
+          "outcome": "TIMEOUT",
+          "detail": "no connect within 6000ms",
+          "elapsedMs": 6005
+        }
+      }
+    },
+    "appContainer": {
+      "label": "appcontainer-isolated",
+      "rc": 13,
+      "outputTail": "ACPROBE create-profile {\"ok\":true,\"hr\":\"0x00000000\"}\r\nACPROBE container-sid {\"sid\":\"S-1-15-2-4050701214-2932413427-2788600767-1413807855-4224776780-187929107-600924767\"}\r\nACPROBE icacls-all-app-packages {\"out\":\"�Ѵ������ļ�: C:\\\\xDev\\\\kAiCreator\\\\_tmp\\\\i85-u01\\\\ac-stage | �ѳɹ����� 1 ���ļ�; ���� 0 ���ļ�ʱʧ��\",\"rc\":0}\r\nACPROBE icacls-container-sid {\"out\":\"�Ѵ������ļ�: C:\\\\xDev\\\\kAiCreator\\\\_tmp\\\\i85-u01\\\\ac-stage | �ѳɹ����� 1 ���ļ�; ���� 0 ���ļ�ʱʧ��\",\"rc\":0}\r\nACPROBE update-attr {\"ok\":false,\"lastError\":24}\r\nACPROBE delete-profile {\"ok\":true,\"hr\":\"0x00000000\"}\r\n",
+      "childResultFile": null,
+      "containerName": "ShunU01Probe8c3e9cd0"
+    }
+  },
+  "localListenerPort": 49977,
+  "analysis": {
+    "controlLoopback": "CONNECTED",
+    "controlTestnet": "TIMEOUT",
+    "acChildRan": false,
+    "acLoopback": "NO-RESULT-FILE",
+    "acLoopbackDetail": null,
+    "acTestnet": "NO-RESULT-FILE",
+    "acTestnetDetail": null
+  },
+  "verdict": "MECHANISM_ATTEMPT_FAILED: no child result file; launcher output tail:  container-sid {\"sid\":\"S-1-15-2-4050701214-2932413427-2788600767-1413807855-4224776780-187929107-600924767\"}\r\nACPROBE icacls-all-app-packages {\"out\":\"�Ѵ������ļ�: C:\\\\xDev\\\\kAiCreator\\\\_tmp\\\\i85-u01\\\\ac-stage | �ѳɹ����� 1 ���ļ�; ���� 0 ���ļ�ʱʧ��\",\"rc\":0}\r\nACPROBE icacls-container-sid {\"out\":\"�Ѵ������ļ�: C:\\\\xDev\\\\kAiCreator\\\\_tmp\\\\i85-u01\\\\ac-stage | �ѳɹ����� 1 ���ļ�; ���� 0 ���ļ�ʱʧ��\",\"rc\":0}\r\nACPROBE update-attr {\"ok\":false,\"lastError\":24}\r\nACPROBE delete-profile {\"ok\":true,\"hr\":\"0x00000000\"}\r\n",
+  "debugAppendix": {
+    "attempts": [
+      {
+        "id": "debug-ac (PowerShell-ref marshaling)",
+        "stdout": "DBG create {\"ok\":true,\"hr\":\"0x00000000\"}\r\nDBG sid {\"sid\":\"S-1-15-2-1696505089-3459718882-2410212205-2421234216-3808475844-2301776337-4042847894\"}\r\nDBG sizes {\"viaObject\":24,\"viaType\":24}\r\nDBG attr-size-required {\"bytes\":48}\r\nDBG init-list {\"lastError\":87,\"ok\":true,\"sizeAfter\":48}\r\nDBG update {\"lastError\":24,\"ok\":false,\"cbSize\":24}\r\nDBG update {\"lastError\":24,\"ok\":false,\"cbSize\":20}\r\nDBG delete {\"ok\":true,\"hr\":\"0x00000000\"}",
+        "stderr": "",
+        "err": null
+      },
+      {
+        "id": "debug-ac2 (pure C# sequence + PARENT_PROCESS control)",
+        "stdout": "DBG2 create hr=0x00000000 ok=True\r\nDBG2 sequence reqSize=48;init=True;scSize=24;upd_sec=False,err=24;upd_parent=True,err=24;",
+        "stderr": "�������ַ�����ʽʱ����: ����(���㿪ʼ)������ڻ�����㣬��С�ڲ����б��Ĵ�С����\r\n����λ�� C:\\xDev\\kAiCreator\\shun-assistant\\i85-u01-zc\\research\\i85-u01\\appcontainer\\debug-ac2.ps1:87 �ַ�: 3\r\n+   [Console]::Out.WriteLine(\"DBG2 delete hr=0x{0:X8} ok={1}\" -f $hrDel ...\r\n+   ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~\r\n    + CategoryInfo          : InvalidOperation: (DBG2 delete hr=0x{0:X8} ok={1}:String) []��RuntimeException\r\n    + FullyQualifiedErrorId : FormatError",
+        "err": null
+      },
+      {
+        "id": "debug-ac3 (cbSize sweep 24/28/32/40/48)",
+        "stdout": "DBG3 create hr=0x00000000\r\nDBG3 sweep init=True;cb=24:ok=False,err=24;cb=28:ok=False,err=24;cb=32:ok=False,err=24;cb=40:ok=False,err=24;cb=48:ok=False,err=24;\r\nDBG3 delete hr=0x00000000",
+        "stderr": "",
+        "err": null
+      }
+    ],
+    "conclusion": {
+      "profileLifecycleWorksUnelevated": true,
+      "securityCapabilitiesAttributeUpdateFails": true,
+      "windowsError": "ERROR_BAD_LENGTH (24)",
+      "controlAttributeThatSucceeds": "PROC_THREAD_ATTRIBUTE_PARENT_PROCESS (0x00020000)",
+      "meaning": "The failure is specific to the SECURITY_CAPABILITIES attribute on this Windows build (10.0.26300.9457) and this standard-user token, not to the attribute-list mechanics or PowerShell marshaling (pure C# reproduces it; cbSize sweep 24/28/32/40/48 all rejected). The capability-less AppContainer child therefore could NOT be launched via this P/Invoke path here. Recorded as mechanism ATTEMPTED / NOT DEMONSTRABLE — explicitly not evidence that AppContainer isolation is unavailable on Windows, only that this launcher path failed in this environment."
+    }
+  }
+}

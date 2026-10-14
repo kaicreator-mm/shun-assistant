@@ -1,0 +1,75 @@
+{
+  "probes": [
+    {
+      "id": "C1",
+      "claim": "no currentness gate before the planner invocation in interpretGoalViaPlanner",
+      "registryCurrentnessAttested": false,
+      "plannerCalls": 1,
+      "status": "PROPOSAL_ACCEPTED",
+      "reason": null
+    },
+    {
+      "id": "C2",
+      "claim": "registry currentness gate lives in the deterministic resolveGoal path",
+      "registryCurrentnessAttested": false,
+      "stage": "RESOLUTION",
+      "failureCode": "REGISTRY_CURRENTNESS_INSUFFICIENT",
+      "failureDetail": "registry currentness unverifiable — the trusted registry authority serves revision does-not-match-any-revision, which does not bind the collected facts (shun.registry-snapshot/1:sha256:914bdcf970058c443b43f472d8d15fd7c154fdd41f404bb32657ffdf98f09926) — reads-between-changed: the collection is stale or was altered (P1-06); reads-between-changed cannot be excluded, fail closed",
+      "fullResult": {
+        "stage": "RESOLUTION",
+        "resolverRevision": "shun.resolver/0.1",
+        "record": {
+          "taskId": "task-t01-001",
+          "resolvedCapabilityId": "image.batch_process",
+          "capabilityRevision": "r1",
+          "normalizedConstraints": {
+            "format": "JPG"
+          },
+          "candidates": [],
+          "feasibleBindings": [],
+          "hardGateDispositions": [],
+          "selectedBindingId": null,
+          "selectionReasons": [],
+          "riskClass": "R1",
+          "executionPlanClass": "KNOWN_CAPABILITY_DETERMINISTIC",
+          "verificationPlan": {
+            "verifierId": "verifier.generic",
+            "verifierRevision": "r1",
+            "checks": [
+              {
+                "checkId": "outcome-declared"
+              }
+            ]
+          },
+          "privacyDisclosurePlan": {
+            "externalDisclosure": "ALLOWED",
+            "notes": []
+          },
+          "failureDisposition": {
+            "failureCode": "REGISTRY_CURRENTNESS_INSUFFICIENT",
+            "detail": "registry currentness unverifiable — the trusted registry authority serves revision does-not-match-any-revision, which does not bind the collected facts (shun.registry-snapshot/1:sha256:914bdcf970058c443b43f472d8d15fd7c154fdd41f404bb32657ffdf98f09926) — reads-between-changed: the collection is stale or was altered (P1-06); reads-between-changed cannot be excluded, fail closed"
+          }
+        }
+      }
+    },
+    {
+      "id": "C3",
+      "claim": "matching currentness authority revision attests the registry and resolution proceeds",
+      "registryCurrentnessAttested": true,
+      "stage": "RESOLUTION",
+      "failureCode": null,
+      "selectedBindingId": "b-im"
+    },
+    {
+      "id": "C4",
+      "claim": "R3: even a declareLocalPlanner-wrapped LOCAL adapter fails closed at the seam with zero invocations",
+      "status": "PLANNER_UNAVAILABLE",
+      "reason": "LOCAL PlannerPort origin cannot be independently attested by this runtime; caller-declared local provenance is not proof of no network egress — refusing execution until an enforceable trusted host is provided",
+      "plannerCalls": 0
+    }
+  ],
+  "conclusion": {
+    "currentnessGateBeforePlannerCallExistsInV0_1": false,
+    "statement": "v0.1 has NO currentness gate ahead of the planner invocation: interpretGoalViaPlanner consumes no currentness record (C1 shows a planner call succeeding against an unattested registry). The real currentness gates sit (a) in deterministic resolveGoal (C2/C3, REGISTRY_CURRENTNESS_INSUFFICIENT) — a path with no model call at all — and (b) in authorization currentAuthority/authorizePlan/authorizeEffect, downstream of planning. Therefore \"invalid currentness -> zero model calls\" cannot be exercised against the planner path in v0.1; the planner-gate sub-item is BLOCKED_NOT_RUNNABLE, recorded without modifying any code."
+  }
+}

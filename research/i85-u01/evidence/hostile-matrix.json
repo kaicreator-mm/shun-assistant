@@ -1,0 +1,264 @@
+{
+  "goalText": "organize desktop screenshots by date",
+  "cases": [
+    {
+      "caseId": "H1",
+      "hostileAction": "caller passes a {planner, transport:\"LOCAL\"} pair (label-as-provenance)",
+      "inputSummary": {
+        "hasAdapter": false,
+        "transport": "LOCAL",
+        "plannerConfigured": true
+      },
+      "status": "PLANNER_UNAVAILABLE",
+      "reason": "caller-supplied planner/transport inputs are not accepted: transport provenance must be bound by the trusted adapter factory (localPlannerAdapter / remotePlannerAdapter) at the composition boundary; a caller label is not provenance and the planner is never invoked",
+      "plannerInvocations": 0,
+      "socketDeltas": {
+        "proxy": {
+          "connections": 0,
+          "requests": 0
+        },
+        "origin": {
+          "connections": 0,
+          "requests": 0
+        },
+        "sink": {
+          "connections": 0,
+          "requests": 0
+        }
+      },
+      "verdict": "SEAM_REFUSED_ZERO_EGRESS"
+    },
+    {
+      "caseId": "H2",
+      "hostileAction": "forged adapter carrying a lookalike (but module-foreign) brand symbol",
+      "inputSummary": {
+        "forgedBrandDescription": "Symbol(shun.trusted-planner-adapter)",
+        "transport": "LOCAL"
+      },
+      "status": "PLANNER_UNAVAILABLE",
+      "reason": "planner adapter transport provenance is not minted by the trusted adapter factory (localPlannerAdapter / remotePlannerAdapter) — a forged adapter is never invoked",
+      "plannerInvocations": 0,
+      "socketDeltas": {
+        "proxy": {
+          "connections": 0,
+          "requests": 0
+        },
+        "origin": {
+          "connections": 0,
+          "requests": 0
+        },
+        "sink": {
+          "connections": 0,
+          "requests": 0
+        }
+      },
+      "verdict": "SEAM_REFUSED_ZERO_EGRESS"
+    },
+    {
+      "caseId": "H3",
+      "hostileAction": "localPlannerAdapter() called on a plain planner that never passed declareLocalPlanner",
+      "thrown": {
+        "name": "TypeError",
+        "message": "localPlannerAdapter requires a planner whose local provenance was declared at the trusted composition boundary via declareLocalPlanner — an arbitrary PlannerPort (possibly remote-backed) cannot be bound to LOCAL transport"
+      },
+      "plannerInvocations": 0,
+      "socketDeltas": {
+        "proxy": {
+          "connections": 0,
+          "requests": 0
+        },
+        "origin": {
+          "connections": 0,
+          "requests": 0
+        },
+        "sink": {
+          "connections": 0,
+          "requests": 0
+        }
+      },
+      "verdict": "FACTORY_REFUSED"
+    },
+    {
+      "caseId": "H4",
+      "hostileAction": "declareLocalPlanner() wraps a planner whose interpretGoal really POSTs through a live loopback reverse proxy to a second live origin listener (and honors HTTP_PROXY pointing at a third sink listener); the LOCAL adapter is then presented to the seam",
+      "controls": {
+        "directInvocationProxyForwarding": {
+          "description": "direct call (no seam): proxy hit then forwarded to origin",
+          "socketDeltas": {
+            "proxy": {
+              "connections": 1,
+              "requests": 1
+            },
+            "origin": {
+              "connections": 1,
+              "requests": 1
+            },
+            "sink": {
+              "connections": 0,
+              "requests": 0
+            }
+          },
+          "expected": {
+            "proxy": {
+              "connections": 1,
+              "requests": 1
+            },
+            "origin": {
+              "connections": 1,
+              "requests": 1
+            },
+            "sink": {
+              "connections": 0,
+              "requests": 0
+            }
+          },
+          "observedAsExpected": true
+        },
+        "directInvocationHttpProxySink": {
+          "description": "direct call with HTTP_PROXY set: traffic reached the sink listener",
+          "socketDeltas": {
+            "proxy": {
+              "connections": 0,
+              "requests": 0
+            },
+            "origin": {
+              "connections": 0,
+              "requests": 0
+            },
+            "sink": {
+              "connections": 1,
+              "requests": 1
+            }
+          },
+          "expected": {
+            "sink": {
+              "connections": 1,
+              "requests": 1
+            }
+          },
+          "observedAsExpected": true
+        }
+      },
+      "observationApparatusValidated": true,
+      "seamCall": {
+        "status": "PLANNER_UNAVAILABLE",
+        "reason": "LOCAL PlannerPort origin cannot be independently attested by this runtime; caller-declared local provenance is not proof of no network egress — refusing execution until an enforceable trusted host is provided",
+        "plannerInvocations": 0,
+        "targetsAttemptedUnderSeam": [],
+        "socketDeltasUnderSeam": {
+          "proxy": {
+            "connections": 0,
+            "requests": 0
+          },
+          "origin": {
+            "connections": 0,
+            "requests": 0
+          },
+          "sink": {
+            "connections": 0,
+            "requests": 0
+          }
+        }
+      },
+      "verdict": "SEAM_REFUSED_ZERO_EGRESS"
+    },
+    {
+      "caseId": "H5",
+      "hostileAction": "REMOTE adapter presented under frozen LOCAL_ONLY policy (localOnly=true, externalDisclosure=FORBIDDEN)",
+      "inputSummary": {
+        "policy": {
+          "localOnly": true,
+          "externalDisclosure": "FORBIDDEN"
+        }
+      },
+      "status": "PLANNER_UNAVAILABLE",
+      "reason": "local-only / no-disclosure policy makes a remote AI Runtime ineligible (external-model disclosure forbidden, L2 §6.3); deterministic and structured paths remain usable",
+      "plannerInvocations": 0,
+      "socketDeltas": {
+        "proxy": {
+          "connections": 0,
+          "requests": 0
+        },
+        "origin": {
+          "connections": 0,
+          "requests": 0
+        },
+        "sink": {
+          "connections": 0,
+          "requests": 0
+        }
+      },
+      "verdict": "SEAM_REFUSED_ZERO_EGRESS"
+    },
+    {
+      "caseId": "H6",
+      "hostileAction": "REMOTE adapter + offline constraint while disclosure is allowed (offline beats disclosure)",
+      "inputSummary": {
+        "policy": {
+          "localOnly": false,
+          "externalDisclosure": "ALLOWED"
+        },
+        "constraints": {
+          "format": "JPG",
+          "other": {
+            "offline": true
+          }
+        }
+      },
+      "status": "PLANNER_UNAVAILABLE",
+      "reason": "offline execution constraint makes a remote AI Runtime ineligible (a remote interpretation is network traffic regardless of the disclosure posture); deterministic and structured paths remain usable",
+      "plannerInvocations": 0,
+      "socketDeltas": {
+        "proxy": {
+          "connections": 0,
+          "requests": 0
+        },
+        "origin": {
+          "connections": 0,
+          "requests": 0
+        },
+        "sink": {
+          "connections": 0,
+          "requests": 0
+        }
+      },
+      "verdict": "SEAM_REFUSED_ZERO_EGRESS"
+    },
+    {
+      "caseId": "H7",
+      "hostileAction": "policy-eligible REMOTE planner whose real fetch targets a genuinely unlistening loopback port",
+      "inputSummary": {
+        "deadEndpoint": "http://127.0.0.1:54560",
+        "policy": {
+          "localOnly": false,
+          "externalDisclosure": "ALLOWED"
+        }
+      },
+      "status": "PROPOSAL_REJECTED",
+      "reason": "planner raised TypeError: fetch failed",
+      "plannerInvocations": 1,
+      "typedSemantics": "TYPED_PROPOSAL_REJECTED_PLANNER_RAISED"
+    },
+    {
+      "caseId": "H8",
+      "hostileAction": "wrong planner binary / invalid currentness of a model binary / model-process swap",
+      "verdict": "BLOCKED_NOT_RUNNABLE",
+      "reason": "U01 requires a real, user-provided local model runtime to attack (swap its binary, feed it invalid currentness, replace its process). fact-collection.json records every scanner (tasklist process filter, where <exe> for ollama/llama-server/lmstudio/koboldcpp/gpt4all, 15 model directories, netstat listening ports 11434/8080/1234/7860/5000/1337/4891, docker images filter, HTTP probe of 127.0.0.1:11434/api/tags) returning ABSENT on this host, and the U01 contract forbids silent installation/download of models. With no model process there is nothing whose binary could be swapped or whose currentness could be invalidated; the case is recorded as not runnable rather than simulated.",
+      "evidenceRef": "evidence/fact-collection.json (modelAbsence[].verdict === \"ABSENT\" for all scans)"
+    }
+  ],
+  "sockets": {
+    "proxy": {
+      "url": "http://127.0.0.1:54556",
+      "role": "loopback reverse proxy that would forward to origin"
+    },
+    "origin": {
+      "url": "http://127.0.0.1:54554",
+      "role": "second real listener standing in for the remote model endpoint"
+    },
+    "sink": {
+      "url": "http://127.0.0.1:54555",
+      "role": "HTTP_PROXY sink every invoked planner attempts as first action"
+    }
+  }
+}
