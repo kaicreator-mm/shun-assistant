@@ -71,6 +71,7 @@ describe('T05 curated Provider trust-bound admission', () => {
     expect(configured().verifyBytes(record, contents)).toBe(false);
     expect(Object.isFrozen(record)).toBe(true);
     expect(Object.isFrozen(record.artifact)).toBe(true);
+    expect(Object.isFrozen(record.artifact.dependencySha256)).toBe(true);
   });
 
   it('refuses a model-supplied URL or changed manifest hash even with a valid key', () => {
