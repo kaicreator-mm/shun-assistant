@@ -195,13 +195,8 @@ describe('v0.2: cloud reservation and uncertain charges', () => {
     expect(mayRefundCloudAttempt(reservation, notSent, () => true)).toBe(true);
     expect(mayRefundCloudAttempt(reservation, notSent, () => false)).toBe(false);
     expect(
-      mayRefundCloudAttempt(
-        reservation,
-        notSent,
-        (() => Promise.resolve(true)) as unknown as Parameters<
-          typeof mayRefundCloudAttempt
-        >[2],
-      ),
+      mayRefundCloudAttempt(reservation, notSent, (() =>
+        Promise.resolve(true)) as unknown as Parameters<typeof mayRefundCloudAttempt>[2]),
     ).toBe(false);
     expect(
       mayRefundCloudAttempt(
@@ -212,14 +207,10 @@ describe('v0.2: cloud reservation and uncertain charges', () => {
     ).toBe(false);
     let wrongAttemptProofInvoked = false;
     expect(
-      mayRefundCloudAttempt(
-        reservation,
-        { ...notSent, attemptId: 'other-attempt' },
-        () => {
-          wrongAttemptProofInvoked = true;
-          return true;
-        },
-      ),
+      mayRefundCloudAttempt(reservation, { ...notSent, attemptId: 'other-attempt' }, () => {
+        wrongAttemptProofInvoked = true;
+        return true;
+      }),
     ).toBe(false);
     expect(wrongAttemptProofInvoked).toBe(false);
     expect(
