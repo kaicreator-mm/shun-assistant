@@ -66,7 +66,9 @@ describe('T03 immutable Recipe revisions', () => {
     const revision = fixture();
     expect(repo.append(revision)).toMatchObject({ inserted: true });
     expect(repo.append(revision)).toMatchObject({ inserted: false });
-    expect(repo.get(revision.identity.recipeId, revision.identity.revisionSha256)).toEqual(revision);
+    expect(repo.get(revision.identity.recipeId, revision.identity.revisionSha256)).toEqual(
+      revision,
+    );
     await store.close();
     stores.splice(stores.indexOf(store), 1);
     const reopened = new ShunStore({ file });
@@ -86,7 +88,12 @@ describe('T03 immutable Recipe revisions', () => {
       { ...base, compiledArtifact: 'modified compiled bytes' },
       {
         ...base,
-        actionGraph: { ...base.actionGraph, nodes: [{ ...base.actionGraph.nodes[0], parameters: { root: 'C:/elsewhere', query: '*.txt' } }] },
+        actionGraph: {
+          ...base.actionGraph,
+          nodes: [
+            { ...base.actionGraph.nodes[0], parameters: { root: 'C:/elsewhere', query: '*.txt' } },
+          ],
+        },
       },
       { ...base, declaredEffects: ['file.copy'] },
       { ...base, identity: { ...base.identity, verifierRevision: 'attacker' } },
@@ -112,18 +119,22 @@ describe('T03 immutable Recipe revisions', () => {
     const { store, repo } = setup();
     const f = fixture();
     repo.append(f);
-    expect(() => store.database.prepare(
-      'UPDATE recipe_revisions_v02 SET payload = ? WHERE recipe_id = ?',
-    ).run('forged', f.identity.recipeId)).toThrow();
-    expect(() => store.database.prepare(
-      'DELETE FROM recipe_revisions_v02 WHERE recipe_id = ?',
-    ).run(f.identity.recipeId)).toThrow();
+    expect(() =>
+      store.database
+        .prepare('UPDATE recipe_revisions_v02 SET payload = ? WHERE recipe_id = ?')
+        .run('forged', f.identity.recipeId),
+    ).toThrow();
+    expect(() =>
+      store.database
+        .prepare('DELETE FROM recipe_revisions_v02 WHERE recipe_id = ?')
+        .run(f.identity.recipeId),
+    ).toThrow();
     // Underlying trust model excludes a privileged attacker that removes DB
     // guards, but corruption must NEVER be interpreted as an enabled Recipe.
     store.database.exec('DROP TRIGGER recipe_revisions_v02_no_update');
-    store.database.prepare(
-      'UPDATE recipe_revisions_v02 SET payload = ? WHERE recipe_id = ?',
-    ).run('forged', f.identity.recipeId);
+    store.database
+      .prepare('UPDATE recipe_revisions_v02 SET payload = ? WHERE recipe_id = ?')
+      .run('forged', f.identity.recipeId);
     expect(() => repo.get(f.identity.recipeId, f.identity.revisionSha256)).toThrow(
       'RECIPE_CORRUPT',
     );
