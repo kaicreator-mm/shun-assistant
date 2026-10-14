@@ -4,9 +4,5 @@
     "incremental": true,
     "tsBuildInfoFile": "node_modules/.cache/llm-remote.tsbuildinfo"
   },
-  "include": [
-    "src",
-    "test",
-    "vitest.config.ts"
-  ]
+  "include": ["src", "test", "vitest.config.ts"]
 }
