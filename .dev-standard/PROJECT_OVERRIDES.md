@@ -10,11 +10,11 @@
 ## Current lifecycle state
 
 - **v0.1.0 historical release:** exact tagged commit `2313ba2773dac7aa535570e22760147d9b383b65` / immutable v0.1 product/security/implementation artifacts; version 0.1.0 closed with documented qualifications. Do not retroactively rewrite historical candidate posture.
-- **Current active version:** v0.2.0, Stage 1 Product Review **CANDIDATE / UNFROZEN**.
+- **Current active version:** v0.2.0, Stage 1 **PRODUCT_FROZEN**; exact authority and frozen scope in `docs/product/PRODUCT-FREEZE-v0.2.md` and #80 Product Freeze terminal.
 - Current PRD candidate: `docs/product/PRD-v0.2.md`; supporting `docs/product/L1-product-evidence-v0.2.md`, `docs/product/script-recipe-v0.2-DRAFT.md`, `docs/research/v0.2/open-source-provider-candidates.md`; controller #80 and PR #81.
 - v0.2 integration target: `version/v0.2.0` (version branch), based initially on `main@217364b0c308e6089ea884ef7cb84eda752f7102`.
-- v0.2 Product Freeze: **NOT_YET**; independent exact-SHA Product Adversarial Review is **REQUIRED** per this file.
-- v0.2 L2 Architecture: **NOT_STARTED**; Task DAG / v0.2 implementation: **NOT_AUTHORIZED**.
+- v0.2 Product Freeze: **FROZEN** at semantic subject `79f47be5ff08a54588790e8abdacffd8697ac4d8` / tree `10c0ad768fee849ada952b038b0b1a653fd9a6d7`, current independent review #84 PASS; integration PR #81 -> `version/v0.2.0@aa395c397810004f113bbec12838db6197fc72fa` with identical tree.
+- v0.2 L2 Architecture: **IN_PROGRESS**, candidate `docs/architecture/L2-v0.2-CANDIDATE.md`; #83 architecture controller, #85 U01, #86 U04, #87 U05 real-host high-impact unknowns. L2 Freeze and Task DAG **NOT_YET**; v0.2 implementation not authorized.
 - v0.1 evidence is reusable by exact source identity; it never substitutes for v0.2 host tests, generic dynamic code loading, local model egress or other new semantics.
 
 ## v4 Adoption / Compatibility Profile
@@ -32,7 +32,7 @@ Rationale: the project is at Product/L1 and uses GitHub durable facts, exact-SHA
 
 ## Repository / execution profile
 
-- v0.2 Integration mode: `version/v0.2.0` plus one-concern branches/PRs; PR #81 is the stage-1 candidate. v0.1 main/tag baseline remains immutable.
+- v0.2 Integration mode: `version/v0.2.0` plus bounded concern branches/PRs; PR #81 is the merged Stage-1 product checkpoint and later version commits add only successor metadata/architecture until L2 Freeze. v0.1 main/tag baseline remains immutable.
 - GitHub Issues are durable work items.
 - One concern -> one branch -> one PR.
 - Chat history is not project authority.
