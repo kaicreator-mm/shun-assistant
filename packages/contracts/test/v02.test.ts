@@ -329,15 +329,25 @@ describe('v0.2: curated signed Provider catalog is data only', () => {
       dependencySha256: [B],
     };
     expect(ProviderCatalogArtifactSchema.safeParse(artifact).success).toBe(true);
-    expect(ProviderCatalogArtifactSchema.safeParse({
-      ...artifact, artifactKind: 'NATIVE_ADDON',
-    }).success).toBe(false);
-    expect(ProviderCatalogArtifactSchema.safeParse({
-      ...artifact, artifactKind: 'NATIVE_ADDON', abiRevision: 'node-v24-abi-1',
-    }).success).toBe(true);
-    expect(ProviderCatalogArtifactSchema.safeParse({
-      ...artifact, bindingEvidenceSha256: 'tampered',
-    }).success).toBe(false);
+    expect(
+      ProviderCatalogArtifactSchema.safeParse({
+        ...artifact,
+        artifactKind: 'NATIVE_ADDON',
+      }).success,
+    ).toBe(false);
+    expect(
+      ProviderCatalogArtifactSchema.safeParse({
+        ...artifact,
+        artifactKind: 'NATIVE_ADDON',
+        abiRevision: 'node-v24-abi-1',
+      }).success,
+    ).toBe(true);
+    expect(
+      ProviderCatalogArtifactSchema.safeParse({
+        ...artifact,
+        bindingEvidenceSha256: 'tampered',
+      }).success,
+    ).toBe(false);
     expect(
       ProviderCatalogArtifactSchema.safeParse({
         ...artifact,
