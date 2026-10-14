@@ -1,8 +1,8 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "urn:shun:contracts:0.1:v02-recipe-action-graph",
+  "$id": "urn:shun:contracts:0.2:v02-recipe-action-graph",
   "title": "v02-recipe-action-graph",
-  "x-contracts-revision": "shun.contracts/0.1",
+  "x-contracts-revision": "shun.contracts/0.2",
   "type": "object",
   "properties": {
     "nodes": {
