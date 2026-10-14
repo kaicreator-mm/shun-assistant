@@ -228,7 +228,9 @@ describe('PlannerPort seam stays proposal-only and policy-bounded', () => {
       },
     };
     const thrown = await interpretGoalViaPlanner({
-      request: input, registry: registry(), adapter: remotePlannerAdapter(badPlanner),
+      request: input,
+      registry: registry(),
+      adapter: remotePlannerAdapter(badPlanner),
     });
     expect(JSON.stringify(thrown)).not.toContain(token);
     expect(JSON.stringify(thrown)).not.toContain('C:/Users/Secret');
@@ -236,17 +238,27 @@ describe('PlannerPort seam stays proposal-only and policy-bounded', () => {
     const obj = validProposal(input);
     obj.goalContract.objects = [...input.objects, { kind: 'DIRECTORY', ref: `C:/Users/${token}` }];
     const out = await interpretGoalViaPlanner({
-      request: input, registry: registry(), adapter: remotePlannerAdapter(spyPlanner(obj)),
+      request: input,
+      registry: registry(),
+      adapter: remotePlannerAdapter(spyPlanner(obj)),
     });
-    expect(out).toMatchObject({ status: 'PROPOSAL_REJECTED', reason: 'PLANNER_OBJECT_SCOPE_MISMATCH' });
+    expect(out).toMatchObject({
+      status: 'PROPOSAL_REJECTED',
+      reason: 'PLANNER_OBJECT_SCOPE_MISMATCH',
+    });
     expect(JSON.stringify(out)).not.toContain(token);
 
     const changed = validProposal(input);
     changed.goalContract.taskId = token;
     const mismatch = await interpretGoalViaPlanner({
-      request: input, registry: registry(), adapter: remotePlannerAdapter(spyPlanner(changed)),
+      request: input,
+      registry: registry(),
+      adapter: remotePlannerAdapter(spyPlanner(changed)),
     });
-    expect(mismatch).toMatchObject({ status: 'PROPOSAL_REJECTED', reason: 'PLANNER_TASK_SCOPE_MISMATCH' });
+    expect(mismatch).toMatchObject({
+      status: 'PROPOSAL_REJECTED',
+      reason: 'PLANNER_TASK_SCOPE_MISMATCH',
+    });
     expect(JSON.stringify(mismatch)).not.toContain(token);
   });
 
