@@ -9,7 +9,9 @@ import { DurableCloudBudgetLedger } from '../src/atomic-budget.ts';
 const directories: string[] = [];
 const connections: DurableCloudBudgetLedger[] = [];
 const NOW = '2026-10-15T00:00:00.000Z';
-const body = Buffer.from('{"model":"deepseek-flash","messages":[{"role":"user","content":"Hello"}]}');
+const body = Buffer.from(
+  '{"model":"deepseek-flash","messages":[{"role":"user","content":"Hello"}]}',
+);
 const projection = Buffer.from('{"provider":"deepseek","user":"Hello"}');
 
 function sha(bytes: Uint8Array): string {
@@ -117,19 +119,29 @@ describe('v0.2 durable DeepSeek privacy budget gate', () => {
   it('refuses nonbroker/async proof, stale policy, expiry, changed projection and pricing', () => {
     const { ledger } = setup(() => false);
     expect(ledger.reserve(request())).toEqual({ ok: false, code: 'CONSENT_REFUSED' });
-    const { ledger: asyncLedger } = setup(
-      (() => Promise.resolve(true)) as unknown as (x: CloudConsentApproval) => boolean,
-    );
+    const { ledger: asyncLedger } = setup((() => Promise.resolve(true)) as unknown as (
+      x: CloudConsentApproval,
+    ) => boolean);
     expect(asyncLedger.reserve(request())).toEqual({ ok: false, code: 'CONSENT_REFUSED' });
     const { ledger: valid } = setup();
-    expect(valid.reserve({ ...request(), currentness: { ...makeCurrent(makeApproval()), policyRevision: 'old' } })).toEqual({
-      ok: false, code: 'CONSENT_STALE',
+    expect(
+      valid.reserve({
+        ...request(),
+        currentness: { ...makeCurrent(makeApproval()), policyRevision: 'old' },
+      }),
+    ).toEqual({
+      ok: false,
+      code: 'CONSENT_STALE',
     });
     expect(valid.reserve({ ...request(), now: '2026-10-15T01:00:00.000Z' })).toEqual({
-      ok: false, code: 'CONSENT_EXPIRED',
+      ok: false,
+      code: 'CONSENT_EXPIRED',
     });
-    expect(valid.reserve({ ...request(), disclosureProjectionBytes: Buffer.from('attacker') })).toEqual({
-      ok: false, code: 'DISCLOSURE_SCOPE_DRIFT',
+    expect(
+      valid.reserve({ ...request(), disclosureProjectionBytes: Buffer.from('attacker') }),
+    ).toEqual({
+      ok: false,
+      code: 'DISCLOSURE_SCOPE_DRIFT',
     });
     const changed = makeApproval();
     changed.scope.pricingRevision = 'old-pricing';
@@ -148,10 +160,15 @@ describe('v0.2 durable DeepSeek privacy budget gate', () => {
       currentness: makeCurrent(approval),
       now: NOW,
     };
-    expect(ledger.markMayHaveSent({ ...input, actualRequestBytes: Buffer.from('changed') })).toBe(false);
-    expect(ledger.markMayHaveSent({
-      ...input, currentness: { ...makeCurrent(approval), revocationEpoch: 2 },
-    })).toBe(false);
+    expect(ledger.markMayHaveSent({ ...input, actualRequestBytes: Buffer.from('changed') })).toBe(
+      false,
+    );
+    expect(
+      ledger.markMayHaveSent({
+        ...input,
+        currentness: { ...makeCurrent(approval), revocationEpoch: 2 },
+      }),
+    ).toBe(false);
     expect(ledger.markMayHaveSent({ ...input, now: '2026-10-15T01:00:00.000Z' })).toBe(false);
     expect(ledger.inspect('attempt-1')?.status).toBe('RESERVED');
     expect(ledger.markMayHaveSent(input)).toBe(true);
@@ -165,21 +182,28 @@ describe('v0.2 durable DeepSeek privacy budget gate', () => {
     const { ledger, file } = setup();
     const approval = makeApproval();
     expect(ledger.reserve(request(approval)).ok).toBe(true);
-    expect(ledger.markMayHaveSent({
-      attemptId: 'attempt-1', approval, currentness: makeCurrent(approval),
-      now: NOW, actualRequestBytes: body,
-    })).toBe(true);
+    expect(
+      ledger.markMayHaveSent({
+        attemptId: 'attempt-1',
+        approval,
+        currentness: makeCurrent(approval),
+        now: NOW,
+        actualRequestBytes: body,
+      }),
+    ).toBe(true);
     expect(ledger.markUnknownCost('attempt-1')).toBe(true);
     ledger.close();
     connections.splice(connections.indexOf(ledger), 1);
     const resumed = new DurableCloudBudgetLedger({
-      file, verifyBroker: () => true,
+      file,
+      verifyBroker: () => true,
       pricing: { revision: 'pricing-1', inputMicrosPerToken: 1, outputMicrosPerToken: 2 },
     });
     connections.push(resumed);
     expect(resumed.inspect('attempt-1')?.status).toBe('UNKNOWN_COST');
     expect(resumed.reserve(request(makeApproval(), 'attempt-2'))).toEqual({
-      ok: false, code: 'BUDGET_EXHAUSTED',
+      ok: false,
+      code: 'BUDGET_EXHAUSTED',
     });
   });
 
@@ -189,10 +213,12 @@ describe('v0.2 durable DeepSeek privacy budget gate', () => {
     expect(ledger.reserve(request(original, 'attempt-1')).ok).toBe(true);
     const changed = makeApproval(4);
     expect(ledger.reserve(request(changed, 'attempt-2'))).toEqual({
-      ok: false, code: 'CONSENT_STALE',
+      ok: false,
+      code: 'CONSENT_STALE',
     });
     expect(ledger.reserve({ ...request(original, 'attempt-2'), outputTokenCeiling: 200 })).toEqual({
-      ok: false, code: 'BUDGET_EXHAUSTED',
+      ok: false,
+      code: 'BUDGET_EXHAUSTED',
     });
   });
 });
