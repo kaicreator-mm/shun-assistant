@@ -390,37 +390,39 @@ export function verifyRecipeRevision(identity: RecipeRevisionIdentity): boolean 
   return identity.revisionSha256 === computeRecipeRevision(identity);
 }
 
-export const ProviderCatalogArtifactSchema = z.strictObject({
-  providerId: Ref,
-  catalogRevision: Ref,
-  bindingId: Ref,
-  scopedVerifierId: Ref,
-  /** Exact signed curator-catalog identity and per-capability binding evidence. */
-  catalogManifestSha256: Sha256HexSchema,
-  bindingEvidenceSha256: Sha256HexSchema,
-  version: Ref,
-  capabilityId: Ref,
-  artifactKind: z.enum(['CLI', 'NATIVE_ADDON']),
-  platform: z.literal('windows-x64'),
-  artifactSha256: Sha256HexSchema,
-  origin: z.url().refine((value) => {
-    try {
-      const u = new URL(value);
-      return u.protocol === 'https:' && u.username === '' && u.password === '';
-    } catch {
-      return false;
+export const ProviderCatalogArtifactSchema = z
+  .strictObject({
+    providerId: Ref,
+    catalogRevision: Ref,
+    bindingId: Ref,
+    scopedVerifierId: Ref,
+    /** Exact signed curator-catalog identity and per-capability binding evidence. */
+    catalogManifestSha256: Sha256HexSchema,
+    bindingEvidenceSha256: Sha256HexSchema,
+    version: Ref,
+    capabilityId: Ref,
+    artifactKind: z.enum(['CLI', 'NATIVE_ADDON']),
+    platform: z.literal('windows-x64'),
+    artifactSha256: Sha256HexSchema,
+    origin: z.url().refine((value) => {
+      try {
+        const u = new URL(value);
+        return u.protocol === 'https:' && u.username === '' && u.password === '';
+      } catch {
+        return false;
+      }
+    }, 'provider acquisition origin must be credential-free HTTPS'),
+    entrypoint: Ref,
+    /** Required only for a native addon. CLI has no ABI requirement. */
+    abiRevision: Ref.optional(),
+    signerKeyId: Ref,
+    /** Not a proof of trusted signing; T05 verifies against pinned curator roots. */
+    curatorSignature: Ref,
+    dependencySha256: z.array(Sha256HexSchema),
+  })
+  .superRefine((artifact, ctx) => {
+    if (artifact.artifactKind === 'NATIVE_ADDON' && !artifact.abiRevision) {
+      ctx.addIssue({ code: 'custom', message: 'native addon requires exact ABI revision' });
     }
-  }, 'provider acquisition origin must be credential-free HTTPS'),
-  entrypoint: Ref,
-  /** Required only for a native addon. CLI has no ABI requirement. */
-  abiRevision: Ref.optional(),
-  signerKeyId: Ref,
-  /** Not a proof of trusted signing; T05 verifies against pinned curator roots. */
-  curatorSignature: Ref,
-  dependencySha256: z.array(Sha256HexSchema),
-}).superRefine((artifact, ctx) => {
-  if (artifact.artifactKind === 'NATIVE_ADDON' && !artifact.abiRevision) {
-    ctx.addIssue({ code: 'custom', message: 'native addon requires exact ABI revision' });
-  }
-});
+  });
 export type ProviderCatalogArtifact = z.infer<typeof ProviderCatalogArtifactSchema>;
