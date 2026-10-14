@@ -163,7 +163,7 @@ describe('PlannerPort seam stays proposal-only and policy-bounded', () => {
     });
     expect(result).toMatchObject({
       status: 'PROPOSAL_REJECTED',
-      reason: expect.stringContaining('D:\\elsewhere'),
+      reason: 'PLANNER_OBJECT_SCOPE_MISMATCH',
     });
   });
 
@@ -215,8 +215,39 @@ describe('PlannerPort seam stays proposal-only and policy-bounded', () => {
     });
     expect(result).toMatchObject({
       status: 'PROPOSAL_REJECTED',
-      reason: expect.stringContaining('model backend exploded'),
+      reason: 'PLANNER_EXECUTION_REFUSED',
     });
+  });
+
+  it('never reflects poisoned planner errors, object paths or task IDs into nonthrow rejection', async () => {
+    const token = 'SHUN_FAKE_BEARER_SECRET_12345';
+    const input = permitRemoteDisclosure(request());
+    const badPlanner: PlannerPort = {
+      interpretGoal: async () => {
+        throw new Error(`Authorization: Bearer ${token} C:/Users/Secret/private.txt`);
+      },
+    };
+    const thrown = await interpretGoalViaPlanner({
+      request: input, registry: registry(), adapter: remotePlannerAdapter(badPlanner),
+    });
+    expect(JSON.stringify(thrown)).not.toContain(token);
+    expect(JSON.stringify(thrown)).not.toContain('C:/Users/Secret');
+
+    const obj = validProposal(input);
+    obj.goalContract.objects = [...input.objects, { kind: 'DIRECTORY', ref: `C:/Users/${token}` }];
+    const out = await interpretGoalViaPlanner({
+      request: input, registry: registry(), adapter: remotePlannerAdapter(spyPlanner(obj)),
+    });
+    expect(out).toMatchObject({ status: 'PROPOSAL_REJECTED', reason: 'PLANNER_OBJECT_SCOPE_MISMATCH' });
+    expect(JSON.stringify(out)).not.toContain(token);
+
+    const changed = validProposal(input);
+    changed.goalContract.taskId = token;
+    const mismatch = await interpretGoalViaPlanner({
+      request: input, registry: registry(), adapter: remotePlannerAdapter(spyPlanner(changed)),
+    });
+    expect(mismatch).toMatchObject({ status: 'PROPOSAL_REJECTED', reason: 'PLANNER_TASK_SCOPE_MISMATCH' });
+    expect(JSON.stringify(mismatch)).not.toContain(token);
   });
 
   it('a remote-backed adapter that omits transport fails closed and is never invoked (P1-01)', async () => {
