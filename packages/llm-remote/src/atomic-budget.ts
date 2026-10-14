@@ -4,6 +4,7 @@
 import { createHash } from 'node:crypto';
 import { DatabaseSync } from 'node:sqlite';
 import {
+  canonicalJson,
   type CloudConsentApproval,
   type CloudConsentCurrentness,
   validateCloudConsent,
@@ -93,6 +94,7 @@ export class DurableCloudBudgetLedger {
         consent_id TEXT NOT NULL,
         task_id TEXT NOT NULL,
         scope_revision TEXT NOT NULL,
+        scope_sha256 TEXT NOT NULL,
         pricing_revision TEXT NOT NULL,
         request_sha256 TEXT NOT NULL,
         projection_sha256 TEXT NOT NULL,
@@ -125,6 +127,7 @@ export class DurableCloudBudgetLedger {
     }
     if (!requested.ok) return { ok: false, code: requested.code };
     const { scope, consentId } = requested.consent;
+    const scopeSha256 = digest(Buffer.from(canonicalJson(scope), 'utf8'));
     if (
       input.currentness.kind !== 'CURRENT' ||
       this.pricing.revision !== scope.pricingRevision
@@ -181,14 +184,15 @@ export class DurableCloudBudgetLedger {
       }
       // Scope identity is frozen for a consentId at first reservation.
       const priorScope = this.db.prepare(
-        'SELECT task_id, scope_revision, pricing_revision FROM v02_cloud_attempts WHERE consent_id = ? LIMIT 1',
+        'SELECT task_id, scope_revision, scope_sha256, pricing_revision FROM v02_cloud_attempts WHERE consent_id = ? LIMIT 1',
       ).get(consentId) as
-        | { task_id: string; scope_revision: string; pricing_revision: string }
+        | { task_id: string; scope_revision: string; scope_sha256: string; pricing_revision: string }
         | undefined;
       if (
         priorScope &&
         (priorScope.task_id !== scope.taskId ||
           priorScope.scope_revision !== scope.scopeRevision ||
+          priorScope.scope_sha256 !== scopeSha256 ||
           priorScope.pricing_revision !== scope.pricingRevision)
       ) {
         this.db.exec('ROLLBACK');
@@ -196,14 +200,15 @@ export class DurableCloudBudgetLedger {
       }
       this.db.prepare(`
         INSERT INTO v02_cloud_attempts
-        (attempt_id, consent_id, task_id, scope_revision, pricing_revision,
+        (attempt_id, consent_id, task_id, scope_revision, scope_sha256, pricing_revision,
          request_sha256, projection_sha256, cost_micros, status, created_at)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'RESERVED', ?)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'RESERVED', ?)
       `).run(
         input.attemptId,
         consentId,
         scope.taskId,
         scope.scopeRevision,
+        scopeSha256,
         scope.pricingRevision,
         requestHash,
         projectionHash,
@@ -223,21 +228,69 @@ export class DurableCloudBudgetLedger {
     }
   }
 
-  /** Durable MAY_HAVE_SENT must precede the first byte of any actual HTTPS. */
-  markMayHaveSent(attemptId: string, actualRequestBytes: Uint8Array): boolean {
-    if (!attemptId || !(actualRequestBytes instanceof Uint8Array)) return false;
+  /**
+   * Final mandatory freshness and payload check at the exact send boundary.
+   * The trusted broker/source of currentness is rechecked AFTER reservation,
+   * so revocation/expiry between reservation and HTTP cannot authorize send.
+   * Commit MAY_HAVE_SENT *before* the network operation begins.
+   */
+  markMayHaveSent(input: {
+    attemptId: string;
+    actualRequestBytes: Uint8Array;
+    approval: unknown;
+    currentness: CloudConsentCurrentness;
+    now: string;
+  }): boolean {
+    if (!input.attemptId || !(input.actualRequestBytes instanceof Uint8Array)) return false;
+    let verdict: ReturnType<typeof validateCloudConsent>;
+    try {
+      verdict = validateCloudConsent({
+        approval: input.approval,
+        currentness: input.currentness,
+        now: input.now,
+        verifyBroker: this.verifyBroker,
+      });
+    } catch {
+      return false;
+    }
+    if (!verdict.ok || verdict.consent.scope.pricingRevision !== this.pricing.revision) {
+      return false;
+    }
+    const { scope, consentId } = verdict.consent;
+    const scopeHash = digest(Buffer.from(canonicalJson(scope), 'utf8'));
     try {
       this.db.exec('BEGIN IMMEDIATE');
       const row = this.db.prepare(
-        'SELECT request_sha256, status FROM v02_cloud_attempts WHERE attempt_id = ?',
-      ).get(attemptId) as { request_sha256: string; status: CloudAttemptStatus } | undefined;
-      if (!row || row.status !== 'RESERVED' || digest(actualRequestBytes) !== row.request_sha256) {
+        `SELECT consent_id, task_id, scope_revision, scope_sha256,
+          pricing_revision, request_sha256, status
+          FROM v02_cloud_attempts WHERE attempt_id = ?`,
+      ).get(input.attemptId) as
+        | {
+            consent_id: string;
+            task_id: string;
+            scope_revision: string;
+            scope_sha256: string;
+            pricing_revision: string;
+            request_sha256: string;
+            status: CloudAttemptStatus;
+          }
+        | undefined;
+      if (
+        !row ||
+        row.status !== 'RESERVED' ||
+        row.consent_id !== consentId ||
+        row.task_id !== scope.taskId ||
+        row.scope_revision !== scope.scopeRevision ||
+        row.scope_sha256 !== scopeHash ||
+        row.pricing_revision !== scope.pricingRevision ||
+        digest(input.actualRequestBytes) !== row.request_sha256
+      ) {
         this.db.exec('ROLLBACK');
         return false;
       }
       this.db.prepare(
         "UPDATE v02_cloud_attempts SET status = 'MAY_HAVE_SENT' WHERE attempt_id = ?",
-      ).run(attemptId);
+      ).run(input.attemptId);
       this.db.exec('COMMIT');
       return true;
     } catch {
