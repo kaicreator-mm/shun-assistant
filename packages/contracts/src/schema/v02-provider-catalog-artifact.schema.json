@@ -55,7 +55,7 @@
     "origin": {
       "type": "string",
       "format": "uri",
-      "pattern": "^https://"
+      "pattern": "^https://(?![^/?#]*@)"
     },
     "entrypoint": {
       "type": "string",
