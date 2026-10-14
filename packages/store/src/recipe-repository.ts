@@ -71,6 +71,18 @@ export class ImmutableRecipeRepository {
         PRIMARY KEY (recipe_id, revision_sha256)
       )
     `);
+    // Even with SQLite recursive_triggers=OFF, a BEFORE INSERT guard rejects
+    // INSERT OR REPLACE of an existing PK before the conflict replacement.
+    // DELETE triggers alone would not prevent REPLACE in that configuration.
+    this.db.exec(`
+      CREATE TRIGGER IF NOT EXISTS recipe_revisions_v02_no_replace
+      BEFORE INSERT ON recipe_revisions_v02
+      WHEN EXISTS (
+        SELECT 1 FROM recipe_revisions_v02
+        WHERE recipe_id = NEW.recipe_id AND revision_sha256 = NEW.revision_sha256
+      )
+      BEGIN SELECT RAISE(ABORT, 'IMMUTABLE_RECIPE_REVISION'); END
+    `);
     // Prevent accidental INSERT OR REPLACE/UPDATE/DELETE mutating pinned source.
     this.db.exec(`
       CREATE TRIGGER IF NOT EXISTS recipe_revisions_v02_no_update
