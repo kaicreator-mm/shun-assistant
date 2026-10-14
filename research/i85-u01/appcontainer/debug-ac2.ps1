@@ -26,6 +26,7 @@ public static class AcDbg2 {
     public IntPtr AppContainerSid;
     public IntPtr Capabilities;
     public uint CapabilityCount;
+    public uint Reserved;
   }
 
   [DllImport("kernel32.dll", SetLastError=true)]
@@ -56,8 +57,8 @@ public static class AcDbg2 {
     IntPtr pSc = Marshal.AllocHGlobal(scSize);
     Marshal.StructureToPtr(sc, pSc, false);
 
-    // Attribute under test: SECURITY_CAPABILITIES (0x00020013).
-    bool updSec = UpdateProcThreadAttribute(list, 0, (IntPtr)0x00020013, pSc, (IntPtr)scSize, IntPtr.Zero, IntPtr.Zero);
+    // Attribute under test: SECURITY_CAPABILITIES (0x00020009).
+    bool updSec = UpdateProcThreadAttribute(list, 0, (IntPtr)0x00020009, pSc, (IntPtr)scSize, IntPtr.Zero, IntPtr.Zero);
     sb.Append("upd_sec=" + updSec + ",err=" + Marshal.GetLastWin32Error() + ";");
 
     // Comparison attribute: PARENT_PROCESS with a NULL handle (value format
