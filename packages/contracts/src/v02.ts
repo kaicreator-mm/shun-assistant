@@ -12,12 +12,9 @@ const Ref = z.string().min(1);
 const NonNegative = z.number().int().nonnegative();
 const Positive = z.number().int().positive();
 
-const DisclosureCategoriesSchema = z.array(z.enum([
-  'GOAL_TEXT',
-  'SYSTEM_INVENTORY',
-  'FILE_METADATA',
-  'USER_SELECTED_CONTENT',
-])).min(1);
+const DisclosureCategoriesSchema = z
+  .array(z.enum(['GOAL_TEXT', 'SYSTEM_INVENTORY', 'FILE_METADATA', 'USER_SELECTED_CONTENT']))
+  .min(1);
 
 export const CloudDisclosureScopeSchema = z
   .strictObject({
@@ -228,7 +225,8 @@ export function mayRefundCloudAttempt(
     !CloudCallReservationSchema.safeParse(reservation).success ||
     !CloudCallReceiptSchema.safeParse(receipt).success ||
     !receipt.noSendProofRef
-  ) return false;
+  )
+    return false;
   let verified = false;
   try {
     verified = verifyNoSendProof(reservation, receipt.noSendProofRef);
@@ -281,12 +279,15 @@ const RecipeOpSchema = z.discriminatedUnion('op', [
   }),
   z.strictObject({
     op: z.literal('software.jit_capability_lifecycle'),
-    parameters: z.strictObject({ providerId: Ref, operation: z.enum(['ACQUIRE', 'ACTIVATE', 'RELEASE']) }),
+    parameters: z.strictObject({
+      providerId: Ref,
+      operation: z.enum(['ACQUIRE', 'ACTIVATE', 'RELEASE']),
+    }),
   }),
 ]);
 export const RecipeActionNodeSchema = z.discriminatedUnion('op', [
   ...RecipeOpSchema.options.map((option) => option.safeExtend({ actionId: Ref })),
-] as [typeof RecipeOpSchema.options[number], ...typeof RecipeOpSchema.options[number][]]);
+] as [(typeof RecipeOpSchema.options)[number], ...(typeof RecipeOpSchema.options)[number][]]);
 export const RecipeActionGraphSchema = z
   .strictObject({
     nodes: z.array(RecipeActionNodeSchema).min(1),
