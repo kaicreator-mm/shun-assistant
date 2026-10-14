@@ -1,13 +1,13 @@
 # Shun v0.2 — Implementation Task DAG planning draft (NOT FROZEN, NOT AUTHORIZED)
 
-**Stage:** `TASK_DAG_DESIGN_ONLY`. This draft is an L2 preparation convenience and **is not a live GitHub execution DAG**, not a Task DAG Freeze and not permission for implementation. Historical frozen Product: `79f47be5ff08a54588790e8abdacffd8697ac4d8`, tree `10c0ad768fee849ada952b038b0b1a653fd9a6d7`. **Conditional DeepSeek-first Product successor:** `docs/product/PRODUCT-SCOPE-CHANGE-v0.2-DEEPSEEK-FIRST.md` (PR #91, review #92/re-freeze PENDING). Architecture candidates: [L2 v0.2](../architecture/L2-v0.2-CANDIDATE.md) and [L2 trust/contract decisions](../architecture/L2-v0.2-CONTRACT-DECISIONS.md). Controller #83. Windows pilot #85 is optional future LOCAL research after Product re-freeze, not a P0 gate; #86/#87 bounded evidence is adopted. Product successor review and explicit Product re-freeze, then exact L2 review/freeze, precede implementation.
+**Stage:** `TASK_DAG_DESIGN_ONLY`. This draft is an L2 preparation convenience and **is not a live GitHub execution DAG**, not a Task DAG Freeze and not permission for implementation. Historical frozen Product: `79f47be5ff08a54588790e8abdacffd8697ac4d8`, tree `10c0ad768fee849ada952b038b0b1a653fd9a6d7`. **Effective DeepSeek-first Product re-freeze:** `docs/product/PRODUCT-REFREEZE-v0.2-DEEPSEEK-FIRST.md` PR #96, record blob `46d35708688663943868b556c0b8b298f609488a`; #92 independent PASS P0:0 P1:0 P2:3. L2 candidate review/Freeze **still pending**. Architecture candidates: [L2 v0.2](../architecture/L2-v0.2-CANDIDATE.md) and [L2 trust/contract decisions](../architecture/L2-v0.2-CONTRACT-DECISIONS.md). Controller #83. Windows pilot #85 is closed `not_planned` for optional LOCAL P0, NOT a technical PASS; #86/#87 bounded evidence adopted. Reviewed Product successor #96 is frozen. **Independent exact-SHA L2 review and explicit L2 Freeze still precede implementation.**
 
 ## 1. Bounded nodes and file-level ownership
 
 | ID | Concern / primary write owner | Depends on | Review policy | Must-pass concern proof | Location |
 | --- | --- | --- | --- | --- | --- |
 | **T00** | New typed v0.2 contracts, LLM proposal, Recipe immutable identity, ProviderCatalog/Acquisition contracts; `packages/contracts/**` ONLY | Frozen L2 | **required** (API/schema/security) | positive JSON/schema fixtures, graph-only/source-only tamper RCP-01, unknown ops deny, backwards compatibility | Web coding agent; local tests via CI |
-| **T01** | **DeepSeek Flash `deepseek-flash` API P0** remote HTTPS adapter, `DEEPSEEK_API_KEY` backend credential, trusted pre-planner privacy/currentness/consent/budget gate; `packages/llm-remote/**`, `packages/resolver/src/planner-seam.ts` ONLY | T00 | **required** (privacy) | real CN/EN Flash API calls, 0 calls on LOCAL_ONLY/OFFLINE/stale/no consent/key/budget, no key/PII leakage, malformed/model-hallucination refusal | Web+Windows integration |
+| **T01** | **DeepSeek Flash `deepseek-flash` API P0** remote HTTPS adapter, `DEEPSEEK_API_KEY` backend credential, trusted pre-planner privacy/currentness/consent/budget gate; `packages/llm-remote/**`, `packages/resolver/src/planner-seam.ts` ONLY | T00 | **required** (privacy) | separate live CN **and** EN Flash-goal journeys (one call is only endpoint minimum), 0 calls on LOCAL_ONLY/OFFLINE/stale/no consent/key/budget, no key/PII leakage, malformed/model-hallucination refusal | Web+Windows integration |
 | **T03** | Durable immutable Recipe persistence/revision migrations and currentness; `packages/store/**` + `packages/workflow/src/recipe-seam.ts` | T00 | **required** (data integrity) | restart replay, immutable identity, all representations hashed, schema migration rollback, tamper `BLOCK`, no old enablement inheritance | Web coding + CI/host |
 | **T04** | Closed-world JS/TS-to-typed-action mediation/RecipeResolver, planner join + secure ActionController reentry; **new** `packages/resolver/src/recipe-resolver.ts` (and recipe-only new files) + `packages/recipe-runtime/**`; **must not edit T01-owned `planner-seam.ts`** | T00,T01,T03 | **required** (execution safety) | no JS code execution for untrusted source, imports/FFI/shell bypass denied, per-run plan/approval, zero LLM exact replay | Web coding + Windows negatives |
 | **T05** | Minimal signed catalog and on-demand Provider artifact staging/activation/cache; `packages/vertical-jit/**` + `packages/provider-loader/**` | T00, **#86 architecture proof adopted** | **required** (supply chain) | unsigned/wrong-hash/redirect/ABI/downgrade/refused consent/offline fail closed; restart/canaries; CLI and native addon separate | Web coding + **Windows Build Host** |
@@ -19,6 +19,8 @@
 | **T11** | Version Closure & independent full Windows negative/hidden/packaging qualification; `docs/implementation/v0.2/**`, `tests/closure/v02/**` | T10 | **required** | all Frozen Product Critical Journeys on actual supported Windows editions; hidden malicious prompts; installer/user-state, recovery, real DeepSeek Flash API consent/key privacy and negative zero-call, full regression, Release Qualification inputs | **Windows Build Host + independent reviewer** |
 
 **Deferred T02 (not part of the P0 table):** Optional LOCAL Ollama/llama.cpp integration is retained as future research with existing #85 AppContainer evidence. It is **not required** for P0, never enables LOCAL without actual-model proof, and needs its own later Product/Architecture authorization. The required P0 DAG contains exactly 11 rows: T00, T01, T03–T11.
+
+**Review #92 P2 trace:** (P2-01) T01/T10/T11 independently test CN and EN goals; (P2-02) existing PlannerPort only, T01 builds genuine DeepSeek HTTP adapter; (P2-03) evidence stores observed `model`, optional `system_fingerprint`, response ID, time and usage, never fabricated model revision. These are required acceptance details despite Product review PASS.
 
 **Source ownership invariant:** T01 alone owns `packages/resolver/src/planner-seam.ts` (pre-model currentness/privacy gate). T04 owns newly introduced Recipe resolver sources, consumes T01's exported guarded PlannerPort interface, and must not add a competing direct model-call path. Shared `packages/resolver/src/index.ts`, if it needs simultaneous edits, is deferred to a single integration owner after T01/T04; otherwise expose a safe subpath API. No concurrent PRs may write the same path. Deferred **T02** is NOT dispatchable in v0.2 P0 and cannot block T08/T10/T11; a later independently authorized LOCAL implementation requires genuine model/egress proof. Treat shared API signature drift as a dependency update, not a reason for co-owned source writes.
 
@@ -47,7 +49,7 @@ After L2 Freeze:
                 T11 (version closure)
 ```
 
-L2 pilots #85–#87 are **not duplicated** as implementation DAG nodes: consume their exact evidence/decisions in T02/T05/T09. **#85 technically remains BLOCKED for optional real LOCAL model inference**; bounded rt1f isolation evidence remains at `task/i85-rt1-zc@3cc6733ccfd3e3da8c6704e3f5e6941852a1f16c`. After revised Product Freeze, #85 is deferred optional research, not a P0 dependency. **#86 is CLOSED** with bounded ripgrep/Sharp ABI architecture evidence, **not** a production loader PASS. **#87 is CLOSED** with a narrow C003 portable local-disk core result, **not** standard-user/inventory-UI or UNC-state qualification. Their release obligations remain in T02/T05/T09/T10/T11. A pilot FAIL changes architecture, and `BLOCKED` stays blocked, never a fake PASS.
+L2 pilots #85–#87 are **not duplicated** as implementation DAG nodes: consume their exact evidence/decisions in T02/T05/T09. **#85 technically remains BLOCKED for optional real LOCAL model inference**; bounded rt1f isolation evidence remains at `task/i85-rt1-zc@3cc6733ccfd3e3da8c6704e3f5e6941852a1f16c`. Following reviewed Product re-freeze #96, #85 is CLOSED `not_planned` for optional LOCAL work, not a P0 dependency. **#86 is CLOSED** with bounded ripgrep/Sharp ABI architecture evidence, **not** a production loader PASS. **#87 is CLOSED** with a narrow C003 portable local-disk core result, **not** standard-user/inventory-UI or UNC-state qualification. Their release obligations remain in T02/T05/T09/T10/T11. A pilot FAIL changes architecture, and `BLOCKED` stays blocked, never a fake PASS.
 
 ## 2. Inputs, outputs and task handoff contract
 
@@ -65,14 +67,14 @@ For every future GitHub Task Issue after Task DAG Freeze:
 ## 3. Architecture acceptance status
 
 ```ini
-PRODUCT_FREEZE=FROZEN
+PRODUCT_FREEZE=SCOPED_DEEPSEEK_FIRST_PASS_PR96
 L2_FREEZE=NO
 TASK_DAG_FREEZE=NO
 EXECUTION_DAG_ISSUES=NOT_CREATED
-PLANNED_P0_TASK_COUNT_AFTER_PRODUCT_RE_FREEZE=11
+PLANNED_P0_TASK_COUNT_UNFROZEN=11
 DEFERRED_OPTIONAL_TASK=T02_LOCAL_LLM
 COMPLETED_V02_IMPLEMENTATION_TASKS=0
 HOST_L2_HYPOTHESES=#85_OPTIONAL_LOCAL_DEFERRED_ISOLATION_PASS,#86_ARCH_EVIDENCE_COMPLETE,#87_PARTIAL_FEASIBILITY_CLOSED
 ```
 
-**Next:** independent scoped Product review #92 and explicit re-freeze → adopt DeepSeek-first L2, fresh independent security review and explicit L2 Freeze → freeze **11 P0 DAG nodes** and materialize GitHub Issues. Actual DeepSeek calls belong in T01/T10/T11, not a mandatory L2 local-model pilot. Nothing in this draft authorizes implementation.
+**Next:** Product #92 PASS and explicit scoped re-freeze #96 are DONE. Conduct fresh **independent exact-SHA L2 security review** on successor candidate → explicit L2 Freeze → freeze **11 P0 DAG nodes** and materialize GitHub Issues. Actual DeepSeek calls belong in T01/T10/T11, not a mandatory L2 local-model pilot. Nothing in this draft authorizes implementation.
