@@ -138,7 +138,9 @@ export function validateCloudConsent(input: {
   )
     return { ok: false, code: 'CONSENT_EXPIRED' };
   try {
-    if (!input.verifyBroker(approval)) return { ok: false, code: 'CONSENT_REFUSED' };
+    // Only literal true is authority. A mistakenly async verifier returning a
+    // Promise is truthy at runtime and must NOT mint consent.
+    if (input.verifyBroker(approval) !== true) return { ok: false, code: 'CONSENT_REFUSED' };
   } catch {
     return { ok: false, code: 'CONSENT_REFUSED' };
   }
@@ -227,21 +229,22 @@ export function mayRefundCloudAttempt(
     !receipt.noSendProofRef
   )
     return false;
-  let verified = false;
+  // Prove identity/status before invoking the trusted proof verifier.
+  // Neither arbitrary truthy return values nor mistakenly async verifiers
+  // (Promises) may authorize a refund.
+  if (
+    reservation.attemptId !== receipt.attemptId ||
+    reservation.consentId !== receipt.consentId ||
+    receipt.status !== 'NOT_SENT_PROVEN' ||
+    (reservation.state !== 'RESERVED' &&
+      reservation.state !== 'NOT_SENT_PROVEN' &&
+      reservation.state !== 'CANCELLED_BEFORE_SEND')
+  ) return false;
   try {
-    verified = verifyNoSendProof(reservation, receipt.noSendProofRef);
+    return verifyNoSendProof(reservation, receipt.noSendProofRef) === true;
   } catch {
     return false;
   }
-  return (
-    verified &&
-    reservation.attemptId === receipt.attemptId &&
-    reservation.consentId === receipt.consentId &&
-    receipt.status === 'NOT_SENT_PROVEN' &&
-    (reservation.state === 'RESERVED' ||
-      reservation.state === 'NOT_SENT_PROVEN' ||
-      reservation.state === 'CANCELLED_BEFORE_SEND')
-  );
 }
 
 const RecipeOpSchema = z.discriminatedUnion('op', [
