@@ -99,6 +99,11 @@ export const CONTRACTS: readonly ContractEntry[] = [
   { name: 'c002-jit-lifecycle-output', schema: JitLifecycleOutputSchema },
   { name: 'c003-storage-diagnose-input', schema: StorageDiagnoseInputSchema },
   { name: 'c003-storage-diagnose-output', schema: StorageDiagnoseOutputSchema },
+
+];
+
+/** Separate v0.2 public contract surface; frozen v0.1 CONTRACTS never grows. */
+export const V02_CONTRACTS: readonly ContractEntry[] = [
   { name: 'v02-cloud-disclosure-scope', schema: CloudDisclosureScopeSchema },
   { name: 'v02-cloud-consent-approval', schema: CloudConsentApprovalSchema },
   { name: 'v02-cloud-consent-currentness', schema: CloudConsentCurrentnessSchema },
@@ -108,6 +113,10 @@ export const CONTRACTS: readonly ContractEntry[] = [
   { name: 'v02-recipe-revision-identity', schema: RecipeRevisionIdentitySchema },
   { name: 'v02-provider-catalog-artifact', schema: ProviderCatalogArtifactSchema },
 ];
+
+export function v02ContractByName(name: string): ContractEntry | undefined {
+  return V02_CONTRACTS.find((entry) => entry.name === name);
+}
 
 export function contractByName(name: string): ContractEntry | undefined {
   return CONTRACTS.find((entry) => entry.name === name);
