@@ -319,7 +319,10 @@ const SAFETY_INVARIANT_OVERLAYS: Record<string, (schema: EmittedSchema) => Emitt
         'x-semantic-validation': ['ProviderCatalogArtifactSchema.safeParse'],
         properties: {
           ...propertiesOf(schema),
-          origin: { ...((propertiesOf(schema).origin ?? {}) as EmittedSchema), pattern: '^https://' },
+          origin: {
+            ...((propertiesOf(schema).origin ?? {}) as EmittedSchema),
+            pattern: '^https://',
+          },
         },
       },
       ifThen(
