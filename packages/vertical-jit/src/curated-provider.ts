@@ -11,8 +11,8 @@ import {
 } from 'node:crypto';
 import {
   canonicalJson,
-  ProviderCatalogArtifactSchema,
   type ProviderCatalogArtifact,
+  ProviderCatalogArtifactSchema,
 } from '@shun/contracts';
 
 export type TrustedProviderScope = Readonly<{
@@ -116,7 +116,8 @@ export class CuratedProviderVerifier {
       value.artifactKind !== scope.artifactKind ||
       value.origin !== scope.origin ||
       value.abiRevision !== scope.abiRevision
-    ) return { ok: false, code: 'CATALOG_SCOPE_DRIFT' };
+    )
+      return { ok: false, code: 'CATALOG_SCOPE_DRIFT' };
     const sig = base64Signature(value.curatorSignature);
     if (!sig) return { ok: false, code: 'CATALOG_SIGNATURE_INVALID' };
     try {
