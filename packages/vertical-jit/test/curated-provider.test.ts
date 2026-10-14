@@ -58,6 +58,21 @@ describe('T05 curated Provider trust-bound admission', () => {
     expect(verifier.verifyBytes(verified, Buffer.alloc(64 * 1024 * 1024 + 1))).toBe(false);
   });
 
+  it('refuses caller-forged success receipts, modified signatures and cross-instance records', () => {
+    const verifier = configured();
+    const record = verifier.verify(makeArtifact());
+    expect(record.ok).toBe(true);
+    if (!record.ok) return;
+    const forged = {
+      ok: true as const,
+      artifact: { ...record.artifact, artifactSha256: hash(Buffer.from('evil')) },
+    };
+    expect(verifier.verifyBytes(forged, Buffer.from('evil'))).toBe(false);
+    expect(configured().verifyBytes(record, contents)).toBe(false);
+    expect(Object.isFrozen(record)).toBe(true);
+    expect(Object.isFrozen(record.artifact)).toBe(true);
+  });
+
   it('refuses a model-supplied URL or changed manifest hash even with a valid key', () => {
     const verifier = configured();
     expect(
