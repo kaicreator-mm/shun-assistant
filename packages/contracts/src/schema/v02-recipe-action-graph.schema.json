@@ -1,0 +1,364 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:shun:contracts:0.1:v02-recipe-action-graph",
+  "title": "v02-recipe-action-graph",
+  "x-contracts-revision": "shun.contracts/0.1",
+  "type": "object",
+  "properties": {
+    "nodes": {
+      "minItems": 1,
+      "type": "array",
+      "items": {
+        "oneOf": [
+          {
+            "type": "object",
+            "properties": {
+              "actionId": {
+                "type": "string",
+                "minLength": 1
+              },
+              "op": {
+                "type": "string",
+                "const": "system.inventory"
+              },
+              "parameters": {
+                "type": "object",
+                "properties": {
+                  "includeProcesses": {
+                    "type": "boolean"
+                  }
+                },
+                "additionalProperties": false
+              }
+            },
+            "required": [
+              "actionId",
+              "op",
+              "parameters"
+            ],
+            "additionalProperties": false
+          },
+          {
+            "type": "object",
+            "properties": {
+              "actionId": {
+                "type": "string",
+                "minLength": 1
+              },
+              "op": {
+                "type": "string",
+                "const": "system.storage.diagnose"
+              },
+              "parameters": {
+                "type": "object",
+                "properties": {
+                  "volumeId": {
+                    "type": "string",
+                    "minLength": 1
+                  }
+                },
+                "required": [
+                  "volumeId"
+                ],
+                "additionalProperties": false
+              }
+            },
+            "required": [
+              "actionId",
+              "op",
+              "parameters"
+            ],
+            "additionalProperties": false
+          },
+          {
+            "type": "object",
+            "properties": {
+              "actionId": {
+                "type": "string",
+                "minLength": 1
+              },
+              "op": {
+                "type": "string",
+                "const": "file.search"
+              },
+              "parameters": {
+                "type": "object",
+                "properties": {
+                  "root": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "query": {
+                    "type": "string",
+                    "minLength": 1
+                  }
+                },
+                "required": [
+                  "root",
+                  "query"
+                ],
+                "additionalProperties": false
+              }
+            },
+            "required": [
+              "actionId",
+              "op",
+              "parameters"
+            ],
+            "additionalProperties": false
+          },
+          {
+            "type": "object",
+            "properties": {
+              "actionId": {
+                "type": "string",
+                "minLength": 1
+              },
+              "op": {
+                "type": "string",
+                "const": "file.copy"
+              },
+              "parameters": {
+                "type": "object",
+                "properties": {
+                  "sourcePath": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "destinationPath": {
+                    "type": "string",
+                    "minLength": 1
+                  }
+                },
+                "required": [
+                  "sourcePath",
+                  "destinationPath"
+                ],
+                "additionalProperties": false
+              }
+            },
+            "required": [
+              "actionId",
+              "op",
+              "parameters"
+            ],
+            "additionalProperties": false
+          },
+          {
+            "type": "object",
+            "properties": {
+              "actionId": {
+                "type": "string",
+                "minLength": 1
+              },
+              "op": {
+                "type": "string",
+                "const": "file.move"
+              },
+              "parameters": {
+                "type": "object",
+                "properties": {
+                  "sourcePath": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "destinationPath": {
+                    "type": "string",
+                    "minLength": 1
+                  }
+                },
+                "required": [
+                  "sourcePath",
+                  "destinationPath"
+                ],
+                "additionalProperties": false
+              }
+            },
+            "required": [
+              "actionId",
+              "op",
+              "parameters"
+            ],
+            "additionalProperties": false
+          },
+          {
+            "type": "object",
+            "properties": {
+              "actionId": {
+                "type": "string",
+                "minLength": 1
+              },
+              "op": {
+                "type": "string",
+                "const": "file.rename"
+              },
+              "parameters": {
+                "type": "object",
+                "properties": {
+                  "sourcePath": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "newName": {
+                    "type": "string",
+                    "minLength": 1
+                  }
+                },
+                "required": [
+                  "sourcePath",
+                  "newName"
+                ],
+                "additionalProperties": false
+              }
+            },
+            "required": [
+              "actionId",
+              "op",
+              "parameters"
+            ],
+            "additionalProperties": false
+          },
+          {
+            "type": "object",
+            "properties": {
+              "actionId": {
+                "type": "string",
+                "minLength": 1
+              },
+              "op": {
+                "type": "string",
+                "const": "file.duplicates.report"
+              },
+              "parameters": {
+                "type": "object",
+                "properties": {
+                  "root": {
+                    "type": "string",
+                    "minLength": 1
+                  }
+                },
+                "required": [
+                  "root"
+                ],
+                "additionalProperties": false
+              }
+            },
+            "required": [
+              "actionId",
+              "op",
+              "parameters"
+            ],
+            "additionalProperties": false
+          },
+          {
+            "type": "object",
+            "properties": {
+              "actionId": {
+                "type": "string",
+                "minLength": 1
+              },
+              "op": {
+                "type": "string",
+                "const": "image.batch_process"
+              },
+              "parameters": {
+                "type": "object",
+                "properties": {
+                  "sourceFolder": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "outputFolder": {
+                    "type": "string",
+                    "minLength": 1
+                  }
+                },
+                "required": [
+                  "sourceFolder",
+                  "outputFolder"
+                ],
+                "additionalProperties": false
+              }
+            },
+            "required": [
+              "actionId",
+              "op",
+              "parameters"
+            ],
+            "additionalProperties": false
+          },
+          {
+            "type": "object",
+            "properties": {
+              "actionId": {
+                "type": "string",
+                "minLength": 1
+              },
+              "op": {
+                "type": "string",
+                "const": "software.jit_capability_lifecycle"
+              },
+              "parameters": {
+                "type": "object",
+                "properties": {
+                  "providerId": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "operation": {
+                    "type": "string",
+                    "enum": [
+                      "ACQUIRE",
+                      "ACTIVATE",
+                      "RELEASE"
+                    ]
+                  }
+                },
+                "required": [
+                  "providerId",
+                  "operation"
+                ],
+                "additionalProperties": false
+              }
+            },
+            "required": [
+              "actionId",
+              "op",
+              "parameters"
+            ],
+            "additionalProperties": false
+          }
+        ]
+      }
+    },
+    "edges": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "from": {
+            "type": "string",
+            "minLength": 1
+          },
+          "to": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "required": [
+          "from",
+          "to"
+        ],
+        "additionalProperties": false
+      }
+    }
+  },
+  "required": [
+    "nodes",
+    "edges"
+  ],
+  "additionalProperties": false,
+  "x-semantic-validation": [
+    "RecipeActionGraphSchema.safeParse"
+  ]
+}
