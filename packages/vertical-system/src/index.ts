@@ -79,6 +79,6 @@ export function suggestReadonlyOptimizations(
   return suggestions;
 }
 
+export type { RuntimeCountRefusal, RuntimeCountResult } from './internal/windows-counts.ts';
 // Public host-only process/startup counts; no names, paths or script arguments.
 export { collectWindowsRuntimeCounts } from './windows-runtime.ts';
-export type { RuntimeCountResult, RuntimeCountRefusal } from './internal/windows-counts.ts';
