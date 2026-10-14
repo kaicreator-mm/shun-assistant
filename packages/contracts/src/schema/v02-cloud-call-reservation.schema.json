@@ -1,0 +1,91 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:shun:contracts:0.2:v02-cloud-call-reservation",
+  "title": "v02-cloud-call-reservation",
+  "x-contracts-revision": "shun.contracts/0.2",
+  "type": "object",
+  "properties": {
+    "attemptId": {
+      "type": "string",
+      "minLength": 1
+    },
+    "consentId": {
+      "type": "string",
+      "minLength": 1
+    },
+    "scopeRevision": {
+      "type": "string",
+      "minLength": 1
+    },
+    "pricingRevision": {
+      "type": "string",
+      "minLength": 1
+    },
+    "idempotencyKey": {
+      "type": "string",
+      "minLength": 1
+    },
+    "taskId": {
+      "type": "string",
+      "minLength": 1
+    },
+    "callSequence": {
+      "type": "integer",
+      "exclusiveMinimum": 0,
+      "maximum": 9007199254740991
+    },
+    "requestBytesSha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "disclosureProjectionSha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "reservedTokens": {
+      "type": "integer",
+      "exclusiveMinimum": 0,
+      "maximum": 9007199254740991
+    },
+    "reservedCostMicros": {
+      "type": "integer",
+      "exclusiveMinimum": 0,
+      "maximum": 9007199254740991
+    },
+    "reservedAt": {
+      "type": "string",
+      "format": "date-time",
+      "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z))$"
+    },
+    "state": {
+      "type": "string",
+      "enum": [
+        "RESERVED",
+        "NOT_SENT_PROVEN",
+        "CANCELLED_BEFORE_SEND",
+        "SENT",
+        "SETTLED",
+        "UNKNOWN_COST"
+      ]
+    }
+  },
+  "required": [
+    "attemptId",
+    "consentId",
+    "scopeRevision",
+    "pricingRevision",
+    "idempotencyKey",
+    "taskId",
+    "callSequence",
+    "requestBytesSha256",
+    "disclosureProjectionSha256",
+    "reservedTokens",
+    "reservedCostMicros",
+    "reservedAt",
+    "state"
+  ],
+  "additionalProperties": false,
+  "x-semantic-validation": [
+    "CloudCallReservationSchema.safeParse"
+  ]
+}

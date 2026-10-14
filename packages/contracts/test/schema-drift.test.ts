@@ -2,15 +2,15 @@ import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { emitPublicJsonSchema } from '../scripts/emit-schemas.ts';
-import { CONTRACTS } from '../src/registry.ts';
+import { CONTRACTS, V02_CONTRACTS } from '../src/registry.ts';
 
 const SCHEMA_DIR = join(import.meta.dirname, '../src/schema');
 
 describe('committed JSON Schema artifacts are authoritative and drift-free', () => {
-  it.each(CONTRACTS.map((c) => c.name))(
+  it.each([...CONTRACTS, ...V02_CONTRACTS].map((c) => c.name))(
     '%s: emission (Zod + safety-invariant overlay) matches the committed artifact byte-for-byte',
     (name) => {
-      const entry = CONTRACTS.find((c) => c.name === name);
+      const entry = [...CONTRACTS, ...V02_CONTRACTS].find((c) => c.name === name);
       if (!entry) throw new Error(`missing contract ${name}`);
 
       const rebuilt = emitPublicJsonSchema(name, entry.schema);

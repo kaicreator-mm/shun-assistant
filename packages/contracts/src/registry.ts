@@ -61,6 +61,16 @@ import {
   VerificationReceiptSchema,
 } from './receipts.ts';
 import { ShunContractError } from './taxonomy.ts';
+import {
+  CloudCallReceiptSchema,
+  CloudCallReservationSchema,
+  CloudConsentApprovalSchema,
+  CloudConsentCurrentnessSchema,
+  CloudDisclosureScopeSchema,
+  ProviderCatalogArtifactSchema,
+  RecipeActionGraphSchema,
+  RecipeRevisionIdentitySchema,
+} from './v02.ts';
 
 export type ContractEntry = {
   readonly name: string;
@@ -90,6 +100,66 @@ export const CONTRACTS: readonly ContractEntry[] = [
   { name: 'c003-storage-diagnose-input', schema: StorageDiagnoseInputSchema },
   { name: 'c003-storage-diagnose-output', schema: StorageDiagnoseOutputSchema },
 ];
+
+/** Separate v0.2 public contract surface; frozen v0.1 CONTRACTS never grows. */
+export const V02_CONTRACTS: readonly ContractEntry[] = [
+  { name: 'v02-cloud-disclosure-scope', schema: CloudDisclosureScopeSchema },
+  { name: 'v02-cloud-consent-approval', schema: CloudConsentApprovalSchema },
+  { name: 'v02-cloud-consent-currentness', schema: CloudConsentCurrentnessSchema },
+  { name: 'v02-cloud-call-reservation', schema: CloudCallReservationSchema },
+  { name: 'v02-cloud-call-receipt', schema: CloudCallReceiptSchema },
+  { name: 'v02-recipe-action-graph', schema: RecipeActionGraphSchema },
+  { name: 'v02-recipe-revision-identity', schema: RecipeRevisionIdentitySchema },
+  { name: 'v02-provider-catalog-artifact', schema: ProviderCatalogArtifactSchema },
+];
+
+export function v02ContractByName(name: string): ContractEntry | undefined {
+  return V02_CONTRACTS.find((entry) => entry.name === name);
+}
+
+/**
+ * Runtime validation boundary for the v0.2 public JSON Schema contract.
+ *
+ * JSON Schema artifacts are **structural-only** for constraints that cannot be
+ * encoded in draft 2020-12 (cross-field hashes, graph cycles, duplicate IDs).
+ * Its x-semantic-validation annotations are documentation, not executable Ajv
+ * rules. Ajv-only acceptance MUST NEVER authorize consent, Recipe execution,
+ * provider acquisition or any other effect.
+ *
+ * Callers pass the Ajv validator compiled from the version-pinned artifact.
+ * We require its result to be literal true AND independently run the Zod
+ * semantic validator for the named v0.2 contract. Neither an absent callback,
+ * a Promise/truthy value, a thrown error, nor an unknown name may pass.
+ * This is a data contract gate, NOT a trusted-broker signature verifier,
+ * authorization grant, durable reservation or provider signature check.
+ */
+export type V02PublicValidationResult =
+  | { ok: true; value: unknown }
+  | { ok: false; code: 'UNKNOWN_CONTRACT' | 'STRUCTURAL_REFUSED' | 'SEMANTIC_REFUSED' };
+
+export function validateV02PublicContract(
+  name: string,
+  value: unknown,
+  validateStructural: (value: unknown) => boolean,
+): V02PublicValidationResult {
+  const entry = v02ContractByName(name);
+  if (!entry) return { ok: false, code: 'UNKNOWN_CONTRACT' };
+  try {
+    if (typeof validateStructural !== 'function' || validateStructural(value) !== true) {
+      return { ok: false, code: 'STRUCTURAL_REFUSED' };
+    }
+  } catch {
+    return { ok: false, code: 'STRUCTURAL_REFUSED' };
+  }
+  try {
+    const parsed = entry.schema.safeParse(value);
+    return parsed.success
+      ? { ok: true, value: parsed.data }
+      : { ok: false, code: 'SEMANTIC_REFUSED' };
+  } catch {
+    return { ok: false, code: 'SEMANTIC_REFUSED' };
+  }
+}
 
 export function contractByName(name: string): ContractEntry | undefined {
   return CONTRACTS.find((entry) => entry.name === name);
