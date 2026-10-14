@@ -115,10 +115,20 @@ describe('T03 immutable Recipe revisions', () => {
     expect(repo.get(two.identity.recipeId, two.identity.revisionSha256)).toEqual(two);
   });
 
-  it('fails closed on journal tampering and blocks UPDATE/DELETE via database triggers', () => {
+  it('fails closed on UPDATE/DELETE/REPLACE and detects journal tampering', () => {
     const { store, repo } = setup();
     const f = fixture();
     repo.append(f);
+    // SQLite REPLACE otherwise bypasses DELETE triggers when recursive_triggers=OFF.
+    store.database.exec('PRAGMA recursive_triggers=OFF');
+    expect(() =>
+      store.database
+        .prepare(`INSERT OR REPLACE INTO recipe_revisions_v02
+          (recipe_id, revision_sha256, payload, payload_sha256, created_at)
+          VALUES (?, ?, ?, ?, ?)`)
+        .run(f.identity.recipeId, f.identity.revisionSha256, 'forged', '0'.repeat(64), '2026-10-15T00:00:00.000Z'),
+    ).toThrow();
+    expect(repo.get(f.identity.recipeId, f.identity.revisionSha256)).toEqual(f);
     expect(() =>
       store.database
         .prepare('UPDATE recipe_revisions_v02 SET payload = ? WHERE recipe_id = ?')
