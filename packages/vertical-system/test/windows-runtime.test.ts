@@ -34,10 +34,12 @@ describe('T06 fixed, readonly Windows process/startup observations', () => {
 
   it('rejects non-Windows without invoking even a fake trusted runner', () => {
     let called = false;
-    expect(observeRuntimeCountsWithHost(() => {
-      called = true;
-      return '42';
-    }, 'linux')).toEqual({ ok: false, code: 'WINDOWS_REQUIRED' });
+    expect(
+      observeRuntimeCountsWithHost(() => {
+        called = true;
+        return '42';
+      }, 'linux'),
+    ).toEqual({ ok: false, code: 'WINDOWS_REQUIRED' });
     expect(called).toBe(false);
   });
 
@@ -66,9 +68,12 @@ describe('T06 fixed, readonly Windows process/startup observations', () => {
   it('public entrypoint remains non-injectable and refuses other operating systems', () => {
     expect(collectWindowsRuntimeCounts.length).toBe(0);
     if (process.platform !== 'win32') {
-      expect((collectWindowsRuntimeCounts as unknown as (arg: unknown) => unknown)({
-        script: 'Remove-Item', platform: 'win32',
-      })).toEqual({ ok: false, code: 'WINDOWS_REQUIRED' });
+      expect(
+        (collectWindowsRuntimeCounts as unknown as (arg: unknown) => unknown)({
+          script: 'Remove-Item',
+          platform: 'win32',
+        }),
+      ).toEqual({ ok: false, code: 'WINDOWS_REQUIRED' });
     }
   });
 });
