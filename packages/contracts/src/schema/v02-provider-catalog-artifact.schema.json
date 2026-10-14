@@ -1,8 +1,8 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "urn:shun:contracts:0.1:v02-provider-catalog-artifact",
+  "$id": "urn:shun:contracts:0.2:v02-provider-catalog-artifact",
   "title": "v02-provider-catalog-artifact",
-  "x-contracts-revision": "shun.contracts/0.1",
+  "x-contracts-revision": "shun.contracts/0.2",
   "type": "object",
   "properties": {
     "providerId": {
