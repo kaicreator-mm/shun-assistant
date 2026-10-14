@@ -303,13 +303,17 @@ export class DurableCloudBudgetLedger {
         this.db.exec('ROLLBACK');
         return false;
       }
-      this.db.prepare(
-        "UPDATE v02_cloud_attempts SET status = 'MAY_HAVE_SENT' WHERE attempt_id = ?",
-      ).run(input.attemptId);
+      this.db
+        .prepare("UPDATE v02_cloud_attempts SET status = 'MAY_HAVE_SENT' WHERE attempt_id = ?")
+        .run(input.attemptId);
       this.db.exec('COMMIT');
       return true;
     } catch {
-      try { this.db.exec('ROLLBACK'); } catch { /* no active txn */ }
+      try {
+        this.db.exec('ROLLBACK');
+      } catch {
+        /* no active txn */
+      }
       return false;
     }
   }
@@ -317,9 +321,11 @@ export class DurableCloudBudgetLedger {
   /** Nonterminal ambiguous send cannot refund or retry; record as UNKNOWN_COST. */
   markUnknownCost(attemptId: string): boolean {
     try {
-      const result = this.db.prepare(
-        "UPDATE v02_cloud_attempts SET status = 'UNKNOWN_COST' WHERE attempt_id = ? AND status = 'MAY_HAVE_SENT'",
-      ).run(attemptId);
+      const result = this.db
+        .prepare(
+          "UPDATE v02_cloud_attempts SET status = 'UNKNOWN_COST' WHERE attempt_id = ? AND status = 'MAY_HAVE_SENT'",
+        )
+        .run(attemptId);
       return Number(result.changes) === 1;
     } catch {
       return false;
@@ -328,10 +334,12 @@ export class DurableCloudBudgetLedger {
 
   inspect(attemptId: string): Readonly<AttemptRow> | null {
     try {
-      const row = this.db.prepare(`
+      const row = this.db
+        .prepare(`
         SELECT attempt_id, consent_id, request_sha256, status, cost_micros
         FROM v02_cloud_attempts WHERE attempt_id = ?
-      `).get(attemptId) as AttemptRow | undefined;
+      `)
+        .get(attemptId) as AttemptRow | undefined;
       return row ? Object.freeze({ ...row }) : null;
     } catch {
       return null;
