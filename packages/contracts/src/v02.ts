@@ -395,6 +395,9 @@ export const ProviderCatalogArtifactSchema = z.strictObject({
   catalogRevision: Ref,
   bindingId: Ref,
   scopedVerifierId: Ref,
+  /** Exact signed curator-catalog identity and per-capability binding evidence. */
+  catalogManifestSha256: Sha256HexSchema,
+  bindingEvidenceSha256: Sha256HexSchema,
   version: Ref,
   capabilityId: Ref,
   artifactKind: z.enum(['CLI', 'NATIVE_ADDON']),
@@ -409,11 +412,15 @@ export const ProviderCatalogArtifactSchema = z.strictObject({
     }
   }, 'provider acquisition origin must be credential-free HTTPS'),
   entrypoint: Ref,
-  /** Explicit CLI sentinel or exact native ABI, never arbitrary executable ABI inference. */
-  abiRevision: Ref,
+  /** Required only for a native addon. CLI has no ABI requirement. */
+  abiRevision: Ref.optional(),
   signerKeyId: Ref,
   /** Not a proof of trusted signing; T05 verifies against pinned curator roots. */
   curatorSignature: Ref,
   dependencySha256: z.array(Sha256HexSchema),
+}).superRefine((artifact, ctx) => {
+  if (artifact.artifactKind === 'NATIVE_ADDON' && !artifact.abiRevision) {
+    ctx.addIssue({ code: 'custom', message: 'native addon requires exact ABI revision' });
+  }
 });
 export type ProviderCatalogArtifact = z.infer<typeof ProviderCatalogArtifactSchema>;
