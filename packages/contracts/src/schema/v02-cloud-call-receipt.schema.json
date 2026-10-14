@@ -1,0 +1,178 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:shun:contracts:0.1:v02-cloud-call-receipt",
+  "title": "v02-cloud-call-receipt",
+  "x-contracts-revision": "shun.contracts/0.1",
+  "type": "object",
+  "properties": {
+    "attemptId": {
+      "type": "string",
+      "minLength": 1
+    },
+    "consentId": {
+      "type": "string",
+      "minLength": 1
+    },
+    "status": {
+      "type": "string",
+      "enum": [
+        "NOT_SENT_PROVEN",
+        "SENT",
+        "SETTLED",
+        "UNKNOWN_COST"
+      ]
+    },
+    "noSendProofRef": {
+      "type": "string",
+      "minLength": 1
+    },
+    "sentAt": {
+      "type": "string",
+      "format": "date-time",
+      "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z))$"
+    },
+    "observedModel": {
+      "type": "string",
+      "minLength": 1
+    },
+    "systemFingerprint": {
+      "type": "string",
+      "minLength": 1
+    },
+    "responseId": {
+      "type": "string",
+      "minLength": 1
+    },
+    "inputTokens": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 9007199254740991
+    },
+    "outputTokens": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 9007199254740991
+    },
+    "observedCostMicros": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 9007199254740991
+    },
+    "recordedAt": {
+      "type": "string",
+      "format": "date-time",
+      "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z))$"
+    }
+  },
+  "required": [
+    "attemptId",
+    "consentId",
+    "status",
+    "recordedAt"
+  ],
+  "additionalProperties": false,
+  "x-semantic-validation": [
+    "CloudCallReceiptSchema.safeParse",
+    "mayRefundCloudAttempt"
+  ],
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "status": {
+            "const": "NOT_SENT_PROVEN"
+          }
+        },
+        "required": [
+          "status"
+        ]
+      },
+      "then": {
+        "required": [
+          "noSendProofRef"
+        ],
+        "not": {
+          "anyOf": [
+            {
+              "required": [
+                "sentAt"
+              ]
+            },
+            {
+              "required": [
+                "observedCostMicros"
+              ]
+            },
+            {
+              "required": [
+                "inputTokens"
+              ]
+            },
+            {
+              "required": [
+                "outputTokens"
+              ]
+            },
+            {
+              "required": [
+                "observedModel"
+              ]
+            },
+            {
+              "required": [
+                "systemFingerprint"
+              ]
+            },
+            {
+              "required": [
+                "responseId"
+              ]
+            }
+          ]
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "status": {
+            "enum": [
+              "SENT",
+              "SETTLED",
+              "UNKNOWN_COST"
+            ]
+          }
+        },
+        "required": [
+          "status"
+        ]
+      },
+      "then": {
+        "not": {
+          "required": [
+            "noSendProofRef"
+          ]
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "status": {
+            "const": "UNKNOWN_COST"
+          }
+        },
+        "required": [
+          "status"
+        ]
+      },
+      "then": {
+        "not": {
+          "required": [
+            "observedCostMicros"
+          ]
+        }
+      }
+    }
+  ]
+}
