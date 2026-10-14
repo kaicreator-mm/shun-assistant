@@ -10,7 +10,7 @@ public static class AcDbg3 {
   [DllImport("userenv.dll", SetLastError=true)]
   public static extern int DeleteAppContainerProfile([MarshalAs(UnmanagedType.LPWStr)] string n);
   [StructLayout(LayoutKind.Sequential)]
-  public struct SECURITY_CAPABILITIES { public IntPtr AppContainerSid; public IntPtr Capabilities; public uint CapabilityCount; }
+  public struct SECURITY_CAPABILITIES { public IntPtr AppContainerSid; public IntPtr Capabilities; public uint CapabilityCount; public uint Reserved; }
   [DllImport("kernel32.dll", SetLastError=true)]
   public static extern bool InitializeProcThreadAttributeList(IntPtr l, int c, int f, ref IntPtr s);
   [DllImport("kernel32.dll", SetLastError=true)]
@@ -27,7 +27,7 @@ public static class AcDbg3 {
       sc.AppContainerSid = sidPtr; sc.Capabilities = IntPtr.Zero; sc.CapabilityCount = 0;
       IntPtr p = Marshal.AllocHGlobal(cb);
       Marshal.StructureToPtr(sc, p, false);
-      bool ok = UpdateProcThreadAttribute(list, 0, (IntPtr)0x00020013, p, (IntPtr)cb, IntPtr.Zero, IntPtr.Zero);
+      bool ok = UpdateProcThreadAttribute(list, 0, (IntPtr)0x00020009, p, (IntPtr)cb, IntPtr.Zero, IntPtr.Zero);
       sb.Append("cb=" + cb + ":ok=" + ok + ",err=" + Marshal.GetLastWin32Error() + ";");
       Marshal.FreeHGlobal(p);
     }
