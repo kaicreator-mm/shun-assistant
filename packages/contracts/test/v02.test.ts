@@ -67,26 +67,34 @@ describe('v0.2: cloud disclosure contracts', () => {
     expect(CloudDisclosureScopeSchema.safeParse({ ...scope, endpoint: 'anything' }).success).toBe(
       false,
     );
-    expect(CloudConsentApprovalSchema.safeParse({
-      ...approval,
-      displayedProjectionSha256: B,
-    }).success).toBe(false);
+    expect(
+      CloudConsentApprovalSchema.safeParse({
+        ...approval,
+        displayedProjectionSha256: B,
+      }).success,
+    ).toBe(false);
   });
 
   it('refuses arbitrary remote model, unapproved host and local-only masquerade', () => {
-    expect(CloudDisclosureScopeSchema.safeParse({
-      ...scope,
-      modelId: 'unknown-model',
-    }).success).toBe(false);
-    expect(CloudDisclosureScopeSchema.safeParse({
-      ...scope,
-      destination: 'http://localhost:9000/chat/completions',
-    }).success).toBe(false);
-    expect(CloudDisclosureScopeSchema.safeParse({
-      ...scope,
-      localOnly: false,
-      externalDisclosure: 'ALLOWED',
-    }).success).toBe(false);
+    expect(
+      CloudDisclosureScopeSchema.safeParse({
+        ...scope,
+        modelId: 'unknown-model',
+      }).success,
+    ).toBe(false);
+    expect(
+      CloudDisclosureScopeSchema.safeParse({
+        ...scope,
+        destination: 'http://localhost:9000/chat/completions',
+      }).success,
+    ).toBe(false);
+    expect(
+      CloudDisclosureScopeSchema.safeParse({
+        ...scope,
+        localOnly: false,
+        externalDisclosure: 'ALLOWED',
+      }).success,
+    ).toBe(false);
   });
 
   it('treats proof presence as data, not verification: injected trusted verifier is mandatory', () => {
@@ -103,14 +111,18 @@ describe('v0.2: cloud disclosure contracts', () => {
 
   it('rejects forged session, replayed nonce, unresolvable registry and expiration', () => {
     const input = { approval, now: NOW, verifyBroker: () => true };
-    expect(validateCloudConsent({ ...input, currentness: { ...current, sessionId: 'forged' } })).toEqual({
+    expect(
+      validateCloudConsent({ ...input, currentness: { ...current, sessionId: 'forged' } }),
+    ).toEqual({
       ok: false,
       code: 'CONSENT_STALE',
     });
-    expect(validateCloudConsent({
-      ...input,
-      currentness: { ...current, nonceIsUnused: false },
-    }).ok).toBe(false);
+    expect(
+      validateCloudConsent({
+        ...input,
+        currentness: { ...current, nonceIsUnused: false },
+      }).ok,
+    ).toBe(false);
     expect(validateCloudConsent({ ...input, currentness: { kind: 'UNRESOLVABLE' } }).ok).toBe(
       false,
     );
@@ -145,19 +157,19 @@ describe('v0.2: cloud reservation and uncertain charges', () => {
   it('accepts a durable typed reservation and proves refunds only on no-send', () => {
     expect(CloudCallReservationSchema.safeParse(reservation).success).toBe(true);
     expect(mayRefundCloudAttempt(reservation, notSent)).toBe(true);
-    expect(mayRefundCloudAttempt(reservation, { ...notSent, status: 'UNKNOWN_COST' })).toBe(
-      false,
-    );
+    expect(mayRefundCloudAttempt(reservation, { ...notSent, status: 'UNKNOWN_COST' })).toBe(false);
     expect(mayRefundCloudAttempt(reservation, { ...notSent, attemptId: 'other' })).toBe(false);
     expect(mayRefundCloudAttempt({ ...reservation, state: 'SENT' }, notSent)).toBe(false);
   });
 
   it('rejects a fabricated cost under UNKNOWN_COST', () => {
-    expect(CloudCallReceiptSchema.safeParse({
-      ...notSent,
-      status: 'UNKNOWN_COST',
-      observedCostMicros: 100,
-    }).success).toBe(false);
+    expect(
+      CloudCallReceiptSchema.safeParse({
+        ...notSent,
+        status: 'UNKNOWN_COST',
+        observedCostMicros: 100,
+      }).success,
+    ).toBe(false);
     expect(CloudCallReservationSchema.safeParse({ ...reservation, callSequence: 0 }).success).toBe(
       false,
     );
@@ -174,18 +186,24 @@ describe('v0.2: exact Recipe identity and closed-world actions', () => {
   };
   it('rejects raw JS, shell execution, duplicate nodes and dangling edges', () => {
     expect(RecipeActionGraphSchema.safeParse(graph).success).toBe(true);
-    expect(RecipeActionGraphSchema.safeParse({
-      ...graph,
-      nodes: [{ actionId: 'one', op: 'node.eval', parameters: { code: 'process.exit()' } }],
-    }).success).toBe(false);
-    expect(RecipeActionGraphSchema.safeParse({
-      ...graph,
-      nodes: [graph.nodes[0], graph.nodes[0]],
-    }).success).toBe(false);
-    expect(RecipeActionGraphSchema.safeParse({
-      ...graph,
-      edges: [{ from: 'one', to: 'third' }],
-    }).success).toBe(false);
+    expect(
+      RecipeActionGraphSchema.safeParse({
+        ...graph,
+        nodes: [{ actionId: 'one', op: 'node.eval', parameters: { code: 'process.exit()' } }],
+      }).success,
+    ).toBe(false);
+    expect(
+      RecipeActionGraphSchema.safeParse({
+        ...graph,
+        nodes: [graph.nodes[0], graph.nodes[0]],
+      }).success,
+    ).toBe(false);
+    expect(
+      RecipeActionGraphSchema.safeParse({
+        ...graph,
+        edges: [{ from: 'one', to: 'third' }],
+      }).success,
+    ).toBe(false);
   });
 
   it('binds source, graph and compiled representation in one immutable revision', () => {
@@ -203,10 +221,12 @@ describe('v0.2: exact Recipe identity and closed-world actions', () => {
     expect(computeRecipeRevision({ ...record, actionGraphSha256: SHA })).not.toBe(
       record.revisionSha256,
     );
-    expect(RecipeRevisionIdentitySchema.safeParse({
-      ...record,
-      compiledSha256: 'tampered',
-    }).success).toBe(false);
+    expect(
+      RecipeRevisionIdentitySchema.safeParse({
+        ...record,
+        compiledSha256: 'tampered',
+      }).success,
+    ).toBe(false);
   });
 });
 
