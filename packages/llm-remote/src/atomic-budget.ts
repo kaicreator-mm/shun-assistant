@@ -4,9 +4,9 @@
 import { createHash } from 'node:crypto';
 import { DatabaseSync } from 'node:sqlite';
 import {
-  canonicalJson,
   type CloudConsentApproval,
   type CloudConsentCurrentness,
+  canonicalJson,
   validateCloudConsent,
 } from '@shun/contracts';
 
@@ -292,8 +292,7 @@ export class DurableCloudBudgetLedger {
           }
         | undefined;
       if (
-        !row ||
-        row.status !== 'RESERVED' ||
+        row?.status !== 'RESERVED' ||
         row.consent_id !== consentId ||
         row.task_id !== scope.taskId ||
         row.scope_revision !== scope.scopeRevision ||
