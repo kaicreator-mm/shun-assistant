@@ -1,0 +1,12 @@
+ACPROBE create-profile {"ok":true,"hr":"0x00000000"}
+ACPROBE container-sid {"sid":"S-1-15-2-2928523693-680641304-3216229261-783675555-336925028-2399934615-3042447347"}
+ACPROBE icacls-all-app-packages {"out":"已处理的文件: C:\\xDev\\kAiCreator\\_tmp\\i85-rt1\\stage | 已成功处理 1 个文件; 处理 0 个文件时失败","rc":0}
+ACPROBE icacls-container-sid {"out":"已处理的文件: C:\\xDev\\kAiCreator\\_tmp\\i85-rt1\\stage | 已成功处理 1 个文件; 处理 0 个文件时失败","rc":0}
+ACPROBE delete-profile {"ok":true,"hr":"0x00000000"}
+无法将值“-1”转换为类型“System.UInt32”。错误:“值对于 UInt32 太大或太小。”
+所在位置 C:\xDev\kAiCreator\shun-assistant\i85-rt1-zc\research\i85-u01\appcontainer\run-ac.ps1:276 字符: 54
++ ... reateError = 0; $waitResult = -1; $childExitCode = [uint32]0xFFFFFFFF
++                                       ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : InvalidArgument: (:) []，RuntimeException
+    + FullyQualifiedErrorId : InvalidCastIConvertible
+ 

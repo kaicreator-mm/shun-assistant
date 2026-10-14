@@ -1,0 +1,1 @@
+{"pid":29232,"loopback":{"host":"127.0.0.1","port":63802,"outcome":"ERROR","detail":"ETIMEDOUT","elapsedMs":318},"controlled":{"host":"192.168.100.245","port":63801,"outcome":"TIMEOUT","detail":"no connect within 6000ms","elapsedMs":6003}}

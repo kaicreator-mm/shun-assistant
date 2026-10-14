@@ -1,0 +1,26 @@
+ACPROBE create-profile {"ok":true,"hr":"0x00000000"}
+ACPROBE container-sid {"sid":"S-1-15-2-379668628-2664456532-297311134-3216562208-1355235783-2176645612-2363410862"}
+ACPROBE icacls-all-app-packages {"out":"已处理的文件: C:\\xDev\\kAiCreator\\_tmp\\i85-rt1\\stage | 已成功处理 1 个文件; 处理 0 个文件时失败","rc":0}
+ACPROBE icacls-container-sid {"out":"已处理的文件: C:\\xDev\\kAiCreator\\_tmp\\i85-rt1\\stage | 已成功处理 1 个文件; 处理 0 个文件时失败","rc":0}
+node:fs:2820
+    const out = binding.lstat(
+                        ^
+
+Error: EPERM: operation not permitted, lstat 'C:\'
+    at Object.realpathSync (node:fs:2820:25)
+    at toRealPath (node:internal/modules/helpers:67:13)
+    at Module._findPath (node:internal/modules/cjs/loader:850:22)
+    at resolveMainPath (node:internal/modules/run_main:35:21)
+    at Module.executeUserEntryPoint [as runMain] (node:internal/modules/run_main:146:20)
+    at node:internal/main/run_main_module:33:47 {
+  errno: -4048,
+  code: 'EPERM',
+  syscall: 'lstat',
+  path: 'C:\\'
+}
+
+Node.js v24.21.0
+ACPROBE launch {"rc":0,"pid":17504,"createError":0}
+ACPROBE child-token {"isAppContainer":1,"appContainerSid":"S-1-15-2-379668628-2664456532-297311134-3216562208-1355235783-2176645612-2363410862","tokenObserved":true}
+ACPROBE child-exit {"exitCode":1,"terminatedOnTimeout":false,"wait":0}
+ACPROBE delete-profile {"ok":true,"hr":"0x00000000"}

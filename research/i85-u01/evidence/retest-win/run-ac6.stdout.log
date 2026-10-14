@@ -1,0 +1,9 @@
+ACPROBE create-profile {"ok":true,"hr":"0x00000000"}
+ACPROBE container-sid {"sid":"S-1-15-2-2271455942-2295063338-1415680664-2632229433-2062655370-91685238-1551000773"}
+ACPROBE icacls-all-app-packages {"out":"已处理的文件: X:\\ | 已成功处理 1 个文件; 处理 0 个文件时失败","rc":0}
+ACPROBE icacls-container-sid {"out":"已处理的文件: X:\\ | 已成功处理 1 个文件; 处理 0 个文件时失败","rc":0}
+ACPROBE launch {"rc":0,"pid":29232,"createError":0}
+ACPROBE child-token {"isAppContainer":1,"appContainerSid":"S-1-15-2-2271455942-2295063338-1415680664-2632229433-2062655370-91685238-1551000773","tokenObserved":true}
+ACPROBE child-exit {"exitCode":0,"terminatedOnTimeout":false,"wait":0}
+ACPROBE probe-written {"ok":true,"controlledOutcome":"TIMEOUT","note":"No automatic OS no-egress PASS from this record"}
+ACPROBE delete-profile {"ok":true,"hr":"0x00000000"}

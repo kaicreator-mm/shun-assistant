@@ -1,0 +1,8 @@
+ACPROBE create-profile {"ok":true,"hr":"0x00000000"}
+ACPROBE container-sid {"sid":"S-1-15-2-455304580-3790523145-3421412878-2779553852-698604858-102957933-1136684572"}
+ACPROBE icacls-all-app-packages {"out":"已处理的文件: C:\\xDev\\kAiCreator\\_tmp\\i85-rt1\\stage | 已成功处理 1 个文件; 处理 0 个文件时失败","rc":0}
+ACPROBE icacls-container-sid {"out":"已处理的文件: C:\\xDev\\kAiCreator\\_tmp\\i85-rt1\\stage | 已成功处理 1 个文件; 处理 0 个文件时失败","rc":0}
+ACPROBE launch {"rc":1,"pid":0,"createError":122}
+ACPROBE child-token {"isAppContainer":-1,"appContainerSid":null,"tokenObserved":false}
+ACPROBE child-exit {"exitCode":4294967295,"terminatedOnTimeout":false,"wait":-1}
+ACPROBE delete-profile {"ok":true,"hr":"0x00000000"}
