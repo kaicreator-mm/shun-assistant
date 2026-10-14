@@ -1,0 +1,199 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:shun:contracts:0.1:v02-cloud-consent-approval",
+  "title": "v02-cloud-consent-approval",
+  "x-contracts-revision": "shun.contracts/0.1",
+  "type": "object",
+  "properties": {
+    "consentId": {
+      "type": "string",
+      "minLength": 1
+    },
+    "scope": {
+      "type": "object",
+      "properties": {
+        "taskId": {
+          "type": "string",
+          "minLength": 1
+        },
+        "principalId": {
+          "type": "string",
+          "minLength": 1
+        },
+        "sessionId": {
+          "type": "string",
+          "minLength": 1
+        },
+        "providerId": {
+          "type": "string",
+          "const": "deepseek"
+        },
+        "modelId": {
+          "type": "string",
+          "const": "deepseek-flash"
+        },
+        "destination": {
+          "type": "string",
+          "const": "https://api.deepseek.com/chat/completions"
+        },
+        "approvedProjectionSha256": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "scopeRevision": {
+          "type": "string",
+          "minLength": 1
+        },
+        "disclosureCategories": {
+          "minItems": 1,
+          "type": "array",
+          "items": {
+            "type": "string",
+            "enum": [
+              "GOAL_TEXT",
+              "SYSTEM_INVENTORY",
+              "FILE_METADATA",
+              "USER_SELECTED_CONTENT"
+            ]
+          }
+        },
+        "registryRevision": {
+          "type": "string",
+          "minLength": 1
+        },
+        "policyRevision": {
+          "type": "string",
+          "minLength": 1
+        },
+        "pricingRevision": {
+          "type": "string",
+          "minLength": 1
+        },
+        "revocationEpoch": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 9007199254740991
+        },
+        "maxCalls": {
+          "type": "integer",
+          "exclusiveMinimum": 0,
+          "maximum": 9007199254740991
+        },
+        "maxInputTokens": {
+          "type": "integer",
+          "exclusiveMinimum": 0,
+          "maximum": 9007199254740991
+        },
+        "maxOutputTokens": {
+          "type": "integer",
+          "exclusiveMinimum": 0,
+          "maximum": 9007199254740991
+        },
+        "maxCostMicros": {
+          "type": "integer",
+          "exclusiveMinimum": 0,
+          "maximum": 9007199254740991
+        },
+        "issuedAt": {
+          "type": "string",
+          "format": "date-time",
+          "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z))$"
+        },
+        "expiresAt": {
+          "type": "string",
+          "format": "date-time",
+          "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z))$"
+        }
+      },
+      "required": [
+        "taskId",
+        "principalId",
+        "sessionId",
+        "providerId",
+        "modelId",
+        "destination",
+        "approvedProjectionSha256",
+        "scopeRevision",
+        "disclosureCategories",
+        "registryRevision",
+        "policyRevision",
+        "pricingRevision",
+        "revocationEpoch",
+        "maxCalls",
+        "maxInputTokens",
+        "maxOutputTokens",
+        "maxCostMicros",
+        "issuedAt",
+        "expiresAt"
+      ],
+      "additionalProperties": false
+    },
+    "confirmationNonce": {
+      "type": "string",
+      "minLength": 1
+    },
+    "displayedProjectionSha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "displayedDisclosureCategories": {
+      "minItems": 1,
+      "type": "array",
+      "items": {
+        "type": "string",
+        "enum": [
+          "GOAL_TEXT",
+          "SYSTEM_INVENTORY",
+          "FILE_METADATA",
+          "USER_SELECTED_CONTENT"
+        ]
+      }
+    },
+    "issuer": {
+      "type": "object",
+      "properties": {
+        "brokerId": {
+          "type": "string",
+          "minLength": 1
+        },
+        "brokerRevision": {
+          "type": "string",
+          "minLength": 1
+        },
+        "assertionId": {
+          "type": "string",
+          "minLength": 1
+        },
+        "channel": {
+          "type": "string",
+          "const": "AUTHENTICATED_PRIVATE_IPC"
+        },
+        "proof": {
+          "type": "string",
+          "minLength": 1
+        }
+      },
+      "required": [
+        "brokerId",
+        "brokerRevision",
+        "assertionId",
+        "channel",
+        "proof"
+      ],
+      "additionalProperties": false
+    }
+  },
+  "required": [
+    "consentId",
+    "scope",
+    "confirmationNonce",
+    "displayedProjectionSha256",
+    "displayedDisclosureCategories",
+    "issuer"
+  ],
+  "additionalProperties": false,
+  "x-semantic-validation": [
+    "CloudConsentApprovalSchema.safeParse",
+    "validateCloudConsent"
+  ]
+}
