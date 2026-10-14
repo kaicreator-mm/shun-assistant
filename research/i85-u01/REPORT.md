@@ -16,8 +16,20 @@ is untouched.
 - `packages/resolver/src/planner-seam.ts` SHA256 (bytes of the pinned tree):
   `f80c72abf77b43df927cfd144e2ed0e7422d218b8299a02ac437a63d08d69f0a` (14,257 bytes).
 - Host: Microsoft Windows 11 Pro, build **10.0.26300.9457**, x64.
-- User `15549`, **STANDARD_USER**: not in Administrators group (`whoami /groups`
-  has no S-1-5-32-544), integrity level not High, `net session` → rc=2 (access denied).
+- User `15549`, **non-elevated for the entire run**. Correction (see follow-up
+  comment): the account is a member of the local `BUILTIN\Administrators`
+  group running under a UAC-filtered token — `whoami.exe /groups /fo csv /nh`
+  (the exact call Shun's own backend uses) shows `S-1-5-32-544` as
+  *"Group used for deny only"*, integrity `S-1-16-8192` (Medium),
+  `IsInRole(Administrator)=false`, `net session` → rc=2 (access denied). The
+  initial draft of this report claimed "not in Administrators group"; that was
+  an artifact of invoking MSYS `whoami` (Git Bash), which silently swallows
+  `/groups` and produced empty output. Shun's own signed host-facts gate —
+  exercised live in the parallel U05 pilot (#87) — classifies this exact host
+  as `FILTERED_ADMIN`, confirming the corrected reading. Every conclusion in
+  this report is unchanged: no elevation was available or used at any step,
+  and all privileged probes (`netsh advfirewall add rule`, `net session`) were
+  denied. A true standard-user *account* was not tested on this host.
 - Node: v24.21.0, ABI 137 (via fnm).
 
 ## Capture protocol
