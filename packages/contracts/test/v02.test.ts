@@ -247,21 +247,29 @@ describe('v0.2: curated signed Provider catalog is data only', () => {
       dependencySha256: [B],
     };
     expect(ProviderCatalogArtifactSchema.safeParse(artifact).success).toBe(true);
-    expect(ProviderCatalogArtifactSchema.safeParse({
-      ...artifact,
-      signerKeyId: '',
-    }).success).toBe(false);
-    expect(ProviderCatalogArtifactSchema.safeParse({
-      ...artifact,
-      artifactSha256: '00',
-    }).success).toBe(false);
-    expect(ProviderCatalogArtifactSchema.safeParse({
-      ...artifact,
-      platform: 'linux',
-    }).success).toBe(false);
-    expect(ProviderCatalogArtifactSchema.safeParse({
-      ...artifact,
-      artifactKind: 'ARBITRARY_JS',
-    }).success).toBe(false);
+    expect(
+      ProviderCatalogArtifactSchema.safeParse({
+        ...artifact,
+        signerKeyId: '',
+      }).success,
+    ).toBe(false);
+    expect(
+      ProviderCatalogArtifactSchema.safeParse({
+        ...artifact,
+        artifactSha256: '00',
+      }).success,
+    ).toBe(false);
+    expect(
+      ProviderCatalogArtifactSchema.safeParse({
+        ...artifact,
+        platform: 'linux',
+      }).success,
+    ).toBe(false);
+    expect(
+      ProviderCatalogArtifactSchema.safeParse({
+        ...artifact,
+        artifactKind: 'ARBITRARY_JS',
+      }).success,
+    ).toBe(false);
   });
 });
