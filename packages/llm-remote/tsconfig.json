@@ -1,0 +1,12 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "incremental": true,
+    "tsBuildInfoFile": "node_modules/.cache/llm-remote.tsbuildinfo"
+  },
+  "include": [
+    "src",
+    "test",
+    "vitest.config.ts"
+  ]
+}
