@@ -1,8 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import {
-  collectWindowsSystemInventory,
-  suggestReadonlyOptimizations,
-} from '../src/index.ts';
+import { collectWindowsSystemInventory, suggestReadonlyOptimizations } from '../src/index.ts';
 import {
   collectSystemInventoryWithTrustedHost,
   type SystemInventoryHost,
