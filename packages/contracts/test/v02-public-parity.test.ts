@@ -192,6 +192,28 @@ const cases = [
 describe('v0.2 public JSON Schema and typed Zod parity', () => {
   const ajv = new Ajv2020({ strict: false, allErrors: true });
   addFormats(ajv);
+  it('refuses Provider URLs carrying userinfo or noncanonical HTTPS on both public surfaces', () => {
+    const entry = V02_CONTRACTS.find((c) => c.name === 'v02-provider-catalog-artifact');
+    const fixture = cases.find((c) => c.name === 'v02-provider-catalog-artifact');
+    expect(entry).toBeDefined();
+    expect(fixture).toBeDefined();
+    if (!entry || !fixture) return;
+    const schemaPath = join(
+      import.meta.dirname,
+      '../src/schema/v02-provider-catalog-artifact.schema.json',
+    );
+    const validate = ajv.compile(JSON.parse(readFileSync(schemaPath, 'utf8')));
+    for (const origin of [
+      'https://user:secret@example.org/rg.exe',
+      'https://user@example.org/rg.exe',
+      'HTTPS://example.org/rg.exe',
+    ]) {
+      const candidate = { ...fixture.good, origin };
+      expect(entry.schema.safeParse(candidate).success).toBe(false);
+      expect(validate(candidate)).toBe(false);
+    }
+  });
+
   for (const fixture of cases) {
     it(`${fixture.name} accepts valid and refuses structural attack in both validators`, () => {
       const entry = V02_CONTRACTS.find((c) => c.name === fixture.name);
