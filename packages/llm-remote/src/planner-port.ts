@@ -2,7 +2,6 @@
 // Only trusted Shun backend composition may inject these ports. T08 owns the
 // real private authenticated user gesture/issuer; model output is proposal only.
 import {
-  type CloudConsentApproval,
   CloudConsentApprovalSchema,
   canonicalJson,
   type GoalProposal,
@@ -34,11 +33,7 @@ function exactEqual(left: unknown, right: unknown): boolean {
   return canonicalJson(left) === canonicalJson(right);
 }
 
-function normalizedProposal(
-  modelText: string,
-  task: GoalRequest,
-  attemptId: string,
-): GoalProposal {
+function normalizedProposal(modelText: string, task: GoalRequest, attemptId: string): GoalProposal {
   let response: unknown;
   try {
     response = JSON.parse(modelText) as unknown;
@@ -61,7 +56,7 @@ function normalizedProposal(
   ) {
     return refused();
   }
-  const allowed = new Set(task.objects.map((object) => object.kind + ':' + object.ref));
+  const allowed = new Set(task.objects.map((object) => `${object.kind}:${object.ref}`));
   if (contract.objects.some((object) => !allowed.has(object.kind + ':' + object.ref))) {
     return refused();
   }
