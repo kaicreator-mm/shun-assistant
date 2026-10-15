@@ -45,9 +45,12 @@ describe('T06 Windows bounded top-memory process evidence', () => {
       [{ Name: 'C:/Users/private', WorkingSet64: 300 }],
       [{ Name: 'pwsh', WorkingSet64: -1 }],
       [{ Name: 'safe', WorkingSet64: 3, CommandLine: 'Bearer token' }],
-      [{ Name: 'low', WorkingSet64: 10 }, { Name: 'high', WorkingSet64: 20 }],
+      [
+        { Name: 'low', WorkingSet64: 10 },
+        { Name: 'high', WorkingSet64: 20 },
+      ],
       [],
-      Array.from({ length: 9 }, (_, i) => ({ Name: 'p' + i, WorkingSet64: 100 - i })),
+      Array.from({ length: 9 }, (_, i) => ({ Name: `p${i}`, WorkingSet64: 100 - i })),
     ];
     for (const rows of adversarial) {
       const result = observeTopMemoryProcessesWithHost(() => JSON.stringify(rows), 'win32');
