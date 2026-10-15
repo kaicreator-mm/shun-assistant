@@ -3,17 +3,19 @@
 import type { CuratedProviderVerifier } from '@shun/vertical-jit';
 import type { CuratedProviderStager } from './staging.ts';
 
-export type ProviderUseCurrentness = Readonly<{
-  kind: 'CURRENT';
-  taskId: string;
-  providerId: string;
-  bindingId: string;
-  catalogRevision: string;
-  artifactSha256: string;
-  revocationEpoch: number;
-  /** The trusted ActionController owns this claim, never the Planner/Recipe. */
-  capability: 'PREPARE_PROVIDER';
-}> | Readonly<{ kind: 'UNRESOLVABLE' }>;
+export type ProviderUseCurrentness =
+  | Readonly<{
+      kind: 'CURRENT';
+      taskId: string;
+      providerId: string;
+      bindingId: string;
+      catalogRevision: string;
+      artifactSha256: string;
+      revocationEpoch: number;
+      /** The trusted ActionController owns this claim, never the Planner/Recipe. */
+      capability: 'PREPARE_PROVIDER';
+    }>
+  | Readonly<{ kind: 'UNRESOLVABLE' }>;
 
 export type ProviderPreflightRefusal =
   | 'CATALOG_UNTRUSTED'
