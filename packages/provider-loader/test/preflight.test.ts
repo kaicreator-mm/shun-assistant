@@ -40,11 +40,9 @@ function makeDescriptor(trust: TrustedProviderScope = scope, dependencies: strin
   };
   return {
     ...unsigned,
-    curatorSignature: sign(
-      null,
-      Buffer.from(canonicalJson(unsigned)),
-      keyPair.privateKey,
-    ).toString('base64'),
+    curatorSignature: sign(null, Buffer.from(canonicalJson(unsigned)), keyPair.privateKey).toString(
+      'base64',
+    ),
   };
 }
 function makeHost(
@@ -54,7 +52,12 @@ function makeHost(
   const dir = mkdtempSync(join(tmpdir(), 'shun-t05-preflight-'));
   roots.push(dir);
   const verifier = new CuratedProviderVerifier(
-    [{ keyId: 'key-1', publicKeyPem: keyPair.publicKey.export({ type: 'spki', format: 'pem' }).toString() }],
+    [
+      {
+        keyId: 'key-1',
+        publicKeyPem: keyPair.publicKey.export({ type: 'spki', format: 'pem' }).toString(),
+      },
+    ],
     [trust],
   );
   const stager = new CuratedProviderStager({
@@ -107,7 +110,7 @@ describe('T05 signed Provider activation preflight (NO execution)', () => {
       digest: sha,
       byteLength: bytes.length,
     });
-    expect(JSON.stringify(result)).not.toContain(dirFromUnknownResult(result));
+    expect(JSON.stringify(result)).not.toContain('artifacts/');
   });
 
   it('refuses unsigned or changed catalog before any authenticated use', async () => {
@@ -136,12 +139,16 @@ describe('T05 signed Provider activation preflight (NO execution)', () => {
       code: 'AUTHORITY_STALE',
     });
     const missing = makeHost(scope, { getAuthorizedCurrentness: () => ({ kind: 'UNRESOLVABLE' }) });
-    expect(await missing.preflight.check({ taskId: 'task-1', descriptor: makeDescriptor() })).toEqual({
+    expect(
+      await missing.preflight.check({ taskId: 'task-1', descriptor: makeDescriptor() }),
+    ).toEqual({
       ok: false,
       code: 'AUTHORITY_STALE',
     });
     const mismatched = makeHost(scope, { getAuthorizedCurrentness: () => state });
-    expect(await mismatched.preflight.check({ taskId: 'wrong-task', descriptor: makeDescriptor() })).toEqual({
+    expect(
+      await mismatched.preflight.check({ taskId: 'wrong-task', descriptor: makeDescriptor() }),
+    ).toEqual({
       ok: false,
       code: 'AUTHORITY_STALE',
     });
@@ -149,10 +156,12 @@ describe('T05 signed Provider activation preflight (NO execution)', () => {
 
   it('refuses non-Windows and wrong native ABI even with signed bytes', async () => {
     const linux = makeHost(scope, { hostPlatform: () => 'linux' });
-    expect(await linux.preflight.check({ taskId: 'task-1', descriptor: makeDescriptor() })).toEqual({
-      ok: false,
-      code: 'HOST_UNSUPPORTED',
-    });
+    expect(await linux.preflight.check({ taskId: 'task-1', descriptor: makeDescriptor() })).toEqual(
+      {
+        ok: false,
+        code: 'HOST_UNSUPPORTED',
+      },
+    );
     const nativeScope: TrustedProviderScope = {
       ...scope,
       artifactKind: 'NATIVE_ADDON',
@@ -187,7 +196,3 @@ describe('T05 signed Provider activation preflight (NO execution)', () => {
   });
 });
 
-// Ensure no path/execution authority is embedded in the public preflight receipt.
-function dirFromUnknownResult(_result: unknown) {
-  return 'artifacts/';
-}
