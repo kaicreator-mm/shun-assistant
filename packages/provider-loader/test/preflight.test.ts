@@ -131,6 +131,30 @@ describe('T05 signed Provider activation preflight (NO execution)', () => {
     ).toEqual({ ok: false, code: 'CATALOG_UNTRUSTED' });
   });
 
+  it('pins original signed descriptor against getter substitution at cache reuse', async () => {
+    const { preflight, stager } = makeHost();
+    const original = makeDescriptor();
+    const drifted = makeDescriptor(scope, ['c'.repeat(64)]);
+    expect((await stager.stage(original)).ok).toBe(true);
+    let reads = 0;
+    const changing = {
+      taskId: 'task-1',
+      get descriptor() {
+        reads += 1;
+        return reads === 1 ? original : drifted;
+      },
+    };
+    expect(await preflight.check(changing)).toMatchObject({
+      ok: true,
+      state: 'PREFLIGHT_ONLY',
+      digest: sha,
+    });
+    expect(reads).toBe(1);
+    expect(
+      await preflight.check({ taskId: 'task-1', descriptor: drifted }),
+    ).toEqual({ ok: false, code: 'DEPENDENCIES_UNVERIFIED' });
+  });
+
   it('refuses revoked, wrong-task or missing trusted currentness', async () => {
     const { preflight, stager, state } = makeHost(scope, { requiredRevocationEpoch: () => 2 });
     await stager.stage(makeDescriptor());
