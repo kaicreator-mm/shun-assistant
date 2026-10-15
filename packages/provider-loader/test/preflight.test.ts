@@ -195,4 +195,3 @@ describe('T05 signed Provider activation preflight (NO execution)', () => {
     expect(JSON.stringify(result)).not.toContain('Alice');
   });
 });
-
