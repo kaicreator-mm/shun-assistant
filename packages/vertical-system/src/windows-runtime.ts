@@ -6,6 +6,10 @@ import {
   observeRuntimeCountsWithHost,
   type RuntimeCountResult,
 } from './internal/windows-counts.ts';
+import {
+  observeTopMemoryProcessesWithHost,
+  type TopMemoryProcessResult,
+} from './internal/windows-pressure.ts';
 
 const COMMAND_TIMEOUT_MS = 5000;
 
@@ -27,6 +31,24 @@ export function collectWindowsRuntimeCounts(): RuntimeCountResult {
         encoding: 'utf8',
         timeout: COMMAND_TIMEOUT_MS,
         maxBuffer: 1024,
+        windowsHide: true,
+        stdio: ['ignore', 'pipe', 'ignore'],
+      }),
+    process.platform,
+  );
+}
+
+/** Fixed Windows PowerShell read-only process memory evidence, NO argv. */
+export function collectWindowsTopMemoryProcesses(): TopMemoryProcessResult {
+  if (process.platform !== 'win32') return { ok: false, code: 'WINDOWS_REQUIRED' };
+  const executable = trustedPowerShellExe();
+  if (!executable) return { ok: false, code: 'PROCESS_FACTS_UNAVAILABLE' };
+  return observeTopMemoryProcessesWithHost(
+    (script) =>
+      execFileSync(executable, ['-NoProfile', '-NonInteractive', '-Command', script], {
+        encoding: 'utf8',
+        timeout: COMMAND_TIMEOUT_MS,
+        maxBuffer: 8192,
         windowsHide: true,
         stdio: ['ignore', 'pipe', 'ignore'],
       }),
