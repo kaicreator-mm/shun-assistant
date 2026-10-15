@@ -165,6 +165,21 @@ export class TrustedDeepSeekTransport {
   }
 
   async invoke(input: DeepSeekGoalInput): Promise<DeepSeekTransportResult> {
+    // Snapshot every caller-owned field ONCE. JavaScript getter/proxy inputs
+    // may otherwise return the approved goal during projection and a private
+    // secret during request serialization.
+    let goalText: string;
+    let attemptId: string;
+    let inputApproval: unknown;
+    let maxOutputTokens: number;
+    try {
+      goalText = input.goalText;
+      attemptId = input.attemptId;
+      inputApproval = input.approval;
+      maxOutputTokens = input.maxOutputTokens;
+    } catch {
+      return { ok: false, code: 'DISCLOSURE_INVALID' };
+    }
     // Fail closed before ever reading a credential or reserving a call.
     try {
       if (this.host.isOffline() !== false || this.host.isLocalOnly() !== false) {
@@ -174,8 +189,8 @@ export class TrustedDeepSeekTransport {
       return { ok: false, code: 'REMOTE_POLICY_REFUSED' };
     }
 
-    const parsed = CloudConsentApprovalSchema.safeParse(input.approval);
-    const disclosure = buildDeepSeekGoalDisclosure(input.goalText);
+    const parsed = CloudConsentApprovalSchema.safeParse(inputApproval);
+    const disclosure = buildDeepSeekGoalDisclosure(goalText);
     if (!parsed.success || !disclosure) return { ok: false, code: 'DISCLOSURE_INVALID' };
     const approval = parsed.data;
     const scope = approval.scope;
@@ -186,9 +201,9 @@ export class TrustedDeepSeekTransport {
       scope.disclosureCategories.length !== 1 ||
       scope.disclosureCategories[0] !== 'GOAL_TEXT' ||
       scope.approvedProjectionSha256 !== disclosure.sha256 ||
-      !Number.isSafeInteger(input.maxOutputTokens) ||
-      input.maxOutputTokens < 1 ||
-      input.maxOutputTokens > scope.maxOutputTokens
+      !Number.isSafeInteger(maxOutputTokens) ||
+      maxOutputTokens < 1 ||
+      maxOutputTokens > scope.maxOutputTokens
     ) {
       return { ok: false, code: 'DISCLOSURE_SCOPE_DRIFT' };
     }
@@ -207,15 +222,15 @@ export class TrustedDeepSeekTransport {
       return { ok: false, code: 'CREDENTIAL_UNAVAILABLE' };
     }
 
-    const bytes = exactRequestBytes(input.goalText, input.maxOutputTokens);
+    const bytes = exactRequestBytes(goalText, maxOutputTokens);
     const reserved = this.host.ledger.reserve({
-      attemptId: input.attemptId,
+      attemptId: attemptId,
       approval,
       currentness,
       now,
       requestBytes: bytes,
       disclosureProjectionBytes: Buffer.from(disclosure.projectionJson, 'utf8'),
-      outputTokenCeiling: input.maxOutputTokens,
+      outputTokenCeiling: maxOutputTokens,
     });
     if (!reserved.ok) return { ok: false, code: 'BUDGET_REFUSED' };
 
@@ -235,7 +250,7 @@ export class TrustedDeepSeekTransport {
     }
     if (
       !this.host.ledger.markMayHaveSent({
-        attemptId: input.attemptId,
+        attemptId: attemptId,
         actualRequestBytes: bytes,
         approval,
         currentness: sendCurrentness,
@@ -260,11 +275,11 @@ export class TrustedDeepSeekTransport {
         signal: AbortSignal.timeout(15_000),
       });
     } catch {
-      this.host.ledger.markUnknownCost(input.attemptId);
+      this.host.ledger.markUnknownCost(attemptId);
       return { ok: false, code: 'REMOTE_UNAVAILABLE' };
     }
     // Regardless of HTTP outcome or response parsing, the call may be billed.
-    if (!this.host.ledger.markUnknownCost(input.attemptId)) {
+    if (!this.host.ledger.markUnknownCost(attemptId)) {
       return { ok: false, code: 'COST_STATE_UNCERTAIN' };
     }
     const raw = await boundedJsonResponse(response);
@@ -272,7 +287,7 @@ export class TrustedDeepSeekTransport {
     if (proposalText === null) return { ok: false, code: 'REMOTE_RESPONSE_INVALID' };
     return {
       ok: true,
-      attemptId: input.attemptId,
+      attemptId: attemptId,
       proposalText,
       costState: 'UNKNOWN_COST',
     };

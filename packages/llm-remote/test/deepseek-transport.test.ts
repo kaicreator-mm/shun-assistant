@@ -155,6 +155,27 @@ describe('T01 DeepSeek HTTPS: exact disclosed projection to send', () => {
     expect(ledger.inspect('en-attempt')?.status).toBe('UNKNOWN_COST');
   });
 
+  it('pins a caller getter exactly once; disclosure and sent bytes cannot diverge', async () => {
+    const { transport, ledger, observed } = setup();
+    let reads = 0;
+    const hostile = {
+      get goalText() {
+        reads += 1;
+        return reads === 1 ? EN : 'C:/private/credentials.txt';
+      },
+      approval: approval(EN),
+      attemptId: 'getter-attempt',
+      maxOutputTokens: 100,
+    };
+    const result = await transport.invoke(hostile);
+    expect(result.ok).toBe(true);
+    expect(reads).toBe(1);
+    expect(observed).toHaveLength(1);
+    expect(observed[0]?.body).toContain(EN);
+    expect(observed[0]?.body).not.toContain('credentials.txt');
+    expect(ledger.inspect('getter-attempt')?.status).toBe('UNKNOWN_COST');
+  });
+
   it('never sends when a caller adds undisclosed private content or body fields', async () => {
     const { transport, observed, ledger } = setup();
     const result = await transport.invoke({
