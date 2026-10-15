@@ -1,10 +1,7 @@
 // T06: deterministic, privacy-minimal read-only Windows diagnosis projection.
 // This file NEVER authorizes cleanup, touches user data or claims root cause.
+import { collectWindowsSystemInventory, type SystemInventoryResult } from './index.ts';
 import type { RuntimeCountResult } from './internal/windows-counts.ts';
-import {
-  collectWindowsSystemInventory,
-  type SystemInventoryResult,
-} from './index.ts';
 import { collectWindowsRuntimeCounts } from './windows-runtime.ts';
 
 export type DiagnosisRefusal =
@@ -61,11 +58,12 @@ export function projectReadonlyDiagnosis(
   if (!inventory.ok || !runtime.ok) {
     return {
       ok: false,
-      code: inventory.ok && !runtime.ok && runtime.code === 'WINDOWS_REQUIRED'
-        ? 'WINDOWS_REQUIRED'
-        : !inventory.ok && inventory.code === 'WINDOWS_REQUIRED'
+      code:
+        inventory.ok && !runtime.ok && runtime.code === 'WINDOWS_REQUIRED'
           ? 'WINDOWS_REQUIRED'
-          : 'OBSERVATION_UNAVAILABLE',
+          : !inventory.ok && inventory.code === 'WINDOWS_REQUIRED'
+            ? 'WINDOWS_REQUIRED'
+            : 'OBSERVATION_UNAVAILABLE',
     };
   }
   const a = inventory.snapshot;
@@ -130,10 +128,7 @@ export function projectReadonlyDiagnosis(
 export function collectWindowsReadonlyDiagnosis(): DiagnosticResult {
   if (process.platform !== 'win32') return { ok: false, code: 'WINDOWS_REQUIRED' };
   try {
-    return projectReadonlyDiagnosis(
-      collectWindowsSystemInventory(),
-      collectWindowsRuntimeCounts(),
-    );
+    return projectReadonlyDiagnosis(collectWindowsSystemInventory(), collectWindowsRuntimeCounts());
   } catch {
     return { ok: false, code: 'OBSERVATION_UNAVAILABLE' };
   }
