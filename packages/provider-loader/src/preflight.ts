@@ -69,12 +69,22 @@ export class CuratedProviderPreflight {
    * results in a fixed denial. No executable path is ever returned.
    */
   async check(input: { taskId: string; descriptor: unknown }): Promise<ProviderPreflightResult> {
-    if (!input || typeof input.taskId !== 'string' || input.taskId.length < 1) {
+    // Snapshot caller-owned getters once. Re-verification MUST use the exact
+    // immutable signed descriptor minted by our trusted catalog verifier.
+    let taskId: string;
+    let descriptor: unknown;
+    try {
+      taskId = input.taskId;
+      descriptor = input.descriptor;
+    } catch {
+      return { ok: false, code: 'AUTHORITY_UNAVAILABLE' };
+    }
+    if (typeof taskId !== 'string' || taskId.length < 1) {
       return { ok: false, code: 'AUTHORITY_UNAVAILABLE' };
     }
     let proof: ReturnType<CuratedProviderVerifier['verify']>;
     try {
-      proof = this.host.verifier.verify(input.descriptor);
+      proof = this.host.verifier.verify(descriptor);
     } catch {
       return { ok: false, code: 'CATALOG_UNTRUSTED' };
     }
@@ -87,7 +97,7 @@ export class CuratedProviderPreflight {
     let arch: string;
     let abi: string;
     try {
-      snapshot = this.host.getAuthorizedCurrentness(input.taskId, artifact.bindingId);
+      snapshot = this.host.getAuthorizedCurrentness(taskId, artifact.bindingId);
       revokedEpoch = this.host.requiredRevocationEpoch(artifact.bindingId);
       platform = this.host.hostPlatform();
       arch = this.host.hostArchitecture();
@@ -98,7 +108,7 @@ export class CuratedProviderPreflight {
     if (
       snapshot.kind !== 'CURRENT' ||
       snapshot.capability !== 'PREPARE_PROVIDER' ||
-      snapshot.taskId !== input.taskId ||
+      snapshot.taskId !== taskId ||
       snapshot.providerId !== artifact.providerId ||
       snapshot.bindingId !== artifact.bindingId ||
       snapshot.catalogRevision !== artifact.catalogRevision ||
@@ -123,7 +133,7 @@ export class CuratedProviderPreflight {
     }
     let bytes: Buffer | null;
     try {
-      bytes = await this.host.stager.readVerified(input.descriptor);
+      bytes = await this.host.stager.readVerified(artifact);
     } catch {
       return { ok: false, code: 'ARTIFACT_NOT_VERIFIED' };
     }
