@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { projectReadonlyDiagnosis, collectWindowsReadonlyDiagnosis } from '../src/diagnostics.ts';
+import { collectWindowsReadonlyDiagnosis, projectReadonlyDiagnosis } from '../src/diagnostics.ts';
 import type { SystemInventoryResult } from '../src/index.ts';
 import type { RuntimeCountResult } from '../src/internal/windows-counts.ts';
 
@@ -81,10 +81,13 @@ describe('T06 deterministic readonly system diagnosis', () => {
   });
 
   it('does not hide a denied or unavailable native observation', () => {
-    expect(projectReadonlyDiagnosis(inventory, { ok: false, code: 'PROCESS_FACTS_UNAVAILABLE' }))
-      .toEqual({ ok: false, code: 'OBSERVATION_UNAVAILABLE' });
-    expect(projectReadonlyDiagnosis({ ok: false, code: 'WINDOWS_REQUIRED' }, runtime))
-      .toEqual({ ok: false, code: 'WINDOWS_REQUIRED' });
+    expect(
+      projectReadonlyDiagnosis(inventory, { ok: false, code: 'PROCESS_FACTS_UNAVAILABLE' }),
+    ).toEqual({ ok: false, code: 'OBSERVATION_UNAVAILABLE' });
+    expect(projectReadonlyDiagnosis({ ok: false, code: 'WINDOWS_REQUIRED' }, runtime)).toEqual({
+      ok: false,
+      code: 'WINDOWS_REQUIRED',
+    });
   });
 
   it('public entrypoint has zero injectable parameters and fails closed on non-Windows', () => {
