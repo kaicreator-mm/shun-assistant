@@ -137,6 +137,7 @@ describe('T01 DeepSeek HTTPS: exact disclosed projection to send', () => {
     expect(observed).toHaveLength(2);
     for (const [i, goal] of [CN, EN].entries()) {
       const request = observed[i];
+      if (!request) throw new Error('missing captured request');
       expect(request.url).toBe(DEEPSEEK_FLASH_DESTINATION);
       expect(request.options.method).toBe('POST');
       expect(request.options.redirect).toBe('manual');
