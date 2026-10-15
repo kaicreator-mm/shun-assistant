@@ -150,9 +150,10 @@ describe('T05 signed Provider activation preflight (NO execution)', () => {
       digest: sha,
     });
     expect(reads).toBe(1);
-    expect(
-      await preflight.check({ taskId: 'task-1', descriptor: drifted }),
-    ).toEqual({ ok: false, code: 'DEPENDENCIES_UNVERIFIED' });
+    expect(await preflight.check({ taskId: 'task-1', descriptor: drifted })).toEqual({
+      ok: false,
+      code: 'DEPENDENCIES_UNVERIFIED',
+    });
   });
 
   it('refuses revoked, wrong-task or missing trusted currentness', async () => {
