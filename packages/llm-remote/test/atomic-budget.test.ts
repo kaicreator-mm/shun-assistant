@@ -151,6 +151,23 @@ describe('v0.2 durable DeepSeek privacy budget gate', () => {
     expect(valid.inspect('attempt-1')).toBeNull();
   });
 
+  it('reserves full approved token ceilings rather than undercounting chat-template overhead', () => {
+    const { ledger } = setup();
+    const approval = makeApproval();
+    // Raw body is under 100 bytes but approved token maxima price at 1200
+    // micro-units (1000 input + 100 output × 2), not byte length + 20 × 2.
+    approval.scope.maxCostMicros = 1100;
+    expect(ledger.reserve(request(approval))).toEqual({
+      ok: false,
+      code: 'BUDGET_EXHAUSTED',
+    });
+    expect(ledger.inspect('attempt-1')).toBeNull();
+    const safe = makeApproval();
+    safe.scope.maxCostMicros = 1200;
+    const approved = ledger.reserve(request(safe));
+    expect(approved).toMatchObject({ ok: true, reservedCostMicros: 1200 });
+  });
+
   it('requires a fresh trusted broker, currentness and exact bytes at send boundary', () => {
     const { ledger } = setup();
     const approval = makeApproval();
