@@ -207,12 +207,18 @@ describe('T01 typed DeepSeek PlannerPort composition (no real broker or HTTP)', 
   it('redacts null, throwing discriminant and throwing proposal getters from transport', async () => {
     const corrupted: unknown[] = [
       null,
-      { get ok() { throw new Error('Bearer secret-value'); } },
+      {
+        get ok() {
+          throw new Error('Bearer secret-value');
+        },
+      },
       {
         ok: true,
         attemptId: 'attempt_1',
         costState: 'UNKNOWN_COST',
-        get proposalText() { throw new Error('C:/private/credentials'); },
+        get proposalText() {
+          throw new Error('C:/private/credentials');
+        },
       },
     ];
     for (const raw of corrupted) {
@@ -224,8 +230,7 @@ describe('T01 typed DeepSeek PlannerPort composition (no real broker or HTTP)', 
           maxOutputTokens: 100,
         }),
         transport: {
-          invoke: async (): Promise<DeepSeekTransportResult> =>
-            raw as DeepSeekTransportResult,
+          invoke: async (): Promise<DeepSeekTransportResult> => raw as DeepSeekTransportResult,
         },
       });
       await expect(port.interpretGoal(request)).rejects.toThrow(/^REMOTE_PLANNER_REFUSED$/);

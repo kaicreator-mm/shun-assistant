@@ -57,7 +57,7 @@ function normalizedProposal(modelText: string, task: GoalRequest, attemptId: str
     return refused();
   }
   const allowed = new Set(task.objects.map((object) => `${object.kind}:${object.ref}`));
-  if (contract.objects.some((object) => !allowed.has(object.kind + ':' + object.ref))) {
+  if (contract.objects.some((object) => !allowed.has(`${object.kind}:${object.ref}`))) {
     return refused();
   }
   // Ignore any model-authored "plannerEvidence": it cannot attest its own
