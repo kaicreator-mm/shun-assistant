@@ -110,9 +110,11 @@ export class DurableCloudBudgetLedger {
 
   /**
    * Fail closed before any network attempt. Reserve at most maxCalls slots and
-   * worst-case cost in ONE SQLite transaction. Conservative estimation: UTF-8
-   * request bytes bound input tokens, which cannot exceed byte count for a
-   * byte-aligned tokenizer; excess bytes simply reject safe requests.
+   * worst-case cost in ONE SQLite transaction. Body byte length only gates
+   * an oversized request; it is NOT a safe upper bound on model token billing
+   * (chat-template special tokens add overhead). Price reservations use the
+   * FULL approved maxInputTokens and maxOutputTokens ceilings per attempt.
+   * Any unknown model pricing/token accounting must fail closed at T01 runtime.
    */
   reserve(input: ReserveCloudAttempt): LedgerResult {
     let requested: ReturnType<typeof validateCloudConsent>;
@@ -153,12 +155,14 @@ export class DurableCloudBudgetLedger {
     if (!SHA64.test(projectionHash) || projectionHash !== scope.approvedProjectionSha256) {
       return { ok: false, code: 'DISCLOSURE_SCOPE_DRIFT' };
     }
-    const conservativeInputTokens = input.requestBytes.byteLength;
-    if (conservativeInputTokens < 1 || conservativeInputTokens > scope.maxInputTokens)
+    if (input.requestBytes.byteLength < 1 || input.requestBytes.byteLength > scope.maxInputTokens)
       return { ok: false, code: 'BUDGET_EXHAUSTED' };
+    // Chat framing/tool metadata may consume tokens absent from serialized
+    // request bytes. Reserve ALL approved token ceilings, never byte-count
+    // estimates or client-requested output ceilings, before egress.
     const maxCost =
-      BigInt(conservativeInputTokens) * BigInt(this.pricing.inputMicrosPerToken) +
-      BigInt(input.outputTokenCeiling) * BigInt(this.pricing.outputMicrosPerToken);
+      BigInt(scope.maxInputTokens) * BigInt(this.pricing.inputMicrosPerToken) +
+      BigInt(scope.maxOutputTokens) * BigInt(this.pricing.outputMicrosPerToken);
     if (maxCost > BigInt(scope.maxCostMicros) || maxCost > BigInt(Number.MAX_SAFE_INTEGER)) {
       return { ok: false, code: 'BUDGET_EXHAUSTED' };
     }
