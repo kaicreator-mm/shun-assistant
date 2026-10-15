@@ -1,9 +1,6 @@
-import type { CloudConsentApproval, GoalRequest, GoalProposal } from '@shun/contracts';
+import type { CloudConsentApproval, GoalProposal, GoalRequest } from '@shun/contracts';
 import { describe, expect, it } from 'vitest';
-import type {
-  DeepSeekGoalInput,
-  DeepSeekTransportResult,
-} from '../src/deepseek-transport.ts';
+import type { DeepSeekGoalInput, DeepSeekTransportResult } from '../src/deepseek-transport.ts';
 import { DeepSeekFlashPlannerPort } from '../src/planner-port.ts';
 
 const SHA = 'a'.repeat(64);
@@ -118,10 +115,20 @@ describe('T01 typed DeepSeek PlannerPort composition (no real broker or HTTP)', 
 
   it('never contacts authorization or model under offline, forbidden or LOCAL_ONLY', async () => {
     for (const policy of [
-      { ...request, policyContext: { ...request.policyContext,
-        privacyPolicy: { localOnly: true, externalDisclosure: 'ALLOWED' as const } } },
-      { ...request, policyContext: { ...request.policyContext,
-        privacyPolicy: { localOnly: false, externalDisclosure: 'FORBIDDEN' as const } } },
+      {
+        ...request,
+        policyContext: {
+          ...request.policyContext,
+          privacyPolicy: { localOnly: true, externalDisclosure: 'ALLOWED' as const },
+        },
+      },
+      {
+        ...request,
+        policyContext: {
+          ...request.policyContext,
+          privacyPolicy: { localOnly: false, externalDisclosure: 'FORBIDDEN' as const },
+        },
+      },
       { ...request, constraints: { other: { offline: true } } },
     ]) {
       const h = harness();
@@ -167,8 +174,14 @@ describe('T01 typed DeepSeek PlannerPort composition (no real broker or HTTP)', 
     const h = harness({ proposalId: 'okay', shell: 'Remove-Item C:/Users/secret' });
     await expect(h.planner.interpretGoal(request)).rejects.toThrow('REMOTE_PLANNER_REFUSED');
     const failing = new DeepSeekFlashPlannerPort({
-      prepareApprovedGoal: async () => { throw new Error('Bearer private-token'); },
-      transport: { invoke: async () => { throw new Error('never called'); } },
+      prepareApprovedGoal: async () => {
+        throw new Error('Bearer private-token');
+      },
+      transport: {
+        invoke: async () => {
+          throw new Error('never called');
+        },
+      },
     });
     await expect(failing.interpretGoal(request)).rejects.toThrow('REMOTE_PLANNER_REFUSED');
   });
@@ -181,10 +194,14 @@ describe('T01 typed DeepSeek PlannerPort composition (no real broker or HTTP)', 
         attemptId: 'attempt_1',
         maxOutputTokens: 100,
       }),
-      transport: { invoke: async () => ({
-        ok: true as const, attemptId: 'swapped', proposalText: JSON.stringify(proposed()),
-        costState: 'UNKNOWN_COST' as const,
-      }) },
+      transport: {
+        invoke: async () => ({
+          ok: true as const,
+          attemptId: 'swapped',
+          proposalText: JSON.stringify(proposed()),
+          costState: 'UNKNOWN_COST' as const,
+        }),
+      },
     });
     await expect(port.interpretGoal(request)).rejects.toThrow('REMOTE_PLANNER_REFUSED');
   });
