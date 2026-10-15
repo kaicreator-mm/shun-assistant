@@ -186,6 +186,52 @@ describe('T01 typed DeepSeek PlannerPort composition (no real broker or HTTP)', 
     await expect(failing.interpretGoal(request)).rejects.toThrow('REMOTE_PLANNER_REFUSED');
   });
 
+  it('redacts nested approval getter/Proxy errors before transport invocation', async () => {
+    const proof = approved();
+    proof.scope = new Proxy(proof.scope, {
+      get(target, property, receiver) {
+        if (property === 'taskId') throw new Error('Bearer private-token');
+        return Reflect.get(target, property, receiver);
+      },
+    });
+    const h = harness(proposed(), async (goal) => ({
+      approval: proof,
+      goalText: goal.goal,
+      attemptId: 'attempt_nested',
+      maxOutputTokens: 100,
+    }));
+    await expect(h.planner.interpretGoal(request)).rejects.toThrow(/^REMOTE_PLANNER_REFUSED$/);
+    expect(h.outgoing).toHaveLength(0);
+  });
+
+  it('redacts null, throwing discriminant and throwing proposal getters from transport', async () => {
+    const corrupted: unknown[] = [
+      null,
+      { get ok() { throw new Error('Bearer secret-value'); } },
+      {
+        ok: true,
+        attemptId: 'attempt_1',
+        costState: 'UNKNOWN_COST',
+        get proposalText() { throw new Error('C:/private/credentials'); },
+      },
+    ];
+    for (const raw of corrupted) {
+      const port = new DeepSeekFlashPlannerPort({
+        prepareApprovedGoal: async (goal) => ({
+          approval: approved(),
+          goalText: goal.goal,
+          attemptId: 'attempt_1',
+          maxOutputTokens: 100,
+        }),
+        transport: {
+          invoke: async (): Promise<DeepSeekTransportResult> =>
+            raw as DeepSeekTransportResult,
+        },
+      });
+      await expect(port.interpretGoal(request)).rejects.toThrow(/^REMOTE_PLANNER_REFUSED$/);
+    }
+  });
+
   it('rejects a transport with a swapped attempt even when it reports success', async () => {
     const port = new DeepSeekFlashPlannerPort({
       prepareApprovedGoal: async (goal) => ({

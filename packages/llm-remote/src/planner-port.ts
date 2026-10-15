@@ -127,7 +127,15 @@ export class DeepSeekFlashPlannerPort implements PlannerPort {
     } catch {
       return refused();
     }
-    const broker = CloudConsentApprovalSchema.safeParse(approvalInput);
+    // Nested broker approval values may be getters/Proxies even after the
+    // top-level fields were captured. Zod may invoke them and throw; no
+    // private error is permitted to cross the PlannerPort boundary.
+    let broker: ReturnType<typeof CloudConsentApprovalSchema.safeParse>;
+    try {
+      broker = CloudConsentApprovalSchema.safeParse(approvalInput);
+    } catch {
+      return refused();
+    }
     if (
       !broker.success ||
       broker.data.scope.taskId !== goal.taskId ||
@@ -140,18 +148,28 @@ export class DeepSeekFlashPlannerPort implements PlannerPort {
     }
     // The transport/ledger validates the issuer cryptographically via its
     // trusted private verifier, quota/nonce/currentness and outbound digest.
-    let remote: DeepSeekTransportResult;
+    // Keep transport result getters, malformed results and normalization in
+    // the same redacting boundary as invoke(), not only the awaited call.
     try {
-      remote = await this.host.transport.invoke({
+      const remote: DeepSeekTransportResult = await this.host.transport.invoke({
         goalText: goal.goal,
         attemptId,
         approval: broker.data,
         maxOutputTokens: ceiling,
       });
+      if (
+        !remote ||
+        typeof remote !== 'object' ||
+        remote.ok !== true ||
+        remote.attemptId !== attemptId ||
+        typeof remote.proposalText !== 'string' ||
+        remote.costState !== 'UNKNOWN_COST'
+      ) {
+        return refused();
+      }
+      return normalizedProposal(remote.proposalText, goal, attemptId);
     } catch {
       return refused();
     }
-    if (!remote.ok || remote.attemptId !== attemptId) return refused();
-    return normalizedProposal(remote.proposalText, goal, attemptId);
   }
 }
