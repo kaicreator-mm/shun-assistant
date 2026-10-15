@@ -12,6 +12,7 @@ import type {
   RecipeDefinition,
   RecipeResolverPort,
 } from '@shun/contracts';
+import type { SavedRecipeRevision } from '@shun/store';
 import { RecipeSeamUnavailableError } from './errors.ts';
 
 export class FailClosedRecipeResolver implements RecipeResolverPort {
@@ -36,5 +37,26 @@ export class FailClosedRecipeResolver implements RecipeResolverPort {
     _currentFacts: Record<string, unknown>,
   ): Promise<ActionPlanProposal> {
     throw new RecipeSeamUnavailableError('instantiate');
+  }
+}
+
+/**
+ * Immutable source lookup ONLY; this seam deliberately cannot run, approve,
+ * promote or revalidate a Recipe for side effects. T04 ActionController must
+ * independently own all those decisions before dispatch.
+ */
+export interface ExactRecipeRevisionReader {
+  get(recipeId: string, revisionSha256: string): SavedRecipeRevision | null;
+}
+
+export class ReadonlyRecipeRevisionCatalog {
+  private readonly reader: ExactRecipeRevisionReader;
+
+  constructor(reader: ExactRecipeRevisionReader) {
+    this.reader = reader;
+  }
+
+  getExact(recipeId: string, revisionSha256: string): SavedRecipeRevision | null {
+    return this.reader.get(recipeId, revisionSha256);
   }
 }
