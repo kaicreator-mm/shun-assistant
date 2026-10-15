@@ -148,7 +148,7 @@ describe('T05 signed curated Provider byte acquisition', () => {
     expect(await host.stager.readVerified(descriptor())).toBeNull();
   });
 
-  it('never reuses a tampered cached binary and refuses cache symlinks', async () => {
+  it('never reuses tampered cached binary bytes', async () => {
     const host = setup();
     expect((await host.stager.stage(descriptor())).ok).toBe(true);
     const path = join(host.root, 'artifacts', trust.artifactSha256);
@@ -156,11 +156,28 @@ describe('T05 signed curated Provider byte acquisition', () => {
     expect(await host.stager.stage(descriptor())).toEqual({ ok: false, code: 'CACHE_UNTRUSTED' });
     expect(host.calls()).toBe(1);
     expect(await host.stager.readVerified(descriptor())).toBeNull();
+  });
 
+  it('refuses a symlinked cached artifact when the host permits symlink fixtures', async (ctx) => {
+    const host = setup();
+    expect((await host.stager.stage(descriptor())).ok).toBe(true);
+    const path = join(host.root, 'artifacts', trust.artifactSha256);
     const victim = join(host.root, 'other-file');
     writeFileSync(victim, trustedContents);
     rmSync(path);
-    symlinkSync(victim, path);
+    try {
+      symlinkSync(victim, path);
+    } catch (error) {
+      // A normal Windows user without Developer Mode cannot create symlinks.
+      // The privilege-dependent fixture must be SKIPPED, not misreported
+      // as product failure or silently counted as a successful symlink check.
+      const code = (error as NodeJS.ErrnoException).code;
+      if (process.platform === 'win32' && (code === 'EPERM' || code === 'EACCES')) {
+        ctx.skip('WIN_SYMLINK_FIXTURE_PRIVILEGE_UNAVAILABLE');
+        return;
+      }
+      throw error;
+    }
     expect(await host.stager.stage(descriptor())).toEqual({ ok: false, code: 'CACHE_UNTRUSTED' });
     expect(readFileSync(victim)).toEqual(trustedContents);
   });
