@@ -7,8 +7,8 @@ import { DurableCloudBudgetLedger } from '../src/atomic-budget.ts';
 import {
   buildDeepSeekGoalDisclosure,
   DEEPSEEK_FLASH_DESTINATION,
-  TrustedDeepSeekTransport,
   type TrustedDeepSeekHost,
+  TrustedDeepSeekTransport,
 } from '../src/deepseek-transport.ts';
 
 const NOW = '2026-10-15T00:00:00.000Z';
@@ -22,13 +22,13 @@ function approval(goalText: string, consentId = 'consent-1'): CloudConsentApprov
   if (!shown) throw new Error('bad fixture');
   return {
     consentId,
-    confirmationNonce: 'nonce-' + consentId,
+    confirmationNonce: `nonce-${consentId}`,
     displayedProjectionSha256: shown.sha256,
     displayedDisclosureCategories: ['GOAL_TEXT'],
     issuer: {
       brokerId: 'private-shun-broker',
       brokerRevision: 'broker-r1',
-      assertionId: 'assertion-' + consentId,
+      assertionId: `assertion-${consentId}`,
       channel: 'AUTHENTICATED_PRIVATE_IPC',
       proof: 'fake-test-proof-not-production',
     },
@@ -75,7 +75,9 @@ type Observed = { url: string; body: string; options: RequestInit };
 function setup(
   overrides: Partial<TrustedDeepSeekHost> = {},
   reply: unknown = {
-    choices: [{ finish_reason: 'stop', message: { role: 'assistant', content: '{"proposal":true}' } }],
+    choices: [
+      { finish_reason: 'stop', message: { role: 'assistant', content: '{"proposal":true}' } },
+    ],
   },
 ) {
   const dir = mkdtempSync(join(tmpdir(), 'shun-deepseek-transport-'));
@@ -155,7 +157,7 @@ describe('T01 DeepSeek HTTPS: exact disclosed projection to send', () => {
   it('never sends when a caller adds undisclosed private content or body fields', async () => {
     const { transport, observed, ledger } = setup();
     const result = await transport.invoke({
-      goalText: EN + ' C:/private/passwords.txt',
+      goalText: `${EN} C:/private/passwords.txt`,
       approval: approval(EN),
       attemptId: 'secret-drift',
       maxOutputTokens: 100,
@@ -206,11 +208,13 @@ describe('T01 DeepSeek HTTPS: exact disclosed projection to send', () => {
     expect(missing.observed).toHaveLength(0);
     expect(missing.ledger.inspect('no-key')).toBeNull();
 
-    const forged = setup({ ledger: new DurableCloudBudgetLedger({
-      file: ':memory:',
-      verifyBroker: () => false,
-      pricing: { revision: 'pricing-1', inputMicrosPerToken: 1, outputMicrosPerToken: 2 },
-    }) });
+    const forged = setup({
+      ledger: new DurableCloudBudgetLedger({
+        file: ':memory:',
+        verifyBroker: () => false,
+        pricing: { revision: 'pricing-1', inputMicrosPerToken: 1, outputMicrosPerToken: 2 },
+      }),
+    });
     expect(
       await forged.transport.invoke({
         goalText: EN,
@@ -246,15 +250,33 @@ describe('T01 DeepSeek HTTPS: exact disclosed projection to send', () => {
     expect(cheap.observed).toHaveLength(0);
   });
 
+  it('rechecks trusted offline policy after reservation and refuses network', async () => {
+    let checks = 0;
+    const { transport, ledger, observed } = setup({
+      isOffline: () => {
+        checks += 1;
+        return checks >= 2;
+      },
+    });
+    expect(
+      await transport.invoke({
+        goalText: EN,
+        approval: approval(EN),
+        attemptId: 'offline-between',
+        maxOutputTokens: 100,
+      }),
+    ).toEqual({ ok: false, code: 'REMOTE_POLICY_REFUSED' });
+    expect(observed).toHaveLength(0);
+    expect(ledger.inspect('offline-between')?.status).toBe('RESERVED');
+  });
+
   it('refuses changed currentness between reserve and send without HTTP', async () => {
     let calls = 0;
     const { transport, observed, ledger } = setup({
       currentnessFor: (p) => {
         calls += 1;
         const state = currentness(p);
-        return calls === 2 && state.kind === 'CURRENT'
-          ? { ...state, revocationEpoch: 999 }
-          : state;
+        return calls === 2 && state.kind === 'CURRENT' ? { ...state, revocationEpoch: 999 } : state;
       },
     });
     expect(
@@ -295,9 +317,14 @@ describe('T01 DeepSeek HTTPS: exact disclosed projection to send', () => {
   });
 
   it('never treats malformed or hallucinated response content as authority', async () => {
-    const { transport, ledger } = setup({}, {
-      choices: [{ finish_reason: 'length', message: { role: 'assistant', content: 'launch shell' } }],
-    });
+    const { transport, ledger } = setup(
+      {},
+      {
+        choices: [
+          { finish_reason: 'length', message: { role: 'assistant', content: 'launch shell' } },
+        ],
+      },
+    );
     const result = await transport.invoke({
       goalText: EN,
       approval: approval(EN),

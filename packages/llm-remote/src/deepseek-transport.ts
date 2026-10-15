@@ -139,9 +139,7 @@ function extractProposal(value: unknown): string | null {
   };
   if (finish_reason !== 'stop' || !message || typeof message !== 'object') return null;
   const { role, content } = message as { role?: unknown; content?: unknown };
-  return role === 'assistant' && typeof content === 'string' && content.length > 0
-    ? content
-    : null;
+  return role === 'assistant' && typeof content === 'string' && content.length > 0 ? content : null;
 }
 
 /**
@@ -153,8 +151,7 @@ export class TrustedDeepSeekTransport {
 
   constructor(host: TrustedDeepSeekHost) {
     if (
-      !host ||
-      !host.ledger ||
+      !host?.ledger ||
       typeof host.ledger.reserve !== 'function' ||
       typeof host.ledger.markMayHaveSent !== 'function' ||
       typeof host.ledger.markUnknownCost !== 'function' ||
@@ -206,7 +203,7 @@ export class TrustedDeepSeekTransport {
     } catch {
       return { ok: false, code: 'CONSENT_STALE' };
     }
-    if (!key || !key.trim() || key.trim() !== key || key.includes('\r') || key.includes('\n')) {
+    if (!key?.trim() || key.trim() !== key || key.includes('\r') || key.includes('\n')) {
       return { ok: false, code: 'CREDENTIAL_UNAVAILABLE' };
     }
 
@@ -228,6 +225,9 @@ export class TrustedDeepSeekTransport {
     let sendCurrentness: CloudConsentCurrentness;
     let sendTime: string;
     try {
+      if (this.host.isOffline() !== false || this.host.isLocalOnly() !== false) {
+        return { ok: false, code: 'REMOTE_POLICY_REFUSED' };
+      }
       sendCurrentness = this.host.currentnessFor(approval);
       sendTime = (this.host.now ?? (() => new Date().toISOString()))();
     } catch {
@@ -253,7 +253,7 @@ export class TrustedDeepSeekTransport {
         credentials: 'omit',
         cache: 'no-store',
         headers: {
-          Authorization: 'Bearer ' + key,
+          Authorization: `Bearer ${key}`,
           'Content-Type': 'application/json',
         },
         body: bytes,
