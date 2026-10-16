@@ -25,6 +25,37 @@ describe('T06 fixed read-only HKLM software sample', () => {
     expect(JSON.stringify(value)).not.toContain('InstallLocation');
   });
 
+  it('admits ordinary product DisplayName with internal slash, but not rooted paths', () => {
+    const value = observeInstalledSoftwareWithHost(
+      () => JSON.stringify([
+        { DisplayName: 'Visual C++ Tools (x64/x86)', DisplayVersion: '1.0' },
+        { DisplayName: 'Audio/Video Codec', DisplayVersion: '2.0' },
+      ]),
+      'win32',
+    );
+    expect(value).toMatchObject({
+      ok: true,
+      report: {
+        entries: [
+          { name: 'Visual C++ Tools (x64/x86)', version: '1.0' },
+          { name: 'Audio/Video Codec', version: '2.0' },
+        ],
+      },
+    });
+    expect(
+      observeInstalledSoftwareWithHost(
+        () => JSON.stringify({ DisplayName: '/private/secret', DisplayVersion: '1' }),
+        'win32',
+      ),
+    ).toEqual({ ok: false, code: 'SOFTWARE_FACTS_INVALID' });
+    expect(
+      observeInstalledSoftwareWithHost(
+        () => JSON.stringify({ DisplayName: 'app/../private', DisplayVersion: '1' }),
+        'win32',
+      ),
+    ).toEqual({ ok: false, code: 'SOFTWARE_FACTS_INVALID' });
+  });
+
   it('rejects path and secret-bearing extra keys without reflecting them', () => {
     const poison = [
       { DisplayName: 'C:/Users/private', DisplayVersion: '1' },
