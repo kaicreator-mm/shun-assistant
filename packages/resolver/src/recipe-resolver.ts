@@ -5,11 +5,11 @@
 import { createHash } from 'node:crypto';
 import {
   canonicalJson,
+  type RecipeActionGraph,
   RecipeActionGraphSchema,
+  type RecipeRevisionIdentity,
   RecipeRevisionIdentitySchema,
   verifyRecipeRevision,
-  type RecipeActionGraph,
-  type RecipeRevisionIdentity,
 } from '@shun/contracts';
 
 const SHA = /^[a-f0-9]{64}$/;
@@ -82,11 +82,7 @@ export class ClosedWorldRecipePreview {
   private readonly host: RecipeReplayHost;
 
   constructor(host: RecipeReplayHost) {
-    if (
-      !host ||
-      typeof host.loadExact !== 'function' ||
-      typeof host.currentness !== 'function'
-    ) {
+    if (!host || typeof host.loadExact !== 'function' || typeof host.currentness !== 'function') {
       throw new Error('RECIPE_PREVIEW_CONFIGURATION_REFUSED');
     }
     this.host = host;

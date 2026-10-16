@@ -12,8 +12,13 @@ const sourceText = 'proposal-only JS source; NEVER executed';
 const compiledArtifact = 'opaque-preverified-typed-artifact';
 function fixture(): RecipeReplaySnapshot {
   const actionGraph = {
-    nodes: [{ actionId: 'read-1', op: 'file.search' as const,
-      parameters: { root: 'C:/selected', query: '*.txt' } }],
+    nodes: [
+      {
+        actionId: 'read-1',
+        op: 'file.search' as const,
+        parameters: { root: 'C:/selected', query: '*.txt' },
+      },
+    ],
     edges: [],
   };
   const declaredEffects = ['file.search'];
@@ -30,19 +35,27 @@ function fixture(): RecipeReplaySnapshot {
   };
   return {
     identity: { ...base, revisionSha256: computeRecipeRevision(base) },
-    sourceText, compiledArtifact, actionGraph, declaredEffects,
+    sourceText,
+    compiledArtifact,
+    actionGraph,
+    declaredEffects,
   };
 }
 function trustedFacts(saved: RecipeReplaySnapshot): RecipeReplayCurrentness {
   return {
-    kind: 'CURRENT', taskId: 'task1', recipeId: 'r1',
+    kind: 'CURRENT',
+    taskId: 'task1',
+    recipeId: 'r1',
     revisionSha256: saved.identity.revisionSha256,
     actionGraphSha256: saved.identity.actionGraphSha256,
     compilerRevision: saved.identity.compilerRevision,
     contractRevision: saved.identity.contractRevision,
-    verifierId: saved.identity.verifierId, verifierRevision: saved.identity.verifierRevision,
-    registryRevision: 'registry-1', policyRevision: 'policy-1',
-    scopeRevision: 'scope-1', revocationEpoch: 1,
+    verifierId: saved.identity.verifierId,
+    verifierRevision: saved.identity.verifierRevision,
+    registryRevision: 'registry-1',
+    policyRevision: 'policy-1',
+    scopeRevision: 'scope-1',
+    revocationEpoch: 1,
     capability: 'PREVIEW_RECIPE',
   };
 }
@@ -50,13 +63,24 @@ function harness(
   saved: RecipeReplaySnapshot = fixture(),
   current: RecipeReplayCurrentness = trustedFacts(saved),
 ) {
-  let loads = 0; let checks = 0;
+  let loads = 0;
+  let checks = 0;
   const port = new ClosedWorldRecipePreview({
-    loadExact: () => { loads++; return saved; },
-    currentness: () => { checks++; return current; },
+    loadExact: () => {
+      loads++;
+      return saved;
+    },
+    currentness: () => {
+      checks++;
+      return current;
+    },
   });
-  return { port, loads: () => loads, checks: () => checks,
-    input: { taskId: 'task1', recipeId: 'r1', revisionSha256: saved.identity.revisionSha256 } };
+  return {
+    port,
+    loads: () => loads,
+    checks: () => checks,
+    input: { taskId: 'task1', recipeId: 'r1', revisionSha256: saved.identity.revisionSha256 },
+  };
 }
 
 describe('T04 immutable closed-world Recipe preview; never execute', () => {
@@ -64,9 +88,12 @@ describe('T04 immutable closed-world Recipe preview; never execute', () => {
     const h = harness();
     const result = h.port.preview(h.input);
     expect(result).toMatchObject({
-      ok: true, state: 'PREVIEW_ONLY',
+      ok: true,
+      state: 'PREVIEW_ONLY',
       declaredEffects: ['file.search'],
-      modelCalls: 0, requiresActionControllerRevalidation: true, executionAuthorized: false,
+      modelCalls: 0,
+      requiresActionControllerRevalidation: true,
+      executionAuthorized: false,
     });
     expect(h.loads()).toBe(1);
     expect(h.checks()).toBe(1);
@@ -78,8 +105,16 @@ describe('T04 immutable closed-world Recipe preview; never execute', () => {
     const old = fixture();
     const forged = {
       ...old,
-      actionGraph: { nodes: [{ actionId: 'read-1', op: 'file.move' as const,
-        parameters: { sourcePath: 'C:/selected/a', destinationPath: 'C:/wrong/b' } }], edges: [] },
+      actionGraph: {
+        nodes: [
+          {
+            actionId: 'read-1',
+            op: 'file.move' as const,
+            parameters: { sourcePath: 'C:/selected/a', destinationPath: 'C:/wrong/b' },
+          },
+        ],
+        edges: [],
+      },
     };
     const h = harness(forged);
     expect(h.port.preview(h.input)).toEqual({ ok: false, code: 'RECIPE_CORRUPT' });
@@ -88,16 +123,24 @@ describe('T04 immutable closed-world Recipe preview; never execute', () => {
 
   it('denies an unregistered raw-shell action and script graph edges with cycles', () => {
     const good = fixture();
-    const rogue = { ...good, actionGraph: { nodes: [
-      { actionId: 'shell', op: 'cmd /c del C:/Users', parameters: {} },
-    ], edges: [] } } as unknown as RecipeReplaySnapshot;
+    const rogue = {
+      ...good,
+      actionGraph: {
+        nodes: [{ actionId: 'shell', op: 'cmd /c del C:/Users', parameters: {} }],
+        edges: [],
+      },
+    } as unknown as RecipeReplaySnapshot;
     expect(harness(rogue).port.preview(harness(rogue).input)).toEqual({
-      ok: false, code: 'RECIPE_CORRUPT',
+      ok: false,
+      code: 'RECIPE_CORRUPT',
     });
-    const cycled = { ...good, actionGraph: {
-      nodes: good.actionGraph.nodes,
-      edges: [{ from: 'read-1', to: 'read-1' }],
-    } };
+    const cycled = {
+      ...good,
+      actionGraph: {
+        nodes: good.actionGraph.nodes,
+        edges: [{ from: 'read-1', to: 'read-1' }],
+      },
+    };
     const h = harness(cycled);
     expect(h.port.preview(h.input)).toEqual({ ok: false, code: 'RECIPE_CORRUPT' });
   });
@@ -122,7 +165,8 @@ describe('T04 immutable closed-world Recipe preview; never execute', () => {
   it('rejects invalid caller identity before any store or authority lookup', () => {
     const h = harness();
     expect(h.port.preview({ ...h.input, revisionSha256: 'not-a-sha' })).toEqual({
-      ok: false, code: 'RECIPE_INVALID',
+      ok: false,
+      code: 'RECIPE_INVALID',
     });
     expect(h.loads()).toBe(0);
     expect(h.checks()).toBe(0);
@@ -130,10 +174,16 @@ describe('T04 immutable closed-world Recipe preview; never execute', () => {
 
   it('redacts throwing revision/corrupt proof getters without passing raw error', () => {
     const h = new ClosedWorldRecipePreview({
-      loadExact: () => { throw new Error('Bearer local-private-token'); },
-      currentness: () => { throw new Error('should never call'); },
+      loadExact: () => {
+        throw new Error('Bearer local-private-token');
+      },
+      currentness: () => {
+        throw new Error('should never call');
+      },
     });
-    expect(h.preview({ taskId: 'task1', recipeId: 'r1', revisionSha256: 'a'.repeat(64) }))
-      .toEqual({ ok: false, code: 'RECIPE_UNAVAILABLE' });
+    expect(h.preview({ taskId: 'task1', recipeId: 'r1', revisionSha256: 'a'.repeat(64) })).toEqual({
+      ok: false,
+      code: 'RECIPE_UNAVAILABLE',
+    });
   });
 });
