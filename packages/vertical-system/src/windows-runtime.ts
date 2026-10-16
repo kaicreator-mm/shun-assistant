@@ -10,6 +10,10 @@ import {
   observeTopMemoryProcessesWithHost,
   type TopMemoryProcessResult,
 } from './internal/windows-pressure.ts';
+import {
+  observeInstalledSoftwareWithHost,
+  type SoftwareReportResult,
+} from './internal/windows-software.ts';
 
 const COMMAND_TIMEOUT_MS = 5000;
 
@@ -49,6 +53,24 @@ export function collectWindowsTopMemoryProcesses(): TopMemoryProcessResult {
         encoding: 'utf8',
         timeout: COMMAND_TIMEOUT_MS,
         maxBuffer: 8192,
+        windowsHide: true,
+        stdio: ['ignore', 'pipe', 'ignore'],
+      }),
+    process.platform,
+  );
+}
+
+/** Public fixed machine-HKLM software observation. No user parameters. */
+export function collectWindowsInstalledSoftware(): SoftwareReportResult {
+  if (process.platform !== 'win32') return { ok: false, code: 'WINDOWS_REQUIRED' };
+  const executable = trustedPowerShellExe();
+  if (!executable) return { ok: false, code: 'SOFTWARE_FACTS_UNAVAILABLE' };
+  return observeInstalledSoftwareWithHost(
+    (script) =>
+      execFileSync(executable, ['-NoProfile', '-NonInteractive', '-Command', script], {
+        encoding: 'utf8',
+        timeout: COMMAND_TIMEOUT_MS,
+        maxBuffer: 16384,
         windowsHide: true,
         stdio: ['ignore', 'pipe', 'ignore'],
       }),

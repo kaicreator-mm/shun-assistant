@@ -90,7 +90,9 @@ export type {
   ProcessPressureRefusal,
   TopMemoryProcessResult,
 } from './internal/windows-pressure.ts';
+export type { SoftwareReportResult } from './internal/windows-software.ts';
 export {
+  collectWindowsInstalledSoftware,
   collectWindowsRuntimeCounts,
   collectWindowsTopMemoryProcesses,
 } from './windows-runtime.ts';
