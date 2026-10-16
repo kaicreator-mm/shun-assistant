@@ -55,7 +55,9 @@ export function observeInstalledSoftwareWithHost(
         typeof name !== 'string' ||
         name.length < 1 ||
         name.length > 120 ||
-        /[\\/:@\r\n\t]/u.test(name) ||
+        /[\\:@\r\n\t]/u.test(name) ||
+        name.startsWith('/') ||
+        name.includes('../') ||
         (version !== null &&
           (typeof version !== 'string' || version.length > 64 || /[\\/:@\r\n\t]/u.test(version)))
       ) {
