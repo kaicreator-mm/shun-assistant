@@ -1,12 +1,7 @@
 // v0.2 T04: signed Recipe preview to the REAL ActionController's plan gate.
 // Narrow read-only file.search path; no generic compiled JS executor and no
 // effect dispatch. Authorization grants are never returned from this adapter.
-import {
-  type ActionPlan,
-  ActionPlanSchema,
-  canonicalJson,
-  computePlanHash,
-} from '@shun/contracts';
+import { type ActionPlan, ActionPlanSchema, canonicalJson, computePlanHash } from '@shun/contracts';
 import type { ClosedWorldRecipePreview } from './recipe-resolver.ts';
 
 type PreviewPort = Pick<ClosedWorldRecipePreview, 'preview'>;
@@ -102,7 +97,7 @@ export class ReadonlyRecipeControllerHandoff {
       const [action] = plan.actions;
       if (
         plan.taskId !== taskId ||
-        plan.recipeRef !== recipeId + '@' + revisionSha256 ||
+        plan.recipeRef !== `${recipeId}@${revisionSha256}` ||
         plan.capabilityId !== 'file.search' ||
         plan.actions.length !== 1 ||
         !action ||
