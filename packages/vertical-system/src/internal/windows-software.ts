@@ -17,7 +17,10 @@ export type SoftwareReportResult =
         entries: readonly Readonly<{ name: string; version: string | null }>[];
       }>;
     }
-  | { ok: false; code: 'WINDOWS_REQUIRED' | 'SOFTWARE_FACTS_UNAVAILABLE' | 'SOFTWARE_FACTS_INVALID' };
+  | {
+      ok: false;
+      code: 'WINDOWS_REQUIRED' | 'SOFTWARE_FACTS_UNAVAILABLE' | 'SOFTWARE_FACTS_INVALID';
+    };
 
 export function observeInstalledSoftwareWithHost(
   runner: (script: string) => string,
@@ -54,9 +57,7 @@ export function observeInstalledSoftwareWithHost(
         name.length > 120 ||
         /[\\/:@\r\n\t]/u.test(name) ||
         (version !== null &&
-          (typeof version !== 'string' ||
-            version.length > 64 ||
-            /[\\/:@\r\n\t]/u.test(version)))
+          (typeof version !== 'string' || version.length > 64 || /[\\/:@\r\n\t]/u.test(version)))
       ) {
         return { ok: false, code: 'SOFTWARE_FACTS_INVALID' };
       }

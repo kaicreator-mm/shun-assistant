@@ -1,5 +1,8 @@
 import { describe, expect, it } from 'vitest';
-import { observeInstalledSoftwareWithHost, SOFTWARE_COMMAND } from '../src/internal/windows-software.ts';
+import {
+  observeInstalledSoftwareWithHost,
+  SOFTWARE_COMMAND,
+} from '../src/internal/windows-software.ts';
 import { collectWindowsInstalledSoftware } from '../src/windows-runtime.ts';
 
 describe('T06 fixed read-only HKLM software sample', () => {
@@ -38,14 +41,18 @@ describe('T06 fixed read-only HKLM software sample', () => {
 
   it('fails closed on unavailable Windows command and non-Windows host', () => {
     let called = false;
-    expect(observeInstalledSoftwareWithHost(() => {
-      called = true;
-      return '{}';
-    }, 'linux')).toEqual({ ok: false, code: 'WINDOWS_REQUIRED' });
+    expect(
+      observeInstalledSoftwareWithHost(() => {
+        called = true;
+        return '{}';
+      }, 'linux'),
+    ).toEqual({ ok: false, code: 'WINDOWS_REQUIRED' });
     expect(called).toBe(false);
-    expect(observeInstalledSoftwareWithHost(() => {
-      throw new Error('Bearer secret');
-    }, 'win32')).toEqual({ ok: false, code: 'SOFTWARE_FACTS_UNAVAILABLE' });
+    expect(
+      observeInstalledSoftwareWithHost(() => {
+        throw new Error('Bearer secret');
+      }, 'win32'),
+    ).toEqual({ ok: false, code: 'SOFTWARE_FACTS_UNAVAILABLE' });
   });
 
   it('public collector takes no untrusted options and declines off Windows', () => {

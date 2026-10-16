@@ -10,7 +10,10 @@ import {
   observeTopMemoryProcessesWithHost,
   type TopMemoryProcessResult,
 } from './internal/windows-pressure.ts';
-import { observeInstalledSoftwareWithHost, type SoftwareReportResult } from './internal/windows-software.ts';
+import {
+  observeInstalledSoftwareWithHost,
+  type SoftwareReportResult,
+} from './internal/windows-software.ts';
 
 const COMMAND_TIMEOUT_MS = 5000;
 
