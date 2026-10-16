@@ -85,6 +85,7 @@ export {
   type DiagnosticResult,
 } from './diagnostics.ts';
 export type { RuntimeCountRefusal, RuntimeCountResult } from './internal/windows-counts.ts';
+export type { SoftwareReportResult } from './internal/windows-software.ts';
 // Public host-only process/startup counts; no names, paths or script arguments.
 export type {
   ProcessPressureRefusal,
@@ -93,4 +94,5 @@ export type {
 export {
   collectWindowsRuntimeCounts,
   collectWindowsTopMemoryProcesses,
+  collectWindowsInstalledSoftware,
 } from './windows-runtime.ts';
