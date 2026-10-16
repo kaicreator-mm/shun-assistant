@@ -159,10 +159,12 @@ describe('T04 R0 Recipe preview → ActionController authorization-only join', (
       const forged = samplePlan();
       mutate(forged);
       forged.planHash = computePlanHash(forged);
-      expect(await h.bridge.authorizeReadonlySearch({
-        ...h.input,
-        candidatePlan: forged,
-      })).toEqual({ ok: false, code: 'RECIPE_PLAN_MISMATCH' });
+      expect(
+        await h.bridge.authorizeReadonlySearch({
+          ...h.input,
+          candidatePlan: forged,
+        }),
+      ).toEqual({ ok: false, code: 'RECIPE_PLAN_MISMATCH' });
       expect(h.calls).toHaveLength(0);
     }
   });
@@ -191,24 +193,33 @@ describe('T04 R0 Recipe preview → ActionController authorization-only join', (
 
   it('redacts constructor getter/proxy errors before any plan can be authorized', () => {
     const injected = new Error('Bearer private-credential');
-    expect(() => new ReadonlyRecipeControllerHandoff({
-      previewer: {
-        get preview(): never {
-          throw injected;
-        },
-      },
-      controller: { authorizePlan: async () => ({ ok: true }) },
-      trustedPlan: { loadExpectedPlan: () => samplePlan() },
-    })).toThrow(/^RECIPE_CONTROLLER_CONFIGURATION_REFUSED$/);
-    expect(() => new ReadonlyRecipeControllerHandoff({
-      previewer: { preview },
-      controller: new Proxy({ authorizePlan: async () => ({ ok: true }) }, {
-        get() {
-          throw injected;
-        },
-      }),
-      trustedPlan: { loadExpectedPlan: () => samplePlan() },
-    })).toThrow(/^RECIPE_CONTROLLER_CONFIGURATION_REFUSED$/);
+    expect(
+      () =>
+        new ReadonlyRecipeControllerHandoff({
+          previewer: {
+            get preview(): never {
+              throw injected;
+            },
+          },
+          controller: { authorizePlan: async () => ({ ok: true }) },
+          trustedPlan: { loadExpectedPlan: () => samplePlan() },
+        }),
+    ).toThrow(/^RECIPE_CONTROLLER_CONFIGURATION_REFUSED$/);
+    expect(
+      () =>
+        new ReadonlyRecipeControllerHandoff({
+          previewer: { preview },
+          controller: new Proxy(
+            { authorizePlan: async () => ({ ok: true }) },
+            {
+              get() {
+                throw injected;
+              },
+            },
+          ),
+          trustedPlan: { loadExpectedPlan: () => samplePlan() },
+        }),
+    ).toThrow(/^RECIPE_CONTROLLER_CONFIGURATION_REFUSED$/);
   });
 
   it('refuses changed Recipe operations and dependency edges before controller', async () => {
