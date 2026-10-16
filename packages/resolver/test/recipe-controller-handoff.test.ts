@@ -64,6 +64,7 @@ function preview(): RecipeReplayPreview {
 }
 function harness(nextPreview: RecipeReplayPreview = preview(), decision = true) {
   const calls: ActionPlan[] = [];
+  const trusted = samplePlan();
   const bridge = new ReadonlyRecipeControllerHandoff({
     previewer: { preview: () => nextPreview },
     controller: {
@@ -72,6 +73,7 @@ function harness(nextPreview: RecipeReplayPreview = preview(), decision = true) 
         return { ok: decision };
       },
     },
+    trustedPlan: { loadExpectedPlan: () => trusted },
   });
   const input = { taskId: 'task1', recipeId: 'r1', revisionSha256: sha };
   return { bridge, calls, input };
@@ -130,6 +132,85 @@ describe('T04 R0 Recipe preview → ActionController authorization-only join', (
     }
   });
 
+  it('denies a self-rehashed but forged binding/verifier/ranking/options plan', async () => {
+    const mutations = [
+      (p: ActionPlan) => {
+        p.bindingRefs = ['attacker-binding'];
+        p.actions[0]!.bindingRef = 'attacker-binding';
+      },
+      (p: ActionPlan) => {
+        p.rankingPolicyRevision = 'attacker-rank';
+      },
+      (p: ActionPlan) => {
+        p.verificationPlan.verifierId = 'attacker-verifier';
+      },
+      (p: ActionPlan) => {
+        p.verificationPlan.verifierRevision = 'stale-verifier-revision';
+      },
+      (p: ActionPlan) => {
+        p.actions[0]!.timeoutMs = 999999;
+      },
+      (p: ActionPlan) => {
+        p.actions[0]!.expectedState = { ignoredByRecipe: true };
+      },
+    ];
+    for (const mutate of mutations) {
+      const h = harness();
+      const forged = samplePlan();
+      mutate(forged);
+      forged.planHash = computePlanHash(forged);
+      expect(await h.bridge.authorizeReadonlySearch({
+        ...h.input,
+        candidatePlan: forged,
+      })).toEqual({ ok: false, code: 'RECIPE_PLAN_MISMATCH' });
+      expect(h.calls).toHaveLength(0);
+    }
+  });
+
+  it('refuses missing trusted expected-plan identity before controller callback', async () => {
+    const calls: unknown[] = [];
+    const bridge = new ReadonlyRecipeControllerHandoff({
+      previewer: { preview },
+      controller: {
+        authorizePlan: async (plan) => {
+          calls.push(plan);
+          return { ok: true };
+        },
+      },
+      trustedPlan: { loadExpectedPlan: () => null },
+    });
+    const result = await bridge.authorizeReadonlySearch({
+      taskId: 'task1',
+      recipeId: 'r1',
+      revisionSha256: sha,
+      candidatePlan: samplePlan(),
+    });
+    expect(result).toEqual({ ok: false, code: 'RECIPE_PLAN_MISMATCH' });
+    expect(calls).toHaveLength(0);
+  });
+
+  it('redacts constructor getter/proxy errors before any plan can be authorized', () => {
+    const injected = new Error('Bearer private-credential');
+    expect(() => new ReadonlyRecipeControllerHandoff({
+      previewer: {
+        get preview(): never {
+          throw injected;
+        },
+      },
+      controller: { authorizePlan: async () => ({ ok: true }) },
+      trustedPlan: { loadExpectedPlan: () => samplePlan() },
+    })).toThrow(/^RECIPE_CONTROLLER_CONFIGURATION_REFUSED$/);
+    expect(() => new ReadonlyRecipeControllerHandoff({
+      previewer: { preview },
+      controller: new Proxy({ authorizePlan: async () => ({ ok: true }) }, {
+        get() {
+          throw injected;
+        },
+      }),
+      trustedPlan: { loadExpectedPlan: () => samplePlan() },
+    })).toThrow(/^RECIPE_CONTROLLER_CONFIGURATION_REFUSED$/);
+  });
+
   it('refuses changed Recipe operations and dependency edges before controller', async () => {
     const changed = preview();
     if (!changed.ok) throw new Error('fixture');
@@ -172,6 +253,7 @@ describe('T04 R0 Recipe preview → ActionController authorization-only join', (
         },
       },
       controller: { authorizePlan: async () => ({ ok: true }) },
+      trustedPlan: { loadExpectedPlan: () => samplePlan() },
     });
     expect(
       await h.authorizeReadonlySearch({

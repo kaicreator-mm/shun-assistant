@@ -8,6 +8,19 @@ type PreviewPort = Pick<ClosedWorldRecipePreview, 'preview'>;
 type ControllerPort = Readonly<{
   authorizePlan: (input: { plan: unknown }) => Promise<{ ok: boolean }>;
 }>;
+type TrustedRecipePlanPort = Readonly<{
+  /**
+   * Shun-owned trusted host derives the FULL expected immutable ActionPlan
+   * for the exact Recipe/graph and current authority snapshot, each call.
+   * Planner, browser and Recipe JS cannot supply or replace this port.
+   */
+  loadExpectedPlan: (identity: {
+    taskId: string;
+    recipeId: string;
+    revisionSha256: string;
+    actionGraphSha256: string;
+  }) => unknown;
+}>;
 
 export type RecipeControllerHandoffResult =
   | {
@@ -34,17 +47,35 @@ export type RecipeControllerHandoffResult =
 export class ReadonlyRecipeControllerHandoff {
   private readonly previewer: PreviewPort;
   private readonly controller: ControllerPort;
+  private readonly trustedPlan: TrustedRecipePlanPort;
 
-  constructor(input: { previewer: PreviewPort; controller: ControllerPort }) {
-    if (
-      !input ||
-      typeof input.previewer?.preview !== 'function' ||
-      typeof input.controller?.authorizePlan !== 'function'
-    ) {
+  constructor(input: {
+    previewer: PreviewPort;
+    controller: ControllerPort;
+    trustedPlan: TrustedRecipePlanPort;
+  }) {
+    // Constructor accessors are not exempt from redaction. Snapshot and bind
+    // methods ONCE: a Proxy getter cannot substitute a different method later.
+    try {
+      const previewer = input?.previewer;
+      const controller = input?.controller;
+      const trustedPlan = input?.trustedPlan;
+      const preview = previewer?.preview;
+      const authorizePlan = controller?.authorizePlan;
+      const loadExpectedPlan = trustedPlan?.loadExpectedPlan;
+      if (
+        typeof preview !== 'function' ||
+        typeof authorizePlan !== 'function' ||
+        typeof loadExpectedPlan !== 'function'
+      ) {
+        throw new Error('RECIPE_CONTROLLER_CONFIGURATION_REFUSED');
+      }
+      this.previewer = { preview: preview.bind(previewer) };
+      this.controller = { authorizePlan: authorizePlan.bind(controller) };
+      this.trustedPlan = { loadExpectedPlan: loadExpectedPlan.bind(trustedPlan) };
+    } catch {
       throw new Error('RECIPE_CONTROLLER_CONFIGURATION_REFUSED');
     }
-    this.previewer = input.previewer;
-    this.controller = input.controller;
   }
 
   async authorizeReadonlySearch(input: {
@@ -95,6 +126,25 @@ export class ReadonlyRecipeControllerHandoff {
       if (!parsed.success) return refused({ ok: false, code: 'RECIPE_PLAN_MISMATCH' });
       const plan: ActionPlan = parsed.data;
       const [action] = plan.actions;
+      // A recomputed hash is only integrity of the caller's chosen plan.
+      // Compare the ENTIRE plan against a fresh, independently host-derived
+      // expected ActionPlan before delegating to ActionController. This pins
+      // bindingRefs, verifier, rank-policy, options and all action fields.
+      const expected = ActionPlanSchema.safeParse(
+        this.trustedPlan.loadExpectedPlan({
+          taskId,
+          recipeId,
+          revisionSha256,
+          actionGraphSha256: preview.actionGraphSha256,
+        }),
+      );
+      if (
+        !expected.success ||
+        computePlanHash(expected.data) !== expected.data.planHash ||
+        canonicalJson(plan) !== canonicalJson(expected.data)
+      ) {
+        return refused({ ok: false, code: 'RECIPE_PLAN_MISMATCH' });
+      }
       if (
         plan.taskId !== taskId ||
         plan.recipeRef !== `${recipeId}@${revisionSha256}` ||
