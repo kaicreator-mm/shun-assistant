@@ -27,10 +27,11 @@ describe('T06 fixed read-only HKLM software sample', () => {
 
   it('admits ordinary product DisplayName with internal slash, but not rooted paths', () => {
     const value = observeInstalledSoftwareWithHost(
-      () => JSON.stringify([
-        { DisplayName: 'Visual C++ Tools (x64/x86)', DisplayVersion: '1.0' },
-        { DisplayName: 'Audio/Video Codec', DisplayVersion: '2.0' },
-      ]),
+      () =>
+        JSON.stringify([
+          { DisplayName: 'Visual C++ Tools (x64/x86)', DisplayVersion: '1.0' },
+          { DisplayName: 'Audio/Video Codec', DisplayVersion: '2.0' },
+        ]),
       'win32',
     );
     expect(value).toMatchObject({
