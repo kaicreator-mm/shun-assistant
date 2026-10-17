@@ -601,6 +601,7 @@ if (RESTART_ARG > -1) {
     hostPlatform: () => process.platform,
     hostArchitecture: () => process.arch,
     hostNodeAbi: () => process.versions.modules,
+    hostNativeChildRuntime: () => process.execPath,
     hostSpawnEnvironment: minimalWindowsSpawnEnvironment,
   };
   const observer = observingSpawn();
@@ -902,6 +903,7 @@ async function mainRun(): Promise<void> {
         hostPlatform: () => process.platform,
         hostArchitecture: () => process.arch,
         hostNodeAbi: () => process.versions.modules,
+        hostNativeChildRuntime: () => process.execPath,
         hostSpawnEnvironment: minimalWindowsSpawnEnvironment,
         process: observer.port,
         ...overrides,

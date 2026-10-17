@@ -30,6 +30,7 @@ export {
 } from './adapters/winget.ts';
 export {
   CuratedProviderVerifier,
+  type ProviderDependencyEntry,
   type ProviderVerificationRefusal,
   type ProviderVerificationResult,
   type TrustedProviderScope,
