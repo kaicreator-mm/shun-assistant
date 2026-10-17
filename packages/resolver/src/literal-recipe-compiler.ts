@@ -5,8 +5,8 @@ import { createHash } from 'node:crypto';
 import {
   canonicalJson,
   computeRecipeRevision,
-  RecipeActionGraphSchema,
   type RecipeActionGraph,
+  RecipeActionGraphSchema,
   type RecipeRevisionIdentity,
 } from '@shun/contracts';
 import type { RecipeReplaySnapshot } from './recipe-resolver.ts';
@@ -15,8 +15,7 @@ const MAX_SOURCE_BYTES = 64 * 1024;
 const MAX_ACTIONS = 128;
 const MAX_EDGES = 256;
 /** Required wrapper is valid TS; the argument is a strict JSON literal subset. */
-const LITERAL_ONLY_RECIPE =
-  /^\s*export\s+default\s+defineRecipe\s*\(\s*([\s\S]*?)\s*\)\s*;\s*$/u;
+const LITERAL_ONLY_RECIPE = /^\s*export\s+default\s+defineRecipe\s*\(\s*([\s\S]*?)\s*\)\s*;\s*$/u;
 
 function hash(value: string): string {
   return createHash('sha256').update(value, 'utf8').digest('hex');
@@ -67,7 +66,11 @@ export function compileLiteralRecipe(
     ) {
       return { ok: false, code: 'COMPILER_CONFIG_INVALID' };
     }
-    if (typeof source !== 'string' || !source || Buffer.byteLength(source, 'utf8') > MAX_SOURCE_BYTES) {
+    if (
+      typeof source !== 'string' ||
+      !source ||
+      Buffer.byteLength(source, 'utf8') > MAX_SOURCE_BYTES
+    ) {
       return { ok: false, code: 'SOURCE_INVALID' };
     }
     const match = LITERAL_ONLY_RECIPE.exec(source);

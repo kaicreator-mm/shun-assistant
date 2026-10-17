@@ -1,5 +1,5 @@
-import { describe, expect, it } from 'vitest';
 import { RecipeActionGraphSchema, verifyRecipeRevision } from '@shun/contracts';
+import { describe, expect, it } from 'vitest';
 import {
   compileLiteralRecipe,
   LITERAL_RECIPE_COMPILER_REVISION,
@@ -70,15 +70,15 @@ describe('T04 literal-only JS/TS Recipe-to-typed-action mediation', () => {
   it('rejects imports, side-effect statements, dynamic JS and TS runtime execution', () => {
     const invalid = [
       "import fs from 'node:fs';\n" + literal(graph),
-      literal(graph) + "\nprocess.exit(0)",
+      literal(graph) + '\nprocess.exit(0)',
       "export default defineRecipe(require('node:fs'))",
       "export default defineRecipe(eval('1'))",
-      "export default defineRecipe((() => ({ nodes: [], edges: [] }))())",
-      "export default defineRecipe({ nodes: [], edges: [] })",
-      "export default defineRecipe(`unsafe-${process.env.KEY}`)",
+      'export default defineRecipe((() => ({ nodes: [], edges: [] }))())',
+      'export default defineRecipe({ nodes: [], edges: [] })',
+      'export default defineRecipe(`unsafe-${process.env.KEY}`)',
       "export default defineRecipe(JSON.parse('[]'))",
-      "export default defineRecipe(await getRecipe())",
-      "export default defineRecipe(/* comment */ {})",
+      'export default defineRecipe(await getRecipe())',
+      'export default defineRecipe(/* comment */ {})',
     ];
     for (const program of invalid) {
       expect(compileLiteralRecipe(program, host).ok).toBe(false);
@@ -88,8 +88,20 @@ describe('T04 literal-only JS/TS Recipe-to-typed-action mediation', () => {
   it('rejects malicious operations, graph cycles and extra unknown fields', () => {
     const variants = [
       { nodes: [{ actionId: 'x', op: 'cmd.exe', parameters: {} }], edges: [] },
-      { nodes: [{ actionId: 'x', op: 'file.search', parameters: {
-        root: 'C:/ok', query: '*', command: 'powershell' } }], edges: [] },
+      {
+        nodes: [
+          {
+            actionId: 'x',
+            op: 'file.search',
+            parameters: {
+              root: 'C:/ok',
+              query: '*',
+              command: 'powershell',
+            },
+          },
+        ],
+        edges: [],
+      },
       { ...graph, edges: [{ from: 'search-1', to: 'search-1' }] },
       { ...graph, untrusted: 'executionGrant' },
       { nodes: [], edges: [] },
@@ -111,26 +123,41 @@ describe('T04 literal-only JS/TS Recipe-to-typed-action mediation', () => {
       ok: false,
       code: 'COMPILER_CONFIG_INVALID',
     });
-    expect(compileLiteralRecipe(literal(graph), {
-      ...host,
-      get verifierId(): never {
-        throw new Error('Bearer private-token');
-      },
-    })).toEqual({ ok: false, code: 'SOURCE_INVALID' });
+    expect(
+      compileLiteralRecipe(literal(graph), {
+        ...host,
+        get verifierId(): never {
+          throw new Error('Bearer private-token');
+        },
+      }),
+    ).toEqual({ ok: false, code: 'SOURCE_INVALID' });
   });
 
   it('pins every changed graph, source and verifier revision into a distinct SHA', () => {
     const first = compileLiteralRecipe(literal(graph), host);
     const changed = compileLiteralRecipe(
-      literal({ ...graph, nodes: [{ ...graph.nodes[0], parameters: {
-        root: 'C:/another', query: '*.txt' } }] }),
+      literal({
+        ...graph,
+        nodes: [
+          {
+            ...graph.nodes[0],
+            parameters: {
+              root: 'C:/another',
+              query: '*.txt',
+            },
+          },
+        ],
+      }),
       host,
     );
     const differentVerifier = compileLiteralRecipe(literal(graph), {
-      ...host, verifierRevision: 'revoked-2',
+      ...host,
+      verifierRevision: 'revoked-2',
     });
     if (!first.ok || !changed.ok || !differentVerifier.ok) throw new Error('fixture');
-    expect(first.compiled.identity.revisionSha256).not.toBe(changed.compiled.identity.revisionSha256);
+    expect(first.compiled.identity.revisionSha256).not.toBe(
+      changed.compiled.identity.revisionSha256,
+    );
     expect(first.compiled.identity.revisionSha256).not.toBe(
       differentVerifier.compiled.identity.revisionSha256,
     );
