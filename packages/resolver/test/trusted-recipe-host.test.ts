@@ -1,7 +1,7 @@
 import { type ActionPlan, computePlanHash } from '@shun/contracts';
 import { describe, expect, it } from 'vitest';
-import { TrustedRecipeReadService } from '../src/trusted-recipe-host.ts';
 import type { RecipeReplayCurrentness, RecipeReplaySnapshot } from '../src/recipe-resolver.ts';
+import { TrustedRecipeReadService } from '../src/trusted-recipe-host.ts';
 
 const cfg = {
   recipeId: 'recipe-1',
@@ -9,7 +9,8 @@ const cfg = {
   verifierId: 'real-verifier',
   verifierRevision: '1',
 };
-const source = 'export default defineRecipe({"nodes":[{"actionId":"read","op":"file.search","parameters":{"root":"C:/approved","query":"*.txt"}}],"edges":[]});';
+const source =
+  'export default defineRecipe({"nodes":[{"actionId":"read","op":"file.search","parameters":{"root":"C:/approved","query":"*.txt"}}],"edges":[]});';
 
 function makeFixture() {
   const revisions = new Map<string, RecipeReplaySnapshot>();
@@ -110,8 +111,12 @@ function makeFixture() {
     loads: () => loads,
     planCalls: () => planCalls,
     authorized: () => authorized,
-    invalidate: () => { policyIsCurrent = false; },
-    changeBetweenReads: () => { mutateOnSecond = true; },
+    invalidate: () => {
+      policyIsCurrent = false;
+    },
+    changeBetweenReads: () => {
+      mutateOnSecond = true;
+    },
   };
 }
 
@@ -173,11 +178,13 @@ describe('T04 trusted source→T03 exact store→ActionController read-only comp
     const record = h.service.registerLiteral(h.source, h.cfg);
     if (!record.ok) throw new Error('fixture');
     h.changeBetweenReads();
-    expect(await h.service.authorizeReadonlySearch({
-      taskId: 'task1',
-      recipeId: record.recipeId,
-      revisionSha256: record.revisionSha256,
-    })).toEqual({ ok: false, code: 'RECIPE_PLAN_MISMATCH' });
+    expect(
+      await h.service.authorizeReadonlySearch({
+        taskId: 'task1',
+        recipeId: record.recipeId,
+        revisionSha256: record.revisionSha256,
+      }),
+    ).toEqual({ ok: false, code: 'RECIPE_PLAN_MISMATCH' });
     expect(h.authorized()).toBe(0);
   });
 
@@ -189,21 +196,32 @@ describe('T04 trusted source→T03 exact store→ActionController read-only comp
     });
     const record = h.service.registerLiteral(h.source, h.cfg);
     if (!record.ok) throw new Error('fixture');
-    expect(await h.service.authorizeReadonlySearch({
-      taskId: 'task1', recipeId: record.recipeId, revisionSha256: 'a'.repeat(64),
-    })).toEqual({ ok: false, code: 'RECIPE_PREVIEW_REFUSED' });
+    expect(
+      await h.service.authorizeReadonlySearch({
+        taskId: 'task1',
+        recipeId: record.recipeId,
+        revisionSha256: 'a'.repeat(64),
+      }),
+    ).toEqual({ ok: false, code: 'RECIPE_PREVIEW_REFUSED' });
     h.invalidate();
-    expect(await h.service.authorizeReadonlySearch({
-      taskId: 'task1', recipeId: record.recipeId, revisionSha256: record.revisionSha256,
-    })).toEqual({ ok: false, code: 'RECIPE_PREVIEW_REFUSED' });
+    expect(
+      await h.service.authorizeReadonlySearch({
+        taskId: 'task1',
+        recipeId: record.recipeId,
+        revisionSha256: record.revisionSha256,
+      }),
+    ).toEqual({ ok: false, code: 'RECIPE_PREVIEW_REFUSED' });
     expect(h.authorized()).toBe(0);
   });
 
   it('redacts hostile getter failures during trusted host configuration', () => {
-    expect(() => new TrustedRecipeReadService({
-      get repository(): never {
-        throw new Error('Bearer private-value');
-      },
-    } as never)).toThrow(/^RECIPE_HOST_CONFIGURATION_REFUSED$/);
+    expect(
+      () =>
+        new TrustedRecipeReadService({
+          get repository(): never {
+            throw new Error('Bearer private-value');
+          },
+        } as never),
+    ).toThrow(/^RECIPE_HOST_CONFIGURATION_REFUSED$/);
   });
 });
