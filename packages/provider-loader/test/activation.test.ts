@@ -178,7 +178,12 @@ describe('T05 bounded CLI activation (executes the pinned verified bytes only)',
     expect(spec.executable.endsWith('rg.exe')).toBe(true);
     expect(spec.args).toEqual(['--version']);
     expect(spec.cwd.startsWith(join(host.cacheRoot, 'active', 'rg-binding', sha))).toBe(true);
-    expect(Object.keys(spec.env).sort()).toEqual(['SystemDrive', 'SystemRoot']);
+    // The child env is exactly the composed scrubbed allowlist — whatever the
+    // platform provides (empty on Linux CI), never the parent environment.
+    expect(spec.env).toEqual(minimalWindowsSpawnEnvironment());
+    expect(Object.keys(spec.env).every((key) => ['SystemRoot', 'SystemDrive'].includes(key))).toBe(
+      true,
+    );
     expect(spec.env.PATH).toBeUndefined();
     expect(spec.timeoutMs).toBeGreaterThan(0);
   });
