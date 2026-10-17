@@ -1,6 +1,6 @@
 // v0.2 T05 signed acquisition → Shun-owned byte cache. Never executes code.
 // This package does not mint a PlanLedger grant or auto-load native addons.
-import { randomUUID } from 'node:crypto';
+import { createHash, randomUUID } from 'node:crypto';
 import { constants } from 'node:fs';
 import { lstat, mkdir, open, rename, rm } from 'node:fs/promises';
 import { isAbsolute, join, resolve } from 'node:path';
@@ -170,6 +170,26 @@ export class CuratedProviderStager {
     const bytes = await safeReadFile(path);
     if (!bytes || !this.verifier.verifyBytes(evidence, bytes)) return null;
     return Buffer.from(bytes);
+  }
+
+  /**
+   * Cached bytes for one TRANSITIVE dependency of a verified descriptor.
+   * Trust chain: the dep digest is inside the signed descriptor payload
+   * (signer-curated), the digest-named cache file is re-hashed against it,
+   * and a dep digest equal to the main artifact is refused. A dependency the
+   * catalog never signed can never be read through this method.
+   */
+  async readVerifiedDependency(descriptor: unknown, depDigest: string): Promise<Buffer | null> {
+    const evidence = this.verifySigned(descriptor);
+    if (!evidence.ok) return null;
+    if (!SHA.test(depDigest) || depDigest === evidence.artifact.artifactSha256) return null;
+    if (!evidence.artifact.dependencySha256.includes(depDigest)) return null;
+    const path = await this.cachePath(depDigest);
+    if (!path) return null;
+    const bytes = await safeReadFile(path);
+    if (!bytes) return null;
+    const observed = createHash('sha256').update(bytes).digest('hex');
+    return observed === depDigest ? Buffer.from(bytes) : null;
   }
 
   async stage(descriptor: unknown): Promise<StageResult> {

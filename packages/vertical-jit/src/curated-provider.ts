@@ -15,6 +15,19 @@ import {
   ProviderCatalogArtifactSchema,
 } from '@shun/contracts';
 
+/**
+ * One signer-curated transitive dependency of a native addon. The DIGEST is
+ * signed (it is part of the descriptor's `dependencySha256`); the exact
+ * on-disk NAME the Windows loader must resolve is pinned here by the trusted
+ * host composition — never by request input, HTTP content or the descriptor
+ * alone. A dep digest without a pinned name is unusable and refused.
+ */
+export type ProviderDependencyEntry = Readonly<{
+  /** Bare DLL/file name (e.g. `libvips-42.dll`); never a path. */
+  name: string;
+  artifactSha256: string;
+}>;
+
 export type TrustedProviderScope = Readonly<{
   providerId: string;
   capabilityId: string;
@@ -29,6 +42,12 @@ export type TrustedProviderScope = Readonly<{
   platform: 'windows-x64';
   artifactKind: 'CLI' | 'NATIVE_ADDON';
   abiRevision?: string;
+  /**
+   * Host-curated name↔digest mapping that must bijection-match the signed
+   * `dependencySha256` list. Optional only for artifact shapes with no
+   * transitive dependencies at all.
+   */
+  dependencyEntries?: readonly ProviderDependencyEntry[];
 }>;
 
 export type ProviderVerificationRefusal =
@@ -40,6 +59,13 @@ export type ProviderVerificationRefusal =
 export type VerifiedProviderArtifact = Readonly<
   Omit<ProviderCatalogArtifact, 'dependencySha256'> & {
     dependencySha256: readonly string[];
+    /**
+     * The host-curated name↔digest pairs resolved for this artifact. Nonempty
+     * exactly when `dependencySha256` is nonempty (strict bijection is
+     * enforced in verify()); a caller can never obtain dep digests without
+     * equally many host-pinned names.
+     */
+    dependencyEntries: readonly ProviderDependencyEntry[];
   }
 >;
 
@@ -61,6 +87,44 @@ function base64Signature(value: string): Buffer | null {
   const decoded = Buffer.from(value, 'base64');
   if (decoded.length !== 64 || decoded.toString('base64') !== value) return null;
   return decoded;
+}
+
+/** Bare DLL/file-name shape for curated dependency names; never a path. */
+const DEPENDENCY_NAME = /^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$/;
+
+/**
+ * Strict bijection between the SIGNED dependency digest list and the
+ * host-pinned dependency names. Any mismatch — a digest without a name, a
+ * name without a digest, duplicates, a self-referential entry, or an unsafe
+ * name shape — is scope drift, because the loader would otherwise materialize
+ * files whose identity the curator signature alone cannot bind.
+ */
+function resolveDependencyEntries(
+  scope: TrustedProviderScope,
+  declared: readonly string[],
+): ProviderDependencyEntry[] | null {
+  const entries = scope.dependencyEntries ?? [];
+  if (entries.length !== declared.length) return null;
+  if (declared.length === 0) return [];
+  const declaredSet = new Set(declared);
+  if (declaredSet.size !== declared.length) return null;
+  const names = new Set<string>();
+  const resolved: ProviderDependencyEntry[] = [];
+  for (const entry of entries) {
+    if (
+      !entry ||
+      !DEPENDENCY_NAME.test(entry.name) ||
+      !declaredSet.has(entry.artifactSha256) ||
+      entry.artifactSha256 === scope.artifactSha256
+    ) {
+      return null;
+    }
+    const lower = entry.name.toLowerCase();
+    if (names.has(lower)) return null;
+    names.add(lower);
+    resolved.push(Object.freeze({ name: entry.name, artifactSha256: entry.artifactSha256 }));
+  }
+  return resolved;
 }
 
 type PinnedRoot = Readonly<{ keyId: string; publicKeyPem: string }>;
@@ -101,9 +165,20 @@ export class CuratedProviderVerifier {
   }
 
   verify(descriptor: unknown): ProviderVerificationResult {
+    // Re-verifying an already-admitted artifact (e.g. the preflight passing
+    // the verified artifact back through the stager) carries the DERIVED
+    // `dependencyEntries` field, which the strict wire schema rejects. That
+    // field is host-derived and NEVER part of the signed payload, so
+    // stripping it before parsing verifies exactly the same canonical bytes;
+    // any other unknown field still fails the strict schema.
+    let candidate: unknown = descriptor;
+    if (candidate !== null && typeof candidate === 'object' && 'dependencyEntries' in candidate) {
+      const { dependencyEntries: _derived, ...rest } = candidate as Record<string, unknown>;
+      candidate = rest;
+    }
     let value: ProviderCatalogArtifact;
     try {
-      value = ProviderCatalogArtifactSchema.parse(descriptor);
+      value = ProviderCatalogArtifactSchema.parse(candidate);
     } catch {
       return { ok: false, code: 'CATALOG_UNTRUSTED' };
     }
@@ -126,6 +201,8 @@ export class CuratedProviderVerifier {
       value.abiRevision !== scope.abiRevision
     )
       return { ok: false, code: 'CATALOG_SCOPE_DRIFT' };
+    const dependencyEntries = resolveDependencyEntries(scope, value.dependencySha256);
+    if (!dependencyEntries) return { ok: false, code: 'CATALOG_SCOPE_DRIFT' };
     const sig = base64Signature(value.curatorSignature);
     if (!sig) return { ok: false, code: 'CATALOG_SIGNATURE_INVALID' };
     try {
@@ -139,6 +216,7 @@ export class CuratedProviderVerifier {
         artifact: Object.freeze({
           ...value,
           dependencySha256: Object.freeze([...value.dependencySha256]),
+          dependencyEntries: Object.freeze(dependencyEntries),
         }),
       });
       this.verifiedDigests.set(admitted, value.artifactSha256);

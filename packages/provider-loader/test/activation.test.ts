@@ -58,8 +58,12 @@ function makeDescriptor(
   overrides: Record<string, unknown> = {},
   signer: typeof keyPair = keyPair,
 ) {
+  // Host-derived scope config (dependency name pins) is NEVER part of the
+  // signed descriptor payload — the wire schema is strict and has no field
+  // for it.
+  const { dependencyEntries: _hostDerived, ...signedScope } = trust;
   const unsigned = {
-    ...trust,
+    ...signedScope,
     entrypoint: trust.artifactKind === 'CLI' ? 'rg.exe' : 'addon.node',
     signerKeyId: 'key-1',
     dependencySha256: [] as string[],
@@ -137,6 +141,7 @@ function makeHost(
     hostPlatform: () => 'win32',
     hostArchitecture: () => 'x64',
     hostNodeAbi: () => '137',
+    hostNativeChildRuntime: () => process.execPath,
     hostSpawnEnvironment: minimalWindowsSpawnEnvironment,
     process: port,
     ...overrides,
@@ -434,7 +439,11 @@ describe('T05 bounded CLI activation (executes the pinned verified bytes only)',
         run: { kind: 'VERSION_PROBE' },
       }),
     ).toEqual({ ok: false, code: 'ACTIVATION_KIND_UNSUPPORTED' });
-    const withDeps = await stagedProvider(scope, { dependencySha256: ['c'.repeat(64)] });
+    const depScope: TrustedProviderScope = {
+      ...scope,
+      dependencyEntries: [{ name: 'libdeps.dll', artifactSha256: 'c'.repeat(64) }],
+    };
+    const withDeps = await stagedProvider(depScope, { dependencySha256: ['c'.repeat(64)] });
     expect(
       await withDeps.host.activator.runCli({
         taskId: 'task-1',

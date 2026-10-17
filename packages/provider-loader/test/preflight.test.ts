@@ -32,8 +32,12 @@ const scope: TrustedProviderScope = {
 };
 
 function makeDescriptor(trust: TrustedProviderScope = scope, dependencies: string[] = []) {
+  // Host-derived scope config (dependency name pins) is NEVER part of the
+  // signed descriptor payload — the wire schema is strict and has no field
+  // for it.
+  const { dependencyEntries: _hostDerived, ...signedScope } = trust;
   const unsigned = {
-    ...trust,
+    ...signedScope,
     entrypoint: trust.artifactKind === 'CLI' ? 'rg.exe' : 'addon.node',
     signerKeyId: 'key-1',
     dependencySha256: dependencies,
@@ -150,9 +154,12 @@ describe('T05 signed Provider activation preflight (NO execution)', () => {
       digest: sha,
     });
     expect(reads).toBe(1);
+    // The drifted descriptor's dependency digest list has no host-curated
+    // names in the pinned scope, so it cannot resolve into a verifiable
+    // binding at all — it refuses at signature admission.
     expect(await preflight.check({ taskId: 'task-1', descriptor: drifted })).toEqual({
       ok: false,
-      code: 'DEPENDENCIES_UNVERIFIED',
+      code: 'CATALOG_UNTRUSTED',
     });
   });
 
@@ -199,14 +206,30 @@ describe('T05 signed Provider activation preflight (NO execution)', () => {
     ).toEqual({ ok: false, code: 'ABI_MISMATCH' });
   });
 
-  it('refuses nonempty transitive dependency set until it is independently verified', async () => {
-    const { preflight, stager } = makeHost();
-    const desc = makeDescriptor(scope, ['c'.repeat(64)]);
-    await stager.stage(desc);
-    expect(await preflight.check({ taskId: 'task-1', descriptor: desc })).toEqual({
-      ok: false,
-      code: 'DEPENDENCIES_UNVERIFIED',
-    });
+  it('admits only resolvable dependency closures; unresolvable sets refuse at admission', async () => {
+    const depSha = 'c'.repeat(64);
+    // A digest list without host-curated names cannot resolve into a
+    // verifiable binding — it refuses at signature admission.
+    const unresolved = makeHost();
+    const unresolvedDesc = makeDescriptor(scope, [depSha]);
+    await unresolved.stager.stage(unresolvedDesc);
+    expect(
+      await unresolved.preflight.check({ taskId: 'task-1', descriptor: unresolvedDesc }),
+    ).toEqual({ ok: false, code: 'CATALOG_UNTRUSTED' });
+    // A strictly bijective name↔digest closure resolves, and preflight-only
+    // admission proceeds; the closure itself is enforced at activation.
+    const depScope: TrustedProviderScope = {
+      ...scope,
+      artifactKind: 'NATIVE_ADDON',
+      abiRevision: '115',
+      dependencyEntries: [{ name: 'libdeps.dll', artifactSha256: depSha }],
+    };
+    const resolved = makeHost(depScope);
+    const resolvedDesc = makeDescriptor(depScope, [depSha]);
+    await resolved.stager.stage(resolvedDesc);
+    expect(
+      await resolved.preflight.check({ taskId: 'task-1', descriptor: resolvedDesc }),
+    ).toMatchObject({ ok: true, state: 'PREFLIGHT_ONLY', bindingId: depScope.bindingId });
   });
 
   it('rejects poisoned trusted-host errors with fixed codes and no leaked paths', async () => {
