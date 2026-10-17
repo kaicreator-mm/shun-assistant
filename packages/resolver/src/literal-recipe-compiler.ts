@@ -14,8 +14,30 @@ import type { RecipeReplaySnapshot } from './recipe-resolver.ts';
 const MAX_SOURCE_BYTES = 64 * 1024;
 const MAX_ACTIONS = 128;
 const MAX_EDGES = 256;
-/** Required wrapper is valid TS; the argument is a strict JSON literal subset. */
-const LITERAL_ONLY_RECIPE = /^\s*export\s+default\s+defineRecipe\s*\(\s*([\s\S]*?)\s*\)\s*;\s*$/u;
+/**
+ * Linear-time, exact-envelope parser for a deliberately tiny valid TS subset.
+ * Never use a whole-source regex with overlapping whitespace/JSON captures:
+ * malformed model text must not block the Node event loop.
+ */
+function extractLiteralArgument(source: string): string | null {
+  const trimmed = source.trim();
+  const prefix = 'export default defineRecipe(';
+  if (!trimmed.startsWith(prefix) || !trimmed.endsWith(');')) return null;
+  const body = trimmed.slice(prefix.length, -2).trim();
+  return body.length > 0 ? body : null;
+}
+
+/** Strict schema below guarantees shallow string-only parameters and edges. */
+function freezeGraph(graph: RecipeActionGraph): RecipeActionGraph {
+  for (const node of graph.nodes) {
+    Object.freeze(node.parameters);
+    Object.freeze(node);
+  }
+  for (const edge of graph.edges) Object.freeze(edge);
+  Object.freeze(graph.nodes);
+  Object.freeze(graph.edges);
+  return Object.freeze(graph);
+}
 
 function hash(value: string): string {
   return createHash('sha256').update(value, 'utf8').digest('hex');
@@ -73,11 +95,11 @@ export function compileLiteralRecipe(
     ) {
       return { ok: false, code: 'SOURCE_INVALID' };
     }
-    const match = LITERAL_ONLY_RECIPE.exec(source);
-    if (!match) return { ok: false, code: 'UNSUPPORTED_CODE' };
+    const literal = extractLiteralArgument(source);
+    if (literal === null) return { ok: false, code: 'UNSUPPORTED_CODE' };
     let raw: unknown;
     try {
-      raw = JSON.parse(match[1] ?? '') as unknown;
+      raw = JSON.parse(literal) as unknown;
     } catch {
       return { ok: false, code: 'UNSUPPORTED_CODE' };
     }
@@ -89,8 +111,8 @@ export function compileLiteralRecipe(
     ) {
       return { ok: false, code: 'GRAPH_INVALID' };
     }
-    const graph: RecipeActionGraph = parsed.data;
-    const declaredEffects = [...new Set(graph.nodes.map((node) => node.op))].sort();
+    const graph: RecipeActionGraph = freezeGraph(parsed.data);
+    const declaredEffects = Object.freeze([...new Set(graph.nodes.map((node) => node.op))].sort());
     const compiledArtifact = canonicalJson(graph);
     const base = {
       recipeId: hostConfig.recipeId,
@@ -103,20 +125,20 @@ export function compileLiteralRecipe(
       verifierId: hostConfig.verifierId,
       verifierRevision: hostConfig.verifierRevision,
     };
-    const identity: RecipeRevisionIdentity = {
+    const identity: RecipeRevisionIdentity = Object.freeze({
       ...base,
       revisionSha256: computeRecipeRevision(base),
-    };
+    });
     return {
       ok: true,
       state: 'COMPILED_NOT_EXECUTED',
-      compiled: {
+      compiled: Object.freeze({
         identity,
         sourceText: source,
         compiledArtifact,
         actionGraph: graph,
         declaredEffects,
-      },
+      }),
       modelCalls: 0,
       effectExecuted: false,
       requiresActionControllerRevalidation: true,

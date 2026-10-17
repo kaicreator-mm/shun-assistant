@@ -49,6 +49,45 @@ describe('T04 literal-only JS/TS Recipe-to-typed-action mediation', () => {
     expect(compileLiteralRecipe(literal(graph), host)).toEqual(result);
   });
 
+  it('rejects long unterminated whitespace without overlapping-regex backtracking', () => {
+    for (const length of [500, 2000, 8192, 32768]) {
+      const malformed = `export default defineRecipe(${' '.repeat(length)}`;
+      expect(compileLiteralRecipe(malformed, host)).toEqual({
+        ok: false,
+        code: 'UNSUPPORTED_CODE',
+      });
+    }
+    // A valid JSON string with a literal closing delimiter is still data.
+    expect(compileLiteralRecipe(
+      literal({
+        nodes: [{
+          actionId: 'search-1',
+          op: 'file.search',
+          parameters: { root: 'C:/selected', query: ');' },
+        }],
+        edges: [],
+      }),
+      host,
+    ).ok).toBe(true);
+  });
+
+  it('returns a frozen nested graph, identity and effects, never a mutable grant', () => {
+    const result = compileLiteralRecipe(literal(graph), host);
+    if (!result.ok) throw new Error('fixture');
+    expect(Object.isFrozen(result.compiled)).toBe(true);
+    expect(Object.isFrozen(result.compiled.identity)).toBe(true);
+    expect(Object.isFrozen(result.compiled.declaredEffects)).toBe(true);
+    expect(Object.isFrozen(result.compiled.actionGraph)).toBe(true);
+    expect(Object.isFrozen(result.compiled.actionGraph.nodes)).toBe(true);
+    expect(Object.isFrozen(result.compiled.actionGraph.nodes[0])).toBe(true);
+    expect(Object.isFrozen(result.compiled.actionGraph.nodes[0]?.parameters)).toBe(true);
+    expect(Object.isFrozen(result.compiled.actionGraph.edges)).toBe(true);
+    expect(() => {
+      (result.compiled.identity as { verifierRevision: string }).verifierRevision = 'attacker';
+    }).toThrow(TypeError);
+    expect(result.compiled.identity.verifierRevision).toBe('1');
+  });
+
   it('keeps effectful operations as typed proposals only, never authorization', () => {
     const effectful = {
       nodes: [
