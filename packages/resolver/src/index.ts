@@ -16,3 +16,13 @@ export * from './ranking.ts';
 export * from './registry.ts';
 export * from './resolve.ts';
 export * from './revision.ts';
+
+// T04 private host-only composition; no source execution, grant or effect port.
+// Sequential integrator owns this entrypoint after T01 source closure.
+export type { TrustedRecipeCompilerConfig } from './literal-recipe-compiler.ts';
+export {
+  TrustedRecipeReadService,
+  type TrustedRecipeHost,
+  type RecipeRegistrationResult,
+  type TrustedRecipeReadResult,
+} from './trusted-recipe-host.ts';
