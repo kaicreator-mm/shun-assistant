@@ -41,8 +41,8 @@ import {
   copyFile,
   lstat,
   mkdir,
-  readFile,
   readdir,
+  readFile,
   rm,
   writeFile,
 } from 'node:fs/promises';
