@@ -1622,23 +1622,25 @@ async function mainRun(): Promise<void> {
           taskId: TASK_ID,
           descriptor,
           run: { kind: 'FILE_SEARCH', pattern: 'CANARY', operands: [helper] },
-          sandboxFiles: [{ name: 'inside.txt', bytes: Buffer.from('canary inside') }],
+          sandboxFiles: [{ name: 'corpus.txt', bytes: Buffer.from('canary inside') }],
         });
         assert(
           !asOperand.ok && asOperand.code === 'RUN_REQUEST_INVALID',
           `--pre helper operand must be RUN_REQUEST_INVALID, got ${JSON.stringify(asOperand)}`,
         );
         // The would-be authorized search still runs (real rg, single spawn).
+        // Register the EXACT search contract for THIS invocation shape first.
+        await registerGrant(world, BINDING, searchContract, outputDir);
         const normal = await activator.runCli({
           taskId: TASK_ID,
           descriptor,
           run: {
             kind: 'FILE_SEARCH',
-            pattern: 'canary',
-            operands: ['inside.txt'],
+            pattern: 'needle',
+            operands: ['corpus.txt'],
             lineNumbers: true,
           },
-          sandboxFiles: [{ name: 'inside.txt', bytes: Buffer.from('canary inside') }],
+          sandboxFiles: [{ name: 'corpus.txt', bytes: Buffer.from('a canary needle inside') }],
         });
         assert(normal.ok, `sanity search must run, got ${JSON.stringify(normal)}`);
         assert(
@@ -1692,24 +1694,30 @@ async function mainRun(): Promise<void> {
         );
         const after = await readFile(outside, 'utf8');
         assert(after === outsideContent, 'outside canary bytes changed!');
-        // The approved inside twin still searches normally.
+        // Zero-access proof: the outside canary CONTAINS the needle, the
+        // in-sandbox corpus does NOT. A bound search over the sandbox-only
+        // operand must exit 1 with empty stdout — had rg followed anything
+        // outside, the needle would have matched.
+        await registerGrant(world, BINDING, searchContract, outputDir);
         const approved = await activator.runCli({
           taskId: TASK_ID,
           descriptor,
           run: {
             kind: 'FILE_SEARCH',
-            pattern: 'CANARY_NEEDLE',
-            operands: ['inside.txt'],
+            pattern: 'needle',
+            operands: ['corpus.txt'],
             lineNumbers: true,
           },
-          sandboxFiles: [{ name: 'inside.txt', bytes: Buffer.from('CANARY_NEEDLE inside') }],
+          sandboxFiles: [{ name: 'corpus.txt', bytes: Buffer.from('nothing interesting here') }],
         });
-        assert(approved.ok && approved.exitCode === 0, 'approved inside operand must still run');
-        assert(!approved.stdout.includes('outside'), 'outside content must never appear');
+        assert(approved.ok, `approved inside operand must still run: ${JSON.stringify(approved)}`);
+        assert(approved.exitCode === 1, `rg must find nothing in the sandbox, got ${JSON.stringify(approved)}`);
+        assert(approved.stdout === '', `outside content leaked: ${approved.stdout.slice(0, 200)}`);
         await event('r1f02.outside', {
           refusedVariants: 4,
           spawnCount: mainObserver.specs.length - spawnsBefore,
           outsideBytesUnchanged: true,
+          sandboxSearchExit: approved.exitCode,
         });
         return 'absolute/UNC/drive/.. operands → RUN_REQUEST_INVALID, 0 spawns, outside bytes intact';
       },
@@ -1722,8 +1730,9 @@ async function mainRun(): Promise<void> {
       'R1-F03-INVOCATION-BINDING',
       'a --version grant does NOT authorize a different invocation (zero spawn)',
       async () => {
-        // world still holds the versionContract grant (search contract was
-        // re-registered back in ACTIVATE-SEARCH).
+        // Bind the version grant EXPLICITLY — grant state is per-scenario,
+        // never inherited from whatever an earlier scenario left behind.
+        await registerGrant(world, BINDING, versionContract, outputDir);
         const spawnsBefore = mainObserver.specs.length;
         const hijack = await activator.runCli({
           taskId: TASK_ID,
@@ -1755,7 +1764,6 @@ async function mainRun(): Promise<void> {
           sandboxFiles: [{ name: 'corpus.txt', bytes: Buffer.from('the needle here') }],
         });
         assert(bound.ok, `bound search must run, got ${JSON.stringify(bound)}`);
-        await registerGrant(world, BINDING, versionContract, outputDir);
         await event('r1f03.binding', {
           mismatch: hijack.code,
           boundExit: bound.exitCode,
@@ -1771,6 +1779,7 @@ async function mainRun(): Promise<void> {
       'R1-F04-EXE-SWAP',
       'staged EXE bytes swapped after verify → EXECUTABLE_IDENTITY_DRIFT, 0 spawns',
       async () => {
+        await registerGrant(world, BINDING, versionContract, outputDir);
         const spawnsBefore = mainObserver.specs.length;
         let swappedPath = '';
         const swapObserver = observingSpawn();
@@ -1824,6 +1833,7 @@ async function mainRun(): Promise<void> {
       'junction canaries: operand redirect and unanchored cache root refuse closed',
       async () => {
         assert(process.platform === 'win32', 'reparse canaries run on the Windows host only');
+        await registerGrant(world, BINDING, versionContract, outputDir);
         const spawnsBefore = mainObserver.specs.length;
         // (a) junction over the seeded operand → SANDBOX_UNSAFE.
         const junctionObserver = observingSpawn();
@@ -1888,6 +1898,7 @@ async function mainRun(): Promise<void> {
       'R1-F05-REVOKE-AT-SEAM',
       'revocation flip at the spawn seam → effect gate refuses, 0 process invocations',
       async () => {
+        await registerGrant(world, BINDING, versionContract, outputDir);
         const spawnsBefore = mainObserver.specs.length;
         let seamFlipped = false;
         let gateCalls = 0;
