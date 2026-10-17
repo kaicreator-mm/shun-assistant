@@ -1,0 +1,96 @@
+{"at":"2026-10-17T16:55:49.001Z","kind":"run.start","task":"T05 #106 real Windows Build Host — trusted ripgrep CLI activation","baseline":"version/v0.2.0@5e0bb2ba4b0f3409247e0f300950b84381d32661","evidenceDir":"C:\\xDev\\kAiCreator\\shun-assistant\\i106-t05-winhost\\packages\\provider-loader\\evidence\\t05-winhost-2026-10-17T16-55-48","rgVersion":"14.1.1","rgUrl":"https://github.com/BurntSushi/ripgrep/releases/download/14.1.1/ripgrep-14.1.1-x86_64-pc-windows-msvc.zip","node":"v24.21.0","modulesAbi":"137"}
+{"at":"2026-10-17T16:55:49.035Z","kind":"canary.baseline","files":["<HOME>\\AppData\\Local\\Temp\\shun-t05-canary\\user-canary-temp.txt","<HOME>\\shun-t05-canary-home.txt","C:\\xDev\\kAiCreator\\shun-assistant\\i106-t05-winhost\\packages\\provider-loader\\t05-canary-cwd.tmp"],"digests":["8be3010086a557b6c086932e35c33a494f93fc5de9968588715c942cf6321547","9e2a80d3980df0f08f399027c321655d1153a158c50062a115cf2e1f38cd4653","9485f0fb16ba3fd4f1655a673eff2f425bf070a3e1fbf7f88e64f282955b264a"]}
+{"at":"2026-10-17T16:55:49.038Z","kind":"scenario.start","id":"HOST","title":"host facts (OS, integrity, symlink privilege, node)"}
+{"at":"2026-10-17T16:55:49.312Z","kind":"host.facts","os":"win32 10.0.26300 x64","node":"v24.21.0","modulesAbi":"137","user":"<HOST>\\<USER>","mandatoryLevel":"Mandatory Label\\Medium Mandatory Level    S-1-16-8192","symlinkPrivilege":false,"elevatedShell":false}
+{"at":"2026-10-17T16:55:49.314Z","kind":"scenario.end","id":"HOST","status":"PASS","detail":"os=win32 10.0.26300 x64 node=v24.21.0 symlinkPriv=false elevated=false"}
+{"at":"2026-10-17T16:55:49.319Z","kind":"scenario.start","id":"PREP","title":"download official ripgrep release and pin exact bytes"}
+{"at":"2026-10-17T16:55:51.202Z","kind":"prep.download","attempts":["attempt1(direct):exit=0,bytes=2058893"]}
+{"at":"2026-10-17T16:55:51.648Z","kind":"prep.ripgrep","url":"https://github.com/BurntSushi/ripgrep/releases/download/14.1.1/ripgrep-14.1.1-x86_64-pc-windows-msvc.zip","zipSha256":"d0f534024c42afd6cb4d38907c25cd2b249b79bbe6cc1dbee8e3e37c2b6e25a1","rgExeSha256":"f162b54de2adfc72d78adb1dbada2dedda111ae0a5e2f6e9500f4f909664c5d2","rgExeBytes":5407744,"zipContents":["CHANGELOG.md","COPYING","FAQ.md","GUIDE.md","LICENSE-MIT","README.md","UNLICENSE","_rg","_rg.ps1","rg.1","rg.bash","rg.exe","rg.fish"],"dllFiles":0}
+{"at":"2026-10-17T16:55:52.508Z","kind":"prep.wingetAnchor","available":false,"matchesZip":false,"note":"informational anchor only; trust anchor is the curator signature over the pinned digest"}
+{"at":"2026-10-17T16:55:52.509Z","kind":"scenario.end","id":"PREP","status":"PASS","detail":"zip=d0f534024c42afd6… rg.exe=f162b54de2adfc72… bytes=5407744 wingetAnchor=UNAVAILABLE"}
+{"at":"2026-10-17T16:55:52.540Z","kind":"fixture.origin","origin":"https://127.0.0.1:58749","endpoints":["/rg.exe","/rg-corrupt.exe","/redirect","/hang"]}
+{"at":"2026-10-17T16:55:52.554Z","kind":"scenario.start","id":"STAGE","title":"production stager fetches fixture origin and pins digest"}
+{"at":"2026-10-17T16:55:53.060Z","kind":"stage.ok","digest":"f162b54de2adfc72d78adb1dbada2dedda111ae0a5e2f6e9500f4f909664c5d2","byteLength":5407744,"state":"VERIFIED_BYTES_ONLY"}
+{"at":"2026-10-17T16:55:53.062Z","kind":"scenario.end","id":"STAGE","status":"PASS","detail":"digest=f162b54de2adfc72… bytes=5407744"}
+{"at":"2026-10-17T16:55:53.062Z","kind":"scenario.start","id":"PREFLIGHT","title":"merged CuratedProviderPreflight admits the staged artifact"}
+{"at":"2026-10-17T16:55:53.072Z","kind":"port.snapshot","taskId":"task-t05-winhost","bindingId":"rg-binding-winhost","snapshot":"{\"kind\":\"CURRENT\",\"taskId\":\"task-t05-winhost\",\"providerId\":\"rg\",\"bindingId\":\"rg-binding-winhost\",\"catalogRevision\":\"catalog-t05-winhost-r1\",\"artifactSha256\":\"f162b54de2adfc72d78adb1dbada2dedda111ae0a5e2f6e9500f4f909664c5d2\",\"revocationEpoch\":1,\"capability\":\"PREPARE_PROVIDER\"}","pinnedSha":"f162b54de2adfc72d78adb1dbada2dedda111ae0a5e2f6e9500f4f909664c5d2","grantRecorded":true}
+{"at":"2026-10-17T16:55:53.088Z","kind":"scenario.end","id":"PREFLIGHT","status":"PASS","detail":"state=PREFLIGHT_ONLY digest=f162b54de2adfc72…"}
+{"at":"2026-10-17T16:55:53.090Z","kind":"scenario.start","id":"ACTIVATE-VERSION","title":"activation executes pinned rg.exe --version"}
+{"at":"2026-10-17T16:55:53.433Z","kind":"effect.authorized","leaseId":"eac9a9d0-c7a8-41ce-b62c-b3f45c4392b6","op":"provider.version.probe","argv":["--version"]}
+{"at":"2026-10-17T16:55:53.800Z","kind":"activate.version","stdoutFirstLine":"ripgrep 14.1.1 (rev 4649aa9700)","executable":"<HOME>\\AppData\\Local\\Temp\\shun-t05-winhost-2026-10-17T16-55-48\\cache\\active\\rg-binding-winhost\\f162b54de2adfc72d78adb1dbada2dedda111ae0a5e2f6e9500f4f909664c5d2\\exec\\b9cc21b3-fbca-4318-8beb-2223a90c7962\\rg.exe","envKeys":["SystemDrive","SystemRoot"],"durationMs":706}
+{"at":"2026-10-17T16:55:53.800Z","kind":"scenario.end","id":"ACTIVATE-VERSION","status":"PASS","detail":"stdout=\"ripgrep 14.1.1 (rev 4649aa9700)\" exit=0"}
+{"at":"2026-10-17T16:55:53.801Z","kind":"scenario.start","id":"ACTIVATE-SEARCH","title":"activation runs a real ripgrep search in its sandbox"}
+{"at":"2026-10-17T16:55:54.167Z","kind":"effect.authorized","leaseId":"3e38d162-dfcd-4ad6-94ee-78001d8a1c81","op":"provider.ripgrep.file-search","argv":["-n","--no-heading","-e","needle","--","corpus.txt"]}
+{"at":"2026-10-17T16:55:54.490Z","kind":"activate.search","stdout":"2:the needle is here","exitCode":0}
+{"at":"2026-10-17T16:55:54.491Z","kind":"scenario.end","id":"ACTIVATE-SEARCH","status":"PASS","detail":"match=\"2:the needle is here\" exit=0"}
+{"at":"2026-10-17T16:55:54.493Z","kind":"scenario.start","id":"NEG-PATH-SUBSTITUTION","title":"hostile PATH entry cannot substitute the pinned provider"}
+{"at":"2026-10-17T16:55:54.791Z","kind":"effect.authorized","leaseId":"0a0ac45e-12e9-4255-8cae-d5b8197a5b13","op":"provider.version.probe","argv":["--version"]}
+{"at":"2026-10-17T16:55:55.134Z","kind":"scenario.end","id":"NEG-PATH-SUBSTITUTION","status":"PASS","detail":"pinned cache executable won; ambush rg.exe never spawned"}
+{"at":"2026-10-17T16:55:55.135Z","kind":"scenario.start","id":"OFFLINE-REPLAY","title":"offline cache replay: 0 downloads, activation still works"}
+{"at":"2026-10-17T16:55:55.475Z","kind":"effect.authorized","leaseId":"71f0fe74-13d2-4aad-9e88-bc5845c6ff5e","op":"provider.version.probe","argv":["--version"]}
+{"at":"2026-10-17T16:55:55.919Z","kind":"scenario.end","id":"OFFLINE-REPLAY","status":"PASS","detail":"cache replay ok, downloads=0, exit=0"}
+{"at":"2026-10-17T16:55:55.920Z","kind":"scenario.start","id":"NEG-OFFLINE-EMPTY","title":"offline + empty cache refuses closed (no download attempt)"}
+{"at":"2026-10-17T16:55:55.926Z","kind":"scenario.end","id":"NEG-OFFLINE-EMPTY","status":"PASS","detail":"OFFLINE at stage; ARTIFACT_NOT_VERIFIED at activation; 0 spawns 0 fetches"}
+{"at":"2026-10-17T16:55:55.927Z","kind":"scenario.start","id":"RESTART","title":"fresh subprocess re-verifies from durable cache and executes"}
+{"at":"2026-10-17T16:55:57.199Z","kind":"restart.child","ok":true,"exitCode":0,"versionLine":"ripgrep 14.1.1 (rev 4649aa9700)","executableUnderCache":true,"envKeys":["SystemDrive","SystemRoot"],"refuseCode":""}
+{"at":"2026-10-17T16:55:57.200Z","kind":"scenario.end","id":"RESTART","status":"PASS","detail":"fresh process: ripgrep 14.1.1 (rev 4649aa9700) env=[SystemDrive,SystemRoot]"}
+{"at":"2026-10-17T16:55:57.200Z","kind":"scenario.start","id":"NEG-TAMPER-CACHE","title":"tampered cached bytes refuse closed, recovery after restore"}
+{"at":"2026-10-17T16:55:58.115Z","kind":"effect.authorized","leaseId":"1c684346-3480-408b-9707-fbdb1984abcd","op":"provider.version.probe","argv":["--version"]}
+{"at":"2026-10-17T16:55:58.472Z","kind":"scenario.end","id":"NEG-TAMPER-CACHE","status":"PASS","detail":"tampered→ARTIFACT_NOT_VERIFIED zero spawn; restored→EXECUTED"}
+{"at":"2026-10-17T16:55:58.473Z","kind":"scenario.start","id":"NEG-CATALOG","title":"unsigned, forged-key and downgrade descriptors refuse before exec"}
+{"at":"2026-10-17T16:55:58.475Z","kind":"neg.catalog","unsigned":"CATALOG_SIGNATURE_INVALID","forged":"CATALOG_SIGNATURE_INVALID","downgrade":"CATALOG_SCOPE_DRIFT"}
+{"at":"2026-10-17T16:55:58.476Z","kind":"scenario.end","id":"NEG-CATALOG","status":"PASS","detail":"unsigned=CATALOG_SIGNATURE_INVALID forged=CATALOG_SIGNATURE_INVALID downgrade=CATALOG_SCOPE_DRIFT spawns=0"}
+{"at":"2026-10-17T16:55:58.476Z","kind":"scenario.start","id":"NEG-REDIRECT","title":"redirect origins refuse: fixture 302 and real github.com 302"}
+{"at":"2026-10-17T16:55:59.146Z","kind":"neg.redirect","fixture":"REDIRECT_REFUSED","github":"REDIRECT_REFUSED","url":"https://github.com/BurntSushi/ripgrep/releases/download/14.1.1/ripgrep-14.1.1-x86_64-pc-windows-msvc.zip"}
+{"at":"2026-10-17T16:55:59.147Z","kind":"scenario.end","id":"NEG-REDIRECT","status":"PASS","detail":"fixture 302 → REDIRECT_REFUSED; real github.com release 302 → REDIRECT_REFUSED"}
+{"at":"2026-10-17T16:55:59.147Z","kind":"scenario.start","id":"NEG-CORRUPT-DOWNLOAD","title":"corrupted bytes over the wire refuse with hash mismatch"}
+{"at":"2026-10-17T16:55:59.240Z","kind":"scenario.end","id":"NEG-CORRUPT-DOWNLOAD","status":"PASS","detail":"ARTIFACT_HASH_MISMATCH, cache stays empty, activation zero-spawn"}
+{"at":"2026-10-17T16:55:59.241Z","kind":"scenario.start","id":"NEG-REVOCATION-EPOCH","title":"host revocation-epoch bump voids activation before exec"}
+{"at":"2026-10-17T16:55:59.547Z","kind":"effect.authorized","leaseId":"e22aec70-164a-4460-94da-00027fe574c0","op":"provider.version.probe","argv":["--version"]}
+{"at":"2026-10-17T16:55:59.867Z","kind":"scenario.end","id":"NEG-REVOCATION-EPOCH","status":"PASS","detail":"epoch 1→2 → AUTHORITY_STALE zero spawn; restored → EXECUTED"}
+{"at":"2026-10-17T16:55:59.868Z","kind":"scenario.start","id":"NEG-POLICY-REVOKED","title":"revoked authorization policy voids activation (real grant substrate)"}
+{"at":"2026-10-17T16:55:59.870Z","kind":"authority.unhealthy","code":"GRANT_POLICY_REVOKED","detail":"current policy revision is revoked"}
+{"at":"2026-10-17T16:55:59.870Z","kind":"scenario.end","id":"NEG-POLICY-REVOKED","status":"PASS","detail":"revokePolicy() → AUTHORITY_STALE zero spawn"}
+{"at":"2026-10-17T16:55:59.872Z","kind":"scenario.start","id":"NEG-CONSENT-REFUSED","title":"unresolvable currentness refuses activation (consent denied)"}
+{"at":"2026-10-17T16:55:59.875Z","kind":"scenario.end","id":"NEG-CONSENT-REFUSED","status":"PASS","detail":"corruptCurrentness(consent refused) → AUTHORITY_STALE zero spawn"}
+{"at":"2026-10-17T16:55:59.876Z","kind":"scenario.start","id":"NEG-GRANT-REVOKED","title":"revoked grant refuses activation; fresh grant restores it"}
+{"at":"2026-10-17T16:56:00.204Z","kind":"effect.authorized","leaseId":"8cdc7f53-a855-4a3c-9199-a907a4c8c17c","op":"provider.version.probe","argv":["--version"]}
+{"at":"2026-10-17T16:56:00.541Z","kind":"scenario.end","id":"NEG-GRANT-REVOKED","status":"PASS","detail":"revokeGrant → AUTHORITY_STALE zero spawn; re-issue → EXECUTED"}
+{"at":"2026-10-17T16:56:00.542Z","kind":"scenario.start","id":"NEG-TOCTOU","title":"ActionController denial between admission and exec voids activation"}
+{"at":"2026-10-17T16:56:00.884Z","kind":"scenario.end","id":"NEG-TOCTOU","status":"PASS","detail":"reads=2 (admission + immediately-before-exec), second denial → zero spawn"}
+{"at":"2026-10-17T16:56:00.885Z","kind":"scenario.start","id":"NEG-INTERRUPT","title":"interrupted staging (socket destroyed) fails closed and recovers"}
+{"at":"2026-10-17T16:56:03.421Z","kind":"scenario.end","id":"NEG-INTERRUPT","status":"PASS","detail":"SOURCE_UNAVAILABLE, no artifact cached; main cache still EXECUTES"}
+{"at":"2026-10-17T16:56:03.422Z","kind":"scenario.start","id":"NEG-ENTRYPOINT","title":"path-traversal entrypoint refuses and materializes nothing"}
+{"at":"2026-10-17T16:56:03.441Z","kind":"scenario.end","id":"NEG-ENTRYPOINT","status":"PASS","detail":"ENTRYPOINT_INVALID; no evil.exe under cache (files before=0)"}
+{"at":"2026-10-17T16:56:03.441Z","kind":"scenario.start","id":"R1-F01-PRE-CANARY","title":"ripgrep --pre is INEXPRESSIBLE: request refused pre-spawn, helper marker absent"}
+{"at":"2026-10-17T16:56:03.867Z","kind":"effect.authorized","leaseId":"c0b751e1-a4b0-4ded-a28d-4484d5cfb5f5","op":"provider.ripgrep.file-search","argv":["-n","--no-heading","-e","needle","--","corpus.txt"]}
+{"at":"2026-10-17T16:56:04.429Z","kind":"r1f01.pre","refused":"RUN_REQUEST_INVALID","helperMarkerAbsent":true,"realSearchExit":0,"spawnCount":1}
+{"at":"2026-10-17T16:56:04.430Z","kind":"scenario.end","id":"R1-F01-PRE-CANARY","status":"PASS","detail":"RUN_REQUEST_INVALID / 0 helper spawns / marker absent; real rg search still works"}
+{"at":"2026-10-17T16:56:04.430Z","kind":"scenario.start","id":"R1-F02-OUTSIDE-CANARY","title":"outside-root operand refuses closed: no spawn, no outside read"}
+{"at":"2026-10-17T16:56:04.869Z","kind":"effect.authorized","leaseId":"b306f69d-3d2b-4918-a5b2-774cc8434480","op":"provider.ripgrep.file-search","argv":["-n","--no-heading","-e","needle","--","corpus.txt"]}
+{"at":"2026-10-17T16:56:05.295Z","kind":"r1f02.outside","refusedVariants":4,"spawnCount":1,"outsideBytesUnchanged":true,"sandboxSearchExit":1}
+{"at":"2026-10-17T16:56:05.296Z","kind":"scenario.end","id":"R1-F02-OUTSIDE-CANARY","status":"PASS","detail":"absolute/UNC/drive/.. operands → RUN_REQUEST_INVALID, 0 spawns, outside bytes intact"}
+{"at":"2026-10-17T16:56:05.296Z","kind":"scenario.start","id":"R1-F03-INVOCATION-BINDING","title":"a --version grant does NOT authorize a different invocation (zero spawn)"}
+{"at":"2026-10-17T16:56:05.688Z","kind":"effect.refused","stage":"invocation-binding","op":"provider.ripgrep.file-search","expectedOp":"provider.version.probe"}
+{"at":"2026-10-17T16:56:06.008Z","kind":"effect.authorized","leaseId":"94f820d3-3516-437e-a7f5-76bac4fd0671","op":"provider.ripgrep.file-search","argv":["-n","--no-heading","-e","needle","--","corpus.txt"]}
+{"at":"2026-10-17T16:56:06.409Z","kind":"r1f03.binding","mismatch":"EFFECT_NOT_AUTHORIZED","boundExit":0}
+{"at":"2026-10-17T16:56:06.410Z","kind":"scenario.end","id":"R1-F03-INVOCATION-BINDING","status":"PASS","detail":"version-grant + search-request → EFFECT_NOT_AUTHORIZED zero spawn; bound grant → EXECUTED"}
+{"at":"2026-10-17T16:56:06.410Z","kind":"scenario.start","id":"R1-F04-EXE-SWAP","title":"staged EXE bytes swapped after verify → EXECUTABLE_IDENTITY_DRIFT, 0 spawns"}
+{"at":"2026-10-17T16:56:07.208Z","kind":"effect.authorized","leaseId":"e4942746-39e8-4be9-9afb-c98fa7158b5b","op":"provider.version.probe","argv":["--version"]}
+{"at":"2026-10-17T16:56:07.607Z","kind":"r1f04.swap","refused":"EXECUTABLE_IDENTITY_DRIFT","recoveredExit":0}
+{"at":"2026-10-17T16:56:07.608Z","kind":"scenario.end","id":"R1-F04-EXE-SWAP","status":"PASS","detail":"post-verify swap → EXECUTABLE_IDENTITY_DRIFT 0 spawns; next run EXECUTED (pinned rg)"}
+{"at":"2026-10-17T16:56:07.609Z","kind":"scenario.start","id":"R1-F04-REPARSE","title":"junction canaries: operand redirect and unanchored cache root refuse closed"}
+{"at":"2026-10-17T16:56:08.038Z","kind":"r1f04.reparse","operandRefused":"SANDBOX_UNSAFE","anchoredRefused":"ACTIVATION_CACHE_UNAVAILABLE"}
+{"at":"2026-10-17T16:56:08.039Z","kind":"scenario.end","id":"R1-F04-REPARSE","status":"PASS","detail":"operand junction → SANDBOX_UNSAFE; junctioned cache root → ACTIVATION_CACHE_UNAVAILABLE; 0 spawns"}
+{"at":"2026-10-17T16:56:08.040Z","kind":"scenario.start","id":"R1-F05-REVOKE-AT-SEAM","title":"revocation flip at the spawn seam → effect gate refuses, 0 process invocations"}
+{"at":"2026-10-17T16:56:08.437Z","kind":"effect.refused","stage":"epoch","op":"provider.version.probe"}
+{"at":"2026-10-17T16:56:08.908Z","kind":"r1f05.seam","seamRefused":"AUTHORITY_STALE","gateCalls":1,"restored":1}
+{"at":"2026-10-17T16:56:08.909Z","kind":"scenario.end","id":"R1-F05-REVOKE-AT-SEAM","status":"PASS","detail":"epoch flip at seam → AUTHORITY_STALE 0 spawns; last-boundary gate ran exactly once"}
+{"at":"2026-10-17T16:56:08.910Z","kind":"scenario.start","id":"CANARY","title":"user-owned canary files unchanged across the entire run"}
+{"at":"2026-10-17T16:56:08.912Z","kind":"scenario.end","id":"CANARY","status":"PASS","detail":"3 canaries intact (temp + user profile + cwd)"}
+{"at":"2026-10-17T16:56:08.913Z","kind":"scenario.start","id":"SHARP","title":"native addon ABI probe: @img/sharp-win32-x64 real dlopen in isolated child"}
+{"at":"2026-10-17T16:56:12.859Z","kind":"sharp.metadata","version":"0.35.5","tarballUrl":"https://registry.npmmirror.com/@img/sharp-win32-x64/-/sharp-win32-x64-0.35.5.tgz","tarballBytes":8575353,"sha256":"16a804181ddd258ca6fe7079b2faa0c0356654c9db3d93ab0a80ec5e5161c3d4","registrySri":"sha512-x76eH0vEiHlcMQu8Y8IenntaACtddpT6W0wmXtWrnKcnKI7ME5DdgqhAD6SEWOEl1v2zDvkZDhFA9KnURwpfqg==","sriMatches":true}
+{"at":"2026-10-17T16:56:15.337Z","kind":"sharp.addon","addon":"sharp-win32-x64-0.35.5.node","sha256":"971048779f9c8598df14641dfc03c625885c93f473a788e65ca2deb50d0b083e","hostAbi":"137","node":"v24.21.0"}
+{"at":"2026-10-17T16:56:16.231Z","kind":"sharp.dlopen","exitCode":0,"stdout":"DLOADED 13 exports: _isUsingJemalloc,_isUsingX64V2,_maxColourDistance,block,cache,concurrency,counters,format,libvipsVersion,metadata,pipeline,simd,stats\nNAPI_ABI_OK node=v24.21.0 modules=137","stderr":""}
+{"at":"2026-10-17T16:56:16.232Z","kind":"scenario.end","id":"SHARP","status":"PASS","detail":"sharp-win32-x64@0.35.5 sha256=16a804181ddd258c… SRI-anchored+staged+ABI=137+dlopen OK; production native activation stays fail-closed (ACTIVATION_KIND_UNSUPPORTED)"}
+{"at":"2026-10-17T16:56:16.236Z","kind":"run.end","pass":29,"fail":0,"skipped":0,"runFailed":false,"summary":"C:\\xDev\\kAiCreator\\shun-assistant\\i106-t05-winhost\\packages\\provider-loader\\evidence\\t05-winhost-2026-10-17T16-55-48\\summary.md"}
