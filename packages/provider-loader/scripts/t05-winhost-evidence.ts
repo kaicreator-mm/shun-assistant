@@ -1711,7 +1711,10 @@ async function mainRun(): Promise<void> {
           sandboxFiles: [{ name: 'corpus.txt', bytes: Buffer.from('nothing interesting here') }],
         });
         assert(approved.ok, `approved inside operand must still run: ${JSON.stringify(approved)}`);
-        assert(approved.exitCode === 1, `rg must find nothing in the sandbox, got ${JSON.stringify(approved)}`);
+        assert(
+          approved.exitCode === 1,
+          `rg must find nothing in the sandbox, got ${JSON.stringify(approved)}`,
+        );
         assert(approved.stdout === '', `outside content leaked: ${approved.stdout.slice(0, 200)}`);
         await event('r1f02.outside', {
           refusedVariants: 4,
