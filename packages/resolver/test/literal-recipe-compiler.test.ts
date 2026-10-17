@@ -58,17 +58,21 @@ describe('T04 literal-only JS/TS Recipe-to-typed-action mediation', () => {
       });
     }
     // A valid JSON string with a literal closing delimiter is still data.
-    expect(compileLiteralRecipe(
-      literal({
-        nodes: [{
-          actionId: 'search-1',
-          op: 'file.search',
-          parameters: { root: 'C:/selected', query: ');' },
-        }],
-        edges: [],
-      }),
-      host,
-    ).ok).toBe(true);
+    expect(
+      compileLiteralRecipe(
+        literal({
+          nodes: [
+            {
+              actionId: 'search-1',
+              op: 'file.search',
+              parameters: { root: 'C:/selected', query: ');' },
+            },
+          ],
+          edges: [],
+        }),
+        host,
+      ).ok,
+    ).toBe(true);
   });
 
   it('returns a frozen nested graph, identity and effects, never a mutable grant', () => {
