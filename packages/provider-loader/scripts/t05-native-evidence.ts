@@ -46,7 +46,13 @@ import {
   rm,
   writeFile,
 } from 'node:fs/promises';
-import { homedir, arch as osArch, hostname as osHostname, release as osRelease, tmpdir } from 'node:os';
+import {
+  homedir,
+  arch as osArch,
+  hostname as osHostname,
+  release as osRelease,
+  tmpdir,
+} from 'node:os';
 import { basename, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { deflateSync } from 'node:zlib';
@@ -319,7 +325,11 @@ if (RESTART_ARG > -1) {
     [{ keyId: 'curator-winhost', publicKeyPem: cfg.publicKeyPem }],
     cfg.scopes,
   );
-  const stager = new CuratedProviderStager({ cacheRoot: cfg.cacheRoot, verifier, isOffline: () => true });
+  const stager = new CuratedProviderStager({
+    cacheRoot: cfg.cacheRoot,
+    verifier,
+    isOffline: () => true,
+  });
   const metadataEffect = async (invocation: ResolvedInvocation): Promise<RunEffectDecision> => {
     const under = (value: string, root: string) =>
       resolve(value).toLowerCase().startsWith(resolve(root).toLowerCase());
@@ -382,7 +392,10 @@ if (RESTART_ARG > -1) {
   };
   process.stdout.write(`RESTART_CHILD_RESULT ${JSON.stringify(payload)}\n`);
   process.exitCode =
-    payload.ok && payload.exitCode === 0 && payload.exportCount > 0 && payload.childAbi === cfg.expectedAbi
+    payload.ok &&
+    payload.exitCode === 0 &&
+    payload.exportCount > 0 &&
+    payload.childAbi === cfg.expectedAbi
       ? 0
       : 1;
 } else {
@@ -421,11 +434,21 @@ async function mainRun(): Promise<void> {
     const gen = await execFileAsync(
       openssl,
       [
-        'req', '-x509', '-newkey', 'ed25519',
-        '-keyout', caKey, '-out', caPem,
-        '-days', '2', '-nodes',
-        '-subj', '//CN=t05-native-fixture',
-        '-addext', 'subjectAltName=IP:127.0.0.1,DNS:localhost',
+        'req',
+        '-x509',
+        '-newkey',
+        'ed25519',
+        '-keyout',
+        caKey,
+        '-out',
+        caPem,
+        '-days',
+        '2',
+        '-nodes',
+        '-subj',
+        '//CN=t05-native-fixture',
+        '-addext',
+        'subjectAltName=IP:127.0.0.1,DNS:localhost',
       ],
       { timeoutMs: 30_000 },
     );
@@ -833,7 +856,10 @@ async function mainRun(): Promise<void> {
       [{ keyId: 'curator-winhost', publicKeyPem }],
       [sharpScope],
     );
-    const makeDescriptor = (overrides: Record<string, unknown> = {}, signer = curator.privateKey) => {
+    const makeDescriptor = (
+      overrides: Record<string, unknown> = {},
+      signer = curator.privateKey,
+    ) => {
       const { dependencyEntries: _host, ...scopeFields } = sharpScope;
       const unsigned = {
         ...scopeFields,
@@ -844,7 +870,9 @@ async function mainRun(): Promise<void> {
       };
       return {
         ...unsigned,
-        curatorSignature: sign(null, Buffer.from(canonicalJson(unsigned)), signer).toString('base64'),
+        curatorSignature: sign(null, Buffer.from(canonicalJson(unsigned)), signer).toString(
+          'base64',
+        ),
       };
     };
     const descriptor = makeDescriptor();
@@ -857,24 +885,32 @@ async function mainRun(): Promise<void> {
     // CACHE: provision dependency bytes into the Shun-owned digest cache with
     // recorded provenance (SRI-anchored tarball extraction). Activation
     // re-verifies every dep digest on every read.
-    await scenario('DEPCACHE', 'provision verified dependency bytes into the digest cache', async () => {
-      await mkdir(join(cacheRoot, 'artifacts'), { recursive: true, mode: 0o700 });
-      for (const dll of SHARP.dlls) {
-        const bytes = await readFile(join(originDir, dll.name));
-        const digest = createHash('sha256').update(bytes).digest('hex');
-        assert(digest === dll.sha256, `dep bytes drifted for ${dll.name}`);
-        await writeFile(join(cacheRoot, 'artifacts', digest), bytes, { flag: 'wx' }).catch(
-          async (error: NodeJS.ErrnoException) => {
-            if (error.code !== 'EEXIST') throw error;
-          },
-        );
-      }
-      await event('depCache.provisioned', {
-        provenance: 'extracted from the SRI-anchored registry tarball (PREP)',
-        entries: SHARP.dlls.map((dll) => ({ name: dll.name, sha256: dll.sha256, bytes: dll.bytes })),
-      });
-      return `${SHARP.dlls.length} deps cached under digest names`;
-    });
+    await scenario(
+      'DEPCACHE',
+      'provision verified dependency bytes into the digest cache',
+      async () => {
+        await mkdir(join(cacheRoot, 'artifacts'), { recursive: true, mode: 0o700 });
+        for (const dll of SHARP.dlls) {
+          const bytes = await readFile(join(originDir, dll.name));
+          const digest = createHash('sha256').update(bytes).digest('hex');
+          assert(digest === dll.sha256, `dep bytes drifted for ${dll.name}`);
+          await writeFile(join(cacheRoot, 'artifacts', digest), bytes, { flag: 'wx' }).catch(
+            async (error: NodeJS.ErrnoException) => {
+              if (error.code !== 'EEXIST') throw error;
+            },
+          );
+        }
+        await event('depCache.provisioned', {
+          provenance: 'extracted from the SRI-anchored registry tarball (PREP)',
+          entries: SHARP.dlls.map((dll) => ({
+            name: dll.name,
+            sha256: dll.sha256,
+            bytes: dll.bytes,
+          })),
+        });
+        return `${SHARP.dlls.length} deps cached under digest names`;
+      },
+    );
 
     const stager = new CuratedProviderStager({ cacheRoot, verifier, isOffline: () => false });
     const observer = {
@@ -887,9 +923,7 @@ async function mainRun(): Promise<void> {
       },
     };
 
-    function activationHost(
-      overrides: Partial<TrustedActivationHost> = {},
-    ): TrustedActivationHost {
+    function activationHost(overrides: Partial<TrustedActivationHost> = {}): TrustedActivationHost {
       return {
         verifier,
         stager,
@@ -926,7 +960,11 @@ async function mainRun(): Promise<void> {
                 sandboxRoot: contract.sandboxRoot,
                 operandName: contract.operandName ?? null,
               }
-            : { argv: [...contract.argv], execRoot: contract.execRoot, sandboxRoot: contract.sandboxRoot },
+            : {
+                argv: [...contract.argv],
+                execRoot: contract.execRoot,
+                sandboxRoot: contract.sandboxRoot,
+              },
         sideEffectClass: 'R1',
         requiredPrivilege: 'USER',
         filesystemScope: {
@@ -1046,7 +1084,10 @@ async function mainRun(): Promise<void> {
           run: { kind: 'ADDON_METADATA' },
         });
         assert(result.ok, `activation refused: ${JSON.stringify(result)}`);
-        assert(result.exitCode === 0, `child exit ${result.exitCode}: ${result.stderr.slice(0, 300)}`);
+        assert(
+          result.exitCode === 0,
+          `child exit ${result.exitCode}: ${result.stderr.slice(0, 300)}`,
+        );
         const native = result.native;
         assert(native?.ok === true, `child report unparsable: ${JSON.stringify(native)}`);
         assert(
@@ -1057,7 +1098,10 @@ async function mainRun(): Promise<void> {
         const spec = observer.specs.at(-1);
         assert(spec, 'spawn was not observed');
         assert(spec?.executable === process.execPath, 'child must run the pinned runtime');
-        assert(spec?.cwd?.toLowerCase().startsWith(execRoot.toLowerCase()), 'cwd must be the exec dir');
+        assert(
+          spec?.cwd?.toLowerCase().startsWith(execRoot.toLowerCase()),
+          'cwd must be the exec dir',
+        );
         assert(
           Object.keys(spec?.env ?? {}).every((key) => ['SystemRoot', 'SystemDrive'].includes(key)),
           'child env must be the scrubbed allowlist',
@@ -1089,8 +1133,7 @@ async function mainRun(): Promise<void> {
         assert(result.ok, `activation refused: ${JSON.stringify(result)}`);
         const native = result.native;
         assert(native?.ok === true, `child report unparsable: ${JSON.stringify(native)}`);
-        const metadata =
-          native.report.kind === 'IMAGE_METADATA' ? native.report.metadata : {};
+        const metadata = native.report.kind === 'IMAGE_METADATA' ? native.report.metadata : {};
         await event('activate.imageMetadata', { metadata });
         assert(
           metadata.width === 8 && metadata.height === 2,
@@ -1107,145 +1150,159 @@ async function mainRun(): Promise<void> {
 
     // RPL: offline cache replay — zero fetch, activation still works.
     let offlineFetches = 0;
-    await scenario('OFFLINE-REPLAY', 'offline cache replay: 0 downloads, activation still works', async () => {
-      await registerGrant(metadataContract);
-      const offlineStager = new CuratedProviderStager({
-        cacheRoot,
-        verifier,
-        isOffline: () => true,
-        fetchArtifact: ((() => {
-          offlineFetches += 1;
-          return Promise.reject(new Error('network must not be touched'));
-        }) as unknown as typeof fetch),
-      });
-      const offlineActivator = new CuratedProviderActivator(
-        activationHost({ stager: offlineStager }),
-      );
-      const replayed = await offlineActivator.runNativeAddon({
-        taskId: TASK_ID,
-        descriptor,
-        run: { kind: 'ADDON_METADATA' },
-      });
-      assert(replayed.ok, `offline replay refused: ${JSON.stringify(replayed)}`);
-      assert(offlineFetches === 0, `offline replay performed ${offlineFetches} downloads`);
-      return `cache replay ok, downloads=0, exports=${replayed.native?.ok && replayed.native.report.kind === 'ADDON_METADATA' ? replayed.native.report.exportCount : 0}`;
-    });
-
-    // RST: fresh subprocess re-composes from the durable cache.
-    await scenario('RESTART', 'fresh subprocess re-verifies from durable cache and activates', async () => {
-      const cfgPath = join(RUNTIME_ROOT, 'restart-cfg.json');
-      await writeFile(
-        cfgPath,
-        JSON.stringify({
+    await scenario(
+      'OFFLINE-REPLAY',
+      'offline cache replay: 0 downloads, activation still works',
+      async () => {
+        await registerGrant(metadataContract);
+        const offlineStager = new CuratedProviderStager({
           cacheRoot,
-          publicKeyPem,
-          scopes: [sharpScope],
-          descriptor,
-          taskId: TASK_ID,
-          bindingId: BINDING,
-          digest: SHARP.addonSha256,
-          expectedAbi: process.versions.modules,
-        } satisfies RestartConfig),
-        'utf8',
-      );
-      const child = await execFileAsync(
-        process.execPath,
-        [fileURLToPath(import.meta.url), '--t05-native-restart-child', cfgPath],
-        { timeoutMs: 120_000, env: { ...minimalWindowsEnv() } },
-      );
-      const line =
-        child.stdout.split('\n').find((entry) => entry.startsWith('RESTART_CHILD_RESULT ')) ?? '';
-      assert(line !== '', `restart child produced no result: ${child.stderr.slice(0, 300)}`);
-      const payload = JSON.parse(line.slice('RESTART_CHILD_RESULT '.length)) as {
-        ok: boolean;
-        exitCode: number;
-        exportCount: number;
-        childAbi: string;
-      };
-      await event('restart.child', payload);
-      assert(payload.ok && payload.exitCode === 0, 'restart child activation failed');
-      assert(payload.exportCount > 0, 'restart child reported no exports');
-      assert(payload.childAbi === process.versions.modules, 'restart child ABI drift');
-      return `fresh process: exports=${payload.exportCount} abi=${payload.childAbi}`;
-    });
-
-    // NEG-TAMPER-MAIN: tampered addon cache bytes.
-    await scenario('NEG-TAMPER-MAIN', 'tampered cached .node refuses closed, recovers after restore', async () => {
-      await registerGrant(metadataContract);
-      const artifactPath = join(cacheRoot, 'artifacts', SHARP.addonSha256);
-      const original = await readFile(artifactPath);
-      const tampered = Buffer.from(original);
-      tampered[0x40] = (tampered[0x40] ?? 0) ^ 0xff;
-      const spawnsBefore = observer.specs.length;
-      try {
-        await writeFile(artifactPath, tampered);
-        const refused = await activator.runNativeAddon({
+          verifier,
+          isOffline: () => true,
+          fetchArtifact: (() => {
+            offlineFetches += 1;
+            return Promise.reject(new Error('network must not be touched'));
+          }) as unknown as typeof fetch,
+        });
+        const offlineActivator = new CuratedProviderActivator(
+          activationHost({ stager: offlineStager }),
+        );
+        const replayed = await offlineActivator.runNativeAddon({
           taskId: TASK_ID,
           descriptor,
           run: { kind: 'ADDON_METADATA' },
         });
-        assert(
-          !refused.ok && refused.code === 'ARTIFACT_NOT_VERIFIED',
-          `expected ARTIFACT_NOT_VERIFIED, got ${JSON.stringify(refused)}`,
+        assert(replayed.ok, `offline replay refused: ${JSON.stringify(replayed)}`);
+        assert(offlineFetches === 0, `offline replay performed ${offlineFetches} downloads`);
+        return `cache replay ok, downloads=0, exports=${replayed.native?.ok && replayed.native.report.kind === 'ADDON_METADATA' ? replayed.native.report.exportCount : 0}`;
+      },
+    );
+
+    // RST: fresh subprocess re-composes from the durable cache.
+    await scenario(
+      'RESTART',
+      'fresh subprocess re-verifies from durable cache and activates',
+      async () => {
+        const cfgPath = join(RUNTIME_ROOT, 'restart-cfg.json');
+        await writeFile(
+          cfgPath,
+          JSON.stringify({
+            cacheRoot,
+            publicKeyPem,
+            scopes: [sharpScope],
+            descriptor,
+            taskId: TASK_ID,
+            bindingId: BINDING,
+            digest: SHARP.addonSha256,
+            expectedAbi: process.versions.modules,
+          } satisfies RestartConfig),
+          'utf8',
         );
-        assert(
-          observer.specs.length === spawnsBefore,
-          'the tamper refusal itself must be zero-spawn',
+        const child = await execFileAsync(
+          process.execPath,
+          [fileURLToPath(import.meta.url), '--t05-native-restart-child', cfgPath],
+          { timeoutMs: 120_000, env: { ...minimalWindowsEnv() } },
         );
-      } finally {
-        await writeFile(artifactPath, original);
-      }
-      const recovered = await activator.runNativeAddon({
-        taskId: TASK_ID,
-        descriptor,
-        run: { kind: 'ADDON_METADATA' },
-      });
-      assert(recovered.ok, `recovery after restore failed: ${JSON.stringify(recovered)}`);
-      return 'tampered→ARTIFACT_NOT_VERIFIED zero spawn; restored→EXECUTED (one fresh run)';
-    });
+        const line =
+          child.stdout.split('\n').find((entry) => entry.startsWith('RESTART_CHILD_RESULT ')) ?? '';
+        assert(line !== '', `restart child produced no result: ${child.stderr.slice(0, 300)}`);
+        const payload = JSON.parse(line.slice('RESTART_CHILD_RESULT '.length)) as {
+          ok: boolean;
+          exitCode: number;
+          exportCount: number;
+          childAbi: string;
+        };
+        await event('restart.child', payload);
+        assert(payload.ok && payload.exitCode === 0, 'restart child activation failed');
+        assert(payload.exportCount > 0, 'restart child reported no exports');
+        assert(payload.childAbi === process.versions.modules, 'restart child ABI drift');
+        return `fresh process: exports=${payload.exportCount} abi=${payload.childAbi}`;
+      },
+    );
+
+    // NEG-TAMPER-MAIN: tampered addon cache bytes.
+    await scenario(
+      'NEG-TAMPER-MAIN',
+      'tampered cached .node refuses closed, recovers after restore',
+      async () => {
+        await registerGrant(metadataContract);
+        const artifactPath = join(cacheRoot, 'artifacts', SHARP.addonSha256);
+        const original = await readFile(artifactPath);
+        const tampered = Buffer.from(original);
+        tampered[0x40] = (tampered[0x40] ?? 0) ^ 0xff;
+        const spawnsBefore = observer.specs.length;
+        try {
+          await writeFile(artifactPath, tampered);
+          const refused = await activator.runNativeAddon({
+            taskId: TASK_ID,
+            descriptor,
+            run: { kind: 'ADDON_METADATA' },
+          });
+          assert(
+            !refused.ok && refused.code === 'ARTIFACT_NOT_VERIFIED',
+            `expected ARTIFACT_NOT_VERIFIED, got ${JSON.stringify(refused)}`,
+          );
+          assert(
+            observer.specs.length === spawnsBefore,
+            'the tamper refusal itself must be zero-spawn',
+          );
+        } finally {
+          await writeFile(artifactPath, original);
+        }
+        const recovered = await activator.runNativeAddon({
+          taskId: TASK_ID,
+          descriptor,
+          run: { kind: 'ADDON_METADATA' },
+        });
+        assert(recovered.ok, `recovery after restore failed: ${JSON.stringify(recovered)}`);
+        return 'tampered→ARTIFACT_NOT_VERIFIED zero spawn; restored→EXECUTED (one fresh run)';
+      },
+    );
 
     // NEG-CATALOG: unsigned / forged / downgrade.
-    await scenario('NEG-CATALOG', 'unsigned, forged-key and downgrade descriptors refuse before exec', async () => {
-      const spawnsBefore = observer.specs.length;
-      const unsigned = { ...descriptor, curatorSignature: 'AAA'.repeat(29) };
-      const unsignedResult = await activator.runNativeAddon({
-        taskId: TASK_ID,
-        descriptor: unsigned,
-        run: { kind: 'ADDON_METADATA' },
-      });
-      assert(!unsignedResult.ok, 'unsigned descriptor must refuse');
-      const forged = makeDescriptor({}, attacker.privateKey);
-      const forgedResult = await activator.runNativeAddon({
-        taskId: TASK_ID,
-        descriptor: forged,
-        run: { kind: 'ADDON_METADATA' },
-      });
-      assert(forgedResult.ok === false, 'forged-key descriptor must refuse');
-      const downgrade = makeDescriptor({ version: '0.0.1-downgrade' });
-      const downgradeResult = await activator.runNativeAddon({
-        taskId: TASK_ID,
-        descriptor: downgrade,
-        run: { kind: 'ADDON_METADATA' },
-      });
-      assert(
-        !downgradeResult.ok && downgradeResult.code === 'CATALOG_SCOPE_DRIFT',
-        `downgrade must SCOPE_DRIFT, got ${JSON.stringify(downgradeResult)}`,
-      );
-      assert(observer.specs.length === spawnsBefore, 'refusals must be zero-spawn');
-      await event('neg.catalog', {
-        unsigned: unsignedResult.ok ? '' : unsignedResult.code,
-        forged: forgedResult.ok ? '' : forgedResult.code,
-        downgrade: 'CATALOG_SCOPE_DRIFT',
-      });
-      return `unsigned=${unsignedResult.ok ? '' : String(unsignedResult.code)} forged=${forgedResult.ok ? '' : String(forgedResult.code)} downgrade=CATALOG_SCOPE_DRIFT spawns=0`;
-    });
+    await scenario(
+      'NEG-CATALOG',
+      'unsigned, forged-key and downgrade descriptors refuse before exec',
+      async () => {
+        const spawnsBefore = observer.specs.length;
+        const unsigned = { ...descriptor, curatorSignature: 'AAA'.repeat(29) };
+        const unsignedResult = await activator.runNativeAddon({
+          taskId: TASK_ID,
+          descriptor: unsigned,
+          run: { kind: 'ADDON_METADATA' },
+        });
+        assert(!unsignedResult.ok, 'unsigned descriptor must refuse');
+        const forged = makeDescriptor({}, attacker.privateKey);
+        const forgedResult = await activator.runNativeAddon({
+          taskId: TASK_ID,
+          descriptor: forged,
+          run: { kind: 'ADDON_METADATA' },
+        });
+        assert(forgedResult.ok === false, 'forged-key descriptor must refuse');
+        const downgrade = makeDescriptor({ version: '0.0.1-downgrade' });
+        const downgradeResult = await activator.runNativeAddon({
+          taskId: TASK_ID,
+          descriptor: downgrade,
+          run: { kind: 'ADDON_METADATA' },
+        });
+        assert(
+          !downgradeResult.ok && downgradeResult.code === 'CATALOG_SCOPE_DRIFT',
+          `downgrade must SCOPE_DRIFT, got ${JSON.stringify(downgradeResult)}`,
+        );
+        assert(observer.specs.length === spawnsBefore, 'refusals must be zero-spawn');
+        await event('neg.catalog', {
+          unsigned: unsignedResult.ok ? '' : unsignedResult.code,
+          forged: forgedResult.ok ? '' : forgedResult.code,
+          downgrade: 'CATALOG_SCOPE_DRIFT',
+        });
+        return `unsigned=${unsignedResult.ok ? '' : String(unsignedResult.code)} forged=${forgedResult.ok ? '' : String(forgedResult.code)} downgrade=CATALOG_SCOPE_DRIFT spawns=0`;
+      },
+    );
 
     // NEG-ABI: host ABI drift.
     await scenario('NEG-ABI', 'host ABI drift refuses closed before any child', async () => {
       const spawnsBefore = observer.specs.length;
-      const abiDrift = new CuratedProviderActivator(
-        activationHost({ hostNodeAbi: () => '999' }),
-      );
+      const abiDrift = new CuratedProviderActivator(activationHost({ hostNodeAbi: () => '999' }));
       const refused = await abiDrift.runNativeAddon({
         taskId: TASK_ID,
         descriptor,
@@ -1260,243 +1317,279 @@ async function mainRun(): Promise<void> {
     });
 
     // NEG-DEP-MISSING / NEG-DEP-TAMPER.
-    await scenario('NEG-DEP', 'missing and tampered dependency cache bytes refuse closed', async () => {
-      await registerGrant(metadataContract);
-      const spawnsBefore = observer.specs.length;
-      const emptyCache = join(RUNTIME_ROOT, 'cache-empty-deps');
-      mkdirSync(emptyCache, { recursive: true, mode: 0o700 });
-      const emptyStager = new CuratedProviderStager({ cacheRoot: emptyCache, verifier, isOffline: () => false });
-      const emptyActivator = new CuratedProviderActivator(activationHost({ stager: emptyStager }));
-      const stagedEmpty = await emptyStager.stage(descriptor);
-      assert(stagedEmpty.ok, `empty-cache stage refused: ${JSON.stringify(stagedEmpty)}`);
-      const missingDep = await emptyActivator.runNativeAddon({
-        taskId: TASK_ID,
-        descriptor,
-        run: { kind: 'ADDON_METADATA' },
-      });
-      assert(
-        !missingDep.ok && missingDep.code === 'DEPENDENCIES_UNVERIFIED',
-        `expected DEPENDENCIES_UNVERIFIED, got ${JSON.stringify(missingDep)}`,
-      );
-      assert(observer.specs.length === spawnsBefore, 'missing-dep refusal must be zero-spawn');
-      const depPath = join(cacheRoot, 'artifacts', SHARP.dlls[0]?.sha256 ?? '');
-      const depOriginal = await readFile(depPath);
-      try {
-        const depTampered = Buffer.from(depOriginal);
-        depTampered[0x40] = (depTampered[0x40] ?? 0) ^ 0xff;
-        await writeFile(depPath, depTampered);
-        const tamperedDep = await activator.runNativeAddon({
+    await scenario(
+      'NEG-DEP',
+      'missing and tampered dependency cache bytes refuse closed',
+      async () => {
+        await registerGrant(metadataContract);
+        const spawnsBefore = observer.specs.length;
+        const emptyCache = join(RUNTIME_ROOT, 'cache-empty-deps');
+        mkdirSync(emptyCache, { recursive: true, mode: 0o700 });
+        const emptyStager = new CuratedProviderStager({
+          cacheRoot: emptyCache,
+          verifier,
+          isOffline: () => false,
+        });
+        const emptyActivator = new CuratedProviderActivator(
+          activationHost({ stager: emptyStager }),
+        );
+        const stagedEmpty = await emptyStager.stage(descriptor);
+        assert(stagedEmpty.ok, `empty-cache stage refused: ${JSON.stringify(stagedEmpty)}`);
+        const missingDep = await emptyActivator.runNativeAddon({
           taskId: TASK_ID,
           descriptor,
           run: { kind: 'ADDON_METADATA' },
         });
         assert(
-          !tamperedDep.ok && tamperedDep.code === 'DEPENDENCIES_UNVERIFIED',
-          `expected DEPENDENCIES_UNVERIFIED, got ${JSON.stringify(tamperedDep)}`,
+          !missingDep.ok && missingDep.code === 'DEPENDENCIES_UNVERIFIED',
+          `expected DEPENDENCIES_UNVERIFIED, got ${JSON.stringify(missingDep)}`,
         );
-      } finally {
-        await writeFile(depPath, depOriginal);
-      }
-      const recovered = await activator.runNativeAddon({
-        taskId: TASK_ID,
-        descriptor,
-        run: { kind: 'ADDON_METADATA' },
-      });
-      assert(recovered.ok, 'activation must recover once dep bytes are restored');
-      return 'missing/tampered dep → DEPENDENCIES_UNVERIFIED zero spawn; restored → EXECUTED (one fresh run)';
-    });
+        assert(observer.specs.length === spawnsBefore, 'missing-dep refusal must be zero-spawn');
+        const depPath = join(cacheRoot, 'artifacts', SHARP.dlls[0]?.sha256 ?? '');
+        const depOriginal = await readFile(depPath);
+        try {
+          const depTampered = Buffer.from(depOriginal);
+          depTampered[0x40] = (depTampered[0x40] ?? 0) ^ 0xff;
+          await writeFile(depPath, depTampered);
+          const tamperedDep = await activator.runNativeAddon({
+            taskId: TASK_ID,
+            descriptor,
+            run: { kind: 'ADDON_METADATA' },
+          });
+          assert(
+            !tamperedDep.ok && tamperedDep.code === 'DEPENDENCIES_UNVERIFIED',
+            `expected DEPENDENCIES_UNVERIFIED, got ${JSON.stringify(tamperedDep)}`,
+          );
+        } finally {
+          await writeFile(depPath, depOriginal);
+        }
+        const recovered = await activator.runNativeAddon({
+          taskId: TASK_ID,
+          descriptor,
+          run: { kind: 'ADDON_METADATA' },
+        });
+        assert(recovered.ok, 'activation must recover once dep bytes are restored');
+        return 'missing/tampered dep → DEPENDENCIES_UNVERIFIED zero spawn; restored → EXECUTED (one fresh run)';
+      },
+    );
 
     // NEG-IMPORT: undeclared non-system import (synthetic fixture).
-    await scenario('NEG-IMPORT', 'undeclared non-system import refuses (synthetic PE fixture)', async () => {
-      const spawnsBefore = observer.specs.length;
-      const evilAddon = buildSynthPe({ imports: ['KERNEL32.dll', 'evil_overlay.dll'] });
-      const evilSha = createHash('sha256').update(evilAddon).digest('hex');
-      const evilScope: TrustedProviderScope = {
-        ...sharpScope,
-        bindingId: 'sharp-evil-binding',
-        artifactSha256: evilSha,
-        dependencyEntries: [],
-      };
-      const evilVerifier = new CuratedProviderVerifier(
-        [{ keyId: 'curator-winhost', publicKeyPem }],
-        [evilScope],
-      );
-      const evilCache = join(RUNTIME_ROOT, 'cache-evil');
-      mkdirSync(evilCache, { recursive: true, mode: 0o700 });
-      const scopeFields = (({ dependencyEntries: _drop, ...rest }) => rest)(evilScope);
-      const evilUnsigned = {
-        ...scopeFields,
-        entrypoint: 'addon.node',
-        signerKeyId: 'curator-winhost',
-        dependencySha256: [],
-      };
-      const evilDescriptor = {
-        ...evilUnsigned,
-        curatorSignature: sign(null, Buffer.from(canonicalJson(evilUnsigned)), curator.privateKey).toString('base64'),
-      };
-      const evilStager = new CuratedProviderStager({
-        cacheRoot: evilCache,
-        verifier: evilVerifier,
-        isOffline: () => false,
-        fetchArtifact: (async () => new Response(evilAddon, { status: 200 })) as typeof fetch,
-      });
-      const evilStaged = await evilStager.stage(evilDescriptor);
-      assert(evilStaged.ok, `evil fixture stage refused: ${JSON.stringify(evilStaged)}`);
-      // The alternate binding resolves currentness through the same substrate
-      // (same policy epoch), so the refusal provably comes from the closure
-      // check and not from a missing grant.
-      const evilActivator = new CuratedProviderActivator(
-        activationHost({
-          stager: evilStager,
-          verifier: evilVerifier,
+    await scenario(
+      'NEG-IMPORT',
+      'undeclared non-system import refuses (synthetic PE fixture)',
+      async () => {
+        const spawnsBefore = observer.specs.length;
+        const evilAddon = buildSynthPe({ imports: ['KERNEL32.dll', 'evil_overlay.dll'] });
+        const evilSha = createHash('sha256').update(evilAddon).digest('hex');
+        const evilScope: TrustedProviderScope = {
+          ...sharpScope,
+          bindingId: 'sharp-evil-binding',
+          artifactSha256: evilSha,
+          dependencyEntries: [],
+        };
+        const evilVerifier = new CuratedProviderVerifier(
+          [{ keyId: 'curator-winhost', publicKeyPem }],
+          [evilScope],
+        );
+        const evilCache = join(RUNTIME_ROOT, 'cache-evil');
+        mkdirSync(evilCache, { recursive: true, mode: 0o700 });
+        const scopeFields = (({ dependencyEntries: _drop, ...rest }) => rest)(evilScope);
+        const evilUnsigned = {
+          ...scopeFields,
+          entrypoint: 'addon.node',
+          signerKeyId: 'curator-winhost',
+          dependencySha256: [],
+        };
+        const evilDescriptor = {
+          ...evilUnsigned,
+          curatorSignature: sign(
+            null,
+            Buffer.from(canonicalJson(evilUnsigned)),
+            curator.privateKey,
+          ).toString('base64'),
+        };
+        const evilStager = new CuratedProviderStager({
           cacheRoot: evilCache,
-          getAuthorizedCurrentness: (taskId, bindingId) =>
-            bindingId === evilScope.bindingId
-              ? {
-                  kind: 'CURRENT',
-                  taskId,
-                  providerId: 'sharp',
-                  bindingId,
-                  catalogRevision: evilScope.catalogRevision,
-                  artifactSha256: evilSha,
-                  revocationEpoch: EPOCH.value,
-                  capability: 'PREPARE_PROVIDER',
-                }
-              : currentnessPort(world)(taskId, bindingId),
-          authorizeRunEffect: async () => ({ ok: true, leaseId: randomUUID() }),
-        }),
-      );
-      const refused = await evilActivator.runNativeAddon({
-        taskId: TASK_ID,
-        descriptor: evilDescriptor,
-        run: { kind: 'ADDON_METADATA' },
-      });
-      assert(
-        !refused.ok && refused.code === 'DEPENDENCIES_UNVERIFIED',
-        `expected DEPENDENCIES_UNVERIFIED, got ${JSON.stringify(refused)}`,
-      );
-      assert(observer.specs.length === spawnsBefore, 'import refusal must be zero-spawn');
-      return 'evil_overlay.dll undeclared → DEPENDENCIES_UNVERIFIED zero spawn';
-    });
+          verifier: evilVerifier,
+          isOffline: () => false,
+          fetchArtifact: (async () => new Response(evilAddon, { status: 200 })) as typeof fetch,
+        });
+        const evilStaged = await evilStager.stage(evilDescriptor);
+        assert(evilStaged.ok, `evil fixture stage refused: ${JSON.stringify(evilStaged)}`);
+        // The alternate binding resolves currentness through the same substrate
+        // (same policy epoch), so the refusal provably comes from the closure
+        // check and not from a missing grant.
+        const evilActivator = new CuratedProviderActivator(
+          activationHost({
+            stager: evilStager,
+            verifier: evilVerifier,
+            cacheRoot: evilCache,
+            getAuthorizedCurrentness: (taskId, bindingId) =>
+              bindingId === evilScope.bindingId
+                ? {
+                    kind: 'CURRENT',
+                    taskId,
+                    providerId: 'sharp',
+                    bindingId,
+                    catalogRevision: evilScope.catalogRevision,
+                    artifactSha256: evilSha,
+                    revocationEpoch: EPOCH.value,
+                    capability: 'PREPARE_PROVIDER',
+                  }
+                : currentnessPort(world)(taskId, bindingId),
+            authorizeRunEffect: async () => ({ ok: true, leaseId: randomUUID() }),
+          }),
+        );
+        const refused = await evilActivator.runNativeAddon({
+          taskId: TASK_ID,
+          descriptor: evilDescriptor,
+          run: { kind: 'ADDON_METADATA' },
+        });
+        assert(
+          !refused.ok && refused.code === 'DEPENDENCIES_UNVERIFIED',
+          `expected DEPENDENCIES_UNVERIFIED, got ${JSON.stringify(refused)}`,
+        );
+        assert(observer.specs.length === spawnsBefore, 'import refusal must be zero-spawn');
+        return 'evil_overlay.dll undeclared → DEPENDENCIES_UNVERIFIED zero spawn';
+      },
+    );
 
     // NEG-DEP-COLLISION: curated dependency named like a system DLL.
-    await scenario('NEG-DEP-COLLISION', 'dependency name colliding with a system DLL refuses', async () => {
-      const spawnsBefore = observer.specs.length;
-      const collidingScope: TrustedProviderScope = {
-        ...sharpScope,
-        bindingId: 'sharp-collision-binding',
-        dependencyEntries: [
-          { name: 'KERNEL32.DLL', artifactSha256: SHARP.dlls[0]?.sha256 ?? '' },
-          ...SHARP.dlls.slice(1).map((dll) => ({ name: dll.name, artifactSha256: dll.sha256 })),
-        ],
-      };
-      const collisionVerifier = new CuratedProviderVerifier(
-        [{ keyId: 'curator-winhost', publicKeyPem }],
-        [collidingScope],
-      );
-      const scopeFields = (({ dependencyEntries: _drop, ...rest }) => rest)(collidingScope);
-      const unsigned = {
-        ...scopeFields,
-        entrypoint: SHARP.addonName,
-        signerKeyId: 'curator-winhost',
-        dependencySha256: (collidingScope.dependencyEntries ?? []).map((entry) => entry.artifactSha256),
-      };
-      const collidingDescriptor = {
-        ...unsigned,
-        curatorSignature: sign(null, Buffer.from(canonicalJson(unsigned)), curator.privateKey).toString('base64'),
-      };
-      const collisionStager = new CuratedProviderStager({
-        cacheRoot,
-        verifier: collisionVerifier,
-        isOffline: () => false,
-      });
-      const staged = await collisionStager.stage(collidingDescriptor);
-      assert(staged.ok, `collision stage refused: ${JSON.stringify(staged)}`);
-      const collisionActivator = new CuratedProviderActivator(
-        activationHost({
-          stager: collisionStager,
+    await scenario(
+      'NEG-DEP-COLLISION',
+      'dependency name colliding with a system DLL refuses',
+      async () => {
+        const spawnsBefore = observer.specs.length;
+        const collidingScope: TrustedProviderScope = {
+          ...sharpScope,
+          bindingId: 'sharp-collision-binding',
+          dependencyEntries: [
+            { name: 'KERNEL32.DLL', artifactSha256: SHARP.dlls[0]?.sha256 ?? '' },
+            ...SHARP.dlls.slice(1).map((dll) => ({ name: dll.name, artifactSha256: dll.sha256 })),
+          ],
+        };
+        const collisionVerifier = new CuratedProviderVerifier(
+          [{ keyId: 'curator-winhost', publicKeyPem }],
+          [collidingScope],
+        );
+        const scopeFields = (({ dependencyEntries: _drop, ...rest }) => rest)(collidingScope);
+        const unsigned = {
+          ...scopeFields,
+          entrypoint: SHARP.addonName,
+          signerKeyId: 'curator-winhost',
+          dependencySha256: (collidingScope.dependencyEntries ?? []).map(
+            (entry) => entry.artifactSha256,
+          ),
+        };
+        const collidingDescriptor = {
+          ...unsigned,
+          curatorSignature: sign(
+            null,
+            Buffer.from(canonicalJson(unsigned)),
+            curator.privateKey,
+          ).toString('base64'),
+        };
+        const collisionStager = new CuratedProviderStager({
+          cacheRoot,
           verifier: collisionVerifier,
-          getAuthorizedCurrentness: (taskId, bindingId) =>
-            bindingId === collidingScope.bindingId
-              ? {
-                  kind: 'CURRENT',
-                  taskId,
-                  providerId: 'sharp',
-                  bindingId,
-                  catalogRevision: collidingScope.catalogRevision,
-                  artifactSha256: SHARP.addonSha256,
-                  revocationEpoch: EPOCH.value,
-                  capability: 'PREPARE_PROVIDER',
-                }
-              : currentnessPort(world)(taskId, bindingId),
-          authorizeRunEffect: async () => ({ ok: true, leaseId: randomUUID() }),
-        }),
-      );
-      const refused = await collisionActivator.runNativeAddon({
-        taskId: TASK_ID,
-        descriptor: collidingDescriptor,
-        run: { kind: 'ADDON_METADATA' },
-      });
-      assert(
-        !refused.ok && refused.code === 'DEPENDENCIES_UNVERIFIED',
-        `expected DEPENDENCIES_UNVERIFIED, got ${JSON.stringify(refused)}`,
-      );
-      assert(observer.specs.length === spawnsBefore, 'collision refusal must be zero-spawn');
-      return 'KERNEL32.DLL as a curated dep name → DEPENDENCIES_UNVERIFIED zero spawn';
-    });
+          isOffline: () => false,
+        });
+        const staged = await collisionStager.stage(collidingDescriptor);
+        assert(staged.ok, `collision stage refused: ${JSON.stringify(staged)}`);
+        const collisionActivator = new CuratedProviderActivator(
+          activationHost({
+            stager: collisionStager,
+            verifier: collisionVerifier,
+            getAuthorizedCurrentness: (taskId, bindingId) =>
+              bindingId === collidingScope.bindingId
+                ? {
+                    kind: 'CURRENT',
+                    taskId,
+                    providerId: 'sharp',
+                    bindingId,
+                    catalogRevision: collidingScope.catalogRevision,
+                    artifactSha256: SHARP.addonSha256,
+                    revocationEpoch: EPOCH.value,
+                    capability: 'PREPARE_PROVIDER',
+                  }
+                : currentnessPort(world)(taskId, bindingId),
+            authorizeRunEffect: async () => ({ ok: true, leaseId: randomUUID() }),
+          }),
+        );
+        const refused = await collisionActivator.runNativeAddon({
+          taskId: TASK_ID,
+          descriptor: collidingDescriptor,
+          run: { kind: 'ADDON_METADATA' },
+        });
+        assert(
+          !refused.ok && refused.code === 'DEPENDENCIES_UNVERIFIED',
+          `expected DEPENDENCIES_UNVERIFIED, got ${JSON.stringify(refused)}`,
+        );
+        assert(observer.specs.length === spawnsBefore, 'collision refusal must be zero-spawn');
+        return 'KERNEL32.DLL as a curated dep name → DEPENDENCIES_UNVERIFIED zero spawn';
+      },
+    );
 
     // NEG-OPERAND: unseeded / absolute operands.
-    await scenario('NEG-OPERAND', 'unseeded and absolute IMAGE_METADATA operands refuse pre-authority', async () => {
-      const spawnsBefore = observer.specs.length;
-      const unseeded = await activator.runNativeAddon({
-        taskId: TASK_ID,
-        descriptor,
-        run: { kind: 'IMAGE_METADATA', operand: 'unseeded.bin' },
-      });
-      assert(
-        !unseeded.ok && unseeded.code === 'RUN_REQUEST_INVALID',
-        `expected RUN_REQUEST_INVALID, got ${JSON.stringify(unseeded)}`,
-      );
-      const absolute = await activator.runNativeAddon({
-        taskId: TASK_ID,
-        descriptor,
-        // Closed world cannot even express an absolute operand as a string —
-        // the grammar refuses any non-seeded name.
-        run: { kind: 'IMAGE_METADATA', operand: 'C:\\evil.png' },
-      });
-      assert(
-        !absolute.ok && absolute.code === 'RUN_REQUEST_INVALID',
-        `expected RUN_REQUEST_INVALID, got ${JSON.stringify(absolute)}`,
-      );
-      assert(observer.specs.length === spawnsBefore, 'operand refusals must be zero-spawn');
-      return 'unseeded + absolute operands → RUN_REQUEST_INVALID, zero spawn';
-    });
+    await scenario(
+      'NEG-OPERAND',
+      'unseeded and absolute IMAGE_METADATA operands refuse pre-authority',
+      async () => {
+        const spawnsBefore = observer.specs.length;
+        const unseeded = await activator.runNativeAddon({
+          taskId: TASK_ID,
+          descriptor,
+          run: { kind: 'IMAGE_METADATA', operand: 'unseeded.bin' },
+        });
+        assert(
+          !unseeded.ok && unseeded.code === 'RUN_REQUEST_INVALID',
+          `expected RUN_REQUEST_INVALID, got ${JSON.stringify(unseeded)}`,
+        );
+        const absolute = await activator.runNativeAddon({
+          taskId: TASK_ID,
+          descriptor,
+          // Closed world cannot even express an absolute operand as a string —
+          // the grammar refuses any non-seeded name.
+          run: { kind: 'IMAGE_METADATA', operand: 'C:\\evil.png' },
+        });
+        assert(
+          !absolute.ok && absolute.code === 'RUN_REQUEST_INVALID',
+          `expected RUN_REQUEST_INVALID, got ${JSON.stringify(absolute)}`,
+        );
+        assert(observer.specs.length === spawnsBefore, 'operand refusals must be zero-spawn');
+        return 'unseeded + absolute operands → RUN_REQUEST_INVALID, zero spawn';
+      },
+    );
 
     // NEG-REVOCATION-EPOCH.
-    await scenario('NEG-REVOCATION-EPOCH', 'host revocation-epoch bump voids activation before exec', async () => {
-      await registerGrant(metadataContract);
-      EPOCH.value = 2;
-      try {
-        const refused = await activator.runNativeAddon({
+    await scenario(
+      'NEG-REVOCATION-EPOCH',
+      'host revocation-epoch bump voids activation before exec',
+      async () => {
+        await registerGrant(metadataContract);
+        EPOCH.value = 2;
+        try {
+          const refused = await activator.runNativeAddon({
+            taskId: TASK_ID,
+            descriptor,
+            run: { kind: 'ADDON_METADATA' },
+          });
+          assert(
+            !refused.ok && refused.code === 'AUTHORITY_STALE',
+            `expected AUTHORITY_STALE, got ${JSON.stringify(refused)}`,
+          );
+        } finally {
+          EPOCH.value = 1;
+        }
+        const recovered = await activator.runNativeAddon({
           taskId: TASK_ID,
           descriptor,
           run: { kind: 'ADDON_METADATA' },
         });
-        assert(
-          !refused.ok && refused.code === 'AUTHORITY_STALE',
-          `expected AUTHORITY_STALE, got ${JSON.stringify(refused)}`,
-        );
-      } finally {
-        EPOCH.value = 1;
-      }
-      const recovered = await activator.runNativeAddon({
-        taskId: TASK_ID,
-        descriptor,
-        run: { kind: 'ADDON_METADATA' },
-      });
-      assert(recovered.ok, 'activation must recover once the epoch matches again');
-      return 'epoch 1→2 → AUTHORITY_STALE zero spawn; restored → EXECUTED';
-    });
+        assert(recovered.ok, 'activation must recover once the epoch matches again');
+        return 'epoch 1→2 → AUTHORITY_STALE zero spawn; restored → EXECUTED';
+      },
+    );
 
     // NEG-GRANT-REVOKED: real substrate move.
     await scenario('NEG-GRANT-REVOKED', 'revoked grant refuses; re-issue restores', async () => {
@@ -1523,133 +1616,155 @@ async function mainRun(): Promise<void> {
     });
 
     // NEG-TOCTOU: second ActionController read denied mid-call.
-    await scenario('NEG-TOCTOU', 'ActionController denial between admission and exec voids activation', async () => {
-      let reads = 0;
-      const toctouActivator = new CuratedProviderActivator(
-        activationHost({
-          getAuthorizedCurrentness: (taskId, bindingId) => {
-            reads += 1;
-            if (reads >= 2) return { kind: 'UNRESOLVABLE' };
-            return currentnessPort(world)(taskId, bindingId);
-          },
-        }),
-      );
-      const refused = await toctouActivator.runNativeAddon({
-        taskId: TASK_ID,
-        descriptor,
-        run: { kind: 'ADDON_METADATA' },
-      });
-      assert(
-        !refused.ok && refused.code === 'AUTHORITY_STALE',
-        `TOCTOU denial must refuse, got ${JSON.stringify(refused)}`,
-      );
-      assert(reads >= 2, 'the second pre-exec read never happened');
-      return `reads=${reads} (admission + immediately-before-exec), second denial → zero spawn`;
-    });
+    await scenario(
+      'NEG-TOCTOU',
+      'ActionController denial between admission and exec voids activation',
+      async () => {
+        let reads = 0;
+        const toctouActivator = new CuratedProviderActivator(
+          activationHost({
+            getAuthorizedCurrentness: (taskId, bindingId) => {
+              reads += 1;
+              if (reads >= 2) return { kind: 'UNRESOLVABLE' };
+              return currentnessPort(world)(taskId, bindingId);
+            },
+          }),
+        );
+        const refused = await toctouActivator.runNativeAddon({
+          taskId: TASK_ID,
+          descriptor,
+          run: { kind: 'ADDON_METADATA' },
+        });
+        assert(
+          !refused.ok && refused.code === 'AUTHORITY_STALE',
+          `TOCTOU denial must refuse, got ${JSON.stringify(refused)}`,
+        );
+        assert(reads >= 2, 'the second pre-exec read never happened');
+        return `reads=${reads} (admission + immediately-before-exec), second denial → zero spawn`;
+      },
+    );
 
     // NEG-SWAP: staged .node swapped after verification.
-    await scenario('NEG-SWAP', 'staged .node byte swap after verification refuses at the last boundary', async () => {
-      await registerGrant(metadataContract);
-      let sabotaged = false;
-      let spawnsBefore = 0;
-      const swapping = new CuratedProviderActivator(
-        activationHost({
-          authorizeRunEffect: async (invocation) => {
-            if (!sabotaged && invocation.native) {
-              sabotaged = true;
-              const { writeFile: writeFileAsync } = await import('node:fs/promises');
-              await writeFileAsync(
-                invocation.native.addonPath,
-                Buffer.from('sentinel: not the pinned bytes'),
-              );
-            }
-            return { ok: true, leaseId: randomUUID() };
-          },
-          process: {
-            async run(): Promise<ActivationProcessOutcome> {
-              return {
-                exitCode: 0,
-                stdout: '',
-                stderr: '',
-                timedOut: false,
-                stdoutTruncated: false,
-                stderrTruncated: false,
-              };
+    await scenario(
+      'NEG-SWAP',
+      'staged .node byte swap after verification refuses at the last boundary',
+      async () => {
+        await registerGrant(metadataContract);
+        let sabotaged = false;
+        let spawnsBefore = 0;
+        const swapping = new CuratedProviderActivator(
+          activationHost({
+            authorizeRunEffect: async (invocation) => {
+              if (!sabotaged && invocation.native) {
+                sabotaged = true;
+                const { writeFile: writeFileAsync } = await import('node:fs/promises');
+                await writeFileAsync(
+                  invocation.native.addonPath,
+                  Buffer.from('sentinel: not the pinned bytes'),
+                );
+              }
+              return { ok: true, leaseId: randomUUID() };
             },
-          },
-        }),
-      );
-      spawnsBefore = observer.specs.length;
-      const refused = await swapping.runNativeAddon({
-        taskId: TASK_ID,
-        descriptor,
-        run: { kind: 'ADDON_METADATA' },
-      });
-      assert(sabotaged, 'the sabotage hook never ran');
-      assert(
-        !refused.ok && refused.code === 'EXECUTABLE_IDENTITY_DRIFT',
-        `expected EXECUTABLE_IDENTITY_DRIFT, got ${JSON.stringify(refused)}`,
-      );
-      assert(observer.specs.length === spawnsBefore, 'swap refusal must be zero-spawn');
-      const recovered = await activator.runNativeAddon({
-        taskId: TASK_ID,
-        descriptor,
-        run: { kind: 'ADDON_METADATA' },
-      });
-      assert(recovered.ok, 'a clean next run must recover');
-      return 'staged .node swapped post-verify → EXECUTABLE_IDENTITY_DRIFT zero spawn; fresh run → EXECUTED';
-    });
+            process: {
+              async run(): Promise<ActivationProcessOutcome> {
+                return {
+                  exitCode: 0,
+                  stdout: '',
+                  stderr: '',
+                  timedOut: false,
+                  stdoutTruncated: false,
+                  stderrTruncated: false,
+                };
+              },
+            },
+          }),
+        );
+        spawnsBefore = observer.specs.length;
+        const refused = await swapping.runNativeAddon({
+          taskId: TASK_ID,
+          descriptor,
+          run: { kind: 'ADDON_METADATA' },
+        });
+        assert(sabotaged, 'the sabotage hook never ran');
+        assert(
+          !refused.ok && refused.code === 'EXECUTABLE_IDENTITY_DRIFT',
+          `expected EXECUTABLE_IDENTITY_DRIFT, got ${JSON.stringify(refused)}`,
+        );
+        assert(observer.specs.length === spawnsBefore, 'swap refusal must be zero-spawn');
+        const recovered = await activator.runNativeAddon({
+          taskId: TASK_ID,
+          descriptor,
+          run: { kind: 'ADDON_METADATA' },
+        });
+        assert(recovered.ok, 'a clean next run must recover');
+        return 'staged .node swapped post-verify → EXECUTABLE_IDENTITY_DRIFT zero spawn; fresh run → EXECUTED';
+      },
+    );
 
     // NEG-INTERRUPT: real child killed mid-flight, then recovery.
-    await scenario('NEG-INTERRUPT', 'killed child surfaces honestly as timedOut; next run recovers', async () => {
-      await registerGrant(metadataContract);
-      const killed = await activator.runNativeAddon({
-        taskId: TASK_ID,
-        descriptor,
-        run: { kind: 'ADDON_METADATA' },
-        timeoutMs: 1,
-      });
-      assert(killed.ok, `kill run failed at admission: ${JSON.stringify(killed)}`);
-      assert(killed.timedOut, 'the killed child must surface timedOut');
-      await event('neg.interrupt', {
-        exitCode: killed.exitCode,
-        timedOut: killed.timedOut,
-        durationMs: killed.durationMs,
-      });
-      const recovered = await activator.runNativeAddon({
-        taskId: TASK_ID,
-        descriptor,
-        run: { kind: 'ADDON_METADATA' },
-      });
-      assert(recovered.ok && !recovered.timedOut, `recovery failed: ${JSON.stringify(recovered)}`);
-      return `child killed at 1ms → EXECUTED timedOut=true exit=${killed.exitCode}; recovery → exports=${recovered.native?.ok && recovered.native.report.kind === 'ADDON_METADATA' ? recovered.native.report.exportCount : 0}`;
-    });
+    await scenario(
+      'NEG-INTERRUPT',
+      'killed child surfaces honestly as timedOut; next run recovers',
+      async () => {
+        await registerGrant(metadataContract);
+        const killed = await activator.runNativeAddon({
+          taskId: TASK_ID,
+          descriptor,
+          run: { kind: 'ADDON_METADATA' },
+          timeoutMs: 1,
+        });
+        assert(killed.ok, `kill run failed at admission: ${JSON.stringify(killed)}`);
+        assert(killed.timedOut, 'the killed child must surface timedOut');
+        await event('neg.interrupt', {
+          exitCode: killed.exitCode,
+          timedOut: killed.timedOut,
+          durationMs: killed.durationMs,
+        });
+        const recovered = await activator.runNativeAddon({
+          taskId: TASK_ID,
+          descriptor,
+          run: { kind: 'ADDON_METADATA' },
+        });
+        assert(
+          recovered.ok && !recovered.timedOut,
+          `recovery failed: ${JSON.stringify(recovered)}`,
+        );
+        return `child killed at 1ms → EXECUTED timedOut=true exit=${killed.exitCode}; recovery → exports=${recovered.native?.ok && recovered.native.report.kind === 'ADDON_METADATA' ? recovered.native.report.exportCount : 0}`;
+      },
+    );
 
     // R1-F03 native: grant/op mismatch refuses at the effect gate.
-    await scenario('R1-F03-GRANT-BINDING', 'effect grant bound to ADDON_METADATA refuses IMAGE_METADATA', async () => {
-      const spawnsBefore = observer.specs.length;
-      await registerGrant(metadataContract);
-      const refused = await activator.runNativeAddon({
-        taskId: TASK_ID,
-        descriptor,
-        run: { kind: 'IMAGE_METADATA', operand: 'photo.png' },
-        sandboxFiles: [{ name: 'photo.png', bytes: operandBytes }],
-      });
-      assert(
-        !refused.ok && refused.code === 'EFFECT_NOT_AUTHORIZED',
-        `expected EFFECT_NOT_AUTHORIZED, got ${JSON.stringify(refused)}`,
-      );
-      assert(observer.specs.length === spawnsBefore, 'grant-mismatch refusal must be zero-spawn');
-      await registerGrant(imageContract);
-      return 'ADDON_METADATA grant vs IMAGE_METADATA invocation → EFFECT_NOT_AUTHORIZED zero spawn';
-    });
+    await scenario(
+      'R1-F03-GRANT-BINDING',
+      'effect grant bound to ADDON_METADATA refuses IMAGE_METADATA',
+      async () => {
+        const spawnsBefore = observer.specs.length;
+        await registerGrant(metadataContract);
+        const refused = await activator.runNativeAddon({
+          taskId: TASK_ID,
+          descriptor,
+          run: { kind: 'IMAGE_METADATA', operand: 'photo.png' },
+          sandboxFiles: [{ name: 'photo.png', bytes: operandBytes }],
+        });
+        assert(
+          !refused.ok && refused.code === 'EFFECT_NOT_AUTHORIZED',
+          `expected EFFECT_NOT_AUTHORIZED, got ${JSON.stringify(refused)}`,
+        );
+        assert(observer.specs.length === spawnsBefore, 'grant-mismatch refusal must be zero-spawn');
+        await registerGrant(imageContract);
+        return 'ADDON_METADATA grant vs IMAGE_METADATA invocation → EFFECT_NOT_AUTHORIZED zero spawn';
+      },
+    );
 
     // DACL: private cache root owner + no world/users write (SID-based,
     // localization-proof).
     await scenario('DACL', 'private cache root DACL/owner: owner-only write surface', async () => {
       const ps = join(
         process.env.SystemRoot ?? 'C:\\Windows',
-        'System32', 'WindowsPowerShell', 'v1.0', 'powershell.exe',
+        'System32',
+        'WindowsPowerShell',
+        'v1.0',
+        'powershell.exe',
       );
       const psScript = [
         `$root = '${cacheRoot}'`,
@@ -1660,16 +1775,20 @@ async function mainRun(): Promise<void> {
         '  $identity = $_.IdentityReference',
         "  $sidValue = ''",
         '  try { $sidValue = $identity.Translate([System.Security.Principal.SecurityIdentifier]).Value } catch { $sidValue = $identity.Value }',
-        "  [PSCustomObject]@{ sid = $sidValue; rights = [int]$_.FileSystemRights; type = $_.AccessControlType.ToString(); inherited = $_.IsInherited }",
+        '  [PSCustomObject]@{ sid = $sidValue; rights = [int]$_.FileSystemRights; type = $_.AccessControlType.ToString(); inherited = $_.IsInherited }',
         '}',
         "$world = 'S-1-1-0'; $users = 'S-1-5-32-545'; $authUsers = 'S-1-5-11'",
         '$writeBits = 0x0002 -bor 0x0004 -bor 0x10000 -bor 0x40000000 -bor 0x80000000',
         "$wideWrite = $rules | Where-Object { ($_.sid -eq $world -or $_.sid -eq $users -or $_.sid -eq $authUsers) -and (($_.rights -band $writeBits) -ne 0) -and $_.type -eq 'Allow' }",
-        "[PSCustomObject]@{ owner = $owner; ownerSid = $sid; wideWriteCount = @($wideWrite).Count; ruleCount = @($rules).Count } | ConvertTo-Json -Compress",
+        '[PSCustomObject]@{ owner = $owner; ownerSid = $sid; wideWriteCount = @($wideWrite).Count; ruleCount = @($rules).Count } | ConvertTo-Json -Compress',
       ].join('; ');
-      const dump = await execFileAsync(ps, ['-NoProfile', '-NonInteractive', '-Command', psScript], {
-        timeoutMs: 60_000,
-      });
+      const dump = await execFileAsync(
+        ps,
+        ['-NoProfile', '-NonInteractive', '-Command', psScript],
+        {
+          timeoutMs: 60_000,
+        },
+      );
       assert(dump.exitCode === 0, `Get-Acl failed: ${dump.stderr.slice(0, 300)}`);
       const parsed = JSON.parse(dump.stdout.trim().split('\n').at(-1) ?? '{}') as {
         owner: string;
@@ -1681,9 +1800,7 @@ async function mainRun(): Promise<void> {
       const who = await execFileAsync(whoExe, [], { timeoutMs: 15_000 });
       const accountName = who.stdout.trim().split('\n').at(0)?.trim() ?? '';
       const bareName = accountName.split('\\').at(-1)?.toLowerCase() ?? '';
-      const ownerMatches =
-        parsed.owner.toLowerCase().includes(bareName) &&
-        bareName.length > 0;
+      const ownerMatches = parsed.owner.toLowerCase().includes(bareName) && bareName.length > 0;
       await event('dacl.inspect', {
         owner: sanitize(parsed.owner),
         ownerSid: parsed.ownerSid,
@@ -1703,10 +1820,7 @@ async function mainRun(): Promise<void> {
     await scenario('CANARY', 'user-owned files unchanged across the whole run', async () => {
       for (const path of canaryPaths) {
         const digest = await sha256File(path);
-        assert(
-          digest === canaryBaseline.get(path),
-          `canary changed: ${sanitize(path)}`,
-        );
+        assert(digest === canaryBaseline.get(path), `canary changed: ${sanitize(path)}`);
       }
       return `${canaryPaths.length} canaries byte-identical`;
     });

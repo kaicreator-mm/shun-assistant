@@ -164,7 +164,9 @@ describe('T05 curated Provider trust-bound admission', () => {
     }
     // A digest without a pinned name cannot resolve.
     expect(
-      makeVerifier(depScope).verify(makeNative(depScope, { dependencySha256: [depSha, 'f'.repeat(64)] })),
+      makeVerifier(depScope).verify(
+        makeNative(depScope, { dependencySha256: [depSha, 'f'.repeat(64)] }),
+      ),
     ).toMatchObject({ ok: false, code: 'CATALOG_SCOPE_DRIFT' });
     // A pinned name without a matching digest cannot either.
     expect(
