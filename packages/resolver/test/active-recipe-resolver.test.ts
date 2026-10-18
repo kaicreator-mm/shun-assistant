@@ -50,7 +50,7 @@ function fixture() {
         actionTemplate: {
           ...recipe.actionTemplate,
           verificationPlan: {
-            ...recipe.actionTemplate.verificationPlan,
+            ...(recipe.actionTemplate.verificationPlan as Record<string, unknown>),
             verifierId: catalogVerifier,
             verifierRevision: catalogVerifierRevision,
           },
