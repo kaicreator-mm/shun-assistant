@@ -630,6 +630,7 @@ async function stagePerRunImages(
   const entrypointPath = join(dir, entrypoint.name);
   let write: FileHandle | undefined;
   let held: FileHandle | undefined;
+  let transferred = false;
   try {
     await mkdir(dir, { recursive: true, mode: 0o700 });
     // The freshly created chain must be reparse-free RIGHT NOW (a junction
@@ -678,6 +679,7 @@ async function stagePerRunImages(
         if (!isEntrypoint) await handle.close().catch(() => undefined);
       }
     }
+    transferred = true;
     return {
       ok: true,
       staged: {
@@ -690,16 +692,15 @@ async function stagePerRunImages(
       },
     };
   } catch {
-    if (held) await held.close().catch(() => undefined);
-    await rm(dir, { recursive: true, force: true }).catch(() => undefined);
     return { ok: false, code: 'ACTIVATION_CACHE_UNAVAILABLE' };
   } finally {
-    if (write) {
-      try {
-        await write.close();
-      } catch {
-        /* the staging failure path cleans the directory below */
-      }
+    if (write) await write.close().catch(() => undefined);
+    // A typed refusal returned inside try MUST clean staged handles/bytes,
+    // exactly like a thrown filesystem error. On success ownership passes
+    // exclusively to the caller's cleanup/recovery path.
+    if (!transferred) {
+      if (held) await held.close().catch(() => undefined);
+      await rm(dir, { recursive: true, force: true }).catch(() => undefined);
     }
   }
 }
