@@ -36,7 +36,9 @@ export type TrustedActiveRecipeAuthority = Readonly<{
 }>;
 
 function isEmptyRecord(value: unknown): boolean {
-  return !!value && typeof value === 'object' && !Array.isArray(value) && Object.keys(value).length === 0;
+  return (
+    !!value && typeof value === 'object' && !Array.isArray(value) && Object.keys(value).length === 0
+  );
 }
 
 function isSafeR0Definition(recipe: RecipeDefinition): boolean {
@@ -108,11 +110,12 @@ export class BoundedActiveRecipeResolver implements RecipeResolverPort {
         if (unique.has(key)) throw new Error('RECIPE_RESOLVER_UNAVAILABLE');
         unique.add(key);
       }
-      return parsed.data.candidates.filter((entry) =>
-        entry.lifecycle.state === 'ACTIVE' &&
-        entry.lifecycle.recipeId === entry.recipe.recipeId &&
-        entry.lifecycle.revision === entry.recipe.revision &&
-        isSafeR0Definition(entry.recipe),
+      return parsed.data.candidates.filter(
+        (entry) =>
+          entry.lifecycle.state === 'ACTIVE' &&
+          entry.lifecycle.recipeId === entry.recipe.recipeId &&
+          entry.lifecycle.revision === entry.recipe.revision &&
+          isSafeR0Definition(entry.recipe),
       );
     } catch {
       throw new Error('RECIPE_RESOLVER_UNAVAILABLE');
@@ -133,8 +136,8 @@ export class BoundedActiveRecipeResolver implements RecipeResolverPort {
       // claim the generic recipe is eligible for unknown selected objects.
       if (intent.objects.length > 0) return { candidates: [] };
       return {
-        candidates: this.active().filter((entry) =>
-          entry.recipe.applicabilityPredicate.objective === intent.objective,
+        candidates: this.active().filter(
+          (entry) => entry.recipe.applicabilityPredicate.objective === intent.objective,
         ),
       };
     } catch {
@@ -145,18 +148,23 @@ export class BoundedActiveRecipeResolver implements RecipeResolverPort {
   private async eligible(
     input: RecipeDefinition,
     facts: Record<string, unknown>,
-  ): Promise<{ recipe: RecipeDefinition; preview: Extract<RecipeReplayPreview, { ok: true }> } | null> {
+  ): Promise<{
+    recipe: RecipeDefinition;
+    preview: Extract<RecipeReplayPreview, { ok: true }>;
+  } | null> {
     try {
       const parsed = RecipeDefinitionSchema.safeParse(input);
       if (!parsed.success || !isSafeR0Definition(parsed.data)) return null;
-      const verified = this.active().find((item) =>
-        item.recipe.recipeId === parsed.data.recipeId &&
-        item.recipe.revision === parsed.data.revision &&
-        canonicalJson(item.recipe) === canonicalJson(parsed.data),
+      const verified = this.active().find(
+        (item) =>
+          item.recipe.recipeId === parsed.data.recipeId &&
+          item.recipe.revision === parsed.data.revision &&
+          canonicalJson(item.recipe) === canonicalJson(parsed.data),
       );
       if (!verified) return null;
       const trustedFacts = this.host.currentFacts();
-      if (!trustedFacts || typeof trustedFacts !== 'object' || Array.isArray(trustedFacts)) return null;
+      if (!trustedFacts || typeof trustedFacts !== 'object' || Array.isArray(trustedFacts))
+        return null;
       const allowed = verified.recipe.currentnessInputs;
       const keys = Object.keys(trustedFacts);
       if (
@@ -171,7 +179,8 @@ export class BoundedActiveRecipeResolver implements RecipeResolverPort {
           );
         }) ||
         canonicalJson(facts) !== canonicalJson(trustedFacts)
-      ) return null;
+      )
+        return null;
       const taskId = this.host.taskId();
       if (typeof taskId !== 'string' || !taskId) return null;
       const preview = this.host.previewExact({
@@ -189,7 +198,8 @@ export class BoundedActiveRecipeResolver implements RecipeResolverPort {
         preview.executionAuthorized !== false ||
         preview.requiresActionControllerRevalidation !== true ||
         preview.modelCalls !== 0
-      ) return null;
+      )
+        return null;
       return { recipe: verified.recipe, preview };
     } catch {
       return null;
@@ -225,14 +235,17 @@ export class BoundedActiveRecipeResolver implements RecipeResolverPort {
         !action ||
         action.op !== 'file.search' ||
         canonicalJson(found.preview.declaredEffects) !== canonicalJson(['file.search'])
-      ) throw new Error('RECIPE_INSTANTIATION_REFUSED');
+      )
+        throw new Error('RECIPE_INSTANTIATION_REFUSED');
       const vp = VerificationPlanSchema.safeParse(found.recipe.actionTemplate.verificationPlan);
       const recovery = RecoveryPlanSchema.safeParse(found.recipe.recoveryTemplate);
       if (!vp.success || !recovery.success) throw new Error('RECIPE_INSTANTIATION_REFUSED');
       const result = ActionPlanProposalSchema.safeParse({
         proposalId: `recipe:${found.recipe.recipeId}@${found.recipe.revision}`,
         capabilityId: found.recipe.capabilityId,
-        candidateActions: [{ actionId: action.actionId, op: action.op, parameters: action.parameters }],
+        candidateActions: [
+          { actionId: action.actionId, op: action.op, parameters: action.parameters },
+        ],
         verificationPlan: vp.data,
         recoveryPlan: recovery.data,
         recipeRef: `${found.recipe.recipeId}@${found.recipe.revision}`,
