@@ -7,7 +7,10 @@
 // and deterministic: hard gates precede ranking, risk is never a score
 // component, ambiguity and failure are typed, and planner output is untrusted
 // proposal data only.
-export { BoundedActiveRecipeResolver, type TrustedActiveRecipeAuthority } from './active-recipe-resolver.ts';
+export {
+  BoundedActiveRecipeResolver,
+  type TrustedActiveRecipeAuthority,
+} from './active-recipe-resolver.ts';
 export * from './feasibility.ts';
 export * from './gates.ts';
 // T04 private host-only composition; no source execution, grant or effect port.
