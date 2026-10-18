@@ -13,10 +13,9 @@ This project follows the immutable `kaicreator-mm/ai-development-standard` revis
 
 ## Current phase rules
 
-- Current phase is Product/L1 candidate review.
-- Do not start L2 or implementation unless Product Freeze authority explicitly allows it.
-- GitHub commit/Issue/PR state is the durable project fact source; chat is not.
-- Review and validation bind only to the exact SHA actually inspected/executed.
-- Do not convert exploratory percentages into population-wide claims.
-- Do not optimize UI-free rate by weakening safety, semantic verification, or necessary human visual review.
-- Product candidate changes that affect PRD authority require Fresh Independent Review before freeze.
+- Active `version/v0.2.0` is **Stage 3 implementation**. Product (including DeepSeek-first re-freeze), L2 and P0 Task DAG are already frozen; do not reopen them to change the development-standard pin.
+- Frozen Task DAG: 11 P0 tasks, 26 dependencies, `docs/planning/TASK-DAG-FREEZE-v0.2.md`. Source and runtime progress must be read from current GitHub Issues/PRs, not from historical planning headers or chat.
+- At this upgrade checkpoint T00/T01/T03/T06 are closed (4/11). T04/T05 remain active; PR #150 and #152 have blocking independent review findings (#151/#153) and must be fixed before merge. T07–T11 remain dependent; no v0.2 Release PASS is claimed.
+- New/checkpointed work applies ADS `4.13.1` at the immutable commit in `.dev-standard/VERSION` with `A1_MANUAL_PROTOCOL` overrides. Accepted in-flight old-standard Task and PR evidence retain their original `4.9.0@7929012f36a2202dcc2edc7a414b8163adc7afbd` identity until a lawful checkpoint; do not retroactively relabel or use a mutable latest reference.
+- Use one concern/PR, review only risks actually requiring review, reuse valid deterministic tests and real-host evidence; CI PASS is not release qualification. Agent logical roles are self-declared independently of GitHub transport accounts.
+- Do not weaken frozen Product/Architecture/security/approval, invent PASS or skip native Windows validation when the affected Task requires it. Shun v0.1 historical freeze/release evidence remains immutable.
