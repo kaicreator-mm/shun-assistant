@@ -207,7 +207,9 @@ describe('T04 active RecipeResolverPort exact-source R0 proposal', () => {
   it('refuses a catalog capability that is not file.search even with an R0 search graph', async () => {
     const catalog = { ...recipe, capabilityId: 'software.jit_capability_lifecycle' };
     const source = new BoundedActiveRecipeResolver({
-      list: () => [{ recipe: catalog, lifecycle: { recipeId: 'r1', revision: sha, state: 'ACTIVE' } }],
+      list: () => [
+        { recipe: catalog, lifecycle: { recipeId: 'r1', revision: sha, state: 'ACTIVE' } },
+      ],
       taskId: () => 't1',
       currentFacts: () => facts,
       previewExact: () => ({
@@ -220,7 +222,13 @@ describe('T04 active RecipeResolverPort exact-source R0 proposal', () => {
         verifierId: 'v',
         verifierRevision: '1',
         actionGraph: {
-          nodes: [{ actionId: 's1', op: 'file.search', parameters: { root: 'C:/selected', query: '*.txt' } }],
+          nodes: [
+            {
+              actionId: 's1',
+              op: 'file.search',
+              parameters: { root: 'C:/selected', query: '*.txt' },
+            },
+          ],
           edges: [],
         },
         declaredEffects: ['file.search'],
