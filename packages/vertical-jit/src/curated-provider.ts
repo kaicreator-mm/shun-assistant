@@ -109,6 +109,7 @@ function resolveDependencyEntries(
   const declaredSet = new Set(declared);
   if (declaredSet.size !== declared.length) return null;
   const names = new Set<string>();
+  const mappedDigests = new Set<string>();
   const resolved: ProviderDependencyEntry[] = [];
   for (const entry of entries) {
     if (
@@ -120,10 +121,12 @@ function resolveDependencyEntries(
       return null;
     }
     const lower = entry.name.toLowerCase();
-    if (names.has(lower)) return null;
+    if (names.has(lower) || mappedDigests.has(entry.artifactSha256)) return null;
     names.add(lower);
+    mappedDigests.add(entry.artifactSha256);
     resolved.push(Object.freeze({ name: entry.name, artifactSha256: entry.artifactSha256 }));
   }
+  if (mappedDigests.size !== declaredSet.size) return null;
   return resolved;
 }
 
@@ -158,7 +161,15 @@ export class CuratedProviderVerifier {
       if (!scope.bindingId || scopes.has(scope.bindingId)) {
         throw new Error('INVALID_TRUST_CONFIGURATION');
       }
-      scopes.set(scope.bindingId, Object.freeze({ ...scope }));
+      scopes.set(
+        scope.bindingId,
+        Object.freeze({
+          ...scope,
+          dependencyEntries: scope.dependencyEntries
+            ? Object.freeze(scope.dependencyEntries.map((entry) => Object.freeze({ ...entry })))
+            : undefined,
+        }),
+      );
     }
     this.keys = keys;
     this.scopes = scopes;

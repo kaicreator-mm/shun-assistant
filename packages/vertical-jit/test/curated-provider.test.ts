@@ -189,6 +189,31 @@ describe('T05 curated Provider trust-bound admission', () => {
         makeNative(dupScope, { dependencySha256: [depSha, 'f'.repeat(64)] }),
       ),
     ).toMatchObject({ ok: false, code: 'CATALOG_SCOPE_DRIFT' });
+    // Two differently named entries must not both resolve the same signed
+    // digest while silently omitting a second signed member.
+    const secondSha = hash(Buffer.from('second dependency fixture', 'utf8'));
+    const duplicatedDigestScope = {
+      ...depScope,
+      dependencyEntries: [
+        { name: 'first.dll', artifactSha256: depSha },
+        { name: 'second.dll', artifactSha256: depSha },
+      ],
+    };
+    expect(
+      makeVerifier(duplicatedDigestScope).verify(
+        makeNative(duplicatedDigestScope, { dependencySha256: [depSha, secondSha] }),
+      ),
+    ).toMatchObject({ ok: false, code: 'CATALOG_SCOPE_DRIFT' });
+    // Mutating an externally held host configuration after constructing the
+    // verifier must not redirect the resolved signed dependency identity.
+    const mutableScope = {
+      ...depScope,
+      dependencyEntries: [{ name: 'libvips-42.dll', artifactSha256: depSha }],
+    };
+    const frozenVerifier = makeVerifier(mutableScope);
+    mutableScope.dependencyEntries[0] = { name: 'attacker.dll', artifactSha256: depSha };
+    expect(frozenVerifier.verify(makeNative(depScope))).toMatchObject({ ok: true });
+
     // Path-shaped names refuse.
     const unsafeScope = {
       ...depScope,

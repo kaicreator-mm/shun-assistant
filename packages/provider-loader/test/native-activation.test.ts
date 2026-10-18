@@ -934,6 +934,25 @@ describe('native PE import scanner', () => {
     });
   });
 
+  it('rejects delay-import VA-form descriptors and truncated import-directory spans', async () => {
+    const { scanPeImports } = await import('../src/native-pe.ts');
+    const make = () => buildSynthPe({ imports: [], delayImports: ['evil-unapproved.dll'] });
+    for (const role of ['addon', 'transitive-DLL']) {
+      const vaForm = make();
+      // PE32+ synthetic image with delay-load table after empty import
+      // descriptor (0x400 + 20). Its nonzero name/pIAT remain intact.
+      vaForm.writeUInt32LE(0, 0x400 + 20);
+      expect(scanPeImports(vaForm)).toEqual({ ok: false, code: 'PE_PARSE_FAILED' });
+      const tooShort = make();
+      const pe = tooShort.readUInt32LE(0x3c);
+      const optional = pe + 4 + 20;
+      const delayEntry = optional + 112 + 13 * 8;
+      tooShort.writeUInt32LE(8, delayEntry + 4);
+      expect(scanPeImports(tooShort)).toEqual({ ok: false, code: 'PE_PARSE_FAILED' });
+      expect(role).toBeTruthy();
+    }
+  });
+
   it('treats API-set virtual DLLs as system and everything else as declarable', async () => {
     const { isSystemDllImportName } = await import('../src/native-pe.ts');
     expect(isSystemDllImportName('KERNEL32.dll')).toBe(true);

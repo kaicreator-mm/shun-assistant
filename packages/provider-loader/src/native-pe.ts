@@ -62,7 +62,11 @@ export function scanPeImports(bytes: Buffer): PeImportScan {
     if (!pe32Plus && magic !== 0x10b) return { ok: false, code: 'PE_PARSE_FAILED' };
     const directoryCount = bytes.readUInt32LE(optional + (pe32Plus ? 108 : 92));
     const directories = optional + (pe32Plus ? 112 : 96);
-    if (directoryCount < 2 || directories + directoryCount * 8 > bytes.length) {
+    if (
+      directoryCount < 2 ||
+      directories + directoryCount * 8 > optional + optionalSize ||
+      directories + directoryCount * 8 > bytes.length
+    ) {
       return { ok: false, code: 'PE_PARSE_FAILED' };
     }
     const readDirectory = (index: number): { rva: number; size: number } => ({
@@ -115,18 +119,24 @@ export function scanPeImports(bytes: Buffer): PeImportScan {
     // IMAGE_DELAYLOAD_DESCRIPTOR (32 bytes). VA-form delay tables (no RVA
     // attribute bit) cannot be resolved from file bytes alone and fail closed.
     const walkDescriptors = (directory: { rva: number; size: number }, delay: boolean): boolean => {
-      if (directory.rva === 0 || directory.rva === 0xffffffff) return true;
+      if (directory.rva === 0 && directory.size === 0) return true;
+      if (directory.rva === 0 || directory.size === 0 || directory.rva === 0xffffffff) return false;
       let offset = rvaToOffset(directory.rva);
       if (offset < 0) return false;
       const stride = delay ? 32 : 20;
+      const end = offset + directory.size;
+      if (end > bytes.length || directory.size < stride) return false;
       for (let index = 0; index < MAX_IMPORT_DLLS; index += 1) {
-        if (offset + stride > bytes.length) return false;
+        if (offset + stride > end) return false;
+        // A terminator is the WHOLE zeroed descriptor, not grAttrs=0.
+        // A real VA-form delay descriptor has grAttrs=0 with other fields
+        // populated; we cannot safely resolve it and must fail closed.
+        if (bytes.subarray(offset, offset + stride).every((byte) => byte === 0)) return true;
         let nameRva: number;
         let thunkRva: number;
         if (delay) {
           const attributes = bytes.readUInt32LE(offset);
-          if (attributes === 0) return true;
-          if ((attributes & 1) === 0) return false;
+          if (attributes !== 1) return false;
           nameRva = bytes.readUInt32LE(offset + 4);
           thunkRva = bytes.readUInt32LE(offset + 16);
           if (thunkRva === 0) thunkRva = bytes.readUInt32LE(offset + 12);
@@ -135,7 +145,7 @@ export function scanPeImports(bytes: Buffer): PeImportScan {
           thunkRva = bytes.readUInt32LE(offset);
           if (thunkRva === 0) thunkRva = bytes.readUInt32LE(offset + 16);
         }
-        if (nameRva === 0 && thunkRva === 0) return true;
+        if (nameRva === 0 || thunkRva === 0) return false;
         const name = asciiZ(bytes, rvaToOffset(nameRva));
         if (!name) return false;
         imports.add(name);
