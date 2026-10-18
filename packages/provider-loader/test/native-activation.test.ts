@@ -576,6 +576,71 @@ describe('T05 native dependency closure — signed names, digest cache, PE impor
     expect(leftoversUnderActive(host.cacheRoot, depScope.bindingId, addonSha)).toEqual([]);
   });
 
+  it('refuses real VA-form delay descriptors in addon and transitive DLL before spawning', async () => {
+    const nonExecutable = buildSynthPe({
+      imports: ['KERNEL32.dll'],
+      delayImports: ['unapproved.dll'],
+    });
+    const descriptorOffset = 0x400 + 2 * 20;
+    // grAttrs=0 is a valid VA-form delay descriptor, not the all-zero
+    // terminator; the nonzero szName/pIAT/pINT must force refusal.
+    nonExecutable.writeUInt32LE(0, descriptorOffset);
+    const badDigest = createHash('sha256').update(nonExecutable).digest('hex');
+    const badAddonScope: TrustedProviderScope = { ...scope, artifactSha256: badDigest };
+    const badAddonHost = makeNativeHost({
+      trust: badAddonScope,
+      fetchBytes: nonExecutable,
+    });
+    const badAddonDescriptor = makeDescriptor(badAddonScope);
+    await badAddonHost.stager.stage(badAddonDescriptor);
+    expect(
+      await badAddonHost.activator.runNativeAddon({
+        taskId: 'task-1',
+        descriptor: badAddonDescriptor,
+        run: { kind: 'ADDON_METADATA' },
+      }),
+    ).toEqual({ ok: false, code: 'DEPENDENCIES_UNVERIFIED' });
+    expect(badAddonHost.specs).toHaveLength(0);
+
+    const badDllScope: TrustedProviderScope = {
+      ...scope,
+      dependencyEntries: [{ name: DEP_NAME, artifactSha256: badDigest }],
+    };
+    const badDllHost = makeNativeHost({ trust: badDllScope });
+    await placeDependency(badDllHost.cacheRoot, badDigest, nonExecutable);
+    const badDllDescriptor = makeDescriptor(badDllScope);
+    await badDllHost.stager.stage(badDllDescriptor);
+    expect(
+      await badDllHost.activator.runNativeAddon({
+        taskId: 'task-1',
+        descriptor: badDllDescriptor,
+        run: { kind: 'ADDON_METADATA' },
+      }),
+    ).toEqual({ ok: false, code: 'DEPENDENCIES_UNVERIFIED' });
+    expect(badDllHost.specs).toHaveLength(0);
+  });
+
+  it('refuses a signed two-digest descriptor with a missing host-pinned digest before spawn', async () => {
+    const secondDigest = createHash('sha256').update('second signed image').digest('hex');
+    const badScope: TrustedProviderScope = {
+      ...scope,
+      dependencyEntries: [
+        { name: 'first.dll', artifactSha256: depSha },
+        { name: 'second.dll', artifactSha256: depSha },
+      ],
+    };
+    const host = makeNativeHost({ trust: badScope });
+    const descriptor = makeDescriptor(badScope, {
+      dependencySha256: [depSha, secondDigest],
+    });
+    expect(await host.stager.stage(descriptor)).toEqual({
+      ok: false,
+      code: 'CATALOG_SCOPE_DRIFT',
+    });
+    expect(host.specs).toHaveLength(0);
+    expect(host.invocations).toHaveLength(0);
+  });
+
   it('refuses an undeclared non-system import anywhere in the closure graph (zero spawns)', async () => {
     const evilAddon = buildSynthPe({ imports: ['KERNEL32.dll', 'evil_overlay.dll'] });
     const evilSha = createHash('sha256').update(evilAddon).digest('hex');
