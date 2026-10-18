@@ -153,6 +153,14 @@ describe('T04 active RecipeResolverPort exact-source R0 proposal', () => {
       (await h.resolver.checkCurrentness({ ...recipe, policyRequirements: { admin: true } }, facts))
         .outcome,
     ).toBe('UNKNOWN');
+    expect(
+      (
+        await h.resolver.checkCurrentness(
+          { ...recipe, verifierRevision: 'wrong-verifier-revision' },
+          facts,
+        )
+      ).outcome,
+    ).toBe('UNKNOWN');
     expect((await h.resolver.match({ ...intent, objective: 'different task' })).candidates).toEqual(
       [],
     );

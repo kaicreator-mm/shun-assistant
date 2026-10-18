@@ -58,6 +58,9 @@ function isSafeR0Definition(recipe: RecipeDefinition): boolean {
     typeof template.actionGraphSha256 === 'string' &&
     /^[a-f0-9]{64}$/.test(template.actionGraphSha256) &&
     VerificationPlanSchema.safeParse(template.verificationPlan).success &&
+    (template.verificationPlan as { verifierId: string }).verifierId === recipe.verifierId &&
+    (template.verificationPlan as { verifierRevision: string }).verifierRevision ===
+      recipe.verifierRevision &&
     RecoveryPlanSchema.safeParse(recipe.recoveryTemplate).success &&
     recipe.currentnessInputs.length > 0 &&
     new Set(recipe.currentnessInputs).size === recipe.currentnessInputs.length
