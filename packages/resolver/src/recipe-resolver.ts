@@ -69,6 +69,9 @@ export type RecipeReplayPreview =
       recipeId: string;
       revisionSha256: string;
       actionGraphSha256: string;
+      /** Exact verifier pins independently checked against T03 saved identity. */
+      verifierId?: string;
+      verifierRevision?: string;
       actionGraph: RecipeActionGraph;
       declaredEffects: readonly string[];
       /** True means no new model call was needed for this exact lookup. */
@@ -207,6 +210,8 @@ export class ClosedWorldRecipePreview {
       recipeId,
       revisionSha256,
       actionGraphSha256: identity.actionGraphSha256,
+      verifierId: identity.verifierId,
+      verifierRevision: identity.verifierRevision,
       actionGraph: graph,
       declaredEffects: effects,
       modelCalls: 0,

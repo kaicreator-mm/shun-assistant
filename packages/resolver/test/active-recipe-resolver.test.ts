@@ -39,8 +39,25 @@ function fixture() {
   let registryRevision = 'reg-1';
   let previews = 0;
   let mutateGraph = false;
+  let catalogVerifier = 'v';
+  let catalogVerifierRevision = '1';
   const authority = {
-    list: () => [{ recipe, lifecycle: { recipeId: 'r1', revision: sha, state } }],
+    list: () => {
+      const definition = {
+        ...recipe,
+        verifierId: catalogVerifier,
+        verifierRevision: catalogVerifierRevision,
+        actionTemplate: {
+          ...recipe.actionTemplate,
+          verificationPlan: {
+            ...recipe.actionTemplate.verificationPlan,
+            verifierId: catalogVerifier,
+            verifierRevision: catalogVerifierRevision,
+          },
+        },
+      };
+      return [{ recipe: definition, lifecycle: { recipeId: 'r1', revision: sha, state } }];
+    },
     taskId: () => 't1',
     currentFacts: () => ({ registryRevision }),
     previewExact: (_input: {
@@ -56,6 +73,9 @@ function fixture() {
         recipeId: 'r1',
         revisionSha256: sha,
         actionGraphSha256: mutateGraph ? 'c'.repeat(64) : graphSha,
+        // These are the independently validated T03 stored revision pins.
+        verifierId: 'v',
+        verifierRevision: '1',
         actionGraph: {
           nodes: [
             {
@@ -83,6 +103,10 @@ function fixture() {
     },
     tamperGraph: () => {
       mutateGraph = true;
+    },
+    tamperCatalogVerifier: () => {
+      catalogVerifier = 'attacker-verifier';
+      catalogVerifierRevision = '2';
     },
     previews: () => previews,
   };
@@ -164,6 +188,49 @@ describe('T04 active RecipeResolverPort exact-source R0 proposal', () => {
     expect((await h.resolver.match({ ...intent, objective: 'different task' })).candidates).toEqual(
       [],
     );
+  });
+
+  it('rejects catalog verifier drift against the unchanged T03 revision identity', async () => {
+    const h = fixture();
+    // Exact R and graph SHA remain unchanged; the catalog changes BOTH its
+    // verifier fields and embedded VerificationPlan consistently.
+    h.tamperCatalogVerifier();
+    const catalog = (await h.resolver.match(intent)).candidates[0]?.recipe;
+    expect(catalog).toBeDefined();
+    if (!catalog) throw new Error('fixture');
+    expect((await h.resolver.checkCurrentness(catalog, facts)).outcome).toBe('UNKNOWN');
+    await expect(h.resolver.instantiate(catalog, {}, facts)).rejects.toThrow(
+      'RECIPE_INSTANTIATION_REFUSED',
+    );
+  });
+
+  it('refuses a catalog capability that is not file.search even with an R0 search graph', async () => {
+    const catalog = { ...recipe, capabilityId: 'software.jit_capability_lifecycle' };
+    const source = new BoundedActiveRecipeResolver({
+      list: () => [{ recipe: catalog, lifecycle: { recipeId: 'r1', revision: sha, state: 'ACTIVE' } }],
+      taskId: () => 't1',
+      currentFacts: () => facts,
+      previewExact: () => ({
+        ok: true,
+        state: 'PREVIEW_ONLY',
+        taskId: 't1',
+        recipeId: 'r1',
+        revisionSha256: sha,
+        actionGraphSha256: graphSha,
+        verifierId: 'v',
+        verifierRevision: '1',
+        actionGraph: {
+          nodes: [{ actionId: 's1', op: 'file.search', parameters: { root: 'C:/selected', query: '*.txt' } }],
+          edges: [],
+        },
+        declaredEffects: ['file.search'],
+        modelCalls: 0,
+        requiresActionControllerRevalidation: true,
+        executionAuthorized: false,
+      }),
+    });
+    expect((await source.match(intent)).candidates).toEqual([]);
+    expect((await source.checkCurrentness(catalog, facts)).outcome).toBe('UNKNOWN');
   });
 
   it('redacts host getters and refuses malformed/duplicate trusted registry', async () => {

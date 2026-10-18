@@ -46,6 +46,7 @@ function isSafeR0Definition(recipe: RecipeDefinition): boolean {
   const predicate = recipe.applicabilityPredicate;
   return (
     recipe.riskFloor === 'R0' &&
+    recipe.capabilityId === 'file.search' &&
     /^[a-f0-9]{64}$/.test(recipe.revision) &&
     Object.keys(predicate).length === 1 &&
     typeof predicate.objective === 'string' &&
@@ -198,6 +199,10 @@ export class BoundedActiveRecipeResolver implements RecipeResolverPort {
         preview.recipeId !== verified.recipe.recipeId ||
         preview.revisionSha256 !== verified.recipe.revision ||
         preview.actionGraphSha256 !== verified.recipe.actionTemplate.actionGraphSha256 ||
+        // The T03 preview reads and cryptographically validates the saved
+        // immutable RecipeRevisionIdentity, not just ACTIVE catalog metadata.
+        preview.verifierId !== verified.recipe.verifierId ||
+        preview.verifierRevision !== verified.recipe.verifierRevision ||
         preview.executionAuthorized !== false ||
         preview.requiresActionControllerRevalidation !== true ||
         preview.modelCalls !== 0
