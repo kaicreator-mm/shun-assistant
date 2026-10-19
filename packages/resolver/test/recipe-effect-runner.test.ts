@@ -69,6 +69,7 @@ function fixture() {
   let policyRevoked = false;
   let recipeRevoked = false;
   let changedPlan = false;
+  let expectedReads = 0;
   let wrongGrant = false;
   let crashBackend = false;
   let blockAuthorization: (() => void) | undefined;
@@ -83,8 +84,11 @@ function fixture() {
     },
     loadExpectedPlan: () => {
       events.push('expected');
+      expectedReads++;
       const proposed = plan();
-      if (changedPlan) {
+      // First read matches what ActionController granted. After the await,
+      // its second read changes ranking-policy revision with a fresh hash.
+      if (changedPlan && expectedReads === 2) {
         proposed.rankingPolicyRevision = 'changed';
         proposed.planHash = computePlanHash(proposed);
       }
