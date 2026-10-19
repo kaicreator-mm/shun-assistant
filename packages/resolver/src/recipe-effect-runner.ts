@@ -30,9 +30,9 @@ export type TrustedReadonlyEffectHost = Readonly<{
   loadExpectedPlan: (input: ExpectedPlanIdentity) => unknown;
   /** Actual ActionController: its plan gate issues grants and effect gate rechecks them. */
   controller: Readonly<{
-    authorizePlan: (input: { plan: unknown }) => Promise<
-      { ok: true; authorization: AuthorizedBundle } | { ok: false }
-    >;
+    authorizePlan: (input: {
+      plan: unknown;
+    }) => Promise<{ ok: true; authorization: AuthorizedBundle } | { ok: false }>;
     authorizeEffect: (input: {
       plan: ActionPlan;
       action: AuthorizedAction;
@@ -56,7 +56,11 @@ export type ReadonlyRecipeEffectOutcome =
         | 'RECIPE_EXECUTION_UNCERTAIN';
     };
 
-function safePlan(candidate: unknown, identity: Identity, preview: RecipeReplayPreview): ActionPlan | null {
+function safePlan(
+  candidate: unknown,
+  identity: Identity,
+  preview: RecipeReplayPreview,
+): ActionPlan | null {
   if (!preview.ok || preview.state !== 'PREVIEW_ONLY') return null;
   const parsed = ActionPlanSchema.safeParse(candidate);
   if (!parsed.success) return null;
@@ -85,7 +89,8 @@ function safePlan(candidate: unknown, identity: Identity, preview: RecipeReplayP
     action.networkScope !== undefined ||
     action.registryScope !== undefined ||
     (action.secretRefs?.length ?? 0) !== 0
-  ) return null;
+  )
+    return null;
   return plan;
 }
 
@@ -125,7 +130,8 @@ export class TrustedReadonlyRecipeEffectRunner {
         typeof authorizePlan !== 'function' ||
         typeof authorizeEffect !== 'function' ||
         typeof execute !== 'function'
-      ) throw new Error('RECIPE_EFFECT_HOST_CONFIGURATION_REFUSED');
+      )
+        throw new Error('RECIPE_EFFECT_HOST_CONFIGURATION_REFUSED');
       this.host = {
         previewExact: preview.bind(input),
         loadExpectedPlan: load.bind(input),
@@ -151,7 +157,8 @@ export class TrustedReadonlyRecipeEffectRunner {
         !input.recipeId ||
         typeof input.revisionSha256 !== 'string' ||
         !/^[a-f0-9]{64}$/.test(input.revisionSha256)
-      ) return { ok: false, code: 'RECIPE_INPUT_REFUSED' };
+      )
+        return { ok: false, code: 'RECIPE_INPUT_REFUSED' };
       key = JSON.stringify([input.taskId, input.recipeId, input.revisionSha256]);
     } catch {
       return { ok: false, code: 'RECIPE_INPUT_REFUSED' };
@@ -160,7 +167,8 @@ export class TrustedReadonlyRecipeEffectRunner {
     this.inflight.add(key);
     try {
       const first = this.host.previewExact(input);
-      if (!validPreview(first, input) || !first.ok) return { ok: false, code: 'RECIPE_NOT_CURRENT' };
+      if (!validPreview(first, input) || !first.ok)
+        return { ok: false, code: 'RECIPE_NOT_CURRENT' };
       const identity = { ...input, actionGraphSha256: first.actionGraphSha256 };
       const firstPlan = safePlan(this.host.loadExpectedPlan(identity), input, first);
       if (!firstPlan) return { ok: false, code: 'RECIPE_PLAN_REFUSED' };
@@ -172,7 +180,11 @@ export class TrustedReadonlyRecipeEffectRunner {
       // Re-read T03 AND the independent trusted expected plan before touching
       // any executor. Full snapshot equality detects even same-SHA drift.
       const second = this.host.previewExact(input);
-      if (!validPreview(second, input) || !second.ok || canonicalJson(first) !== canonicalJson(second)) {
+      if (
+        !validPreview(second, input) ||
+        !second.ok ||
+        canonicalJson(first) !== canonicalJson(second)
+      ) {
         return { ok: false, code: 'RECIPE_NOT_CURRENT' };
       }
       const secondPlan = safePlan(this.host.loadExpectedPlan(identity), input, second);
@@ -202,7 +214,8 @@ export class TrustedReadonlyRecipeEffectRunner {
         canonicalJson(grant.data.actionScope.actionIds) !== canonicalJson([action.data.actionId]) ||
         canonicalJson(grant.data.actionScope.filesystem) !==
           canonicalJson({ read: firstPlan.actions[0]?.filesystemScope?.read, write: [] })
-      ) return { ok: false, code: 'RECIPE_AUTHORIZATION_REFUSED' };
+      )
+        return { ok: false, code: 'RECIPE_AUTHORIZATION_REFUSED' };
       const verdict = await this.host.controller.authorizeEffect({
         plan: firstPlan,
         action: action.data,
@@ -224,7 +237,8 @@ export class TrustedReadonlyRecipeEffectRunner {
         parsedReceipt.data.actionId !== action.data.actionId ||
         parsedReceipt.data.sideEffectEvidence.sideEffectClass !== 'R0' ||
         parsedReceipt.data.terminal !== 'SUCCEEDED'
-      ) return { ok: false, code: 'RECIPE_EXECUTION_UNCERTAIN' };
+      )
+        return { ok: false, code: 'RECIPE_EXECUTION_UNCERTAIN' };
       // Success at the execution surface is not a semantic verifier PASS.
       return {
         ok: true,

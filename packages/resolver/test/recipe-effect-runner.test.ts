@@ -1,11 +1,8 @@
-import {
-  type ActionPlan,
-  computePlanHash,
-} from '@shun/contracts';
+import { type ActionPlan, computePlanHash } from '@shun/contracts';
 import { describe, expect, it } from 'vitest';
 import {
-  TrustedReadonlyRecipeEffectRunner,
   type TrustedReadonlyEffectHost,
+  TrustedReadonlyRecipeEffectRunner,
 } from '../src/recipe-effect-runner.ts';
 import type { RecipeReplayPreview } from '../src/recipe-resolver.ts';
 
@@ -21,15 +18,17 @@ function plan(): ActionPlan {
     recipeRef: `recipe-1@${sha}`,
     rankingPolicyRevision: 'rank-1',
     policySnapshotRevision: 'policy-1',
-    actions: [{
-      actionId: 'search-1',
-      bindingRef: 'binding-1',
-      op: 'file.search',
-      parameters: { root: 'C:/safe', query: '*.txt' },
-      sideEffectClass: 'R0',
-      requiredPrivilege: 'USER',
-      filesystemScope: { read: ['C:/safe'], write: [] },
-    }],
+    actions: [
+      {
+        actionId: 'search-1',
+        bindingRef: 'binding-1',
+        op: 'file.search',
+        parameters: { root: 'C:/safe', query: '*.txt' },
+        sideEffectClass: 'R0',
+        requiredPrivilege: 'USER',
+        filesystemScope: { read: ['C:/safe'], write: [] },
+      },
+    ],
     verificationPlan: { verifierId: 'v1', verifierRevision: '1', checks: [{ checkId: 'found' }] },
     recoveryPlan: {
       classificationStrategy: 'JOURNAL_AND_POST_STATE',
@@ -50,7 +49,13 @@ function preview(): RecipeReplayPreview {
     verifierId: 'v1',
     verifierRevision: '1',
     actionGraph: {
-      nodes: [{ actionId: 'search-1', op: 'file.search', parameters: { root: 'C:/safe', query: '*.txt' } }],
+      nodes: [
+        {
+          actionId: 'search-1',
+          op: 'file.search',
+          parameters: { root: 'C:/safe', query: '*.txt' },
+        },
+      ],
       edges: [],
     },
     declaredEffects: ['file.search'],
@@ -67,7 +72,9 @@ function fixture() {
   let wrongGrant = false;
   let crashBackend = false;
   let blockAuthorization: (() => void) | undefined;
-  const gate = new Promise<void>((resolve) => { blockAuthorization = resolve; });
+  const gate = new Promise<void>((resolve) => {
+    blockAuthorization = resolve;
+  });
   let delay = false;
   const host: TrustedReadonlyEffectHost = {
     previewExact: () => {
@@ -113,7 +120,10 @@ function fixture() {
           expiresAt: '2026-10-20T00:00:00.000Z',
           integrity: { scheme: 'HMAC_SHA256' as const, value: 'test-integrity' },
         };
-        return { ok: true as const, authorization: { plan: p, actions: [action], grants: [grant] } };
+        return {
+          ok: true as const,
+          authorization: { plan: p, actions: [action], grants: [grant] },
+        };
       },
       authorizeEffect: async () => {
         events.push('effect');
@@ -145,12 +155,24 @@ function fixture() {
   return {
     runner: new TrustedReadonlyRecipeEffectRunner(host),
     events,
-    revokePolicy: () => { policyRevoked = true; },
-    revokeRecipe: () => { recipeRevoked = true; },
-    driftPlan: () => { changedPlan = true; },
-    forgeGrant: () => { wrongGrant = true; },
-    crash: () => { crashBackend = true; },
-    delayAuth: () => { delay = true; },
+    revokePolicy: () => {
+      policyRevoked = true;
+    },
+    revokeRecipe: () => {
+      recipeRevoked = true;
+    },
+    driftPlan: () => {
+      changedPlan = true;
+    },
+    forgeGrant: () => {
+      wrongGrant = true;
+    },
+    crash: () => {
+      crashBackend = true;
+    },
+    delayAuth: () => {
+      delay = true;
+    },
     releaseAuth: () => blockAuthorization?.(),
   };
 }
@@ -164,7 +186,15 @@ describe('T04 real authorization reentry before read-only Recipe effect', () => 
       actionCount: 1,
       taskPass: false,
     });
-    expect(x.events).toEqual(['preview', 'expected', 'plan', 'preview', 'expected', 'effect', 'execute']);
+    expect(x.events).toEqual([
+      'preview',
+      'expected',
+      'plan',
+      'preview',
+      'expected',
+      'effect',
+      'execute',
+    ]);
   });
 
   it('refuses revoked policy at per-effect check with ZERO backend dispatch', async () => {
@@ -215,12 +245,18 @@ describe('T04 real authorization reentry before read-only Recipe effect', () => 
   it('refuses input, throwing host constructor getters, and plan drift', async () => {
     const x = fixture();
     expect(await x.runner.run({ ...ids, revisionSha256: 'bad' })).toEqual({
-      ok: false, code: 'RECIPE_INPUT_REFUSED',
+      ok: false,
+      code: 'RECIPE_INPUT_REFUSED',
     });
     x.driftPlan();
     expect(await x.runner.run(ids)).toMatchObject({ ok: false });
-    expect(() => new TrustedReadonlyRecipeEffectRunner({
-      get controller(): never { throw new Error('Bearer private'); },
-    } as never)).toThrow(/^RECIPE_EFFECT_HOST_CONFIGURATION_REFUSED$/);
+    expect(
+      () =>
+        new TrustedReadonlyRecipeEffectRunner({
+          get controller(): never {
+            throw new Error('Bearer private');
+          },
+        } as never),
+    ).toThrow(/^RECIPE_EFFECT_HOST_CONFIGURATION_REFUSED$/);
   });
 });
