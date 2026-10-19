@@ -145,8 +145,8 @@ function fixture() {
           outputRefs: [],
           sideEffectEvidence: {
             sideEffectClass: 'R0' as const,
-            recoveryClassification: 'PROVEN_NOT_EXECUTED' as const,
-            postStateVerified: false,
+            recoveryClassification: 'COMPLETED_VERIFIED' as const,
+            postStateVerified: true,
           },
         };
       },
