@@ -106,10 +106,122 @@ describe('T05 curated Provider trust-bound admission', () => {
 
   it('rejects a tampered signed field without a valid new signature', () => {
     const before = makeArtifact();
+    // Tampering the dependency digest list now trips the name↔digest
+    // bijection BEFORE the signature check — still refused, with the more
+    // precise drift code.
     const changed = { ...before, dependencySha256: ['f'.repeat(64)] };
     expect(configured().verify(changed)).toMatchObject({
       ok: false,
+      code: 'CATALOG_SCOPE_DRIFT',
+    });
+    // A tampered field that scope-pinning alone does not gate (the entrypoint
+    // is not part of the scope comparison) still dies on the signature.
+    const rehashed = { ...before, entrypoint: 'tampered.exe' };
+    expect(configured().verify(rehashed)).toMatchObject({
+      ok: false,
       code: 'CATALOG_SIGNATURE_INVALID',
+    });
+  });
+
+  it('enforces the strict host-curated dependency name↔digest bijection', () => {
+    const depSha = hash(Buffer.from('libvips fixture bytes', 'utf8'));
+    const depScope = {
+      ...scope,
+      artifactKind: 'NATIVE_ADDON' as const,
+      abiRevision: '137',
+      dependencyEntries: [{ name: 'libvips-42.dll', artifactSha256: depSha }],
+    };
+    const makeVerifier = (trust: typeof depScope) =>
+      new CuratedProviderVerifier(
+        [
+          {
+            keyId: issuer,
+            publicKeyPem: publicKey.export({ type: 'spki', format: 'pem' }).toString(),
+          },
+        ],
+        [trust],
+      );
+    const makeNative = (trust: typeof depScope, data: Record<string, unknown> = {}) => {
+      const signed = {
+        ...trust,
+        entrypoint: 'sharp-win32-x64.node',
+        signerKeyId: issuer,
+        dependencySha256: [depSha],
+        ...data,
+      };
+      // Host-derived name pins are never part of the signed payload.
+      const { dependencyEntries: _hostDerived, ...unsigned } = signed;
+      return { ...unsigned, curatorSignature: signer(unsigned) };
+    };
+    // Valid closure: the verified artifact carries the resolved entries.
+    const verified = makeVerifier(depScope).verify(makeNative(depScope));
+    expect(verified.ok).toBe(true);
+    if (verified.ok) {
+      expect(verified.artifact.dependencyEntries).toEqual([
+        { name: 'libvips-42.dll', artifactSha256: depSha },
+      ]);
+      expect(Object.isFrozen(verified.artifact.dependencyEntries)).toBe(true);
+    }
+    // A digest without a pinned name cannot resolve.
+    expect(
+      makeVerifier(depScope).verify(
+        makeNative(depScope, { dependencySha256: [depSha, 'f'.repeat(64)] }),
+      ),
+    ).toMatchObject({ ok: false, code: 'CATALOG_SCOPE_DRIFT' });
+    // A pinned name without a matching digest cannot either.
+    expect(
+      makeVerifier(depScope).verify(makeNative(depScope, { dependencySha256: [] })),
+    ).toMatchObject({ ok: false, code: 'CATALOG_SCOPE_DRIFT' });
+    // Digest drift against the pinned name refuses.
+    expect(
+      makeVerifier(depScope).verify(makeNative(depScope, { dependencySha256: ['f'.repeat(64)] })),
+    ).toMatchObject({ ok: false, code: 'CATALOG_SCOPE_DRIFT' });
+    // Case-insensitive duplicate names refuse (loader name confusion).
+    const dupScope = {
+      ...depScope,
+      dependencyEntries: [
+        { name: 'libvips-42.dll', artifactSha256: depSha },
+        { name: 'LIBVIPS-42.DLL', artifactSha256: 'f'.repeat(64) },
+      ],
+    };
+    expect(
+      makeVerifier(dupScope).verify(
+        makeNative(dupScope, { dependencySha256: [depSha, 'f'.repeat(64)] }),
+      ),
+    ).toMatchObject({ ok: false, code: 'CATALOG_SCOPE_DRIFT' });
+    // Two differently named entries must not both resolve the same signed
+    // digest while silently omitting a second signed member.
+    const secondSha = hash(Buffer.from('second dependency fixture', 'utf8'));
+    const duplicatedDigestScope = {
+      ...depScope,
+      dependencyEntries: [
+        { name: 'first.dll', artifactSha256: depSha },
+        { name: 'second.dll', artifactSha256: depSha },
+      ],
+    };
+    expect(
+      makeVerifier(duplicatedDigestScope).verify(
+        makeNative(duplicatedDigestScope, { dependencySha256: [depSha, secondSha] }),
+      ),
+    ).toMatchObject({ ok: false, code: 'CATALOG_SCOPE_DRIFT' });
+    // Mutating an externally held host configuration after constructing the
+    // verifier must not redirect the resolved signed dependency identity.
+    const mutableScope = {
+      ...depScope,
+      dependencyEntries: [{ name: 'libvips-42.dll', artifactSha256: depSha }],
+    };
+    const frozenVerifier = makeVerifier(mutableScope);
+    mutableScope.dependencyEntries[0] = { name: 'attacker.dll', artifactSha256: depSha };
+    expect(frozenVerifier.verify(makeNative(depScope))).toMatchObject({ ok: true });
+
+    // Path-shaped names refuse.
+    const unsafeScope = {
+      ...depScope,
+      dependencyEntries: [{ name: 'sub/evil.dll', artifactSha256: depSha }],
+    };
+    expect(makeVerifier(unsafeScope).verify(makeNative(unsafeScope))).toMatchObject({
+      ok: false,
+      code: 'CATALOG_SCOPE_DRIFT',
     });
   });
 

@@ -125,10 +125,11 @@ export class CuratedProviderPreflight {
     if (artifact.artifactKind === 'NATIVE_ADDON' && artifact.abiRevision !== abi) {
       return { ok: false, code: 'ABI_MISMATCH' };
     }
-    // Dependency closure requires independently signed transitive manifests.
-    // This narrow slice deliberately refuses all nonempty sets until that
-    // later host implementation exists. Never waive dependencies on "CLI".
-    if (artifact.dependencySha256.length !== 0) {
+    // Dependency closure: the verifier already enforces the strict bijection
+    // between signed dep digests and host-curated names, so a nonempty set
+    // that did not resolve to names is unrepresentable; refuse the shape
+    // anyway (fail closed) for both CLI and native admission.
+    if (artifact.dependencySha256.length !== artifact.dependencyEntries.length) {
       return { ok: false, code: 'DEPENDENCIES_UNVERIFIED' };
     }
     let bytes: Buffer | null;

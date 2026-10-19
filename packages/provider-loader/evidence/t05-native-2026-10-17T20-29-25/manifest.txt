@@ -1,0 +1,12 @@
+T05 native evidence manifest — 2026-10-17T20-29-25
+evidence_dir=C:\xDev\kAiCreator\shun-assistant\shun-assistant-i106-zcode\packages\provider-loader\evidence\t05-native-2026-10-17T20-29-25
+runtime_root=<HOME>\AppData\Local\Temp\shun-t05-native-2026-10-17T20-29-24 (NOT committed; heavy artifacts)
+pkg=@img/sharp-win32-x64@0.35.5
+tarball_sha256=16a804181ddd258ca6fe7079b2faa0c0356654c9db3d93ab0a80ec5e5161c3d4
+addon=sharp-win32-x64-0.35.5.node
+addon_sha256=971048779f9c8598df14641dfc03c625885c93f473a788e65ca2deb50d0b083e
+closure=[{"name":"libvips-42.dll","sha256":"06dab07cc386748513337a31672b1d5269fbc770a14ff403080575665bf0813f","bytes":19018240},{"name":"libvips-cpp-8.18.7.dll","sha256":"25001dbd05305a0a29119ab49933622c70b4a20ea12ef1d5d20ca40181db53bf","bytes":333312}]
+curator_public_key_sha256=b7e2eb0e5d80d711bfd64e9b500b9c5e73658f16579e110e0f39c11f4d34470a
+
+f0685a5fc2167565a670af952ff4c96bbcda2ffeaf9f16edac8ccee39e26cda9  C:\xDev\kAiCreator\shun-assistant\shun-assistant-i106-zcode\packages\provider-loader\evidence\t05-native-2026-10-17T20-29-25\events.ndjson
+570563c32511e037ac367cc4e3eeb605d6bdb3f96bf762b7ea0032d3de008cbf  C:\xDev\kAiCreator\shun-assistant\shun-assistant-i106-zcode\packages\provider-loader\evidence\t05-native-2026-10-17T20-29-25\summary.md
