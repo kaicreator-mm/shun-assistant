@@ -85,7 +85,8 @@ function fixture() {
       events.push('preview');
       if (recipeRevoked) return { ok: false, code: 'RECIPE_CURRENTNESS_STALE' };
       const snapshot = preview();
-      if (wrongDeclaredEffects && snapshot.ok) snapshot.declaredEffects = ['file.search', 'file.copy'];
+      if (wrongDeclaredEffects && snapshot.ok)
+        snapshot.declaredEffects = ['file.search', 'file.copy'];
       return snapshot;
     },
     loadExpectedPlan: () => {
