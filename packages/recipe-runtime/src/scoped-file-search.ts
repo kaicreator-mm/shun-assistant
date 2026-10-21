@@ -29,7 +29,8 @@ function assertName(name: string): void {
     name.includes('\\') ||
     name.includes(':') ||
     name.includes('\0')
-  ) throw new Error('REFUSED');
+  )
+    throw new Error('REFUSED');
   if (process.platform === 'win32') {
     // Win32 normalizes trailing spaces/dots and reserves DOS device names.
     if (/[. ]$/.test(name) || /^(con|prn|aux|nul|com[1-9]|lpt[1-9])(?:\.|$)/i.test(name))
@@ -68,9 +69,10 @@ function wildcardMatch(name: string, pattern: string): boolean {
     const current = new Array<boolean>(n.length + 1).fill(false);
     if (ch === '*') current[0] = previous[0];
     for (let i = 1; i <= n.length; i++) {
-      current[i] = ch === '*'
-        ? (previous[i] ?? false) || (current[i - 1] ?? false)
-        : (previous[i - 1] ?? false) && (ch === '?' || ch === n[i - 1]);
+      current[i] =
+        ch === '*'
+          ? (previous[i] ?? false) || (current[i - 1] ?? false)
+          : (previous[i - 1] ?? false) && (ch === '?' || ch === n[i - 1]);
     }
     previous = current;
   }
@@ -96,7 +98,8 @@ export function observeScopedFileSearch(action: AuthorizedAction): LocalFileSear
       a.registryScope !== undefined ||
       (a.secretRefs?.length ?? 0) !== 0 ||
       Object.keys(a.parameters).length !== 2
-    ) throw new Error('REFUSED');
+    )
+      throw new Error('REFUSED');
 
     const { root, query } = a.parameters;
     if (
@@ -110,7 +113,8 @@ export function observeScopedFileSearch(action: AuthorizedAction): LocalFileSear
       query.length > 128 ||
       !/^[a-zA-Z0-9._?* -]+$/.test(query) ||
       a.filesystemScope.read[0] !== root
-    ) throw new Error('REFUSED');
+    )
+      throw new Error('REFUSED');
 
     const canonicalRoot = realpathSync.native(root);
     if (!samePath(resolve(root), canonicalRoot)) throw new Error('REFUSED');
