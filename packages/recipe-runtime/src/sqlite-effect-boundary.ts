@@ -88,9 +88,6 @@ export class SqliteReadonlySearchAuthorizationBoundary {
       const parsed = AuthorizedActionSchema.safeParse(presentation);
       if (!parsed.success) throw new Error('RECIPE_EFFECT_BOUNDARY_REFUSED');
       const action = parsed.data;
-      if (action.authorizationKind === 'EXPLICIT_APPROVAL') {
-        // The controller independently confirms this route's provenance.
-      }
       const [rawGrant, rawPlan] = await Promise.all([
         this.store.get(action.authorizationRef),
         this.loadPlanByHash(action.planHash),
