@@ -1,17 +1,11 @@
 import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import {
-  ActionController,
-  AuthorizationAuthority,
-} from '@shun/authorization';
+import { ActionController, AuthorizationAuthority } from '@shun/authorization';
 import { type ActionPlan, computePlanHash } from '@shun/contracts';
 import { ShunStore, ShunStoreAuthorizationAdapter } from '@shun/store';
 import { afterEach, describe, expect, it } from 'vitest';
-import {
-  createSqliteRecipeReadService,
-  type SqliteRecipeHostOptions,
-} from '../src/index.ts';
+import { createSqliteRecipeReadService, type SqliteRecipeHostOptions } from '../src/index.ts';
 
 const config = {
   recipeId: 'recipe-1',
@@ -59,27 +53,35 @@ function fixture() {
       issuanceSecret: 'private-issuance-fixture',
       clock: () => now,
     });
-    let revision: {
-      recipeId: string;
-      revisionSha256: string;
-    } | undefined;
+    let revision:
+      | {
+          recipeId: string;
+          revisionSha256: string;
+        }
+      | undefined;
     const host: SqliteRecipeHostOptions = {
       store: currentStore,
       controller,
       currentness: (taskId, recipeId) => {
         if (stale || !revision) return { kind: 'UNRESOLVABLE' };
         const saved = currentStore.database
-          .prepare('SELECT payload FROM recipe_revisions_v02 WHERE recipe_id = ? AND revision_sha256 = ?')
+          .prepare(
+            'SELECT payload FROM recipe_revisions_v02 WHERE recipe_id = ? AND revision_sha256 = ?',
+          )
           .get(recipeId, revision.revisionSha256) as { payload: string } | undefined;
         if (!saved) return { kind: 'UNRESOLVABLE' };
-        const identity = (JSON.parse(saved.payload) as { identity: {
-          revisionSha256: string;
-          actionGraphSha256: string;
-          compilerRevision: string;
-          contractRevision: string;
-          verifierId: string;
-          verifierRevision: string;
-        } }).identity;
+        const identity = (
+          JSON.parse(saved.payload) as {
+            identity: {
+              revisionSha256: string;
+              actionGraphSha256: string;
+              compilerRevision: string;
+              contractRevision: string;
+              verifierId: string;
+              verifierRevision: string;
+            };
+          }
+        ).identity;
         return {
           kind: 'CURRENT',
           taskId,

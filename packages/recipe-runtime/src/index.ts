@@ -2,10 +2,7 @@
 // and the real, policy-backed ActionController. This is not an HTTP endpoint,
 // Recipe promotion surface, grant issuer or execution service.
 import { ActionController } from '@shun/authorization';
-import {
-  type TrustedRecipeHost,
-  TrustedRecipeReadService,
-} from '@shun/resolver';
+import { type TrustedRecipeHost, TrustedRecipeReadService } from '@shun/resolver';
 import { ImmutableRecipeRepository, ShunStore } from '@shun/store';
 
 /** Actual host-only ports: trusted currentness and a host-derived plan. */
