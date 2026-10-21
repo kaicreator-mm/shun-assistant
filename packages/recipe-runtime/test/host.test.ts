@@ -269,9 +269,9 @@ describe('T04 real SQLite Recipe host + actual ActionController read-only bounda
   it('rejects absent backend instead of producing an unguarded effect capability', () => {
     const f = fixture();
     const h = f.attach(f.getStore());
-    expect(() =>
-      createSqliteRecipeEffectHost({ ...h.host, backend: {} as never }),
-    ).toThrow(/^RECIPE_EFFECT_HOST_CONFIGURATION_REFUSED$/);
+    expect(() => createSqliteRecipeEffectHost({ ...h.host, backend: {} as never })).toThrow(
+      /^RECIPE_EFFECT_HOST_CONFIGURATION_REFUSED$/,
+    );
   });
 
   it('refuses fake store/controller and hostile getters without leaking details', () => {
