@@ -63,11 +63,9 @@ describe('T04 SQLite pre-effect journal: source-only durable reservation', () =>
           code: 'RECONCILE_REQUIRED',
         });
         const digest = '1'.repeat(64);
-        expect(afterRestart.recordObservation(
-          action,
-          'OBSERVED_NOT_SEMANTICALLY_VERIFIED',
-          digest,
-        )).toBe(true);
+        expect(
+          afterRestart.recordObservation(action, 'OBSERVED_NOT_SEMANTICALLY_VERIFIED', digest),
+        ).toBe(true);
         expect(afterRestart.lookup(action)).toEqual({
           ok: true,
           state: 'OBSERVED_NOT_SEMANTICALLY_VERIFIED',
@@ -75,11 +73,9 @@ describe('T04 SQLite pre-effect journal: source-only durable reservation', () =>
           semanticVerified: false,
         });
         // Matching observation is idempotent; conflicting proof is refused.
-        expect(afterRestart.recordObservation(
-          action,
-          'OBSERVED_NOT_SEMANTICALLY_VERIFIED',
-          digest,
-        )).toBe(true);
+        expect(
+          afterRestart.recordObservation(action, 'OBSERVED_NOT_SEMANTICALLY_VERIFIED', digest),
+        ).toBe(true);
         expect(afterRestart.recordObservation(action, 'UNCERTAIN', '2'.repeat(64))).toBe(false);
         expect(afterRestart.reserve(action)).toEqual({
           ok: false,
@@ -89,8 +85,16 @@ describe('T04 SQLite pre-effect journal: source-only durable reservation', () =>
         await reopened.close();
       }
     } finally {
-      try { await a.close(); } catch { /* already closed */ }
-      try { await b.close(); } catch { /* already closed */ }
+      try {
+        await a.close();
+      } catch {
+        /* already closed */
+      }
+      try {
+        await b.close();
+      } catch {
+        /* already closed */
+      }
       rmSync(dir, { recursive: true, force: true });
     }
   });
