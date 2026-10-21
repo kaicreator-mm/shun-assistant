@@ -27,7 +27,8 @@ function intentOf(raw: unknown): { action: AuthorizedAction; digest: string } | 
     action.action.op !== 'file.search' ||
     action.action.sideEffectClass !== 'R0' ||
     action.action.requiredPrivilege !== 'USER'
-  ) return null;
+  )
+    return null;
   return {
     action,
     digest: createHash('sha256').update(canonicalJson(action)).digest('hex'),
@@ -76,9 +77,11 @@ export class SqliteR0EffectJournal {
     const db = this.store.database;
     try {
       db.exec('BEGIN IMMEDIATE');
-      const existing = db.prepare(
-        'SELECT intent_hash, state, receipt_sha256 FROM recipe_r0_effect_journal_v02 WHERE task_id=? AND action_id=?',
-      ).get(action.taskId, action.actionId) as Row | undefined;
+      const existing = db
+        .prepare(
+          'SELECT intent_hash, state, receipt_sha256 FROM recipe_r0_effect_journal_v02 WHERE task_id=? AND action_id=?',
+        )
+        .get(action.taskId, action.actionId) as Row | undefined;
       if (existing) {
         db.exec('ROLLBACK');
         // The same attempt is never auto-replayed after STARTED, even
@@ -102,22 +105,23 @@ export class SqliteR0EffectJournal {
    * The private reconciler may record its bounded observation, but the
    * ledger never upgrades it to semantic PASS or re-authorizes execution.
    */
-  recordObservation(
-    raw: unknown,
-    state: TerminalObservation,
-    receiptSha256: string,
-  ): boolean {
+  recordObservation(raw: unknown, state: TerminalObservation, receiptSha256: string): boolean {
     const intent = intentOf(raw);
-    if (!intent || !validReceiptHash(receiptSha256) ||
-      (state !== 'OBSERVED_NOT_SEMANTICALLY_VERIFIED' && state !== 'UNCERTAIN'))
+    if (
+      !intent ||
+      !validReceiptHash(receiptSha256) ||
+      (state !== 'OBSERVED_NOT_SEMANTICALLY_VERIFIED' && state !== 'UNCERTAIN')
+    )
       return false;
     const db = this.store.database;
     try {
       db.exec('BEGIN IMMEDIATE');
       const { action, digest } = intent;
-      const existing = db.prepare(
-        'SELECT intent_hash, state, receipt_sha256 FROM recipe_r0_effect_journal_v02 WHERE task_id=? AND action_id=?',
-      ).get(action.taskId, action.actionId) as Row | undefined;
+      const existing = db
+        .prepare(
+          'SELECT intent_hash, state, receipt_sha256 FROM recipe_r0_effect_journal_v02 WHERE task_id=? AND action_id=?',
+        )
+        .get(action.taskId, action.actionId) as Row | undefined;
       if (!existing || existing.intent_hash !== digest) {
         db.exec('ROLLBACK');
         return false;
@@ -141,15 +145,18 @@ export class SqliteR0EffectJournal {
     const intent = intentOf(raw);
     if (!intent) return { ok: false, code: 'JOURNAL_REFUSED' };
     try {
-      const row = this.store.database.prepare(
-        'SELECT intent_hash, state, receipt_sha256 FROM recipe_r0_effect_journal_v02 WHERE task_id=? AND action_id=?',
-      ).get(intent.action.taskId, intent.action.actionId) as Row | undefined;
+      const row = this.store.database
+        .prepare(
+          'SELECT intent_hash, state, receipt_sha256 FROM recipe_r0_effect_journal_v02 WHERE task_id=? AND action_id=?',
+        )
+        .get(intent.action.taskId, intent.action.actionId) as Row | undefined;
       if (!row) return { ok: false, code: 'NOT_FOUND' };
       if (
         row.intent_hash !== intent.digest ||
         !['STARTED', 'OBSERVED_NOT_SEMANTICALLY_VERIFIED', 'UNCERTAIN'].includes(row.state) ||
         (row.receipt_sha256 !== null && !validReceiptHash(row.receipt_sha256))
-      ) return { ok: false, code: 'JOURNAL_REFUSED' };
+      )
+        return { ok: false, code: 'JOURNAL_REFUSED' };
       return {
         ok: true,
         state: row.state as JournalState,
