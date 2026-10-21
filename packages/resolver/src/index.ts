@@ -11,6 +11,11 @@ export {
   BoundedActiveRecipeResolver,
   type TrustedActiveRecipeAuthority,
 } from './active-recipe-resolver.ts';
+export {
+  type ReadonlyRecipeEffectOutcome,
+  type TrustedReadonlyEffectHost,
+  TrustedReadonlyRecipeEffectRunner,
+} from './recipe-effect-runner.ts';
 export * from './feasibility.ts';
 export * from './gates.ts';
 // T04 private host-only composition; no source execution, grant or effect port.
