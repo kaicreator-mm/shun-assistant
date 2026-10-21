@@ -5,7 +5,11 @@ import { ActionController, AuthorizationAuthority } from '@shun/authorization';
 import { type ActionPlan, computePlanHash } from '@shun/contracts';
 import { ShunStore, ShunStoreAuthorizationAdapter } from '@shun/store';
 import { afterEach, describe, expect, it } from 'vitest';
-import { createSqliteRecipeReadService, type SqliteRecipeHostOptions } from '../src/index.ts';
+import {
+  createSqliteRecipeEffectHost,
+  createSqliteRecipeReadService,
+  type SqliteRecipeHostOptions,
+} from '../src/index.ts';
 
 const config = {
   recipeId: 'recipe-1',
@@ -138,6 +142,8 @@ function fixture() {
     const service = createSqliteRecipeReadService(host);
     return {
       service,
+      controller,
+      host,
       adapter,
       attachRevision: (id: typeof revision) => {
         revision = id;
@@ -222,6 +228,50 @@ describe('T04 real SQLite Recipe host + actual ActionController read-only bounda
         revisionSha256: saved.revisionSha256,
       }),
     ).toMatchObject({ ok: false, code: 'RECIPE_CURRENTNESS_UNKNOWN' });
+  });
+
+  it('routes actual SQLite Recipe preview to real ActionController before ANY backend effect', async () => {
+    const f = fixture();
+    const h = f.attach(f.getStore());
+    const saved = h.service.registerLiteral(source, config);
+    if (!saved.ok) throw new Error('fixture register failed');
+    h.attachRevision(saved);
+    let dispatched = 0;
+    const live = createSqliteRecipeEffectHost({
+      ...h.host,
+      backend: {
+        execute: async () => {
+          dispatched++;
+          throw new Error('unexpected execution');
+        },
+      },
+    });
+    expect(
+      await live.runner.run({
+        taskId: 'task-1',
+        recipeId: saved.recipeId,
+        revisionSha256: saved.revisionSha256,
+      }),
+    ).toEqual({ ok: false, code: 'RECIPE_AUTHORIZATION_REFUSED' });
+    expect(dispatched).toBe(0);
+    expect(await h.adapter.hasAnyGrant()).toBe(false);
+    f.invalidate();
+    expect(
+      await live.runner.run({
+        taskId: 'task-1',
+        recipeId: saved.recipeId,
+        revisionSha256: saved.revisionSha256,
+      }),
+    ).toEqual({ ok: false, code: 'RECIPE_NOT_CURRENT' });
+    expect(dispatched).toBe(0);
+  });
+
+  it('rejects absent backend instead of producing an unguarded effect capability', () => {
+    const f = fixture();
+    const h = f.attach(f.getStore());
+    expect(() => createSqliteRecipeEffectHost({ ...h.host, backend: {} as never })).toThrow(
+      /^RECIPE_EFFECT_HOST_CONFIGURATION_REFUSED$/,
+    );
   });
 
   it('refuses fake store/controller and hostile getters without leaking details', () => {
