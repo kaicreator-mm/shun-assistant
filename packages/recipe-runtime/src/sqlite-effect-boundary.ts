@@ -72,7 +72,8 @@ export class SqliteReadonlySearchAuthorizationBoundary {
         !(config?.controller instanceof ActionController) ||
         typeof config.loadPlanByHash !== 'function' ||
         typeof config.executeScopedSearch !== 'function'
-      ) throw new Error('RECIPE_BOUNDARY_CONFIGURATION_REFUSED');
+      )
+        throw new Error('RECIPE_BOUNDARY_CONFIGURATION_REFUSED');
       this.store = new ShunStoreAuthorizationAdapter(config.store);
       this.controller = config.controller;
       this.loadPlanByHash = config.loadPlanByHash.bind(config);
@@ -85,7 +86,8 @@ export class SqliteReadonlySearchAuthorizationBoundary {
   async execute(presentation: AuthorizedAction): Promise<unknown> {
     try {
       const parsed = AuthorizedActionSchema.safeParse(presentation);
-      if (!parsed.success) throw new Error('RECIPE_EFFECT_BOUNDARY_REFUSED');
+      if (!parsed.success)
+        throw new Error('RECIPE_EFFECT_BOUNDARY_REFUSED');
       const action = parsed.data;
       if (action.authorizationKind === 'EXPLICIT_APPROVAL') {
         // The controller independently confirms this route's provenance.

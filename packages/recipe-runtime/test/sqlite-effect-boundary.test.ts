@@ -2,11 +2,7 @@ import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { ActionController, AuthorizationAuthority } from '@shun/authorization';
-import {
-  type ActionPlan,
-  type AuthorizedAction,
-  computePlanHash,
-} from '@shun/contracts';
+import { type ActionPlan, type AuthorizedAction, computePlanHash } from '@shun/contracts';
 import { ShunStore, ShunStoreAuthorizationAdapter } from '@shun/store';
 import { afterEach, describe, expect, it } from 'vitest';
 import { SqliteReadonlySearchAuthorizationBoundary } from '../src/sqlite-effect-boundary.ts';
@@ -26,15 +22,17 @@ function validPlan(): ActionPlan {
     recipeRef: `r1@${'b'.repeat(64)}`,
     rankingPolicyRevision: 'rank-1',
     policySnapshotRevision: 'policy-1',
-    actions: [{
-      actionId: 'search-1',
-      bindingRef: 'binding-1',
-      op: 'file.search',
-      parameters: { root, query: '*.txt' },
-      sideEffectClass: 'R0',
-      requiredPrivilege: 'USER',
-      filesystemScope: { read: [root], write: [] },
-    }],
+    actions: [
+      {
+        actionId: 'search-1',
+        bindingRef: 'binding-1',
+        op: 'file.search',
+        parameters: { root, query: '*.txt' },
+        sideEffectClass: 'R0',
+        requiredPrivilege: 'USER',
+        filesystemScope: { read: [root], write: [] },
+      },
+    ],
     verificationPlan: {
       verifierId: 'v1',
       verifierRevision: '1',
@@ -71,14 +69,16 @@ async function world() {
     authorityId: 'auth-1',
     authorityRevision: 'rev-1',
     revokedGrantIds: [],
-    rules: [{
-      ruleId: 'rule-search-1',
-      capabilityId: 'file.search',
-      op: 'file.search',
-      maxRiskClass: 'R0',
-      privilegeLevel: 'USER',
-      filesystem: { read: [root], write: [] },
-    }],
+    rules: [
+      {
+        ruleId: 'rule-search-1',
+        capabilityId: 'file.search',
+        op: 'file.search',
+        maxRiskClass: 'R0',
+        privilegeLevel: 'USER',
+        filesystem: { read: [root], write: [] },
+      },
+    ],
     riskGuards: [],
     updatedAt: now,
   });
@@ -92,7 +92,11 @@ async function world() {
   const controller = new ActionController({
     authority,
     policyState: adapter,
-    approvals: { requestApproval: async () => { throw new Error('approval not allowed'); } },
+    approvals: {
+      requestApproval: async () => {
+        throw new Error('approval not allowed');
+      },
+    },
     issuanceSecret: 'private-issuance-key',
     clock: () => now,
   });
@@ -106,16 +110,22 @@ async function world() {
   const backend = new SqliteReadonlySearchAuthorizationBoundary({
     store,
     controller,
-    loadPlanByHash: async () => brokenPlan ? { ...plan, planHash: '0'.repeat(64) } : plan,
+    loadPlanByHash: async () => (brokenPlan ? { ...plan, planHash: '0'.repeat(64) } : plan),
     executeScopedSearch: async () => {
       dispatches++;
       return { source: 'trusted private effect port' };
     },
   });
   return {
-    store,adapter,plan,action,backend,
+    store,
+    adapter,
+    plan,
+    action,
+    backend,
     count: () => dispatches,
-    wrongPlan: () => { brokenPlan = true; },
+    wrongPlan: () => {
+      brokenPlan = true;
+    },
   };
 }
 
@@ -124,7 +134,7 @@ describe('T04 real SQLite durable effect authorization before read-only dispatch
     const v = await world();
     expect(await v.backend.execute(v.action)).toEqual({ source: 'trusted private effect port' });
     expect(v.count()).toBe(1);
-    expect((await v.adapter.get(v.action.authorizationRef))).toMatchObject({
+    expect(await v.adapter.get(v.action.authorizationRef)).toMatchObject({
       grantId: v.action.authorizationRef,
     });
   });
@@ -164,11 +174,14 @@ describe('T04 real SQLite durable effect authorization before read-only dispatch
 
   it('fails closed on missing true host controller/store instead of trusting structural fakes', async () => {
     const v = await world();
-    expect(() => new SqliteReadonlySearchAuthorizationBoundary({
-      store: v.store,
-      controller: {} as ActionController,
-      loadPlanByHash: async () => v.plan,
-      executeScopedSearch: async () => null,
-    })).toThrow(/^RECIPE_BOUNDARY_CONFIGURATION_REFUSED$/);
+    expect(
+      () =>
+        new SqliteReadonlySearchAuthorizationBoundary({
+          store: v.store,
+          controller: {} as ActionController,
+          loadPlanByHash: async () => v.plan,
+          executeScopedSearch: async () => null,
+        }),
+    ).toThrow(/^RECIPE_BOUNDARY_CONFIGURATION_REFUSED$/);
   });
 });
