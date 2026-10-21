@@ -2,6 +2,10 @@
 // and the real, policy-backed ActionController. This is not an HTTP endpoint,
 // Recipe promotion surface, grant issuer or execution service.
 import { ActionController } from '@shun/authorization';
+import {
+  SqliteReadonlySearchAuthorizationBoundary,
+  type SqliteReadonlySearchGateConfig,
+} from './sqlite-effect-boundary.ts';
 import type { AuthorizedAction } from '@shun/contracts';
 import {
   TrustedReadonlyRecipeEffectRunner,
@@ -92,6 +96,47 @@ export function createSqliteRecipeEffectHost(options: SqliteRecipeEffectHostOpti
     };
   } catch {
     // Never leak trusted policy, DB paths, grants, file paths or host errors.
+    throw new Error('RECIPE_EFFECT_HOST_CONFIGURATION_REFUSED');
+  }
+}
+
+
+/**
+ * Private-host-only composition of the two independently reviewed T04 seams:
+ *   SQLite Recipe preview + REAL ActionController plan authorization
+ *   -> persisted SQLite Grant + immutable plan reload + REAL effect reentry.
+ *
+ * A raw backend cannot be supplied to this composition; only the trusted
+ * host's *restricted* R0 file.search port crosses the final boundary.
+ * This is NOT a Windows filesystem implementation, semantic verifier, or
+ * a cross-process exactly-once journal. T04 remains open until those proofs.
+ */
+export type SqliteAuthorizedRecipeEffectHostOptions = SqliteRecipeHostOptions &
+  Readonly<{
+    loadPlanByHash: SqliteReadonlySearchGateConfig['loadPlanByHash'];
+    executeScopedSearch: SqliteReadonlySearchGateConfig['executeScopedSearch'];
+  }>;
+
+export function createSqliteAuthorizedRecipeEffectHost(
+  options: SqliteAuthorizedRecipeEffectHostOptions,
+): ReturnType<typeof createSqliteRecipeEffectHost> {
+  try {
+    // An untrusted caller cannot replace the backend or present a grant. All
+    // capabilities here must be constructed within Shun's private host.
+    const gate = new SqliteReadonlySearchAuthorizationBoundary({
+      store: options.store,
+      controller: options.controller,
+      loadPlanByHash: options.loadPlanByHash,
+      executeScopedSearch: options.executeScopedSearch,
+    });
+    return createSqliteRecipeEffectHost({
+      store: options.store,
+      controller: options.controller,
+      currentness: options.currentness,
+      loadExpectedPlan: options.loadExpectedPlan,
+      backend: gate,
+    });
+  } catch {
     throw new Error('RECIPE_EFFECT_HOST_CONFIGURATION_REFUSED');
   }
 }
