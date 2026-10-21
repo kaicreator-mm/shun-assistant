@@ -297,14 +297,16 @@ describe('T04 real SQLite Recipe host + actual ActionController read-only bounda
       authorityId: 'auth-1',
       authorityRevision: 'rev-1',
       revokedGrantIds: [],
-      rules: [{
-        ruleId: 'allow-single-R0',
-        capabilityId: 'file.search',
-        op: 'file.search',
-        maxRiskClass: 'R0',
-        privilegeLevel: 'USER',
-        filesystem: { read: ['C:/approved'], write: [] },
-      }],
+      rules: [
+        {
+          ruleId: 'allow-single-R0',
+          capabilityId: 'file.search',
+          op: 'file.search',
+          maxRiskClass: 'R0',
+          privilegeLevel: 'USER',
+          filesystem: { read: ['C:/approved'], write: [] },
+        },
+      ],
       riskGuards: [],
       updatedAt: '2026-10-22T00:00:00.000Z',
     });
@@ -313,8 +315,7 @@ describe('T04 real SQLite Recipe host + actual ActionController read-only bounda
     const live = createSqliteAuthorizedRecipeEffectHost({
       ...h.host,
       loadPlanByHash: async (hash) =>
-        hash !== plan.planHash ? null :
-          corruptPlan ? { ...plan, planHash: '0'.repeat(64) } : plan,
+        hash !== plan.planHash ? null : corruptPlan ? { ...plan, planHash: '0'.repeat(64) } : plan,
       executeScopedSearch: async (action) => {
         calls++;
         // Deliberately synthetic: NOT an installed Windows filesystem receipt.
