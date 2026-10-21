@@ -67,7 +67,7 @@ function wildcardMatch(name: string, pattern: string): boolean {
   previous[0] = true;
   for (const ch of p) {
     const current = new Array<boolean>(n.length + 1).fill(false);
-    if (ch === '*') current[0] = previous[0];
+    if (ch === '*') current[0] = previous[0] ?? false;
     for (let i = 1; i <= n.length; i++) {
       current[i] =
         ch === '*'
