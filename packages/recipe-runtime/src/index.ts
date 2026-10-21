@@ -2,10 +2,6 @@
 // and the real, policy-backed ActionController. This is not an HTTP endpoint,
 // Recipe promotion surface, grant issuer or execution service.
 import { ActionController } from '@shun/authorization';
-import {
-  SqliteReadonlySearchAuthorizationBoundary,
-  type SqliteReadonlySearchGateConfig,
-} from './sqlite-effect-boundary.ts';
 import type { AuthorizedAction } from '@shun/contracts';
 import {
   TrustedReadonlyRecipeEffectRunner,
@@ -13,6 +9,10 @@ import {
   TrustedRecipeReadService,
 } from '@shun/resolver';
 import { ImmutableRecipeRepository, ShunStore } from '@shun/store';
+import {
+  SqliteReadonlySearchAuthorizationBoundary,
+  type SqliteReadonlySearchGateConfig,
+} from './sqlite-effect-boundary.ts';
 
 /** Actual host-only ports: trusted currentness and a host-derived plan. */
 export type SqliteRecipeHostOptions = Readonly<{
@@ -99,7 +99,6 @@ export function createSqliteRecipeEffectHost(options: SqliteRecipeEffectHostOpti
     throw new Error('RECIPE_EFFECT_HOST_CONFIGURATION_REFUSED');
   }
 }
-
 
 /**
  * Private-host-only composition of the two independently reviewed T04 seams:
