@@ -71,6 +71,9 @@ function fixture() {
   let changedPlan = false;
   let expectedReads = 0;
   let wrongGrant = false;
+  let extraScope = false;
+  let wrongActionPolicy = false;
+  let wrongDeclaredEffects = false;
   let crashBackend = false;
   let blockAuthorization: (() => void) | undefined;
   const gate = new Promise<void>((resolve) => {
@@ -80,7 +83,11 @@ function fixture() {
   const host: TrustedReadonlyEffectHost = {
     previewExact: () => {
       events.push('preview');
-      return recipeRevoked ? { ok: false, code: 'RECIPE_CURRENTNESS_STALE' } : preview();
+      if (recipeRevoked) return { ok: false, code: 'RECIPE_CURRENTNESS_STALE' };
+      const snapshot = preview();
+      if (wrongDeclaredEffects && snapshot.ok)
+        snapshot.declaredEffects = ['file.search', 'file.copy'];
+      return snapshot;
     },
     loadExpectedPlan: () => {
       events.push('expected');
@@ -103,7 +110,7 @@ function fixture() {
           taskId: p.taskId,
           actionId: p.actions[0]!.actionId,
           planHash: p.planHash,
-          policySnapshotRevision: p.policySnapshotRevision,
+          policySnapshotRevision: wrongActionPolicy ? 'forged-policy' : p.policySnapshotRevision,
           authorizationKind: 'AUTOMATIC' as const,
           authorizationRef: 'grant-1',
           expiresAt: '2026-10-20T00:00:00.000Z',
@@ -119,6 +126,7 @@ function fixture() {
             actionIds: [action.actionId],
             privilegeLevel: 'USER' as const,
             filesystem: { read: ['C:/safe'], write: [] },
+            ...(extraScope ? { network: { allowed: true } } : {}),
           },
           issuedAt: now,
           expiresAt: '2026-10-20T00:00:00.000Z',
@@ -170,6 +178,15 @@ function fixture() {
     },
     forgeGrant: () => {
       wrongGrant = true;
+    },
+    addScope: () => {
+      extraScope = true;
+    },
+    driftAuthorizedPolicy: () => {
+      wrongActionPolicy = true;
+    },
+    changeDeclaredEffects: () => {
+      wrongDeclaredEffects = true;
     },
     crash: () => {
       crashBackend = true;
@@ -223,6 +240,30 @@ describe('T04 real authorization reentry before read-only Recipe effect', () => 
   it('refuses forged grant/action binding before per-effect gate', async () => {
     const x = fixture();
     x.forgeGrant();
+    expect(await x.runner.run(ids)).toEqual({ ok: false, code: 'RECIPE_AUTHORIZATION_REFUSED' });
+    expect(x.events).not.toContain('effect');
+    expect(x.events).not.toContain('execute');
+  });
+
+  it('rejects untrusted extra declared effects before requesting any authorization', async () => {
+    const x = fixture();
+    x.changeDeclaredEffects();
+    expect(await x.runner.run(ids)).toEqual({ ok: false, code: 'RECIPE_PLAN_REFUSED' });
+    expect(x.events).not.toContain('plan');
+    expect(x.events).not.toContain('execute');
+  });
+
+  it('rejects extra grant network scope without effect or execution', async () => {
+    const x = fixture();
+    x.addScope();
+    expect(await x.runner.run(ids)).toEqual({ ok: false, code: 'RECIPE_AUTHORIZATION_REFUSED' });
+    expect(x.events).not.toContain('effect');
+    expect(x.events).not.toContain('execute');
+  });
+
+  it('rejects mismatched authorized action policy revision before effect gate', async () => {
+    const x = fixture();
+    x.driftAuthorizedPolicy();
     expect(await x.runner.run(ids)).toEqual({ ok: false, code: 'RECIPE_AUTHORIZATION_REFUSED' });
     expect(x.events).not.toContain('effect');
     expect(x.events).not.toContain('execute');

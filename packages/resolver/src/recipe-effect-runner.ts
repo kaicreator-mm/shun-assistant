@@ -76,6 +76,7 @@ function safePlan(
     !action ||
     preview.actionGraph.nodes.length !== 1 ||
     preview.actionGraph.edges.length !== 0 ||
+    canonicalJson(preview.declaredEffects) !== canonicalJson(['file.search']) ||
     !node ||
     node.op !== 'file.search' ||
     action.actionId !== node.actionId ||
@@ -206,11 +207,18 @@ export class TrustedReadonlyRecipeEffectRunner {
         action.data.taskId !== firstPlan.taskId ||
         action.data.actionId !== firstPlan.actions[0]?.actionId ||
         action.data.planHash !== firstPlan.planHash ||
+        action.data.policySnapshotRevision !== firstPlan.policySnapshotRevision ||
+        action.data.policySnapshotRevision !== grant.data.policySnapshotRevision ||
         action.data.authorizationRef !== grant.data.grantId ||
+        (action.data.authorizationKind === 'EXPLICIT_APPROVAL' && !grant.data.approvalRef) ||
+        (action.data.expiresAt !== undefined &&
+          Date.parse(action.data.expiresAt) > Date.parse(grant.data.expiresAt)) ||
         canonicalJson(action.data.action) !== canonicalJson(firstPlan.actions[0]) ||
         grant.data.taskId !== firstPlan.taskId ||
         grant.data.planHash !== firstPlan.planHash ||
         grant.data.actionScope.privilegeLevel !== 'USER' ||
+        grant.data.actionScope.network !== undefined ||
+        grant.data.actionScope.registry !== undefined ||
         canonicalJson(grant.data.actionScope.actionIds) !== canonicalJson([action.data.actionId]) ||
         canonicalJson(grant.data.actionScope.filesystem) !==
           canonicalJson({ read: firstPlan.actions[0]?.filesystemScope?.read, write: [] })
