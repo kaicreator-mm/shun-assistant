@@ -1,7 +1,7 @@
-import { mkdtempSync, mkdirSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { AuthorizedActionSchema, type AuthorizedAction } from '@shun/contracts';
+import { type AuthorizedAction, AuthorizedActionSchema } from '@shun/contracts';
 import { afterEach, describe, expect, it } from 'vitest';
 import { observeScopedFileSearch } from '../src/scoped-file-search.ts';
 
@@ -87,7 +87,11 @@ describe('T04 trusted R0 local filesystem observation (not grant issuer/receipt)
     mkdirSync(target);
     writeFileSync(join(target, 'secret.txt'), 'never disclose');
     try {
-      symlinkSync(target, join(root, 'nested', 'escape'), process.platform === 'win32' ? 'junction' : 'dir');
+      symlinkSync(
+        target,
+        join(root, 'nested', 'escape'),
+        process.platform === 'win32' ? 'junction' : 'dir',
+      );
     } catch (err) {
       // A Windows runner without symlink privileges cannot prove this physical canary.
       if ((err as NodeJS.ErrnoException).code === 'EPERM') return;
