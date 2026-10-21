@@ -86,8 +86,7 @@ export class SqliteReadonlySearchAuthorizationBoundary {
   async execute(presentation: AuthorizedAction): Promise<unknown> {
     try {
       const parsed = AuthorizedActionSchema.safeParse(presentation);
-      if (!parsed.success)
-        throw new Error('RECIPE_EFFECT_BOUNDARY_REFUSED');
+      if (!parsed.success) throw new Error('RECIPE_EFFECT_BOUNDARY_REFUSED');
       const action = parsed.data;
       if (action.authorizationKind === 'EXPLICIT_APPROVAL') {
         // The controller independently confirms this route's provenance.
@@ -107,7 +106,8 @@ export class SqliteReadonlySearchAuthorizationBoundary {
         stored.data.grant.planHash !== action.planHash ||
         computePlanHash(planRecord.data) !== planRecord.data.planHash ||
         !exactR0Search(planRecord.data, action)
-      ) throw new Error('RECIPE_EFFECT_BOUNDARY_REFUSED');
+      )
+        throw new Error('RECIPE_EFFECT_BOUNDARY_REFUSED');
       const verdict = await this.controller.authorizeEffect({
         plan: planRecord.data,
         action,
