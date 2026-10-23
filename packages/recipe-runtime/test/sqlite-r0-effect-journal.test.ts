@@ -99,6 +99,36 @@ describe('T04 SQLite pre-effect journal: source-only durable reservation', () =>
     }
   });
 
+  it('refuses in-memory SQLite and does not forge durable STARTED', async () => {
+    const volatile = new ShunStore({ file: ':memory:' });
+    try {
+      expect(() => new SqliteR0EffectJournal(volatile)).toThrow(
+        'R0_JOURNAL_CONFIGURATION_REFUSED',
+      );
+    } finally {
+      await volatile.close();
+    }
+  });
+
+  it('refuses a file database whose synchronous durability guarantee was downgraded', async () => {
+    const dir = mkdtempSync(join(tmpdir(), 'shun-r0-weak-mode-'));
+    const db = new ShunStore({ file: join(dir, 'shun.sqlite') });
+    try {
+      const journal = new SqliteR0EffectJournal(db);
+      db.database.exec('PRAGMA synchronous = OFF');
+      expect(journal.reserve(actionOf())).toEqual({ ok: false, code: 'JOURNAL_REFUSED' });
+      db.database.exec('PRAGMA synchronous = FULL');
+      expect(journal.reserve(actionOf())).toEqual({
+        ok: true,
+        state: 'DURABLY_RESERVED',
+        semanticVerified: false,
+      });
+    } finally {
+      await db.close();
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
   it('refuses a fake action and never mints a new grant or semantic PASS', async () => {
     const dir = mkdtempSync(join(tmpdir(), 'shun-r0-deny-'));
     const db = new ShunStore({ file: join(dir, 'shun.sqlite') });
