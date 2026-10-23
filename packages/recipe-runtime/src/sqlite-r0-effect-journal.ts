@@ -189,9 +189,9 @@ export class SqliteR0EffectJournal {
     if (
       !file ||
       !isAbsolute(file) ||
-      file.startsWith('\\\\\\\\') ||
+      file.startsWith('\\\\') ||
       file.startsWith('//') ||
-      file.includes('\\0')
+      file.includes('\0')
     )
       return null;
     return file;
