@@ -102,9 +102,7 @@ describe('T04 SQLite pre-effect journal: source-only durable reservation', () =>
   it('refuses in-memory SQLite and does not forge durable STARTED', async () => {
     const volatile = new ShunStore({ file: ':memory:' });
     try {
-      expect(() => new SqliteR0EffectJournal(volatile)).toThrow(
-        'R0_JOURNAL_CONFIGURATION_REFUSED',
-      );
+      expect(() => new SqliteR0EffectJournal(volatile)).toThrow('R0_JOURNAL_CONFIGURATION_REFUSED');
     } finally {
       await volatile.close();
     }
