@@ -192,7 +192,8 @@ export class SqliteR0EffectJournal {
       file.startsWith('\\\\\\\\') ||
       file.startsWith('//') ||
       file.includes('\\0')
-    ) return null;
+    )
+      return null;
     return file;
   }
 
