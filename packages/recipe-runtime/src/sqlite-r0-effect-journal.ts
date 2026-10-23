@@ -46,6 +46,18 @@ function validReceiptHash(hash: unknown): hash is string {
  * across processes. It records an immutable pre-effect reservation; it cannot
  * retrospectively prove whether an interrupted OS effect ran.
  */
+/** Private-to-recipe-runtime SQLite admission: no volatile file/UNC/NUL alias. */
+export function isSafeJournalMainFile(file: string | undefined): file is string {
+  return (
+    typeof file === 'string' &&
+    file.length > 0 &&
+    isAbsolute(file) &&
+    !file.startsWith('\\\\') &&
+    !file.startsWith('//') &&
+    !file.includes('\\0')
+  );
+}
+
 export class SqliteR0EffectJournal {
   private readonly store: ShunStore;
   private readonly backingFile: string;
@@ -186,15 +198,7 @@ export class SqliteR0EffectJournal {
       file: string;
     }>;
     const file = rows.find((row) => row.name === 'main')?.file;
-    if (
-      !file ||
-      !isAbsolute(file) ||
-      file.startsWith('\\\\') ||
-      file.startsWith('//') ||
-      file.includes('\0')
-    )
-      return null;
-    return file;
+    return isSafeJournalMainFile(file) ? file : null;
   }
 
   private hasDurableMode(): boolean {
