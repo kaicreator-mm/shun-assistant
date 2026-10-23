@@ -23,15 +23,17 @@ function validPlan(): ActionPlan {
     recipeRef: `r1@${'b'.repeat(64)}`,
     rankingPolicyRevision: 'rank-1',
     policySnapshotRevision: 'policy-1',
-    actions: [{
-      actionId: 'search-1',
-      bindingRef: 'binding-1',
-      op: 'file.search',
-      parameters: { root, query: '*.txt' },
-      sideEffectClass: 'R0',
-      requiredPrivilege: 'USER',
-      filesystemScope: { read: [root], write: [] },
-    }],
+    actions: [
+      {
+        actionId: 'search-1',
+        bindingRef: 'binding-1',
+        op: 'file.search',
+        parameters: { root, query: '*.txt' },
+        sideEffectClass: 'R0',
+        requiredPrivilege: 'USER',
+        filesystemScope: { read: [root], write: [] },
+      },
+    ],
     verificationPlan: {
       verifierId: 'v1',
       verifierRevision: '1',
@@ -69,14 +71,16 @@ async function setup() {
     authorityId: 'auth-1',
     authorityRevision: 'rev-1',
     revokedGrantIds: [],
-    rules: [{
-      ruleId: 'allow-single-search',
-      capabilityId: 'file.search',
-      op: 'file.search',
-      maxRiskClass: 'R0',
-      privilegeLevel: 'USER',
-      filesystem: { read: [root], write: [] },
-    }],
+    rules: [
+      {
+        ruleId: 'allow-single-search',
+        capabilityId: 'file.search',
+        op: 'file.search',
+        maxRiskClass: 'R0',
+        privilegeLevel: 'USER',
+        filesystem: { read: [root], write: [] },
+      },
+    ],
     riskGuards: [],
     updatedAt: timestamp,
   });
@@ -90,7 +94,11 @@ async function setup() {
   const controller = new ActionController({
     authority,
     policyState: adapter,
-    approvals: { requestApproval: async () => { throw new Error('approval cannot be reached'); } },
+    approvals: {
+      requestApproval: async () => {
+        throw new Error('approval cannot be reached');
+      },
+    },
     issuanceSecret: 'private-test-issuance',
     clock: () => timestamp,
   });
@@ -147,7 +155,7 @@ describe('T04 composed real SQLite grant gate + durable journal (synthetic OS re
     const gate = new SqliteJournaledSearchAuthorizationBoundary({
       store: x.store,
       controller: x.controller,
-      loadPlanByHash: async () => broken ? { ...x.plan, planHash: '0'.repeat(64) } : x.plan,
+      loadPlanByHash: async () => (broken ? { ...x.plan, planHash: '0'.repeat(64) } : x.plan),
       executeScopedSearch,
     });
     await expect(gate.execute(x.action)).rejects.toThrow('RECIPE_EFFECT_BOUNDARY_REFUSED');
@@ -197,18 +205,24 @@ describe('T04 composed real SQLite grant gate + durable journal (synthetic OS re
     const ephemeral = new ShunStore({ file: ':memory:' });
     try {
       const x = await setup();
-      expect(() => new SqliteJournaledSearchAuthorizationBoundary({
-        store: ephemeral,
-        controller: x.controller,
-        loadPlanByHash: async () => x.plan,
-        executeScopedSearch: async () => x.receipt,
-      })).toThrow('R0_PRIVATE_BOOTSTRAP_REFUSED');
-      expect(() => new SqliteJournaledSearchAuthorizationBoundary({
-        store: x.store,
-        controller: {} as ActionController,
-        loadPlanByHash: async () => x.plan,
-        executeScopedSearch: async () => x.receipt,
-      })).toThrow('R0_PRIVATE_BOOTSTRAP_REFUSED');
+      expect(
+        () =>
+          new SqliteJournaledSearchAuthorizationBoundary({
+            store: ephemeral,
+            controller: x.controller,
+            loadPlanByHash: async () => x.plan,
+            executeScopedSearch: async () => x.receipt,
+          }),
+      ).toThrow('R0_PRIVATE_BOOTSTRAP_REFUSED');
+      expect(
+        () =>
+          new SqliteJournaledSearchAuthorizationBoundary({
+            store: x.store,
+            controller: {} as ActionController,
+            loadPlanByHash: async () => x.plan,
+            executeScopedSearch: async () => x.receipt,
+          }),
+      ).toThrow('R0_PRIVATE_BOOTSTRAP_REFUSED');
     } finally {
       await ephemeral.close();
     }
