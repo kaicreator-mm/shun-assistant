@@ -4,14 +4,15 @@
 - **Pre-fix reviewed source (R1 BLOCK subject):** `0273709e76a23eab027df07271a3d7f8af559962` (base `version/v0.2.0@3a5cfb6864b190469e5588a10dc597f38409173a`)
 - **Repaired source validated at this exact SHA:** `ee52bdba43682ce57b4e4de938823493de5737eb`
 - **Files:** `packages/recipe-runtime/src/scoped-file-search.ts`, `packages/recipe-runtime/test/scoped-file-search.test.ts` (plus `package.json` / `pnpm-lock.yaml` for the `koffi@3.3.3` runtime dependency required to reach Win32 from Node without a toolchain build)
-- **Gate:** `tools/task-check.sh` exit 0 (`task-check: 全绿`), lint (Biome) and `tsc --noEmit` clean at the SHA above.
+- **Gate:** workspace-level `C:\xDev\kAiCreator\tools\task-check.sh` (not a repo-tracked path) exit 0 (`task-check: 全绿`), lint (Biome) and `tsc --noEmit` clean at the SHA above.
+- **Revision:** host-fact wording corrected per R2 finding P2-03 (the account is an Administrators-group member; the operative canary property is the non-elevated UAC-filtered token, under which every canary was reproduced by the independent reviewer). Per R2 P2-04, root-acquisition hardening (attribute-only bootstrap open, then re-open the verified final path for enumeration) and the physical SMB mapped-drive-root canary are recorded as T04 qualification backlog items.
 
 ## Host facts (physical canary run)
 
 | Item | Value |
 | --- | --- |
 | OS | Microsoft Windows 11 专业版 (Pro), build 26300.9711 |
-| Account | `NILAR\15549` — **not** in Administrators group, non-elevated token (standard user) |
+| Account | `NILAR\15549` — member of the local Administrators group running a **non-elevated (UAC-filtered) token** (Medium integrity, `BUILTIN\Administrators` present as deny-only, `SeCreateSymbolicLinkPrivilege` absent): no symlink creation, junction-only reparse surface. All canaries executed under this token |
 | Node | v24.21.0 (repo `.node-version` 24.21.0) |
 | FFI | koffi 3.3.3 (prebuilt N-API binaries; no install scripts required) |
 
