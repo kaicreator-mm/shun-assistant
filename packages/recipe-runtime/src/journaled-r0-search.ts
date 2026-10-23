@@ -34,12 +34,12 @@ export class JournaledR0SearchCapability {
 
   constructor(options: JournaledR0SearchConfig) {
     if (
-      !options ||
-      !options.journal ||
+      !options?.journal ||
       typeof options.journal.reserve !== 'function' ||
       typeof options.journal.recordObservation !== 'function' ||
       typeof options.effect !== 'function'
-    ) throw new Error('R0_JOURNALED_SEARCH_CONFIG_REFUSED');
+    )
+      throw new Error('R0_JOURNALED_SEARCH_CONFIG_REFUSED');
     this.journal = options.journal;
     this.effect = options.effect;
   }
@@ -58,7 +58,8 @@ export class JournaledR0SearchCapability {
         action.action.networkScope !== undefined ||
         action.action.registryScope !== undefined ||
         (action.action.secretRefs?.length ?? 0) !== 0
-      ) throw new Error(ERROR);
+      )
+        throw new Error(ERROR);
 
       // The *real* journal implementation must durably COMMIT STARTED before
       // this returns. A duplicate or ambiguous previous STARTED never replays.
@@ -99,11 +100,7 @@ export class JournaledR0SearchCapability {
     }
   }
 
-  private tryRecord(
-    action: AuthorizedAction,
-    state: 'UNCERTAIN',
-    digest: string,
-  ): void {
+  private tryRecord(action: AuthorizedAction, state: 'UNCERTAIN', digest: string): void {
     try {
       this.journal.recordObservation(action, state, digest);
     } catch {
