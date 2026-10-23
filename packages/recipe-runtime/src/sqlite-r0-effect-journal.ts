@@ -3,6 +3,7 @@
 // A durable STARTED row that outlives a process is UNKNOWN until a separate
 // reconcile-first verifier proves its effect state; never auto-replay it.
 import { createHash } from 'node:crypto';
+import { isAbsolute } from 'node:path';
 import { type AuthorizedAction, AuthorizedActionSchema, canonicalJson } from '@shun/contracts';
 import { ShunStore } from '@shun/store';
 
@@ -47,11 +48,17 @@ function validReceiptHash(hash: unknown): hash is string {
  */
 export class SqliteR0EffectJournal {
   private readonly store: ShunStore;
+  private readonly backingFile: string;
 
   constructor(store: ShunStore) {
     if (!(store instanceof ShunStore)) throw new Error('R0_JOURNAL_CONFIGURATION_REFUSED');
     this.store = store;
     try {
+      const candidate = this.readBackingFile();
+      if (!candidate || !this.hasDurableMode()) {
+        throw new Error('R0_JOURNAL_CONFIGURATION_REFUSED');
+      }
+      this.backingFile = candidate;
       store.database.exec(`
         CREATE TABLE IF NOT EXISTS recipe_r0_effect_journal_v02 (
           task_id TEXT NOT NULL,
@@ -76,6 +83,9 @@ export class SqliteR0EffectJournal {
     const { action, digest } = intent;
     const db = this.store.database;
     try {
+      if (!this.hasDurableMode() || this.readBackingFile() !== this.backingFile) {
+        return { ok: false, code: 'JOURNAL_REFUSED' };
+      }
       db.exec('BEGIN IMMEDIATE');
       const existing = db
         .prepare(
@@ -115,6 +125,7 @@ export class SqliteR0EffectJournal {
       return false;
     const db = this.store.database;
     try {
+      if (!this.hasDurableMode() || this.readBackingFile() !== this.backingFile) return false;
       db.exec('BEGIN IMMEDIATE');
       const { action, digest } = intent;
       const existing = db
@@ -166,6 +177,33 @@ export class SqliteR0EffectJournal {
     } catch {
       return { ok: false, code: 'JOURNAL_REFUSED' };
     }
+  }
+
+  /** An in-memory or temporary SQLite database cannot prove crash-safe reservation. */
+  private readBackingFile(): string | null {
+    const rows = this.store.database.prepare('PRAGMA database_list').all() as Array<{
+      name: string;
+      file: string;
+    }>;
+    const file = rows.find((row) => row.name === 'main')?.file;
+    if (
+      !file ||
+      !isAbsolute(file) ||
+      file.startsWith('\\\\\\\\') ||
+      file.startsWith('//') ||
+      file.includes('\\0')
+    ) return null;
+    return file;
+  }
+
+  private hasDurableMode(): boolean {
+    const mode = this.store.database.prepare('PRAGMA main.journal_mode').get() as
+      | { journal_mode: string }
+      | undefined;
+    const sync = this.store.database.prepare('PRAGMA main.synchronous').get() as
+      | { synchronous: number }
+      | undefined;
+    return mode?.journal_mode.toLowerCase() === 'wal' && (sync?.synchronous ?? 0) >= 2;
   }
 
   private rollbackQuietly(): void {
