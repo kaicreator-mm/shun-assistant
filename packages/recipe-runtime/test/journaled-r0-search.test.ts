@@ -142,7 +142,11 @@ describe('T04 private R0 journal-before-native-effect (synthetic effect)', () =>
       await expect(capability.execute(action())).rejects.toThrow('R0_JOURNALED_SEARCH_UNCERTAIN');
       expect(effect).toHaveBeenCalledTimes(1);
       expect(j.record).toHaveBeenCalledTimes(1);
-      expect(j.record).toHaveBeenCalledWith(action(), 'UNCERTAIN', expect.stringMatching(/^[a-f0-9]{64}$/));
+      expect(j.record).toHaveBeenCalledWith(
+        action(),
+        'UNCERTAIN',
+        expect.stringMatching(/^[a-f0-9]{64}$/),
+      );
       expect(j.record).not.toHaveBeenCalledWith(
         expect.anything(),
         'OBSERVED_NOT_SEMANTICALLY_VERIFIED',
