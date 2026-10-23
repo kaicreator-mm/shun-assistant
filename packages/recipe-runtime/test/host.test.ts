@@ -344,8 +344,11 @@ describe('T04 real SQLite Recipe host + actual ActionController read-only bounda
     expect(calls).toBe(1);
     expect(await h.adapter.hasAnyGrant()).toBe(true);
     expect(
-      f.getStore().database
-        .prepare('SELECT state FROM recipe_r0_effect_journal_v02 WHERE task_id=? AND action_id=?')
+      f
+        .getStore()
+        .database.prepare(
+          'SELECT state FROM recipe_r0_effect_journal_v02 WHERE task_id=? AND action_id=?',
+        )
         .get('task-1', 'read'),
     ).toMatchObject({ state: 'OBSERVED_NOT_SEMANTICALLY_VERIFIED' });
 
