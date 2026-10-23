@@ -37,8 +37,8 @@ function receipt() {
     outputRefs: [],
     sideEffectEvidence: {
       sideEffectClass: 'R0',
-      recoveryClassification: 'MAY_HAVE_EXECUTED_UNCERTAIN',
-      postStateVerified: false,
+      recoveryClassification: 'COMPLETED_VERIFIED',
+      postStateVerified: true,
     },
   };
 }
@@ -58,7 +58,7 @@ function journal(): {
 }
 
 describe('T04 private R0 journal-before-native-effect (synthetic effect)', () => {
-  it('durably reserves before one host effect and never promotes receipt to semantic PASS', async () => {
+  it('reserves before one post-state verified host effect without minting semantic Task PASS', async () => {
     const j = journal();
     const calls: string[] = [];
     j.reserve.mockImplementation(() => {
@@ -80,7 +80,7 @@ describe('T04 private R0 journal-before-native-effect (synthetic effect)', () =>
     );
     expect(result).toMatchObject({
       terminal: 'SUCCEEDED',
-      sideEffectEvidence: { postStateVerified: false },
+      sideEffectEvidence: { postStateVerified: true, recoveryClassification: 'COMPLETED_VERIFIED' },
     });
   });
 
@@ -118,13 +118,43 @@ describe('T04 private R0 journal-before-native-effect (synthetic effect)', () =>
       ...receipt(),
       sideEffectEvidence: {
         ...receipt().sideEffectEvidence,
-        postStateVerified: true,
+        postStateVerified: false,
         recoveryClassification: 'COMPLETED_VERIFIED',
       },
     };
     await expect(capability.execute(action())).rejects.toThrow('R0_JOURNALED_SEARCH_UNCERTAIN');
     expect(effect).toHaveBeenCalledTimes(3);
   });
+
+
+  it.each([
+    'NOT_STARTED',
+    'FAILED_BEFORE_EFFECT',
+    'MAY_HAVE_EXECUTED_UNCERTAIN',
+  ] as const)(
+    'rejects contradictory or uncertain SUCCEEDED + %s with zero positive observations',
+    async (classification) => {
+      const j = journal();
+      const effect = vi.fn(async () => ({
+        ...receipt(),
+        sideEffectEvidence: {
+          sideEffectClass: 'R0',
+          postStateVerified: false,
+          recoveryClassification: classification,
+        },
+      }));
+      const capability = new JournaledR0SearchCapability({ journal: j.port, effect });
+      await expect(capability.execute(action())).rejects.toThrow('R0_JOURNALED_SEARCH_UNCERTAIN');
+      expect(effect).toHaveBeenCalledTimes(1);
+      expect(j.record).toHaveBeenCalledTimes(1);
+      expect(j.record).toHaveBeenCalledWith(action(), 'UNCERTAIN', expect.stringMatching(/^[a-f0-9]{64}$/));
+      expect(j.record).not.toHaveBeenCalledWith(
+        expect.anything(),
+        'OBSERVED_NOT_SEMANTICALLY_VERIFIED',
+        expect.anything(),
+      );
+    },
+  );
 
   it('fails closed if journaling after OS effect cannot persist', async () => {
     const j = journal();
