@@ -166,7 +166,7 @@ describe('T04 composed real SQLite grant gate + durable journal (synthetic OS re
     broken = false;
     const policy = await x.adapter.loadCurrentPolicy();
     if (!policy) throw new Error('fixture lacks policy');
-    await x.adapter.savePolicySnapshot({ ...policy, status: 'REVOKED' });
+    await x.adapter.savePolicySnapshot({ ...policy, status: 'REVOKED' } as never);
     await expect(gate.execute(x.action)).rejects.toThrow('RECIPE_EFFECT_BOUNDARY_REFUSED');
     expect(executeScopedSearch).not.toHaveBeenCalled();
     expect(new SqliteR0EffectJournal(x.store).lookup(x.action)).toEqual({
