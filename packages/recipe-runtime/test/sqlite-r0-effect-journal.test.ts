@@ -28,15 +28,15 @@ function actionOf(planHash = 'a'.repeat(64)): AuthorizedAction {
 
 describe('T04 SQLite pre-effect journal: source-only durable reservation', () => {
   it('rejects literal two-slash UNC, NUL, memory and ephemeral SQLite identities', () => {
-    expect(isSafeJournalMainFile(String.raw`\\\\server\\share\\journal.sqlite`)).toBe(false);
+    expect(isSafeJournalMainFile(String.raw`\\server\share\journal.sqlite`)).toBe(false);
     expect(isSafeJournalMainFile('//server/share/journal.sqlite')).toBe(false);
-    expect(isSafeJournalMainFile(`/tmp/journal-\\0.sqlite`)).toBe(false);
+    expect(isSafeJournalMainFile(`/tmp/journal-\0.sqlite`)).toBe(false);
     expect(isSafeJournalMainFile(':memory:')).toBe(false);
     expect(isSafeJournalMainFile('')).toBe(false);
     expect(isSafeJournalMainFile('journal.sqlite')).toBe(false);
     expect(
       isSafeJournalMainFile(
-        process.platform === 'win32' ? 'C:\\\\journal\\\\shun.sqlite' : '/tmp/shun.sqlite',
+        process.platform === 'win32' ? 'C:\\journal\\shun.sqlite' : '/tmp/shun.sqlite',
       ),
     ).toBe(true);
   });
