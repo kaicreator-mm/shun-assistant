@@ -54,7 +54,7 @@ export function isSafeJournalMainFile(file: string | undefined): file is string 
     isAbsolute(file) &&
     !file.startsWith('\\\\') &&
     !file.startsWith('//') &&
-    !file.includes('\\0')
+    !file.includes('\0')
   );
 }
 
