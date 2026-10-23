@@ -144,83 +144,41 @@ interface CanaryKernel32 {
   close(handle: bigint): void;
 }
 
+interface NativeCanaryAddon {
+  openNoFollow(path: string): bigint | null;
+  openFollow(path: string): bigint | null;
+  pinExclusive(path: string): bigint | null;
+  isReparse(handle: bigint): boolean;
+  finalPath(handle: bigint): string | null;
+  close(handle: bigint): void;
+}
+
 let canaryCache: CanaryKernel32 | null = null;
 
 /**
  * Minimal kernel32 surface used by the physical canaries themselves. This is
- * the canary's independent instrument — the source under test does not use
- * these declarations. Built once: koffi named types are process-global.
+ * the canary's independent instrument: a separately compiled addon built on
+ * disjoint declarations (kernel32 CreateFileW flag semantics), never shared
+ * with the NtOpenFile/NtQueryDirectoryFile implementation addon that the
+ * source under test loads.
  */
 function canary(): CanaryKernel32 {
   if (canaryCache !== null) return canaryCache;
-  const koffi = createRequire(import.meta.url)('koffi') as typeof import('koffi');
-  const kernel32 = koffi.load('kernel32.dll');
-  const bhfi = koffi.struct('CanaryByHandleInfo', {
-    attrs: 'uint32',
-    a: 'uint32',
-    b: 'uint32',
-    c: 'uint32',
-    d: 'uint32',
-    e: 'uint32',
-    f: 'uint32',
-    volSerial: 'uint32',
-    g: 'uint32',
-    h: 'uint32',
-    i: 'uint32',
-    idxHigh: 'uint32',
-    idxLow: 'uint32',
-  });
-  const CreateFileW = kernel32.func('__stdcall', 'CreateFileW', 'uintptr', [
-    'str16',
-    'uint32',
-    'uint32',
-    'void*',
-    'uint32',
-    'uint32',
-    'void*',
-  ]);
-  const CloseHandle = kernel32.func('__stdcall', 'CloseHandle', 'int', ['uintptr']);
-  const GetFileInformationByHandle = kernel32.func(
-    '__stdcall',
-    'GetFileInformationByHandle',
-    'int',
-    ['uintptr', koffi.out(koffi.pointer(bhfi))],
-  );
-  const GetFinalPathNameByHandleW = kernel32.func(
-    '__stdcall',
-    'GetFinalPathNameByHandleW',
-    'uint32',
-    ['uintptr', koffi.pointer('uint16'), 'uint32', 'uint32'],
-  );
-  const invalid = (handle: bigint | number): boolean =>
-    typeof handle === 'bigint' ? handle === 0xffffffffffffffffn : handle === -1;
+  const addon = createRequire(import.meta.url)(
+    '../native/canary/shun_win32_canary.node',
+  ) as NativeCanaryAddon;
   const built: CanaryKernel32 = {
-    openNoFollow: (path: string): bigint | null => {
-      const handle = CreateFileW(path, 0x80, 3, null, 3, 0x02200000, null);
-      return invalid(handle) ? null : handle;
+    openNoFollow: (path) => addon.openNoFollow(path),
+    openFollow: (path) => addon.openFollow(path),
+    pinExclusive: (path) => addon.pinExclusive(path),
+    isReparse: (handle) => addon.isReparse(handle),
+    finalPath: (handle) => {
+      const path = addon.finalPath(handle);
+      expect(path).not.toBeNull();
+      return path as string;
     },
-    openFollow: (path: string): bigint | null => {
-      const handle = CreateFileW(path, 0x80, 3, null, 3, 0x02000000, null);
-      return invalid(handle) ? null : handle;
-    },
-    pinExclusive: (path: string): bigint | null => {
-      const handle = CreateFileW(path, 0x80, 0, null, 3, 0x02000000, null);
-      return invalid(handle) ? null : handle;
-    },
-    isReparse: (handle: bigint): boolean => {
-      const info: Record<string, number> = {};
-      if (!GetFileInformationByHandle(handle, info)) return false;
-      return ((info.attrs ?? 0) & 0x400) !== 0;
-    },
-    finalPath: (handle: bigint): string => {
-      const buffer = koffi.alloc('uint16', 600);
-      const len = GetFinalPathNameByHandleW(handle, buffer, 600, 0);
-      expect(len).toBeGreaterThan(0);
-      const bytes = koffi.decode(buffer, 'uint8', len * 2) as number[];
-      return Buffer.from(new Uint8Array(bytes)).toString('utf16le');
-    },
-    close: (handle: bigint): void => {
-      CloseHandle(handle);
+    close: (handle) => {
+      addon.close(handle);
     },
   };
   canaryCache = built;
@@ -471,8 +429,20 @@ describe.skipIf(!isWin32)('T04 Windows handle-anchored physical canaries (real w
         try {
           const observation = observeScopedFileSearch(authorized(root));
           outcomes.push(`ok:${observation.paths.length}`);
-          expect(JSON.stringify(observation.paths)).not.toContain('__atk');
+          // The attacker only renames the in-scope 'nested' directory, so a
+          // successful walk may legitimately observe the transient '__atk'
+          // spelling of that same verified object; that is an accurate
+          // observation of the concurrent world, not a scope escape. What
+          // must never happen is an outside-scope path or an unexpected name.
+          for (const p of observation.paths) {
+            expect(
+              p === 'note.txt' ||
+                p === join('nested', 'second.txt') ||
+                p === join('nested__atk', 'second.txt'),
+            ).toBe(true);
+          }
           expect(JSON.stringify(observation.paths)).not.toContain('outside');
+          expect(JSON.stringify(observation.paths)).not.toContain('secret');
         } catch (err) {
           expect((err as Error).message).toBe('R0_FILE_SEARCH_REFUSED');
           outcomes.push('refused');

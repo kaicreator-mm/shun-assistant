@@ -95,20 +95,14 @@ function wildcardMatch(name: string, pattern: string): boolean {
 }
 
 // ---------------------------------------------------------------------------
-// Windows handle-anchored traversal (NtOpenFile/NtQueryDirectoryFile via koffi)
+// Windows handle-anchored traversal (NtOpenFile/NtQueryDirectoryFile through
+// the native shun-win32-impl addon: windows-rs behind napi-rs, built per
+// native/README.md). Only raw syscalls live in the addon; every status,
+// attribute mask and byte count is validated here.
 // ---------------------------------------------------------------------------
 
 const NT_STATUS_NO_MORE_FILES = 0x80000006;
 const NT_STATUS_BUFFER_OVERFLOW = 0x80000005;
-const FILE_LIST_DIRECTORY = 0x00000001;
-const FILE_READ_ATTRIBUTES = 0x00000080;
-const SYNCHRONIZE = 0x00100000;
-const FILE_SHARE_ALL = 0x00000007;
-const FILE_DIRECTORY_FILE = 0x00000001;
-const FILE_SYNCHRONOUS_IO_NONALERT = 0x00000020;
-const FILE_OPEN_REPARSE_POINT = 0x00200000;
-const OBJ_CASE_INSENSITIVE = 0x00000040;
-const FileIdBothDirectoryInformation = 37;
 const FILE_ATTRIBUTE_DIRECTORY = 0x00000010;
 const FILE_ATTRIBUTE_REPARSE_POINT = 0x00000400;
 // FILE_ID_BOTH_DIR_INFORMATION field offsets on x64.
@@ -120,6 +114,18 @@ const ENUM_BUFFER_BYTES = 262144;
 
 type EnumEntry = Readonly<{ name: string; isDirectory: boolean; isReparse: boolean }>;
 
+interface NativeImplAddon {
+  openDir(parent: bigint | null, name: string): bigint | null;
+  entryInfo(handle: bigint): number | null;
+  finalPath(handle: bigint): string | null;
+  enumerate(
+    handle: bigint,
+    restart: boolean,
+    bufferBytes: number,
+  ): { status: number; returned: number; data: Buffer } | null;
+  close(handle: bigint): void;
+}
+
 interface Win32Handles {
   openDir(parent: bigint | null, name: string): bigint | null;
   entryInfo(handle: bigint): { isDirectory: boolean; isReparse: boolean } | null;
@@ -130,183 +136,82 @@ interface Win32Handles {
 
 let win32Handles: Win32Handles | null = null;
 
-function loadWin32(): Win32Handles {
-  // koffi named types are process-global: build the binding exactly once.
+let nativeImplAddon: NativeImplAddon | null = null;
+
+function loadNativeImplAddon(): NativeImplAddon | null {
+  if (nativeImplAddon !== null) return nativeImplAddon;
+  try {
+    nativeImplAddon = createRequire(import.meta.url)(
+      '../native/impl/shun_win32_impl.node',
+    ) as NativeImplAddon;
+  } catch {
+    // Fail closed: a missing or unloadable addon must refuse the walk, never
+    // fall back to a path-based traversal.
+    return null;
+  }
+  return nativeImplAddon;
+}
+
+function loadWin32(): Win32Handles | null {
   if (win32Handles !== null) return win32Handles;
-  const koffi = createRequire(import.meta.url)('koffi') as typeof import('koffi');
-  const ntdll = koffi.load('ntdll.dll');
-  const kernel32 = koffi.load('kernel32.dll');
-  const byHandleInfo = koffi.struct('R0ByHandleFileInformation', {
-    attrs: 'uint32',
-    a: 'uint32',
-    b: 'uint32',
-    c: 'uint32',
-    d: 'uint32',
-    e: 'uint32',
-    f: 'uint32',
-    volSerial: 'uint32',
-    g: 'uint32',
-    h: 'uint32',
-    i: 'uint32',
-    idxHigh: 'uint32',
-    idxLow: 'uint32',
-  });
-  const NtOpenFile = ntdll.func('__stdcall', 'NtOpenFile', 'uint32', [
-    koffi.pointer('uintptr'),
-    'uint32',
-    koffi.pointer('uint8'),
-    koffi.pointer('uint8'),
-    'uint32',
-    'uint32',
-  ]);
-  const NtQueryDirectoryFile = ntdll.func('__stdcall', 'NtQueryDirectoryFile', 'uint32', [
-    'uintptr',
-    'uintptr',
-    'uintptr',
-    'uintptr',
-    koffi.pointer('uint8'),
-    koffi.pointer('uint8'),
-    'uint32',
-    'uint32',
-    'uint8',
-    'uintptr',
-    'uint8',
-  ]);
-  const NtClose = ntdll.func('__stdcall', 'NtClose', 'uint32', ['uintptr']);
-  const GetFileInformationByHandle = kernel32.func(
-    '__stdcall',
-    'GetFileInformationByHandle',
-    'int',
-    ['uintptr', koffi.out(koffi.pointer(byHandleInfo))],
-  );
-  const GetFinalPathNameByHandleW = kernel32.func(
-    '__stdcall',
-    'GetFinalPathNameByHandleW',
-    'uint32',
-    ['uintptr', koffi.pointer('uint16'), 'uint32', 'uint32'],
-  );
-
-  const enumBuffer = koffi.alloc('uint8', ENUM_BUFFER_BYTES);
-
-  function zeroIosb(): unknown {
-    const iosb = koffi.alloc('uint8', 16);
-    for (let i = 0; i < 16; i++) koffi.encode(iosb, i, 'uint8', 0);
-    return iosb;
-  }
-
-  // OBJECT_ATTRIBUTES (48B) + UNICODE_STRING (16B) + UTF-16 name in one blob so
-  // the single koffi.address() base anchors every embedded NT pointer.
-  function openDir(parent: bigint | null, name: string): bigint | null {
-    const isAbsoluteOpen = parent === null;
-    const ntName = isAbsoluteOpen ? `\\??\\${name}` : name;
-    const nameBytes = Buffer.from(ntName, 'utf16le');
-    const usOffset = 48;
-    const nameOffset = 64;
-    const blob = koffi.alloc('uint8', nameOffset + nameBytes.length + 8);
-    const base = koffi.address(blob);
-    koffi.encode(blob, 0, 'uint32', 48);
-    koffi.encode(blob, 4, 'uint32', 0);
-    koffi.encode(blob, 8, 'uint64', isAbsoluteOpen ? 0n : parent);
-    koffi.encode(blob, 16, 'uint64', base + BigInt(usOffset));
-    koffi.encode(blob, 24, 'uint32', OBJ_CASE_INSENSITIVE);
-    koffi.encode(blob, 28, 'uint32', 0);
-    koffi.encode(blob, 32, 'uint64', 0);
-    koffi.encode(blob, 40, 'uint64', 0);
-    koffi.encode(blob, usOffset, 'uint16', nameBytes.length);
-    koffi.encode(blob, usOffset + 2, 'uint16', nameBytes.length + 2);
-    koffi.encode(blob, usOffset + 8, 'uint64', base + BigInt(nameOffset));
-    for (let i = 0; i < nameBytes.length; i++)
-      koffi.encode(blob, nameOffset + i, 'uint8', nameBytes[i]);
-    const handleOut = koffi.alloc('uintptr', 1);
-    const iosb = zeroIosb();
-    const access = (FILE_LIST_DIRECTORY | FILE_READ_ATTRIBUTES | SYNCHRONIZE) >>> 0;
-    const options =
-      (FILE_DIRECTORY_FILE | FILE_SYNCHRONOUS_IO_NONALERT | FILE_OPEN_REPARSE_POINT) >>> 0;
-    const status = NtOpenFile(handleOut, access, blob, iosb, FILE_SHARE_ALL, options) >>> 0;
-    if (status !== 0) return null;
-    return koffi.decode(handleOut, 'uintptr', 1)[0];
-  }
-
-  function entryInfo(handle: bigint): { isDirectory: boolean; isReparse: boolean } | null {
-    const info: Record<string, number> = {};
-    if (!GetFileInformationByHandle(handle, info)) return null;
-    const attrs = (info.attrs ?? 0) >>> 0;
-    return {
-      isDirectory: (attrs & FILE_ATTRIBUTE_DIRECTORY) !== 0,
-      isReparse: (attrs & FILE_ATTRIBUTE_REPARSE_POINT) !== 0,
-    };
-  }
-
-  function finalPath(handle: bigint): string | null {
-    const buffer = koffi.alloc('uint16', 600);
-    const len = GetFinalPathNameByHandleW(handle, buffer, 600, 0);
-    if (!len || len > 600) return null;
-    // Decode raw bytes: koffi element decoding plus Buffer.from(typedArray)
-    // truncation must never be mixed for multi-byte data.
-    const bytes = koffi.decode(buffer, 'uint8', len * 2) as number[];
-    return Buffer.from(new Uint8Array(bytes)).toString('utf16le');
-  }
-
-  function enumerate(handle: bigint, restart: boolean): { status: number; entries: EnumEntry[] } {
-    const iosb = zeroIosb();
-    const status =
-      NtQueryDirectoryFile(
-        handle,
-        0n,
-        0n,
-        0n,
-        iosb,
-        enumBuffer,
-        ENUM_BUFFER_BYTES,
-        FileIdBothDirectoryInformation,
-        0,
-        0n,
-        restart ? 1 : 0,
-      ) >>> 0;
-    if (status === NT_STATUS_NO_MORE_FILES) return { status, entries: [] };
-    if (status !== 0 && status !== NT_STATUS_BUFFER_OVERFLOW) return { status, entries: [] };
-    const returned = Number(koffi.decode(iosb, 8, 'uint64', 1)[0]);
-    if (!Number.isSafeInteger(returned) || returned <= 0 || returned > ENUM_BUFFER_BYTES)
-      throw new Error('REFUSED');
-    const bytes = koffi.decode(enumBuffer, 'uint8', returned) as number[];
-    const entries: EnumEntry[] = [];
-    let offset = 0;
-    while (offset < returned) {
-      const read32 = (at: number): number =>
-        ((bytes[at] ?? 0) |
-          ((bytes[at + 1] ?? 0) << 8) |
-          ((bytes[at + 2] ?? 0) << 16) |
-          ((bytes[at + 3] ?? 0) << 24)) >>>
-        0;
-      const next = read32(offset + OFF_NEXT_ENTRY);
-      const attrs = read32(offset + OFF_ATTRIBUTES);
-      const nameLength = read32(offset + OFF_NAME_LENGTH);
-      const nameStart = offset + OFF_FILE_NAME;
-      if (nameLength % 2 !== 0 || nameStart + nameLength > returned) throw new Error('REFUSED');
-      const nameBytes: number[] = [];
-      for (let i = 0; i < nameLength; i++) nameBytes.push(bytes[nameStart + i] ?? 0);
-      entries.push({
-        name: Buffer.from(nameBytes).toString('utf16le'),
+  const addon = loadNativeImplAddon();
+  if (addon === null) return null;
+  win32Handles = {
+    // The absolute bootstrap open resolves an NT pathname, so it must carry
+    // the `\??\` Win32-namespace prefix; child opens stay single components
+    // anchored at the parent handle.
+    openDir: (parent, name) => addon.openDir(parent, parent === null ? `\\??\\${name}` : name),
+    entryInfo: (handle) => {
+      const attrs = addon.entryInfo(handle);
+      if (attrs === null) return null;
+      return {
         isDirectory: (attrs & FILE_ATTRIBUTE_DIRECTORY) !== 0,
         isReparse: (attrs & FILE_ATTRIBUTE_REPARSE_POINT) !== 0,
-      });
-      if (!next) break;
-      // A chain entry must at least cover the fixed header, stay 8-byte
-      // aligned, and never run past the returned byte count.
-      if (next < OFF_FILE_NAME || next % 8 !== 0 || offset + next > returned)
+      };
+    },
+    finalPath: (handle) => addon.finalPath(handle),
+    enumerate: (handle, restart) => {
+      const raw = addon.enumerate(handle, restart, ENUM_BUFFER_BYTES);
+      if (raw === null) throw new Error('REFUSED');
+      if (raw.status === NT_STATUS_NO_MORE_FILES) return { status: raw.status, entries: [] };
+      if (raw.status !== 0 && raw.status !== NT_STATUS_BUFFER_OVERFLOW)
+        return { status: raw.status, entries: [] };
+      const returned = raw.returned;
+      if (!Number.isSafeInteger(returned) || returned <= 0 || returned > ENUM_BUFFER_BYTES)
         throw new Error('REFUSED');
-      offset += next;
-    }
-    return { status, entries };
-  }
-
-  win32Handles = {
-    openDir,
-    entryInfo,
-    finalPath,
-    enumerate,
+      const bytes = raw.data;
+      const entries: EnumEntry[] = [];
+      let offset = 0;
+      while (offset < returned) {
+        const read32 = (at: number): number =>
+          ((bytes[at] ?? 0) |
+            ((bytes[at + 1] ?? 0) << 8) |
+            ((bytes[at + 2] ?? 0) << 16) |
+            ((bytes[at + 3] ?? 0) << 24)) >>>
+          0;
+        const next = read32(offset + OFF_NEXT_ENTRY);
+        const attrs = read32(offset + OFF_ATTRIBUTES);
+        const nameLength = read32(offset + OFF_NAME_LENGTH);
+        const nameStart = offset + OFF_FILE_NAME;
+        if (nameLength % 2 !== 0 || nameStart + nameLength > returned) throw new Error('REFUSED');
+        const nameBytes: number[] = [];
+        for (let i = 0; i < nameLength; i++) nameBytes.push(bytes[nameStart + i] ?? 0);
+        entries.push({
+          name: Buffer.from(nameBytes).toString('utf16le'),
+          isDirectory: (attrs & FILE_ATTRIBUTE_DIRECTORY) !== 0,
+          isReparse: (attrs & FILE_ATTRIBUTE_REPARSE_POINT) !== 0,
+        });
+        if (!next) break;
+        // A chain entry must at least cover the fixed header, stay 8-byte
+        // aligned, and never run past the returned byte count.
+        if (next < OFF_FILE_NAME || next % 8 !== 0 || offset + next > returned)
+          throw new Error('REFUSED');
+        offset += next;
+      }
+      return { status: raw.status, entries };
+    },
     close: (handle) => {
-      NtClose(handle);
+      addon.close(handle);
     },
   };
   return win32Handles;
@@ -322,6 +227,8 @@ function walkWin32(
   instrument: ScopedSearchInstrumentation,
 ): { matches: string[]; inspected: number } {
   const win = loadWin32();
+  // No native capability on this host: refuse the whole action (fail closed).
+  if (win === null) refuse();
   const openHandles: bigint[] = [];
   try {
     const resolvedRoot = resolve(root);
