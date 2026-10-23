@@ -7,7 +7,6 @@ import { ShunStore, ShunStoreAuthorizationAdapter } from '@shun/store';
 import { afterEach, describe, expect, it } from 'vitest';
 import {
   createSqliteAuthorizedRecipeEffectHost,
-  createSqliteRecipeEffectHost,
   createSqliteRecipeReadService,
   type SqliteRecipeHostOptions,
 } from '../src/index.ts';
@@ -238,13 +237,12 @@ describe('T04 real SQLite Recipe host + actual ActionController read-only bounda
     if (!saved.ok) throw new Error('fixture register failed');
     h.attachRevision(saved);
     let dispatched = 0;
-    const live = createSqliteRecipeEffectHost({
+    const live = createSqliteAuthorizedRecipeEffectHost({
       ...h.host,
-      backend: {
-        execute: async () => {
-          dispatched++;
-          throw new Error('unexpected execution');
-        },
+      loadPlanByHash: async () => null,
+      executeScopedSearch: async () => {
+        dispatched++;
+        throw new Error('unexpected execution');
       },
     });
     expect(
@@ -345,6 +343,19 @@ describe('T04 real SQLite Recipe host + actual ActionController read-only bounda
     });
     expect(calls).toBe(1);
     expect(await h.adapter.hasAnyGrant()).toBe(true);
+    expect(
+      f.getStore().database
+        .prepare('SELECT state FROM recipe_r0_effect_journal_v02 WHERE task_id=? AND action_id=?')
+        .get('task-1', 'read'),
+    ).toMatchObject({ state: 'OBSERVED_NOT_SEMANTICALLY_VERIFIED' });
+
+    // No unjournaled Host entry: a second execution with the same
+    // task/action identity cannot repeat an effect even with fresh approval.
+    expect(await live.runner.run(identity)).toEqual({
+      ok: false,
+      code: 'RECIPE_EXECUTION_UNCERTAIN',
+    });
+    expect(calls).toBe(1);
 
     // The runner's earlier approval cannot bypass the second independent
     // immutable-plan read in the SQLite authority boundary.
@@ -356,12 +367,16 @@ describe('T04 real SQLite Recipe host + actual ActionController read-only bounda
     expect(calls).toBe(1);
   });
 
-  it('rejects absent backend instead of producing an unguarded effect capability', () => {
+  it('rejects a missing restricted native search port instead of exposing a raw backend', () => {
     const f = fixture();
     const h = f.attach(f.getStore());
-    expect(() => createSqliteRecipeEffectHost({ ...h.host, backend: {} as never })).toThrow(
-      /^RECIPE_EFFECT_HOST_CONFIGURATION_REFUSED$/,
-    );
+    expect(() =>
+      createSqliteAuthorizedRecipeEffectHost({
+        ...h.host,
+        loadPlanByHash: async () => null,
+        executeScopedSearch: undefined as never,
+      }),
+    ).toThrow(/^RECIPE_EFFECT_HOST_CONFIGURATION_REFUSED$/);
   });
 
   it('refuses fake store/controller and hostile getters without leaking details', () => {
