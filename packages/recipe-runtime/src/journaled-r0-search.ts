@@ -82,14 +82,18 @@ export class JournaledR0SearchCapability {
         receipt.data.actionId !== action.actionId ||
         receipt.data.terminal !== 'SUCCEEDED' ||
         receipt.data.sideEffectEvidence.sideEffectClass !== 'R0' ||
-        receipt.data.sideEffectEvidence.postStateVerified ||
-        receipt.data.sideEffectEvidence.recoveryClassification === 'COMPLETED_VERIFIED'
+        // L2 9.4: positive observation requires independent post-state proof.
+        // NOT_STARTED / FAILED_BEFORE_EFFECT contradict terminal=SUCCEEDED.
+        // MAY_HAVE_EXECUTED_UNCERTAIN must remain UNKNOWN, not OBSERVED.
+        receipt.data.sideEffectEvidence.postStateVerified !== true ||
+        receipt.data.sideEffectEvidence.recoveryClassification !== 'COMPLETED_VERIFIED'
       ) {
         this.tryRecord(action, 'UNCERTAIN', UNKNOWN_DIGEST);
         throw new Error(ERROR);
       }
-      // A successful executor receipt is still NOT the required semantic
-      // verification. Store only a digest, not file names or user content.
+      // COMPLETED_VERIFIED is privileged *effect post-state* evidence, not
+      // the task's separate semantic oracle. No task PASS is minted here.
+      // Store only a digest, not file names or user content.
       const digest = createHash('sha256').update(canonicalJson(receipt.data)).digest('hex');
       if (!this.journal.recordObservation(action, 'OBSERVED_NOT_SEMANTICALLY_VERIFIED', digest))
         throw new Error(ERROR);
