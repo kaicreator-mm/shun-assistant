@@ -126,12 +126,7 @@ describe('T04 private R0 journal-before-native-effect (synthetic effect)', () =>
     expect(effect).toHaveBeenCalledTimes(3);
   });
 
-
-  it.each([
-    'NOT_STARTED',
-    'FAILED_BEFORE_EFFECT',
-    'MAY_HAVE_EXECUTED_UNCERTAIN',
-  ] as const)(
+  it.each(['NOT_STARTED', 'FAILED_BEFORE_EFFECT', 'MAY_HAVE_EXECUTED_UNCERTAIN'] as const)(
     'rejects contradictory or uncertain SUCCEEDED + %s with zero positive observations',
     async (classification) => {
       const j = journal();
