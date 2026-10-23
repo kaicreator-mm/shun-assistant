@@ -13,9 +13,10 @@
   },
   "dependencies": {
     "@shun/authorization": "workspace:*",
+    "@shun/contracts": "workspace:*",
     "@shun/resolver": "workspace:*",
     "@shun/store": "workspace:*",
-    "@shun/contracts": "workspace:*"
+    "koffi": "3.3.3"
   },
   "devDependencies": {
     "@biomejs/biome": "^2.3.8",
