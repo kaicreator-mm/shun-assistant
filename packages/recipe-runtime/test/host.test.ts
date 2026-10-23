@@ -6,6 +6,7 @@ import { type ActionPlan, computePlanHash } from '@shun/contracts';
 import { ShunStore, ShunStoreAuthorizationAdapter } from '@shun/store';
 import { afterEach, describe, expect, it } from 'vitest';
 import {
+  createSqliteAuthorizedRecipeEffectHost,
   createSqliteRecipeEffectHost,
   createSqliteRecipeReadService,
   type SqliteRecipeHostOptions,
@@ -264,6 +265,95 @@ describe('T04 real SQLite Recipe host + actual ActionController read-only bounda
       }),
     ).toEqual({ ok: false, code: 'RECIPE_NOT_CURRENT' });
     expect(dispatched).toBe(0);
+  });
+
+  it('composes actual SQLite grant reentry before private R0 operation (synthetic receipt only)', async () => {
+    const f = fixture();
+    const h = f.attach(f.getStore());
+    const saved = h.service.registerLiteral(source, config);
+    if (!saved.ok) throw new Error('fixture register failed');
+    h.attachRevision(saved);
+    const identity = {
+      taskId: 'task-1',
+      recipeId: saved.recipeId,
+      revisionSha256: saved.revisionSha256,
+    };
+    const preview = h.service.previewExact(identity);
+    if (!preview.ok) throw new Error('fixture preview failed');
+    const plan = h.host.loadExpectedPlan({
+      ...identity,
+      actionGraphSha256: preview.actionGraphSha256,
+    }) as ActionPlan;
+
+    await h.adapter.saveAuthorityRecord({
+      authorityId: 'auth-1',
+      authorityRevision: 'rev-1',
+      updatedAt: '2026-10-22T00:00:00.000Z',
+      policyInitialized: true,
+    });
+    await h.adapter.savePolicySnapshot({
+      policySnapshotRevision: 'policy-1',
+      status: 'ACTIVE',
+      authorityId: 'auth-1',
+      authorityRevision: 'rev-1',
+      revokedGrantIds: [],
+      rules: [
+        {
+          ruleId: 'allow-single-R0',
+          capabilityId: 'file.search',
+          op: 'file.search',
+          maxRiskClass: 'R0',
+          privilegeLevel: 'USER',
+          filesystem: { read: ['C:/approved'], write: [] },
+        },
+      ],
+      riskGuards: [],
+      updatedAt: '2026-10-22T00:00:00.000Z',
+    });
+    let calls = 0;
+    let corruptPlan = false;
+    const live = createSqliteAuthorizedRecipeEffectHost({
+      ...h.host,
+      loadPlanByHash: async (hash) =>
+        hash !== plan.planHash ? null : corruptPlan ? { ...plan, planHash: '0'.repeat(64) } : plan,
+      executeScopedSearch: async (action) => {
+        calls++;
+        // Deliberately synthetic: NOT an installed Windows filesystem receipt.
+        return {
+          actionId: action.actionId,
+          environmentId: 'synthetic-host',
+          providerId: 'test-readonly',
+          providerVersion: '0.2.0',
+          startedAt: '2026-10-22T00:00:00.000Z',
+          finishedAt: '2026-10-22T00:00:00.000Z',
+          terminal: 'SUCCEEDED',
+          outputRefs: [],
+          sideEffectEvidence: {
+            sideEffectClass: 'R0',
+            recoveryClassification: 'COMPLETED_VERIFIED',
+            postStateVerified: true,
+            journalRef: 'synthetic-only',
+          },
+        };
+      },
+    });
+    expect(await live.runner.run(identity)).toEqual({
+      ok: true,
+      state: 'EXECUTED_NOT_SEMANTICALLY_VERIFIED',
+      actionCount: 1,
+      taskPass: false,
+    });
+    expect(calls).toBe(1);
+    expect(await h.adapter.hasAnyGrant()).toBe(true);
+
+    // The runner's earlier approval cannot bypass the second independent
+    // immutable-plan read in the SQLite authority boundary.
+    corruptPlan = true;
+    expect(await live.runner.run(identity)).toEqual({
+      ok: false,
+      code: 'RECIPE_EXECUTION_UNCERTAIN',
+    });
+    expect(calls).toBe(1);
   });
 
   it('rejects absent backend instead of producing an unguarded effect capability', () => {
