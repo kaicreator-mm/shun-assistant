@@ -41,6 +41,15 @@ describe.skipIf(process.platform !== 'win32')(
           ok: true,
           taskSemantic: 'PASS',
         });
+        // JS consumers must not be able to poison a shared singleton refused
+        // verdict, then make later missing-evidence calls appear successful.
+        const attack = host.verifyTaskSemantics('unrelated-task');
+        Object.assign(attack, { ok: true, taskSemantic: 'PASS' });
+        expect(host.verifyTaskSemantics('unrelated-task')).toMatchObject({
+          ok: false,
+          taskSemantic: 'UNCERTAIN',
+          code: 'SEMANTIC_EVIDENCE_INCOMPLETE',
+        });
         // A second caller cannot reuse an in-memory proof to mint a new PASS.
         expect(host.verifyTaskSemantics(fixture.identity.taskId)).toMatchObject({
           ok: false,
