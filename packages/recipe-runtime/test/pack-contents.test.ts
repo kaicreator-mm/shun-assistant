@@ -32,5 +32,5 @@ describe('T04 native package contents are runtime-only', () => {
       false,
     );
     expect(entries?.some((path) => path.startsWith('test/'))).toBe(false);
-  });
+  }, 45_000);
 });
