@@ -1,8 +1,6 @@
 // T04 deployed private composition, not a test-owned injected native callback.
 import { describe, expect, it } from 'vitest';
-import {
-  createSqliteVerifiedWindowsR0RecipeEffectHost,
-} from '../src/sqlite-verified-windows-r0-host.ts';
+import { createSqliteVerifiedWindowsR0RecipeEffectHost } from '../src/sqlite-verified-windows-r0-host.ts';
 import {
   buildAuthorityStack,
   buildCurrentness,
@@ -19,7 +17,7 @@ describe.skipIf(process.platform !== 'win32')(
         const { plan } = fixture.compose();
         const controller = buildAuthorityStack(fixture.store).controller;
         let injectedCalls = 0;
-        const host = createSqliteVerifiedWindowsR0RecipeEffectHost({
+        const injectedOptions = {
           store: fixture.store,
           controller,
           currentness: buildCurrentness(fixture.store),
@@ -30,7 +28,8 @@ describe.skipIf(process.platform !== 'win32')(
             injectedCalls++;
             throw new Error('INJECTED_CALLBACK_MUST_NOT_RUN');
           },
-        });
+        };
+        const host = createSqliteVerifiedWindowsR0RecipeEffectHost(injectedOptions);
         expect(await host.runner.run(fixture.identity)).toEqual({
           ok: true,
           state: 'EXECUTED_NOT_SEMANTICALLY_VERIFIED',
