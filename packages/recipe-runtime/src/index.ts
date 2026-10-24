@@ -9,10 +9,8 @@ import {
   TrustedRecipeReadService,
 } from '@shun/resolver';
 import { ImmutableRecipeRepository, ShunStore } from '@shun/store';
-import {
-  SqliteReadonlySearchAuthorizationBoundary,
-  type SqliteReadonlySearchGateConfig,
-} from './sqlite-effect-boundary.ts';
+import type { SqliteReadonlySearchGateConfig } from './sqlite-effect-boundary.ts';
+import { SqliteJournaledSearchAuthorizationBoundary } from './sqlite-journaled-search-boundary.ts';
 
 /** Actual host-only ports: trusted currentness and a host-derived plan. */
 export type SqliteRecipeHostOptions = Readonly<{
@@ -68,12 +66,12 @@ export function createSqliteRecipeReadService(
  * capability; T04 Windows admission is NOT complete until that backend
  * independently verifies persisted authorization and supports file.search.
  */
-export type SqliteRecipeEffectHostOptions = SqliteRecipeHostOptions &
+type SqliteRecipeEffectHostOptions = SqliteRecipeHostOptions &
   Readonly<{
     backend: Readonly<{ execute: (action: AuthorizedAction) => Promise<unknown> }>;
   }>;
 
-export function createSqliteRecipeEffectHost(options: SqliteRecipeEffectHostOptions): {
+function createSqliteRecipeEffectHost(options: SqliteRecipeEffectHostOptions): {
   readService: TrustedRecipeReadService;
   runner: TrustedReadonlyRecipeEffectRunner;
 } {
@@ -107,8 +105,11 @@ export function createSqliteRecipeEffectHost(options: SqliteRecipeEffectHostOpti
  *
  * A raw backend cannot be supplied to this composition; only the trusted
  * host's *restricted* R0 file.search port crosses the final boundary.
- * This is NOT a Windows filesystem implementation, semantic verifier, or
- * a cross-process exactly-once journal. T04 remains open until those proofs.
+ * The only exposed effect host now ALWAYS constructs the same-store durable
+ * STARTED journal behind the persisted-grant/current-policy reentry. No
+ * unjournaled generic backend factory is exported. The trusted host still
+ * must own the native OS port and independently verified receipt.
+ * This is NOT Windows E2E or Task semantic verification. T04 remains open.
  */
 export type SqliteAuthorizedRecipeEffectHostOptions = SqliteRecipeHostOptions &
   Readonly<{
@@ -122,7 +123,7 @@ export function createSqliteAuthorizedRecipeEffectHost(
   try {
     // An untrusted caller cannot replace the backend or present a grant. All
     // capabilities here must be constructed within Shun's private host.
-    const gate = new SqliteReadonlySearchAuthorizationBoundary({
+    const gate = new SqliteJournaledSearchAuthorizationBoundary({
       store: options.store,
       controller: options.controller,
       loadPlanByHash: options.loadPlanByHash,
