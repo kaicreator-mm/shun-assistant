@@ -30,7 +30,7 @@ function verifiedLocalShape(input: LocalFileSearchObservation): boolean {
         path.length > 0 &&
         !path.startsWith('\\') &&
         !path.startsWith('/') &&
-        !path.includes('\\0') &&
+        !path.includes('\0') &&
         !path.split(/[\\/]/).includes('..'),
     )
   );
