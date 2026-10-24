@@ -115,6 +115,8 @@ const ENUM_BUFFER_BYTES = 262144;
 type EnumEntry = Readonly<{ name: string; isDirectory: boolean; isReparse: boolean }>;
 
 interface NativeImplAddon {
+  dosDevice(letter: string): string | null;
+  driveType(root: string): number | null;
   openDir(parent: bigint | null, name: string): bigint | null;
   entryInfo(handle: bigint): number | null;
   finalPath(handle: bigint): string | null;
@@ -127,6 +129,8 @@ interface NativeImplAddon {
 }
 
 interface Win32Handles {
+  dosDevice(letter: string): string | null;
+  driveType(root: string): number | null;
   openDir(parent: bigint | null, name: string): bigint | null;
   entryInfo(handle: bigint): { isDirectory: boolean; isReparse: boolean } | null;
   finalPath(handle: bigint): string | null;
@@ -157,6 +161,8 @@ function loadWin32(): Win32Handles | null {
   const addon = loadNativeImplAddon();
   if (addon === null) return null;
   win32Handles = {
+    dosDevice: (letter) => addon.dosDevice(letter),
+    driveType: (root) => addon.driveType(root),
     // The absolute bootstrap open resolves an NT pathname, so it must carry
     // the `\??\` Win32-namespace prefix; child opens stay single components
     // anchored at the parent handle.
@@ -241,6 +247,17 @@ function walkWin32(
     // kernel32 final-path normalization expands them to their long spellings.
     if (!/^[a-zA-Z]:\\/.test(resolvedRoot)) refuse();
     const driveRoot = resolvedRoot.slice(0, 3);
+    // Native R0 can also be called by the older conservative Host adapter,
+    // without an independent Oracle preflight. Its first open MUST NOT
+    // touch a redirected SMB/subst volume. Both questions query local OS
+    // device metadata only; on missing/old addon methods we fail closed.
+    const targetDevice = win.dosDevice(driveRoot.slice(0, 2));
+    if (
+      typeof targetDevice !== 'string' ||
+      !/^\\\\Device\\\\HarddiskVolume[0-9]+$/i.test(targetDevice) ||
+      win.driveType(driveRoot) !== 3
+    )
+      refuse();
     const driveHandle = win.openDir(null, driveRoot);
     if (driveHandle === null) refuse();
     openHandles.push(driveHandle);
