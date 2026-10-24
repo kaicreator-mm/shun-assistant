@@ -2,7 +2,7 @@
 
 - **PR / branch:** this PR `task/shun-i108-r2-zc` (base `version/v0.2.0`, stacked on `task/shun-i108-winhost` @ `5fabb7562a4dea39b51e778285938093479372ea`, not merged)
 - **R2 scope:** closes the independent R1 BLOCK (`shun-v02-pr173-independent-r1-5fabb756`) — P1-01 oracle confinement, P1-02 receipt phase binding, P2-01 hard-kill proof strength, P2-02 mapped-SMB honesty.
-- **Raw evidence log:** `docs/validation/v0.2/logs/t04-winhost-r2-8950cf6.log` (real vitest output, real exit codes recorded in the log header)
+- **Raw evidence log:** `docs/validation/v0.2/logs/t04-winhost-r2-75695cf.log` (real vitest output, real exit codes recorded in the log header)
 - **Write-set:** `packages/recipe-runtime/**` only (src + test + native). No overlap with open PRs #168/#171/#172/#174/#175.
 - **Gate:** workspace `task-check.sh` (lint → typecheck → test, all packages) exit 0 at this SHA.
 

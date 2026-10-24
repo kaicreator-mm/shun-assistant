@@ -1,13 +1,12 @@
 # T04 Windows host R2 raw evidence log
-# source_sha=8950cf6618a042e62536ba6c4de84f2a9c59febc
-# source_tree=0a57ee539babc530951c6bac436d6c7d4e45b9fc
-# base=version/v0.2.0 (stacked on origin/task/shun-i108-winhost@5fabb7562a4dea39b51e778285938093479372ea)
+# source_sha=75695cf601eecfd04c10f2103d5c71da70396d52
+# source_tree=f83e3436b4ae58f6b3aba33ee9544f49be223e87
+# base=version/v0.2.0 (stacked on origin/task/shun-i108-winhost; PR #173 head fast-forwarded 5fabb75 -> 75695cf)
 # native_addon_sha256=7f85afc973ae8d49c817a9ae8c1d16e4225a313f4114eebe12760f038ce847fb
-# captured_at=2026-10-24T10:35:02Z
-# host_os=
-Microsoft Windows [�汾 10.0.26300.9711]
+# captured_at=2026-10-24T10:57:16Z
+# host_os=Windows 11 Pro build 26300.9711
 # node=v24.21.0
-# user=15549 (NON-ELEVATED UAC-filtered token; asserted by E2E_PRIVILEGE_TOKEN)
+# user=NILAR\15549 (Administrators-group member, NON-ELEVATED UAC-filtered token; asserted by E2E_PRIVILEGE_TOKEN below)
 
 ## whoami /groups (integrity evidence)
 
@@ -35,17 +34,13 @@ Microsoft Windows [�汾 10.0.26300.9711]
 [22m[39mORACLE_SMB_MAPPED_ZERO_IO=SKIPPED_NO_SMB_DRIVE_PROVIDED
 
 [90mstdout[2m | test/r0-oracle-confinement.test.ts[2m > [22m[2mT04 oracle confinement falsifiers[2m > [22m[2mnever verifies a foreign world while the ancestor and an in-tree directory are concurrently swapped
-[22m[39mORACLE_RACE_NO_FOREIGN_WORLD=PASS OK=2347 REFUSED=1654 SWAP_RACE_EXERCISED=true
+[22m[39mORACLE_RACE_NO_FOREIGN_WORLD=PASS OK=2491 REFUSED=1510 SWAP_RACE_EXERCISED=true
 
 [90mstdout[2m | test/r0-oracle-confinement.test.ts[2m > [22m[2mT04 oracle confinement falsifiers[2m > [22m[2mbinds the task semantic verdict to the content fingerprint, refusing a size/mtime-preserving swap
 [22m[39mORACLE_CONTENT_SWAP_REFUSED_BY_SEMANTIC_VERIFIER=PASS
 
- [32m✓[39m test/r0-oracle-confinement.test.ts [2m([22m[2m7 tests[22m[2m)[22m[33m 7722[2mms[22m[39m
-   [33m[2m✓[22m[39m T04 oracle confinement falsifiers[2m > [22mnever verifies a foreign world while the ancestor and an in-tree directory are concurrently swapped [33m 7470[2mms[22m[39m
-(node:29960) [DEP0190] DeprecationWarning: Passing args to a child process with shell option true can lead to security vulnerabilities, as the arguments are not escaped, only concatenated.
-(Use `node --trace-deprecation ...` to show where the warning was created)
- [32m✓[39m test/pack-contents.test.ts [2m([22m[2m1 test[22m[2m)[22m[33m 1529[2mms[22m[39m
-   [33m[2m✓[22m[39m T04 native package contents are runtime-only[2m > [22mnever publishes the test-only native canary or Rust build source [33m 1527[2mms[22m[39m
+ [32m✓[39m test/r0-oracle-confinement.test.ts [2m([22m[2m7 tests[22m[2m)[22m[33m 8348[2mms[22m[39m
+   [33m[2m✓[22m[39m T04 oracle confinement falsifiers[2m > [22mnever verifies a foreign world while the ancestor and an in-tree directory are concurrently swapped [33m 8085[2mms[22m[39m
 [90mstdout[2m | test/windows-host-e2e.test.ts[2m > [22m[2mT04 Windows host minimal E2E closed loop[2m > [22m[2mruns the standard-user privilege gate before any host loop evidence
 [22m[39mE2E_PRIVILEGE_TOKEN=MEDIUM
 
@@ -73,23 +68,27 @@ Microsoft Windows [�汾 10.0.26300.9711]
 [90mstdout[2m | test/windows-host-e2e.test.ts[2m > [22m[2mT04 Windows host minimal E2E closed loop[2m > [22m[2mrefuses a real SMB mapped drive scope when one is provided
 [22m[39mE2E_SMB_MAPPED_DRIVE_NEGATIVE=SKIPPED_NO_SMB_DRIVE_PROVIDED
 
- [32m✓[39m test/windows-host-e2e.test.ts [2m([22m[2m7 tests[22m[2m)[22m[33m 1960[2mms[22m[39m
-   [33m[2m✓[22m[39m T04 Windows host minimal E2E closed loop[2m > [22maccepts a legitimate 8.3 short-path spelling of the same approved scope [33m 688[2mms[22m[39m
-   [33m[2m✓[22m[39m T04 Windows host minimal E2E closed loop[2m > [22mfails closed in a fresh process when the native addon is missing, then recovers [33m 823[2mms[22m[39m
+ [32m✓[39m test/windows-host-e2e.test.ts [2m([22m[2m7 tests[22m[2m)[22m[33m 2035[2mms[22m[39m
+   [33m[2m✓[22m[39m T04 Windows host minimal E2E closed loop[2m > [22maccepts a legitimate 8.3 short-path spelling of the same approved scope [33m 763[2mms[22m[39m
+   [33m[2m✓[22m[39m T04 Windows host minimal E2E closed loop[2m > [22mfails closed in a fresh process when the native addon is missing, then recovers [33m 837[2mms[22m[39m
 [90mstdout[2m | test/windows-host-hardkill-replay.test.ts[2m > [22m[2mT04 hard kill between durable STARTED and receipt: restart refuses replay[2m > [22m[2mkills a real composed host child post-commit and never re-dispatches
 [22m[39mE2E_HARDKILL_START_COMMITTED=PASS E2E_KILL_IDENTITY=code:null,signal:SIGKILL E2E_RESTART_NO_REPLAY=PASS
 
 [90mstdout[2m | test/windows-host-hardkill-replay.test.ts[2m > [22m[2mT04 hard kill between durable STARTED and receipt: restart refuses replay[2m > [22m[2mrejects an ordinary child exit as forced-death evidence (negative control)
 [22m[39mE2E_HARDKILL_ORDINARY_EXIT_REJECTED=PASS
 
- [32m✓[39m test/windows-host-hardkill-replay.test.ts [2m([22m[2m2 tests[22m[2m)[22m[33m 1795[2mms[22m[39m
-   [33m[2m✓[22m[39m T04 hard kill between durable STARTED and receipt: restart refuses replay[2m > [22mkills a real composed host child post-commit and never re-dispatches [33m 1537[2mms[22m[39m
- [32m✓[39m test/scoped-file-search.test.ts [2m([22m[2m15 tests[22m[2m | [22m[33m1 skipped[39m[2m)[22m[33m 1822[2mms[22m[39m
-   [33m[2m✓[22m[39m T04 Windows handle-anchored physical canaries (real win32 host)[2m > [22msurvives a real concurrent rename attacker without ever returning outside-scope paths [33m 1571[2mms[22m[39m
- [32m✓[39m test/host.test.ts [2m([22m[2m6 tests[22m[2m)[22m[33m 320[2mms[22m[39m
- [32m✓[39m test/sqlite-effect-boundary.test.ts [2m([22m[2m6 tests[22m[2m)[22m[32m 298[2mms[22m[39m
- [32m✓[39m test/sqlite-journaled-search-boundary.test.ts [2m([22m[2m4 tests[22m[2m)[22m[32m 230[2mms[22m[39m
- [32m✓[39m test/sqlite-r0-effect-journal.test.ts [2m([22m[2m5 tests[22m[2m)[22m[32m 128[2mms[22m[39m
+ [32m✓[39m test/windows-host-hardkill-replay.test.ts [2m([22m[2m2 tests[22m[2m)[22m[33m 1885[2mms[22m[39m
+   [33m[2m✓[22m[39m T04 hard kill between durable STARTED and receipt: restart refuses replay[2m > [22mkills a real composed host child post-commit and never re-dispatches [33m 1601[2mms[22m[39m
+ [32m✓[39m test/scoped-file-search.test.ts [2m([22m[2m15 tests[22m[2m | [22m[33m1 skipped[39m[2m)[22m[33m 1841[2mms[22m[39m
+   [33m[2m✓[22m[39m T04 Windows handle-anchored physical canaries (real win32 host)[2m > [22msurvives a real concurrent rename attacker without ever returning outside-scope paths [33m 1575[2mms[22m[39m
+(node:34340) [DEP0190] DeprecationWarning: Passing args to a child process with shell option true can lead to security vulnerabilities, as the arguments are not escaped, only concatenated.
+(Use `node --trace-deprecation ...` to show where the warning was created)
+ [32m✓[39m test/pack-contents.test.ts [2m([22m[2m1 test[22m[2m)[22m[33m 1453[2mms[22m[39m
+   [33m[2m✓[22m[39m T04 native package contents are runtime-only[2m > [22mnever publishes the test-only native canary or Rust build source [33m 1451[2mms[22m[39m
+ [32m✓[39m test/host.test.ts [2m([22m[2m6 tests[22m[2m)[22m[33m 333[2mms[22m[39m
+ [32m✓[39m test/sqlite-effect-boundary.test.ts [2m([22m[2m6 tests[22m[2m)[22m[32m 267[2mms[22m[39m
+ [32m✓[39m test/sqlite-journaled-search-boundary.test.ts [2m([22m[2m4 tests[22m[2m)[22m[32m 224[2mms[22m[39m
+ [32m✓[39m test/sqlite-r0-effect-journal.test.ts [2m([22m[2m5 tests[22m[2m)[22m[32m 122[2mms[22m[39m
 [90mstdout[2m | test/trusted-windows-r0-effect.test.ts[2m > [22m[2mT04 effect phase binding (R2 P1-02)[2m > [22m[2mnever mints a positive receipt without a trusted phase journal
 [22m[39mPHASE_NO_JOURNAL_NO_POSITIVE=PASS
 
@@ -105,13 +104,13 @@ Microsoft Windows [�汾 10.0.26300.9711]
 [90mstdout[2m | test/trusted-windows-r0-effect.test.ts[2m > [22m[2mT04 effect phase binding (R2 P1-02)[2m > [22m[2mdurably refuses unreserved attempts, divergence and tampered phase rows
 [22m[39mPHASE_JOURNAL_IMMUTABILITY=PASS
 
- [32m✓[39m test/trusted-windows-r0-effect.test.ts [2m([22m[2m5 tests[22m[2m)[22m[32m 108[2mms[22m[39m
- [32m✓[39m test/journaled-r0-search.test.ts [2m([22m[2m7 tests[22m[2m)[22m[32m 40[2mms[22m[39m
+ [32m✓[39m test/trusted-windows-r0-effect.test.ts [2m([22m[2m5 tests[22m[2m)[22m[32m 98[2mms[22m[39m
+ [32m✓[39m test/journaled-r0-search.test.ts [2m([22m[2m7 tests[22m[2m)[22m[32m 41[2mms[22m[39m
 
 [2m Test Files [22m [1m[32m11 passed[39m[22m[90m (11)[39m
 [2m      Tests [22m [1m[32m64 passed[39m[22m[2m | [22m[33m1 skipped[39m[90m (65)[39m
-[2m   Start at [22m 18:35:05
-[2m   Duration [22m 24.69s[2m (transform 889ms, setup 0ms, collect 3.84s, tests 15.95s, environment 3ms, prepare 1.98s)[22m
+[2m   Start at [22m 18:57:18
+[2m   Duration [22m 25.49s[2m (transform 909ms, setup 0ms, collect 3.87s, tests 16.65s, environment 3ms, prepare 1.97s)[22m
 
 PACKAGE_VITEST_EXIT=0
 
@@ -124,26 +123,25 @@ PACKAGE_VITEST_EXIT=0
 Scope: 17 of 18 workspace projects
 apps/control-ui lint$ biome check .
 packages/contracts lint$ biome check .
-packages/vertical-system lint$ biome check .
 packages/vertical-support lint$ biome check .
+packages/vertical-system lint$ biome check .
 apps/control-ui lint: Checked 4 files in 21ms. No fixes applied.
-packages/vertical-system lint: Checked 15 files in 28ms. No fixes applied.
+packages/vertical-support lint: Checked 9 files in 31ms. No fixes applied.
+packages/vertical-system lint: Checked 15 files in 24ms. No fixes applied.
 apps/control-ui lint: Done
 tests/integration lint$ node --check run-tests.mjs
-packages/vertical-support lint: Checked 9 files in 33ms. No fixes applied.
+packages/contracts lint: Checked 35 files in 72ms. No fixes applied.
 packages/vertical-system lint: Done
 packages/vertical-support lint: Done
-packages/contracts lint: Checked 35 files in 78ms. No fixes applied.
 packages/contracts lint: Done
 tests/integration lint: Done
+packages/executor-windows lint$ biome check .
 packages/authorization lint$ biome check .
 packages/llm-remote lint$ biome check .
 packages/resolver lint$ biome check .
-packages/executor-windows lint$ biome check .
-packages/llm-remote lint: Checked 10 files in 49ms. No fixes applied.
+packages/llm-remote lint: Checked 10 files in 54ms. No fixes applied.
 packages/authorization lint: Checked 17 files in 97ms. No fixes applied.
-packages/llm-remote lint: Done
-packages/vertical-image lint$ biome check .
+packages/executor-windows lint: Checked 64 files in 147ms. No fixes applied.
 packages/resolver lint: test\literal-recipe-compiler.test.ts:115:7 lint/style/useTemplate  FIXABLE  ━━━━━━━━━━━━━━━━━━━━━━━━
 packages/resolver lint:   i Template literals are preferred over string concatenation.
 packages/resolver lint:   
@@ -217,6 +215,7 @@ packages/resolver lint:     175 175 │         if (!firstPlan) return { ok: fal
 packages/resolver lint:     176 176 │         const approved = await this.host.controller.authorizePlan({ plan: firstPlan });
 packages/resolver lint:     177     │ - ······if·(!approved·||·approved.ok·!==·true)·{
 packages/resolver lint:         177 │ + ······if·(approved?.ok·!==·true)·{
+packages/llm-remote lint: Done
 packages/resolver lint:     178 178 │           return { ok: false, code: 'RECIPE_AUTHORIZATION_REFUSED' };
 packages/resolver lint:     179 179 │         }
 packages/resolver lint:   
@@ -246,6 +245,7 @@ packages/resolver lint:     174 │     }
 packages/resolver lint:     175 │     try {
 packages/resolver lint:   > 176 │       if (!facts || facts.kind !== 'CURRENT') {
 packages/resolver lint:         │           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+packages/authorization lint: Done
 packages/resolver lint:     177 │         return { ok: false, code: 'RECIPE_CURRENTNESS_UNKNOWN' };
 packages/resolver lint:     178 │       }
 packages/resolver lint:   
@@ -282,6 +282,7 @@ packages/resolver lint:     104 │       (p: ActionPlan) => {
 packages/resolver lint:   
 packages/resolver lint:   i Unsafe fix: Replace with optional chain operator ?. This operator includes runtime checks, so it is safer than the compile-only non-null assertion operator
 packages/resolver lint:   
+packages/vertical-image lint$ biome check .
 packages/resolver lint:     100 100 │       const poison = [
 packages/resolver lint:     101 101 │         (p: ActionPlan) => {
 packages/resolver lint:     102     │ - ········p.actions[0]!.parameters.root·=·'C:/private';
@@ -405,8 +406,10 @@ packages/resolver lint:     110 110 │             taskId: p.taskId,
 packages/resolver lint:     111     │ - ··········actionId:·p.actions[0]!.actionId,
 packages/resolver lint:         111 │ + ··········actionId:·p.actions[0]?.actionId,
 packages/resolver lint:     112 112 │             planHash: p.planHash,
+packages/resolver lint: Checked 38 files in 139ms. No fixes applied.
+packages/resolver lint: Found 17 warnings.
+packages/resolver lint: Found 2 infos.
 packages/resolver lint:     113 113 │             policySnapshotRevision: wrongActionPolicy ? 'forged-policy' : p.policySnapshotRevision,
-packages/authorization lint: Done
 packages/resolver lint:   
 packages/resolver lint: test\recipe-effect-runner.test.ts:117:19 lint/style/noNonNullAssertion ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 packages/resolver lint:   ! Forbidden non-null assertion.
@@ -414,30 +417,26 @@ packages/resolver lint:
 packages/resolver lint:     115 │           authorizationRef: 'grant-1',
 packages/resolver lint:     116 │           expiresAt: '2026-10-20T00:00:00.000Z',
 packages/resolver lint:   > 117 │           action: p.actions[0]!,
-packages/resolver lint: Checked 38 files in 95ms. No fixes applied.
-packages/resolver lint: Found 17 warnings.
-packages/resolver lint: Found 2 infos.
 packages/resolver lint:         │                   ^^^^^^^^^^^^^
 packages/resolver lint:     118 │         };
 packages/resolver lint:     119 │         const grant = {
 packages/resolver lint:   
-packages/executor-windows lint: Checked 64 files in 133ms. No fixes applied.
-packages/resolver lint: Done
 packages/executor-windows lint: Done
-packages/vertical-image lint: Checked 29 files in 61ms. No fixes applied.
+packages/resolver lint: Done
+packages/vertical-image lint: Checked 29 files in 64ms. No fixes applied.
 packages/vertical-image lint: Done
-packages/store lint$ biome check .
 packages/vertical-storage lint$ biome check .
-packages/store lint: Checked 18 files in 52ms. No fixes applied.
-packages/vertical-storage lint: Checked 28 files in 56ms. No fixes applied.
+packages/store lint$ biome check .
+packages/store lint: Checked 18 files in 51ms. No fixes applied.
+packages/vertical-storage lint: Checked 28 files in 62ms. No fixes applied.
 packages/store lint: Done
 packages/vertical-storage lint: Done
+packages/vertical-jit lint$ biome check .
 apps/control-api lint$ biome check . --max-diagnostics=200
 packages/recipe-runtime lint$ biome check .
-packages/vertical-jit lint$ biome check .
 packages/workflow lint$ biome check .
-packages/recipe-runtime lint: Checked 26 files in 125ms. No fixes applied.
-packages/workflow lint: Checked 20 files in 124ms. No fixes applied.
+packages/recipe-runtime lint: Checked 27 files in 151ms. No fixes applied.
+packages/workflow lint: Checked 20 files in 157ms. No fixes applied.
 apps/control-api lint: src\real-storage\backend.ts:178:25 lint/style/useTemplate  FIXABLE  ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 apps/control-api lint:   i Template literals are preferred over string concatenation.
 apps/control-api lint:   
@@ -498,8 +497,6 @@ apps/control-api lint:
 apps/control-api lint: src\real-storage\backend.ts:379:22 lint/style/useTemplate  FIXABLE  ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 apps/control-api lint:   i Template literals are preferred over string concatenation.
 apps/control-api lint:   
-packages/recipe-runtime lint: Done
-packages/workflow lint: Done
 apps/control-api lint:     377 │         : 'STANDARD_USER';
 apps/control-api lint:     378 │     return {
 apps/control-api lint:   > 379 │       environmentId: 'shun-real-storage-' + process.arch,
@@ -552,6 +549,7 @@ apps/control-api lint:     424 424 │           taskId: task.taskId,
 apps/control-api lint:     425     │ - ········goal:·CAPABILITY·+·':·'·+·task.title,
 apps/control-api lint:         425 │ + ········goal:·`${CAPABILITY}:·${task.title}`,
 apps/control-api lint:     426 426 │           objects: [{ kind: 'DIRECTORY', ref: this.#workspace }],
+packages/recipe-runtime lint: Done
 apps/control-api lint:     427 427 │           constraints: { other: { offline: true, boundedCleanup: true } },
 apps/control-api lint:   
 apps/control-api lint: src\real-storage\backend.ts:486:13 lint/style/useTemplate  FIXABLE  ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
@@ -566,7 +564,6 @@ apps/control-api lint:     488 │               recordKind: 'task',
 apps/control-api lint:   
 apps/control-api lint:   i Unsafe fix: Use a template literal.
 apps/control-api lint:   
-packages/vertical-jit lint: Checked 50 files in 175ms. No fixes applied.
 apps/control-api lint:     484 484 │             // after this commit, recovery must conservatively reconcile.
 apps/control-api lint:     485 485 │             const boundary = await this.#store.apply(
 apps/control-api lint:     486     │ - ············'real-storage-effect-authorized-'·+·task.taskId·+·'-'·+·input.action.actionId,
@@ -579,6 +576,7 @@ apps/control-api lint:   i Template literals are preferred over string concatena
 apps/control-api lint:   
 apps/control-api lint:     539 │         throw new Error('REAL_STORAGE_CANCEL_AFTER_EFFECT_AUTHORIZATION_REFUSED');
 apps/control-api lint:     540 │       }
+packages/workflow lint: Done
 apps/control-api lint:   > 541 │       const cancelled = await this.#store.apply('real-storage-cancel-' + task.taskId, {
 apps/control-api lint:         │                                                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 apps/control-api lint:     542 │         recordKind: 'task',
@@ -586,6 +584,7 @@ apps/control-api lint:     543 │         recordId: task.taskId,
 apps/control-api lint:   
 apps/control-api lint:   i Unsafe fix: Use a template literal.
 apps/control-api lint:   
+packages/vertical-jit lint: Checked 50 files in 192ms. No fixes applied.
 apps/control-api lint:     539 539 │           throw new Error('REAL_STORAGE_CANCEL_AFTER_EFFECT_AUTHORIZATION_REFUSED');
 apps/control-api lint:     540 540 │         }
 apps/control-api lint:     541     │ - ······const·cancelled·=·await·this.#store.apply('real-storage-cancel-'·+·task.taskId,·{
@@ -814,7 +813,6 @@ apps/control-api lint: test\csrf.test.ts:75:19 lint/style/noNonNullAssertion  FI
 apps/control-api lint:   ! Forbidden non-null assertion.
 apps/control-api lint:   
 apps/control-api lint:     73 │     const { taskId, approvalId, planHash } = {
-packages/vertical-jit lint: Done
 apps/control-api lint:     74 │       taskId: (created.body as TaskSnapshot).taskId,
 apps/control-api lint:   > 75 │       approvalId: (created.body as TaskSnapshot).approval!.approvalId,
 apps/control-api lint:        │                   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
@@ -847,6 +845,7 @@ apps/control-api lint:      75  75 │         approvalId: (created.body as Task
 apps/control-api lint:      76     │ - ······planHash:·(created.body·as·TaskSnapshot).approval!.planHash,
 apps/control-api lint:          76 │ + ······planHash:·(created.body·as·TaskSnapshot).approval?.planHash,
 apps/control-api lint:      77  77 │       };
+packages/vertical-jit lint: Done
 apps/control-api lint:      78  78 │       const attack = await h.raw(
 apps/control-api lint:   
 apps/control-api lint: test\csrf.test.ts:112:24 lint/style/noNonNullAssertion  FIXABLE  ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
@@ -982,16 +981,6 @@ apps/control-api lint:        27 │ + ····planHash:·detail.approval?.planH
 apps/control-api lint:     28 28 │     };
 apps/control-api lint:     29 29 │   }
 apps/control-api lint:   
-apps/control-api lint: test\policy-failsafe.test.ts:9:20 lint/style/noNonNullAssertion ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-apps/control-api lint:   ! Forbidden non-null assertion.
-apps/control-api lint:   
-apps/control-api lint:      7 │ ): Promise<{ approvalId: string; planHash: string }> {
-apps/control-api lint:      8 │   const created = await target.post('/api/tasks', cleanupGoalRequest());
-apps/control-api lint:    > 9 │   const approval = (created.body as TaskSnapshot).approval!;
-apps/control-api lint:        │                    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-apps/control-api lint:     10 │   return { approvalId: approval.approvalId, planHash: approval.planHash };
-apps/control-api lint:     11 │ }
-apps/control-api lint:   
 apps/control-api lint: test\policy-failsafe.test.ts:21:26 lint/style/noNonNullAssertion  FIXABLE  ━━━━━━━━━━━━━━━━━━━━━━━━━
 apps/control-api lint:   ! Forbidden non-null assertion.
 apps/control-api lint:   
@@ -1068,15 +1057,15 @@ apps/control-api lint:          67 │ + ······const·planHash·=·snapsho
 apps/control-api lint:      68  68 │         const refused = await trust.post(`/api/approvals/${approvalId}/decision`, {
 apps/control-api lint:      69  69 │           approved: true,
 apps/control-api lint:   
-apps/control-api lint: test\preview-prose.test.ts:37:5 lint/style/noNonNullAssertion ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+apps/control-api lint: test\policy-failsafe.test.ts:9:20 lint/style/noNonNullAssertion ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 apps/control-api lint:   ! Forbidden non-null assertion.
 apps/control-api lint:   
-apps/control-api lint:     35 │     // soften what verification means.
-apps/control-api lint:     36 │     const plan = buildImageBatchPlan('task-crafted-prose-r1');
-apps/control-api lint:   > 37 │     plan.verificationPlan.checks[1]!.description = CRAFTED_PROSE;
-apps/control-api lint:        │     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-apps/control-api lint:     38 │     const preview = previewForPlan(plan, { generatedAt: T0 });
-apps/control-api lint:     39 │     expect(JSON.stringify(preview)).not.toContain('auto-pass');
+apps/control-api lint:      7 │ ): Promise<{ approvalId: string; planHash: string }> {
+apps/control-api lint:      8 │   const created = await target.post('/api/tasks', cleanupGoalRequest());
+apps/control-api lint:    > 9 │   const approval = (created.body as TaskSnapshot).approval!;
+apps/control-api lint:        │                    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+apps/control-api lint:     10 │   return { approvalId: approval.approvalId, planHash: approval.planHash };
+apps/control-api lint:     11 │ }
 apps/control-api lint:   
 apps/control-api lint: test\preview-prose.test.ts:20:3 lint/style/noNonNullAssertion ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 apps/control-api lint:   ! Forbidden non-null assertion.
@@ -1087,6 +1076,16 @@ apps/control-api lint:   > 20 │   plan.verificationPlan.checks[0]!.description
 apps/control-api lint:        │   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 apps/control-api lint:     21 │   return plan;
 apps/control-api lint:     22 │ }
+apps/control-api lint:   
+apps/control-api lint: test\preview-prose.test.ts:37:5 lint/style/noNonNullAssertion ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+apps/control-api lint:   ! Forbidden non-null assertion.
+apps/control-api lint:   
+apps/control-api lint:     35 │     // soften what verification means.
+apps/control-api lint:     36 │     const plan = buildImageBatchPlan('task-crafted-prose-r1');
+apps/control-api lint:   > 37 │     plan.verificationPlan.checks[1]!.description = CRAFTED_PROSE;
+apps/control-api lint:        │     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+apps/control-api lint:     38 │     const preview = previewForPlan(plan, { generatedAt: T0 });
+apps/control-api lint:     39 │     expect(JSON.stringify(preview)).not.toContain('auto-pass');
 apps/control-api lint:   
 apps/control-api lint: test\preview.test.ts:82:5 lint/style/noNonNullAssertion ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 apps/control-api lint:   ! Forbidden non-null assertion.
@@ -1135,10 +1134,10 @@ apps/control-api lint:      28     │ - ····planHash:·snapshot.approval!.p
 apps/control-api lint:          28 │ + ····planHash:·snapshot.approval?.planHash,
 apps/control-api lint:      29  29 │     });
 apps/control-api lint:      30  30 │     expect((approved.body as { taskState: string }).taskState).toBe('NEEDS_INTERVENTION');
-apps/control-api lint:   
-apps/control-api lint: Checked 36 files in 164ms. No fixes applied.
+apps/control-api lint: Checked 36 files in 166ms. No fixes applied.
 apps/control-api lint: Found 29 warnings.
 apps/control-api lint: Found 10 infos.
+apps/control-api lint:   
 apps/control-api lint: Done
 packages/provider-loader lint$ biome check .
 packages/provider-loader lint: Checked 16 files in 113ms. No fixes applied.
@@ -1158,8 +1157,8 @@ packages/vertical-support typecheck: Done
 apps/control-ui typecheck: Done
 packages/contracts typecheck: Done
 packages/authorization typecheck$ tsc --noEmit
-packages/executor-windows typecheck$ tsc --noEmit
 packages/llm-remote typecheck$ tsc --noEmit
+packages/executor-windows typecheck$ tsc --noEmit
 packages/resolver typecheck$ tsc --noEmit
 packages/llm-remote typecheck: Done
 packages/vertical-image typecheck$ tsc --noEmit
@@ -1171,14 +1170,14 @@ packages/store typecheck$ tsc --noEmit
 packages/vertical-storage typecheck$ tsc --noEmit
 packages/store typecheck: Done
 packages/vertical-storage typecheck: Done
-apps/control-api typecheck$ tsc --noEmit
 packages/recipe-runtime typecheck$ tsc --noEmit
+apps/control-api typecheck$ tsc --noEmit
 packages/vertical-jit typecheck$ tsc --noEmit
 packages/workflow typecheck$ tsc --noEmit
 packages/workflow typecheck: Done
-packages/recipe-runtime typecheck: Done
 apps/control-api typecheck: Done
 packages/vertical-jit typecheck: Done
+packages/recipe-runtime typecheck: Done
 packages/provider-loader typecheck$ tsc --noEmit
 packages/provider-loader typecheck: Done
 == test ==
@@ -1187,61 +1186,61 @@ packages/provider-loader typecheck: Done
 > pnpm -r --if-present run test
 
 Scope: 17 of 18 workspace projects
-packages/contracts test$ vitest run
 apps/control-ui test$ vitest run
-packages/vertical-support test$ vitest run
 packages/vertical-system test$ vitest run
-packages/contracts test: [1m[46m RUN [49m[22m [36mv3.2.7 [39m[90mC:/xDev/kAiCreator/shun-assistant/shun-i108-r2-zc/packages/contracts[39m
+packages/contracts test$ vitest run
+packages/vertical-support test$ vitest run
 apps/control-ui test: [1m[46m RUN [49m[22m [36mv3.2.7 [39m[90mC:/xDev/kAiCreator/shun-assistant/shun-i108-r2-zc/apps/control-ui[39m
-packages/vertical-support test: [1m[46m RUN [49m[22m [36mv3.2.7 [39m[90mC:/xDev/kAiCreator/shun-assistant/shun-i108-r2-zc/packages/vertical-support[39m
+packages/contracts test: [1m[46m RUN [49m[22m [36mv3.2.7 [39m[90mC:/xDev/kAiCreator/shun-assistant/shun-i108-r2-zc/packages/contracts[39m
 packages/vertical-system test: [1m[46m RUN [49m[22m [36mv3.2.7 [39m[90mC:/xDev/kAiCreator/shun-assistant/shun-i108-r2-zc/packages/vertical-system[39m
-apps/control-ui test:  [32m✓[39m test/view-model.test.ts [2m([22m[2m20 tests[22m[2m)[22m[32m 21[2mms[22m[39m
+packages/vertical-support test: [1m[46m RUN [49m[22m [36mv3.2.7 [39m[90mC:/xDev/kAiCreator/shun-assistant/shun-i108-r2-zc/packages/vertical-support[39m
+packages/vertical-system test:  [32m✓[39m test/windows-runtime.test.ts [2m([22m[2m5 tests[22m[2m)[22m[32m 11[2mms[22m[39m
+packages/vertical-system test:  [32m✓[39m test/windows-software.test.ts [2m([22m[2m5 tests[22m[2m)[22m[32m 12[2mms[22m[39m
+packages/vertical-system test:  [32m✓[39m test/windows-pressure.test.ts [2m([22m[2m4 tests[22m[2m)[22m[32m 15[2mms[22m[39m
+apps/control-ui test:  [32m✓[39m test/view-model.test.ts [2m([22m[2m20 tests[22m[2m)[22m[32m 22[2mms[22m[39m
+packages/vertical-support test:  [32m✓[39m test/support-context.test.ts [2m([22m[2m11 tests[22m[2m)[22m[32m 46[2mms[22m[39m
+packages/vertical-system test:  [32m✓[39m test/diagnostics.test.ts [2m([22m[2m5 tests[22m[2m)[22m[32m 11[2mms[22m[39m
+packages/vertical-system test:  [32m✓[39m test/inventory.test.ts [2m([22m[2m6 tests[22m[2m)[22m[32m 13[2mms[22m[39m
 apps/control-ui test: [2m Test Files [22m [1m[32m1 passed[39m[22m[90m (1)[39m
 apps/control-ui test: [2m      Tests [22m [1m[32m20 passed[39m[22m[90m (20)[39m
-apps/control-ui test: [2m   Start at [22m 18:36:14
-apps/control-ui test: [2m   Duration [22m 1.96s[2m (transform 689ms, setup 0ms, collect 583ms, tests 21ms, environment 0ms, prepare 699ms)[22m
-packages/vertical-system test:  [32m✓[39m test/windows-software.test.ts [2m([22m[2m5 tests[22m[2m)[22m[32m 11[2mms[22m[39m
-packages/vertical-system test:  [32m✓[39m test/windows-runtime.test.ts [2m([22m[2m5 tests[22m[2m)[22m[32m 9[2mms[22m[39m
-packages/vertical-system test:  [32m✓[39m test/windows-pressure.test.ts [2m([22m[2m4 tests[22m[2m)[22m[32m 12[2mms[22m[39m
-packages/vertical-system test:  [32m✓[39m test/diagnostics.test.ts [2m([22m[2m5 tests[22m[2m)[22m[32m 24[2mms[22m[39m
-packages/vertical-system test:  [32m✓[39m test/inventory.test.ts [2m([22m[2m6 tests[22m[2m)[22m[32m 12[2mms[22m[39m
-packages/vertical-system test: [2m Test Files [22m [1m[32m5 passed[39m[22m[90m (5)[39m
-packages/vertical-system test: [2m      Tests [22m [1m[32m25 passed[39m[22m[90m (25)[39m
-packages/vertical-system test: [2m   Start at [22m 18:36:14
-packages/vertical-system test: [2m   Duration [22m 2.17s[2m (transform 2.73s, setup 0ms, collect 3.23s, tests 67ms, environment 2ms, prepare 2.60s)[22m
-packages/contracts test:  [32m✓[39m test/taxonomy.test.ts [2m([22m[2m14 tests[22m[2m)[22m[32m 13[2mms[22m[39m
-packages/vertical-support test:  [32m✓[39m test/support-context.test.ts [2m([22m[2m11 tests[22m[2m)[22m[32m 52[2mms[22m[39m
-packages/contracts test:  [32m✓[39m test/v02.test.ts [2m([22m[2m9 tests[22m[2m)[22m[32m 52[2mms[22m[39m
+apps/control-ui test: [2m   Start at [22m 18:59:39
+apps/control-ui test: [2m   Duration [22m 2.37s[2m (transform 430ms, setup 0ms, collect 370ms, tests 22ms, environment 0ms, prepare 786ms)[22m
 packages/vertical-support test: [2m Test Files [22m [1m[32m1 passed[39m[22m[90m (1)[39m
 packages/vertical-support test: [2m      Tests [22m [1m[32m11 passed[39m[22m[90m (11)[39m
-packages/vertical-support test: [2m   Start at [22m 18:36:14
-packages/vertical-support test: [2m   Duration [22m 2.58s[2m (transform 211ms, setup 0ms, collect 522ms, tests 52ms, environment 0ms, prepare 479ms)[22m
-apps/control-ui test: Done
-tests/integration test$ node run-tests.mjs
-packages/contracts test:  [32m✓[39m test/version-identity.test.ts [2m([22m[2m24 tests[22m[2m)[22m[32m 31[2mms[22m[39m
-packages/contracts test:  [32m✓[39m test/plan-hash.test.ts [2m([22m[2m6 tests[22m[2m)[22m[32m 26[2mms[22m[39m
-packages/contracts test:  [32m✓[39m test/action-id-uniqueness.test.ts [2m([22m[2m9 tests[22m[2m)[22m[32m 24[2mms[22m[39m
-packages/contracts test:  [32m✓[39m test/authorization-integrity.test.ts [2m([22m[2m19 tests[22m[2m)[22m[32m 42[2mms[22m[39m
-packages/contracts test:  [32m✓[39m test/schema-drift.test.ts [2m([22m[2m29 tests[22m[2m)[22m[32m 68[2mms[22m[39m
-packages/vertical-system test: Done
-packages/contracts test:  [32m✓[39m test/grant.test.ts [2m([22m[2m29 tests[22m[2m)[22m[32m 98[2mms[22m[39m
-packages/contracts test:  [32m✓[39m test/rejection.test.ts [2m([22m[2m25 tests[22m[2m)[22m[32m 104[2mms[22m[39m
-tests/integration test: [t10-integration] RUN b037-run.test.mjs
-packages/contracts test:  [32m✓[39m test/v02-public-parity.test.ts [2m([22m[2m11 tests[22m[2m)[22m[33m 421[2mms[22m[39m
+packages/vertical-support test: [2m   Start at [22m 18:59:39
+packages/vertical-support test: [2m   Duration [22m 2.37s[2m (transform 261ms, setup 0ms, collect 545ms, tests 46ms, environment 0ms, prepare 499ms)[22m
+packages/vertical-system test: [2m Test Files [22m [1m[32m5 passed[39m[22m[90m (5)[39m
+packages/vertical-system test: [2m      Tests [22m [1m[32m25 passed[39m[22m[90m (25)[39m
+packages/vertical-system test: [2m   Start at [22m 18:59:39
+packages/vertical-system test: [2m   Duration [22m 2.58s[2m (transform 1.40s, setup 0ms, collect 2.04s, tests 61ms, environment 2ms, prepare 3.73s)[22m
+packages/contracts test:  [32m✓[39m test/taxonomy.test.ts [2m([22m[2m14 tests[22m[2m)[22m[32m 12[2mms[22m[39m
+packages/contracts test:  [32m✓[39m test/plan-hash.test.ts [2m([22m[2m6 tests[22m[2m)[22m[32m 14[2mms[22m[39m
+packages/contracts test:  [32m✓[39m test/grant.test.ts [2m([22m[2m29 tests[22m[2m)[22m[32m 54[2mms[22m[39m
+packages/contracts test:  [32m✓[39m test/authorization-integrity.test.ts [2m([22m[2m19 tests[22m[2m)[22m[32m 43[2mms[22m[39m
+packages/contracts test:  [32m✓[39m test/rejection.test.ts [2m([22m[2m25 tests[22m[2m)[22m[32m 169[2mms[22m[39m
+packages/contracts test:  [32m✓[39m test/version-identity.test.ts [2m([22m[2m24 tests[22m[2m)[22m[32m 28[2mms[22m[39m
+packages/contracts test:  [32m✓[39m test/schema-drift.test.ts [2m([22m[2m29 tests[22m[2m)[22m[32m 63[2mms[22m[39m
+packages/contracts test:  [32m✓[39m test/v02.test.ts [2m([22m[2m9 tests[22m[2m)[22m[32m 44[2mms[22m[39m
 packages/vertical-support test: Done
-packages/contracts test:  [32m✓[39m test/schema-parity.test.ts [2m([22m[2m101 tests[22m[2m)[22m[33m 665[2mms[22m[39m
-packages/contracts test:  [32m✓[39m test/roundtrip.test.ts [2m([22m[2m43 tests[22m[2m)[22m[33m 692[2mms[22m[39m
+tests/integration test$ node run-tests.mjs
+packages/contracts test:  [32m✓[39m test/action-id-uniqueness.test.ts [2m([22m[2m9 tests[22m[2m)[22m[32m 24[2mms[22m[39m
+apps/control-ui test: Done
+packages/vertical-system test: Done
+packages/contracts test:  [32m✓[39m test/v02-public-parity.test.ts [2m([22m[2m11 tests[22m[2m)[22m[33m 330[2mms[22m[39m
+tests/integration test: [t10-integration] RUN b037-run.test.mjs
+packages/contracts test:  [32m✓[39m test/schema-parity.test.ts [2m([22m[2m101 tests[22m[2m)[22m[33m 626[2mms[22m[39m
+packages/contracts test:  [32m✓[39m test/roundtrip.test.ts [2m([22m[2m43 tests[22m[2m)[22m[33m 639[2mms[22m[39m
 packages/contracts test: [2m Test Files [22m [1m[32m12 passed[39m[22m[90m (12)[39m
 packages/contracts test: [2m      Tests [22m [1m[32m319 passed[39m[22m[90m (319)[39m
-packages/contracts test: [2m   Start at [22m 18:36:13
-packages/contracts test: [2m   Duration [22m 3.57s[2m (transform 3.22s, setup 0ms, collect 11.73s, tests 2.24s, environment 5ms, prepare 6.42s)[22m
+packages/contracts test: [2m   Start at [22m 18:59:39
+packages/contracts test: [2m   Duration [22m 3.51s[2m (transform 1.75s, setup 0ms, collect 11.38s, tests 2.04s, environment 4ms, prepare 5.20s)[22m
 packages/contracts test: Done
-tests/integration test: (node:20344) ExperimentalWarning: Transform Types is an experimental feature and might change at any time
+tests/integration test: (node:18604) ExperimentalWarning: Transform Types is an experimental feature and might change at any time
 tests/integration test: (Use `node --trace-warnings ...` to show where the warning was created)
-tests/integration test: ✔ shared resolver selects the real sharp binding under no-network gates (42.686ms)
-tests/integration test: ✔ resolver fails closed when the observed backend is not local Windows (3.7845ms)
-tests/integration test: ✔ integration constants remain tied to the frozen T09 case (0.2827ms)
-tests/integration test: ✔ T09 observation nests hard-gate evidence inside provider_selection (1.4988ms)
+tests/integration test: ✔ shared resolver selects the real sharp binding under no-network gates (35.4229ms)
+tests/integration test: ✔ resolver fails closed when the observed backend is not local Windows (3.9945ms)
+tests/integration test: ✔ integration constants remain tied to the frozen T09 case (0.3486ms)
+tests/integration test: ✔ T09 observation nests hard-gate evidence inside provider_selection (1.5028ms)
 tests/integration test: ℹ tests 4
 tests/integration test: ℹ suites 0
 tests/integration test: ℹ pass 4
@@ -1249,17 +1248,17 @@ tests/integration test: ℹ fail 0
 tests/integration test: ℹ cancelled 0
 tests/integration test: ℹ skipped 0
 tests/integration test: ℹ todo 0
-tests/integration test: ℹ duration_ms 922.7437
+tests/integration test: ℹ duration_ms 927.4339
 tests/integration test: [t10-integration] RUN b039-run.test.mjs
-tests/integration test: (node:7980) ExperimentalWarning: Transform Types is an experimental feature and might change at any time
+tests/integration test: (node:33304) ExperimentalWarning: Transform Types is an experimental feature and might change at any time
 tests/integration test: (Use `node --trace-warnings ...` to show where the warning was created)
-tests/integration test: ✔ shared resolver selects the native local storage binding with no network (29.781ms)
-tests/integration test: ✔ resolver fails closed when the observed backend is not local Windows (3.0677ms)
-tests/integration test: ✔ adapter source never imports or reads T09 private gold (6.7251ms)
-tests/integration test: ✔ growth refinement uses only checkpoint metadata and rejects an ambiguous largest file (1.0366ms)
-tests/integration test: ✔ event sequence is emitted only when production evidence proves every phase (2.3805ms)
-tests/integration test: ✔ B-039 real SQLite authority adapter preserves initial policy across close/reopen (48.4778ms)
-tests/integration test: ✔ B-039 durable grant survives restart, and persisted revocation refuses the effect (63.7049ms)
+tests/integration test: ✔ shared resolver selects the native local storage binding with no network (23.5848ms)
+tests/integration test: ✔ resolver fails closed when the observed backend is not local Windows (3.557ms)
+tests/integration test: ✔ adapter source never imports or reads T09 private gold (4.9625ms)
+tests/integration test: ✔ growth refinement uses only checkpoint metadata and rejects an ambiguous largest file (1.1511ms)
+tests/integration test: ✔ event sequence is emitted only when production evidence proves every phase (1.3998ms)
+tests/integration test: ✔ B-039 real SQLite authority adapter preserves initial policy across close/reopen (45.6894ms)
+tests/integration test: ✔ B-039 durable grant survives restart, and persisted revocation refuses the effect (69.786ms)
 tests/integration test: ℹ tests 7
 tests/integration test: ℹ suites 0
 tests/integration test: ℹ pass 7
@@ -1267,14 +1266,14 @@ tests/integration test: ℹ fail 0
 tests/integration test: ℹ cancelled 0
 tests/integration test: ℹ skipped 0
 tests/integration test: ℹ todo 0
-tests/integration test: ℹ duration_ms 884.551
+tests/integration test: ℹ duration_ms 929.1219
 tests/integration test: [t10-integration] RUN b040-run.test.mjs
-tests/integration test: (node:28752) ExperimentalWarning: Transform Types is an experimental feature and might change at any time
+tests/integration test: (node:35772) ExperimentalWarning: Transform Types is an experimental feature and might change at any time
 tests/integration test: (Use `node --trace-warnings ...` to show where the warning was created)
-tests/integration test: ✔ uses real host sections and only bounded adversarial redaction metadata (8.4036ms)
-tests/integration test: ✔ rejects a nonlocal host collector result instead of inventing zero disclosure (2.6383ms)
-tests/integration test: ✔ rejects missing audit markers and unreviewed report metadata (1.9408ms)
-tests/integration test: ﹣ does not run collector on a non-Windows host (0.2299ms) # real Windows collection belongs to the explicit local host gate
+tests/integration test: ✔ uses real host sections and only bounded adversarial redaction metadata (10.7191ms)
+tests/integration test: ✔ rejects a nonlocal host collector result instead of inventing zero disclosure (1.4284ms)
+tests/integration test: ✔ rejects missing audit markers and unreviewed report metadata (3.7757ms)
+tests/integration test: ﹣ does not run collector on a non-Windows host (0.4964ms) # real Windows collection belongs to the explicit local host gate
 tests/integration test: ℹ tests 4
 tests/integration test: ℹ suites 0
 tests/integration test: ℹ pass 3
@@ -1282,164 +1281,168 @@ tests/integration test: ℹ fail 0
 tests/integration test: ℹ cancelled 0
 tests/integration test: ℹ skipped 1
 tests/integration test: ℹ todo 0
-tests/integration test: ℹ duration_ms 428.9752
+tests/integration test: ℹ duration_ms 431.1392
 tests/integration test: [t10-integration] PASS 3 file(s)
 tests/integration test: Done
-packages/authorization test$ vitest run
 packages/executor-windows test$ vitest run
-packages/resolver test$ vitest run
+packages/authorization test$ vitest run
 packages/llm-remote test$ vitest run
+packages/resolver test$ vitest run
+packages/executor-windows test: [1m[46m RUN [49m[22m [36mv3.2.7 [39m[90mC:/xDev/kAiCreator/shun-assistant/shun-i108-r2-zc/packages/executor-windows[39m
 packages/resolver test: [1m[46m RUN [49m[22m [36mv3.2.7 [39m[90mC:/xDev/kAiCreator/shun-assistant/shun-i108-r2-zc/packages/resolver[39m
 packages/authorization test: [1m[46m RUN [49m[22m [36mv3.2.7 [39m[90mC:/xDev/kAiCreator/shun-assistant/shun-i108-r2-zc/packages/authorization[39m
 packages/llm-remote test: [1m[46m RUN [49m[22m [36mv3.2.7 [39m[90mC:/xDev/kAiCreator/shun-assistant/shun-i108-r2-zc/packages/llm-remote[39m
-packages/executor-windows test: [1m[46m RUN [49m[22m [36mv3.2.7 [39m[90mC:/xDev/kAiCreator/shun-assistant/shun-i108-r2-zc/packages/executor-windows[39m
-packages/llm-remote test:  [32m✓[39m test/planner-port.test.ts [2m([22m[2m8 tests[22m[2m)[22m[32m 129[2mms[22m[39m
-packages/llm-remote test:  [32m✓[39m test/atomic-budget.test.ts [2m([22m[2m6 tests[22m[2m)[22m[33m 323[2mms[22m[39m
-packages/llm-remote test:  [32m✓[39m test/deepseek-transport.test.ts [2m([22m[2m9 tests[22m[2m)[22m[33m 488[2mms[22m[39m
-packages/llm-remote test: [2m Test Files [22m [1m[32m3 passed[39m[22m[90m (3)[39m
-packages/llm-remote test: [2m      Tests [22m [1m[32m23 passed[39m[22m[90m (23)[39m
-packages/llm-remote test: [2m   Start at [22m 18:36:20
-packages/llm-remote test: [2m   Duration [22m 3.81s[2m (transform 1.49s, setup 0ms, collect 4.18s, tests 940ms, environment 1ms, prepare 2.47s)[22m
-packages/llm-remote test: Done
-packages/vertical-image test$ vitest run
-packages/executor-windows test:  [32m✓[39m test/anchor-writer-build.test.ts [2m([22m[2m1 test[22m[2m)[22m[33m 1189[2mms[22m[39m
-packages/executor-windows test:    [33m[2m✓[22m[39m C06 R5 anchor-writer production bundle[2m > [22mbundles as one ESM artifact with root/key compile-time constants [33m 1186[2mms[22m[39m
-packages/authorization test:  [32m✓[39m test/policy-change-between-effects.test.ts [2m([22m[2m7 tests[22m[2m)[22m[32m 112[2mms[22m[39m
-packages/authorization test:  [32m✓[39m test/adversarial-r2.test.ts [2m([22m[2m14 tests[22m[2m)[22m[32m 80[2mms[22m[39m
-packages/authorization test:  [32m✓[39m test/authority.test.ts [2m([22m[2m28 tests[22m[2m)[22m[32m 135[2mms[22m[39m
-packages/authorization test:  [32m✓[39m test/adversarial-r1.test.ts [2m([22m[2m11 tests[22m[2m)[22m[32m 147[2mms[22m[39m
-packages/authorization test:  [32m✓[39m test/boundary-negative.test.ts [2m([22m[2m29 tests[22m[2m)[22m[32m 215[2mms[22m[39m
-packages/authorization test:  [32m✓[39m test/controller.test.ts [2m([22m[2m35 tests[22m[2m)[22m[33m 321[2mms[22m[39m
+packages/llm-remote test:  [32m✓[39m test/planner-port.test.ts [2m([22m[2m8 tests[22m[2m)[22m[32m 62[2mms[22m[39m
+packages/authorization test:  [32m✓[39m test/adversarial-r2.test.ts [2m([22m[2m14 tests[22m[2m)[22m[32m 86[2mms[22m[39m
+packages/authorization test:  [32m✓[39m test/adversarial-r1.test.ts [2m([22m[2m11 tests[22m[2m)[22m[32m 112[2mms[22m[39m
+packages/authorization test:  [32m✓[39m test/policy-change-between-effects.test.ts [2m([22m[2m7 tests[22m[2m)[22m[32m 154[2mms[22m[39m
+packages/authorization test:  [32m✓[39m test/boundary-negative.test.ts [2m([22m[2m29 tests[22m[2m)[22m[32m 182[2mms[22m[39m
+packages/resolver test:  [32m✓[39m test/feasibility.test.ts [2m([22m[2m13 tests[22m[2m)[22m[32m 18[2mms[22m[39m
+packages/resolver test:  [32m✓[39m test/literal-recipe-compiler.test.ts [2m([22m[2m8 tests[22m[2m)[22m[32m 37[2mms[22m[39m
+packages/resolver test:  [32m✓[39m test/planner-adapter.test.ts [2m([22m[2m7 tests[22m[2m)[22m[32m 82[2mms[22m[39m
+packages/authorization test:  [32m✓[39m test/controller.test.ts [2m([22m[2m35 tests[22m[2m)[22m[32m 221[2mms[22m[39m
+packages/authorization test:  [32m✓[39m test/authority.test.ts [2m([22m[2m28 tests[22m[2m)[22m[32m 254[2mms[22m[39m
 packages/authorization test: [2m Test Files [22m [1m[32m6 passed[39m[22m[90m (6)[39m
 packages/authorization test: [2m      Tests [22m [1m[32m124 passed[39m[22m[90m (124)[39m
-packages/authorization test: [2m   Start at [22m 18:36:20
-packages/authorization test: [2m   Duration [22m 4.88s[2m (transform 3.38s, setup 0ms, collect 14.57s, tests 1.01s, environment 3ms, prepare 5.03s)[22m
-packages/resolver test:  [32m✓[39m test/feasibility.test.ts [2m([22m[2m13 tests[22m[2m)[22m[32m 15[2mms[22m[39m
-packages/resolver test:  [32m✓[39m test/hard-gates.test.ts [2m([22m[2m32 tests[22m[2m)[22m[32m 24[2mms[22m[39m
-packages/resolver test:  [32m✓[39m test/recipe-resolver.test.ts [2m([22m[2m6 tests[22m[2m)[22m[32m 29[2mms[22m[39m
-packages/resolver test:  [32m✓[39m test/literal-recipe-compiler.test.ts [2m([22m[2m8 tests[22m[2m)[22m[32m 47[2mms[22m[39m
-packages/resolver test:  [32m✓[39m test/goal-normalization.test.ts [2m([22m[2m10 tests[22m[2m)[22m[32m 12[2mms[22m[39m
-packages/resolver test:  [32m✓[39m test/planner-adapter.test.ts [2m([22m[2m7 tests[22m[2m)[22m[32m 43[2mms[22m[39m
-packages/resolver test:  [32m✓[39m test/trusted-recipe-host.test.ts [2m([22m[2m5 tests[22m[2m)[22m[32m 71[2mms[22m[39m
-packages/resolver test:  [32m✓[39m test/recipe-controller-handoff.test.ts [2m([22m[2m8 tests[22m[2m)[22m[32m 83[2mms[22m[39m
-packages/resolver test:  [32m✓[39m test/active-recipe-resolver.test.ts [2m([22m[2m7 tests[22m[2m)[22m[32m 80[2mms[22m[39m
-packages/resolver test:  [32m✓[39m test/recipe-effect-runner.test.ts [2m([22m[2m10 tests[22m[2m)[22m[32m 80[2mms[22m[39m
-packages/resolver test:  [32m✓[39m test/planner-seam.test.ts [2m([22m[2m14 tests[22m[2m)[22m[32m 115[2mms[22m[39m
-packages/resolver test:  [32m✓[39m test/registry-integrity.test.ts [2m([22m[2m14 tests[22m[2m)[22m[32m 89[2mms[22m[39m
-packages/resolver test:  [32m✓[39m test/adversarial-r2.test.ts [2m([22m[2m10 tests[22m[2m)[22m[32m 104[2mms[22m[39m
+packages/authorization test: [2m   Start at [22m 18:59:46
+packages/authorization test: [2m   Duration [22m 4.68s[2m (transform 4.43s, setup 0ms, collect 12.98s, tests 1.01s, environment 2ms, prepare 4.87s)[22m
+packages/llm-remote test:  [32m✓[39m test/atomic-budget.test.ts [2m([22m[2m6 tests[22m[2m)[22m[33m 594[2mms[22m[39m
+packages/resolver test:  [32m✓[39m test/hard-gates.test.ts [2m([22m[2m32 tests[22m[2m)[22m[32m 55[2mms[22m[39m
+packages/resolver test:  [32m✓[39m test/recipe-resolver.test.ts [2m([22m[2m6 tests[22m[2m)[22m[32m 93[2mms[22m[39m
+packages/resolver test:  [32m✓[39m test/goal-normalization.test.ts [2m([22m[2m10 tests[22m[2m)[22m[32m 56[2mms[22m[39m
+packages/resolver test:  [32m✓[39m test/planner-seam.test.ts [2m([22m[2m14 tests[22m[2m)[22m[32m 103[2mms[22m[39m
+packages/resolver test:  [32m✓[39m test/recipe-controller-handoff.test.ts [2m([22m[2m8 tests[22m[2m)[22m[32m 64[2mms[22m[39m
+packages/resolver test:  [32m✓[39m test/recipe-effect-runner.test.ts [2m([22m[2m10 tests[22m[2m)[22m[32m 129[2mms[22m[39m
+packages/resolver test:  [32m✓[39m test/active-recipe-resolver.test.ts [2m([22m[2m7 tests[22m[2m)[22m[32m 109[2mms[22m[39m
+packages/resolver test:  [32m✓[39m test/trusted-recipe-host.test.ts [2m([22m[2m5 tests[22m[2m)[22m[32m 83[2mms[22m[39m
+packages/resolver test:  [32m✓[39m test/adversarial-r2.test.ts [2m([22m[2m10 tests[22m[2m)[22m[32m 90[2mms[22m[39m
+packages/resolver test:  [32m✓[39m test/registry-integrity.test.ts [2m([22m[2m14 tests[22m[2m)[22m[32m 143[2mms[22m[39m
+packages/resolver test:  [32m✓[39m test/gold-evidence.test.ts [2m([22m[2m6 tests[22m[2m)[22m[32m 103[2mms[22m[39m
+packages/resolver test:  [32m✓[39m test/resolve.test.ts [2m([22m[2m23 tests[22m[2m)[22m[32m 182[2mms[22m[39m
+packages/llm-remote test:  [32m✓[39m test/deepseek-transport.test.ts [2m([22m[2m9 tests[22m[2m)[22m[33m 1014[2mms[22m[39m
+packages/llm-remote test: [2m Test Files [22m [1m[32m3 passed[39m[22m[90m (3)[39m
+packages/llm-remote test: [2m      Tests [22m [1m[32m23 passed[39m[22m[90m (23)[39m
+packages/llm-remote test: [2m   Start at [22m 18:59:46
+packages/llm-remote test: [2m   Duration [22m 5.19s[2m (transform 3.17s, setup 0ms, collect 7.10s, tests 1.67s, environment 1ms, prepare 1.82s)[22m
 packages/authorization test: Done
-packages/resolver test:  [32m✓[39m test/gold-evidence.test.ts [2m([22m[2m6 tests[22m[2m)[22m[32m 159[2mms[22m[39m
-packages/resolver test:  [32m✓[39m test/resolve.test.ts [2m([22m[2m23 tests[22m[2m)[22m[32m 162[2mms[22m[39m
+packages/vertical-image test$ vitest run
+packages/llm-remote test: Done
 packages/resolver test:  [32m✓[39m test/ranking.test.ts [2m([22m[2m6 tests[22m[2m)[22m[32m 12[2mms[22m[39m
-packages/vertical-image test: [1m[46m RUN [49m[22m [36mv3.2.7 [39m[90mC:/xDev/kAiCreator/shun-assistant/shun-i108-r2-zc/packages/vertical-image[39m
 packages/resolver test: [2m Test Files [22m [1m[32m16 passed[39m[22m[90m (16)[39m
 packages/resolver test: [2m      Tests [22m [1m[32m179 passed[39m[22m[90m (179)[39m
-packages/resolver test: [2m   Start at [22m 18:36:20
-packages/resolver test: [2m   Duration [22m 6.35s[2m (transform 15.07s, setup 0ms, collect 44.24s, tests 1.12s, environment 8ms, prepare 10.05s)[22m
-packages/executor-windows test:  [32m✓[39m test/recovery-honesty.test.ts [2m([22m[2m14 tests[22m[2m)[22m[33m 1536[2mms[22m[39m
+packages/resolver test: [2m   Start at [22m 18:59:46
+packages/resolver test: [2m   Duration [22m 5.94s[2m (transform 9.06s, setup 0ms, collect 33.46s, tests 1.36s, environment 7ms, prepare 13.20s)[22m
 packages/resolver test: Done
-packages/executor-windows test:  [32m✓[39m test/privileged-env-sterilization.test.ts [2m([22m[2m3 tests[22m[2m)[22m[33m 1986[2mms[22m[39m
-packages/executor-windows test:    [33m[2m✓[22m[39m N-R2-1 — the launcher→relay spawn carries NO hostile environment[2m > [22mspawnRelay runs the relay with a sterilized environment (NODE_OPTIONS/NODE_PATH have no carrier) [33m 1724[2mms[22m[39m
+packages/executor-windows test:  [32m✓[39m test/facts.test.ts [2m([22m[2m7 tests[22m[2m)[22m[33m 1871[2mms[22m[39m
+packages/executor-windows test:    [33m[2m✓[22m[39m whoami token probe anchoring + identity pin (N-1)[2m > [22mresolves whoami.exe under SystemRoot only through a pinned authority store [33m 420[2mms[22m[39m
+packages/executor-windows test:    [33m[2m✓[22m[39m whoami token probe anchoring + identity pin (N-1)[2m > [22mreal probe (win32)[2m > [22mstill observes the real token with PATH wiped (PATH-injection immune) [33m 1215[2mms[22m[39m
+packages/vertical-image test: [1m[46m RUN [49m[22m [36mv3.2.7 [39m[90mC:/xDev/kAiCreator/shun-assistant/shun-i108-r2-zc/packages/vertical-image[39m
+packages/executor-windows test:  [32m✓[39m test/recovery-honesty.test.ts [2m([22m[2m14 tests[22m[2m)[22m[33m 2051[2mms[22m[39m
+packages/executor-windows test:  [32m✓[39m test/privileged-env-sterilization.test.ts [2m([22m[2m3 tests[22m[2m)[22m[33m 2037[2mms[22m[39m
+packages/executor-windows test:    [33m[2m✓[22m[39m N-R2-1 — the injection mechanism itself (control, expected to succeed)[2m > [22ma poisoned NODE_OPTIONS=--require really executes attacker JS in a spawned node [33m 392[2mms[22m[39m
+packages/executor-windows test:    [33m[2m✓[22m[39m N-R2-1 — the launcher→relay spawn carries NO hostile environment[2m > [22mspawnRelay runs the relay with a sterilized environment (NODE_OPTIONS/NODE_PATH have no carrier) [33m 1632[2mms[22m[39m
+packages/executor-windows test: authority store has no helper pin — refusing to execute (fail closed)
+packages/executor-windows test:  [32m✓[39m test/authority-dir.test.ts [2m([22m[2m6 tests[22m[2m)[22m[33m 2472[2mms[22m[39m
+packages/executor-windows test:    [33m[2m✓[22m[39m empty-define helper bundle vs a launcher-planted CWD trust anchor (real bundle)[2m > [22mrefuses pre-journal — the planted CWD pin is NOT honored (no files written) [33m 513[2mms[22m[39m
+packages/executor-windows test:  [32m✓[39m test/system-tools-pin.test.ts [2m([22m[2m10 tests[22m[2m)[22m[33m 2474[2mms[22m[39m
+packages/executor-windows test:    [33m[2m✓[22m[39m N-1 — resolver wrappers verify against the authority store[2m > [22mwith a pinned store, every security-relevant tool resolves to the real binary [33m 1281[2mms[22m[39m
+packages/executor-windows test:    [33m[2m✓[22m[39m N-1 — resolver wrappers verify against the authority store[2m > [22mthe host pin writer records the REAL host tool digests [33m 407[2mms[22m[39m
+packages/executor-windows test:    [33m[2m✓[22m[39m N-1 — resolver wrappers verify against the authority store[2m > [22mF-4: the package index exports the pin provisioning API (compile-level check) [33m 693[2mms[22m[39m
+packages/executor-windows test:  [32m✓[39m test/anchor-interim-failclosed.test.ts [2m([22m[2m5 tests[22m[2m)[22m[33m 2803[2mms[22m[39m
+packages/executor-windows test:    [33m[2m✓[22m[39m C06 R5 — deny-to-self ACL theater is not a protected deployment[2m > [22ma runtime-owned root stays forgeable even after it denies itself data writes [33m 716[2mms[22m[39m
+packages/executor-windows test: node.exe identity mismatch: measured sha256 ba4e6d110e8c1592a1ecd390f6b05f3da124b13871a5be62b341a07a853c6c32 != pinned 1538bf71f41a30bfc408d4f48a3a57cf62a1fc0958e0b3d7477e6b682925b817 — refusing to run on an unpinned interpreter
+packages/executor-windows test: I/O path refused: resolved I/O path C:\Users\15549\AppData\Local\Temp\shun-c07-evidence-bcXFGe escapes the pinned workspace root C:\Users\15549\AppData\Local\Temp\shun-c07-MvcDUk\workspace (junction/symlink escape refused)
+packages/executor-windows test:  [32m✓[39m test/interpreter.test.ts [2m([22m[2m15 tests[22m[2m)[22m[33m 3805[2mms[22m[39m
+packages/executor-windows test:    [33m[2m✓[22m[39m registry ops (HKCU)[2m > [22mcreate → setValue → verify → delete lifecycle [33m 898[2mms[22m[39m
+packages/executor-windows test:    [33m[2m✓[22m[39m proc.exec (typed argv, shell:false)[2m > [22marguments arrive BYTE-EXACT — metacharacters are data, not syntax [33m 636[2mms[22m[39m
+packages/executor-windows test:    [33m[2m✓[22m[39m proc.exec (typed argv, shell:false)[2m > [22mexpected exit code matching works [33m 364[2mms[22m[39m
+packages/executor-windows test:    [33m[2m✓[22m[39m proc.exec (typed argv, shell:false)[2m > [22mper-step deadline kills the child and fails the step (launcher-side tree-kill path) [33m 1583[2mms[22m[39m
+packages/executor-windows test:  [32m✓[39m test/anchor-writer-build.test.ts [2m([22m[2m1 test[22m[2m)[22m[33m 920[2mms[22m[39m
+packages/executor-windows test:    [33m[2m✓[22m[39m C06 R5 anchor-writer production bundle[2m > [22mbundles as one ESM artifact with root/key compile-time constants [33m 918[2mms[22m[39m
+packages/vertical-image test:  [32m✓[39m test/dims.test.ts [2m([22m[2m5 tests[22m[2m)[22m[32m 8[2mms[22m[39m
 packages/vertical-image test:  [32m✓[39m test/sniff.test.ts [2m([22m[2m5 tests[22m[2m)[22m[32m 7[2mms[22m[39m
-packages/vertical-image test:  [32m✓[39m test/dims.test.ts [2m([22m[2m5 tests[22m[2m)[22m[32m 10[2mms[22m[39m
-packages/executor-windows test:  [32m✓[39m test/system-tools-pin.test.ts [2m([22m[2m10 tests[22m[2m)[22m[33m 2674[2mms[22m[39m
-packages/executor-windows test:    [33m[2m✓[22m[39m N-1 — resolver wrappers verify against the authority store[2m > [22mwith a pinned store, every security-relevant tool resolves to the real binary [33m 1829[2mms[22m[39m
-packages/executor-windows test:    [33m[2m✓[22m[39m N-1 — resolver wrappers verify against the authority store[2m > [22mthe host pin writer records the REAL host tool digests [33m 381[2mms[22m[39m
-packages/executor-windows test:    [33m[2m✓[22m[39m N-1 — resolver wrappers verify against the authority store[2m > [22mF-4: the package index exports the pin provisioning API (compile-level check) [33m 431[2mms[22m[39m
-packages/vertical-image test:  [32m✓[39m test/exif.test.ts [2m([22m[2m3 tests[22m[2m)[22m[32m 113[2mms[22m[39m
-packages/vertical-image test:  [32m✓[39m test/engine.test.ts [2m([22m[2m6 tests[22m[2m)[22m[33m 480[2mms[22m[39m
-packages/vertical-image test:    [33m[2m✓[22m[39m makeSharpImageProvider[2m > [22mresizes a JPG to exact target dims and preserves the capture date [33m 301[2mms[22m[39m
-packages/executor-windows test: authority store has no helper pin — refusing to execute (fail closed)
-packages/executor-windows test:  [32m✓[39m test/authority-dir.test.ts [2m([22m[2m6 tests[22m[2m)[22m[33m 3097[2mms[22m[39m
-packages/executor-windows test:    [33m[2m✓[22m[39m empty-define helper bundle vs a launcher-planted CWD trust anchor (real bundle)[2m > [22mrefuses pre-journal — the planted CWD pin is NOT honored (no files written) [33m 507[2mms[22m[39m
-packages/executor-windows test: I/O path refused: resolved I/O path C:\Users\15549\AppData\Local\Temp\shun-c07-evidence-PYoGW7 escapes the pinned workspace root C:\Users\15549\AppData\Local\Temp\shun-c07-lRROUN\workspace (junction/symlink escape refused)
-packages/vertical-image test:  [32m✓[39m test/selector-oracle.test.ts [2m([22m[2m13 tests[22m[2m)[22m[33m 1023[2mms[22m[39m
-packages/vertical-image test:    [33m[2m✓[22m[39m commitOracle[2m > [22mgenerates lossless references at the exact output dimensions [33m 860[2mms[22m[39m
-packages/vertical-image test:  [32m✓[39m test/owned-dir.test.ts [2m([22m[2m4 tests[22m[2m)[22m[33m 1338[2mms[22m[39m
-packages/vertical-image test:    [33m[2m✓[22m[39m owned-dir guard (VI-P1-05)[2m > [22mrun-b037 refuses a user corpus directory and deletes nothing (VI-P1-05) [33m 1197[2mms[22m[39m
-packages/executor-windows test:  [32m✓[39m test/interpreter.test.ts [2m([22m[2m15 tests[22m[2m)[22m[33m 3847[2mms[22m[39m
-packages/executor-windows test:    [33m[2m✓[22m[39m registry ops (HKCU)[2m > [22mcreate → setValue → verify → delete lifecycle [33m 1405[2mms[22m[39m
-packages/executor-windows test:    [33m[2m✓[22m[39m proc.exec (typed argv, shell:false)[2m > [22mnon-zero exit is a structured step failure with the exit code [33m 319[2mms[22m[39m
-packages/executor-windows test:    [33m[2m✓[22m[39m proc.exec (typed argv, shell:false)[2m > [22mper-step deadline kills the child and fails the step (launcher-side tree-kill path) [33m 1582[2mms[22m[39m
-packages/executor-windows test: node.exe identity mismatch: measured sha256 ba4e6d110e8c1592a1ecd390f6b05f3da124b13871a5be62b341a07a853c6c32 != pinned e787da49de6710ff28ac2004aa27cf1bd7a34b9c4793d57bd8c7af4f0ad72b83 — refusing to run on an unpinned interpreter
-packages/executor-windows test:  [32m✓[39m test/anchor-interim-failclosed.test.ts [2m([22m[2m5 tests[22m[2m)[22m[33m 4290[2mms[22m[39m
-packages/executor-windows test:    [33m[2m✓[22m[39m C06 R5 — deny-to-self ACL theater is not a protected deployment[2m > [22ma runtime-owned root stays forgeable even after it denies itself data writes [33m 373[2mms[22m[39m
-packages/vertical-image test:  [32m✓[39m test/path-alias.test.ts [2m([22m[2m3 tests[22m[2m)[22m[33m 796[2mms[22m[39m
-packages/vertical-image test:    [33m[2m✓[22m[39m output/input directory alias precheck (VI-P1-03)[2m > [22mdoes not block a genuinely distinct output directory (overblocking guard) [33m 454[2mms[22m[39m
-packages/executor-windows test: I/O path refused: resolved I/O path C:\Users\15549\AppData\Local\Temp\shun-c07-journal-br51Md\journal.jsonl escapes the pinned workspace root C:\Users\15549\AppData\Local\Temp\shun-c07-lRROUN\workspace (junction/symlink escape refused)
-packages/executor-windows test:  [32m✓[39m test/facts.test.ts [2m([22m[2m7 tests[22m[2m)[22m[33m 4461[2mms[22m[39m
-packages/executor-windows test:    [33m[2m✓[22m[39m whoami token probe anchoring + identity pin (N-1)[2m > [22mresolves whoami.exe under SystemRoot only through a pinned authority store [33m 1479[2mms[22m[39m
-packages/executor-windows test:    [33m[2m✓[22m[39m whoami token probe anchoring + identity pin (N-1)[2m > [22mreal probe (win32)[2m > [22mstill observes the real token with PATH wiped (PATH-injection immune) [33m 2763[2mms[22m[39m
-packages/executor-windows test:  [32m✓[39m test/recovery.test.ts [2m([22m[2m13 tests[22m[2m)[22m[32m 237[2mms[22m[39m
-packages/executor-windows test:  [32m✓[39m test/fs-safety.test.ts [2m([22m[2m5 tests[22m[2m)[22m[33m 815[2mms[22m[39m
-packages/executor-windows test:    [33m[2m✓[22m[39m resolveWithinScope (real fs)[2m > [22mrefuses a lexically-legal path resolving OUTSIDE the scope (realpath check) [33m 795[2mms[22m[39m
-packages/executor-windows test:  [32m✓[39m test/authority-same-user-known-open.test.ts [2m([22m[2m1 test[22m[2m)[22m[33m 5086[2mms[22m[39m
-packages/executor-windows test:    [33m[2m✓[22m[39m C06 KNOWN-OPEN (P0, escalated): same-user re-signed anchors must NOT authenticate[2m > [22ma same-user attacker who replaces the co-located HMAC key and re-signs gets NOTHING through the boundary [33m 1916[2mms[22m[39m
-packages/executor-windows test: I/O path refused: resolved I/O path C:\Users\15549\AppData\Local\Temp\shun-c07-lexical-aA1d7I\journal.jsonl escapes the pinned workspace root C:\Users\15549\AppData\Local\Temp\shun-c07-lRROUN\workspace (junction/symlink escape refused)
-packages/executor-windows test:  [32m✓[39m test/authority-writer-negative.test.ts [2m([22m[2m17 tests[22m[2m)[22m[33m 602[2mms[22m[39m
-packages/executor-windows test:  [32m✓[39m test/system-root-resolution.test.ts [2m([22m[2m19 tests[22m[2m)[22m[32m 260[2mms[22m[39m
-packages/executor-windows test:  [32m✓[39m test/journal-corruption.test.ts [2m([22m[2m7 tests[22m[2m)[22m[32m 103[2mms[22m[39m
-packages/executor-windows test:  [32m✓[39m test/trusted-store.test.ts [2m([22m[2m21 tests[22m[2m)[22m[32m 141[2mms[22m[39m
-packages/executor-windows test:  [32m✓[39m test/journal.test.ts [2m([22m[2m5 tests[22m[2m)[22m[32m 75[2mms[22m[39m
-packages/executor-windows test:  [32m✓[39m test/journal-durability.test.ts [2m([22m[2m3 tests[22m[2m)[22m[32m 47[2mms[22m[39m
-packages/executor-windows test:  [32m✓[39m test/authority-writer-sealing.test.ts [2m([22m[2m2 tests[22m[2m)[22m[32m 26[2mms[22m[39m
-packages/executor-windows test:  [32m✓[39m test/action-id.test.ts [2m([22m[2m4 tests[22m[2m)[22m[32m 9[2mms[22m[39m
+packages/vertical-image test:  [32m✓[39m test/exif.test.ts [2m([22m[2m3 tests[22m[2m)[22m[32m 126[2mms[22m[39m
+packages/executor-windows test:  [32m✓[39m test/recovery.test.ts [2m([22m[2m13 tests[22m[2m)[22m[32m 149[2mms[22m[39m
+packages/vertical-image test:  [32m✓[39m test/engine.test.ts [2m([22m[2m6 tests[22m[2m)[22m[32m 262[2mms[22m[39m
+packages/executor-windows test:  [32m✓[39m test/trusted-store.test.ts [2m([22m[2m21 tests[22m[2m)[22m[32m 68[2mms[22m[39m
+packages/vertical-image test:  [32m✓[39m test/selector-oracle.test.ts [2m([22m[2m13 tests[22m[2m)[22m[33m 471[2mms[22m[39m
+packages/vertical-image test:    [33m[2m✓[22m[39m commitOracle[2m > [22mgenerates lossless references at the exact output dimensions [33m 412[2mms[22m[39m
+packages/executor-windows test:  [32m✓[39m test/authority-same-user-known-open.test.ts [2m([22m[2m1 test[22m[2m)[22m[33m 4959[2mms[22m[39m
+packages/executor-windows test:    [33m[2m✓[22m[39m C06 KNOWN-OPEN (P0, escalated): same-user re-signed anchors must NOT authenticate[2m > [22ma same-user attacker who replaces the co-located HMAC key and re-signs gets NOTHING through the boundary [33m 3823[2mms[22m[39m
+packages/executor-windows test: I/O path refused: resolved I/O path C:\Users\15549\AppData\Local\Temp\shun-c07-journal-L1Q9V8\journal.jsonl escapes the pinned workspace root C:\Users\15549\AppData\Local\Temp\shun-c07-MvcDUk\workspace (junction/symlink escape refused)
+packages/executor-windows test:  [32m✓[39m test/journal.test.ts [2m([22m[2m5 tests[22m[2m)[22m[32m 78[2mms[22m[39m
+packages/executor-windows test:  [32m✓[39m test/journal-corruption.test.ts [2m([22m[2m7 tests[22m[2m)[22m[32m 90[2mms[22m[39m
+packages/executor-windows test:  [32m✓[39m test/journal-durability.test.ts [2m([22m[2m3 tests[22m[2m)[22m[32m 77[2mms[22m[39m
+packages/executor-windows test:  [32m✓[39m test/fs-safety.test.ts [2m([22m[2m5 tests[22m[2m)[22m[33m 858[2mms[22m[39m
+packages/executor-windows test:    [33m[2m✓[22m[39m resolveWithinScope (real fs)[2m > [22mrefuses a lexically-legal path resolving OUTSIDE the scope (realpath check) [33m 834[2mms[22m[39m
+packages/vertical-image test:  [32m✓[39m test/owned-dir.test.ts [2m([22m[2m4 tests[22m[2m)[22m[33m 1260[2mms[22m[39m
+packages/vertical-image test:    [33m[2m✓[22m[39m owned-dir guard (VI-P1-05)[2m > [22mrun-b037 refuses a user corpus directory and deletes nothing (VI-P1-05) [33m 1174[2mms[22m[39m
+packages/executor-windows test: I/O path refused: resolved I/O path C:\Users\15549\AppData\Local\Temp\shun-c07-lexical-ua31JN\journal.jsonl escapes the pinned workspace root C:\Users\15549\AppData\Local\Temp\shun-c07-MvcDUk\workspace (junction/symlink escape refused)
 packages/executor-windows test:  [32m✓[39m test/ops.test.ts [2m([22m[2m13 tests[22m[2m)[22m[32m 31[2mms[22m[39m
-packages/executor-windows test: program identity refused: no program identity pin for C:\Users\15549\AppData\Local\Temp\shun-n2-sfnFeP\workspace\n2-unpinned-tool.exe — refusing to execute an unpinned program elevated (fail closed)
-packages/vertical-image test:  [32m✓[39m test/ownership.test.ts [2m([22m[2m5 tests[22m[2m)[22m[33m 3021[2mms[22m[39m
-packages/vertical-image test:    [33m[2m✓[22m[39m output ownership after O_EXCL collision (VI-P0-01)[2m > [22mnever deletes the foreign winner of a create race [33m 405[2mms[22m[39m
-packages/vertical-image test:    [33m[2m✓[22m[39m per-record provider fallback screening (VI-P0-02)[2m > [22mrejects the record instead of executing an infeasible binding as fallback [33m 573[2mms[22m[39m
-packages/vertical-image test:    [33m[2m✓[22m[39m per-record provider fallback screening (VI-P0-02)[2m > [22mrejects the record instead of executing an unscreened (unregistered) binding as fallback [33m 661[2mms[22m[39m
-packages/vertical-image test:    [33m[2m✓[22m[39m per-record provider fallback screening (VI-P0-02)[2m > [22mstill uses a screened feasible fallback and discloses it in the receipt [33m 1231[2mms[22m[39m
-packages/vertical-image test:  [32m✓[39m test/oracle-negative.test.ts [2m([22m[2m4 tests[22m[2m)[22m[33m 3041[2mms[22m[39m
-packages/vertical-image test:    [33m[2m✓[22m[39m committed sample without written output (VI-P1-04)[2m > [22mnever returns PASS when a precommitted sample is rejected at execution [33m 762[2mms[22m[39m
-packages/vertical-image test:    [33m[2m✓[22m[39m committed sample without written output (VI-P1-04)[2m > [22mnever returns PASS when the verifier replays a committed sample without a record [33m 1286[2mms[22m[39m
-packages/vertical-image test:    [33m[2m✓[22m[39m nonfinite SSIM values (VI-P2-06)[2m > [22mtreats +Infinity as metric-unavailable, never as a score [33m 524[2mms[22m[39m
-packages/vertical-image test:    [33m[2m✓[22m[39m nonfinite SSIM values (VI-P2-06)[2m > [22mtreats -Infinity as metric-unavailable, never as a score [33m 464[2mms[22m[39m
-packages/executor-windows test:  [32m✓[39m test/helper-privilege-gate.test.ts [2m([22m[2m3 tests[22m[2m)[22m[33m 6943[2mms[22m[39m
-packages/executor-windows test:    [33m[2m✓[22m[39m C08 — privileged surfaces reject USER/NONE grants (real helper)[2m > [22mhelper refuses a USER grant inside the privileged boundary (negative control for C08) [33m 2173[2mms[22m[39m
-packages/executor-windows test:    [33m[2m✓[22m[39m C08 — privileged surfaces reject USER/NONE grants (real helper)[2m > [22mhelper refuses a NONE grant inside the privileged boundary [33m 1924[2mms[22m[39m
-packages/executor-windows test:  [32m✓[39m test/io-containment.test.ts [2m([22m[2m5 tests[22m[2m)[22m[33m 7363[2mms[22m[39m
-packages/executor-windows test:    [33m[2m✓[22m[39m C07 — junction escape on privileged I/O paths (real fs)[2m > [22mjunction as the evidence dir → helper refuses PRE-JOURNAL; the elevated write escapes nothing [33m 2117[2mms[22m[39m
-packages/executor-windows test:    [33m[2m✓[22m[39m C07 — junction escape on privileged I/O paths (real fs)[2m > [22mjunction as the journal file parent → helper refuses PRE-JOURNAL [33m 1539[2mms[22m[39m
-packages/executor-windows test:    [33m[2m✓[22m[39m C07 — junction escape on privileged I/O paths (real fs)[2m > [22mlexically-outside I/O path still refused (regression guard for the original check) [33m 606[2mms[22m[39m
-packages/executor-windows test:    [33m[2m✓[22m[39m C07 — junction escape on privileged I/O paths (real fs)[2m > [22mnon-junction layout passes containment: the journal OPENS (outcome after startup is host-dependent) [33m 1925[2mms[22m[39m
-packages/executor-windows test:  [32m✓[39m test/helper-node-pinning.test.ts [2m([22m[2m4 tests[22m[2m)[22m[33m 7220[2mms[22m[39m
-packages/executor-windows test:    [33m[2m✓[22m[39m C12 — elevated interpreter identity pinning (real helper)[2m > [22mhelper refuses to run on an unpinned interpreter — pre-journal, nothing written [33m 1075[2mms[22m[39m
-packages/executor-windows test:    [33m[2m✓[22m[39m C12 — elevated interpreter identity pinning (real helper)[2m > [22ma correctly pinned interpreter passes startup (journal opens) [33m 2789[2mms[22m[39m
-packages/executor-windows test:    [33m[2m✓[22m[39m C12 — elevated interpreter identity pinning (real helper)[2m > [22mlauncher-side ok check now carries the interpreter measurement [33m 361[2mms[22m[39m
-packages/executor-windows test: program identity refused: program identity mismatch for C:\Users\15549\AppData\Local\Temp\shun-n2-sfnFeP\workspace\n2-swap-tool.exe: measured sha256 f0f9d2796934b3d213d18fade3cf7470dfdf50d850e958646fe2c194516d38a0 != pinned 23240ef9f8b0a9a324110b1c2331de31dc1b0e08f5359cb707e51a939af56cd3 — bytes replaced after pinning, refusing elevated execution (fail closed)
-packages/executor-windows test:  [32m✓[39m test/fs-verify-exists.test.ts [2m([22m[2m4 tests[22m[2m)[22m[32m 25[2mms[22m[39m
-packages/executor-windows test:  [32m✓[39m test/program-pinning.test.ts [2m([22m[2m9 tests[22m[2m)[22m[33m 8423[2mms[22m[39m
-packages/executor-windows test:    [33m[2m✓[22m[39m N-2 — program identity pin core (canonical path + measured bytes)[2m > [22mpinProgram records the measured bytes keyed by the canonical path [33m 1900[2mms[22m[39m
-packages/executor-windows test:    [33m[2m✓[22m[39m N-2 — program identity pin core (canonical path + measured bytes)[2m > [22mverifyPinnedProgram passes unchanged bytes and REFUSES replaced bytes [33m 1458[2mms[22m[39m
-packages/executor-windows test:    [33m[2m✓[22m[39m N-2 — program identity pin core (canonical path + measured bytes)[2m > [22mverifyPinnedProgram fails closed when NO pin exists for the path [33m 977[2mms[22m[39m
-packages/executor-windows test:    [33m[2m✓[22m[39m N-2 — program identity pin core (canonical path + measured bytes)[2m > [22mF-3: a pin stored under the right KEY but naming a DIFFERENT path is refused (cross-check) [33m 510[2mms[22m[39m
-packages/executor-windows test:    [33m[2m✓[22m[39m N-2 — program identity pin core (canonical path + measured bytes)[2m > [22mcanonicalProgramPath refuses missing files and non-files [33m 561[2mms[22m[39m
-packages/executor-windows test:    [33m[2m✓[22m[39m N-2 — privileged helper enforces the pin (real helper)[2m > [22mhelper refuses an UNPINNED program pre-journal — no journal, no receipt, no effect [33m 606[2mms[22m[39m
-packages/executor-windows test:    [33m[2m✓[22m[39m N-2 — privileged helper enforces the pin (real helper)[2m > [22mhelper refuses a program whose bytes were REPLACED after pinning — nothing written [33m 649[2mms[22m[39m
-packages/executor-windows test:    [33m[2m✓[22m[39m N-2 — privileged helper enforces the pin (real helper)[2m > [22ma pinned, unchanged program passes the pre-journal identity check (journal opens) [33m 969[2mms[22m[39m
-packages/executor-windows test:  [32m✓[39m test/backend.test.ts [2m([22m[2m13 tests[22m[2m)[22m[33m 8416[2mms[22m[39m
-packages/executor-windows test:    [33m[2m✓[22m[39m LocalWindowsBackend (real, unprivileged)[2m > [22mexecutes a scoped fs.write and completes verified with a full journal [33m 1693[2mms[22m[39m
-packages/executor-windows test:    [33m[2m✓[22m[39m LocalWindowsBackend (real, unprivileged)[2m > [22menforces the action deadline with TIMED_OUT [33m 1600[2mms[22m[39m
-packages/executor-windows test:    [33m[2m✓[22m[39m LocalWindowsBackend (real, unprivileged)[2m > [22mcancel(actionId) produces CANCELLED with sentinel recorded in the journal [33m 1336[2mms[22m[39m
-packages/executor-windows test:  [32m✓[39m test/authority-store-tamper.test.ts [2m([22m[2m5 tests[22m[2m)[22m[33m 9504[2mms[22m[39m
-packages/executor-windows test:    [33m[2m✓[22m[39m C06 — same-user trust-anchor tampering refuses (real helper)[2m > [22ma rewritten grant record (widened scope, stale envelope) is refused [33m 2286[2mms[22m[39m
-packages/executor-windows test:    [33m[2m✓[22m[39m C06 — same-user trust-anchor tampering refuses (real helper)[2m > [22man emptied HMAC key file fails closed (unverifiable = unauthentic) [33m 1964[2mms[22m[39m
-packages/executor-windows test:    [33m[2m✓[22m[39m C06 — same-user trust-anchor tampering refuses (real helper)[2m > [22ma rolled-back currentness record (stale authority revision) breaks the grant pairing [33m 836[2mms[22m[39m
-packages/executor-windows test:    [33m[2m✓[22m[39m C06 — externalized HMAC key path (in-scope hardening, real helper)[2m > [22ma store-located attacker key + re-signed grant still fails (external key wins) [33m 600[2mms[22m[39m
-packages/executor-windows test:    [33m[2m✓[22m[39m C06 — externalized HMAC key path (in-scope hardening, real helper)[2m > [22mgenuine authority signatures still verify against the external key [33m 543[2mms[22m[39m
-packages/vertical-image test:  [32m✓[39m test/verifier.test.ts [2m([22m[2m8 tests[22m[2m)[22m[33m 7014[2mms[22m[39m
-packages/vertical-image test:    [33m[2m✓[22m[39m verifyBatch[2m > [22mnever reports PASS when a committed eligible sample produced no output (VI-P1-04) [33m 582[2mms[22m[39m
-packages/vertical-image test:    [33m[2m✓[22m[39m verifyBatch[2m > [22mrejects a non-finite metric value (Infinity) as unavailable, never PASS (VI-P2-06) [33m 1465[2mms[22m[39m
-packages/vertical-image test:    [33m[2m✓[22m[39m verifyBatch[2m > [22mrejects an out-of-range metric value (>1) as unavailable, never PASS (VI-P2-06) [33m 1566[2mms[22m[39m
-packages/vertical-image test:    [33m[2m✓[22m[39m verifyBatch[2m > [22mstays honest when the metric cannot be produced (INCOMPLETE, never PASS) [33m 741[2mms[22m[39m
-packages/vertical-image test:    [33m[2m✓[22m[39m verifyBatch[2m > [22mfails the SSIM oracle when an output is visibly degraded [33m 830[2mms[22m[39m
-packages/vertical-image test:    [33m[2m✓[22m[39m verifyBatch[2m > [22mfails outputs-decodable when a written file is garbage [33m 547[2mms[22m[39m
-packages/vertical-image test:    [33m[2m✓[22m[39m verifyBatch[2m > [22mfails sources-unchanged when an input mutates after execution [33m 533[2mms[22m[39m
-packages/vertical-image test:    [33m[2m✓[22m[39m verifyBatch[2m > [22mpasses all checks on an honest batch executed with the default metric [33m 747[2mms[22m[39m
+packages/executor-windows test:  [32m✓[39m test/authority-writer-negative.test.ts [2m([22m[2m17 tests[22m[2m)[22m[33m 980[2mms[22m[39m
+packages/executor-windows test:    [33m[2m✓[22m[39m ShunAnchorWriter core — unattended negative controls (L2 v0.2 delta §7)[2m > [22muser write DENIED on the anchor root → apply fails, nothing written (denied path) [33m 479[2mms[22m[39m
+packages/executor-windows test:  [32m✓[39m test/action-id.test.ts [2m([22m[2m4 tests[22m[2m)[22m[32m 11[2mms[22m[39m
+packages/executor-windows test:  [32m✓[39m test/helper-node-pinning.test.ts [2m([22m[2m4 tests[22m[2m)[22m[33m 6523[2mms[22m[39m
+packages/executor-windows test:    [33m[2m✓[22m[39m C12 — elevated interpreter identity pinning (real helper)[2m > [22mhelper refuses to run on an unpinned interpreter — pre-journal, nothing written [33m 1346[2mms[22m[39m
+packages/executor-windows test:    [33m[2m✓[22m[39m C12 — elevated interpreter identity pinning (real helper)[2m > [22ma correctly pinned interpreter passes startup (journal opens) [33m 3073[2mms[22m[39m
+packages/executor-windows test:    [33m[2m✓[22m[39m C12 — elevated interpreter identity pinning (real helper)[2m > [22mlauncher-side ok check now carries the interpreter measurement [33m 372[2mms[22m[39m
+packages/executor-windows test:  [32m✓[39m test/authority-writer-sealing.test.ts [2m([22m[2m2 tests[22m[2m)[22m[32m 28[2mms[22m[39m
+packages/vertical-image test:  [32m✓[39m test/path-alias.test.ts [2m([22m[2m3 tests[22m[2m)[22m[33m 1292[2mms[22m[39m
+packages/vertical-image test:    [33m[2m✓[22m[39m output/input directory alias precheck (VI-P1-03)[2m > [22mblocks an output directory that aliases an input directory [33m 431[2mms[22m[39m
+packages/vertical-image test:    [33m[2m✓[22m[39m output/input directory alias precheck (VI-P1-03)[2m > [22mblocks when an aliased input path resolves onto the output directory [33m 335[2mms[22m[39m
+packages/vertical-image test:    [33m[2m✓[22m[39m output/input directory alias precheck (VI-P1-03)[2m > [22mdoes not block a genuinely distinct output directory (overblocking guard) [33m 521[2mms[22m[39m
+packages/executor-windows test:  [32m✓[39m test/system-root-resolution.test.ts [2m([22m[2m19 tests[22m[2m)[22m[32m 186[2mms[22m[39m
+packages/executor-windows test:  [32m✓[39m test/fs-verify-exists.test.ts [2m([22m[2m4 tests[22m[2m)[22m[32m 30[2mms[22m[39m
+packages/executor-windows test:  [32m✓[39m test/helper-privilege-gate.test.ts [2m([22m[2m3 tests[22m[2m)[22m[33m 7328[2mms[22m[39m
+packages/executor-windows test:    [33m[2m✓[22m[39m C08 — privileged surfaces reject USER/NONE grants (real helper)[2m > [22mhelper refuses a USER grant inside the privileged boundary (negative control for C08) [33m 3791[2mms[22m[39m
+packages/executor-windows test:    [33m[2m✓[22m[39m C08 — privileged surfaces reject USER/NONE grants (real helper)[2m > [22mhelper refuses a NONE grant inside the privileged boundary [33m 2245[2mms[22m[39m
+packages/executor-windows test:  [32m✓[39m test/io-containment.test.ts [2m([22m[2m5 tests[22m[2m)[22m[33m 7395[2mms[22m[39m
+packages/executor-windows test:    [33m[2m✓[22m[39m C07 — junction escape on privileged I/O paths (real fs)[2m > [22mjunction as the evidence dir → helper refuses PRE-JOURNAL; the elevated write escapes nothing [33m 1969[2mms[22m[39m
+packages/executor-windows test:    [33m[2m✓[22m[39m C07 — junction escape on privileged I/O paths (real fs)[2m > [22mjunction as the journal file parent → helper refuses PRE-JOURNAL [33m 1803[2mms[22m[39m
+packages/executor-windows test:    [33m[2m✓[22m[39m C07 — junction escape on privileged I/O paths (real fs)[2m > [22mlexically-outside I/O path still refused (regression guard for the original check) [33m 903[2mms[22m[39m
+packages/executor-windows test:    [33m[2m✓[22m[39m C07 — junction escape on privileged I/O paths (real fs)[2m > [22mnon-junction layout passes containment: the journal OPENS (outcome after startup is host-dependent) [33m 1476[2mms[22m[39m
+packages/executor-windows test: program identity refused: no program identity pin for C:\Users\15549\AppData\Local\Temp\shun-n2-sFIU29\workspace\n2-unpinned-tool.exe — refusing to execute an unpinned program elevated (fail closed)
+packages/vertical-image test:  [32m✓[39m test/ownership.test.ts [2m([22m[2m5 tests[22m[2m)[22m[33m 2672[2mms[22m[39m
+packages/vertical-image test:    [33m[2m✓[22m[39m output ownership after O_EXCL collision (VI-P0-01)[2m > [22mnever deletes the foreign winner of a create race [33m 863[2mms[22m[39m
+packages/vertical-image test:    [33m[2m✓[22m[39m per-record provider fallback screening (VI-P0-02)[2m > [22mrejects the record instead of executing an infeasible binding as fallback [33m 530[2mms[22m[39m
+packages/vertical-image test:    [33m[2m✓[22m[39m per-record provider fallback screening (VI-P0-02)[2m > [22mrejects the record instead of executing an unscreened (unregistered) binding as fallback [33m 473[2mms[22m[39m
+packages/vertical-image test:    [33m[2m✓[22m[39m per-record provider fallback screening (VI-P0-02)[2m > [22mstill uses a screened feasible fallback and discloses it in the receipt [33m 638[2mms[22m[39m
+packages/executor-windows test: program identity refused: program identity mismatch for C:\Users\15549\AppData\Local\Temp\shun-n2-sFIU29\workspace\n2-swap-tool.exe: measured sha256 f0f9d2796934b3d213d18fade3cf7470dfdf50d850e958646fe2c194516d38a0 != pinned 23240ef9f8b0a9a324110b1c2331de31dc1b0e08f5359cb707e51a939af56cd3 — bytes replaced after pinning, refusing elevated execution (fail closed)
+packages/vertical-image test:  [32m✓[39m test/oracle-negative.test.ts [2m([22m[2m4 tests[22m[2m)[22m[33m 2961[2mms[22m[39m
+packages/vertical-image test:    [33m[2m✓[22m[39m committed sample without written output (VI-P1-04)[2m > [22mnever returns PASS when a precommitted sample is rejected at execution [33m 1291[2mms[22m[39m
+packages/vertical-image test:    [33m[2m✓[22m[39m committed sample without written output (VI-P1-04)[2m > [22mnever returns PASS when the verifier replays a committed sample without a record [33m 913[2mms[22m[39m
+packages/vertical-image test:    [33m[2m✓[22m[39m nonfinite SSIM values (VI-P2-06)[2m > [22mtreats +Infinity as metric-unavailable, never as a score [33m 320[2mms[22m[39m
+packages/vertical-image test:    [33m[2m✓[22m[39m nonfinite SSIM values (VI-P2-06)[2m > [22mtreats -Infinity as metric-unavailable, never as a score [33m 433[2mms[22m[39m
+packages/executor-windows test:  [32m✓[39m test/backend.test.ts [2m([22m[2m13 tests[22m[2m)[22m[33m 8545[2mms[22m[39m
+packages/executor-windows test:    [33m[2m✓[22m[39m LocalWindowsBackend (real, unprivileged)[2m > [22mexecutes a scoped fs.write and completes verified with a full journal [33m 2929[2mms[22m[39m
+packages/executor-windows test:    [33m[2m✓[22m[39m LocalWindowsBackend (real, unprivileged)[2m > [22menforces the action deadline with TIMED_OUT [33m 1690[2mms[22m[39m
+packages/executor-windows test:    [33m[2m✓[22m[39m LocalWindowsBackend (real, unprivileged)[2m > [22mcancel(actionId) produces CANCELLED with sentinel recorded in the journal [33m 1373[2mms[22m[39m
+packages/executor-windows test:  [32m✓[39m test/program-pinning.test.ts [2m([22m[2m9 tests[22m[2m)[22m[33m 9343[2mms[22m[39m
+packages/executor-windows test:    [33m[2m✓[22m[39m N-2 — program identity pin core (canonical path + measured bytes)[2m > [22mpinProgram records the measured bytes keyed by the canonical path [33m 1796[2mms[22m[39m
+packages/executor-windows test:    [33m[2m✓[22m[39m N-2 — program identity pin core (canonical path + measured bytes)[2m > [22mverifyPinnedProgram passes unchanged bytes and REFUSES replaced bytes [33m 1469[2mms[22m[39m
+packages/executor-windows test:    [33m[2m✓[22m[39m N-2 — program identity pin core (canonical path + measured bytes)[2m > [22mverifyPinnedProgram fails closed when NO pin exists for the path [33m 984[2mms[22m[39m
+packages/executor-windows test:    [33m[2m✓[22m[39m N-2 — program identity pin core (canonical path + measured bytes)[2m > [22mF-3: a pin stored under the right KEY but naming a DIFFERENT path is refused (cross-check) [33m 745[2mms[22m[39m
+packages/executor-windows test:    [33m[2m✓[22m[39m N-2 — program identity pin core (canonical path + measured bytes)[2m > [22mcanonicalProgramPath refuses missing files and non-files [33m 1394[2mms[22m[39m
+packages/executor-windows test:    [33m[2m✓[22m[39m N-2 — privileged helper enforces the pin (real helper)[2m > [22mhelper refuses an UNPINNED program pre-journal — no journal, no receipt, no effect [33m 616[2mms[22m[39m
+packages/executor-windows test:    [33m[2m✓[22m[39m N-2 — privileged helper enforces the pin (real helper)[2m > [22mhelper refuses a program whose bytes were REPLACED after pinning — nothing written [33m 530[2mms[22m[39m
+packages/executor-windows test:    [33m[2m✓[22m[39m N-2 — privileged helper enforces the pin (real helper)[2m > [22ma pinned, unchanged program passes the pre-journal identity check (journal opens) [33m 1126[2mms[22m[39m
+packages/executor-windows test:  [32m✓[39m test/authority-store-tamper.test.ts [2m([22m[2m5 tests[22m[2m)[22m[33m 9672[2mms[22m[39m
+packages/executor-windows test:    [33m[2m✓[22m[39m C06 — same-user trust-anchor tampering refuses (real helper)[2m > [22ma rewritten grant record (widened scope, stale envelope) is refused [33m 1356[2mms[22m[39m
+packages/executor-windows test:    [33m[2m✓[22m[39m C06 — same-user trust-anchor tampering refuses (real helper)[2m > [22man emptied HMAC key file fails closed (unverifiable = unauthentic) [33m 2769[2mms[22m[39m
+packages/executor-windows test:    [33m[2m✓[22m[39m C06 — same-user trust-anchor tampering refuses (real helper)[2m > [22ma rolled-back currentness record (stale authority revision) breaks the grant pairing [33m 2285[2mms[22m[39m
+packages/executor-windows test:    [33m[2m✓[22m[39m C06 — externalized HMAC key path (in-scope hardening, real helper)[2m > [22ma store-located attacker key + re-signed grant still fails (external key wins) [33m 874[2mms[22m[39m
+packages/executor-windows test:    [33m[2m✓[22m[39m C06 — externalized HMAC key path (in-scope hardening, real helper)[2m > [22mgenuine authority signatures still verify against the external key [33m 759[2mms[22m[39m
+packages/vertical-image test:  [32m✓[39m test/verifier.test.ts [2m([22m[2m8 tests[22m[2m)[22m[33m 6683[2mms[22m[39m
+packages/vertical-image test:    [33m[2m✓[22m[39m verifyBatch[2m > [22mnever reports PASS when a committed eligible sample produced no output (VI-P1-04) [33m 1030[2mms[22m[39m
+packages/vertical-image test:    [33m[2m✓[22m[39m verifyBatch[2m > [22mrejects a non-finite metric value (Infinity) as unavailable, never PASS (VI-P2-06) [33m 1187[2mms[22m[39m
+packages/vertical-image test:    [33m[2m✓[22m[39m verifyBatch[2m > [22mrejects an out-of-range metric value (>1) as unavailable, never PASS (VI-P2-06) [33m 970[2mms[22m[39m
+packages/vertical-image test:    [33m[2m✓[22m[39m verifyBatch[2m > [22mstays honest when the metric cannot be produced (INCOMPLETE, never PASS) [33m 678[2mms[22m[39m
+packages/vertical-image test:    [33m[2m✓[22m[39m verifyBatch[2m > [22mfails the SSIM oracle when an output is visibly degraded [33m 874[2mms[22m[39m
+packages/vertical-image test:    [33m[2m✓[22m[39m verifyBatch[2m > [22mfails outputs-decodable when a written file is garbage [33m 556[2mms[22m[39m
+packages/vertical-image test:    [33m[2m✓[22m[39m verifyBatch[2m > [22mfails sources-unchanged when an input mutates after execution [33m 583[2mms[22m[39m
+packages/vertical-image test:    [33m[2m✓[22m[39m verifyBatch[2m > [22mpasses all checks on an honest batch executed with the default metric [33m 801[2mms[22m[39m
 packages/executor-windows test: authority store has no helper pin — refusing to execute (fail closed)
-packages/executor-windows test: I/O path refused: resolved I/O path C:\Users\15549\AppData\Local\Temp\shun-evil-io-uqEIl3\journal.jsonl escapes the pinned workspace root C:\Users\15549\AppData\Local\Temp\shun-helper-Nj94FX\workspace (junction/symlink escape refused)
+packages/executor-windows test: I/O path refused: resolved I/O path C:\Users\15549\AppData\Local\Temp\shun-evil-io-EjI29d\journal.jsonl escapes the pinned workspace root C:\Users\15549\AppData\Local\Temp\shun-helper-Vp6Fdj\workspace (junction/symlink escape refused)
 packages/executor-windows test: envelope rejected: [
 packages/executor-windows test:   {
 packages/executor-windows test:     "code": "unrecognized_keys",
@@ -1450,168 +1453,172 @@ packages/executor-windows test:     "path": [],
 packages/executor-windows test:     "message": "Unrecognized key: \"helperOverride\""
 packages/executor-windows test:   }
 packages/executor-windows test: ]
-packages/executor-windows test:  [32m✓[39m test/privileged-helper.test.ts [2m([22m[2m18 tests[22m[2m | [22m[33m2 skipped[39m[2m)[22m[33m 13757[2mms[22m[39m
-packages/executor-windows test:    [33m[2m✓[22m[39m one-shot helper — privileged-boundary negatives (real bundle)[2m > [22melevation-required action on a filtered token → REFUSED with privilege journal, no effect [33m 2710[2mms[22m[39m
-packages/executor-windows test:    [33m[2m✓[22m[39m one-shot helper — privileged-boundary negatives (real bundle)[2m > [22mUSER action on the same token → REFUSED: the privileged helper accepts ELEVATED grants only (C08) [33m 1904[2mms[22m[39m
-packages/executor-windows test:    [33m[2m✓[22m[39m one-shot helper — privileged-boundary negatives (real bundle)[2m > [22mforged grant (self-declared, no integrity envelope) → REFUSED GRANT_NOT_AUTHENTIC [33m 978[2mms[22m[39m
-packages/executor-windows test:    [33m[2m✓[22m[39m one-shot helper — privileged-boundary negatives (real bundle)[2m > [22mplan tampered after approval → REFUSED GRANT_PLAN_MISMATCH inside the helper [33m 649[2mms[22m[39m
-packages/executor-windows test:    [33m[2m✓[22m[39m one-shot helper — privileged-boundary negatives (real bundle)[2m > [22mstale authority revision → REFUSED GRANT_AUTHORITY_STALE [33m 615[2mms[22m[39m
-packages/executor-windows test:    [33m[2m✓[22m[39m one-shot helper — privileged-boundary negatives (real bundle)[2m > [22msuperseded policy revision → REFUSED GRANT_POLICY_STALE [33m 542[2mms[22m[39m
-packages/executor-windows test:    [33m[2m✓[22m[39m one-shot helper — privileged-boundary negatives (real bundle)[2m > [22mrevoked policy → REFUSED GRANT_POLICY_REVOKED [33m 536[2mms[22m[39m
-packages/executor-windows test:    [33m[2m✓[22m[39m one-shot helper — privileged-boundary negatives (real bundle)[2m > [22mrevoked grant id → REFUSED GRANT_REVOKED [33m 572[2mms[22m[39m
-packages/executor-windows test:    [33m[2m✓[22m[39m one-shot helper — privileged-boundary negatives (real bundle)[2m > [22munresolvable currentness (corrupt record) → REFUSED GRANT_CURRENTNESS_UNRESOLVABLE [33m 545[2mms[22m[39m
-packages/executor-windows test:    [33m[2m✓[22m[39m one-shot helper — privileged-boundary negatives (real bundle)[2m > [22mmissing currentness record → REFUSED GRANT_CURRENTNESS_UNRESOLVABLE (fail closed) [33m 555[2mms[22m[39m
-packages/executor-windows test:    [33m[2m✓[22m[39m one-shot helper — privileged-boundary negatives (real bundle)[2m > [22mexpired grant → REFUSED GRANT_EXPIRED [33m 562[2mms[22m[39m
-packages/executor-windows test:    [33m[2m✓[22m[39m one-shot helper — privileged-boundary negatives (real bundle)[2m > [22mscope escape (target outside grant filesystem scope) → REFUSED before effects [33m 559[2mms[22m[39m
-packages/executor-windows test:    [33m[2m✓[22m[39m one-shot helper — privileged-boundary negatives (real bundle)[2m > [22msubstituted helper bundle → the helper refuses its own identity (defense in depth) [33m 458[2mms[22m[39m
-packages/executor-windows test:    [33m[2m✓[22m[39m one-shot helper — privileged-boundary negatives (real bundle)[2m > [22mlauncher I/O path outside the pinned workspace root → REFUSED pre-journal (no files written) [33m 369[2mms[22m[39m
+packages/executor-windows test:  [32m✓[39m test/privileged-helper.test.ts [2m([22m[2m18 tests[22m[2m | [22m[33m2 skipped[39m[2m)[22m[33m 15185[2mms[22m[39m
+packages/executor-windows test:    [33m[2m✓[22m[39m one-shot helper — privileged-boundary negatives (real bundle)[2m > [22melevation-required action on a filtered token → REFUSED with privilege journal, no effect [33m 3428[2mms[22m[39m
+packages/executor-windows test:    [33m[2m✓[22m[39m one-shot helper — privileged-boundary negatives (real bundle)[2m > [22mUSER action on the same token → REFUSED: the privileged helper accepts ELEVATED grants only (C08) [33m 2642[2mms[22m[39m
+packages/executor-windows test:    [33m[2m✓[22m[39m one-shot helper — privileged-boundary negatives (real bundle)[2m > [22mforged grant (self-declared, no integrity envelope) → REFUSED GRANT_NOT_AUTHENTIC [33m 863[2mms[22m[39m
+packages/executor-windows test:    [33m[2m✓[22m[39m one-shot helper — privileged-boundary negatives (real bundle)[2m > [22mplan tampered after approval → REFUSED GRANT_PLAN_MISMATCH inside the helper [33m 804[2mms[22m[39m
+packages/executor-windows test:    [33m[2m✓[22m[39m one-shot helper — privileged-boundary negatives (real bundle)[2m > [22mstale authority revision → REFUSED GRANT_AUTHORITY_STALE [33m 706[2mms[22m[39m
+packages/executor-windows test:    [33m[2m✓[22m[39m one-shot helper — privileged-boundary negatives (real bundle)[2m > [22msuperseded policy revision → REFUSED GRANT_POLICY_STALE [33m 635[2mms[22m[39m
+packages/executor-windows test:    [33m[2m✓[22m[39m one-shot helper — privileged-boundary negatives (real bundle)[2m > [22mrevoked policy → REFUSED GRANT_POLICY_REVOKED [33m 595[2mms[22m[39m
+packages/executor-windows test:    [33m[2m✓[22m[39m one-shot helper — privileged-boundary negatives (real bundle)[2m > [22mrevoked grant id → REFUSED GRANT_REVOKED [33m 589[2mms[22m[39m
+packages/executor-windows test:    [33m[2m✓[22m[39m one-shot helper — privileged-boundary negatives (real bundle)[2m > [22munresolvable currentness (corrupt record) → REFUSED GRANT_CURRENTNESS_UNRESOLVABLE [33m 631[2mms[22m[39m
+packages/executor-windows test:    [33m[2m✓[22m[39m one-shot helper — privileged-boundary negatives (real bundle)[2m > [22mmissing currentness record → REFUSED GRANT_CURRENTNESS_UNRESOLVABLE (fail closed) [33m 691[2mms[22m[39m
+packages/executor-windows test:    [33m[2m✓[22m[39m one-shot helper — privileged-boundary negatives (real bundle)[2m > [22mexpired grant → REFUSED GRANT_EXPIRED [33m 551[2mms[22m[39m
+packages/executor-windows test:    [33m[2m✓[22m[39m one-shot helper — privileged-boundary negatives (real bundle)[2m > [22mscope escape (target outside grant filesystem scope) → REFUSED before effects [33m 576[2mms[22m[39m
+packages/executor-windows test:    [33m[2m✓[22m[39m one-shot helper — privileged-boundary negatives (real bundle)[2m > [22msubstituted helper bundle → the helper refuses its own identity (defense in depth) [33m 496[2mms[22m[39m
+packages/executor-windows test:    [33m[2m✓[22m[39m one-shot helper — privileged-boundary negatives (real bundle)[2m > [22mlauncher I/O path outside the pinned workspace root → REFUSED pre-journal (no files written) [33m 463[2mms[22m[39m
 packages/executor-windows test: [2m Test Files [22m [1m[32m28 passed[39m[22m[90m (28)[39m
 packages/executor-windows test: [2m      Tests [22m [1m[32m230 passed[39m[22m[2m | [22m[33m2 skipped[39m[90m (232)[39m
-packages/executor-windows test: [2m   Start at [22m 18:36:20
-packages/executor-windows test: [2m   Duration [22m 19.90s[2m (transform 8.11s, setup 0ms, collect 63.52s, tests 92.16s, environment 9ms, prepare 14.22s)[22m
+packages/executor-windows test: [2m   Start at [22m 18:59:46
+packages/executor-windows test: [2m   Duration [22m 20.70s[2m (transform 7.80s, setup 0ms, collect 56.90s, tests 89.97s, environment 11ms, prepare 14.15s)[22m
 packages/executor-windows test: Done
-packages/vertical-image test:  [32m✓[39m test/executor.test.ts [2m([22m[2m21 tests[22m[2m)[22m[33m 13530[2mms[22m[39m
-packages/vertical-image test:    [33m[2m✓[22m[39m runImageBatchProcess — happy path[2m > [22mwrites every input, preserves dates, keeps sources intact and verifies PASS [33m 2042[2mms[22m[39m
-packages/vertical-image test:    [33m[2m✓[22m[39m runImageBatchProcess — task-level failures[2m > [22mrefuses an output directory equal to an input directory before any write [33m 422[2mms[22m[39m
-packages/vertical-image test:    [33m[2m✓[22m[39m runImageBatchProcess — task-level failures[2m > [22mblocks an output directory that aliases an input directory via a junction (VI-P1-03) [33m 475[2mms[22m[39m
-packages/vertical-image test:    [33m[2m✓[22m[39m runImageBatchProcess — task-level failures[2m > [22mblocks an output directory symlink planted after precheck but before mkdir (VI-P1-03) [33m 495[2mms[22m[39m
-packages/vertical-image test:    [33m[2m✓[22m[39m runImageBatchProcess — task-level failures[2m > [22mreturns NO_TRUSTED_PROVIDER with no provider and writes nothing [33m 319[2mms[22m[39m
-packages/vertical-image test:    [33m[2m✓[22m[39m runImageBatchProcess — task-level failures[2m > [22mfalls back to the available binding when the preferred one is missing [33m 892[2mms[22m[39m
-packages/vertical-image test:    [33m[2m✓[22m[39m runImageBatchProcess — per-record failures[2m > [22mrejects corrupt input per-record while the rest verifies PASS [33m 659[2mms[22m[39m
-packages/vertical-image test:    [33m[2m✓[22m[39m runImageBatchProcess — per-record failures[2m > [22mrejects pre-existing targets and in-batch duplicate names up front [33m 462[2mms[22m[39m
-packages/vertical-image test:    [33m[2m✓[22m[39m runImageBatchProcess — per-record failures[2m > [22mroutes formats to another registered provider when the selected one lacks them [33m 770[2mms[22m[39m
-packages/vertical-image test:    [33m[2m✓[22m[39m runImageBatchProcess — per-record failures[2m > [22mrecords the real executing binding when a registered feasible fallback is used (VI-P0-02) [33m 764[2mms[22m[39m
-packages/vertical-image test:    [33m[2m✓[22m[39m runImageBatchProcess — original preservation[2m > [22mleaves every source byte-identical [33m 4654[2mms[22m[39m
+packages/vertical-image test:  [32m✓[39m test/executor.test.ts [2m([22m[2m21 tests[22m[2m)[22m[33m 13542[2mms[22m[39m
+packages/vertical-image test:    [33m[2m✓[22m[39m runImageBatchProcess — happy path[2m > [22mwrites every input, preserves dates, keeps sources intact and verifies PASS [33m 2143[2mms[22m[39m
+packages/vertical-image test:    [33m[2m✓[22m[39m runImageBatchProcess — task-level failures[2m > [22mblocks an output directory that aliases an input directory via a junction (VI-P1-03) [33m 342[2mms[22m[39m
+packages/vertical-image test:    [33m[2m✓[22m[39m runImageBatchProcess — task-level failures[2m > [22mblocks an output directory symlink planted after precheck but before mkdir (VI-P1-03) [33m 335[2mms[22m[39m
+packages/vertical-image test:    [33m[2m✓[22m[39m runImageBatchProcess — task-level failures[2m > [22mfalls back to the available binding when the preferred one is missing [33m 947[2mms[22m[39m
+packages/vertical-image test:    [33m[2m✓[22m[39m runImageBatchProcess — per-record failures[2m > [22mrejects corrupt input per-record while the rest verifies PASS [33m 714[2mms[22m[39m
+packages/vertical-image test:    [33m[2m✓[22m[39m runImageBatchProcess — per-record failures[2m > [22mrejects pre-existing targets and in-batch duplicate names up front [33m 473[2mms[22m[39m
+packages/vertical-image test:    [33m[2m✓[22m[39m runImageBatchProcess — per-record failures[2m > [22mroutes formats to another registered provider when the selected one lacks them [33m 868[2mms[22m[39m
+packages/vertical-image test:    [33m[2m✓[22m[39m runImageBatchProcess — per-record failures[2m > [22mrecords the real executing binding when a registered feasible fallback is used (VI-P0-02) [33m 785[2mms[22m[39m
+packages/vertical-image test:    [33m[2m✓[22m[39m runImageBatchProcess — per-record failures[2m > [22mmarks PNG records UNSUPPORTED_INPUT when no provider covers PNG [33m 308[2mms[22m[39m
+packages/vertical-image test:    [33m[2m✓[22m[39m runImageBatchProcess — original preservation[2m > [22mleaves every source byte-identical [33m 4676[2mms[22m[39m
 packages/vertical-image test: [2m Test Files [22m [1m[32m11 passed[39m[22m[90m (11)[39m
 packages/vertical-image test: [2m      Tests [22m [1m[32m77 passed[39m[22m[90m (77)[39m
-packages/vertical-image test: [2m   Start at [22m 18:36:26
-packages/vertical-image test: [2m   Duration [22m 17.11s[2m (transform 3.58s, setup 0ms, collect 14.99s, tests 30.37s, environment 4ms, prepare 4.25s)[22m
+packages/vertical-image test: [2m   Start at [22m 18:59:53
+packages/vertical-image test: [2m   Duration [22m 17.17s[2m (transform 4.45s, setup 0ms, collect 15.81s, tests 29.28s, environment 4ms, prepare 5.19s)[22m
 packages/vertical-image test: Done
 packages/store test$ vitest run
 packages/vertical-storage test$ vitest run
 packages/store test: [1m[46m RUN [49m[22m [36mv3.2.7 [39m[90mC:/xDev/kAiCreator/shun-assistant/shun-i108-r2-zc/packages/store[39m
 packages/vertical-storage test: [1m[46m RUN [49m[22m [36mv3.2.7 [39m[90mC:/xDev/kAiCreator/shun-assistant/shun-i108-r2-zc/packages/vertical-storage[39m
-packages/vertical-storage test:  [32m✓[39m test/classify.test.ts [2m([22m[2m7 tests[22m[2m)[22m[32m 60[2mms[22m[39m
-packages/vertical-storage test:  [32m✓[39m test/scope.test.ts [2m([22m[2m8 tests[22m[2m)[22m[32m 79[2mms[22m[39m
-packages/vertical-storage test:  [32m✓[39m test/verify.test.ts [2m([22m[2m8 tests[22m[2m)[22m[32m 106[2mms[22m[39m
-packages/vertical-storage test:  [32m✓[39m test/attribute.test.ts [2m([22m[2m5 tests[22m[2m)[22m[32m 116[2mms[22m[39m
-packages/store test:  [32m✓[39m test/crash-atomicity.test.ts [2m([22m[2m3 tests[22m[2m)[22m[32m 222[2mms[22m[39m
-packages/store test:  [32m✓[39m test/records.test.ts [2m([22m[2m3 tests[22m[2m)[22m[33m 323[2mms[22m[39m
-packages/store test:  [32m✓[39m test/recipe-repository.test.ts [2m([22m[2m5 tests[22m[2m)[22m[33m 439[2mms[22m[39m
-packages/store test:  [32m✓[39m test/ui-approval-bridge.test.ts [2m([22m[2m7 tests[22m[2m)[22m[33m 511[2mms[22m[39m
-packages/vertical-storage test:  [32m✓[39m test/effect-time-safety.test.ts [2m([22m[2m9 tests[22m[2m)[22m[33m 442[2mms[22m[39m
-packages/store test:  [32m✓[39m test/idempotent-apply.test.ts [2m([22m[2m8 tests[22m[2m)[22m[33m 519[2mms[22m[39m
-packages/vertical-storage test:  [32m✓[39m test/controller-integration.test.ts [2m([22m[2m4 tests[22m[2m)[22m[33m 446[2mms[22m[39m
-packages/vertical-storage test:  [32m✓[39m test/plan.test.ts [2m([22m[2m6 tests[22m[2m)[22m[33m 485[2mms[22m[39m
-packages/store test:  [32m✓[39m test/authorization-adapter.test.ts [2m([22m[2m6 tests[22m[2m)[22m[33m 550[2mms[22m[39m
-packages/vertical-storage test:  [32m✓[39m test/grant.test.ts [2m([22m[2m10 tests[22m[2m)[22m[33m 522[2mms[22m[39m
-packages/vertical-storage test:  [32m✓[39m test/observe-unreadable.test.ts [2m([22m[2m3 tests[22m[2m)[22m[33m 562[2mms[22m[39m
-packages/vertical-storage test:  [32m✓[39m test/empty-dir-containment.test.ts [2m([22m[2m4 tests[22m[2m)[22m[33m 575[2mms[22m[39m
-packages/vertical-storage test:  [32m✓[39m test/execute.test.ts [2m([22m[2m8 tests[22m[2m)[22m[33m 578[2mms[22m[39m
-packages/store test:  [32m✓[39m test/crash-hard-kill.test.ts [2m([22m[2m1 test[22m[2m)[22m[33m 1026[2mms[22m[39m
-packages/store test:    [33m[2m✓[22m[39m ShunStore — hard-kill subprocess durability (C05)[2m > [22meffects committed before a hard kill survive in a brand-new process [33m 1024[2mms[22m[39m
+packages/store test:  [32m✓[39m test/crash-atomicity.test.ts [2m([22m[2m3 tests[22m[2m)[22m[32m 287[2mms[22m[39m
+packages/store test:  [32m✓[39m test/records.test.ts [2m([22m[2m3 tests[22m[2m)[22m[33m 357[2mms[22m[39m
+packages/vertical-storage test:  [32m✓[39m test/classify.test.ts [2m([22m[2m7 tests[22m[2m)[22m[32m 69[2mms[22m[39m
+packages/store test:  [32m✓[39m test/recipe-repository.test.ts [2m([22m[2m5 tests[22m[2m)[22m[33m 522[2mms[22m[39m
+packages/vertical-storage test:  [32m✓[39m test/scope.test.ts [2m([22m[2m8 tests[22m[2m)[22m[32m 107[2mms[22m[39m
+packages/vertical-storage test:  [32m✓[39m test/verify.test.ts [2m([22m[2m8 tests[22m[2m)[22m[32m 136[2mms[22m[39m
+packages/store test:  [32m✓[39m test/ui-approval-bridge.test.ts [2m([22m[2m7 tests[22m[2m)[22m[33m 568[2mms[22m[39m
+packages/store test:  [32m✓[39m test/idempotent-apply.test.ts [2m([22m[2m8 tests[22m[2m)[22m[33m 557[2mms[22m[39m
+packages/vertical-storage test:  [32m✓[39m test/attribute.test.ts [2m([22m[2m5 tests[22m[2m)[22m[32m 160[2mms[22m[39m
+packages/vertical-storage test:  [32m✓[39m test/plan.test.ts [2m([22m[2m6 tests[22m[2m)[22m[32m 261[2mms[22m[39m
+packages/store test:  [32m✓[39m test/authorization-adapter.test.ts [2m([22m[2m6 tests[22m[2m)[22m[33m 621[2mms[22m[39m
+packages/vertical-storage test:  [32m✓[39m test/effect-time-safety.test.ts [2m([22m[2m9 tests[22m[2m)[22m[33m 500[2mms[22m[39m
+packages/vertical-storage test:  [32m✓[39m test/observe-unreadable.test.ts [2m([22m[2m3 tests[22m[2m)[22m[33m 623[2mms[22m[39m
+packages/vertical-storage test:  [32m✓[39m test/controller-integration.test.ts [2m([22m[2m4 tests[22m[2m)[22m[33m 664[2mms[22m[39m
+packages/vertical-storage test:    [33m[2m✓[22m[39m C-003 real ActionController integration[2m > [22mauthorizes the exact storage plan and gates the real cleanup effect [33m 476[2mms[22m[39m
+packages/vertical-storage test:  [32m✓[39m test/empty-dir-containment.test.ts [2m([22m[2m4 tests[22m[2m)[22m[33m 685[2mms[22m[39m
+packages/vertical-storage test:    [33m[2m✓[22m[39m empty-dir removal — ancestor junction containment at effect time[2m > [22man ancestor swapped to a junction cannot make removeEmptyDir rmdir an external EMPTY mirror (no false EXEC_DONE (dir)) [33m 301[2mms[22m[39m
+packages/vertical-storage test:  [32m✓[39m test/grant.test.ts [2m([22m[2m10 tests[22m[2m)[22m[33m 685[2mms[22m[39m
+packages/vertical-storage test:  [32m✓[39m test/execute.test.ts [2m([22m[2m8 tests[22m[2m)[22m[33m 853[2mms[22m[39m
+packages/vertical-storage test:    [33m[2m✓[22m[39m bounded deletion mechanics[2m > [22mdeletes nested trees, removes emptied subdirectories, and never touches paths outside targets [33m 520[2mms[22m[39m
+packages/store test:  [32m✓[39m test/crash-hard-kill.test.ts [2m([22m[2m1 test[22m[2m)[22m[33m 1256[2mms[22m[39m
+packages/store test:    [33m[2m✓[22m[39m ShunStore — hard-kill subprocess durability (C05)[2m > [22meffects committed before a hard kill survive in a brand-new process [33m 1254[2mms[22m[39m
 packages/store test: [2m Test Files [22m [1m[32m7 passed[39m[22m[90m (7)[39m
 packages/store test: [2m      Tests [22m [1m[32m33 passed[39m[22m[90m (33)[39m
-packages/store test: [2m   Start at [22m 18:36:45
-packages/store test: [2m   Duration [22m 3.03s[2m (transform 1.58s, setup 0ms, collect 7.06s, tests 3.59s, environment 2ms, prepare 2.85s)[22m
-packages/vertical-storage test:  [32m✓[39m test/diagnose.test.ts [2m([22m[2m10 tests[22m[2m)[22m[33m 1120[2mms[22m[39m
-packages/vertical-storage test:    [33m[2m✓[22m[39m B-039 — diagnose → bounded cleanup → verify (real Windows filesystem)[2m > [22midentifies injected growth, removes only disposable cache after approval, verifies reclaimed bytes and protected hashes [33m 497[2mms[22m[39m
+packages/store test: [2m   Start at [22m 19:00:11
+packages/store test: [2m   Duration [22m 3.60s[2m (transform 1.40s, setup 0ms, collect 8.49s, tests 4.17s, environment 2ms, prepare 3.24s)[22m
+packages/vertical-storage test:  [32m✓[39m test/diagnose.test.ts [2m([22m[2m10 tests[22m[2m)[22m[33m 1196[2mms[22m[39m
+packages/vertical-storage test:    [33m[2m✓[22m[39m B-039 — diagnose → bounded cleanup → verify (real Windows filesystem)[2m > [22midentifies injected growth, removes only disposable cache after approval, verifies reclaimed bytes and protected hashes [33m 333[2mms[22m[39m
 packages/vertical-storage test: [2m Test Files [22m [1m[32m12 passed[39m[22m[90m (12)[39m
 packages/vertical-storage test: [2m      Tests [22m [1m[32m82 passed[39m[22m[90m (82)[39m
-packages/vertical-storage test: [2m   Start at [22m 18:36:45
-packages/vertical-storage test: [2m   Duration [22m 3.17s[2m (transform 1.49s, setup 0ms, collect 11.34s, tests 5.09s, environment 4ms, prepare 3.90s)[22m
+packages/vertical-storage test: [2m   Start at [22m 19:00:11
+packages/vertical-storage test: [2m   Duration [22m 3.86s[2m (transform 3.49s, setup 0ms, collect 17.88s, tests 5.94s, environment 4ms, prepare 5.07s)[22m
 packages/store test: Done
 packages/vertical-storage test: Done
 apps/control-api test$ vitest run
 packages/workflow test$ vitest run
 packages/recipe-runtime test$ vitest run
 packages/vertical-jit test$ vitest run
-packages/workflow test: [1m[46m RUN [49m[22m [36mv3.2.7 [39m[90mC:/xDev/kAiCreator/shun-assistant/shun-i108-r2-zc/packages/workflow[39m
-apps/control-api test: [1m[46m RUN [49m[22m [36mv3.2.7 [39m[90mC:/xDev/kAiCreator/shun-assistant/shun-i108-r2-zc/apps/control-api[39m
 packages/vertical-jit test: [1m[46m RUN [49m[22m [36mv3.2.7 [39m[90mC:/xDev/kAiCreator/shun-assistant/shun-i108-r2-zc/packages/vertical-jit[39m
+apps/control-api test: [1m[46m RUN [49m[22m [36mv3.2.7 [39m[90mC:/xDev/kAiCreator/shun-assistant/shun-i108-r2-zc/apps/control-api[39m
 packages/recipe-runtime test: [1m[46m RUN [49m[22m [36mv3.2.7 [39m[90mC:/xDev/kAiCreator/shun-assistant/shun-i108-r2-zc/packages/recipe-runtime[39m
-apps/control-api test:  [32m✓[39m test/registry-key-pin.test.ts [2m([22m[2m4 tests[22m[2m)[22m[32m 47[2mms[22m[39m
-apps/control-api test:  [32m✓[39m test/real-storage-recovery.test.ts [2m([22m[2m8 tests[22m[2m)[22m[32m 13[2mms[22m[39m
-packages/workflow test:  [32m✓[39m test/recipe-revision-catalog.test.ts [2m([22m[2m1 test[22m[2m)[22m[32m 5[2mms[22m[39m
-apps/control-api test:  [32m✓[39m test/preview-prose.test.ts [2m([22m[2m2 tests[22m[2m)[22m[32m 8[2mms[22m[39m
-packages/vertical-jit test:  [32m✓[39m test/curated-provider.test.ts [2m([22m[2m8 tests[22m[2m)[22m[32m 79[2mms[22m[39m
-packages/vertical-jit test:  [32m✓[39m test/winget-external-uninstall-negative.test.ts [2m([22m[2m2 tests[22m[2m)[22m[32m 48[2mms[22m[39m
-packages/vertical-jit test:  [32m✓[39m test/winget-adapter.test.ts [2m([22m[2m9 tests[22m[2m)[22m[32m 50[2mms[22m[39m
-apps/control-api test:  [32m✓[39m test/registry-host-facts.test.ts [2m([22m[2m3 tests[22m[2m)[22m[32m 11[2mms[22m[39m
-apps/control-api test:  [32m✓[39m test/server.test.ts [2m([22m[2m5 tests[22m[2m)[22m[32m 279[2mms[22m[39m
-apps/control-api test:  [32m✓[39m test/simulation-label.test.ts [2m([22m[2m2 tests[22m[2m)[22m[32m 189[2mms[22m[39m
-apps/control-api test:  [32m✓[39m test/approval-status.test.ts [2m([22m[2m3 tests[22m[2m)[22m[33m 302[2mms[22m[39m
-apps/control-api test:  [32m✓[39m test/approvals.test.ts [2m([22m[2m8 tests[22m[2m)[22m[33m 387[2mms[22m[39m
-apps/control-api test:  [32m✓[39m test/policy-failsafe.test.ts [2m([22m[2m4 tests[22m[2m)[22m[33m 478[2mms[22m[39m
-apps/control-api test:  [32m✓[39m test/recovery-honesty.test.ts [2m([22m[2m3 tests[22m[2m)[22m[33m 484[2mms[22m[39m
-apps/control-api test:    [33m[2m✓[22m[39m reconciliation never launders uncertainty (VC-P1-03)[2m > [22mkeeps MAY_HAVE_EXECUTED_UNCERTAIN when no post-state proof exists [33m 423[2mms[22m[39m
-packages/vertical-jit test:  [32m✓[39m test/grant-negative.test.ts [2m([22m[2m5 tests[22m[2m)[22m[32m 54[2mms[22m[39m
-packages/vertical-jit test:  [32m✓[39m test/task-presentation-negative.test.ts [2m([22m[2m8 tests[22m[2m)[22m[32m 65[2mms[22m[39m
-packages/vertical-jit test:  [32m✓[39m test/lifecycle-checkpoint.test.ts [2m([22m[2m3 tests[22m[2m)[22m[32m 81[2mms[22m[39m
-apps/control-api test:  [32m✓[39m test/csrf.test.ts [2m([22m[2m7 tests[22m[2m)[22m[33m 497[2mms[22m[39m
-apps/control-api test:    [33m[2m✓[22m[39m cross-site mutations are refused (CSRF, VC-P1-04)[2m > [22mrefuses a text/plain form-style POST with a hostile Origin (no preflight needed) [33m 346[2mms[22m[39m
-apps/control-api test:  [32m✓[39m test/preview.test.ts [2m([22m[2m7 tests[22m[2m)[22m[33m 572[2mms[22m[39m
-apps/control-api test:  [32m✓[39m test/policy-drift.test.ts [2m([22m[2m3 tests[22m[2m)[22m[33m 531[2mms[22m[39m
-apps/control-api test:    [33m[2m✓[22m[39m active policy revision drift fails closed (VC-P1-02)[2m > [22mrefuses an approval decided under a drifted ACTIVE policy revision [33m 444[2mms[22m[39m
-apps/control-api test:  [32m✓[39m test/lifecycle.test.ts [2m([22m[2m12 tests[22m[2m)[22m[33m 624[2mms[22m[39m
-packages/vertical-jit test:  [32m✓[39m test/durable-restart.test.ts [2m([22m[2m4 tests[22m[2m)[22m[32m 124[2mms[22m[39m
-packages/vertical-jit test:  [32m✓[39m test/cache-root-census.test.ts [2m([22m[2m3 tests[22m[2m)[22m[32m 146[2mms[22m[39m
-packages/vertical-jit test:  [32m✓[39m test/lifecycle-remove.test.ts [2m([22m[2m4 tests[22m[2m)[22m[32m 159[2mms[22m[39m
-packages/vertical-jit test:  [32m✓[39m test/effect-boundary-recensus.test.ts [2m([22m[2m6 tests[22m[2m)[22m[32m 172[2mms[22m[39m
-apps/control-api test:  [32m✓[39m test/local-only.test.ts [2m([22m[2m7 tests[22m[2m)[22m[33m 734[2mms[22m[39m
-packages/vertical-jit test:  [32m✓[39m test/lifecycle-retain.test.ts [2m([22m[2m4 tests[22m[2m)[22m[32m 226[2mms[22m[39m
-packages/vertical-jit test:  [32m✓[39m test/effect-atomicity.test.ts [2m([22m[2m7 tests[22m[2m)[22m[32m 225[2mms[22m[39m
-packages/vertical-jit test:  [32m✓[39m test/recovery.test.ts [2m([22m[2m8 tests[22m[2m)[22m[32m 233[2mms[22m[39m
-apps/control-api test:  [32m✓[39m test/registry-issuance.test.ts [2m([22m[2m7 tests[22m[2m)[22m[32m 23[2mms[22m[39m
-packages/vertical-jit test:  [32m✓[39m test/journal.test.ts [2m([22m[2m6 tests[22m[2m)[22m[32m 62[2mms[22m[39m
-packages/vertical-jit test:  [32m✓[39m test/journal-attempts.test.ts [2m([22m[2m4 tests[22m[2m)[22m[32m 5[2mms[22m[39m
-packages/vertical-jit test:  [32m✓[39m test/poststate-verification-honesty.test.ts [2m([22m[2m4 tests[22m[2m)[22m[32m 47[2mms[22m[39m
-packages/vertical-jit test:  [32m✓[39m test/nested-user-asset.test.ts [2m([22m[2m3 tests[22m[2m)[22m[32m 105[2mms[22m[39m
-packages/vertical-jit test:  [32m✓[39m test/benchmark-envelope.test.ts [2m([22m[2m2 tests[22m[2m)[22m[32m 99[2mms[22m[39m
-packages/workflow test:  [32m✓[39m test/recipe-seam.test.ts [2m([22m[2m3 tests[22m[2m)[22m[32m 8[2mms[22m[39m
+packages/workflow test: [1m[46m RUN [49m[22m [36mv3.2.7 [39m[90mC:/xDev/kAiCreator/shun-assistant/shun-i108-r2-zc/packages/workflow[39m
+packages/workflow test:  [32m✓[39m test/recipe-revision-catalog.test.ts [2m([22m[2m1 test[22m[2m)[22m[32m 6[2mms[22m[39m
+apps/control-api test:  [32m✓[39m test/real-storage-recovery.test.ts [2m([22m[2m8 tests[22m[2m)[22m[32m 17[2mms[22m[39m
+apps/control-api test:  [32m✓[39m test/registry-key-pin.test.ts [2m([22m[2m4 tests[22m[2m)[22m[32m 222[2mms[22m[39m
+apps/control-api test:  [32m✓[39m test/registry-host-facts.test.ts [2m([22m[2m3 tests[22m[2m)[22m[32m 10[2mms[22m[39m
+packages/workflow test:  [32m✓[39m test/recipe-seam.test.ts [2m([22m[2m3 tests[22m[2m)[22m[32m 9[2mms[22m[39m
+packages/workflow test:  [32m✓[39m test/journal-torn.test.ts [2m([22m[2m3 tests[22m[2m)[22m[32m 73[2mms[22m[39m
+packages/vertical-jit test:  [32m✓[39m test/curated-provider.test.ts [2m([22m[2m8 tests[22m[2m)[22m[32m 67[2mms[22m[39m
+packages/workflow test:  [32m✓[39m test/journal-semantic-validation.test.ts [2m([22m[2m8 tests[22m[2m)[22m[32m 197[2mms[22m[39m
+apps/control-api test:  [32m✓[39m test/preview-prose.test.ts [2m([22m[2m2 tests[22m[2m)[22m[32m 13[2mms[22m[39m
+packages/workflow test:  [32m✓[39m test/destructive-redispatch-guard.test.ts [2m([22m[2m3 tests[22m[2m)[22m[33m 367[2mms[22m[39m
+packages/workflow test:  [32m✓[39m test/effect-protocol.test.ts [2m([22m[2m4 tests[22m[2m)[22m[33m 444[2mms[22m[39m
+packages/workflow test:  [32m✓[39m test/receipt-semantics.test.ts [2m([22m[2m5 tests[22m[2m)[22m[33m 452[2mms[22m[39m
+packages/workflow test:  [32m✓[39m test/kernel-serialization.test.ts [2m([22m[2m5 tests[22m[2m)[22m[33m 556[2mms[22m[39m
+apps/control-api test:  [32m✓[39m test/policy-drift.test.ts [2m([22m[2m3 tests[22m[2m)[22m[33m 457[2mms[22m[39m
+apps/control-api test:  [32m✓[39m test/server.test.ts [2m([22m[2m5 tests[22m[2m)[22m[33m 488[2mms[22m[39m
+apps/control-api test:  [32m✓[39m test/preview.test.ts [2m([22m[2m7 tests[22m[2m)[22m[33m 502[2mms[22m[39m
+apps/control-api test:  [32m✓[39m test/recovery-honesty.test.ts [2m([22m[2m3 tests[22m[2m)[22m[33m 521[2mms[22m[39m
+apps/control-api test:    [33m[2m✓[22m[39m reconciliation never launders uncertainty (VC-P1-03)[2m > [22mkeeps MAY_HAVE_EXECUTED_UNCERTAIN when no post-state proof exists [33m 377[2mms[22m[39m
+packages/workflow test:  [32m✓[39m test/kernel-port.test.ts [2m([22m[2m15 tests[22m[2m)[22m[33m 785[2mms[22m[39m
+packages/workflow test:  [32m✓[39m test/recovery-four-states.test.ts [2m([22m[2m10 tests[22m[2m)[22m[33m 838[2mms[22m[39m
+apps/control-api test:  [32m✓[39m test/policy-failsafe.test.ts [2m([22m[2m4 tests[22m[2m)[22m[33m 603[2mms[22m[39m
+apps/control-api test:  [32m✓[39m test/simulation-label.test.ts [2m([22m[2m2 tests[22m[2m)[22m[33m 541[2mms[22m[39m
+apps/control-api test:    [33m[2m✓[22m[39m simulation disclosure (VC-P2-06)[2m > [22mhealth carries the simulation flag the UI banner renders [33m 355[2mms[22m[39m
+apps/control-api test:  [32m✓[39m test/local-only.test.ts [2m([22m[2m7 tests[22m[2m)[22m[33m 628[2mms[22m[39m
+packages/workflow test: [2m Test Files [22m [1m[32m10 passed[39m[22m[90m (10)[39m
+packages/workflow test: [2m      Tests [22m [1m[32m57 passed[39m[22m[90m (57)[39m
+packages/workflow test: [2m   Start at [22m 19:00:17
+packages/workflow test: [2m   Duration [22m 4.95s[2m (transform 4.87s, setup 0ms, collect 22.91s, tests 3.73s, environment 3ms, prepare 4.98s)[22m
+apps/control-api test:  [32m✓[39m test/approvals.test.ts [2m([22m[2m8 tests[22m[2m)[22m[33m 677[2mms[22m[39m
+apps/control-api test:    [33m[2m✓[22m[39m R2 approval flow (L2 §12 approve/reject)[2m > [22msurfaces a pending approval bound to the exact plan hash [33m 312[2mms[22m[39m
+apps/control-api test:  [32m✓[39m test/approval-status.test.ts [2m([22m[2m3 tests[22m[2m)[22m[33m 713[2mms[22m[39m
+apps/control-api test:    [33m[2m✓[22m[39m approval DTO carries the actual status (VC-P1-01)[2m > [22mlists inbox approvals with an explicit PENDING status [33m 630[2mms[22m[39m
 packages/recipe-runtime test: [90mstdout[2m | test/r0-oracle-confinement.test.ts[2m > [22m[2mT04 oracle confinement falsifiers[2m > [22m[2mrefuses a junction ancestor at that component with zero opens below it
 packages/recipe-runtime test: [22m[39mORACLE_JUNCTION_ANCESTOR_ZERO_IO=PASS
-packages/vertical-jit test:  [32m✓[39m test/tree-depth.test.ts [2m([22m[2m1 test[22m[2m)[22m[32m 64[2mms[22m[39m
-packages/workflow test:  [32m✓[39m test/journal-torn.test.ts [2m([22m[2m3 tests[22m[2m)[22m[32m 76[2mms[22m[39m
-packages/vertical-jit test:  [32m✓[39m test/provenance-fail-closed.test.ts [2m([22m[2m3 tests[22m[2m)[22m[32m 36[2mms[22m[39m
-packages/vertical-jit test:  [32m✓[39m test/task-read-scope.test.ts [2m([22m[2m2 tests[22m[2m)[22m[32m 6[2mms[22m[39m
-packages/workflow test:  [32m✓[39m test/journal-semantic-validation.test.ts [2m([22m[2m8 tests[22m[2m)[22m[32m 180[2mms[22m[39m
+packages/vertical-jit test:  [32m✓[39m test/managed-portable.test.ts [2m([22m[2m10 tests[22m[2m | [22m[33m1 skipped[39m[2m)[22m[33m 754[2mms[22m[39m
+packages/vertical-jit test:    [33m[2m✓[22m[39m T10 managed portable acquisition[2m > [22muses official ZIP catalog metadata, verifies the downloaded SHA and removes only through the native pinned deleter [33m 396[2mms[22m[39m
 packages/recipe-runtime test: [90mstdout[2m | test/r0-oracle-confinement.test.ts[2m > [22m[2mT04 oracle confinement falsifiers[2m > [22m[2mrefuses an in-tree junction from enumeration metadata alone
 packages/recipe-runtime test: [22m[39mORACLE_INTREE_JUNCTION_REFUSED=PASS
-packages/vertical-jit test:  [32m✓[39m test/residue.test.ts [2m([22m[2m9 tests[22m[2m)[22m[32m 15[2mms[22m[39m
-packages/vertical-jit test:  [32m✓[39m test/managed-portable.test.ts [2m([22m[2m10 tests[22m[2m | [22m[33m1 skipped[39m[2m)[22m[33m 2207[2mms[22m[39m
-packages/vertical-jit test:    [33m[2m✓[22m[39m T10 managed portable acquisition[2m > [22muses official ZIP catalog metadata, verifies the downloaded SHA and removes only through the native pinned deleter [33m 1551[2mms[22m[39m
-packages/vertical-jit test:    [33m[2m✓[22m[39m T10 managed portable acquisition[2m > [22maccepts only the catalog-pinned ZIP plus one bounded winget YAML sidecar [33m 371[2mms[22m[39m
-packages/workflow test:  [32m✓[39m test/destructive-redispatch-guard.test.ts [2m([22m[2m3 tests[22m[2m)[22m[33m 407[2mms[22m[39m
-packages/workflow test:  [32m✓[39m test/effect-protocol.test.ts [2m([22m[2m4 tests[22m[2m)[22m[33m 442[2mms[22m[39m
-packages/workflow test:  [32m✓[39m test/receipt-semantics.test.ts [2m([22m[2m5 tests[22m[2m)[22m[33m 464[2mms[22m[39m
-apps/control-api test:  [32m✓[39m test/real-storage-bootstrap.test.ts [2m([22m[2m2 tests[22m[2m)[22m[32m 4[2mms[22m[39m
-packages/workflow test:  [32m✓[39m test/kernel-serialization.test.ts [2m([22m[2m5 tests[22m[2m)[22m[33m 553[2mms[22m[39m
-apps/control-api test: [2m Test Files [22m [1m[32m17 passed[39m[22m[90m (17)[39m
-apps/control-api test: [2m      Tests [22m [1m[32m87 passed[39m[22m[90m (87)[39m
-apps/control-api test: [2m   Start at [22m 18:36:49
-apps/control-api test: [2m   Duration [22m 6.01s[2m (transform 6.45s, setup 0ms, collect 26.73s, tests 5.18s, environment 6ms, prepare 8.12s)[22m
+apps/control-api test:  [32m✓[39m test/csrf.test.ts [2m([22m[2m7 tests[22m[2m)[22m[33m 906[2mms[22m[39m
+apps/control-api test:    [33m[2m✓[22m[39m cross-site mutations are refused (CSRF, VC-P1-04)[2m > [22mrefuses a text/plain form-style POST with a hostile Origin (no preflight needed) [33m 676[2mms[22m[39m
+apps/control-api test:  [32m✓[39m test/lifecycle.test.ts [2m([22m[2m12 tests[22m[2m)[22m[33m 1035[2mms[22m[39m
+apps/control-api test:    [33m[2m✓[22m[39m goal intake and clarification (L2 §12)[2m > [22mnormalizes a goal through the frozen contract and reports readable progress [33m 308[2mms[22m[39m
+packages/vertical-jit test:  [32m✓[39m test/benchmark-envelope.test.ts [2m([22m[2m2 tests[22m[2m)[22m[32m 112[2mms[22m[39m
+packages/vertical-jit test:  [32m✓[39m test/tree-depth.test.ts [2m([22m[2m1 test[22m[2m)[22m[32m 92[2mms[22m[39m
+packages/vertical-jit test:  [32m✓[39m test/effect-atomicity.test.ts [2m([22m[2m7 tests[22m[2m)[22m[32m 154[2mms[22m[39m
+packages/vertical-jit test:  [32m✓[39m test/durable-restart.test.ts [2m([22m[2m4 tests[22m[2m)[22m[32m 195[2mms[22m[39m
+packages/vertical-jit test:  [32m✓[39m test/task-presentation-negative.test.ts [2m([22m[2m8 tests[22m[2m)[22m[32m 198[2mms[22m[39m
+packages/vertical-jit test:  [32m✓[39m test/nested-user-asset.test.ts [2m([22m[2m3 tests[22m[2m)[22m[32m 211[2mms[22m[39m
+packages/vertical-jit test:  [32m✓[39m test/lifecycle-retain.test.ts [2m([22m[2m4 tests[22m[2m)[22m[32m 216[2mms[22m[39m
+packages/vertical-jit test:  [32m✓[39m test/effect-boundary-recensus.test.ts [2m([22m[2m6 tests[22m[2m)[22m[32m 193[2mms[22m[39m
+packages/vertical-jit test:  [32m✓[39m test/lifecycle-remove.test.ts [2m([22m[2m4 tests[22m[2m)[22m[32m 227[2mms[22m[39m
+packages/vertical-jit test:  [32m✓[39m test/cache-root-census.test.ts [2m([22m[2m3 tests[22m[2m)[22m[32m 230[2mms[22m[39m
 packages/recipe-runtime test: [90mstdout[2m | test/r0-oracle-confinement.test.ts[2m > [22m[2mT04 oracle confinement falsifiers[2m > [22m[2mrefuses a subst alias root by device attestation with zero opens at all
 packages/recipe-runtime test: [22m[39mORACLE_SUBST_ZERO_IO=PASS DRIVE=V:
 packages/recipe-runtime test: [90mstdout[2m | test/r0-oracle-confinement.test.ts[2m > [22m[2mT04 oracle confinement falsifiers[2m > [22m[2mattests fixed local volumes only, refusing the mapped SMB device form
 packages/recipe-runtime test: [22m[39mORACLE_DRIVE_ATTESTATION_MATRIX=PASS
 packages/recipe-runtime test: [90mstdout[2m | test/r0-oracle-confinement.test.ts[2m > [22m[2mT04 oracle confinement falsifiers[2m > [22m[2mfails closed with zero opens on a real mapped SMB drive when one is provided
 packages/recipe-runtime test: [22m[39mORACLE_SMB_MAPPED_ZERO_IO=SKIPPED_NO_SMB_DRIVE_PROVIDED
-packages/workflow test:  [32m✓[39m test/kernel-port.test.ts [2m([22m[2m15 tests[22m[2m)[22m[33m 790[2mms[22m[39m
-packages/workflow test:  [32m✓[39m test/recovery-four-states.test.ts [2m([22m[2m10 tests[22m[2m)[22m[33m 854[2mms[22m[39m
-packages/workflow test: [2m Test Files [22m [1m[32m10 passed[39m[22m[90m (10)[39m
-packages/workflow test: [2m      Tests [22m [1m[32m57 passed[39m[22m[90m (57)[39m
-packages/workflow test: [2m   Start at [22m 18:36:49
-packages/workflow test: [2m   Duration [22m 6.30s[2m (transform 7.88s, setup 0ms, collect 34.62s, tests 3.78s, environment 4ms, prepare 6.01s)[22m
-apps/control-api test: Done
+packages/vertical-jit test:  [32m✓[39m test/recovery.test.ts [2m([22m[2m8 tests[22m[2m)[22m[32m 256[2mms[22m[39m
+packages/vertical-jit test:  [32m✓[39m test/lifecycle-checkpoint.test.ts [2m([22m[2m3 tests[22m[2m)[22m[32m 272[2mms[22m[39m
+packages/vertical-jit test:  [32m✓[39m test/journal.test.ts [2m([22m[2m6 tests[22m[2m)[22m[32m 82[2mms[22m[39m
 packages/workflow test: Done
+apps/control-api test:  [32m✓[39m test/registry-issuance.test.ts [2m([22m[2m7 tests[22m[2m)[22m[32m 33[2mms[22m[39m
+packages/vertical-jit test:  [32m✓[39m test/journal-attempts.test.ts [2m([22m[2m4 tests[22m[2m)[22m[32m 7[2mms[22m[39m
+packages/vertical-jit test:  [32m✓[39m test/winget-external-uninstall-negative.test.ts [2m([22m[2m2 tests[22m[2m)[22m[32m 58[2mms[22m[39m
+packages/vertical-jit test:  [32m✓[39m test/grant-negative.test.ts [2m([22m[2m5 tests[22m[2m)[22m[32m 48[2mms[22m[39m
+packages/vertical-jit test:  [32m✓[39m test/winget-adapter.test.ts [2m([22m[2m9 tests[22m[2m)[22m[32m 95[2mms[22m[39m
+packages/vertical-jit test:  [32m✓[39m test/poststate-verification-honesty.test.ts [2m([22m[2m4 tests[22m[2m)[22m[32m 61[2mms[22m[39m
+packages/vertical-jit test:  [32m✓[39m test/residue.test.ts [2m([22m[2m9 tests[22m[2m)[22m[32m 21[2mms[22m[39m
+packages/vertical-jit test:  [32m✓[39m test/provenance-fail-closed.test.ts [2m([22m[2m3 tests[22m[2m)[22m[32m 28[2mms[22m[39m
+packages/vertical-jit test:  [32m✓[39m test/task-read-scope.test.ts [2m([22m[2m2 tests[22m[2m)[22m[32m 8[2mms[22m[39m
+apps/control-api test:  [32m✓[39m test/real-storage-bootstrap.test.ts [2m([22m[2m2 tests[22m[2m)[22m[32m 6[2mms[22m[39m
+apps/control-api test: [2m Test Files [22m [1m[32m17 passed[39m[22m[90m (17)[39m
+apps/control-api test: [2m      Tests [22m [1m[32m87 passed[39m[22m[90m (87)[39m
+apps/control-api test: [2m   Start at [22m 19:00:17
+apps/control-api test: [2m   Duration [22m 7.39s[2m (transform 8.83s, setup 0ms, collect 39.94s, tests 7.37s, environment 6ms, prepare 9.26s)[22m
+apps/control-api test: Done
 packages/recipe-runtime test: [90mstdout[2m | test/r0-oracle-confinement.test.ts[2m > [22m[2mT04 oracle confinement falsifiers[2m > [22m[2mnever verifies a foreign world while the ancestor and an in-tree directory are concurrently swapped
-packages/recipe-runtime test: [22m[39mORACLE_RACE_NO_FOREIGN_WORLD=PASS OK=2501 REFUSED=1500 SWAP_RACE_EXERCISED=true
+packages/recipe-runtime test: [22m[39mORACLE_RACE_NO_FOREIGN_WORLD=PASS OK=3048 REFUSED=953 SWAP_RACE_EXERCISED=true
 packages/recipe-runtime test: [90mstdout[2m | test/r0-oracle-confinement.test.ts[2m > [22m[2mT04 oracle confinement falsifiers[2m > [22m[2mbinds the task semantic verdict to the content fingerprint, refusing a size/mtime-preserving swap
 packages/recipe-runtime test: [22m[39mORACLE_CONTENT_SWAP_REFUSED_BY_SEMANTIC_VERIFIER=PASS
-packages/recipe-runtime test:  [32m✓[39m test/r0-oracle-confinement.test.ts [2m([22m[2m7 tests[22m[2m)[22m[33m 8683[2mms[22m[39m
-packages/recipe-runtime test:    [33m[2m✓[22m[39m T04 oracle confinement falsifiers[2m > [22mrefuses a subst alias root by device attestation with zero opens at all [33m 494[2mms[22m[39m
-packages/recipe-runtime test:    [33m[2m✓[22m[39m T04 oracle confinement falsifiers[2m > [22mnever verifies a foreign world while the ancestor and an in-tree directory are concurrently swapped [33m 7791[2mms[22m[39m
+packages/recipe-runtime test:  [32m✓[39m test/r0-oracle-confinement.test.ts [2m([22m[2m7 tests[22m[2m)[22m[33m 12566[2mms[22m[39m
+packages/recipe-runtime test:    [33m[2m✓[22m[39m T04 oracle confinement falsifiers[2m > [22mrefuses a subst alias root by device attestation with zero opens at all [33m 560[2mms[22m[39m
+packages/recipe-runtime test:    [33m[2m✓[22m[39m T04 oracle confinement falsifiers[2m > [22mnever verifies a foreign world while the ancestor and an in-tree directory are concurrently swapped [33m 11697[2mms[22m[39m
 packages/recipe-runtime test: [90mstdout[2m | test/windows-host-e2e.test.ts[2m > [22m[2mT04 Windows host minimal E2E closed loop[2m > [22m[2mruns the standard-user privilege gate before any host loop evidence
 packages/recipe-runtime test: [22m[39mE2E_PRIVILEGE_TOKEN=MEDIUM
 packages/recipe-runtime test: [90mstdout[2m | test/windows-host-e2e.test.ts[2m > [22m[2mT04 Windows host minimal E2E closed loop[2m > [22m[2mcloses the loop: grant -> durable STARTED -> native scan -> oracle -> semantic PASS, then refuses replay
@@ -1630,25 +1637,26 @@ packages/recipe-runtime test: [90mstdout[2m | test/windows-host-e2e.test.ts[2
 packages/recipe-runtime test: [22m[39mE2E_MISSING_ADDON_FAIL_CLOSED=PASS
 packages/recipe-runtime test: [90mstdout[2m | test/windows-host-e2e.test.ts[2m > [22m[2mT04 Windows host minimal E2E closed loop[2m > [22m[2mrefuses a real SMB mapped drive scope when one is provided
 packages/recipe-runtime test: [22m[39mE2E_SMB_MAPPED_DRIVE_NEGATIVE=SKIPPED_NO_SMB_DRIVE_PROVIDED
-packages/recipe-runtime test:  [32m✓[39m test/windows-host-e2e.test.ts [2m([22m[2m7 tests[22m[2m)[22m[33m 1932[2mms[22m[39m
-packages/recipe-runtime test:    [33m[2m✓[22m[39m T04 Windows host minimal E2E closed loop[2m > [22maccepts a legitimate 8.3 short-path spelling of the same approved scope [33m 688[2mms[22m[39m
-packages/recipe-runtime test:    [33m[2m✓[22m[39m T04 Windows host minimal E2E closed loop[2m > [22mfails closed in a fresh process when the native addon is missing, then recovers [33m 799[2mms[22m[39m
-packages/recipe-runtime test:  [32m✓[39m test/scoped-file-search.test.ts [2m([22m[2m15 tests[22m[2m | [22m[33m1 skipped[39m[2m)[22m[33m 1824[2mms[22m[39m
-packages/recipe-runtime test:    [33m[2m✓[22m[39m T04 Windows handle-anchored physical canaries (real win32 host)[2m > [22msurvives a real concurrent rename attacker without ever returning outside-scope paths [33m 1572[2mms[22m[39m
+packages/recipe-runtime test:  [32m✓[39m test/windows-host-e2e.test.ts [2m([22m[2m7 tests[22m[2m)[22m[33m 2282[2mms[22m[39m
+packages/recipe-runtime test:    [33m[2m✓[22m[39m T04 Windows host minimal E2E closed loop[2m > [22mcloses the loop: grant -> durable STARTED -> native scan -> oracle -> semantic PASS, then refuses replay [33m 365[2mms[22m[39m
+packages/recipe-runtime test:    [33m[2m✓[22m[39m T04 Windows host minimal E2E closed loop[2m > [22maccepts a legitimate 8.3 short-path spelling of the same approved scope [33m 726[2mms[22m[39m
+packages/recipe-runtime test:    [33m[2m✓[22m[39m T04 Windows host minimal E2E closed loop[2m > [22mfails closed in a fresh process when the native addon is missing, then recovers [33m 875[2mms[22m[39m
 packages/recipe-runtime test: [90mstdout[2m | test/windows-host-hardkill-replay.test.ts[2m > [22m[2mT04 hard kill between durable STARTED and receipt: restart refuses replay[2m > [22m[2mkills a real composed host child post-commit and never re-dispatches
 packages/recipe-runtime test: [22m[39mE2E_HARDKILL_START_COMMITTED=PASS E2E_KILL_IDENTITY=code:null,signal:SIGKILL E2E_RESTART_NO_REPLAY=PASS
 packages/recipe-runtime test: [90mstdout[2m | test/windows-host-hardkill-replay.test.ts[2m > [22m[2mT04 hard kill between durable STARTED and receipt: restart refuses replay[2m > [22m[2mrejects an ordinary child exit as forced-death evidence (negative control)
 packages/recipe-runtime test: [22m[39mE2E_HARDKILL_ORDINARY_EXIT_REJECTED=PASS
-packages/recipe-runtime test:  [32m✓[39m test/windows-host-hardkill-replay.test.ts [2m([22m[2m2 tests[22m[2m)[22m[33m 1787[2mms[22m[39m
-packages/recipe-runtime test:    [33m[2m✓[22m[39m T04 hard kill between durable STARTED and receipt: restart refuses replay[2m > [22mkills a real composed host child post-commit and never re-dispatches [33m 1526[2mms[22m[39m
-packages/recipe-runtime test: (node:17472) [DEP0190] DeprecationWarning: Passing args to a child process with shell option true can lead to security vulnerabilities, as the arguments are not escaped, only concatenated.
+packages/recipe-runtime test:  [32m✓[39m test/windows-host-hardkill-replay.test.ts [2m([22m[2m2 tests[22m[2m)[22m[33m 1849[2mms[22m[39m
+packages/recipe-runtime test:    [33m[2m✓[22m[39m T04 hard kill between durable STARTED and receipt: restart refuses replay[2m > [22mkills a real composed host child post-commit and never re-dispatches [33m 1582[2mms[22m[39m
+packages/recipe-runtime test:  [32m✓[39m test/scoped-file-search.test.ts [2m([22m[2m15 tests[22m[2m | [22m[33m1 skipped[39m[2m)[22m[33m 1799[2mms[22m[39m
+packages/recipe-runtime test:    [33m[2m✓[22m[39m T04 Windows handle-anchored physical canaries (real win32 host)[2m > [22msurvives a real concurrent rename attacker without ever returning outside-scope paths [33m 1564[2mms[22m[39m
+packages/recipe-runtime test: (node:35764) [DEP0190] DeprecationWarning: Passing args to a child process with shell option true can lead to security vulnerabilities, as the arguments are not escaped, only concatenated.
 packages/recipe-runtime test: (Use `node --trace-deprecation ...` to show where the warning was created)
-packages/recipe-runtime test:  [32m✓[39m test/pack-contents.test.ts [2m([22m[2m1 test[22m[2m)[22m[33m 1475[2mms[22m[39m
-packages/recipe-runtime test:    [33m[2m✓[22m[39m T04 native package contents are runtime-only[2m > [22mnever publishes the test-only native canary or Rust build source [33m 1473[2mms[22m[39m
-packages/recipe-runtime test:  [32m✓[39m test/host.test.ts [2m([22m[2m6 tests[22m[2m)[22m[33m 360[2mms[22m[39m
-packages/recipe-runtime test:  [32m✓[39m test/sqlite-effect-boundary.test.ts [2m([22m[2m6 tests[22m[2m)[22m[33m 313[2mms[22m[39m
-packages/recipe-runtime test:  [32m✓[39m test/sqlite-journaled-search-boundary.test.ts [2m([22m[2m4 tests[22m[2m)[22m[32m 228[2mms[22m[39m
-packages/recipe-runtime test:  [32m✓[39m test/sqlite-r0-effect-journal.test.ts [2m([22m[2m5 tests[22m[2m)[22m[32m 135[2mms[22m[39m
+packages/recipe-runtime test:  [32m✓[39m test/pack-contents.test.ts [2m([22m[2m1 test[22m[2m)[22m[33m 1454[2mms[22m[39m
+packages/recipe-runtime test:    [33m[2m✓[22m[39m T04 native package contents are runtime-only[2m > [22mnever publishes the test-only native canary or Rust build source [33m 1452[2mms[22m[39m
+packages/recipe-runtime test:  [32m✓[39m test/host.test.ts [2m([22m[2m6 tests[22m[2m)[22m[33m 311[2mms[22m[39m
+packages/recipe-runtime test:  [32m✓[39m test/sqlite-effect-boundary.test.ts [2m([22m[2m6 tests[22m[2m)[22m[32m 265[2mms[22m[39m
+packages/recipe-runtime test:  [32m✓[39m test/sqlite-journaled-search-boundary.test.ts [2m([22m[2m4 tests[22m[2m)[22m[32m 204[2mms[22m[39m
+packages/recipe-runtime test:  [32m✓[39m test/sqlite-r0-effect-journal.test.ts [2m([22m[2m5 tests[22m[2m)[22m[32m 133[2mms[22m[39m
 packages/recipe-runtime test: [90mstdout[2m | test/trusted-windows-r0-effect.test.ts[2m > [22m[2mT04 effect phase binding (R2 P1-02)[2m > [22m[2mnever mints a positive receipt without a trusted phase journal
 packages/recipe-runtime test: [22m[39mPHASE_NO_JOURNAL_NO_POSITIVE=PASS
 packages/recipe-runtime test: [90mstdout[2m | test/trusted-windows-r0-effect.test.ts[2m > [22m[2mT04 effect phase binding (R2 P1-02)[2m > [22m[2mstays UNCERTAIN when phase persistence is refused
@@ -1659,53 +1667,53 @@ packages/recipe-runtime test: [90mstdout[2m | test/trusted-windows-r0-effect.t
 packages/recipe-runtime test: [22m[39mPHASE_POSITIVE_CITES_REAL_RECEIPT=PASS
 packages/recipe-runtime test: [90mstdout[2m | test/trusted-windows-r0-effect.test.ts[2m > [22m[2mT04 effect phase binding (R2 P1-02)[2m > [22m[2mdurably refuses unreserved attempts, divergence and tampered phase rows
 packages/recipe-runtime test: [22m[39mPHASE_JOURNAL_IMMUTABILITY=PASS
-packages/recipe-runtime test:  [32m✓[39m test/trusted-windows-r0-effect.test.ts [2m([22m[2m5 tests[22m[2m)[22m[32m 198[2mms[22m[39m
-packages/recipe-runtime test:  [32m✓[39m test/journaled-r0-search.test.ts [2m([22m[2m7 tests[22m[2m)[22m[32m 29[2mms[22m[39m
+packages/recipe-runtime test:  [32m✓[39m test/trusted-windows-r0-effect.test.ts [2m([22m[2m5 tests[22m[2m)[22m[32m 104[2mms[22m[39m
+packages/recipe-runtime test:  [32m✓[39m test/journaled-r0-search.test.ts [2m([22m[2m7 tests[22m[2m)[22m[32m 32[2mms[22m[39m
 packages/recipe-runtime test: [2m Test Files [22m [1m[32m11 passed[39m[22m[90m (11)[39m
 packages/recipe-runtime test: [2m      Tests [22m [1m[32m64 passed[39m[22m[2m | [22m[33m1 skipped[39m[90m (65)[39m
-packages/recipe-runtime test: [2m   Start at [22m 18:36:49
-packages/recipe-runtime test: [2m   Duration [22m 29.47s[2m (transform 3.49s, setup 0ms, collect 6.51s, tests 16.96s, environment 3ms, prepare 2.67s)[22m
+packages/recipe-runtime test: [2m   Start at [22m 19:00:17
+packages/recipe-runtime test: [2m   Duration [22m 33.71s[2m (transform 2.73s, setup 0ms, collect 6.73s, tests 21.00s, environment 3ms, prepare 2.82s)[22m
 packages/recipe-runtime test: Done
-packages/vertical-jit test:  [32m✓[39m test/native-safety.win.test.ts [2m([22m[2m20 tests[22m[2m)[22m[33m 59196[2mms[22m[39m
-packages/vertical-jit test:    [33m[2m✓[22m[39m T10/R6 native extraction: exact-entry happy path with spaces/parentheses and per-file identities [33m 2027[2mms[22m[39m
-packages/vertical-jit test:    [33m[2m✓[22m[39m T10/R6 native extraction: traversal / ADS / absolute / reserved-name entries fail closed [33m 6239[2mms[22m[39m
-packages/vertical-jit test:    [33m[2m✓[22m[39m T10/R6 native extraction: collision and type conflicts refuse [33m 1620[2mms[22m[39m
-packages/vertical-jit test:    [33m[2m✓[22m[39m T10/R6 native extraction: archive-bomb budgets refuse before and during writes [33m 7982[2mms[22m[39m
-packages/vertical-jit test:    [33m[2m✓[22m[39m T10/R6 native extraction: oversize archive and SHA mismatch refuse inside the lock [33m 1448[2mms[22m[39m
-packages/vertical-jit test:    [33m[2m✓[22m[39m T10/R6 native extraction: pre-planted junction inside destination refuses with zero canary contact [33m 784[2mms[22m[39m
-packages/vertical-jit test:    [33m[2m✓[22m[39m T10/R6 native extraction: destination itself planted as a junction to user data refuses [33m 781[2mms[22m[39m
-packages/vertical-jit test:    [33m[2m✓[22m[39m T10/R6 native extraction: ACTIVE junction-swap storm never writes through to user data [33m 4886[2mms[22m[39m
-packages/vertical-jit test:    [33m[2m✓[22m[39m T10/R6 native deletion: exact manifest removes the whole provider root by handle [33m 2246[2mms[22m[39m
-packages/vertical-jit test:    [33m[2m✓[22m[39m T10/R6 native deletion: census identities AGREE with install-time identities across file sizes [33m 3081[2mms[22m[39m
-packages/vertical-jit test:    [33m[2m✓[22m[39m T10/R6 native deletion: foreign file anywhere in the root refuses with ZERO deletion [33m 2288[2mms[22m[39m
-packages/vertical-jit test:    [33m[2m✓[22m[39m T10/R6 native deletion: junction planted inside the root refuses as FOREIGN_REPARSE with zero deletion [33m 2333[2mms[22m[39m
-packages/vertical-jit test:    [33m[2m✓[22m[39m T10/R6 native deletion: parent junction swap refuses even when the mirrored tree matches the manifest exactly [33m 1389[2mms[22m[39m
-packages/vertical-jit test:    [33m[2m✓[22m[39m T10/R6 native deletion: same-path content replacement detected by install-time identity (zero deletion) [33m 2195[2mms[22m[39m
-packages/vertical-jit test:    [33m[2m✓[22m[39m T10/R8 native deletion: same-content new object is refused by install-time FileId [33m 2231[2mms[22m[39m
-packages/vertical-jit test:    [33m[2m✓[22m[39m T10/R8 native deletion: file-to-empty-directory replacement is refused [33m 2262[2mms[22m[39m
-packages/vertical-jit test:    [33m[2m✓[22m[39m T10/R6 native deletion: hardlink substitution is refused even when bytes match a user file [33m 2245[2mms[22m[39m
-packages/vertical-jit test:    [33m[2m✓[22m[39m T10/R6 native deletion: ACTIVE same-path replacement + junction storm never deletes user data [33m 9318[2mms[22m[39m
-packages/vertical-jit test:    [33m[2m✓[22m[39m T10/R6 native deletion: crash reconcile — missing entries skip, foreign residue still refuses, then completes [33m 3079[2mms[22m[39m
-packages/vertical-jit test:    [33m[2m✓[22m[39m T10/R6 native deletion: absent root reports ABSENT instead of inventing work [33m 760[2mms[22m[39m
+packages/vertical-jit test:  [32m✓[39m test/native-safety.win.test.ts [2m([22m[2m20 tests[22m[2m)[22m[33m 62983[2mms[22m[39m
+packages/vertical-jit test:    [33m[2m✓[22m[39m T10/R6 native extraction: exact-entry happy path with spaces/parentheses and per-file identities [33m 2498[2mms[22m[39m
+packages/vertical-jit test:    [33m[2m✓[22m[39m T10/R6 native extraction: traversal / ADS / absolute / reserved-name entries fail closed [33m 7202[2mms[22m[39m
+packages/vertical-jit test:    [33m[2m✓[22m[39m T10/R6 native extraction: collision and type conflicts refuse [33m 1911[2mms[22m[39m
+packages/vertical-jit test:    [33m[2m✓[22m[39m T10/R6 native extraction: archive-bomb budgets refuse before and during writes [33m 8978[2mms[22m[39m
+packages/vertical-jit test:    [33m[2m✓[22m[39m T10/R6 native extraction: oversize archive and SHA mismatch refuse inside the lock [33m 1514[2mms[22m[39m
+packages/vertical-jit test:    [33m[2m✓[22m[39m T10/R6 native extraction: pre-planted junction inside destination refuses with zero canary contact [33m 774[2mms[22m[39m
+packages/vertical-jit test:    [33m[2m✓[22m[39m T10/R6 native extraction: destination itself planted as a junction to user data refuses [33m 871[2mms[22m[39m
+packages/vertical-jit test:    [33m[2m✓[22m[39m T10/R6 native extraction: ACTIVE junction-swap storm never writes through to user data [33m 4672[2mms[22m[39m
+packages/vertical-jit test:    [33m[2m✓[22m[39m T10/R6 native deletion: exact manifest removes the whole provider root by handle [33m 2204[2mms[22m[39m
+packages/vertical-jit test:    [33m[2m✓[22m[39m T10/R6 native deletion: census identities AGREE with install-time identities across file sizes [33m 3076[2mms[22m[39m
+packages/vertical-jit test:    [33m[2m✓[22m[39m T10/R6 native deletion: foreign file anywhere in the root refuses with ZERO deletion [33m 2377[2mms[22m[39m
+packages/vertical-jit test:    [33m[2m✓[22m[39m T10/R6 native deletion: junction planted inside the root refuses as FOREIGN_REPARSE with zero deletion [33m 2349[2mms[22m[39m
+packages/vertical-jit test:    [33m[2m✓[22m[39m T10/R6 native deletion: parent junction swap refuses even when the mirrored tree matches the manifest exactly [33m 1680[2mms[22m[39m
+packages/vertical-jit test:    [33m[2m✓[22m[39m T10/R6 native deletion: same-path content replacement detected by install-time identity (zero deletion) [33m 2414[2mms[22m[39m
+packages/vertical-jit test:    [33m[2m✓[22m[39m T10/R8 native deletion: same-content new object is refused by install-time FileId [33m 2399[2mms[22m[39m
+packages/vertical-jit test:    [33m[2m✓[22m[39m T10/R8 native deletion: file-to-empty-directory replacement is refused [33m 2372[2mms[22m[39m
+packages/vertical-jit test:    [33m[2m✓[22m[39m T10/R6 native deletion: hardlink substitution is refused even when bytes match a user file [33m 2242[2mms[22m[39m
+packages/vertical-jit test:    [33m[2m✓[22m[39m T10/R6 native deletion: ACTIVE same-path replacement + junction storm never deletes user data [33m 9517[2mms[22m[39m
+packages/vertical-jit test:    [33m[2m✓[22m[39m T10/R6 native deletion: crash reconcile — missing entries skip, foreign residue still refuses, then completes [33m 3184[2mms[22m[39m
+packages/vertical-jit test:    [33m[2m✓[22m[39m T10/R6 native deletion: absent root reports ABSENT instead of inventing work [33m 746[2mms[22m[39m
 packages/vertical-jit test: [2m Test Files [22m [1m[32m24 passed[39m[22m[90m (24)[39m
 packages/vertical-jit test: [2m      Tests [22m [1m[32m134 passed[39m[22m[2m | [22m[33m1 skipped[39m[90m (135)[39m
-packages/vertical-jit test: [2m   Start at [22m 18:36:49
-packages/vertical-jit test: [2m   Duration [22m 61.88s[2m (transform 7.59s, setup 0ms, collect 33.04s, tests 63.51s, environment 8ms, prepare 11.07s)[22m
+packages/vertical-jit test: [2m   Start at [22m 19:00:17
+packages/vertical-jit test: [2m   Duration [22m 66.26s[2m (transform 12.86s, setup 0ms, collect 52.94s, tests 66.57s, environment 8ms, prepare 11.39s)[22m
 packages/vertical-jit test: Done
 packages/provider-loader test$ vitest run
 packages/provider-loader test: [1m[46m RUN [49m[22m [36mv3.2.7 [39m[90mC:/xDev/kAiCreator/shun-assistant/shun-i108-r2-zc/packages/provider-loader[39m
-packages/provider-loader test:  [32m✓[39m test/staging.test.ts [2m([22m[2m7 tests[22m[2m | [22m[33m1 skipped[39m[2m)[22m[32m 142[2mms[22m[39m
+packages/provider-loader test:  [32m✓[39m test/preflight.test.ts [2m([22m[2m7 tests[22m[2m)[22m[32m 189[2mms[22m[39m
+packages/provider-loader test:  [32m✓[39m test/staging.test.ts [2m([22m[2m7 tests[22m[2m | [22m[33m1 skipped[39m[2m)[22m[32m 215[2mms[22m[39m
 packages/provider-loader test:    [2m[90m↓[39m[22m T05 signed curated Provider byte acquisition[2m > [22mrefuses a symlinked cached artifact when the host permits symlink fixtures[2m[90m [WIN_SYMLINK_FIXTURE_PRIVILEGE_UNAVAILABLE][39m[22m
-packages/provider-loader test:  [32m✓[39m test/preflight.test.ts [2m([22m[2m7 tests[22m[2m)[22m[32m 140[2mms[22m[39m
-packages/provider-loader test:  [32m✓[39m test/native-activation.test.ts [2m([22m[2m31 tests[22m[2m)[22m[33m 1552[2mms[22m[39m
-packages/provider-loader test:    [33m[2m✓[22m[39m T05 native child — bounded outcome and recovery[2m > [22mclamps the timeout into the bounded window and reports a real killed child honestly [33m 324[2mms[22m[39m
-packages/provider-loader test:  [32m✓[39m test/activation.test.ts [2m([22m[2m40 tests[22m[2m | [22m[33m1 skipped[39m[2m)[22m[33m 2929[2mms[22m[39m
-packages/provider-loader test:    [33m[2m✓[22m[39m BoundedSpawnProcess (real transport, unit-scoped)[2m > [22menforces the hard timeout and marks the run timed out [33m 1016[2mms[22m[39m
-packages/provider-loader test:    [33m[2m✓[22m[39m BoundedSpawnProcess (real transport, unit-scoped)[2m > [22mcaps captured output at the configured byte limit [33m 479[2mms[22m[39m
+packages/provider-loader test:  [32m✓[39m test/native-activation.test.ts [2m([22m[2m31 tests[22m[2m)[22m[33m 1685[2mms[22m[39m
+packages/provider-loader test:    [33m[2m✓[22m[39m T05 native child — bounded outcome and recovery[2m > [22mclamps the timeout into the bounded window and reports a real killed child honestly [33m 330[2mms[22m[39m
+packages/provider-loader test:  [32m✓[39m test/activation.test.ts [2m([22m[2m40 tests[22m[2m | [22m[33m1 skipped[39m[2m)[22m[33m 3125[2mms[22m[39m
+packages/provider-loader test:    [33m[2m✓[22m[39m BoundedSpawnProcess (real transport, unit-scoped)[2m > [22menforces the hard timeout and marks the run timed out [33m 1019[2mms[22m[39m
+packages/provider-loader test:    [33m[2m✓[22m[39m BoundedSpawnProcess (real transport, unit-scoped)[2m > [22mcaps captured output at the configured byte limit [33m 522[2mms[22m[39m
 packages/provider-loader test: [2m Test Files [22m [1m[32m4 passed[39m[22m[90m (4)[39m
 packages/provider-loader test: [2m      Tests [22m [1m[32m83 passed[39m[22m[2m | [22m[33m2 skipped[39m[90m (85)[39m
-packages/provider-loader test: [2m   Start at [22m 18:37:52
-packages/provider-loader test: [2m   Duration [22m 4.65s[2m (transform 944ms, setup 0ms, collect 3.93s, tests 4.76s, environment 2ms, prepare 1.13s)[22m
+packages/provider-loader test: [2m   Start at [22m 19:01:24
+packages/provider-loader test: [2m   Duration [22m 5.23s[2m (transform 987ms, setup 0ms, collect 4.66s, tests 5.21s, environment 1ms, prepare 1.15s)[22m
 packages/provider-loader test: Done
 task-check: 全绿
 TASK_CHECK_EXIT=0
