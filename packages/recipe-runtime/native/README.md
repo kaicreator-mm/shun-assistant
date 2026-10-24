@@ -49,6 +49,40 @@ cp "$CARGO_TARGET_DIR/release/shun_win32_impl.dll"   impl/shun_win32_impl.node
 cp "$CARGO_TARGET_DIR/release/shun_win32_canary.dll" canary/shun_win32_canary.node
 ```
 
+### Byte-identical native provenance check (independent validator)
+
+The independent Windows Node 24 validator reproduced both committed binaries from
+the frozen `Cargo.lock` and exact Rust sources using rustc/cargo 1.99.1
+`stable-x86_64-pc-windows-gnu`. A normal fresh build differed only in PE
+COFF TimeDateStamp and derived CheckSum; rebuilding each independently with
+its original linker epoch produced SHA256-identical committed binaries:
+
+```sh
+# Build from a fresh, exact-SHA source checkout with the documented Node
+# import library, pinned toolchain and external CARGO_TARGET_DIR.
+# Keep the builds separate: the binaries were linked at different times.
+SOURCE_DATE_EPOCH=1792785077 \
+  rustup run stable-x86_64-pc-windows-gnu cargo build --release --locked -p shun-win32-impl
+# Force the canary to relink under its distinct, independently derived epoch.
+rustup run stable-x86_64-pc-windows-gnu cargo clean -p shun-win32-canary
+SOURCE_DATE_EPOCH=1792785321 \
+  rustup run stable-x86_64-pc-windows-gnu cargo build --release --locked -p shun-win32-canary
+```
+
+Before treating the result as provenance evidence, verify actual GitHub blob
+bytes against the checkout, compare each rebuilt `.dll` to the committed
+`.node` byte-for-byte, record the SHA256s, toolchain/Node executable identities
+and command exit codes, then run the Windows Standard User canary suite on the
+**committed** artifacts. A differing binary is not proof about the shipped
+binary even when its own tests pass. The epochs were independently recovered
+from the committed PE headers, not accepted solely from the original builder.
+
+Production packaging is restricted by the package `files` allowlist: publish
+`src/` and `native/impl/shun_win32_impl.node` only, never the test-only
+`native/canary/` addon or Rust build source. The `test/pack-contents.test.ts`
+negative test checks real `npm pack --dry-run` output; no source or native
+rebuild is performed by the packaging test.
+
 The built `.node` artifacts are committed so the exact-head CI/review host can
 run the physical canaries without a Rust toolchain; their SHA256 and the exact
 toolchain are pinned in `docs/validation/v0.2/`. A rebuilt artifact must pass
