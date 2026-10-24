@@ -186,6 +186,29 @@ function canary(): CanaryKernel32 {
 }
 
 describe.skipIf(!isWin32)('T04 Windows handle-anchored physical canaries (real win32 host)', () => {
+  it('rejects a real SMB mapped drive before the native drive-root handle open', () => {
+    const smbRoot = process.env.SHUN_T04_SMB_DRIVE_ROOT;
+    if (!smbRoot) {
+      console.log('NATIVE_DIRECT_SMB_NEGATIVE=NOT_RUN_NO_MAPPED_DRIVE');
+      return;
+    }
+    const native = createRequire(import.meta.url)(
+      '../native/impl/shun_win32_impl.node',
+    ) as { dosDevice(letter: string): string | null; driveType(root: string): number | null };
+    const letter = smbRoot.slice(0, 2);
+    expect(native.dosDevice(letter)?.toLowerCase()).not.toMatch(
+      /^\\\\device\\\\harddiskvolume[0-9]+$/,
+    );
+    const opened: string[] = [];
+    expect(() =>
+      observeScopedFileSearch(authorized(smbRoot), {
+        onDirectoryOpened: (rel) => opened.push(rel),
+      }),
+    ).toThrow(/^R0_FILE_SEARCH_REFUSED$/);
+    expect(opened).toEqual([]);
+    console.log('NATIVE_DIRECT_SMB_NEGATIVE=PASS_REAL_MAPPED_DRIVE');
+  });
+
   it('anchors every root component, including 8.3 short-name temp paths, without aliasing', () => {
     const { root } = fixture();
     // Windows GitHub runners may supply TEMP containing RUNNER~1 while
