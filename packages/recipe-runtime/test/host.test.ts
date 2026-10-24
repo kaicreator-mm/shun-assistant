@@ -452,5 +452,4 @@ describe('T04 real SQLite Recipe host + actual ActionController read-only bounda
       }),
     ).toThrow(/^R0_NATIVE_HOST_BOOTSTRAP_REFUSED$/);
   });
-
 });
