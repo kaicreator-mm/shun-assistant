@@ -3,6 +3,10 @@
   "version": "0.2.0",
   "private": true,
   "type": "module",
+  "files": [
+    "src/",
+    "native/impl/shun_win32_impl.node"
+  ],
   "exports": {
     ".": "./src/index.ts"
   },
@@ -13,9 +17,9 @@
   },
   "dependencies": {
     "@shun/authorization": "workspace:*",
+    "@shun/contracts": "workspace:*",
     "@shun/resolver": "workspace:*",
-    "@shun/store": "workspace:*",
-    "@shun/contracts": "workspace:*"
+    "@shun/store": "workspace:*"
   },
   "devDependencies": {
     "@biomejs/biome": "^2.3.8",

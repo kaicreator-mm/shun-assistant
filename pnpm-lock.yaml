@@ -279,12 +279,12 @@ importers:
         specifier: ^4.1.13
         version: 4.6.5
     devDependencies:
-      '@shun/store':
-        specifier: workspace:*
-        version: link:../store
       '@biomejs/biome':
         specifier: ^2.3.8
         version: 2.5.15
+      '@shun/store':
+        specifier: workspace:*
+        version: link:../store
       '@types/node':
         specifier: ^24.7.0
         version: 24.19.2
@@ -320,7 +320,11 @@ importers:
         specifier: ^3.2.4
         version: 3.2.7(@types/node@24.19.2)
 
-  packages/vertical-system:
+  packages/vertical-support:
+    dependencies:
+      zod:
+        specifier: ^4.1.13
+        version: 4.6.5
     devDependencies:
       '@biomejs/biome':
         specifier: ^2.3.8
@@ -335,11 +339,7 @@ importers:
         specifier: ^3.2.4
         version: 3.2.7(@types/node@24.19.2)
 
-  packages/vertical-support:
-    dependencies:
-      zod:
-        specifier: ^4.1.13
-        version: 4.6.5
+  packages/vertical-system:
     devDependencies:
       '@biomejs/biome':
         specifier: ^2.3.8
