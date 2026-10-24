@@ -186,6 +186,21 @@ function canary(): CanaryKernel32 {
 }
 
 describe.skipIf(!isWin32)('T04 Windows handle-anchored physical canaries (real win32 host)', () => {
+  it('anchors every root component, including 8.3 short-name temp paths, without aliasing', () => {
+    const { root } = fixture();
+    // Windows GitHub runners may supply TEMP containing RUNNER~1 while
+    // GetFinalPathNameByHandleW returns RunnerAdmin. Never require those
+    // spellings to compare byte-for-byte or accept a junction to compensate.
+    const opened: string[] = [];
+    const observed = observeScopedFileSearch(authorized(root), {
+      onDirectoryOpened: (relativePath) => opened.push(relativePath),
+    });
+    expect(observed.paths).toEqual([join('nested', 'second.txt'), 'note.txt'].sort());
+    expect(opened).toEqual(['nested']);
+    expect(observed.cloudDisclosure).toBe(false);
+    expect(JSON.stringify(observed)).not.toContain(root);
+  });
+
   it('proves the OS primitive: no-follow open of a junction resolves the junction object, never the target', () => {
     const { base, root } = fixture();
     const target = join(base, 'outside');
