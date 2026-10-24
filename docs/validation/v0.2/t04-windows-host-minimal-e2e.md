@@ -2,7 +2,7 @@
 
 - **PR / branch:** this PR `task/shun-i108-r2-zc` (base `version/v0.2.0`, stacked on `task/shun-i108-winhost` @ `5fabb7562a4dea39b51e778285938093479372ea`, not merged)
 - **R2 scope:** closes the independent R1 BLOCK (`shun-v02-pr173-independent-r1-5fabb756`) — P1-01 oracle confinement, P1-02 receipt phase binding, P2-01 hard-kill proof strength, P2-02 mapped-SMB honesty.
-- **Raw evidence log:** `docs/validation/v0.2/logs/t04-winhost-r2-75dec6d.log` (real vitest output, real exit codes recorded in the log header)
+- **Raw evidence log:** `docs/validation/v0.2/logs/t04-winhost-r2-75dec6d.log` (real vitest output, real exit codes recorded in the log header). R3 controller round at PR head `0062bb8` — native provenance rebuild, ABI checks and the deeper SMB feasibility trail: `docs/validation/v0.2/logs/t04-winhost-r3-0062bb8.log`
 - **Write-set:** `packages/recipe-runtime/**` only (src + test + native). No overlap with open PRs #168/#171/#172/#174/#175.
 - **Gate:** workspace `task-check.sh` (lint → typecheck → test, all packages) exit 0 at this SHA.
 
@@ -13,7 +13,7 @@
 | OS | Windows 11 Pro build 26300.9711 |
 | Account | `NILAR\15549` — Administrators-group member running a **non-elevated UAC-filtered token** (Medium integrity `S-1-16-8192`, asserted by the privilege-gate test each run) |
 | Node | v24.21.0 (`.node-version`) |
-| Native addon | `packages/recipe-runtime/native/impl/shun_win32_impl.node`, SHA256 `7f85afc973ae8d49c817a9ae8c1d16e4225a313f4114eebe12760f038ce847fb`, rebuilt at this SHA from the exact Rust sources with the pinned toolchain (`stable-x86_64-pc-windows-gnu`, per `native/README.md`) |
+| Native addon | `packages/recipe-runtime/native/impl/shun_win32_impl.node`, SHA256 `7f85afc973ae8d49c817a9ae8c1d16e4225a313f4114eebe12760f038ce847fb`, rebuilt at this SHA from the exact Rust sources with the pinned toolchain (`stable-x86_64-pc-windows-gnu`, per `native/README.md`). Independently re-verified at `0062bb8` (see the R3 section below): GitHub blob bytes match the checkout, and a fresh `CARGO_TARGET_DIR` rebuild from the recovered PE epochs reproduces both committed addons byte-for-byte. |
 | SQLite | real file-backed `ShunStore` per fixture (`WAL` + `synchronous=FULL`), real `AuthorizationAuthority`/`ActionController` |
 
 ## R2 P1-01 — the oracle performs ZERO pathname IO (confinement redesign)
@@ -126,7 +126,11 @@ is the pre-existing EPERM-gated directory-symlink canary (`test/scoped-file-sear
 "refuses a directory symlink when the host can create one" — a non-elevated token cannot create
 directory symlinks); the env-gated SMB canaries are NOT the skipped test — they execute and pass
 with their honest console markers. Full-workspace `task-check.sh` exit 0 (see the raw log header
-for exact codes).
+for exact codes). Re-run at the PR head `0062bb8` (R3 controller round, real
+`PACKAGE_TEST_EXIT=0` in `logs/t04-winhost-r3-0062bb8.log` §4): **11 test files, 64 passed,
+1 skipped, 0 failed**, physical operator-gated suites executed on the Medium token
+(`E2E_PRIVILEGE_TOKEN=MEDIUM`), both SMB canaries printed their honest
+`SKIPPED_NO_SMB_DRIVE_PROVIDED` markers.
 The physical host-evidence suites (the closed-loop E2E and the hard-kill replay) are
 **operator-gated**: `test/helpers/win-token.ts` skips them with an explicit
 `E2E_PHYSICAL_SUITE=SKIPPED_ELEVATED_TOKEN` marker wherever the session token is elevated
@@ -134,6 +138,38 @@ The physical host-evidence suites (the closed-loop E2E and the hard-kill replay)
 (`.github/workflows/executor-windows.yml`) CI is source/ABI regression only, never standard-user
 host integration. All unit-level falsifiers (oracle confinement, phase binding, journal
 immutability, pack contents) run everywhere.
+
+## R3 controller round at 0062bb8 — independent native rebuild byte-identity, ABI, SMB re-probe
+
+Run on 2026-10-24 at the PR head `0062bb8429d8666a3c9e88080db3f24f151f0f31`
+(tree `51211bab7e433ade0de6b68d7c0e0686566a97db`), fresh worktree, no source changes
+(`git diff 75dec6d..0062bb84 -- packages/recipe-runtime/native` is empty; native artifacts
+unchanged since the R2 rebuild). Raw trail: `logs/t04-winhost-r3-0062bb8.log`.
+
+1. **Committed-artifact identity** — GitHub blob bytes (`gh api /git/blobs/<sha>` raw) match the
+   checkout for both addons; `impl` SHA256
+   `7f85afc973ae8d49c817a9ae8c1d16e4225a313f4114eebe12760f038ce847fb`, `canary` SHA256
+   `b5f8d1bf5b4a3927ff7c259f751b50ee63fc5dfab99c85b66ca148985a87d5a0`.
+2. **Independent rebuild, byte-identical** — fresh `CARGO_TARGET_DIR` outside the repo,
+   `CARGO_INCREMENTAL=0`, `--locked`, pinned `stable-x86_64-pc-windows-gnu` rustc/cargo 1.99.1,
+   node import library regenerated per `native/README.md` (node.exe
+   `ba4e6d110e8c1592a1ecd390f6b05f3da124b13871a5be62b341a07a853c6c32`, libnode.dll
+   `80741b7316820417f09fc5a226654a4b7b720ff470b7465d6e91aa1f04538ce6`). Link epochs were
+   recovered from the committed PE headers (impl TimeDateStamp `1792836474`; canary
+   `1792785321`, matching the value already recorded in `native/README.md`) and passed via
+   `SOURCE_DATE_EPOCH`; the canary was relinked after `cargo clean -p shun-win32-canary`.
+   Build exits `IMPL_BUILD_EXIT=0`, `CANARY_BUILD_EXIT=0`. Both rebuilt cdylibs are
+   **SHA256-identical and `cmp`-byte-identical** to the committed `.node` artifacts
+   (`REBUILD_BYTE_IDENTITY=PASS`).
+3. **ABI verification of the committed artifacts** — PE machine `0x8664` (x64) for both; both
+   load and run under Node `v24.21.0` with runtime NAPI version 10 (≥ the addon's `napi8`
+   floor): all 10 `impl` exports (`close, dosDevice, driveType, entryId, entryInfo, enumerate,
+   finalPath, openDir, openFile, readFile`) and all 6 `canary` exports are callable;
+   functional smoke returns correct OS answers (`dosDevice("C:") = \Device\HarddiskVolume3`,
+   `driveType("C:\") = 3` DRIVE_FIXED, root-dir open → DIRECTORY attributes → `finalPath` =
+   `\\?\C:\` → close). `ABI_RUNTIME_LOAD_AND_CALL=PASS`.
+4. **SMB feasibility re-probe** — see the section above; conclusion `NOT_RUN` stands, now with a
+   mechanically exhaustive elevation/networking trail.
 
 ## Real SMB mapped drive negative — NOT_RUN (unchanged, honest)
 
@@ -147,6 +183,30 @@ falsifier runs wherever `SHUN_T04_SMB_DRIVE_ROOT` (oracle-level, zero-open proof
 The device-attestation decision itself is unit-covered for the exact mapped-SMB device string
 (`\Device\LanmanRedirector\;Q:...`), and the physically equivalent alias case (subst) is proven
 end-to-end with zero opens. **This item remains explicitly outstanding: it is NOT claimed.**
+
+R3 controller round at `0062bb8` re-derived the same conclusion from a wider mechanical trail
+(raw probe outputs in `logs/t04-winhost-r3-0062bb8.log` §3 — every probe read-only or refused by
+the OS, zero state changed):
+
+- `net use \\localhost\IPC$` / `\\localhost\C$` / `\\192.168.100.245\C$` → system error 67
+  (找不到网络名); `New-SmbMapping -RemotePath \\localhost\C$` → same refusal.
+- Share creation under the filtered token: `net share T04SMBPROBE=... /grant:NILAR\15549,FULL`
+  → **system error 5, 拒绝访问** (needs elevation).
+- Elevation paths, exhausted: Windows `sudo` disabled host-wide ("已在此计算机上禁用 Sudo");
+  `schtasks /create /rl HIGHEST` from the filtered token → 拒绝访问; UAC policy is
+  `EnableLUA=1, ConsentPromptBehaviorAdmin=0x5, PromptOnSecureDesktop=1` — every elevation
+  requires interactive consent on the secure desktop, so no unattended path exists.
+- Port 445 is owned by the kernel SMB server (`Get-NetTCPConnection -LocalPort 445` →
+  OwningProcess 4 = System), closing every local bind for a third-party SMB server on any
+  address. WSL is `networkingMode=mirrored` and the WSL docker bridge is unreachable from the
+  host: `Get-NetRoute 172.17.0.0/16,172.18.0.0/16` → none, `Test-NetConnection 172.17.0.1:445`
+  → False. A `\\wsl.localhost\Ubuntu` mapping (9P, non-SMB) also returns error 67 from this
+  session, so no supplementary remote-provider control could be mapped either.
+
+Conclusion unchanged: **`SMB_MAPPED_NETWORK_DRIVE_NEGATIVE=NOT_RUN`** on this host — the two
+env-gated falsifiers executed honestly with `SKIPPED_NO_SMB_DRIVE_PROVIDED` markers in the R3
+suite run (§ full loop below and the R3 log §4), and the SMB device-form refusal stays
+unit-proven (`ORACLE_DRIVE_ATTESTATION_MATRIX=PASS`).
 
 ## What this PR does NOT claim
 
