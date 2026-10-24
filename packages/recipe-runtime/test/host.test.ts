@@ -492,20 +492,22 @@ describe('T04 real SQLite Recipe host + actual ActionController read-only bounda
         authorityId: 'auth-1',
         authorityRevision: 'rev-1',
         revokedGrantIds: [],
-        rules: [{
-          ruleId: 'allow-native-r0',
-          capabilityId: 'file.search',
-          op: 'file.search',
-          maxRiskClass: 'R0',
-          privilegeLevel: 'USER',
-          filesystem: { read: [root], write: [] },
-        }],
+        rules: [
+          {
+            ruleId: 'allow-native-r0',
+            capabilityId: 'file.search',
+            op: 'file.search',
+            maxRiskClass: 'R0',
+            privilegeLevel: 'USER',
+            filesystem: { read: [root], write: [] },
+          },
+        ],
         riskGuards: [],
         updatedAt: '2026-10-22T00:00:00.000Z',
       });
       const live = createSqliteNativeR0RecipeEffectHost({
         ...h.host,
-        loadPlanByHash: async (hash) => hash === plan.planHash ? plan : null,
+        loadPlanByHash: async (hash) => (hash === plan.planHash ? plan : null),
       });
       const first = await live.runner.run(identity);
       // Native execution is a genuine Windows OS scan, but there is no
@@ -513,14 +515,18 @@ describe('T04 real SQLite Recipe host + actual ActionController read-only bounda
       expect(first).toEqual({ ok: false, code: 'RECIPE_EXECUTION_UNCERTAIN' });
       expect(await h.adapter.hasAnyGrant()).toBe(true);
       expect(
-        f.getStore().database.prepare(
-          'SELECT state FROM recipe_r0_effect_journal_v02 WHERE task_id=? AND action_id=?',
-        ).get('task-1', 'read'),
+        f
+          .getStore()
+          .database.prepare(
+            'SELECT state FROM recipe_r0_effect_journal_v02 WHERE task_id=? AND action_id=?',
+          )
+          .get('task-1', 'read'),
       ).toMatchObject({ state: 'UNCERTAIN' });
       // Re-enter through the actual full Recipe runner: no second OS dispatch
       // is permitted with an existing journal row for the same task/action.
       expect(await live.runner.run(identity)).toEqual({
-        ok: false, code: 'RECIPE_EXECUTION_UNCERTAIN',
+        ok: false,
+        code: 'RECIPE_EXECUTION_UNCERTAIN',
       });
       expect(JSON.stringify(first)).not.toContain(root);
       expect(JSON.stringify(first)).not.toContain('NEVER_DISCLOSE_CONTENT');
@@ -528,5 +534,4 @@ describe('T04 real SQLite Recipe host + actual ActionController read-only bounda
     },
     45_000,
   );
-
 });
