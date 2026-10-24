@@ -14,7 +14,7 @@ import { type LocalFileSearchObservation, observeScopedFileSearch } from './scop
 const REFUSED = 'R0_NATIVE_EFFECT_UNCERTAIN';
 const PROVIDER_VERSION = '0.2.0';
 
-function boundedLocalShape(input: LocalFileSearchObservation): boolean {
+export function boundedLocalShape(input: LocalFileSearchObservation): boolean {
   return (
     input.kind === 'R0_LOCAL_FILE_SEARCH_OBSERVATION' &&
     input.truncated === false &&
@@ -29,9 +29,9 @@ function boundedLocalShape(input: LocalFileSearchObservation): boolean {
       (path) =>
         typeof path === 'string' &&
         path.length > 0 &&
-        !path.startsWith('\\\\') &&
+        !path.startsWith('\\') &&
         !path.startsWith('/') &&
-        !path.includes('\\0') &&
+        !path.includes('\0') &&
         !path.split(/[\\\\/]/).includes('..'),
     )
   );
