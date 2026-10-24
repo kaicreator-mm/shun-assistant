@@ -82,9 +82,10 @@ describe('T04 journal real forced-process-death recovery contract', () => {
           semanticVerified: false,
         });
         expect(journal.reserve(action)).toEqual({ ok: false, code: 'RECONCILE_REQUIRED' });
-        expect(
-          journal.reserve({ ...action, planHash: '2'.repeat(64) }),
-        ).toEqual({ ok: false, code: 'JOURNAL_REFUSED' });
+        expect(journal.reserve({ ...action, planHash: '2'.repeat(64) })).toEqual({
+          ok: false,
+          code: 'JOURNAL_REFUSED',
+        });
 
         // Even a conservative reconcile record never licenses re-dispatch.
         expect(journal.recordObservation(action, 'UNCERTAIN', 'a'.repeat(64))).toBe(true);
