@@ -232,20 +232,41 @@ function walkWin32(
   const openHandles: bigint[] = [];
   try {
     const resolvedRoot = resolve(root);
-    const rootHandle = win.openDir(null, resolvedRoot);
-    if (rootHandle === null) refuse();
-    openHandles.push(rootHandle);
-    const rootInfo = win.entryInfo(rootHandle);
-    if (!rootInfo || rootInfo.isReparse || !rootInfo.isDirectory) refuse();
-    const actual = win.finalPath(rootHandle);
-    if (actual === null) refuse();
-    // Strip the Win32 namespace prefix and refuse volume aliases: mapped or
-    // UNC-backed roots surface here as \\?\UNC\... provenance and are refused
-    // (P2-01); subst-style local aliases fail the exact-path comparison.
-    const stripped = actual.startsWith('\\\\?\\') ? actual.slice(4) : actual;
-    if (stripped.startsWith('\\\\') || /^unc\\/i.test(stripped) || !/^[a-zA-Z]:\\/.test(stripped))
-      refuse();
-    if (!samePath(stripped, resolvedRoot)) refuse();
+    // Never bootstrap by opening the full user-controlled pathname: an
+    // ancestor replaced with a junction could give that first handle LIST
+    // DIRECTORY rights outside the approved scope before we notice.
+    // Instead open only the local drive root, establish its real provenance,
+    // then descend using a *single component* relative to a verified handle.
+    // This also accepts legitimate 8.3 short-name components (RUNNER~1):
+    // kernel32 final-path normalization expands them to their long spellings.
+    if (!/^[a-zA-Z]:\\/.test(resolvedRoot)) refuse();
+    const driveRoot = resolvedRoot.slice(0, 3);
+    const driveHandle = win.openDir(null, driveRoot);
+    if (driveHandle === null) refuse();
+    openHandles.push(driveHandle);
+    const driveInfo = win.entryInfo(driveHandle);
+    if (!driveInfo || driveInfo.isReparse || !driveInfo.isDirectory) refuse();
+    const actualDrive = win.finalPath(driveHandle);
+    if (actualDrive === null) refuse();
+    const strippedDrive = actualDrive.startsWith('\\\\?\\')
+      ? actualDrive.slice(4)
+      : actualDrive;
+    // Refuse UNC/mapped-drive and subst-style aliases BEFORE any descendant
+    // is opened. A real drive-root handle must resolve to that same drive.
+    if (!samePath(strippedDrive, driveRoot)) refuse();
+
+    let rootHandle = driveHandle;
+    for (const component of resolvedRoot.slice(3).split('\\').filter(Boolean)) {
+      assertName(component);
+      const child = win.openDir(rootHandle, component);
+      if (child === null) refuse();
+      openHandles.push(child);
+      const childInfo = win.entryInfo(child);
+      if (!childInfo || childInfo.isReparse || !childInfo.isDirectory) refuse();
+      rootHandle = child;
+    }
+    // No potentially redirected multi-component pathname was followed.
+    // The final root object is reached exclusively through anchored handles.
 
     const matches: string[] = [];
     let inspected = 0;
