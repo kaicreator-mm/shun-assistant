@@ -3,7 +3,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { AuthorizedActionSchema } from '@shun/contracts';
 import { afterEach, describe, expect, it } from 'vitest';
-import { executeConservativeNativeR0Search } from '../src/native-r0-effect.ts';
+import { boundedLocalShape, executeConservativeNativeR0Search } from '../src/native-r0-effect.ts';
 
 const bases: string[] = [];
 afterEach(() => {
@@ -96,6 +96,23 @@ describe('T04 private Win32 native R0 receipt never claims independent post-stat
       await expect(executeConservativeNativeR0Search(action)).rejects.toThrow(
         /^R0_NATIVE_EFFECT_UNCERTAIN$/,
       );
+    }
+  });
+});
+
+describe('T04 private bounded observation defensive path guards', () => {
+  it('accepts only root-relative entries and rejects NUL, rooted or traversing names', () => {
+    const valid = {
+      kind: 'R0_LOCAL_FILE_SEARCH_OBSERVATION',
+      paths: ['nested\\second.txt', 'note.txt'],
+      inspectedEntries: 4,
+      truncated: false,
+      semanticVerified: false,
+      cloudDisclosure: false,
+    } as const;
+    expect(boundedLocalShape(valid)).toBe(true);
+    for (const path of ['\\rooted', 'nested\0bad', '../escape', '/absolute', '\\\\server\\share']) {
+      expect(boundedLocalShape({ ...valid, paths: [path] })).toBe(false);
     }
   });
 });
