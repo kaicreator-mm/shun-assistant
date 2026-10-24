@@ -8,7 +8,7 @@ import {
   type ExecutionReceipt,
   ExecutionReceiptSchema,
 } from '@shun/contracts';
-import { observeScopedFileSearch, type LocalFileSearchObservation } from './scoped-file-search.ts';
+import { type LocalFileSearchObservation, observeScopedFileSearch } from './scoped-file-search.ts';
 
 const REFUSED = 'R0_NATIVE_EFFECT_UNCERTAIN';
 const PROVIDER_VERSION = '0.2.0';
@@ -46,7 +46,9 @@ function verifiedLocalShape(input: LocalFileSearchObservation): boolean {
  * NOT an independent Task semantic oracle. No file contents or absolute paths
  * are placed in the execution receipt or sent to a provider/cloud.
  */
-export async function executeVerifiedNativeR0Search(action: AuthorizedAction): Promise<ExecutionReceipt> {
+export async function executeVerifiedNativeR0Search(
+  action: AuthorizedAction,
+): Promise<ExecutionReceipt> {
   try {
     if (process.platform !== 'win32') throw new Error(REFUSED);
     const startedAt = new Date().toISOString();
