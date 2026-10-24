@@ -1,4 +1,4 @@
-import { mkdtempSync, rmSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { ActionController, AuthorizationAuthority } from '@shun/authorization';
@@ -10,6 +10,7 @@ import {
   createSqliteRecipeReadService,
   type SqliteRecipeHostOptions,
 } from '../src/index.ts';
+import { createSqliteNativeR0RecipeEffectHost } from '../src/sqlite-native-r0-host.ts';
 
 const config = {
   recipeId: 'recipe-1',
@@ -25,7 +26,7 @@ afterEach(async () => {
   for (const task of cleanup.splice(0).reverse()) await task();
 });
 
-function fixture() {
+function fixture(root = 'C:/approved') {
   const dir = mkdtempSync(join(tmpdir(), 'shun-v02-real-recipe-'));
   const dbPath = join(dir, 'business.sqlite');
   let store = new ShunStore({ file: dbPath });
@@ -117,10 +118,10 @@ function fixture() {
               actionId: 'read',
               bindingRef: 'binding-1',
               op: 'file.search',
-              parameters: { root: 'C:/approved', query: '*.txt' },
+              parameters: { root, query: '*.txt' },
               sideEffectClass: 'R0',
               requiredPrivilege: 'USER',
-              filesystemScope: { read: ['C:/approved'], write: [] },
+              filesystemScope: { read: [root], write: [] },
             },
           ],
           verificationPlan: {
@@ -408,4 +409,129 @@ describe('T04 real SQLite Recipe host + actual ActionController read-only bounda
       code: 'RECIPE_SOURCE_REFUSED',
     });
   });
+  it('fixed native bootstrap cannot use injected Recipe search callbacks and fails closed without policy', async () => {
+    const f = fixture();
+    const h = f.attach(f.getStore());
+    const saved = h.service.registerLiteral(source, config);
+    if (!saved.ok) throw new Error('fixture register failed');
+    h.attachRevision(saved);
+    let injectedCalls = 0;
+    // A malicious extra property cannot be used to replace the compile-time
+    // fixed native port, even though JavaScript callers may supply it.
+    const options = {
+      ...h.host,
+      loadPlanByHash: async () => null,
+      executeScopedSearch: async () => {
+        injectedCalls++;
+        throw new Error('UNTRUSTED_OVERRIDE');
+      },
+    };
+    const live = createSqliteNativeR0RecipeEffectHost(options);
+    expect(
+      await live.runner.run({
+        taskId: 'task-1',
+        recipeId: saved.recipeId,
+        revisionSha256: saved.revisionSha256,
+      }),
+    ).toEqual({ ok: false, code: 'RECIPE_AUTHORIZATION_REFUSED' });
+    expect(injectedCalls).toBe(0);
+    expect(await h.adapter.hasAnyGrant()).toBe(false);
+    expect(
+      f.getStore().database.prepare('SELECT COUNT(*) AS n FROM recipe_r0_effect_journal_v02').get(),
+    ).toMatchObject({ n: 0 });
+  });
+
+  it('fixed native bootstrap refuses fake SQLite store before any side effect', () => {
+    const f = fixture();
+    const h = f.attach(f.getStore());
+    expect(() =>
+      createSqliteNativeR0RecipeEffectHost({
+        ...h.host,
+        store: {} as ShunStore,
+        loadPlanByHash: async () => null,
+      }),
+    ).toThrow(/^R0_NATIVE_HOST_BOOTSTRAP_REFUSED$/);
+  });
+  it.skipIf(process.platform !== 'win32')(
+    'executes real Win32 read-only port only after persisted SQLite grant and STARTED, never auto-replays UNCERTAIN',
+    async () => {
+      const dir = mkdtempSync(join(tmpdir(), 'shun-t04-native-host-real-'));
+      cleanup.push(async () => rmSync(dir, { recursive: true, force: true }));
+      const root = join(dir, 'approved');
+      mkdirSync(root);
+      writeFileSync(join(root, 'note.txt'), 'NEVER_DISCLOSE_CONTENT');
+      const f = fixture(root);
+      const h = f.attach(f.getStore());
+      const literal = `export default defineRecipe(${JSON.stringify({
+        nodes: [{ actionId: 'read', op: 'file.search', parameters: { root, query: '*.txt' } }],
+        edges: [],
+      })});`;
+      const saved = h.service.registerLiteral(literal, config);
+      if (!saved.ok) throw new Error('native fixture register failed');
+      h.attachRevision(saved);
+      const identity = {
+        taskId: 'task-1',
+        recipeId: saved.recipeId,
+        revisionSha256: saved.revisionSha256,
+      };
+      const preview = h.service.previewExact(identity);
+      if (!preview.ok) throw new Error('native fixture preview failed');
+      const plan = h.host.loadExpectedPlan({
+        ...identity,
+        actionGraphSha256: preview.actionGraphSha256,
+      }) as ActionPlan;
+      await h.adapter.saveAuthorityRecord({
+        authorityId: 'auth-1',
+        authorityRevision: 'rev-1',
+        updatedAt: '2026-10-22T00:00:00.000Z',
+        policyInitialized: true,
+      });
+      await h.adapter.savePolicySnapshot({
+        policySnapshotRevision: 'policy-1',
+        status: 'ACTIVE',
+        authorityId: 'auth-1',
+        authorityRevision: 'rev-1',
+        revokedGrantIds: [],
+        rules: [
+          {
+            ruleId: 'allow-native-r0',
+            capabilityId: 'file.search',
+            op: 'file.search',
+            maxRiskClass: 'R0',
+            privilegeLevel: 'USER',
+            filesystem: { read: [root], write: [] },
+          },
+        ],
+        riskGuards: [],
+        updatedAt: '2026-10-22T00:00:00.000Z',
+      });
+      const live = createSqliteNativeR0RecipeEffectHost({
+        ...h.host,
+        loadPlanByHash: async (hash) => (hash === plan.planHash ? plan : null),
+      });
+      const first = await live.runner.run(identity);
+      // Native execution is a genuine Windows OS scan, but there is no
+      // independent post-state oracle, therefore never claim Task PASS.
+      expect(first).toEqual({ ok: false, code: 'RECIPE_EXECUTION_UNCERTAIN' });
+      expect(await h.adapter.hasAnyGrant()).toBe(true);
+      expect(
+        f
+          .getStore()
+          .database.prepare(
+            'SELECT state FROM recipe_r0_effect_journal_v02 WHERE task_id=? AND action_id=?',
+          )
+          .get('task-1', 'read'),
+      ).toMatchObject({ state: 'UNCERTAIN' });
+      // Re-enter through the actual full Recipe runner: no second OS dispatch
+      // is permitted with an existing journal row for the same task/action.
+      expect(await live.runner.run(identity)).toEqual({
+        ok: false,
+        code: 'RECIPE_EXECUTION_UNCERTAIN',
+      });
+      expect(JSON.stringify(first)).not.toContain(root);
+      expect(JSON.stringify(first)).not.toContain('NEVER_DISCLOSE_CONTENT');
+      expect(JSON.stringify(first)).not.toContain('note.txt');
+    },
+    45_000,
+  );
 });
