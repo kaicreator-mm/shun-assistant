@@ -25,6 +25,11 @@ jobs:
       - run: pnpm --filter @shun/executor-windows run typecheck
       # helper bundle must build deterministically from committed sources
       - run: pnpm --filter @shun/executor-windows run build:helper
+      # T04: exercise the committed Windows NAPI-RS implementation and separate
+      # native canary on windows-latest. This is source/ABI regression only,
+      # NOT Standard User host integration or source-to-binary attestation.
+      - run: pnpm --filter @shun/recipe-runtime run typecheck
+      - run: pnpm --filter @shun/recipe-runtime run test
       # unit + integration suite (no elevation required; evidence runs are
       # operator-gated and never run in CI)
       - run: pnpm --filter @shun/executor-windows run test
