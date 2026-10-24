@@ -192,9 +192,10 @@ describe.skipIf(!isWin32)('T04 Windows handle-anchored physical canaries (real w
       console.log('NATIVE_DIRECT_SMB_NEGATIVE=NOT_RUN_NO_MAPPED_DRIVE');
       return;
     }
-    const native = createRequire(import.meta.url)(
-      '../native/impl/shun_win32_impl.node',
-    ) as { dosDevice(letter: string): string | null; driveType(root: string): number | null };
+    const native = createRequire(import.meta.url)('../native/impl/shun_win32_impl.node') as {
+      dosDevice(letter: string): string | null;
+      driveType(root: string): number | null;
+    };
     const letter = smbRoot.slice(0, 2);
     expect(native.dosDevice(letter)?.toLowerCase()).not.toMatch(
       /^\\\\device\\\\harddiskvolume[0-9]+$/,
