@@ -186,6 +186,21 @@ function canary(): CanaryKernel32 {
 }
 
 describe.skipIf(!isWin32)('T04 Windows handle-anchored physical canaries (real win32 host)', () => {
+  it('anchors every root component, including 8.3 short-name temp paths, without aliasing', () => {
+    const { root } = fixture();
+    // Windows GitHub runners may supply TEMP containing RUNNER~1 while
+    // GetFinalPathNameByHandleW returns RunnerAdmin. Never require those
+    // spellings to compare byte-for-byte or accept a junction to compensate.
+    const opened: string[] = [];
+    const observed = observeScopedFileSearch(authorized(root), {
+      onDirectoryOpened: (relativePath) => opened.push(relativePath),
+    });
+    expect(observed.paths).toEqual([join('nested', 'second.txt'), 'note.txt'].sort());
+    expect(opened).toEqual(['nested']);
+    expect(observed.cloudDisclosure).toBe(false);
+    expect(JSON.stringify(observed)).not.toContain(root);
+  });
+
   it('proves the OS primitive: no-follow open of a junction resolves the junction object, never the target', () => {
     const { base, root } = fixture();
     const target = join(base, 'outside');
@@ -199,14 +214,18 @@ describe.skipIf(!isWin32)('T04 Windows handle-anchored physical canaries (real w
     expect(noFollow).not.toBeNull();
     expect(k32.isReparse(noFollow as bigint)).toBe(true);
     const noFollowPath = k32.finalPath(noFollow as bigint).replace(/^\\\\\?\\/, '');
-    expect(noFollowPath.toLowerCase()).toBe(esc.toLowerCase());
+    // Kernel32 expands 8.3 parent segments (RUNNER~1 -> RunnerAdmin).
+    // Verify the no-follow handle is the *junction object* by its stable
+    // final relative suffix, never by exact caller spelling.
+    expect(noFollowPath.toLowerCase().endsWith('\\approved\\esc')).toBe(true);
     k32.close(noFollow as bigint);
 
     const follow = k32.openFollow(esc);
     expect(follow).not.toBeNull();
     expect(k32.isReparse(follow as bigint)).toBe(false);
     const followPath = k32.finalPath(follow as bigint).replace(/^\\\\\?\\/, '');
-    expect(followPath.toLowerCase()).toBe(target.toLowerCase());
+    expect(followPath.toLowerCase().endsWith('\\outside')).toBe(true);
+    expect(followPath.toLowerCase()).not.toBe(noFollowPath.toLowerCase());
     k32.close(follow as bigint);
   });
 
