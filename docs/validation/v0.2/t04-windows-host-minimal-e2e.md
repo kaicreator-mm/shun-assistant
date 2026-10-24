@@ -58,7 +58,7 @@ Mechanical negative controls (new `test/r0-oracle-confinement.test.ts`, all real
 | Subst alias root | refused by device attestation with **zero opens at all** | `ORACLE_SUBST_ZERO_IO=PASS` |
 | Drive-attestation decision matrix incl. `\Device\LanmanRedirector\;Q:...` (mapped SMB device form) | only `\Device\HarddiskVolume*` + `DRIVE_FIXED` admits | `ORACLE_DRIVE_ATTESTATION_MATRIX=PASS` |
 | Real mapped SMB drive (env-gated `SHUN_T04_SMB_DRIVE_ROOT`) | fail-closed with zero opens when provided | `ORACLE_SMB_MAPPED_ZERO_IO=SKIPPED_NO_SMB_DRIVE_PROVIDED` (this host provides none — see below) |
-| ACTIVE concurrent swap of the ancestor and an in-tree directory (4 s swapper child) | 2596 admitted walks all observed the real world byte-identically outside the toggled subtree (incl. content hashes); 1405 refused; zero foreign worlds, zero match fabrications | `ORACLE_RACE_NO_FOREIGN_WORLD=PASS OK=2596 REFUSED=1405 SWAP_RACE_EXERCISED=true` |
+| ACTIVE concurrent swap of the ancestor and an in-tree directory (4 s swapper child) | 2491 admitted walks all observed the real world byte-identically outside the toggled subtree (incl. content hashes); 1510 refused (counts vary run to run — the cited log is quoted; every recorded run shows `SWAP_RACE_EXERCISED=true`); zero foreign worlds, zero match fabrications | `ORACLE_RACE_NO_FOREIGN_WORLD=PASS OK=2491 REFUSED=1510 SWAP_RACE_EXERCISED=true` |
 | Content swap preserving name/size/mtime | fingerprint changes; task semantic verdict refuses (`SEMANTIC_EXPECTATION_MISMATCH`) | `ORACLE_CONTENT_SWAP_REFUSED_BY_SEMANTIC_VERIFIER=PASS` |
 
 ## R2 P1-02 — receipt phase binding (no positive before durable phase evidence)
@@ -121,8 +121,12 @@ re-dispatch/fingerprint-unchanged assertions are preserved.
 | Subst drive-letter alias as scope root | refused end to end | `E2E_SUBST_REFUSED=PASS` |
 | Missing native addon (fresh child process) | run refuses `RECIPE_EXECUTION_UNCERTAIN`, durable row `UNCERTAIN`; restored addon closes the loop again | `E2E_MISSING_ADDON_FAIL_CLOSED=PASS` |
 
-Package suite at this SHA: **11 test files, 64 passed, 1 skipped (the env-gated SMB canary),
-0 failed**; full-workspace `task-check.sh` exit 0 (see the raw log header for exact codes).
+Package suite at this SHA: **11 test files, 64 passed, 1 skipped, 0 failed**. The one skipped test
+is the pre-existing EPERM-gated directory-symlink canary (`test/scoped-file-search.test.ts`,
+"refuses a directory symlink when the host can create one" — a non-elevated token cannot create
+directory symlinks); the env-gated SMB canaries are NOT the skipped test — they execute and pass
+with their honest console markers. Full-workspace `task-check.sh` exit 0 (see the raw log header
+for exact codes).
 The physical host-evidence suites (the closed-loop E2E and the hard-kill replay) are
 **operator-gated**: `test/helpers/win-token.ts` skips them with an explicit
 `E2E_PHYSICAL_SUITE=SKIPPED_ELEVATED_TOKEN` marker wherever the session token is elevated
