@@ -19,6 +19,7 @@ import {
   type SqliteAuthorizedRecipeEffectHostOptions,
   type SqliteRecipeHostOptions,
 } from '../../src/index.ts';
+import { SqliteR0EffectJournal } from '../../src/sqlite-r0-effect-journal.ts';
 import {
   executeTrustedWindowsR0Search,
   type R0SearchEffectEvidence,
@@ -257,6 +258,9 @@ export async function makeHostFixture(prefix: string, query = '*.txt') {
   let lastReceipt: ExecutionReceipt | null = null;
   let lastAction: AuthorizedAction | null = null;
   let lastEvidence: R0SearchEffectEvidence | null = null;
+  // The trusted host owns the durable journal: the effect's phase-receipt
+  // port and the journaled capability's reservation share the same store.
+  const phaseJournal = new SqliteR0EffectJournal(store);
 
   const compose = () => {
     const preview = service.previewExact(identity);
@@ -272,8 +276,11 @@ export async function makeHostFixture(prefix: string, query = '*.txt') {
         loadPlanByHash: async (hash) => (hash === plan.planHash ? plan : null),
         executeScopedSearch: async (action) => {
           scans++;
-          const receipt = await executeTrustedWindowsR0Search(action, (e) => {
-            lastEvidence = e;
+          const receipt = await executeTrustedWindowsR0Search(action, {
+            phaseJournal,
+            evidenceSink: (e) => {
+              lastEvidence = e;
+            },
           });
           lastReceipt = receipt;
           lastAction = action;
@@ -304,5 +311,6 @@ export async function makeHostFixture(prefix: string, query = '*.txt') {
     lastReceipt: () => lastReceipt,
     lastAction: () => lastAction,
     lastEvidence: () => lastEvidence,
+    phaseJournal: () => phaseJournal,
   };
 }

@@ -103,8 +103,20 @@ describe.skipIf(process.platform !== 'win32')('T04 Windows host minimal E2E clos
       sideEffectClass: 'R0',
       recoveryClassification: 'COMPLETED_VERIFIED',
       postStateVerified: true,
-      journalRef: 'recipe_r0_effect_journal_v02',
     });
+    // The receipt cites the REAL durable phase receipt of this attempt
+    // (R2 P1-02), never a constant table name.
+    const journalRef = receipt.sideEffectEvidence.journalRef;
+    expect(typeof journalRef).toBe('string');
+    expect(journalRef?.startsWith('recipe_r0_effect_phase_v02:')).toBe(true);
+    const phaseDigest = journalRef?.slice('recipe_r0_effect_phase_v02:'.length) ?? '';
+    const phaseReadback = f.phaseJournal().lookupEffectPhase(action);
+    expect(phaseReadback.ok).toBe(true);
+    if (phaseReadback.ok) {
+      expect(phaseReadback.phaseReceiptSha256).toBe(phaseDigest);
+      expect(evidence.postStateSha256).toBe(phaseReadback.commitment.postStateSha256);
+      expect(phaseReadback.commitment.expectedStateSha256).not.toBe('');
+    }
     expect(evidence).toMatchObject({
       effectObserved: true,
       fingerprintUnchanged: true,
@@ -221,7 +233,10 @@ describe.skipIf(process.platform !== 'win32')('T04 Windows host minimal E2E clos
       currentness: buildCurrentness(f.store),
       loadExpectedPlan: buildLoadExpectedPlan(shortForward),
       loadPlanByHash: async (hash) => (hash === plan.planHash ? plan : null),
-      executeScopedSearch: async (action) => executeTrustedWindowsR0Search(action),
+      executeScopedSearch: async (action) =>
+        executeTrustedWindowsR0Search(action, {
+          phaseJournal: new SqliteR0EffectJournal(f.store),
+        }),
     });
     const run = await host.runner.run(identity);
     expect(run).toEqual({
@@ -295,7 +310,10 @@ describe.skipIf(process.platform !== 'win32')('T04 Windows host minimal E2E clos
       currentness: buildCurrentness(f.store),
       loadExpectedPlan: buildLoadExpectedPlan(aliasForward),
       loadPlanByHash: async (hash) => (hash === plan.planHash ? plan : null),
-      executeScopedSearch: async (action) => executeTrustedWindowsR0Search(action),
+      executeScopedSearch: async (action) =>
+        executeTrustedWindowsR0Search(action, {
+          phaseJournal: new SqliteR0EffectJournal(f.store),
+        }),
     });
     const run = await host.runner.run(identity);
     expect(run).toEqual({ ok: false, code: 'RECIPE_EXECUTION_UNCERTAIN' });
@@ -401,7 +419,10 @@ describe.skipIf(process.platform !== 'win32')('T04 Windows host minimal E2E clos
       currentness: buildCurrentness(store),
       loadExpectedPlan: buildLoadExpectedPlan(rootForward),
       loadPlanByHash: async (hash) => (hash === plan.planHash ? plan : null),
-      executeScopedSearch: async (action) => executeTrustedWindowsR0Search(action),
+      executeScopedSearch: async (action) =>
+        executeTrustedWindowsR0Search(action, {
+          phaseJournal: new SqliteR0EffectJournal(store),
+        }),
     });
     const run = await host.runner.run(identity);
     expect(run).toEqual({ ok: false, code: 'RECIPE_EXECUTION_UNCERTAIN' });

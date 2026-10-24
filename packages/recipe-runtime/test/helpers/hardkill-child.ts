@@ -15,6 +15,7 @@ import { writeSync } from 'node:fs';
 import type { ActionPlan } from '@shun/contracts';
 import { ShunStore } from '@shun/store';
 import { createSqliteAuthorizedRecipeEffectHost } from '../../src/index.ts';
+import { SqliteR0EffectJournal } from '../../src/sqlite-r0-effect-journal.ts';
 import { executeTrustedWindowsR0Search } from '../../src/trusted-windows-r0-effect.ts';
 import {
   buildAuthorityStack,
@@ -48,7 +49,10 @@ try {
             await new Promise<never>(() => {});
             return undefined as never;
           }
-        : async (action) => executeTrustedWindowsR0Search(action),
+        : async (action) =>
+            executeTrustedWindowsR0Search(action, {
+              phaseJournal: new SqliteR0EffectJournal(store),
+            }),
   });
   live.runner
     .run(identity)
