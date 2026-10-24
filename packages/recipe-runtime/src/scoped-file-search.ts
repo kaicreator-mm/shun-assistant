@@ -254,7 +254,7 @@ function walkWin32(
     const targetDevice = win.dosDevice(driveRoot.slice(0, 2));
     if (
       typeof targetDevice !== 'string' ||
-      !/^\\\\Device\\\\HarddiskVolume[0-9]+$/i.test(targetDevice) ||
+      !/^\\Device\\HarddiskVolume[0-9]+$/i.test(targetDevice) ||
       win.driveType(driveRoot) !== 3
     )
       refuse();
