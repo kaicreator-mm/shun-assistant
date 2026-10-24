@@ -3,7 +3,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { AuthorizedActionSchema } from '@shun/contracts';
 import { afterEach, describe, expect, it } from 'vitest';
-import { executeVerifiedNativeR0Search } from '../src/native-r0-effect.ts';
+import { executeConservativeNativeR0Search } from '../src/native-r0-effect.ts';
 
 const bases: string[] = [];
 afterEach(() => {
@@ -38,28 +38,30 @@ function approved() {
   return { base, root, action };
 }
 
-describe('T04 private Win32 native R0 post-state receipt (never Task semantic PASS)', () => {
+describe('T04 private Win32 native R0 receipt never claims independent post-state / Task PASS', () => {
   it.skipIf(process.platform !== 'win32')(
-    'uses genuine native handle-safe search twice and returns only verified execution evidence',
+    'performs genuine native search but returns only UNCERTAIN without separate oracle',
     async () => {
       const { root, action } = approved();
-      const receipt = await executeVerifiedNativeR0Search(action);
+      const receipt = await executeConservativeNativeR0Search(action);
       expect(receipt).toMatchObject({
         actionId: 'read-only-1',
         environmentId: 'local-windows-user',
         providerId: 'shun-win32-r0-native',
-        terminal: 'SUCCEEDED',
+        terminal: 'UNCERTAIN',
         outputRefs: [],
         sideEffectEvidence: {
           sideEffectClass: 'R0',
-          recoveryClassification: 'COMPLETED_VERIFIED',
-          postStateVerified: true,
+          recoveryClassification: 'MAY_HAVE_EXECUTED_UNCERTAIN',
+          postStateVerified: false,
         },
       });
       expect(JSON.stringify(receipt)).not.toContain(root);
       expect(JSON.stringify(receipt)).not.toContain('NEVER_EXPOSE_SECRET_CONTENT');
       expect(JSON.stringify(receipt)).not.toContain('note.txt');
       expect(receipt).not.toHaveProperty('semanticVerified');
+      expect(JSON.stringify(receipt)).not.toContain('COMPLETED_VERIFIED');
+      expect(JSON.stringify(receipt)).not.toContain('postStateVerified":true');
       expect(receipt).not.toHaveProperty('taskPass');
     },
   );
@@ -72,7 +74,7 @@ describe('T04 private Win32 native R0 post-state receipt (never Task semantic PA
       mkdirSync(outside);
       writeFileSync(join(outside, 'secret.txt'), 'NEVER_ESCAPE_SCOPE');
       symlinkSync(outside, join(root, 'escape'), 'junction');
-      await expect(executeVerifiedNativeR0Search(action)).rejects.toThrow(
+      await expect(executeConservativeNativeR0Search(action)).rejects.toThrow(
         /^R0_NATIVE_EFFECT_UNCERTAIN$/,
       );
     },
@@ -87,11 +89,11 @@ describe('T04 private Win32 native R0 post-state receipt (never Task semantic PA
         filesystemScope: { read: action.action.filesystemScope?.read ?? [], write: ['/outside'] },
       },
     };
-    await expect(executeVerifiedNativeR0Search(widened)).rejects.toThrow(
+    await expect(executeConservativeNativeR0Search(widened)).rejects.toThrow(
       /^R0_NATIVE_EFFECT_UNCERTAIN$/,
     );
     if (process.platform !== 'win32') {
-      await expect(executeVerifiedNativeR0Search(action)).rejects.toThrow(
+      await expect(executeConservativeNativeR0Search(action)).rejects.toThrow(
         /^R0_NATIVE_EFFECT_UNCERTAIN$/,
       );
     }
