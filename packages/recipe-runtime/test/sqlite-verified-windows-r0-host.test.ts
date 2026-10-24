@@ -22,7 +22,7 @@ describe.skipIf(process.platform !== 'win32')(
           controller,
           currentness: buildCurrentness(fixture.store),
           loadExpectedPlan: buildLoadExpectedPlan(fixture.tree.rootForward),
-          loadPlanByHash: async (hash) => (hash === plan.planHash ? plan : null),
+          loadPlanByHash: async (hash: string) => (hash === plan.planHash ? plan : null),
           // An untrusted extra property at runtime must be ignored.
           executeScopedSearch: async () => {
             injectedCalls++;
