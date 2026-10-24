@@ -248,9 +248,7 @@ function walkWin32(
     if (!driveInfo || driveInfo.isReparse || !driveInfo.isDirectory) refuse();
     const actualDrive = win.finalPath(driveHandle);
     if (actualDrive === null) refuse();
-    const strippedDrive = actualDrive.startsWith('\\\\?\\')
-      ? actualDrive.slice(4)
-      : actualDrive;
+    const strippedDrive = actualDrive.startsWith('\\\\?\\') ? actualDrive.slice(4) : actualDrive;
     // Refuse UNC/mapped-drive and subst-style aliases BEFORE any descendant
     // is opened. A real drive-root handle must resolve to that same drive.
     if (!samePath(strippedDrive, driveRoot)) refuse();
