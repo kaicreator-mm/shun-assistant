@@ -2,12 +2,9 @@
 // This module is deliberately NOT exported from the package root.
 // Recipe/model/UI code cannot substitute a callback in the host's R0 port.
 // Independent post-state and semantic Task verification remain NOT IMPLEMENTED.
-import type { SqliteReadonlySearchGateConfig } from './sqlite-effect-boundary.ts';
-import {
-  createSqliteAuthorizedRecipeEffectHost,
-  type SqliteRecipeHostOptions,
-} from './index.ts';
+import { createSqliteAuthorizedRecipeEffectHost, type SqliteRecipeHostOptions } from './index.ts';
 import { executeConservativeNativeR0Search } from './native-r0-effect.ts';
+import type { SqliteReadonlySearchGateConfig } from './sqlite-effect-boundary.ts';
 
 type FixedNativeR0HostOptions = SqliteRecipeHostOptions &
   Readonly<{
