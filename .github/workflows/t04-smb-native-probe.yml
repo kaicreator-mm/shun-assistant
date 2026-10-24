@@ -1,0 +1,50 @@
+name: t04-smb-native-probe
+
+on:
+  push:
+    branches: ['task/v02-t04-smb-native-win-probe']
+
+jobs:
+  windows-smb:
+    runs-on: windows-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10.34.5
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - name: Physical mapped-SMB negative against exact PR173 implementation
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $shareName = 'ShunT04Probe'
+          $shareDir = Join-Path $env:RUNNER_TEMP 'shun-t04-smb-physical'
+          New-Item -Path $shareDir -ItemType Directory -Force | Out-Null
+          Set-Content -Path (Join-Path $shareDir 'do-not-read.txt') -Value 'SMB_PHYSICAL_NEGATIVE'
+          $created = $false
+          $mapped = $false
+          try {
+            New-SmbShare -Name $shareName -Path $shareDir -ChangeAccess $env:USERNAME -Temporary -ErrorAction Stop | Out-Null
+            $created = $true
+            $mapping = '\\localhost\' + $shareName
+            & net.exe use Q: $mapping /persistent:no
+            if ($LASTEXITCODE -ne 0) { throw "SMB_MAP_FAILED_RC_$LASTEXITCODE" }
+            $mapped = $true
+            if (-not (Test-Path 'Q:\')) { throw 'SMB_MAPPING_NOT_REACHABLE' }
+            Write-Host 'SHUN_T04_REAL_SMB_MAPPED_DRIVE=PROVIDED'
+            $env:SHUN_T04_SMB_DRIVE_ROOT = 'Q:\'
+            pnpm --filter @shun/recipe-runtime exec vitest run test/r0-oracle-confinement.test.ts
+            if ($LASTEXITCODE -ne 0) { throw "SMB_NEGATIVE_TEST_FAILED_RC_$LASTEXITCODE" }
+            Write-Host 'SHUN_T04_REAL_SMB_NEGATIVE_TEST=PASS'
+          } catch {
+            Write-Host "SHUN_T04_SMB_PROBE_FAILED=$($_.Exception.Message)"
+            throw
+          } finally {
+            if ($mapped) { & net.exe use Q: /delete /y | Out-Null }
+            if ($created) { Remove-SmbShare -Name $shareName -Force -ErrorAction SilentlyContinue }
+          }
