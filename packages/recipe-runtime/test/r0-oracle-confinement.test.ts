@@ -284,7 +284,10 @@ describe.skipIf(process.platform !== 'win32')('T04 oracle confinement falsifiers
           refusals++;
         }
         if (child.exitCode !== null || child.signalCode !== null) break;
-        if (refusals + oks > 4000) break;
+        // Runaway guard only: the swapper self-terminates after its duration
+        // (~4 s, ~6k walks even on slow hosts); 12k iterations must never be
+        // reached in a healthy run.
+        if (refusals + oks > 12_000) break;
       }
     } finally {
       if (child.exitCode === null && child.signalCode === null) child.kill('SIGKILL');
@@ -310,10 +313,13 @@ describe.skipIf(process.platform !== 'win32')('T04 oracle confinement falsifiers
     }
     const innerPath = join(holder, 'scope', 'inner');
     if (!existsSync(innerPath) || lstatSync(innerPath).isSymbolicLink()) {
-      rmSync(innerPath, { force: true });
+      rmSync(innerPath, { force: true, recursive: true });
       mkdirSync(innerPath, { recursive: true });
-      writeFileSync(join(innerPath, 'b.txt'), 'real-bravo');
     }
+    // A kill mid-recreation can leave the real inner directory present but
+    // empty; the settled world needs the file back.
+    if (!existsSync(join(innerPath, 'b.txt')))
+      writeFileSync(join(innerPath, 'b.txt'), 'real-bravo');
     if (!existsSync(join(holder, 'scope', 'a.txt'))) {
       mkdirSync(join(holder, 'scope', 'inner'), { recursive: true });
       writeFileSync(join(holder, 'scope', 'a.txt'), 'real-alpha');

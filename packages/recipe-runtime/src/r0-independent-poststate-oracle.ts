@@ -42,7 +42,12 @@ const MAX_MATCHES = 128;
 // order, so the budget cutoff is deterministic for a given tree.
 const FILE_CONTENT_CAP_BYTES = 262144;
 const WALK_CONTENT_BUDGET_BYTES = 32 << 20;
-const ENUM_BUFFER_BYTES = 262144;
+// Enumeration buffer: deliberately SMALL. Each raw call allocates a fresh
+// buffer that only GC can reclaim, and the oracle walks whole directories
+// across many batch round trips (the decoder merges them), so a compact
+// buffer keeps the allocation pressure of a full tree walk bounded. Entries
+// are ~600 bytes each; 16 KiB still batches ~26 entries per call.
+const ENUM_BUFFER_BYTES = 16384;
 const CONTENT_UNREAD = 'CONTENT_UNREAD_BUDGET';
 
 const NT_STATUS_NO_MORE_FILES = 0x80000006;
