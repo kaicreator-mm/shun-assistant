@@ -38,7 +38,7 @@ jobs:
             if (-not (Test-Path 'Q:\')) { throw 'SMB_MAPPING_NOT_REACHABLE' }
             Write-Host 'SHUN_T04_REAL_SMB_MAPPED_DRIVE=PROVIDED'
             $env:SHUN_T04_SMB_DRIVE_ROOT = 'Q:\'
-            pnpm --filter @shun/recipe-runtime exec vitest run test/r0-oracle-confinement.test.ts test/scoped-file-search.test.ts
+            pnpm --filter @shun/recipe-runtime exec vitest run test/r0-oracle-confinement.test.ts test/scoped-file-search.test.ts test/sqlite-verified-windows-r0-host.test.ts
             if ($LASTEXITCODE -ne 0) { throw "SMB_NEGATIVE_TEST_FAILED_RC_$LASTEXITCODE" }
             Write-Host 'SHUN_T04_REAL_SMB_NEGATIVE_TEST=PASS'
           } catch {
