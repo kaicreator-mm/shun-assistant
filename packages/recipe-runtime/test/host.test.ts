@@ -10,6 +10,7 @@ import {
   createSqliteRecipeReadService,
   type SqliteRecipeHostOptions,
 } from '../src/index.ts';
+import { createSqliteNativeR0RecipeEffectHost } from '../src/sqlite-native-r0-host.ts';
 
 const config = {
   recipeId: 'recipe-1',
@@ -408,4 +409,48 @@ describe('T04 real SQLite Recipe host + actual ActionController read-only bounda
       code: 'RECIPE_SOURCE_REFUSED',
     });
   });
+  it('fixed native bootstrap cannot use injected Recipe search callbacks and fails closed without policy', async () => {
+    const f = fixture();
+    const h = f.attach(f.getStore());
+    const saved = h.service.registerLiteral(source, config);
+    if (!saved.ok) throw new Error('fixture register failed');
+    h.attachRevision(saved);
+    let injectedCalls = 0;
+    // A malicious extra property cannot be used to replace the compile-time
+    // fixed native port, even though JavaScript callers may supply it.
+    const options = {
+      ...h.host,
+      loadPlanByHash: async () => null,
+      executeScopedSearch: async () => {
+        injectedCalls++;
+        throw new Error('UNTRUSTED_OVERRIDE');
+      },
+    };
+    const live = createSqliteNativeR0RecipeEffectHost(options);
+    expect(
+      await live.runner.run({
+        taskId: 'task-1',
+        recipeId: saved.recipeId,
+        revisionSha256: saved.revisionSha256,
+      }),
+    ).toEqual({ ok: false, code: 'RECIPE_AUTHORIZATION_REFUSED' });
+    expect(injectedCalls).toBe(0);
+    expect(await h.adapter.hasAnyGrant()).toBe(false);
+    expect(
+      f.getStore().database.prepare('SELECT COUNT(*) AS n FROM recipe_r0_effect_journal_v02').get(),
+    ).toMatchObject({ n: 0 });
+  });
+
+  it('fixed native bootstrap refuses fake SQLite store before any side effect', () => {
+    const f = fixture();
+    const h = f.attach(f.getStore());
+    expect(() =>
+      createSqliteNativeR0RecipeEffectHost({
+        ...h.host,
+        store: {} as ShunStore,
+        loadPlanByHash: async () => null,
+      }),
+    ).toThrow(/^R0_NATIVE_HOST_BOOTSTRAP_REFUSED$/);
+  });
+
 });
