@@ -27,11 +27,9 @@ type Observed = Readonly<{
   evidence: R0SearchEffectEvidence;
 }>;
 
-const REFUSED: R0TaskSemanticVerdict = {
-  ok: false,
-  taskSemantic: 'UNCERTAIN',
-  code: 'SEMANTIC_EVIDENCE_INCOMPLETE',
-};
+function refused(): R0TaskSemanticVerdict {
+  return { ok: false, taskSemantic: 'UNCERTAIN', code: 'SEMANTIC_EVIDENCE_INCOMPLETE' };
+}
 
 /**
  * The caller owns a real local ShunStore and ActionController. This factory
@@ -77,9 +75,9 @@ export function createSqliteVerifiedWindowsR0RecipeEffectHost(
       readService: host.readService,
       runner: host.runner,
       verifyTaskSemantics: (taskId: string): R0TaskSemanticVerdict => {
-        if (!taskId || typeof taskId !== 'string') return REFUSED;
+        if (!taskId || typeof taskId !== 'string') return refused();
         const saved = observed.get(taskId);
-        if (!saved) return REFUSED;
+        if (!saved) return refused();
         observed.delete(taskId);
         return verifyR0SearchTaskSemantics({ ...saved, journal });
       },
