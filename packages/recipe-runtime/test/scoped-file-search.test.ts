@@ -214,14 +214,18 @@ describe.skipIf(!isWin32)('T04 Windows handle-anchored physical canaries (real w
     expect(noFollow).not.toBeNull();
     expect(k32.isReparse(noFollow as bigint)).toBe(true);
     const noFollowPath = k32.finalPath(noFollow as bigint).replace(/^\\\\\?\\/, '');
-    expect(noFollowPath.toLowerCase()).toBe(esc.toLowerCase());
+    // Kernel32 expands 8.3 parent segments (RUNNER~1 -> RunnerAdmin).
+    // Verify the no-follow handle is the *junction object* by its stable
+    // final relative suffix, never by exact caller spelling.
+    expect(noFollowPath.toLowerCase().endsWith('\\approved\\esc')).toBe(true);
     k32.close(noFollow as bigint);
 
     const follow = k32.openFollow(esc);
     expect(follow).not.toBeNull();
     expect(k32.isReparse(follow as bigint)).toBe(false);
     const followPath = k32.finalPath(follow as bigint).replace(/^\\\\\?\\/, '');
-    expect(followPath.toLowerCase()).toBe(target.toLowerCase());
+    expect(followPath.toLowerCase().endsWith('\\outside')).toBe(true);
+    expect(followPath.toLowerCase()).not.toBe(noFollowPath.toLowerCase());
     k32.close(follow as bigint);
   });
 
