@@ -28,7 +28,9 @@ describe('T04 native package contents are runtime-only', () => {
     expect(entries).toContain('native/impl/shun_win32_impl.node');
     expect(entries).not.toContain('native/canary/shun_win32_canary.node');
     expect(entries?.some((path) => path.startsWith('native/canary/'))).toBe(false);
-    expect(entries?.some((path) => path.endsWith('.rs') || path.endsWith('Cargo.lock'))).toBe(false);
+    expect(entries?.some((path) => path.endsWith('.rs') || path.endsWith('Cargo.lock'))).toBe(
+      false,
+    );
     expect(entries?.some((path) => path.startsWith('test/'))).toBe(false);
   });
 });
