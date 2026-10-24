@@ -2,7 +2,7 @@
 // The child uses the ACTUAL ShunStore+SQLite journal in another Node process,
 // synchronously acknowledges a committed STARTED row then terminates without
 // close()/checkpoint() or a receipt. The parent must never auto-dispatch again.
-import { spawnSync } from 'node:child_process';
+import { spawn, spawnSync } from 'node:child_process';
 import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
@@ -23,10 +23,80 @@ const abruptlyKilledChild = [
   'const reservation = journal.reserve(JSON.parse(process.argv[2]));',
   "if (!reservation.ok) { writeSync(2, 'RESERVATION_REFUSED'); process.exit(12); }",
   "writeSync(1, 'DURABLY_RESERVED');",
-  '// No graceful close, journal update, or cleanup: real process termination.',
-  "process.kill(process.pid, 'SIGKILL');",
-  'process.exit(13);',
+  '// Wait alive with DB connection open until the PARENT sends SIGKILL.',
+  'setInterval(() => {}, 60_000);',
 ].join('\n');
+
+type DeathEvidence = Readonly<{
+  acknowledged: boolean;
+  parentKillAccepted: boolean;
+  code: number | null;
+  signal: NodeJS.Signals | null;
+  stderr: string;
+}>;
+
+function isProvenForcedDeath(evidence: DeathEvidence): boolean {
+  if (!evidence.acknowledged || !evidence.parentKillAccepted) return false;
+  if (evidence.signal === 'SIGKILL' && evidence.code === null) return true;
+  // Windows TerminateProcess can report exit code 1 rather than a POSIX
+  // signal. This branch is valid ONLY after the PARENT explicitly requested
+  // SIGKILL from an observed still-running child; a normal exit cannot pass.
+  return process.platform === 'win32' && evidence.signal === null && evidence.code === 1;
+}
+
+async function killAfterDurableCommit(file: string, action: unknown): Promise<DeathEvidence> {
+  return new Promise((resolve, reject) => {
+    const child = spawn(
+      process.execPath,
+      [
+        '--experimental-strip-types',
+        '--input-type=module',
+        '-e',
+        abruptlyKilledChild,
+        file,
+        JSON.stringify(action),
+      ],
+      { cwd: packageRoot, stdio: ['ignore', 'pipe', 'pipe'] },
+    );
+    let output = '';
+    let stderr = '';
+    let parentKillAccepted = false;
+    let timedOut = false;
+    const watchdog = setTimeout(() => {
+      timedOut = true;
+      child.kill('SIGKILL');
+    }, 15_000);
+    child.stdout.on('data', (chunk: Buffer) => {
+      output += chunk.toString('utf8');
+      if (output.includes('DURABLY_RESERVED') && !parentKillAccepted) {
+        // The actual DB COMMIT happened before this synchronous child marker.
+        // The parent (not the child) issues the real process-kill request.
+        parentKillAccepted = child.kill('SIGKILL');
+      }
+    });
+    child.stderr.on('data', (chunk: Buffer) => {
+      stderr += chunk.toString('utf8');
+    });
+    child.once('error', (error) => {
+      clearTimeout(watchdog);
+      reject(error);
+    });
+    child.once('close', (code, signal) => {
+      clearTimeout(watchdog);
+      if (timedOut) {
+        reject(new Error('KILL_CANARY_TIMED_OUT'));
+        return;
+      }
+      resolve({
+        acknowledged: output.includes('DURABLY_RESERVED'),
+        parentKillAccepted,
+        code,
+        signal,
+        stderr,
+      });
+    });
+  });
+}
 
 function authorizedAction() {
   return AuthorizedActionSchema.parse({
@@ -54,23 +124,28 @@ describe('T04 journal real forced-process-death recovery contract', () => {
     const file = join(folder, 'shun.sqlite');
     const action = authorizedAction();
     try {
-      const child = spawnSync(
+      // The false-proof control confirms an ordinary exit 13 is rejected,
+      // even when a forged readiness marker precedes it.
+      const ordinaryExit = spawnSync(
         process.execPath,
-        [
-          '--experimental-strip-types',
-          '--input-type=module',
-          '-e',
-          abruptlyKilledChild,
-          file,
-          JSON.stringify(action),
-        ],
-        { cwd: packageRoot, encoding: 'utf8', timeout: 15_000 },
+        ['-e', "process.stdout.write('DURABLY_RESERVED'); process.exit(13);"],
+        { encoding: 'utf8', timeout: 5_000 },
       );
-      expect(child.error).toBeUndefined();
-      // Child really reached the durable commit and was then killed, not
-      // silently skipped by a child startup or TypeScript resolution error.
-      expect(child.stdout, child.stderr).toContain('DURABLY_RESERVED');
-      expect(child.status).not.toBe(0);
+      expect(ordinaryExit.status).toBe(13);
+      expect(
+        isProvenForcedDeath({
+          acknowledged: ordinaryExit.stdout.includes('DURABLY_RESERVED'),
+          parentKillAccepted: false,
+          code: ordinaryExit.status,
+          signal: ordinaryExit.signal,
+          stderr: ordinaryExit.stderr,
+        }),
+      ).toBe(false);
+
+      const death = await killAfterDurableCommit(file, action);
+      expect(death.acknowledged, death.stderr).toBe(true);
+      expect(death.parentKillAccepted, death.stderr).toBe(true);
+      expect(isProvenForcedDeath(death), death.stderr).toBe(true);
 
       const recovered = new ShunStore({ file });
       try {
