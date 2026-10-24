@@ -36,10 +36,9 @@ const MAX_ENTRIES = 4096;
 const MAX_DIRS = 512;
 const MAX_DEPTH = 8;
 const MAX_MATCHES = 128;
-// Per-file content digest cap and a whole-walk read budget: files beyond
-// them are recorded with an explicit deterministic marker instead of
-// silently weakening the mutation proof. Entries are processed in sorted
-// order, so the budget cutoff is deterministic for a given tree.
+// Per-file and whole-walk HARD bounds. A successful Oracle result must
+// cover every file byte; a bounded walk that cannot read everything is
+// REFUSED, never represented by partial hashes or sentinel fingerprints.
 const FILE_CONTENT_CAP_BYTES = 262144;
 const WALK_CONTENT_BUDGET_BYTES = 32 << 20;
 // Enumeration buffer: deliberately SMALL. Each raw call allocates a fresh
@@ -48,7 +47,6 @@ const WALK_CONTENT_BUDGET_BYTES = 32 << 20;
 // buffer keeps the allocation pressure of a full tree walk bounded. Entries
 // are ~600 bytes each; 16 KiB still batches ~26 entries per call.
 const ENUM_BUFFER_BYTES = 16384;
-const CONTENT_UNREAD = 'CONTENT_UNREAD_BUDGET';
 
 const NT_STATUS_NO_MORE_FILES = 0x80000006;
 const NT_STATUS_BUFFER_OVERFLOW = 0x80000005;
@@ -400,7 +398,14 @@ function walkAnchored(
           if (matches.length >= MAX_MATCHES && oracleGlobMatch(entry.name, query))
             return { ok: false, code: 'ORACLE_BOUNDS_EXCEEDED' };
           if (oracleGlobMatch(entry.name, query)) matches.push(rel);
-          const unread = contentBytes >= WALK_CONTENT_BUDGET_BYTES;
+          // A partial prefix hash is NOT an independent proof that the
+          // complete state was unchanged. Fail closed before opening the
+          // offending file if either budget is exceeded.
+          if (
+            entry.size > BigInt(FILE_CONTENT_CAP_BYTES) ||
+            entry.size > BigInt(WALK_CONTENT_BUDGET_BYTES - contentBytes)
+          )
+            return { ok: false, code: 'ORACLE_BOUNDS_EXCEEDED' };
           lines.push(
             `f\t${rel}\t${entry.size}\t${entry.lastWriteMs}\t${entry.fileId}\t${hashFileContent(
               native,
@@ -408,10 +413,9 @@ function walkAnchored(
               entry,
               rel,
               instrument,
-              unread,
             )}`,
           );
-          if (!unread) contentBytes += Number(entry.size);
+          contentBytes += Number(entry.size);
         }
       }
     }
@@ -433,11 +437,8 @@ function hashFileContent(
   entry: EnumeratedEntry,
   rel: string,
   instrument: OracleInstrument,
-  unread: boolean,
 ): string {
-  if (unread) return CONTENT_UNREAD;
-  const capped = entry.size > BigInt(FILE_CONTENT_CAP_BYTES);
-  const wantBytes = capped ? FILE_CONTENT_CAP_BYTES : Number(entry.size);
+  const wantBytes = Number(entry.size);
   const handle = native.openFile(parentHandle, entry.name);
   if (handle === null) throw new Error('ORACLE_FILE_OPEN_REFUSED');
   instrument.onFileOpen?.(rel);
@@ -459,14 +460,10 @@ function hashFileContent(
       throw new Error('ORACLE_FILE_READ_STATUS');
     if (!Number.isSafeInteger(read.returned) || read.returned < 0 || read.returned > wantBytes)
       throw new Error('ORACLE_FILE_READ_BOUNDS');
-    if (
-      read.returned !== Number(entry.size) &&
-      !(capped && read.returned === FILE_CONTENT_CAP_BYTES)
-    )
-      throw new Error('ORACLE_FILE_SIZE_DRIFT');
+    if (read.returned !== wantBytes) throw new Error('ORACLE_FILE_SIZE_DRIFT');
     const bytes = read.data.subarray(0, read.returned);
     const digest = createHash('sha256').update(bytes).digest('hex');
-    return capped ? `${digest}+CAPPED` : digest;
+    return digest;
   } finally {
     native.close(handle);
   }
