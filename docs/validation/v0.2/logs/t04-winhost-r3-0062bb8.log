@@ -1,0 +1,253 @@
+# T04 Windows host R3 controller evidence log — native provenance rebuild + SMB feasibility re-probe
+# source_sha=0062bb8429d8666a3c9e88080db3f24f151f0f31
+# source_tree=51211bab7e433ade0de6b68d7c0e0686566a97db
+# base=PR #173 head task/shun-i108-winhost @ 0062bb84; no source changes this round (evidence-only docs commit follows)
+# native_impl_committed_sha256=7f85afc973ae8d49c817a9ae8c1d16e4225a313f4114eebe12760f038ce847fb (unchanged since 75dec6d: git diff 75dec6d..0062bb84 -- packages/recipe-runtime/native is empty)
+# native_canary_committed_sha256=b5f8d1bf5b4a3927ff7c259f751b50ee63fc5dfab99c85b66ca148985a87d5a0
+# captured_at=2026-10-24T14:19:09Z
+# host_os=Windows 11 Pro build 26300.9711
+# node=v24.21.0 (.node-version)
+# user=NILAR\15549 (Administrators-group member, NON-ELEVATED UAC-filtered token)
+# integrity=Medium Mandatory Level, sid=S-1-16-8192 (whoami /groups /fo csv; localized label elided)
+# rust_toolchain=stable-x86_64-pc-windows-gnu rustc 1.99.1 (58cf8f9c3 2026-10-13) cargo 1.99.1 (5f94df478 2026-08-27)
+# libnode_import_node_exe_sha256=ba4e6d110e8c1592a1ecd390f6b05f3da124b13871a5be62b341a07a853c6c32
+# libnode_import_libnode_dll_sha256=80741b7316820417f09fc5a226654a4b7b720ff470b7465d6e91aa1f04538ce6
+
+## 1. Independent rebuild of both native crates (fresh worktree @ 0062bb84, fresh CARGO_TARGET_DIR, CARGO_INCREMENTAL=0, --locked)
+
+GitHub blob byte verification (gh api /git/blobs/<sha> raw vs checkout): BLOB_MATCH impl, BLOB_MATCH canary.
+PE header facts of the committed artifacts (recovered, not assumed): impl machine=0x8664 TimeDateStamp=1792836474 (2026-10-24T10:07:54Z); canary machine=0x8664 TimeDateStamp=1792785321 (2026-10-23T19:55:21Z, matches the value recorded in native/README.md).
+Build command per native/README.md; epochs passed via SOURCE_DATE_EPOCH; canary relinked after cargo clean -p shun-win32-canary.
+
+/usr/bin/bash: line 19: printf: --: invalid option
+printf: usage: printf [-v var] format [arguments]
+# impl build SOURCE_DATE_EPOCH=1792836474
+   Compiling proc-macro2 v1.0.107
+   Compiling unicode-ident v1.0.27
+   Compiling quote v1.0.47
+   Compiling windows-link v0.2.1
+   Compiling futures-sink v0.3.34
+   Compiling futures-core v0.3.34
+   Compiling memchr v2.8.3
+   Compiling futures-io v0.3.34
+   Compiling slab v0.4.12
+   Compiling futures-task v0.3.34
+   Compiling pin-project-lite v0.2.17
+   Compiling napi-build v2.6.0
+   Compiling napi-sys v3.4.1
+   Compiling unicode-segmentation v1.13.3
+   Compiling semver v1.0.28
+   Compiling rustc-hash v2.1.3
+   Compiling windows-strings v0.5.1
+   Compiling windows-result v0.4.1
+   Compiling libloading v0.9.0
+   Compiling windows-threading v0.2.1
+   Compiling futures-channel v0.3.34
+   Compiling ctor v1.0.13
+   Compiling bitflags v2.13.2
+   Compiling nohash-hasher v0.2.0
+   Compiling napi v3.15.0
+   Compiling convert_case v0.12.0
+   Compiling syn v3.0.9
+   Compiling syn v2.0.119
+   Compiling windows-implement v0.60.2
+   Compiling windows-interface v0.59.3
+   Compiling windows-core v0.62.2
+   Compiling napi-derive-backend v6.1.6
+   Compiling windows-collections v0.3.2
+   Compiling windows-numerics v0.3.1
+   Compiling windows-future v0.3.2
+   Compiling futures-macro v0.3.34
+   Compiling windows v0.62.2
+   Compiling futures-util v0.3.34
+   Compiling napi-derive v3.6.13
+   Compiling futures-executor v0.3.34
+   Compiling futures v0.3.34
+   Compiling shun-win32-impl v0.2.0 (C:\xDev\kAiCreator\shun-assistant\shun-pr173-t04-smb-zc\packages\recipe-runtime\native\impl)
+    Finished `release` profile [optimized] target(s) in 31.22s
+IMPL_BUILD_EXIT=0
+# canary build SOURCE_DATE_EPOCH=1792785321
+     Removed 0 files
+   Compiling shun-win32-canary v0.2.0 (C:\xDev\kAiCreator\shun-assistant\shun-pr173-t04-smb-zc\packages\recipe-runtime\native\canary)
+    Finished `release` profile [optimized] target(s) in 1.21s
+CANARY_BUILD_EXIT=0
+
+--- artifact comparison (verbatim) ---
+7f85afc973ae8d49c817a9ae8c1d16e4225a313f4114eebe12760f038ce847fb *target/release/shun_win32_impl.dll
+b5f8d1bf5b4a3927ff7c259f751b50ee63fc5dfab99c85b66ca148985a87d5a0 *target/release/shun_win32_canary.dll
+cmp rebuilt_impl.dll vs committed shun_win32_impl.node: IDENTICAL
+cmp rebuilt_canary.dll vs committed shun_win32_canary.node: IDENTICAL
+REBUILD_BYTE_IDENTITY=PASS (both crates, exit codes IMPL_BUILD_EXIT=0 CANARY_BUILD_EXIT=0 above)
+
+## 2. ABI verification of the committed artifacts (runtime under Node v24.21.0, NAPI runtime version 10)
+
+PE machine both = 0x8664 (x64). process.versions.napi=10 >= addon napi8 feature floor.
+/usr/bin/bash: line 28: printf: --: invalid option
+printf: usage: printf [-v var] format [arguments]
+node=v24.21.0 napi=10 arch=x64 platform=win32
+IMPL_EXPORTS=close,dosDevice,driveType,entryId,entryInfo,enumerate,finalPath,openDir,openFile,readFile
+CANARY_EXPORTS=close,finalPath,isReparse,openFollow,openNoFollow,pinExclusive
+dosDevice(C:)=\Device\HarddiskVolume3 IS_HARDDISK_VOLUME=true
+driveType(C:\)=3 (3=DRIVE_FIXED)
+openDir(C:) ok=false
+/usr/bin/bash: line 29: printf: --: invalid option
+printf: usage: printf [-v var] format [arguments]
+openDir(\??\C:\) ok=true
+entryInfo(root).attributes=22
+entryId(root).volumeSerialNumber=undefined fileIndex=undefined
+finalPath(root)=\\?\C:\
+close ok
+canary finalPath smoke present=true
+ABI_RUNTIME_LOAD_AND_CALL=PASS
+
+## 3. Real SMB mapped drive feasibility re-probe at 0062bb84 (result: NOT_RUN stands, deeper trail)
+
+/usr/bin/bash: line 33: printf: --: invalid option
+printf: usage: printf [-v var] format [arguments]
+--- probe-trail-v2.log (verbatim; all probes read-only or refused by the OS, no state changed) ---
+=== SMB feasibility probe trail v2 (proper $ quoting) 2026-10-24T14:12:11Z ===
+--- [1] IPC$ connect, current identity ---
+发生系统错误 67。
+
+找不到网络名。
+--- [2] map admin share C$ to Z: ---
+发生系统错误 67。
+
+找不到网络名。
+--- [3] create user share as filtered token ---
+发生系统错误 5。
+
+拒绝访问。
+
+--- [4] 9P mapped drive via wsl.localhost\Ubuntu ---
+发生系统错误 67。
+
+找不到网络名。
+--- [5] route to WSL docker bridge ---
+no-route
+0
+--- [6] 172.17.0.1:445 TCP probe ---
+False
+
+--- supplementary facts ---
+sudo disabled: "已在此计算机上禁用 Sudo" (sudo config; no HKLM ...\Sudo key)
+schtasks /create /rl HIGHEST from filtered token: 错误: 拒绝访问 (CREATE_EXIT=1)
+UAC policy: EnableLUA=0x1 ConsentPromptBehaviorAdmin=0x5 PromptOnSecureDesktop=0x1 -> every elevation needs interactive consent on the secure desktop; no unattended elevation path exists for this account
+port 445 listener: Get-NetTCPConnection -LocalPort 445 -> OwningProcess=4 (System; kernel SMB server LanmanServer) -> no local bind available for any third-party SMB server on any address
+WSL networkingMode=mirrored (wslinfo); Get-NetRoute 172.17.0.0/16,172.18.0.0/16 -> none; Test-NetConnection 172.17.0.1 -Port 445 -> False; docker Desktop/WSL side publishing to 445 impossible (conflicts with the kernel owner above)
+New-SmbMapping -RemotePath \localhost\C$ -> 找不到网络名 (error 67 family)
+SMB feasibility=IMPOSSIBLE_WITHOUT_INTERACTIVE_ELEVATION on this host; the env-gated falsifiers (SHUN_T04_SMB_DRIVE_ROOT / SHUN_E2E_SMB_DRIVE_ROOT) remain the standing instrumentation; SMB_MAPPED_NETWORK_DRIVE_NEGATIVE=NOT_RUN
+
+## 4. recipe-runtime full suite at this SHA (real exit code below; physical operator-gated suites ran on the Medium token)
+
+/usr/bin/bash: line 44: printf: --: invalid option
+printf: usage: printf [-v var] format [arguments]
+node=v24.21.0
+
+> @shun/recipe-runtime@0.2.0 test
+> vitest run
+
+
+[1m[46m RUN [49m[22m [36mv3.2.7 [39m[90mC:/xDev/kAiCreator/shun-assistant/shun-pr173-t04-smb-zc/packages/recipe-runtime[39m
+
+[90mstdout[2m | test/windows-host-e2e.test.ts[2m > [22m[2mT04 Windows host minimal E2E closed loop[2m > [22m[2mruns the standard-user privilege gate before any host loop evidence
+[22m[39mE2E_PRIVILEGE_TOKEN=MEDIUM
+
+[90mstdout[2m | test/windows-host-e2e.test.ts[2m > [22m[2mT04 Windows host minimal E2E closed loop[2m > [22m[2mcloses the loop: grant -> durable STARTED -> native scan -> oracle -> semantic PASS, then refuses replay
+[22m[39mE2E_POSITIVE_LOOP=PASS E2E_REPLAY_REFUSED=PASS E2E_SEMANTIC=PASS
+
+[90mstdout[2m | test/windows-host-e2e.test.ts[2m > [22m[2mT04 Windows host minimal E2E closed loop[2m > [22m[2mrefuses an in-scope junction reparse point without following it, and never replays
+[22m[39mE2E_JUNCTION_REFUSED=PASS E2E_JUNCTION_NO_REPLAY=PASS
+
+[90mstdout[2m | test/windows-host-e2e.test.ts[2m > [22m[2mT04 Windows host minimal E2E closed loop[2m > [22m[2maccepts a legitimate 8.3 short-path spelling of the same approved scope
+[22m[39mE2E_SHORT_PATH_ALIAS_LEN=48
+
+[90mstdout[2m | test/windows-host-e2e.test.ts[2m > [22m[2mT04 Windows host minimal E2E closed loop[2m > [22m[2maccepts a legitimate 8.3 short-path spelling of the same approved scope
+[22m[39mE2E_SHORT_PATH_ACCEPTED=PASS
+
+[90mstdout[2m | test/windows-host-e2e.test.ts[2m > [22m[2mT04 Windows host minimal E2E closed loop[2m > [22m[2mrefuses a subst drive-letter alias as scope root by final-path provenance
+[22m[39mE2E_SUBST_DRIVE=V:
+
+[90mstdout[2m | test/windows-host-e2e.test.ts[2m > [22m[2mT04 Windows host minimal E2E closed loop[2m > [22m[2mrefuses a subst drive-letter alias as scope root by final-path provenance
+[22m[39mE2E_SUBST_REFUSED=PASS
+
+[90mstdout[2m | test/windows-host-e2e.test.ts[2m > [22m[2mT04 Windows host minimal E2E closed loop[2m > [22m[2mfails closed in a fresh process when the native addon is missing, then recovers
+[22m[39mE2E_MISSING_ADDON_FAIL_CLOSED=PASS
+
+[90mstdout[2m | test/windows-host-e2e.test.ts[2m > [22m[2mT04 Windows host minimal E2E closed loop[2m > [22m[2mrefuses a real SMB mapped drive scope when one is provided
+[22m[39mE2E_SMB_MAPPED_DRIVE_NEGATIVE=SKIPPED_NO_SMB_DRIVE_PROVIDED
+
+ [32m✓[39m test/windows-host-e2e.test.ts [2m([22m[2m7 tests[22m[2m)[22m[33m 2664[2mms[22m[39m
+   [33m[2m✓[22m[39m T04 Windows host minimal E2E closed loop[2m > [22maccepts a legitimate 8.3 short-path spelling of the same approved scope [33m 950[2mms[22m[39m
+   [33m[2m✓[22m[39m T04 Windows host minimal E2E closed loop[2m > [22mfails closed in a fresh process when the native addon is missing, then recovers [33m 1086[2mms[22m[39m
+[90mstdout[2m | test/r0-oracle-confinement.test.ts[2m > [22m[2mT04 oracle confinement falsifiers[2m > [22m[2mrefuses a junction ancestor at that component with zero opens below it
+[22m[39mORACLE_JUNCTION_ANCESTOR_ZERO_IO=PASS
+
+[90mstdout[2m | test/r0-oracle-confinement.test.ts[2m > [22m[2mT04 oracle confinement falsifiers[2m > [22m[2mrefuses an in-tree junction from enumeration metadata alone
+[22m[39mORACLE_INTREE_JUNCTION_REFUSED=PASS
+
+[90mstdout[2m | test/r0-oracle-confinement.test.ts[2m > [22m[2mT04 oracle confinement falsifiers[2m > [22m[2mrefuses a subst alias root by device attestation with zero opens at all
+[22m[39mORACLE_SUBST_ZERO_IO=PASS DRIVE=V:
+
+[90mstdout[2m | test/r0-oracle-confinement.test.ts[2m > [22m[2mT04 oracle confinement falsifiers[2m > [22m[2mattests fixed local volumes only, refusing the mapped SMB device form
+[22m[39mORACLE_DRIVE_ATTESTATION_MATRIX=PASS
+
+[90mstdout[2m | test/r0-oracle-confinement.test.ts[2m > [22m[2mT04 oracle confinement falsifiers[2m > [22m[2mfails closed with zero opens on a real mapped SMB drive when one is provided
+[22m[39mORACLE_SMB_MAPPED_ZERO_IO=SKIPPED_NO_SMB_DRIVE_PROVIDED
+
+[90mstdout[2m | test/r0-oracle-confinement.test.ts[2m > [22m[2mT04 oracle confinement falsifiers[2m > [22m[2mnever verifies a foreign world while the ancestor and an in-tree directory are concurrently swapped
+[22m[39mORACLE_RACE_NO_FOREIGN_WORLD=PASS OK=10846 REFUSED=1155 SWAP_RACE_EXERCISED=true
+
+[90mstdout[2m | test/r0-oracle-confinement.test.ts[2m > [22m[2mT04 oracle confinement falsifiers[2m > [22m[2mbinds the task semantic verdict to the content fingerprint, refusing a size/mtime-preserving swap
+[22m[39mORACLE_CONTENT_SWAP_REFUSED_BY_SEMANTIC_VERIFIER=PASS
+
+ [32m✓[39m test/r0-oracle-confinement.test.ts [2m([22m[2m7 tests[22m[2m)[22m[33m 24724[2mms[22m[39m
+   [33m[2m✓[22m[39m T04 oracle confinement falsifiers[2m > [22mnever verifies a foreign world while the ancestor and an in-tree directory are concurrently swapped [33m 24392[2mms[22m[39m
+ [32m✓[39m test/scoped-file-search.test.ts [2m([22m[2m15 tests[22m[2m | [22m[33m1 skipped[39m[2m)[22m[33m 3389[2mms[22m[39m
+   [33m[2m✓[22m[39m T04 Windows handle-anchored physical canaries (real win32 host)[2m > [22manchors every root component, including 8.3 short-name temp paths, without aliasing [33m 1142[2mms[22m[39m
+   [33m[2m✓[22m[39m T04 Windows handle-anchored physical canaries (real win32 host)[2m > [22msurvives a real concurrent rename attacker without ever returning outside-scope paths [33m 1577[2mms[22m[39m
+ [32m✓[39m test/host.test.ts [2m([22m[2m6 tests[22m[2m)[22m[33m 3142[2mms[22m[39m
+   [33m[2m✓[22m[39m T04 real SQLite Recipe host + actual ActionController read-only boundary[2m > [22mpersists immutable literal candidate across SQLite restart without model or grant [33m 1370[2mms[22m[39m
+   [33m[2m✓[22m[39m T04 real SQLite Recipe host + actual ActionController read-only boundary[2m > [22mfails closed through REAL ActionController when no ACTIVE policy, no grant/effect [33m 1499[2mms[22m[39m
+[90mstdout[2m | test/windows-host-hardkill-replay.test.ts[2m > [22m[2mT04 hard kill between durable STARTED and receipt: restart refuses replay[2m > [22m[2mkills a real composed host child post-commit and never re-dispatches
+[22m[39mE2E_HARDKILL_START_COMMITTED=PASS E2E_KILL_IDENTITY=code:null,signal:SIGKILL E2E_RESTART_NO_REPLAY=PASS
+
+[90mstdout[2m | test/windows-host-hardkill-replay.test.ts[2m > [22m[2mT04 hard kill between durable STARTED and receipt: restart refuses replay[2m > [22m[2mrejects an ordinary child exit as forced-death evidence (negative control)
+[22m[39mE2E_HARDKILL_ORDINARY_EXIT_REJECTED=PASS
+
+ [32m✓[39m test/windows-host-hardkill-replay.test.ts [2m([22m[2m2 tests[22m[2m)[22m[33m 2337[2mms[22m[39m
+   [33m[2m✓[22m[39m T04 hard kill between durable STARTED and receipt: restart refuses replay[2m > [22mkills a real composed host child post-commit and never re-dispatches [33m 1854[2mms[22m[39m
+   [33m[2m✓[22m[39m T04 hard kill between durable STARTED and receipt: restart refuses replay[2m > [22mrejects an ordinary child exit as forced-death evidence (negative control) [33m 480[2mms[22m[39m
+ [32m✓[39m test/sqlite-journaled-search-boundary.test.ts [2m([22m[2m4 tests[22m[2m)[22m[33m 920[2mms[22m[39m
+   [33m[2m✓[22m[39m T04 composed real SQLite grant gate + durable journal (synthetic OS receipt)[2m > [22mruns one persisted-grant current-policy checked R0 effect, then refuses replay across two objects [33m 761[2mms[22m[39m
+[90mstdout[2m | test/trusted-windows-r0-effect.test.ts[2m > [22m[2mT04 effect phase binding (R2 P1-02)[2m > [22m[2mnever mints a positive receipt without a trusted phase journal
+[22m[39mPHASE_NO_JOURNAL_NO_POSITIVE=PASS
+
+[90mstdout[2m | test/trusted-windows-r0-effect.test.ts[2m > [22m[2mT04 effect phase binding (R2 P1-02)[2m > [22m[2mstays UNCERTAIN when phase persistence is refused
+[22m[39mPHASE_RECORD_REFUSED_UNCERTAIN=PASS
+
+[90mstdout[2m | test/trusted-windows-r0-effect.test.ts[2m > [22m[2mT04 effect phase binding (R2 P1-02)[2m > [22m[2mstays UNCERTAIN when the phase readback is corrupt or divergent
+[22m[39mPHASE_READBACK_CORRUPT_UNCERTAIN=PASS
+
+[90mstdout[2m | test/trusted-windows-r0-effect.test.ts[2m > [22m[2mT04 effect phase binding (R2 P1-02)[2m > [22m[2mcites the real phase receipt digest in a positive receipt
+[22m[39mPHASE_POSITIVE_CITES_REAL_RECEIPT=PASS
+
+[90mstdout[2m | test/trusted-windows-r0-effect.test.ts[2m > [22m[2mT04 effect phase binding (R2 P1-02)[2m > [22m[2mdurably refuses unreserved attempts, divergence and tampered phase rows
+[22m[39mPHASE_JOURNAL_IMMUTABILITY=PASS
+
+ [32m✓[39m test/trusted-windows-r0-effect.test.ts [2m([22m[2m5 tests[22m[2m)[22m[32m 127[2mms[22m[39m
+ [32m✓[39m test/sqlite-effect-boundary.test.ts [2m([22m[2m6 tests[22m[2m)[22m[32m 295[2mms[22m[39m
+ [32m✓[39m test/sqlite-r0-effect-journal.test.ts [2m([22m[2m5 tests[22m[2m)[22m[33m 985[2mms[22m[39m
+   [33m[2m✓[22m[39m T04 SQLite pre-effect journal: source-only durable reservation[2m > [22mserializes two real connections and refuses a replay after DB reopen [33m 907[2mms[22m[39m
+ [32m✓[39m test/journaled-r0-search.test.ts [2m([22m[2m7 tests[22m[2m)[22m[32m 49[2mms[22m[39m
+(node:34792) [DEP0190] DeprecationWarning: Passing args to a child process with shell option true can lead to security vulnerabilities, as the arguments are not escaped, only concatenated.
+(Use `node --trace-deprecation ...` to show where the warning was created)
+ [32m✓[39m test/pack-contents.test.ts [2m([22m[2m1 test[22m[2m)[22m[33m 3141[2mms[22m[39m
+   [33m[2m✓[22m[39m T04 native package contents are runtime-only[2m > [22mnever publishes the test-only native canary or Rust build source [33m 3139[2mms[22m[39m
+
+[2m Test Files [22m [1m[32m11 passed[39m[22m[90m (11)[39m
+[2m      Tests [22m [1m[32m64 passed[39m[22m[2m | [22m[33m1 skipped[39m[90m (65)[39m
+[2m   Start at [22m 22:16:24
+[2m   Duration [22m 54.62s[2m (transform 1.77s, setup 0ms, collect 5.99s, tests 41.77s, environment 4ms, prepare 2.51s)[22m
+
+PACKAGE_TEST_EXIT=0

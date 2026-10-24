@@ -1,0 +1,117 @@
+# T04 Windows host minimal E2E â€” raw evidence log
+# source_sha=dae91c9eadafa0a55260672e17042cf68380b223
+# source_tree=0bc6b2d192cbe0fc107a960c0b4ae13dfb7c2e64
+# base=version/v0.2.0@a5667f289d4ca004215958a43edbe1c0c0c2d99d
+# captured_at=2026-10-24T05:42:18Z
+# host_os=Windows 11 Pro build 26300.9711
+# node=v24.21.0
+# user=NILAR\15549 (Administrators-group member, NON-ELEVATED UAC-filtered token)
+
+## whoami /groups (integrity evidence)
+´íÎó: ÎÞÐ§²ÎÊý/Ñ¡Ïî - 'C:/Program Files/Git/groups'¡£
+¼üÈë "WHOAMI /?" ÒÔÁË½âÓÃ·¨¡£
+
+## E2E suite run (vitest, exit code below)
+
+[1m[46m RUN [49m[22m [36mv3.2.7 [39m[90mC:/xDev/kAiCreator/shun-assistant/shun-i108-winhost/packages/recipe-runtime[39m
+
+[90mstdout[2m | test/windows-host-e2e.test.ts[2m > [22m[2mT04 Windows host minimal E2E closed loop[2m > [22m[2mruns the standard-user privilege gate before any host loop evidence
+[22m[39mE2E_PRIVILEGE_TOKEN=MEDIUM
+
+[90mstdout[2m | test/windows-host-e2e.test.ts[2m > [22m[2mT04 Windows host minimal E2E closed loop[2m > [22m[2mcloses the loop: grant -> durable STARTED -> native scan -> oracle -> semantic PASS, then refuses replay
+[22m[39mE2E_POSITIVE_LOOP=PASS E2E_REPLAY_REFUSED=PASS E2E_SEMANTIC=PASS
+
+[90mstdout[2m | test/windows-host-e2e.test.ts[2m > [22m[2mT04 Windows host minimal E2E closed loop[2m > [22m[2mrefuses an in-scope junction reparse point without following it, and never replays
+[22m[39mE2E_JUNCTION_REFUSED=PASS E2E_JUNCTION_NO_REPLAY=PASS
+
+[90mstdout[2m | test/windows-host-hardkill-replay.test.ts[2m > [22m[2mT04 hard kill between durable STARTED and receipt: restart refuses replay[2m > [22m[2mkills a real composed host child post-commit and never re-dispatches
+[22m[39mE2E_HARDKILL_START_COMMITTED=PASS E2E_RESTART_NO_REPLAY=PASS
+
+ [32mâœ“[39m test/windows-host-hardkill-replay.test.ts [2m([22m[2m1 test[22m[2m)[22m[33m 741[2mms[22m[39m
+   [33m[2mâœ“[22m[39m T04 hard kill between durable STARTED and receipt: restart refuses replay[2m > [22mkills a real composed host child post-commit and never re-dispatches [33m 739[2mms[22m[39m
+[90mstdout[2m | test/windows-host-e2e.test.ts[2m > [22m[2mT04 Windows host minimal E2E closed loop[2m > [22m[2maccepts a legitimate 8.3 short-path spelling of the same approved scope
+[22m[39mE2E_SHORT_PATH_ALIAS_LEN=48
+
+[90mstdout[2m | test/windows-host-e2e.test.ts[2m > [22m[2mT04 Windows host minimal E2E closed loop[2m > [22m[2maccepts a legitimate 8.3 short-path spelling of the same approved scope
+[22m[39mE2E_SHORT_PATH_ACCEPTED=PASS
+
+[90mstdout[2m | test/windows-host-e2e.test.ts[2m > [22m[2mT04 Windows host minimal E2E closed loop[2m > [22m[2mrefuses a subst drive-letter alias as scope root by final-path provenance
+[22m[39mE2E_SUBST_DRIVE=V:
+
+[90mstdout[2m | test/windows-host-e2e.test.ts[2m > [22m[2mT04 Windows host minimal E2E closed loop[2m > [22m[2mrefuses a subst drive-letter alias as scope root by final-path provenance
+[22m[39mE2E_SUBST_REFUSED=PASS
+
+[90mstdout[2m | test/windows-host-e2e.test.ts[2m > [22m[2mT04 Windows host minimal E2E closed loop[2m > [22m[2mfails closed in a fresh process when the native addon is missing, then recovers
+[22m[39mE2E_MISSING_ADDON_FAIL_CLOSED=PASS
+
+[90mstdout[2m | test/windows-host-e2e.test.ts[2m > [22m[2mT04 Windows host minimal E2E closed loop[2m > [22m[2mrefuses a real SMB mapped drive scope when one is provided
+[22m[39mE2E_SMB_MAPPED_DRIVE_NEGATIVE=SKIPPED_NO_SMB_DRIVE_PROVIDED
+
+ [32mâœ“[39m test/windows-host-e2e.test.ts [2m([22m[2m7 tests[22m[2m)[22m[33m 1721[2mms[22m[39m
+   [33m[2mâœ“[22m[39m T04 Windows host minimal E2E closed loop[2m > [22maccepts a legitimate 8.3 short-path spelling of the same approved scope [33m 644[2mms[22m[39m
+   [33m[2mâœ“[22m[39m T04 Windows host minimal E2E closed loop[2m > [22mfails closed in a fresh process when the native addon is missing, then recovers [33m 660[2mms[22m[39m
+
+[2m Test Files [22m [1m[32m2 passed[39m[22m[90m (2)[39m
+[2m      Tests [22m [1m[32m8 passed[39m[22m[90m (8)[39m
+[2m   Start at [22m 13:42:20
+[2m   Duration [22m 3.17s[2m (transform 582ms, setup 0ms, collect 1.62s, tests 2.46s, environment 0ms, prepare 356ms)[22m
+
+E2E_VITEST_EXIT=0
+
+## Full recipe-runtime package suite (regression check)
+
+[1m[46m RUN [49m[22m [36mv3.2.7 [39m[90mC:/xDev/kAiCreator/shun-assistant/shun-i108-winhost/packages/recipe-runtime[39m
+
+ [32mâœ“[39m test/journaled-r0-search.test.ts [2m([22m[2m7 tests[22m[2m)[22m[32m 34[2mms[22m[39m
+ [32mâœ“[39m test/sqlite-r0-effect-journal.test.ts [2m([22m[2m5 tests[22m[2m)[22m[32m 131[2mms[22m[39m
+ [32mâœ“[39m test/sqlite-journaled-search-boundary.test.ts [2m([22m[2m4 tests[22m[2m)[22m[32m 261[2mms[22m[39m
+[90mstdout[2m | test/windows-host-e2e.test.ts[2m > [22m[2mT04 Windows host minimal E2E closed loop[2m > [22m[2mruns the standard-user privilege gate before any host loop evidence
+[22m[39mE2E_PRIVILEGE_TOKEN=MEDIUM
+
+ [32mâœ“[39m test/sqlite-effect-boundary.test.ts [2m([22m[2m6 tests[22m[2m)[22m[33m 335[2mms[22m[39m
+[90mstdout[2m | test/windows-host-e2e.test.ts[2m > [22m[2mT04 Windows host minimal E2E closed loop[2m > [22m[2mcloses the loop: grant -> durable STARTED -> native scan -> oracle -> semantic PASS, then refuses replay
+[22m[39mE2E_POSITIVE_LOOP=PASS E2E_REPLAY_REFUSED=PASS E2E_SEMANTIC=PASS
+
+[90mstdout[2m | test/windows-host-e2e.test.ts[2m > [22m[2mT04 Windows host minimal E2E closed loop[2m > [22m[2mrefuses an in-scope junction reparse point without following it, and never replays
+[22m[39mE2E_JUNCTION_REFUSED=PASS E2E_JUNCTION_NO_REPLAY=PASS
+
+ [32mâœ“[39m test/host.test.ts [2m([22m[2m6 tests[22m[2m)[22m[33m 391[2mms[22m[39m
+(node:25556) [DEP0190] DeprecationWarning: Passing args to a child process with shell option true can lead to security vulnerabilities, as the arguments are not escaped, only concatenated.
+(Use `node --trace-deprecation ...` to show where the warning was created)
+ [32mâœ“[39m test/pack-contents.test.ts [2m([22m[2m1 test[22m[2m)[22m[33m 1527[2mms[22m[39m
+   [33m[2mâœ“[22m[39m T04 native package contents are runtime-only[2m > [22mnever publishes the test-only native canary or Rust build source [33m 1525[2mms[22m[39m
+[90mstdout[2m | test/windows-host-hardkill-replay.test.ts[2m > [22m[2mT04 hard kill between durable STARTED and receipt: restart refuses replay[2m > [22m[2mkills a real composed host child post-commit and never re-dispatches
+[22m[39mE2E_HARDKILL_START_COMMITTED=PASS E2E_RESTART_NO_REPLAY=PASS
+
+ [32mâœ“[39m test/windows-host-hardkill-replay.test.ts [2m([22m[2m1 test[22m[2m)[22m[33m 835[2mms[22m[39m
+   [33m[2mâœ“[22m[39m T04 hard kill between durable STARTED and receipt: restart refuses replay[2m > [22mkills a real composed host child post-commit and never re-dispatches [33m 833[2mms[22m[39m
+[90mstdout[2m | test/windows-host-e2e.test.ts[2m > [22m[2mT04 Windows host minimal E2E closed loop[2m > [22m[2maccepts a legitimate 8.3 short-path spelling of the same approved scope
+[22m[39mE2E_SHORT_PATH_ALIAS_LEN=48
+
+[90mstdout[2m | test/windows-host-e2e.test.ts[2m > [22m[2mT04 Windows host minimal E2E closed loop[2m > [22m[2maccepts a legitimate 8.3 short-path spelling of the same approved scope
+[22m[39mE2E_SHORT_PATH_ACCEPTED=PASS
+
+[90mstdout[2m | test/windows-host-e2e.test.ts[2m > [22m[2mT04 Windows host minimal E2E closed loop[2m > [22m[2mrefuses a subst drive-letter alias as scope root by final-path provenance
+[22m[39mE2E_SUBST_DRIVE=V:
+
+[90mstdout[2m | test/windows-host-e2e.test.ts[2m > [22m[2mT04 Windows host minimal E2E closed loop[2m > [22m[2mrefuses a subst drive-letter alias as scope root by final-path provenance
+[22m[39mE2E_SUBST_REFUSED=PASS
+
+ [32mâœ“[39m test/scoped-file-search.test.ts [2m([22m[2m15 tests[22m[2m | [22m[33m1 skipped[39m[2m)[22m[33m 1822[2mms[22m[39m
+   [33m[2mâœ“[22m[39m T04 Windows handle-anchored physical canaries (real win32 host)[2m > [22msurvives a real concurrent rename attacker without ever returning outside-scope paths [33m 1554[2mms[22m[39m
+[90mstdout[2m | test/windows-host-e2e.test.ts[2m > [22m[2mT04 Windows host minimal E2E closed loop[2m > [22m[2mfails closed in a fresh process when the native addon is missing, then recovers
+[22m[39mE2E_MISSING_ADDON_FAIL_CLOSED=PASS
+
+[90mstdout[2m | test/windows-host-e2e.test.ts[2m > [22m[2mT04 Windows host minimal E2E closed loop[2m > [22m[2mrefuses a real SMB mapped drive scope when one is provided
+[22m[39mE2E_SMB_MAPPED_DRIVE_NEGATIVE=SKIPPED_NO_SMB_DRIVE_PROVIDED
+
+ [32mâœ“[39m test/windows-host-e2e.test.ts [2m([22m[2m7 tests[22m[2m)[22m[33m 1874[2mms[22m[39m
+   [33m[2mâœ“[22m[39m T04 Windows host minimal E2E closed loop[2m > [22maccepts a legitimate 8.3 short-path spelling of the same approved scope [33m 693[2mms[22m[39m
+   [33m[2mâœ“[22m[39m T04 Windows host minimal E2E closed loop[2m > [22mfails closed in a fresh process when the native addon is missing, then recovers [33m 696[2mms[22m[39m
+
+[2m Test Files [22m [1m[32m9 passed[39m[22m[90m (9)[39m
+[2m      Tests [22m [1m[32m51 passed[39m[22m[2m | [22m[33m1 skipped[39m[90m (52)[39m
+[2m   Start at [22m 13:42:26
+[2m   Duration [22m 3.60s[2m (transform 1.19s, setup 0ms, collect 6.14s, tests 7.21s, environment 3ms, prepare 1.98s)[22m
+
+PACKAGE_VITEST_EXIT=0

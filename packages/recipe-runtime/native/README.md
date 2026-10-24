@@ -8,7 +8,7 @@ Two **separately compiled** addons on disjoint declarations:
 
 | crate | artifact | surface | consumer |
 |---|---|---|---|
-| `impl/` (`shun-win32-impl`) | `impl/shun_win32_impl.node` | ntdll `NtOpenFile` / `NtQueryDirectoryFile` / `NtClose`, kernel32 `GetFileInformationByHandle` / `GetFinalPathNameByHandleW` | `src/scoped-file-search.ts` (production, behind the SQLite grant gate) |
+| `impl/` (`shun-win32-impl`) | `impl/shun_win32_impl.node` | ntdll `NtOpenFile` / `NtQueryDirectoryFile` / `NtReadFile` / `NtClose`, kernel32 `GetFileInformationByHandle` / `GetFinalPathNameByHandleW` / `QueryDosDeviceW` / `GetDriveTypeW` | `src/scoped-file-search.ts` (native walker) and `src/r0-independent-poststate-oracle.ts` (independent post-state oracle; raw adapter only — parsing, traversal, matching, fingerprinting and refusal logic are per-consumer) |
 | `canary/` (`shun-win32-canary`) | `canary/shun_win32_canary.node` | kernel32 `CreateFileW` flag semantics, `CloseHandle`, `GetFileInformationByHandle`, `GetFinalPathNameByHandleW` | `test/scoped-file-search.test.ts` only (physical canaries) |
 
 The canary addon is the physical canaries' **independent instrument**: it is

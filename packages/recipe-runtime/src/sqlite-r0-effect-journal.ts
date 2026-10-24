@@ -10,6 +10,26 @@ import { ShunStore } from '@shun/store';
 type TerminalObservation = 'OBSERVED_NOT_SEMANTICALLY_VERIFIED' | 'UNCERTAIN';
 type JournalState = 'STARTED' | TerminalObservation;
 
+/**
+ * The immutable expected-state commitment recorded BEFORE any positive
+ * receipt exists: the effect-time pre-state fingerprint (expected), the
+ * canonical observation digest, and the post-state fingerprint, all bound to
+ * the exact task/action/intent of the durable STARTED reservation (R2 P1-02).
+ */
+export type R0EffectPhaseCommitment = Readonly<{
+  expectedStateSha256: string;
+  observationSha256: string;
+  postStateSha256: string;
+}>;
+
+export type EffectPhaseRecordResult =
+  | { ok: true; phaseReceiptSha256: string }
+  | { ok: false; code: 'JOURNAL_REFUSED' | 'RECONCILE_REQUIRED' | 'PHASE_DIVERGED' };
+
+export type EffectPhaseLookupResult =
+  | { ok: true; commitment: R0EffectPhaseCommitment; phaseReceiptSha256: string }
+  | { ok: false; code: 'NOT_FOUND' | 'JOURNAL_REFUSED' };
+
 export type ReservationDecision =
   | { ok: true; state: 'DURABLY_RESERVED'; semanticVerified: false }
   | { ok: false; code: 'RECONCILE_REQUIRED' | 'JOURNAL_REFUSED' };
@@ -38,6 +58,27 @@ function intentOf(raw: unknown): { action: AuthorizedAction; digest: string } | 
 
 function validReceiptHash(hash: unknown): hash is string {
   return typeof hash === 'string' && /^[a-f0-9]{64}$/.test(hash);
+}
+
+function phaseDigestOf(
+  taskId: string,
+  actionId: string,
+  intentHash: string,
+  commitment: R0EffectPhaseCommitment,
+): string {
+  return createHash('sha256')
+    .update(
+      canonicalJson({
+        table: 'recipe_r0_effect_phase_v02',
+        taskId,
+        actionId,
+        intentHash,
+        expectedStateSha256: commitment.expectedStateSha256,
+        observationSha256: commitment.observationSha256,
+        postStateSha256: commitment.postStateSha256,
+      }),
+    )
+    .digest('hex');
 }
 
 /**
@@ -84,6 +125,19 @@ export class SqliteR0EffectJournal {
           PRIMARY KEY (task_id, action_id)
         )
       `);
+      store.database.exec(`
+        CREATE TABLE IF NOT EXISTS recipe_r0_effect_phase_v02 (
+          task_id TEXT NOT NULL,
+          action_id TEXT NOT NULL,
+          intent_hash TEXT NOT NULL,
+          expected_state_sha256 TEXT NOT NULL,
+          observation_sha256 TEXT NOT NULL,
+          post_state_sha256 TEXT NOT NULL,
+          phase_sha256 TEXT NOT NULL,
+          created_at TEXT NOT NULL,
+          PRIMARY KEY (task_id, action_id)
+        )
+      `);
     } catch {
       throw new Error('R0_JOURNAL_CONFIGURATION_REFUSED');
     }
@@ -119,6 +173,142 @@ export class SqliteR0EffectJournal {
       return { ok: true, state: 'DURABLY_RESERVED', semanticVerified: false };
     } catch {
       this.rollbackQuietly();
+      return { ok: false, code: 'JOURNAL_REFUSED' };
+    }
+  }
+
+  /**
+   * Persists the immutable effect-phase commitment (expected state,
+   * observation digest, post state) for one reserved attempt, bound to the
+   * exact task/action/intent of the durable STARTED row. A positive effect
+   * receipt may cite this phase receipt only after the write is durably
+   * committed and re-read back. The row is written once: an identical
+   * re-record is idempotent, any divergence is refused (R2 P1-02).
+   */
+  recordEffectPhase(raw: unknown, commitment: R0EffectPhaseCommitment): EffectPhaseRecordResult {
+    const intent = intentOf(raw);
+    if (
+      !intent ||
+      !validReceiptHash(commitment?.expectedStateSha256) ||
+      !validReceiptHash(commitment?.observationSha256) ||
+      !validReceiptHash(commitment?.postStateSha256)
+    )
+      return { ok: false, code: 'JOURNAL_REFUSED' };
+    const { action, digest } = intent;
+    const db = this.store.database;
+    try {
+      if (!this.hasDurableMode() || this.readBackingFile() !== this.backingFile)
+        return { ok: false, code: 'JOURNAL_REFUSED' };
+      db.exec('BEGIN IMMEDIATE');
+      const reservation = db
+        .prepare(
+          'SELECT intent_hash FROM recipe_r0_effect_journal_v02 WHERE task_id=? AND action_id=?',
+        )
+        .get(action.taskId, action.actionId) as { intent_hash: string } | undefined;
+      // A phase receipt exists only for a durably reserved attempt identity.
+      if (!reservation || reservation.intent_hash !== digest) {
+        db.exec('ROLLBACK');
+        return { ok: false, code: 'JOURNAL_REFUSED' };
+      }
+      const phaseSha256 = phaseDigestOf(action.taskId, action.actionId, digest, commitment);
+      const existing = db
+        .prepare(
+          'SELECT intent_hash, expected_state_sha256, observation_sha256, post_state_sha256, phase_sha256 FROM recipe_r0_effect_phase_v02 WHERE task_id=? AND action_id=?',
+        )
+        .get(action.taskId, action.actionId) as
+        | {
+            intent_hash: string;
+            expected_state_sha256: string;
+            observation_sha256: string;
+            post_state_sha256: string;
+            phase_sha256: string;
+          }
+        | undefined;
+      if (existing) {
+        db.exec('ROLLBACK');
+        const identical =
+          existing.intent_hash === digest &&
+          existing.expected_state_sha256 === commitment.expectedStateSha256 &&
+          existing.observation_sha256 === commitment.observationSha256 &&
+          existing.post_state_sha256 === commitment.postStateSha256 &&
+          existing.phase_sha256 === phaseSha256;
+        return identical
+          ? { ok: true, phaseReceiptSha256: existing.phase_sha256 }
+          : { ok: false, code: 'PHASE_DIVERGED' };
+      }
+      db.prepare(
+        'INSERT INTO recipe_r0_effect_phase_v02 (task_id, action_id, intent_hash, expected_state_sha256, observation_sha256, post_state_sha256, phase_sha256, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
+      ).run(
+        action.taskId,
+        action.actionId,
+        digest,
+        commitment.expectedStateSha256,
+        commitment.observationSha256,
+        commitment.postStateSha256,
+        phaseSha256,
+        new Date().toISOString(),
+      );
+      db.exec('COMMIT');
+      return { ok: true, phaseReceiptSha256: phaseSha256 };
+    } catch {
+      this.rollbackQuietly();
+      return { ok: false, code: 'JOURNAL_REFUSED' };
+    }
+  }
+
+  /**
+   * Readback-only verification of the phase receipt: the stored row must
+   * carry the caller's intent hash and an internally consistent phase
+   * digest, so a corrupt or forged phase row can never back a positive
+   * receipt.
+   */
+  lookupEffectPhase(raw: unknown): EffectPhaseLookupResult {
+    const intent = intentOf(raw);
+    if (!intent) return { ok: false, code: 'JOURNAL_REFUSED' };
+    try {
+      const row = this.store.database
+        .prepare(
+          'SELECT intent_hash, expected_state_sha256, observation_sha256, post_state_sha256, phase_sha256 FROM recipe_r0_effect_phase_v02 WHERE task_id=? AND action_id=?',
+        )
+        .get(intent.action.taskId, intent.action.actionId) as
+        | {
+            intent_hash: string;
+            expected_state_sha256: string;
+            observation_sha256: string;
+            post_state_sha256: string;
+            phase_sha256: string;
+          }
+        | undefined;
+      if (!row) return { ok: false, code: 'NOT_FOUND' };
+      if (
+        row.intent_hash !== intent.digest ||
+        !validReceiptHash(row.expected_state_sha256) ||
+        !validReceiptHash(row.observation_sha256) ||
+        !validReceiptHash(row.post_state_sha256) ||
+        !validReceiptHash(row.phase_sha256)
+      )
+        return { ok: false, code: 'JOURNAL_REFUSED' };
+      const recomputed = phaseDigestOf(
+        intent.action.taskId,
+        intent.action.actionId,
+        intent.digest,
+        {
+          expectedStateSha256: row.expected_state_sha256,
+          observationSha256: row.observation_sha256,
+          postStateSha256: row.post_state_sha256,
+        },
+      );
+      if (recomputed !== row.phase_sha256) return { ok: false, code: 'JOURNAL_REFUSED' };
+      return {
+        ok: true,
+        commitment: {
+          expectedStateSha256: row.expected_state_sha256,
+          observationSha256: row.observation_sha256,
+          postStateSha256: row.post_state_sha256,
+        },
+        phaseReceiptSha256: row.phase_sha256,
+      };
+    } catch {
       return { ok: false, code: 'JOURNAL_REFUSED' };
     }
   }
