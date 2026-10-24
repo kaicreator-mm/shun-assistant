@@ -18,6 +18,7 @@ import { describe, expect, it } from 'vitest';
 import { captureOracleWalk, oracleWalksEqual } from '../src/r0-independent-poststate-oracle.ts';
 import { SqliteR0EffectJournal } from '../src/sqlite-r0-effect-journal.ts';
 import { type HostFixture, makeHostFixture } from './helpers/win-e2e-fixture.ts';
+import { physicalHostSuiteActive } from './helpers/win-token.ts';
 
 const here = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 
@@ -70,7 +71,7 @@ function isProvenForcedDeath(evidence: DeathEvidence): boolean {
   return process.platform === 'win32' && evidence.signal === null && evidence.code === 1;
 }
 
-describe.skipIf(process.platform !== 'win32')(
+describe.skipIf(process.platform !== 'win32' || !physicalHostSuiteActive())(
   'T04 hard kill between durable STARTED and receipt: restart refuses replay',
   () => {
     it('kills a real composed host child post-commit and never re-dispatches', async () => {

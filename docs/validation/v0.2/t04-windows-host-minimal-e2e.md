@@ -123,6 +123,13 @@ re-dispatch/fingerprint-unchanged assertions are preserved.
 
 Package suite at this SHA: **11 test files, 64 passed, 1 skipped (the env-gated SMB canary),
 0 failed**; full-workspace `task-check.sh` exit 0 (see the raw log header for exact codes).
+The physical host-evidence suites (the closed-loop E2E and the hard-kill replay) are
+**operator-gated**: `test/helpers/win-token.ts` skips them with an explicit
+`E2E_PHYSICAL_SUITE=SKIPPED_ELEVATED_TOKEN` marker wherever the session token is elevated
+(High integrity) — CI runner images may present one, and per the CI lane's own contract
+(`.github/workflows/executor-windows.yml`) CI is source/ABI regression only, never standard-user
+host integration. All unit-level falsifiers (oracle confinement, phase binding, journal
+immutability, pack contents) run everywhere.
 
 ## Real SMB mapped drive negative — NOT_RUN (unchanged, honest)
 

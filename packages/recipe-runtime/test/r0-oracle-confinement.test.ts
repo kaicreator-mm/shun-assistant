@@ -302,9 +302,23 @@ describe.skipIf(process.platform !== 'win32')('T04 oracle confinement falsifiers
 
     // After the swapper settles the real tree verifies cleanly again (the
     // recreated inner directory legitimately carries a new file identity).
+    // A child killed at the iteration cap dies mid-toggle (SIGKILL runs no
+    // cleanup), so BOTH toggled positions must be restored explicitly.
     if (existsSync(anchor)) {
       if (lstatSync(anchor).isSymbolicLink()) rmSync(anchor);
       else renameSync(anchor, holder);
+    }
+    const innerPath = join(holder, 'scope', 'inner');
+    if (!existsSync(innerPath) || lstatSync(innerPath).isSymbolicLink()) {
+      rmSync(innerPath, { force: true });
+      mkdirSync(innerPath, { recursive: true });
+      writeFileSync(join(innerPath, 'b.txt'), 'real-bravo');
+    }
+    if (!existsSync(join(holder, 'scope', 'a.txt'))) {
+      mkdirSync(join(holder, 'scope', 'inner'), { recursive: true });
+      writeFileSync(join(holder, 'scope', 'a.txt'), 'real-alpha');
+      writeFileSync(join(holder, 'scope', 'skip.log'), 'real-log');
+      writeFileSync(join(holder, 'scope', 'inner', 'b.txt'), 'real-bravo');
     }
     const settled = captureOracleWalk(join(holder, 'scope'), '*.txt');
     expect(settled.ok).toBe(true);
