@@ -25,8 +25,10 @@ import { describe, expect, it } from 'vitest';
 import {
   attestsFixedLocalVolume,
   type HostObservationInstrument,
+  observeAuthorizedFileDuplicates,
   observeVerifiedFileDuplicates,
 } from '../src/host-observation.ts';
+import * as publicApi from '../src/index.ts';
 
 const SYSTEM32 = join(process.env.SystemRoot ?? 'C:\\Windows', 'System32');
 
@@ -156,6 +158,147 @@ describe.skipIf(process.platform === 'win32')(
     });
   },
 );
+
+// ---------------------------------------------------------------------------
+// R1 authorization mediation (review P1-01/P2-01): the public surface must
+// expose NO unmediated scan and NO caller execution hooks. Zero IO, all
+// platforms.
+// ---------------------------------------------------------------------------
+
+function authorizedAction(
+  scopeRoot: string,
+  mutate?: (draft: Record<string, unknown>) => void,
+): Record<string, unknown> {
+  const action: Record<string, unknown> = {
+    taskId: 'task-f02b-r1',
+    actionId: 'act-f02b-r1',
+    planHash: 'ab'.repeat(32),
+    policySnapshotRevision: 'policy-1',
+    authorizationKind: 'AUTOMATIC',
+    authorizationRef: 'grant-f02b-r1',
+    expiresAt: new Date(Date.now() + 5 * 60_000).toISOString(),
+    action: {
+      actionId: 'act-f02b-r1',
+      bindingRef: 'binding-f02b-r1',
+      op: 'files.duplicates.observe',
+      parameters: { scopeRoot },
+      sideEffectClass: 'R0',
+      requiredPrivilege: 'USER',
+      filesystemScope: { read: [scopeRoot], write: [] },
+    },
+  };
+  mutate?.(action);
+  return action;
+}
+
+describe('T07 F02B R1 public surface exposes no unmediated scan', () => {
+  it('re-exports only the authorized entry, never the {scopeRoot} seam or its hook types', () => {
+    expect(Object.hasOwn(publicApi, 'observeAuthorizedFileDuplicates')).toBe(true);
+    expect(typeof publicApi.observeAuthorizedFileDuplicates).toBe('function');
+    expect(Object.hasOwn(publicApi, 'observeVerifiedFileDuplicates')).toBe(false);
+  });
+});
+
+describe('T07 F02B R1 authorized entry refuses unmediated or mismatched actions', () => {
+  const refused = (input: unknown) =>
+    expect(observeAuthorizedFileDuplicates(input)).toEqual({
+      ok: false,
+      code: 'HOST_OBSERVE_AUTHORIZATION_REFUSED',
+    });
+
+  it('refuses non-plain shapes, proxies, extra/missing keys before any IO', () => {
+    refused(null);
+    refused(undefined);
+    refused('C:\\scope');
+    refused(42);
+    refused([]);
+    refused(new Proxy(authorizedAction('C:\\scope'), {}));
+    const missingExpiry = authorizedAction('C:\\scope');
+    delete missingExpiry.expiresAt;
+    refused(missingExpiry);
+    const extraKey = authorizedAction('C:\\scope');
+    extraKey.extra = 1;
+    refused(extraKey);
+    const emptyIdentity = authorizedAction('C:\\scope');
+    emptyIdentity.taskId = '';
+    refused(emptyIdentity);
+    const badHash = authorizedAction('C:\\scope');
+    badHash.planHash = 'not-a-sha256';
+    refused(badHash);
+    const badKind = authorizedAction('C:\\scope');
+    badKind.authorizationKind = 'SUPERUSER';
+    refused(badKind);
+  });
+
+  it('refuses an elapsed or malformed bounded expiry (currentness gate)', () => {
+    const elapsed = authorizedAction('C:\\scope');
+    elapsed.expiresAt = new Date(Date.now() - 60_000).toISOString();
+    refused(elapsed);
+    const malformed = authorizedAction('C:\\scope');
+    malformed.expiresAt = 'tomorrow';
+    refused(malformed);
+  });
+
+  it('refuses a foreign op, risk class, privilege or mismatched action identity', () => {
+    const foreignOp = authorizedAction('C:\\scope');
+    (foreignOp.action as Record<string, unknown>).op = 'file.search';
+    refused(foreignOp);
+    const r1 = authorizedAction('C:\\scope');
+    (r1.action as Record<string, unknown>).sideEffectClass = 'R1';
+    refused(r1);
+    const elevated = authorizedAction('C:\\scope');
+    (elevated.action as Record<string, unknown>).requiredPrivilege = 'ELEVATED';
+    refused(elevated);
+    const swappedId = authorizedAction('C:\\scope');
+    (swappedId.action as Record<string, unknown>).actionId = 'act-other';
+    refused(swappedId);
+  });
+
+  it('refuses any write, network, registry or secret scope on the action', () => {
+    const write = authorizedAction('C:\\scope');
+    ((write.action as Record<string, unknown>).filesystemScope as Record<string, unknown>).write = [
+      'C:\\elsewhere',
+    ];
+    refused(write);
+    const network = authorizedAction('C:\\scope');
+    (network.action as Record<string, unknown>).networkScope = { allowed: false };
+    refused(network);
+    const registry = authorizedAction('C:\\scope');
+    (registry.action as Record<string, unknown>).registryScope = { write: [] };
+    refused(registry);
+    const secrets = authorizedAction('C:\\scope');
+    (secrets.action as Record<string, unknown>).secretRefs = ['secret:1'];
+    refused(secrets);
+    const timeout = authorizedAction('C:\\scope');
+    (timeout.action as Record<string, unknown>).timeoutMs = 1000;
+    refused(timeout);
+  });
+
+  it('refuses when the granted read scope is not exactly the observed root', () => {
+    const mismatch = authorizedAction('C:\\granted\\scope');
+    ((mismatch.action as Record<string, unknown>).parameters as Record<string, unknown>).scopeRoot =
+      'C:\\other\\scope';
+    refused(mismatch);
+    const widened = authorizedAction('C:\\scope');
+    ((widened.action as Record<string, unknown>).filesystemScope as Record<string, unknown>).read =
+      ['C:\\scope', 'C:\\other'];
+    refused(widened);
+    const narrowed = authorizedAction('C:\\scope');
+    ((narrowed.action as Record<string, unknown>).parameters as Record<string, unknown>).extra = 1;
+    refused(narrowed);
+    const missingScope = authorizedAction('C:\\scope');
+    delete (missingScope.action as Record<string, unknown>).filesystemScope;
+    refused(missingScope);
+  });
+
+  it('refuses a statically inadmissible root even through a well-formed action', () => {
+    const unc = authorizedAction('\\\\server\\share');
+    expect(observeAuthorizedFileDuplicates(unc)).toEqual({
+      ok: false,
+      code: 'HOST_OBSERVE_SCOPE_REFUSED',
+    });
+  });
+});
 
 // ---------------------------------------------------------------------------
 // Physical Windows host observation (Standard User, no elevation).
@@ -480,6 +623,95 @@ describe.skipIf(process.platform !== 'win32')('T07 F02B physical host observatio
         code: 'HOST_OBSERVE_BOUNDS_EXCEEDED',
       });
       console.log('F02B_ENTRY_BOUND_REFUSED=PASS');
+    } finally {
+      scope.dispose();
+    }
+  }, 120_000);
+
+  // -------------------------------------------------------------------------
+  // R1 regressions: authorization mediation on the physical path.
+  // -------------------------------------------------------------------------
+
+  it('observes real duplicates through the authorized entry and ignores injected hooks', () => {
+    const scope = makeScope('shun-f02b-r1-auth', {
+      'a.txt': 'AAAA',
+      'c.txt': 'AAAA',
+      'd.txt': 'BBBB',
+      'sub\\b.txt': 'AAAA',
+    });
+    try {
+      const hookCalls = { stage: 0, fileOpen: 0, pass: 0 };
+      const hooks = {
+        onStage: () => {
+          hookCalls.stage++;
+        },
+        onFileOpen: () => {
+          hookCalls.fileOpen++;
+        },
+        onPassCompleted: () => {
+          hookCalls.pass++;
+        },
+      };
+      // The authorized entry accepts exactly one argument; a caller smuggling
+      // an instrument as a second argument must have zero influence (P2-01).
+      const smuggleInstrument = observeAuthorizedFileDuplicates as (
+        action: unknown,
+        injected: unknown,
+      ) => ReturnType<typeof observeAuthorizedFileDuplicates>;
+      const result = smuggleInstrument(authorizedAction(scope.dir), hooks);
+      expect(result.ok).toBe(true);
+      if (!result.ok) return;
+      const o = result.observation;
+      expect(o.observedFiles).toBe(4);
+      expect(o.verifiedDuplicateGroups).toEqual([
+        {
+          sizeBytes: 4,
+          contentDigestSha256: sha256('AAAA'),
+          relativePaths: ['a.txt', 'c.txt', 'sub\\b.txt'],
+        },
+      ]);
+      expect(hookCalls).toEqual({ stage: 0, fileOpen: 0, pass: 0 });
+      console.log('F02B_R1_AUTHORIZED_PHYSICAL_POSITIVE=PASS HOOKS_IGNORED=PASS');
+    } finally {
+      scope.dispose();
+    }
+  }, 60_000);
+
+  it('refuses a huge directory during enumeration accumulation, before any file is opened', () => {
+    const scope = makeScope('shun-f02b-r1-acc', {});
+    try {
+      // 5000 entries in ONE directory: the pre-accumulation bound must refuse
+      // while the stream is still being read — the file-open hook may never
+      // fire (the pre-fix code opened and hashed 4096 files first).
+      for (let i = 0; i < 5000; i++) {
+        writeFileSync(join(scope.dir, `e${String(i).padStart(4, '0')}.dat`), '');
+      }
+      const log: OpenLog = { dirs: [], files: [], stages: [] };
+      const startedAt = Date.now();
+      const result = observeVerifiedFileDuplicates({ scopeRoot: scope.dir }, instrument(log));
+      const elapsedMs = Date.now() - startedAt;
+      expect(result).toEqual({ ok: false, code: 'HOST_OBSERVE_BOUNDS_EXCEEDED' });
+      expect(log.files).toEqual([]);
+      expect(elapsedMs).toBeLessThan(30_000);
+      console.log(
+        `F02B_R1_ACCUMULATION_BOUND_BEFORE_ACCUMULATION=PASS FILES_OPENED=0 ELAPSED_MS=${elapsedMs}`,
+      );
+    } finally {
+      scope.dispose();
+    }
+  }, 120_000);
+
+  it('refuses the 4096-entry inventory bound through the authorized entry too', () => {
+    const scope = makeScope('shun-f02b-r1-entries', {});
+    try {
+      for (let i = 0; i < 4097; i++) {
+        writeFileSync(join(scope.dir, `e${String(i).padStart(4, '0')}.dat`), '');
+      }
+      expect(observeAuthorizedFileDuplicates(authorizedAction(scope.dir))).toEqual({
+        ok: false,
+        code: 'HOST_OBSERVE_BOUNDS_EXCEEDED',
+      });
+      console.log('F02B_R1_AUTHORIZED_ENTRY_BOUND_REFUSED=PASS');
     } finally {
       scope.dispose();
     }

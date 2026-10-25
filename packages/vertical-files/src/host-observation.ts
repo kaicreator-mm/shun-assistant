@@ -26,6 +26,23 @@
 // This module performs NO writes, grants no authority, accepts no callbacks
 // with capability, and refuses incomplete walks rather than returning an
 // apparently complete partial result.
+//
+// R1 authorization boundary (PR #182 review P1-01/P2-01): a handle anchor is
+// path integrity, NOT user authorization. The ONLY entry a production caller
+// can reach is `observeAuthorizedFileDuplicates`, which consumes an
+// AuthorizedAction produced by the T04 central ActionController
+// (packages/authorization + @shun/contracts plan.ts AuthorizedActionSchema):
+// the action must name this capability's op, be R0 read-only, carry no
+// write/network/registry/secret scope, bind its single filesystem read scope
+// EXACTLY to the one scopeRoot it observes, and still be inside its bounded
+// expiry when the scan starts. The per-effect currentness/grant-integrity
+// re-validation (ActionController.authorizeEffect) stays with the trusted
+// host bootstrap that wires this bridge, exactly as in T04's
+// executeTrustedWindowsR0Search. The older `{scopeRoot}`-shaped entry below
+// is a package-internal test/audit seam: it is deliberately NOT exported
+// through the package exports map (src/index.ts), so Recipe/model/HTTP code
+// cannot initiate an unmediated scan, and it accepts no caller callbacks on
+// the authorized path.
 import { createHash } from 'node:crypto';
 import { createRequire } from 'node:module';
 import { types } from 'node:util';
@@ -74,6 +91,7 @@ export type HostDuplicateObservation = Readonly<{
 }>;
 
 export type HostObservationRefusalCode =
+  | 'HOST_OBSERVE_AUTHORIZATION_REFUSED'
   | 'HOST_OBSERVE_SCOPE_REFUSED'
   | 'HOST_OBSERVE_NATIVE_UNAVAILABLE'
   | 'HOST_OBSERVE_DRIVE_REFUSED'
@@ -86,9 +104,14 @@ export type HostObservationResult =
   | { ok: false; code: HostObservationRefusalCode };
 
 /**
- * Test/audit-only synchronous observation of what the bridge actually opened.
- * The negative controls use it to prove zero IO beyond the admitted prefix.
- * Production callers never pass it; it carries no capability.
+ * PACKAGE-INTERNAL test/audit-only seam (R1 P2-01 resolution): synchronous
+ * observation of what the bridge actually opened, used by the negative
+ * controls to prove zero IO beyond the admitted prefix and to stage
+ * deterministic mutations between passes. It is reachable ONLY inside this
+ * package (tests import the module file directly; src/index.ts does not
+ * re-export it or the seam entry that accepts it), and the authorized public
+ * entry below never accepts or invokes caller callbacks — an untrusted
+ * caller cannot inject execution hooks into a privileged scan.
  */
 export type HostObservationInstrument = Readonly<{
   onStage?: (stage: HostObservationStage, detail: string) => void;
@@ -362,7 +385,7 @@ function anchoredPass(
       // Collect the whole directory stream first, then process it in sorted
       // name order: the traversal (and the content budget with it) becomes
       // deterministic for a given tree.
-      let batch: EnumeratedEntry[] = [];
+      const batch: EnumeratedEntry[] = [];
       let restart = true;
       for (;;) {
         const raw = native.enumerate(frame.handle, restart, ENUM_BUFFER_BYTES);
@@ -379,12 +402,26 @@ function anchoredPass(
           refuse('HOST_OBSERVE_MUTATION_REFUSED');
         const decoded = decodeEnumerateBuffer(raw.data, raw.returned);
         if (decoded.length === 0) refuse('HOST_OBSERVE_MUTATION_REFUSED');
-        batch = batch.concat(decoded);
+        // Bound BEFORE accumulation (R1 P1-02): the inventory budget must
+        // gate the stream while it is being read — `entries` counts entries
+        // already processed in earlier directories of this pass, `batch` the
+        // decoded-but-unprocessed ones here. Refusing here keeps both the
+        // batch memory and the enumeration progress bounded by MAX_ENTRIES
+        // (every round decodes at least one entry), so a hostile huge
+        // directory is refused without ever being fully read, hashed or
+        // buffered; the per-entry check below remains as defense in depth.
+        if (entries + batch.length + decoded.length > MAX_ENTRIES)
+          refuse('HOST_OBSERVE_BOUNDS_EXCEEDED');
+        for (const entry of decoded) batch.push(entry);
       }
       batch.sort((left, right) => (left.name < right.name ? -1 : left.name > right.name ? 1 : 0));
       for (const entry of batch) {
         if (entry.name === '.' || entry.name === '..') continue;
         if (!validComponent(entry.name)) refuse('HOST_OBSERVE_SCOPE_REFUSED');
+        // Defense in depth: the pre-accumulation bound above already keeps
+        // every decoded batch inside the remaining budget, so this per-entry
+        // count can no longer be crossed by a huge directory; it stays as a
+        // hard cap on total inventory across all visited directories.
         if (++entries > MAX_ENTRIES) refuse('HOST_OBSERVE_BOUNDS_EXCEEDED');
         // A reparse entry is refused from enumeration metadata alone: its
         // target is never opened, not even for attributes.
@@ -504,12 +541,14 @@ function plainWithExactKeys(
 }
 
 /**
- * Trusted host bridge: one read-only, twice-verified, handle-anchored
- * observation of a fixed-local scope. The caller supplies only the scope
- * root string — never file lists, never handles, never capability
- * callbacks. Duplicate groups are certified ONLY from content digests read
- * through verified anchored handles in two independent passes with identical
- * fingerprints; same-size files with different content are never grouped.
+ * PACKAGE-INTERNAL test/audit seam (R1 P1-01/P2-01): direct `{scopeRoot}`
+ * observation of a fixed-local scope with deterministic mutation hooks.
+ * It exists so the in-package falsifiers can stage junction escapes,
+ * interpass swaps and mid-scan mutations and prove zero IO beyond the
+ * admitted prefix; src/index.ts does NOT re-export it, so code outside this
+ * package (Recipe/model/HTTP) can never reach an unmediated scan. Production
+ * access is exclusively `observeAuthorizedFileDuplicates` below, which takes
+ * no callbacks and only an AuthorizedAction.
  */
 export function observeVerifiedFileDuplicates(
   request: unknown,
@@ -615,4 +654,131 @@ export function observeVerifiedFileDuplicates(
     // Never disclose scope paths, native errors or partial observations.
     return Object.freeze({ ok: false as const, code: 'HOST_OBSERVE_MUTATION_REFUSED' });
   }
+}
+
+// ---------------------------------------------------------------------------
+// R1 authorization mediation (review P1-01/P2-01). Mirrors how T04's trusted
+// hosts consume the central ActionController's output: an AuthorizedAction
+// whose shape follows @shun/contracts plan.ts AuthorizedActionSchema
+// (re-validated structurally here — this package adds no runtime dependency
+// on @shun/contracts), whose declared op is this capability's, whose only
+// filesystem scope READ is exactly the root it will observe, and whose
+// bounded expiry is still in the future when the scan starts. Grant
+// integrity and per-effect currentness re-validation remain the wiring
+// bootstrap's job (ActionController.authorizeEffect), exactly as for T04's
+// executeTrustedWindowsR0Search.
+// ---------------------------------------------------------------------------
+
+const OBSERVATION_OP = 'files.duplicates.observe';
+const AUTHORIZATION_KINDS = ['AUTOMATIC', 'EXPLICIT_APPROVAL', 'DURABLE_POLICY'] as const;
+const SHA256_HEX = /^[a-f0-9]{64}$/;
+const ISO_INSTANT = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d+)?Z$/;
+
+function nonEmptyString(value: unknown, max: number): value is string {
+  return typeof value === 'string' && value.length > 0 && value.length <= max;
+}
+
+/**
+ * Structural + semantic admission of one AuthorizedAction. Returns the
+ * admitted scopeRoot, or null. Deliberately stricter than the schema on two
+ * points, both fail-closed: `expiresAt` is REQUIRED (an action without a
+ * bounded expiry can never authorize a scan) and must not have elapsed; and
+ * optional PlanAction fields (timeoutMs/cancellation/expectedState) are not
+ * accepted here — an action carrying them is refused rather than guessed at.
+ */
+function admittedObservationAction(value: unknown): string | null {
+  if (
+    !plainWithExactKeys(value, [
+      'taskId',
+      'actionId',
+      'planHash',
+      'policySnapshotRevision',
+      'authorizationKind',
+      'authorizationRef',
+      'expiresAt',
+      'action',
+    ])
+  )
+    return null;
+  const top = value as Record<string, unknown>;
+  if (
+    !nonEmptyString(top.taskId, 128) ||
+    !nonEmptyString(top.actionId, 128) ||
+    !nonEmptyString(top.policySnapshotRevision, 128) ||
+    !nonEmptyString(top.authorizationRef, 128)
+  )
+    return null;
+  if (typeof top.planHash !== 'string' || !SHA256_HEX.test(top.planHash)) return null;
+  if (
+    typeof top.authorizationKind !== 'string' ||
+    !AUTHORIZATION_KINDS.includes(top.authorizationKind as (typeof AUTHORIZATION_KINDS)[number])
+  )
+    return null;
+  if (
+    typeof top.expiresAt !== 'string' ||
+    !ISO_INSTANT.test(top.expiresAt) ||
+    !Number.isFinite(Date.parse(top.expiresAt))
+  )
+    return null;
+  // Currentness bound: the controller's bounded action validity must still
+  // cover the moment the scan starts; an elapsed action authorizes nothing.
+  if (Date.parse(top.expiresAt) <= Date.now()) return null;
+  if (
+    !plainWithExactKeys(top.action, [
+      'actionId',
+      'bindingRef',
+      'op',
+      'parameters',
+      'sideEffectClass',
+      'requiredPrivilege',
+      'filesystemScope',
+    ])
+  )
+    return null;
+  const action = top.action as Record<string, unknown>;
+  // The authorized action identity must be the one the plan bound.
+  if (typeof action.actionId !== 'string' || action.actionId !== top.actionId) return null;
+  if (!nonEmptyString(action.bindingRef, 128)) return null;
+  if (action.op !== OBSERVATION_OP) return null;
+  if (action.sideEffectClass !== 'R0') return null;
+  if (action.requiredPrivilege !== 'USER') return null;
+  if (!plainWithExactKeys(action.parameters, ['scopeRoot'])) return null;
+  const scopeRoot = action.parameters.scopeRoot;
+  if (typeof scopeRoot !== 'string') return null;
+  if (!plainWithExactKeys(action.filesystemScope, ['read', 'write'])) return null;
+  const scope = action.filesystemScope as Record<string, unknown>;
+  if (
+    !Array.isArray(scope.read) ||
+    scope.read.length !== 1 ||
+    typeof scope.read[0] !== 'string' ||
+    !Array.isArray(scope.write) ||
+    scope.write.length !== 0
+  )
+    return null;
+  // The authorization gate itself: the single granted read prefix must be
+  // exactly the root the action wants observed — a grant for any other
+  // scope, however valid, does not reach this scan.
+  if (scope.read[0] !== scopeRoot) return null;
+  return scopeRoot;
+}
+
+/**
+ * The ONLY production entry into the physical duplicate observation: one
+ * read-only, twice-verified, handle-anchored observation of the single
+ * fixed-local scope an ActionController AuthorizedAction names. The caller
+ * supplies no root, no file lists, no handles and NO callbacks — the scope
+ * root comes exclusively from the authorized action's parameters, bound to
+ * its single filesystem read scope, and nothing caller-supplied executes
+ * during the scan. Authorization failures return
+ * HOST_OBSERVE_AUTHORIZATION_REFUSED before any IO; physical refusals keep
+ * their own codes.
+ */
+export function observeAuthorizedFileDuplicates(action: unknown): HostObservationResult {
+  const scopeRoot = admittedObservationAction(action);
+  if (scopeRoot === null) {
+    return Object.freeze({ ok: false as const, code: 'HOST_OBSERVE_AUTHORIZATION_REFUSED' });
+  }
+  // The internal seam is invoked with NO instrument: the authorized path
+  // never runs caller-visible callbacks (R1 P2-01).
+  return observeVerifiedFileDuplicates({ scopeRoot }, {});
 }
