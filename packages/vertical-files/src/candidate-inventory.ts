@@ -52,10 +52,7 @@ function plainWithExactKeys(
   keys: readonly string[],
 ): value is Record<string, unknown> {
   if (value === null || typeof value !== 'object' || Array.isArray(value)) return false;
-  if (
-    Object.getPrototypeOf(value) !== Object.prototype &&
-    Object.getPrototypeOf(value) !== null
-  )
+  if (Object.getPrototypeOf(value) !== Object.prototype && Object.getPrototypeOf(value) !== null)
     return false;
   const descriptors = Object.getOwnPropertyDescriptors(value);
   const names = Reflect.ownKeys(descriptors);
