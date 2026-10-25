@@ -114,8 +114,12 @@ export function reportDuplicateCandidates(value: unknown): DuplicateCandidateRes
       throw new Error('REFUSED');
     const lengthDescriptor = Object.getOwnPropertyDescriptor(rawFiles, 'length');
     const fileCount = lengthDescriptor?.value;
-    if (typeof fileCount !== 'number' || !Number.isSafeInteger(fileCount) ||
-      fileCount > MAX_FILES || fileCount < 0)
+    if (
+      typeof fileCount !== 'number' ||
+      !Number.isSafeInteger(fileCount) ||
+      fileCount > MAX_FILES ||
+      fileCount < 0
+    )
       throw new Error('REFUSED');
     if (Reflect.ownKeys(rawFiles).length !== fileCount + 1) throw new Error('REFUSED');
 
@@ -156,15 +160,17 @@ export function reportDuplicateCandidates(value: unknown): DuplicateCandidateRes
       [...bySize]
         .filter(([, paths]) => paths.length > 1)
         .sort(([a], [b]) => a - b)
-        .map(([sizeBytes, relativePaths]) =>
-          Object.freeze({ sizeBytes, relativePaths: Object.freeze([...relativePaths]) })),
+        .map(
+          ([sizeBytes, relativePaths]) =>
+            Object.freeze({ sizeBytes, relativePaths: Object.freeze([...relativePaths]) }),
+        ),
     );
     if (sameSizeCandidates.length > MAX_GROUPS) throw new Error('REFUSED');
     const inputDigestSha256 = createHash('sha256')
       .update(JSON.stringify({ scopeRoot, files: normalized }))
       .digest('hex');
     return Object.freeze({
-      ok: true,
+      ok: true as const,
       report: Object.freeze({
         schema: 'shun.files.duplicate-candidates.v02',
         status: 'REPORTED_METADATA_ONLY',
@@ -178,7 +184,7 @@ export function reportDuplicateCandidates(value: unknown): DuplicateCandidateRes
         executionAuthorized: false,
         cloudDisclosure: false,
         pendingTrustedChecks: REQUIRED,
-      }),
+      } as const),
     });
   } catch {
     return { ok: false, code: 'FILE_CANDIDATES_REFUSED' };
