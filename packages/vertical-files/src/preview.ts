@@ -34,7 +34,7 @@ export type FilePreview = Readonly<{
   status: 'PREVIEW_ONLY';
   executionAuthorized: false;
   filesystemObserved: false;
-  overwrittenExistingFile: false;
+  destinationOverwriteStatus: 'UNKNOWN_NOT_CHECKED';
   pendingTrustedChecks: readonly [
     'CURRENT_ACTION_CONTROLLER_GRANT',
     'OS_CANONICAL_SCOPE_AND_REPARSE',
@@ -48,20 +48,21 @@ export type FilePreviewResult =
   | { ok: true; preview: FilePreview }
   | { ok: false; code: 'FILE_PREVIEW_REFUSED' };
 
-const PENDING = [
+const PENDING = Object.freeze([
   'CURRENT_ACTION_CONTROLLER_GRANT',
   'OS_CANONICAL_SCOPE_AND_REPARSE',
   'NO_OVERWRITE_AT_EFFECT_TIME',
   'DURABLE_PRE_EFFECT_JOURNAL',
   'INDEPENDENT_POSTSTATE_AND_RECONCILIATION',
-] as const;
+] as const);
 
-const DEVICE = /^(con|prn|aux|nul|com[1-9]|lpt[1-9])(?:\.|$)/i;
-const BAD_SEGMENT = /[<>:"|?*]/;
+const DEVICE = /^(con|prn|aux|nul|com[1-9\u00b9\u00b2\u00b3]|lpt[1-9\u00b9\u00b2\u00b3])(?:\.|$)/i;
+const BAD_SEGMENT = /[<>:"|?*\u202a-\u202e\u2066-\u2069]/u;
 
 function hasControlCharacters(value: string): boolean {
   for (const char of value) {
-    if (char.charCodeAt(0) < 32) return true;
+    const code = char.charCodeAt(0);
+    if (code < 32 || (code >= 127 && code <= 159)) return true;
   }
   return false;
 }
@@ -104,6 +105,7 @@ function queryOk(value: unknown): value is string {
     value.length <= MAX_QUERY &&
     !/[\\/:<>"|]/.test(value) &&
     !hasControlCharacters(value) &&
+    !/[\u202a-\u202e\u2066-\u2069]/u.test(value) &&
     !value.includes('..')
   );
 }
@@ -117,7 +119,7 @@ export function previewScopedFileOperation(value: unknown): FilePreviewResult {
     const op = raw.op as FileOperation;
     const taskId = raw.taskId;
     const root = localWindowsPath(raw.scopeRoot);
-    if (typeof taskId !== 'string' || taskId.length < 1 || taskId.length > 128 || !root)
+    if (typeof taskId !== 'string' || !/^[A-Za-z0-9][A-Za-z0-9_.:-]{0,127}$/.test(taskId) || !root)
       return { ok: false, code: 'FILE_PREVIEW_REFUSED' };
 
     const basics = ['taskId', 'scopeRoot', 'op'];
@@ -166,19 +168,19 @@ export function previewScopedFileOperation(value: unknown): FilePreviewResult {
     // signature, path-to-handle binding, or preview approval.
     const intent = { taskId, op, scopeRoot: root, sourcePath, destinationPath, query };
     const intentSha256 = createHash('sha256').update(JSON.stringify(intent)).digest('hex');
-    return {
-      ok: true,
-      preview: {
-        schema: 'shun.files.preview.v02',
+    return Object.freeze({
+      ok: true as const,
+      preview: Object.freeze({
+        schema: 'shun.files.preview.v02' as const,
         ...intent,
         intentSha256,
-        status: 'PREVIEW_ONLY',
+        status: 'PREVIEW_ONLY' as const,
         executionAuthorized: false,
         filesystemObserved: false,
-        overwrittenExistingFile: false,
+        destinationOverwriteStatus: 'UNKNOWN_NOT_CHECKED' as const,
         pendingTrustedChecks: PENDING,
-      },
-    };
+      }),
+    });
   } catch {
     // Malicious proxy/getter cannot leak paths or force preview success.
     return { ok: false, code: 'FILE_PREVIEW_REFUSED' };
