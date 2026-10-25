@@ -58,8 +58,7 @@ export function describeUntrustedMutationRecovery(
   input: unknown,
 ): MutationRecoveryDispositionResult {
   try {
-    if (!exactPlainRecord(input))
-      return { ok: false, code: 'FILE_RECOVERY_RECORD_REFUSED' };
+    if (!exactPlainRecord(input)) return { ok: false, code: 'FILE_RECOVERY_RECORD_REFUSED' };
     const state = input.journalState;
     let requiredNextStep: MutationRecoveryDisposition['requiredNextStep'];
     switch (state) {
