@@ -242,6 +242,22 @@ importers:
         specifier: ^3.2.4
         version: 3.2.7(@types/node@24.19.2)
 
+  packages/vertical-files:
+    devDependencies:
+      '@biomejs/biome':
+        specifier: ^2.3.8
+        version: 2.5.15
+      '@types/node':
+        specifier: ^24.7.0
+        version: 24.19.2
+      typescript:
+        specifier: ^5.9.3
+        version: 5.9.3
+      vitest:
+        specifier: ^3.2.4
+        version: 3.2.7(@types/node@24.19.2)
+
+
   packages/vertical-image:
     dependencies:
       '@shun/contracts':
