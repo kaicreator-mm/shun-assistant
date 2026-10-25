@@ -93,7 +93,7 @@ function localWindowsPath(raw: unknown): string | null {
 }
 
 function within(child: string, root: string): boolean {
-  const base = root.endsWith('\\') ? root : root + '\\';
+  const base = root.endsWith('\\') ? root : `${root}\\`;
   return child.toLowerCase().startsWith(base.toLowerCase());
 }
 
@@ -114,7 +114,7 @@ export function previewScopedFileOperation(value: unknown): FilePreviewResult {
     if (value === null || typeof value !== 'object' || Array.isArray(value))
       return { ok: false, code: 'FILE_PREVIEW_REFUSED' };
     const raw = value as Record<string, unknown>;
-    const op = raw.op;
+    const op = raw.op as FileOperation;
     const taskId = raw.taskId;
     const root = localWindowsPath(raw.scopeRoot);
     if (typeof taskId !== 'string' || taskId.length < 1 || taskId.length > 128 || !root)
