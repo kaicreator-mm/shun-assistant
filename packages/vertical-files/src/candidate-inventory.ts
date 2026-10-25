@@ -160,9 +160,8 @@ export function reportDuplicateCandidates(value: unknown): DuplicateCandidateRes
       [...bySize]
         .filter(([, paths]) => paths.length > 1)
         .sort(([a], [b]) => a - b)
-        .map(
-          ([sizeBytes, relativePaths]) =>
-            Object.freeze({ sizeBytes, relativePaths: Object.freeze([...relativePaths]) }),
+        .map(([sizeBytes, relativePaths]) =>
+          Object.freeze({ sizeBytes, relativePaths: Object.freeze([...relativePaths]) }),
         ),
     );
     if (sameSizeCandidates.length > MAX_GROUPS) throw new Error('REFUSED');
