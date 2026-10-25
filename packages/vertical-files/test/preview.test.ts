@@ -140,4 +140,64 @@ describe('T07 F01 local-only typed preview, never an executable capability', () 
       }),
     ).toEqual({ ok: false, code: 'FILE_PREVIEW_REFUSED' });
   });
+
+  it('does not suggest that overwrite safety was checked by a lexical preview', () => {
+    const result = previewScopedFileOperation({
+      taskId: 'task-1',
+      scopeRoot: root,
+      op: 'file.copy',
+      sourcePath: 'C:\\Approved\\Jobs\\source.txt',
+      destinationPath: 'C:\\Approved\\Jobs\\dest.txt',
+    });
+    expect(result).toMatchObject({
+      ok: true,
+      preview: {
+        status: 'PREVIEW_ONLY',
+        filesystemObserved: false,
+        executionAuthorized: false,
+        destinationOverwriteStatus: 'UNKNOWN_NOT_CHECKED',
+      },
+    });
+    if (!result.ok) return;
+    expect('overwrittenExistingFile' in result.preview).toBe(false);
+    expect(Object.isFrozen(result)).toBe(true);
+    expect(Object.isFrozen(result.preview)).toBe(true);
+    expect(Object.isFrozen(result.preview.pendingTrustedChecks)).toBe(true);
+    expect(() => {
+      (result.preview as { executionAuthorized: boolean }).executionAuthorized = true;
+    }).toThrow();
+    expect(
+      previewScopedFileOperation({
+        taskId: 'task-1',
+        scopeRoot: root,
+        op: 'file.copy',
+        sourcePath: 'C:\\Approved\\Jobs\\source.txt',
+        destinationPath: 'C:\\Approved\\Jobs\\dest.txt',
+      }),
+    ).toEqual(result);
+  });
+
+  it('rejects task display injection, Unicode device aliases and bidi filename/query', () => {
+    const base = { taskId: 'task-1', scopeRoot: root, op: 'file.search', query: '*.txt' };
+    for (const taskId of ['task\u202Eevil', 'task\nbad', 'task\u007Fbad', 'task bad']) {
+      expect(previewScopedFileOperation({ ...base, taskId })).toEqual({
+        ok: false,
+        code: 'FILE_PREVIEW_REFUSED',
+      });
+    }
+    expect(previewScopedFileOperation({ ...base, query: 'r\u202Etl.txt' })).toMatchObject({
+      ok: false,
+    });
+    for (const badFileName of ['COM¹.txt', 'LPT².txt', 'COM³.log', 'rtl\u202eevil.txt']) {
+      expect(
+        previewScopedFileOperation({
+          taskId: 'task-1',
+          scopeRoot: root,
+          op: 'file.rename',
+          sourcePath: 'C:\\Approved\\Jobs\\source.txt',
+          newName: badFileName,
+        }),
+      ).toEqual({ ok: false, code: 'FILE_PREVIEW_REFUSED' });
+    }
+  });
 });
