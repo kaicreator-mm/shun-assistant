@@ -14,12 +14,17 @@ use napi_derive::napi;
 use windows::core::{PCWSTR, PWSTR};
 use windows::Wdk::Foundation::{NtClose, OBJECT_ATTRIBUTES};
 use windows::Wdk::Storage::FileSystem::{
-    FileIdBothDirectoryInformation, NtOpenFile, NtQueryDirectoryFile, NtReadFile,
+    FileIdBothDirectoryInformation, FILE_INFORMATION_CLASS, NtCreateFile, NtFlushBuffersFile,
+    NtOpenFile, NtQueryDirectoryFile, NtReadFile, NtSetInformationFile, NtWriteFile,
+    NTCREATEFILE_CREATE_DISPOSITION, NTCREATEFILE_CREATE_OPTIONS,
 };
-use windows::Win32::Foundation::{HANDLE, NTSTATUS, UNICODE_STRING, OBJECT_ATTRIBUTE_FLAGS};
+use windows::Win32::Foundation::{
+    HANDLE, NTSTATUS, UNICODE_STRING, OBJECT_ATTRIBUTE_FLAGS,
+};
 use windows::Win32::Storage::FileSystem::{
     GetDriveTypeW, GetFileInformationByHandle, GetFinalPathNameByHandleW, QueryDosDeviceW,
-    BY_HANDLE_FILE_INFORMATION, FILE_READ_DATA, GETFINALPATHNAMEBYHANDLE_FLAGS,
+    BY_HANDLE_FILE_INFORMATION, FILE_ACCESS_RIGHTS, FILE_FLAGS_AND_ATTRIBUTES, FILE_READ_DATA,
+    FILE_SHARE_MODE, GETFINALPATHNAMEBYHANDLE_FLAGS,
 };
 use windows::Win32::System::IO::IO_STATUS_BLOCK;
 
@@ -318,4 +323,241 @@ pub fn read_file(handle: BigInt, length: i64) -> Option<FileRead> {
         returned: iosb.Information as i64,
         data: Buffer::from(data),
     })
+}
+
+// --- T07 F03 anchored mutation ABI (exclusive create, no-replace rename).
+// --- Same surface rules as the readonly half: raw syscalls, every bound,
+// --- status distinction and refusal decision lives in the reviewed
+// --- TypeScript layer. Nothing here follows a reparse target, replaces an
+// --- existing destination, or resolves an ambient path.
+
+const FILE_WRITE_DATA_ACCESS: u32 = 0x00000002;
+const FILE_DELETE_ACCESS: u32 = 0x00010000;
+const FILE_CREATE_DISPOSITION: u32 = 0x00000002;
+// Upper sanity bound per write call; the JS layer chunks to its own smaller
+// reviewed cap.
+const MAX_WRITE_BYTES: i64 = 8 << 20;
+// FileRenameInformation (FILE_INFORMATION_CLASS value 10), built byte-wise
+// below: the windows-rs variable-length struct is not used so the on-wire
+// layout stays explicit and reviewable.
+const FILE_RENAME_INFORMATION_CLASS: i32 = 10;
+
+/// NtCreateFile with disposition FILE_CREATE anchored at a verified parent
+/// directory handle: single name component, so the destination can only come
+/// into existence inside the already-verified directory object. FILE_CREATE
+/// fails when the name already exists — this is the no-overwrite primitive;
+/// there is no supersede/overwrite path anywhere in this addon. Any failure
+/// is null; the JS layer refuses.
+#[napi]
+pub fn create_file_exclusive(parent: BigInt, name: String) -> Option<BigInt> {
+    let mut name_bytes: Vec<u16> = name.encode_utf16().collect();
+    name_bytes.push(0);
+    let unicode = UNICODE_STRING {
+        Length: ((name_bytes.len() - 1) * 2) as u16,
+        MaximumLength: (name_bytes.len() * 2) as u16,
+        Buffer: PWSTR(name_bytes.as_mut_ptr()),
+    };
+    let parent_handle = handle_from_raw(parent)?;
+    let attributes = OBJECT_ATTRIBUTES {
+        Length: std::mem::size_of::<OBJECT_ATTRIBUTES>() as u32,
+        RootDirectory: parent_handle,
+        ObjectName: &unicode,
+        Attributes: OBJECT_ATTRIBUTE_FLAGS(OBJ_CASE_INSENSITIVE),
+        SecurityDescriptor: std::ptr::null(),
+        SecurityQualityOfService: std::ptr::null(),
+    };
+    let mut handle = HANDLE::default();
+    let mut iosb = IO_STATUS_BLOCK::default();
+    let status = unsafe {
+        NtCreateFile(
+            &mut handle,
+            FILE_ACCESS_RIGHTS(FILE_WRITE_DATA_ACCESS | FILE_READ_ATTRIBUTES | SYNCHRONIZE),
+            &attributes,
+            &mut iosb,
+            None,
+            FILE_FLAGS_AND_ATTRIBUTES(0),
+            FILE_SHARE_MODE(FILE_SHARE_ALL),
+            NTCREATEFILE_CREATE_DISPOSITION(FILE_CREATE_DISPOSITION),
+            NTCREATEFILE_CREATE_OPTIONS(FILE_NON_DIRECTORY_FILE | FILE_SYNCHRONOUS_IO_NONALERT),
+            None,
+            0,
+        )
+    };
+    if status.is_ok() {
+        Some(handle_to_raw(handle))
+    } else {
+        None
+    }
+}
+
+/// One NtWriteFile round trip from the current file position (synchronous
+/// non-alert handle). Raw NTSTATUS and IO_STATUS_BLOCK.Information; the JS
+/// layer re-validates the returned count against the submitted length.
+#[napi]
+pub fn write_file(handle: BigInt, data: Buffer) -> Option<FileRead> {
+    if data.len() as i64 > MAX_WRITE_BYTES {
+        return None;
+    }
+    let handle = handle_from_raw(handle)?;
+    let mut iosb = IO_STATUS_BLOCK::default();
+    let status = unsafe {
+        NtWriteFile(
+            handle,
+            None,
+            None,
+            None,
+            &mut iosb,
+            data.as_ptr().cast(),
+            data.len() as u32,
+            None,
+            None,
+        )
+    };
+    Some(FileRead {
+        status: status.0 as u32,
+        returned: iosb.Information as i64,
+        data: Buffer::from(Vec::new()),
+    })
+}
+
+/// One NtReadFile round trip at an EXPLICIT 64-bit byte offset, leaving the
+/// current file position untouched. Used by the independent post-state
+/// re-read of a freshly written destination through a second handle.
+#[napi]
+pub fn read_file_at(handle: BigInt, offset: BigInt, length: i64) -> Option<FileRead> {
+    if length <= 0 || length > MAX_READ_BYTES {
+        return None;
+    }
+    let (_sign, offset_value, lossless) = offset.get_u64();
+    if !lossless {
+        return None;
+    }
+    let handle = handle_from_raw(handle)?;
+    let byte_offset = i64::from_ne_bytes(offset_value.to_ne_bytes());
+    let mut data = vec![0u8; length as usize];
+    let mut iosb = IO_STATUS_BLOCK::default();
+    let status = unsafe {
+        NtReadFile(
+            handle,
+            None,
+            None,
+            None,
+            &mut iosb,
+            data.as_mut_ptr().cast(),
+            length as u32,
+            Some(&byte_offset),
+            None,
+        )
+    };
+    Some(FileRead {
+        status: status.0 as u32,
+        returned: iosb.Information as i64,
+        data: Buffer::from(data),
+    })
+}
+
+/// NtFlushBuffersFile verbatim: true only when the kernel flushed the volume
+/// data for this handle. The JS layer gates any COMMITTED classification on
+/// a successful flush.
+#[napi]
+pub fn flush_file(handle: BigInt) -> bool {
+    let Some(handle) = handle_from_raw(handle) else {
+        return false;
+    };
+    let mut iosb = IO_STATUS_BLOCK::default();
+    let status: NTSTATUS = unsafe { NtFlushBuffersFile(handle, &mut iosb) };
+    status.is_ok()
+}
+
+/// Open one regular FILE anchored at a verified parent with DELETE access,
+/// single name component, FILE_OPEN_REPARSE_POINT (a reparse entry opens the
+/// reparse point itself — refused from attributes in JS) and
+/// FILE_NON_DIRECTORY_FILE. Required for no-replace relocation, which is
+/// issued through this same handle.
+#[napi]
+pub fn open_file_for_delete(parent: BigInt, name: String) -> Option<BigInt> {
+    let mut name_bytes: Vec<u16> = name.encode_utf16().collect();
+    name_bytes.push(0);
+    let unicode = UNICODE_STRING {
+        Length: ((name_bytes.len() - 1) * 2) as u16,
+        MaximumLength: (name_bytes.len() * 2) as u16,
+        Buffer: PWSTR(name_bytes.as_mut_ptr()),
+    };
+    let parent_handle = handle_from_raw(parent)?;
+    let attributes = OBJECT_ATTRIBUTES {
+        Length: std::mem::size_of::<OBJECT_ATTRIBUTES>() as u32,
+        RootDirectory: parent_handle,
+        ObjectName: &unicode,
+        Attributes: OBJECT_ATTRIBUTE_FLAGS(OBJ_CASE_INSENSITIVE),
+        SecurityDescriptor: std::ptr::null(),
+        SecurityQualityOfService: std::ptr::null(),
+    };
+    let mut handle = HANDLE::default();
+    let mut iosb = IO_STATUS_BLOCK::default();
+    let status = unsafe {
+        NtOpenFile(
+            &mut handle,
+            FILE_DELETE_ACCESS | FILE_READ_ATTRIBUTES | SYNCHRONIZE,
+            &attributes,
+            &mut iosb,
+            FILE_SHARE_ALL,
+            FILE_NON_DIRECTORY_FILE | FILE_SYNCHRONOUS_IO_NONALERT | FILE_OPEN_REPARSE_POINT,
+        )
+    };
+    if status.is_ok() {
+        Some(handle_to_raw(handle))
+    } else {
+        None
+    }
+}
+
+/// NtSetInformationFile(FileRenameInformation) with ReplaceIfExists = FALSE
+/// on the source handle: relocate it to `new_name` inside the verified
+/// `new_parent` directory object without ever replacing an existing
+/// destination. True only when the kernel completed the rename. The explicit
+/// byte layout below is FILE_RENAME_INFORMATION on x64:
+///   [0..4)   union { BOOLEAN ReplaceIfExists; ULONG Flags } = 0 (no replace)
+///   [8..16)  HANDLE RootDirectory = destination parent
+///   [16..20) ULONG FileNameLength in BYTES
+///   [20..)   WCHAR FileName[] (no terminator)
+#[napi]
+pub fn rename_no_replace(handle: BigInt, new_parent: BigInt, new_name: String) -> bool {
+    let Some(handle) = handle_from_raw(handle) else {
+        return false;
+    };
+    let Some(new_parent) = handle_from_raw(new_parent) else {
+        return false;
+    };
+    let name_units: Vec<u16> = new_name.encode_utf16().collect();
+    if name_units.is_empty() || name_units.len() > 255 {
+        return false;
+    }
+    let mut info = vec![0u8; 20 + name_units.len() * 2];
+    info[8..16].copy_from_slice(&(new_parent.0 as usize as u64).to_le_bytes());
+    info[16..20].copy_from_slice(&((name_units.len() * 2) as u32).to_le_bytes());
+    for (index, unit) in name_units.iter().enumerate() {
+        info[20 + index * 2..22 + index * 2].copy_from_slice(&unit.to_le_bytes());
+    }
+    let mut iosb = IO_STATUS_BLOCK::default();
+    let status = unsafe {
+        NtSetInformationFile(
+            handle,
+            &mut iosb,
+            info.as_mut_ptr().cast(),
+            info.len() as u32,
+            FILE_INFORMATION_CLASS(FILE_RENAME_INFORMATION_CLASS),
+        )
+    };
+    status.is_ok()
+}
+
+/// dwVolumeSerialNumber of an open handle (GetFileInformationByHandle). The
+/// JS relocation layer compares the source file's volume with the verified
+/// destination parent's volume and refuses any cross-volume move.
+#[napi]
+pub fn volume_serial(handle: BigInt) -> Option<u32> {
+    let mut info = BY_HANDLE_FILE_INFORMATION::default();
+    let handle = handle_from_raw(handle)?;
+    unsafe { GetFileInformationByHandle(handle, &mut info) }.ok()?;
+    Some(info.dwVolumeSerialNumber)
 }
