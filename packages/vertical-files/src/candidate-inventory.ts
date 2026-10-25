@@ -1,6 +1,7 @@
 // T07 F02A: pure candidate grouping of REPORTED metadata, not OS observation.
 // Same size is NOT proof of identical file content. No fs, native, shell or grants.
 import { createHash } from 'node:crypto';
+import { types } from 'node:util';
 
 const MAX_FILES = 4096;
 const MAX_GROUPS = 128;
@@ -40,18 +41,19 @@ export type DuplicateCandidateResult =
   | { ok: true; report: ReportedDuplicateCandidates }
   | { ok: false; code: 'FILE_CANDIDATES_REFUSED' };
 
-const REQUIRED = [
+const REQUIRED = Object.freeze([
   'WINDOWS_HANDLE_ANCHORED_INVENTORY',
   'NO_REPARSE_OR_NETWORK_FOLLOW',
   'CONTENT_DIGEST_FROM_VERIFIED_HANDLES',
   'INDEPENDENT_POSTSTATE_CHECK',
-] as const;
+] as const);
 
 function plainWithExactKeys(
   value: unknown,
   keys: readonly string[],
 ): value is Record<string, unknown> {
-  if (value === null || typeof value !== 'object' || Array.isArray(value)) return false;
+  if (value === null || typeof value !== 'object' || types.isProxy(value) || Array.isArray(value))
+    return false;
   if (Object.getPrototypeOf(value) !== Object.prototype && Object.getPrototypeOf(value) !== null)
     return false;
   const descriptors = Object.getOwnPropertyDescriptors(value);
@@ -105,12 +107,24 @@ export function reportDuplicateCandidates(value: unknown): DuplicateCandidateRes
     if (!plainWithExactKeys(value, ['scopeRoot', 'files'])) throw new Error('REFUSED');
     const scopeRoot = localScope(value.scopeRoot);
     const rawFiles = value.files;
-    if (!scopeRoot || !Array.isArray(rawFiles) || rawFiles.length > MAX_FILES)
+    // Reject arbitrary iterators, getters, holes and Proxies. Never use
+    // Array iteration on untrusted metadata: an own Symbol.iterator can yield
+    // infinitely, bypassing length-based admission and exhausting memory.
+    if (!scopeRoot || types.isProxy(rawFiles) || !Array.isArray(rawFiles))
       throw new Error('REFUSED');
+    const lengthDescriptor = Object.getOwnPropertyDescriptor(rawFiles, 'length');
+    const fileCount = lengthDescriptor?.value;
+    if (typeof fileCount !== 'number' || !Number.isSafeInteger(fileCount) ||
+      fileCount > MAX_FILES || fileCount < 0)
+      throw new Error('REFUSED');
+    if (Reflect.ownKeys(rawFiles).length !== fileCount + 1) throw new Error('REFUSED');
 
     const normalized: Array<{ relativePath: string; sizeBytes: number }> = [];
     const seen = new Set<string>();
-    for (const raw of rawFiles) {
+    for (let i = 0; i < fileCount; i++) {
+      const item = Object.getOwnPropertyDescriptor(rawFiles, String(i));
+      if (!item || !Object.hasOwn(item, 'value')) throw new Error('REFUSED');
+      const raw: unknown = item.value;
       if (!plainWithExactKeys(raw, ['relativePath', 'sizeBytes'])) throw new Error('REFUSED');
       const relativePath = relativeFile(raw.relativePath);
       const sizeBytes = raw.sizeBytes;
@@ -138,17 +152,20 @@ export function reportDuplicateCandidates(value: unknown): DuplicateCandidateRes
       paths.push(item.relativePath);
       bySize.set(item.sizeBytes, paths);
     }
-    const sameSizeCandidates = [...bySize]
-      .filter(([, paths]) => paths.length > 1)
-      .sort(([a], [b]) => a - b)
-      .map(([sizeBytes, relativePaths]) => ({ sizeBytes, relativePaths }));
+    const sameSizeCandidates = Object.freeze(
+      [...bySize]
+        .filter(([, paths]) => paths.length > 1)
+        .sort(([a], [b]) => a - b)
+        .map(([sizeBytes, relativePaths]) =>
+          Object.freeze({ sizeBytes, relativePaths: Object.freeze([...relativePaths]) })),
+    );
     if (sameSizeCandidates.length > MAX_GROUPS) throw new Error('REFUSED');
     const inputDigestSha256 = createHash('sha256')
       .update(JSON.stringify({ scopeRoot, files: normalized }))
       .digest('hex');
-    return {
+    return Object.freeze({
       ok: true,
-      report: {
+      report: Object.freeze({
         schema: 'shun.files.duplicate-candidates.v02',
         status: 'REPORTED_METADATA_ONLY',
         trust: 'UNVERIFIED_INPUT',
@@ -161,8 +178,8 @@ export function reportDuplicateCandidates(value: unknown): DuplicateCandidateRes
         executionAuthorized: false,
         cloudDisclosure: false,
         pendingTrustedChecks: REQUIRED,
-      },
-    };
+      }),
+    });
   } catch {
     return { ok: false, code: 'FILE_CANDIDATES_REFUSED' };
   }
