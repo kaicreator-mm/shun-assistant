@@ -14,13 +14,12 @@ type FileOperation =
   | 'file.rename';
 
 export type FilePreviewRequest = Readonly<
-  { taskId: string; scopeRoot: string } &
-    (
-      | { op: 'file.search'; query: string }
-      | { op: 'file.duplicates.report' }
-      | { op: 'file.copy' | 'file.move'; sourcePath: string; destinationPath: string }
-      | { op: 'file.rename'; sourcePath: string; newName: string }
-    )
+  { taskId: string; scopeRoot: string } & (
+    | { op: 'file.search'; query: string }
+    | { op: 'file.duplicates.report' }
+    | { op: 'file.copy' | 'file.move'; sourcePath: string; destinationPath: string }
+    | { op: 'file.rename'; sourcePath: string; newName: string }
+  )
 >;
 
 export type FilePreview = Readonly<{
@@ -58,7 +57,14 @@ const PENDING = [
 ] as const;
 
 const DEVICE = /^(con|prn|aux|nul|com[1-9]|lpt[1-9])(?:\.|$)/i;
-const BAD_SEGMENT = /[<>:"|?*\u0000-\u001f]/;
+const BAD_SEGMENT = /[<>:"|?*]/;
+
+function hasControlCharacters(value: string): boolean {
+  for (const char of value) {
+    if (char.charCodeAt(0) < 32) return true;
+  }
+  return false;
+}
 const MAX_PATH = 1024;
 const MAX_QUERY = 128;
 
@@ -69,6 +75,7 @@ function cleanSegment(name: string): boolean {
     name !== '.' &&
     name !== '..' &&
     !BAD_SEGMENT.test(name) &&
+    !hasControlCharacters(name) &&
     !DEVICE.test(name) &&
     !/[. ]$/.test(name)
   );
@@ -95,7 +102,8 @@ function queryOk(value: unknown): value is string {
     typeof value === 'string' &&
     value.length > 0 &&
     value.length <= MAX_QUERY &&
-    !/[\\/:<>"|\u0000-\u001f]/.test(value) &&
+    !/[\\/:<>"|]/.test(value) &&
+    !hasControlCharacters(value) &&
     !value.includes('..')
   );
 }
