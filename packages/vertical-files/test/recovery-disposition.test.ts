@@ -64,11 +64,14 @@ describe('T07 F04A advisory-only interrupted file mutation classification', () =
       },
     });
     const symbolKey = { journalState: 'ABSENT', [Symbol('authority')]: true };
-    const proxy = new Proxy({ journalState: 'ABSENT' }, {
-      get() {
-        throw new Error('untrusted proxy trap');
+    const proxy = new Proxy(
+      { journalState: 'ABSENT' },
+      {
+        get() {
+          throw new Error('untrusted proxy trap');
+        },
       },
-    });
+    );
     for (const input of [getter, symbolKey, proxy, new Date(), new String('STARTED')]) {
       expect(describeUntrustedMutationRecovery(input)).toEqual({
         ok: false,
