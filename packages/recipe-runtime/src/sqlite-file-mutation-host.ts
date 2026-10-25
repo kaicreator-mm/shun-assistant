@@ -48,9 +48,21 @@ function sameDir(a: string, b: string): boolean {
 }
 
 function dirnameOf(path: string): string | null {
-  const cut = path.lastIndexOf('\\');
-  if (cut <= 2) return null;
-  return path.slice(0, cut);
+  // Canonical fixed-drive spelling ONLY, judged on the raw plan string:
+  // backslash separators (a forward slash is refused, never normalized),
+  // no empty component (doubled/trailing separators refuse — a collapsing
+  // derivation would bind the approved scope to a DIFFERENT lexical parent
+  // than the handle-anchored parent the physical bridge opens), and at
+  // least one parent directory component. These rules are exactly
+  // vertical-files staticPathAdmission; the two derivations must agree so
+  // the approved parent and the opened parent are the same directory.
+  if (path.length < 3 || path.length > 2048) return null;
+  if (path.includes('\u0000') || path.includes('/')) return null;
+  if (!/^[a-zA-Z]:\\/.test(path)) return null;
+  const components = path.slice(3).split('\\');
+  if (components.length < 2) return null;
+  if (components.some((component) => component.length === 0)) return null;
+  return path.slice(0, path.lastIndexOf('\\'));
 }
 
 /**

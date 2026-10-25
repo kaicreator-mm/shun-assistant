@@ -6,15 +6,28 @@
 // second attempt of the same (task, action) identity — an interrupted effect
 // stays UNKNOWN and is never auto-replayed. The final describe composes the
 // real boundary with the real anchored vertical-files executor on Windows.
-import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import {
+  appendFileSync,
+  mkdirSync,
+  mkdtempSync,
+  readFileSync,
+  rmSync,
+  writeFileSync,
+} from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { ActionController, AuthorizationAuthority } from '@shun/authorization';
 import { type ActionPlan, type AuthorizedAction, computePlanHash } from '@shun/contracts';
 import { ShunStore, ShunStoreAuthorizationAdapter } from '@shun/store';
 import { afterEach, describe, expect, it } from 'vitest';
-import { executeAuthorizedFileMutation } from '../../vertical-files/src/file-mutation-host.ts';
-import { SqliteFileMutationAuthorizationBoundary } from '../src/sqlite-file-mutation-host.ts';
+import {
+  executeAuthorizedFileMutation,
+  executeVerifiedFileMutation,
+} from '../../vertical-files/src/file-mutation-host.ts';
+import {
+  exactFileMutationPlan,
+  SqliteFileMutationAuthorizationBoundary,
+} from '../src/sqlite-file-mutation-host.ts';
 import { SqliteFileMutationJournal } from '../src/sqlite-file-mutation-journal.ts';
 
 const fixedNow = '2026-10-26T04:00:00.000Z';
@@ -63,6 +76,34 @@ function mutationPlan(op: 'file.copy' | 'file.move' | 'file.rename' = 'file.copy
   return plan;
 }
 
+/** One (plan, action) pair with EXPLICIT path spellings and scope bindings,
+ * so malformed-spelling negatives can bind exactly the confused lexical
+ * parent the old raw-lastIndexOf derivation produced. */
+function spelledPlan(
+  sourcePath: string,
+  destinationPath: string,
+  readScope: string,
+  writeScope: readonly string[],
+): { plan: ActionPlan; action: AuthorizedAction } {
+  const plan = mutationPlan();
+  const one = plan.actions[0];
+  if (!one) throw new Error('fixture plan has no action');
+  one.parameters = { sourcePath, destinationPath };
+  one.filesystemScope = { read: [readScope], write: [...writeScope] };
+  plan.planHash = computePlanHash(plan);
+  const action = {
+    taskId: plan.taskId,
+    actionId: one.actionId,
+    planHash: plan.planHash,
+    policySnapshotRevision: plan.policySnapshotRevision,
+    authorizationKind: 'DURABLE_POLICY',
+    authorizationRef: 'grant-1',
+    expiresAt: '2026-10-26T04:05:00.000Z',
+    action: one,
+  } as AuthorizedAction;
+  return { plan, action };
+}
+
 function validReceipt(actionId: string, startedAt = fixedNow) {
   return {
     actionId,
@@ -81,7 +122,13 @@ function validReceipt(actionId: string, startedAt = fixedNow) {
   };
 }
 
-async function world(options: { clock?: () => string; plan?: ActionPlan } = {}) {
+async function world(
+  options: {
+    clock?: () => string;
+    plan?: ActionPlan;
+    policyScope?: { read: readonly string[]; write: readonly string[] };
+  } = {},
+) {
   const folder = mkdtempSync(join(tmpdir(), 'shun-f03-gate-'));
   const file = join(folder, 'gate.sqlite');
   const store = new ShunStore({ file });
@@ -113,7 +160,10 @@ async function world(options: { clock?: () => string; plan?: ActionPlan } = {}) 
         op: plan.actions[0]?.op ?? 'file.copy',
         maxRiskClass: 'R2',
         privilegeLevel: 'USER',
-        filesystem: { read: [sourceDir], write: [destDir] },
+        filesystem: {
+          read: options.policyScope ? [...options.policyScope.read] : [sourceDir],
+          write: options.policyScope ? [...options.policyScope.write] : [destDir],
+        },
       },
     ],
     riskGuards: [],
@@ -375,6 +425,68 @@ describe('T07 F03 mutation authorization boundary (REAL grant re-entry + STARTED
         }),
     ).toThrow('FILE_MUTATION_BOUNDARY_CONFIGURATION_REFUSED');
   });
+
+  it('refuses separator-malformed spellings even when the scope binds the confused raw parent', () => {
+    // R1 P1-01 corpus at the plan-identity gate: for every malformed
+    // spelling the scope strings are bound to EXACTLY the parent the old
+    // raw-lastIndexOf derivation produced (the confused lexical parent), so
+    // passing these proves the derivation itself refuses the spelling —
+    // the approved parent can never diverge from the handle-anchored parent
+    // the vertical-files bridge opens (same canonical rules).
+    const corpus: ReadonlyArray<readonly [string, string, string, readonly string[]]> = [
+      ['C:\\approved\\src\\a.txt\\', DST, 'C:\\approved\\src\\a.txt', ['C:\\approved\\dst']],
+      [
+        'C:\\approved\\src\\a.txt',
+        'C:\\approved\\dst\\b.txt\\',
+        'C:\\approved\\src',
+        ['C:\\approved\\dst\\b.txt'],
+      ],
+      ['C:\\approved\\src\\\\a.txt', DST, 'C:\\approved\\src\\', ['C:\\approved\\dst']],
+      ['C:\\a.txt', DST, 'C:', ['C:\\approved\\dst']],
+      ['C:/approved/src/a.txt', DST, 'C:/approved/src', ['C:\\approved\\dst']],
+    ];
+    for (const [source, dest, read, write] of corpus) {
+      const { plan, action } = spelledPlan(source, dest, read, write);
+      expect(exactFileMutationPlan(plan, action)).toBe(false);
+    }
+    // Positive control: the CANONICAL spelling with the same raw
+    // lastIndexOf derivation still binds (lexical parent == physical
+    // parent for admitted forms; the vertical-files corpus proves the
+    // bridge refuses every spelling this gate refuses).
+    const canonical = spelledPlan(SRC, DST, 'C:\\approved\\src', ['C:\\approved\\dst']);
+    expect(exactFileMutationPlan(canonical.plan, canonical.action)).toBe(true);
+    console.log('F03_BOUNDARY_PATH_PARENT_CONSISTENCY=PASS');
+  });
+
+  it('refuses a REAL issued grant whose plan carries a trailing separator with ZERO dispatch', async () => {
+    // The full trusted boundary with a genuinely authorized (grant + plan
+    // rehydrated, policy rule matching) mutation whose source path ends in
+    // a separator: the plan-identity derivation refuses it before
+    // authorizeEffect, the executor is never reached, nothing is journaled.
+    const confusedRead = 'C:\\approved\\src\\a.txt';
+    const { plan } = spelledPlan('C:\\approved\\src\\a.txt\\', DST, confusedRead, [
+      'C:\\approved\\dst',
+    ]);
+    const v = await world({
+      plan,
+      policyScope: { read: [confusedRead], write: ['C:\\approved\\dst'] },
+    });
+    let dispatches = 0;
+    const backend = new SqliteFileMutationAuthorizationBoundary({
+      store: v.store,
+      controller: v.controller,
+      loadPlanByHash: async () => plan,
+      executeFileMutation: async () => {
+        dispatches++;
+        return null;
+      },
+    });
+    expect(await backend.execute(v.action)).toEqual({ ok: false, code: 'FILE_MUTATION_REFUSED' });
+    expect(dispatches).toBe(0);
+    const journal = new SqliteFileMutationJournal(v.store);
+    expect(journal.lookup(v.action)).toEqual({ ok: false, code: 'NOT_FOUND' });
+    console.log('F03_BOUNDARY_MALFORMED_SPELLING_ZERO_DISPATCH=PASS');
+  });
 });
 
 describe.skipIf(process.platform !== 'win32')(
@@ -564,6 +676,121 @@ describe.skipIf(process.platform !== 'win32')(
         code: 'FILE_MUTATION_RECONCILE_REQUIRED',
       });
       console.log('F03_E2E_COLLISION_NO_OVERWRITE_UNCERTAIN_NO_REPLAY=PASS');
+    });
+
+    it('routes an adversarial post-create append to UNCERTAIN: no false COMPLETED_VERIFIED, no replay', async () => {
+      // R1 P1-02 at the FULL gate: a concurrent actor appends to the
+      // destination right after its exclusive creation. The trusted
+      // capability is the same anchored executor the host injects (the
+      // physical seam reached with the ADMITTED intent of the authorized
+      // action, instrumented only to schedule the adversarial append); the
+      // exact-length/EOF verification must refuse, the journal must record
+      // UNCERTAIN, and the attempt identity must never replay.
+      const folder = mkdtempSync(join(tmpdir(), 'shun-f03-e2ea-'));
+      mkdirSync(join(folder, 'src'));
+      mkdirSync(join(folder, 'dst'));
+      writeFileSync(join(folder, 'src', 'a.txt'), 'E2E-APPEND-CONTENT');
+      const file = join(folder, 'e2e.sqlite');
+      const store = new ShunStore({ file });
+      dispose.push(async () => {
+        await store.close();
+        rmSync(folder, { recursive: true, force: true });
+      });
+      const adapter = new ShunStoreAuthorizationAdapter(store);
+      const clock = () => new Date().toISOString();
+      await adapter.saveAuthorityRecord({
+        authorityId: 'auth-1',
+        authorityRevision: 'rev-1',
+        updatedAt: fixedNow,
+        policyInitialized: true,
+      });
+      const sourceDir = join(folder, 'src');
+      const destDir = join(folder, 'dst');
+      await adapter.savePolicySnapshot({
+        policySnapshotRevision: 'policy-1',
+        status: 'ACTIVE',
+        authorityId: 'auth-1',
+        authorityRevision: 'rev-1',
+        revokedGrantIds: [],
+        rules: [
+          {
+            ruleId: 'allow-f03-e2ea',
+            capabilityId: 'file.copy',
+            op: 'file.copy',
+            maxRiskClass: 'R2',
+            privilegeLevel: 'USER',
+            filesystem: { read: [sourceDir], write: [destDir] },
+          },
+        ],
+        riskGuards: [],
+        updatedAt: fixedNow,
+      });
+      const authority = new AuthorizationAuthority({
+        state: adapter,
+        grants: adapter,
+        integritySecret: 'private-test-integrity',
+        issuanceSecret: 'private-test-issuance',
+        clock,
+      });
+      const controller = new ActionController({
+        authority,
+        policyState: adapter,
+        approvals: {
+          requestApproval: async () => {
+            throw new Error('approval cannot be reached');
+          },
+        },
+        issuanceSecret: 'private-test-issuance',
+        clock,
+      });
+      const sourcePath = join(sourceDir, 'a.txt');
+      const destinationPath = join(destDir, 'b.txt');
+      const plan = mutationPlan();
+      const oneAction = plan.actions[0];
+      if (!oneAction) throw new Error('fixture plan has no action');
+      oneAction.parameters = { sourcePath, destinationPath };
+      oneAction.filesystemScope = { read: [sourceDir], write: [destDir] };
+      plan.planHash = computePlanHash(plan);
+      const authorized = await controller.authorizePlan({ plan });
+      if (!authorized.ok) throw new Error(`e2e authorization failed: ${authorized.code}`);
+      const action = authorized.authorization.actions[0];
+      if (!action) throw new Error('fixture has no authorized action');
+      const backend = new SqliteFileMutationAuthorizationBoundary({
+        store,
+        controller,
+        loadPlanByHash: async () => plan,
+        executeFileMutation: async (authorizedAction) => {
+          const parameters = authorizedAction.action.parameters as Record<string, unknown>;
+          return executeVerifiedFileMutation(
+            {
+              op: authorizedAction.action.op,
+              sourcePath: parameters.sourcePath,
+              destinationPath: parameters.destinationPath,
+            },
+            authorizedAction.actionId,
+            {
+              onDestCreate: () => {
+                // Longer than the source content so the bridge's own write
+                // cannot overwrite the whole tail: the destination provably
+                // ends up LONGER than the source.
+                appendFileSync(destinationPath, 'ADVERSARIAL-APPEND-BY-CONCURRENT-ACTOR');
+              },
+            },
+          );
+        },
+      });
+      expect(await backend.execute(action)).toEqual({ ok: false, code: 'FILE_MUTATION_REFUSED' });
+      // The destination is LONGER than the source: the N-byte digest-matching
+      // prefix was NOT accepted as a verified post-state.
+      const bytes = readFileSync(destinationPath, 'utf8');
+      expect(bytes.length).toBeGreaterThan('E2E-APPEND-CONTENT'.length);
+      const journal = new SqliteFileMutationJournal(store);
+      expect(journal.lookup(action)).toMatchObject({ ok: true, state: 'UNCERTAIN' });
+      expect(await backend.execute(action)).toEqual({
+        ok: false,
+        code: 'FILE_MUTATION_RECONCILE_REQUIRED',
+      });
+      console.log('F03_E2E_APPEND_DIVERGENCE_UNCERTAIN_NO_REPLAY=PASS');
     });
   },
 );

@@ -10,6 +10,7 @@
 // everywhere; physical canaries run on real Windows Standard User.
 import { spawnSync } from 'node:child_process';
 import {
+  appendFileSync,
   createWriteStream,
   existsSync,
   mkdirSync,
@@ -232,6 +233,77 @@ describe('T07 F03 structural admission and pure decisions (no IO)', () => {
     refused(relative);
   });
 
+  it('refuses separator-malformed spellings on the RAW path: no silent component collapse', () => {
+    // Confused-deputy witness (R1 P1-01): a trailing separator made the
+    // lexical scope parent (raw lastIndexOf derivation, which
+    // mutationAction encodes) diverge from the handle-anchored parent the
+    // bridge opens (collapsed components). Every malformed spelling is now
+    // refused outright — even when the grant is bound to exactly the
+    // confused parent the old derivation produced.
+    refused(
+      mutationAction({
+        op: 'file.copy',
+        sourcePath: 'C:\\s\\a.txt\\',
+        destinationPath: 'C:\\d\\b.txt',
+      }),
+    ); // read scope auto-derived as the confused C:\s\a.txt (the file itself)
+    refused(
+      mutationAction({
+        op: 'file.copy',
+        sourcePath: 'C:\\s\\a.txt',
+        destinationPath: 'C:\\d\\b.txt\\',
+      }),
+    ); // write scope bound to the alleged child C:\d\b.txt
+    refused(
+      mutationAction({
+        op: 'file.copy',
+        sourcePath: 'C:\\s\\\\a.txt',
+        destinationPath: 'C:\\d\\b.txt',
+      }),
+    ); // doubled separator
+    refused(
+      mutationAction({
+        op: 'file.copy',
+        sourcePath: 'C:\\a.txt',
+        destinationPath: 'C:\\d\\b.txt',
+      }),
+    ); // root-level file: no parent directory component exists
+    refused(
+      mutationAction({
+        op: 'file.copy',
+        sourcePath: 'C:/s/a.txt',
+        destinationPath: 'C:\\d\\b.txt',
+      }),
+    ); // foreign separator is refused, never normalized
+    refused(
+      mutationAction({
+        op: 'file.move',
+        sourcePath: 'C:\\s\\a.txt',
+        destinationPath: 'C:\\s\\\\a.txt',
+      }),
+    ); // same-object alias through a doubled separator: a self-"move"
+    // The physical seam refuses the same corpus with zero destination IO
+    // (structural admission runs before any platform or native check).
+    const log: IoLog = { destCreates: [], renames: [], stages: [] };
+    const corpus = [
+      mutationRequest('file.copy', 'C:\\s\\a.txt\\', 'C:\\d\\b.txt'),
+      mutationRequest('file.copy', 'C:\\s\\a.txt', 'C:\\d\\b.txt\\'),
+      mutationRequest('file.copy', 'C:\\s\\\\a.txt', 'C:\\d\\b.txt'),
+      mutationRequest('file.copy', 'C:\\a.txt', 'C:\\d\\b.txt'),
+      mutationRequest('file.copy', 'C:/s/a.txt', 'C:\\d\\b.txt'),
+      mutationRequest('file.move', 'C:\\s\\a.txt', 'C:\\s\\\\a.txt'),
+    ];
+    for (const malformed of corpus) {
+      expect(executeVerifiedFileMutation(malformed, 'mut-spelling', instrument(log))).toEqual({
+        ok: false,
+        code: 'FILE_MUTATION_SCOPE_REFUSED',
+      });
+    }
+    expect(log.destCreates).toHaveLength(0);
+    expect(log.renames).toHaveLength(0);
+    console.log('F03_PATH_SPELLING_PARENT_CONSISTENCY=PASS');
+  });
+
   it('same-volume decision admits equal serials only', () => {
     expect(sameVolumeDecision(1918219760, 1918219760)).toBe(true);
     expect(sameVolumeDecision(1918219760, 1918219761)).toBe(false);
@@ -290,6 +362,89 @@ describe.skipIf(process.platform !== 'win32')(
         if (result.ok) expect(existsSync(join(scope.dir, 'out', 'e.dat'))).toBe(true);
         expect(readFileSync(join(scope.dir, 'out', 'e.dat')).length).toBe(0);
         console.log('F03_PHYSICAL_ZERO_BYTE_COPY=PASS');
+      } finally {
+        scope.dispose();
+      }
+    });
+
+    it('refuses a concurrent append after destination creation: exact length, not an N-byte prefix', () => {
+      // R1 P1-02 witness: every bridge handle is FILE_SHARE_ALL, so a
+      // concurrent actor can append to the freshly created destination
+      // before post-state verification. The N-byte digest-matching prefix
+      // must NOT mint COMPLETED_VERIFIED while the file is longer.
+      const scope = makeScope('shun-f03-append', {
+        'src/a.txt': 'PREFIX-CONTENT',
+        'out/.keep': '',
+      });
+      const dest = join(scope.dir, 'out', 'b.txt');
+      try {
+        const result = executeVerifiedFileMutation(
+          mutationRequest('file.copy', join(scope.dir, 'src', 'a.txt'), dest),
+          'mut-append',
+          {
+            onDestCreate: () => {
+              appendFileSync(dest, 'APPENDED-BY-CONCURRENT-ACTOR');
+            },
+          },
+        );
+        expect(result).toEqual({ ok: false, code: 'FILE_MUTATION_EFFECT_REFUSED' });
+        const bytes = readFileSync(dest, 'utf8');
+        expect(bytes.startsWith('PREFIX-CONTENT')).toBe(true);
+        expect(bytes.length).toBeGreaterThan('PREFIX-CONTENT'.length);
+        console.log('F03_PHYSICAL_CONCURRENT_APPEND_REFUSED=PASS');
+      } finally {
+        scope.dispose();
+      }
+    });
+
+    it('refuses a zero-byte source whose destination gained bytes before verification', () => {
+      // The old code verified NOTHING for a zero-length source; the EOF
+      // probe at offset 0 now refuses any byte that appeared.
+      const scope = makeScope('shun-f03-zappend', { 'src/empty.dat': '', 'out/.keep': '' });
+      const dest = join(scope.dir, 'out', 'e.dat');
+      try {
+        const result = executeVerifiedFileMutation(
+          mutationRequest('file.copy', join(scope.dir, 'src', 'empty.dat'), dest),
+          'mut-zappend',
+          {
+            onDestCreate: () => {
+              appendFileSync(dest, 'GAINED');
+            },
+          },
+        );
+        expect(result).toEqual({ ok: false, code: 'FILE_MUTATION_EFFECT_REFUSED' });
+        expect(readFileSync(dest, 'utf8')).toBe('GAINED');
+        console.log('F03_PHYSICAL_ZERO_SOURCE_APPEND_REFUSED=PASS');
+      } finally {
+        scope.dispose();
+      }
+    });
+
+    it('refuses a concurrent append after relocation at the post-state handle', () => {
+      const scope = makeScope('shun-f03-mappend', {
+        'src/a.txt': 'MOVED-CONTENT',
+        'dst/.keep': '',
+      });
+      const dest = join(scope.dir, 'dst', 'moved.txt');
+      try {
+        const result = executeVerifiedFileMutation(
+          mutationRequest('file.move', join(scope.dir, 'src', 'a.txt'), dest),
+          'mut-mappend',
+          {
+            onRename: () => {
+              appendFileSync(dest, 'TAIL-BY-CONCURRENT-ACTOR');
+            },
+          },
+        );
+        expect(result).toEqual({ ok: false, code: 'FILE_MUTATION_EFFECT_REFUSED' });
+        const bytes = readFileSync(dest, 'utf8');
+        expect(bytes.startsWith('MOVED-CONTENT')).toBe(true);
+        expect(bytes.length).toBeGreaterThan('MOVED-CONTENT'.length);
+        // The relocation itself happened (the refusal is honestly UNCERTAIN
+        // at the journal layer); what is under proof is that no verified
+        // positive receipt exists for the divergent length.
+        expect(existsSync(join(scope.dir, 'src', 'a.txt'))).toBe(false);
+        console.log('F03_PHYSICAL_MOVE_APPEND_REFUSED=PASS');
       } finally {
         scope.dispose();
       }

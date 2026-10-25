@@ -25,8 +25,12 @@
 //     destination parent live on different volumes (no cross-volume
 //     relocation is attempted), and a positive receipt requires an
 //     independent post-state re-open of the destination through a second
-//     handle whose FileId matches the created/moved object and whose content
-//     digest equals the source digest read before the effect.
+//     handle whose FileId matches the created/moved object and which is
+//     proven to be EXACTLY the source bytes: full digest re-read plus a
+//     1-byte EOF probe at offset size, so an appended tail (or any
+//     truncate/repad divergence under FILE_SHARE_ALL concurrency) refuses
+//     instead of minting a false COMPLETED_VERIFIED — zero-length sources
+//     included.
 // This module performs no authorization of its own beyond fail-closed
 // structural admission of the AuthorizedAction shape: grant integrity and
 // per-effect currentness re-validation (ActionController.authorizeEffect)
@@ -169,17 +173,24 @@ type StaticAdmission = Readonly<{ drive: string; components: readonly string[] }
 function staticPathAdmission(raw: unknown): StaticAdmission | null {
   if (typeof raw !== 'string' || raw.length < 3 || raw.length > MAX_PATH) return null;
   if (raw.includes('\u0000')) return null;
-  const path = raw.replaceAll('/', '\\');
+  const path = raw;
   // Fixed-drive absolute syntax only, judged on the RAW caller form: no UNC
   // shares, no device namespace, no ADS colon (refused per component), no
-  // drive-relative or rooted-relative re-anchoring.
+  // drive-relative or rooted-relative re-anchoring, and no forward slashes —
+  // the canonical separator is backslash, a foreign separator is refused
+  // rather than silently normalized.
   if (!/^[a-zA-Z]:\\/.test(path)) return null;
-  const components = path
-    .slice(3)
-    .split('\\')
-    .filter((part) => part.length > 0);
-  if (components.length === 0) return null;
+  if (path.includes('/')) return null;
+  // Canonical component vector, NO silent normalization: every component
+  // must be non-empty (doubled/trailing separators refuse instead of
+  // collapsing), and at least one PARENT directory must exist, so the
+  // lexical scope parent every authorization layer binds is exactly the
+  // handle-anchored parent this bridge opens (recipe-runtime dirnameOf; the
+  // two must agree).
+  const components = path.slice(3).split('\\');
+  if (components.length < 2) return null;
   for (const component of components) {
+    if (component.length === 0) return null;
     if (!validComponent(component)) return null;
   }
   return { drive: `${path[0]?.toUpperCase()}:${'\\'}`, components };
@@ -470,6 +481,38 @@ function closeTracked(native: MutationNativeAddon, openHandles: bigint[], handle
 }
 
 /**
+ * Post-state proof through the SAME verified second handle that the
+ * destination is EXACTLY the source object: a full re-read of [0, size)
+ * whose digest matches, AND a 1-byte probe at offset `size` that must
+ * complete with STATUS_END_OF_FILE and zero bytes. Every handle in this
+ * bridge is FILE_SHARE_ALL, so a concurrent actor can append to a freshly
+ * created/renamed destination; an N-byte digest match alone would prove
+ * only a PREFIX and a longer (or truncated-then-repadded) file would mint
+ * a false COMPLETED_VERIFIED. The zero-length source runs the same EOF
+ * probe at offset 0 — an empty destination that gained any byte refuses.
+ */
+function verifyExactDestination(
+  native: MutationNativeAddon,
+  handle: bigint,
+  source: Readonly<{ size: number; digest: string }>,
+): void {
+  if (source.size > 0) {
+    const back = native.readFileAt(handle, 0n, source.size);
+    if (
+      back === null ||
+      (back.status !== 0 && back.status !== NT_STATUS_END_OF_FILE) ||
+      back.returned !== source.size ||
+      createHash('sha256').update(back.data.subarray(0, back.returned)).digest('hex') !==
+        source.digest
+    )
+      refuse('FILE_MUTATION_EFFECT_REFUSED');
+  }
+  const eof = native.readFileAt(handle, BigInt(source.size), 1);
+  if (eof === null || eof.status !== NT_STATUS_END_OF_FILE || eof.returned !== 0)
+    refuse('FILE_MUTATION_EFFECT_REFUSED');
+}
+
+/**
  * Open the admitted source through its verified parent, identity-check it,
  * and read its FULL bounded content through the SAME handle (one 8 MiB probe
  * plus a 1-byte follow-up decides the size; anything larger is refused
@@ -653,27 +696,18 @@ export function executeVerifiedFileMutation(
         closeTracked(native, openHandles, created);
 
         // Independent post-state: a SECOND open of the destination through
-        // the same verified parent; its FileId must be the created object and
-        // its content digest must equal the source digest read before the
-        // effect. The created handle is already closed, so this proves the
-        // durable on-disk object, not a live buffer.
+        // the same verified parent; its FileId must be the created object
+        // and it must be EXACTLY the source content and length (digest +
+        // EOF proof — see verifyExactDestination). The created handle is
+        // already closed, so this proves the durable on-disk object, not a
+        // live buffer.
         const verify = native.openFile(destParent, destName);
         if (verify === null) refuse('FILE_MUTATION_EFFECT_REFUSED');
         openHandles.push(verify);
         const verifyIdentity = native.entryId(verify);
         if (verifyIdentity === null || verifyIdentity.index !== createdId)
           refuse('FILE_MUTATION_EFFECT_REFUSED');
-        if (source.size > 0) {
-          const back = native.readFileAt(verify, 0n, source.size);
-          if (
-            back === null ||
-            (back.status !== 0 && back.status !== NT_STATUS_END_OF_FILE) ||
-            back.returned !== source.size ||
-            createHash('sha256').update(back.data.subarray(0, back.returned)).digest('hex') !==
-              source.digest
-          )
-            refuse('FILE_MUTATION_EFFECT_REFUSED');
-        }
+        verifyExactDestination(native, verify, source);
         closeTracked(native, openHandles, verify);
         stage('COMPLETED_VERIFIED', 'file.copy');
         return { ok: true, receipt: mintReceipt(owner, startedAt) };
@@ -702,25 +736,16 @@ export function executeVerifiedFileMutation(
 
       // Independent post-state: the destination exists as the SAME object
       // (FileId preserved through the relocation — this proves move, not
-      // copy+delete), its content digest is unchanged, and the source name
-      // is gone from its verified parent.
+      // copy+delete), it is EXACTLY the source content and length (digest +
+      // EOF proof — see verifyExactDestination), and the source name is
+      // gone from its verified parent.
       const moved = native.openFile(destParent, destName);
       if (moved === null) refuse('FILE_MUTATION_EFFECT_REFUSED');
       openHandles.push(moved);
       const movedIdentity = native.entryId(moved);
       if (movedIdentity === null || movedIdentity.index !== source.fileId)
         refuse('FILE_MUTATION_EFFECT_REFUSED');
-      if (source.size > 0) {
-        const back = native.readFileAt(moved, 0n, source.size);
-        if (
-          back === null ||
-          (back.status !== 0 && back.status !== NT_STATUS_END_OF_FILE) ||
-          back.returned !== source.size ||
-          createHash('sha256').update(back.data.subarray(0, back.returned)).digest('hex') !==
-            source.digest
-        )
-          refuse('FILE_MUTATION_EFFECT_REFUSED');
-      }
+      verifyExactDestination(native, moved, source);
       closeTracked(native, openHandles, moved);
       const oldName = native.openFile(source.parent, sourceName);
       if (oldName !== null) {
