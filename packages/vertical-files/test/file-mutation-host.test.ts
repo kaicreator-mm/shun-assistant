@@ -551,16 +551,14 @@ describe.skipIf(process.platform === 'win32')(
   'T07 F03 non-Windows hosts never mutate (fail closed)',
   () => {
     it('refuses a statically admitted intent when no anchored native host exists', () => {
-      const scope = makeScope('shun-f03-nonwin', { 'a.txt': 'A' });
-      try {
-        const result = executeVerifiedFileMutation(
-          mutationRequest('file.copy', join(scope.dir, 'a.txt'), join(scope.dir, 'b.txt')),
-          'mut-nonwin',
-        );
-        expect(result).toEqual({ ok: false, code: 'FILE_MUTATION_NATIVE_UNAVAILABLE' });
-      } finally {
-        scope.dispose();
-      }
+      // A literal fixed-drive intent (not a host temp path, which is not a
+      // Windows form on this platform): static admission passes and the
+      // missing Windows native host is what refuses.
+      const result = executeVerifiedFileMutation(
+        mutationRequest('file.copy', 'C:\\s\\a.txt', 'C:\\d\\b.txt'),
+        'mut-nonwin',
+      );
+      expect(result).toEqual({ ok: false, code: 'FILE_MUTATION_NATIVE_UNAVAILABLE' });
     });
   },
 );
