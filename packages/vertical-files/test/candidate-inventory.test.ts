@@ -97,4 +97,69 @@ describe('T07 F02A metadata-only duplicate candidates', () => {
       },
     });
   });
+
+  it('refuses own Symbol.iterator even if it yields over 4096 rows from length one', () => {
+    const files = [{ relativePath: 'seed.txt', sizeBytes: 1 }];
+    let invoked = false;
+    Object.defineProperty(files, Symbol.iterator, {
+      value: function* () {
+        invoked = true;
+        for (let i = 0; i < 4097; i++) {
+          yield { relativePath: String(i), sizeBytes: i };
+        }
+      },
+    });
+    refused({ scopeRoot: root, files });
+    expect(invoked).toBe(false);
+  });
+
+  it('refuses holes, getters, unexpected keys and proxied arrays or metadata', () => {
+    const holes = new Array(1);
+    refused({ scopeRoot: root, files: holes });
+    const accessors = [{ relativePath: 'a.txt', sizeBytes: 1 }];
+    Object.defineProperty(accessors, '0', {
+      get() {
+        throw new Error('NEVER_READ_UNTRUSTED_GETTER');
+      },
+    });
+    refused({ scopeRoot: root, files: accessors });
+    const extraKey = [{ relativePath: 'a.txt', sizeBytes: 1 }] as object[] & {
+      unexpected?: boolean;
+    };
+    extraKey.unexpected = true;
+    refused({ scopeRoot: root, files: extraKey });
+    const original = [{ relativePath: 'a.txt', sizeBytes: 1 }];
+    refused({ scopeRoot: root, files: new Proxy(original, {}) });
+    refused({
+      scopeRoot: root,
+      files: [new Proxy({ relativePath: 'a.txt', sizeBytes: 1 }, {})],
+    });
+  });
+
+  it('does not let callers corrupt subsequent reports or verified-state flags', () => {
+    const input = {
+      scopeRoot: root,
+      files: [
+        { relativePath: 'a.txt', sizeBytes: 3 },
+        { relativePath: 'b.txt', sizeBytes: 3 },
+      ],
+    };
+    const result = reportDuplicateCandidates(input);
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(Object.isFrozen(result.report)).toBe(true);
+    expect(Object.isFrozen(result.report.pendingTrustedChecks)).toBe(true);
+    expect(Object.isFrozen(result.report.sameSizeCandidates)).toBe(true);
+    expect(Object.isFrozen(result.report.sameSizeCandidates[0])).toBe(true);
+    expect(Object.isFrozen(result.report.sameSizeCandidates[0]?.relativePaths)).toBe(true);
+    expect(() => {
+      (result.report as { duplicatesVerified: boolean }).duplicatesVerified = true;
+    }).toThrow();
+    expect(() => {
+      (result.report.pendingTrustedChecks as unknown as string[]).splice(0, 1);
+    }).toThrow();
+    const next = reportDuplicateCandidates(input);
+    expect(next).toEqual(result);
+    if (next.ok) expect(next.report.duplicatesVerified).toBe(false);
+  });
 });
