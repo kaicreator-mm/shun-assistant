@@ -3,6 +3,10 @@ import { reportDuplicateCandidates } from '../src/candidate-inventory.ts';
 
 const root = 'C:\\Approved\\Jobs';
 
+function refused(input: unknown): void {
+  expect(reportDuplicateCandidates(input)).toEqual({ ok: false, code: 'FILE_CANDIDATES_REFUSED' });
+}
+
 describe('T07 F02A metadata-only duplicate candidates', () => {
   it('groups only same-size candidates without claiming content or filesystem proof', () => {
     const result = reportDuplicateCandidates({
@@ -56,18 +60,15 @@ describe('T07 F02A metadata-only duplicate candidates', () => {
       'folder\\\\child.txt',
     ];
     for (const relativePath of forbidden) {
-      expect(reportDuplicateCandidates({
-        scopeRoot: root,
-        files: [{ relativePath, sizeBytes: 12 }],
-      })).toEqual({ ok: false, code: 'FILE_CANDIDATES_REFUSED' });
+      refused({ scopeRoot: root, files: [{ relativePath, sizeBytes: 12 }] });
     }
-    expect(reportDuplicateCandidates({
+    refused({
       scopeRoot: root,
       files: [
         { relativePath: 'File.txt', sizeBytes: 1 },
         { relativePath: 'file.TXT', sizeBytes: 2 },
       ],
-    }).ok).toBe(false);
+    });
   });
 
   it('refuses extra authority fields, getters, invalid sizes and excessive inventory', () => {
@@ -79,19 +80,21 @@ describe('T07 F02A metadata-only duplicate candidates', () => {
       { ...standard, sizeBytes: NaN },
       { ...standard, relativePath: 'x'.repeat(1100) },
     ];
-    for (const file of bad) {
-      expect(reportDuplicateCandidates({ scopeRoot: root, files: [file] }).ok).toBe(false);
-    }
-    expect(reportDuplicateCandidates({ scopeRoot: root, files: [], grant: true }).ok).toBe(false);
-    expect(reportDuplicateCandidates({
+    for (const file of bad) refused({ scopeRoot: root, files: [file] });
+
+    refused({ scopeRoot: root, files: [], grant: true });
+    refused({
       scopeRoot: root,
       files: Array.from({ length: 4097 }, (_, i) => ({
-        relativePath: String(i) + '.txt', sizeBytes: i,
+        relativePath: i.toString(),
+        sizeBytes: i,
       })),
-    }).ok).toBe(false);
-    expect(reportDuplicateCandidates({
+    });
+    refused({
       scopeRoot: root,
-      get files() { throw new Error('SECRET'); },
-    })).toEqual({ ok: false, code: 'FILE_CANDIDATES_REFUSED' });
+      get files() {
+        throw new Error('SECRET');
+      },
+    });
   });
 });
