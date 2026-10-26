@@ -16,6 +16,9 @@ importers:
       '@shun/contracts':
         specifier: workspace:*
         version: link:../../packages/contracts
+      '@shun/llm-remote':
+        specifier: workspace:*
+        version: link:../../packages/llm-remote
       '@shun/resolver':
         specifier: workspace:*
         version: link:../../packages/resolver
