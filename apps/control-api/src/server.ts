@@ -11,6 +11,7 @@ import { createServer, type IncomingMessage, type Server, type ServerResponse } 
 import { extname, normalize, resolve, sep } from 'node:path';
 import type { GoalRequest } from '@shun/contracts';
 import { GoalRequestSchema } from '@shun/contracts';
+import { buildDeepSeekGoalDisclosure } from '@shun/llm-remote';
 import { collectWindowsSystemInventory, suggestReadonlyOptimizations } from '@shun/vertical-system';
 import { z } from 'zod';
 import {
@@ -29,6 +30,12 @@ const DecisionBodySchema = z.strictObject({
   approved: z.boolean(),
   planHash: z.string().regex(/^[0-9a-f]{64}$/, 'planHash must be a lowercase sha-256 hex digest'),
   reason: z.string().min(1).optional(),
+});
+
+// Preview only: browser JSON cannot mint trusted broker consent, approve a
+// cloud send, choose another provider endpoint or carry authorization material.
+const CloudDisclosurePreviewSchema = z.strictObject({
+  goalText: z.string().min(1).max(8192),
 });
 
 const ClarificationBodySchema = z.strictObject({
@@ -223,6 +230,29 @@ async function handle(
       externalDisclosures: [],
       snapshot: observed.snapshot,
       suggestions: suggestReadonlyOptimizations(observed),
+    });
+  }
+
+  // T08 C01 — Actual T01 disclosure projection, shown locally BEFORE any
+  // trusted private IPC gesture. This route performs NO outbound I/O and has
+  // no access to consent issuer, credential, ledger or transport.
+  if (method === 'POST' && url.pathname === '/api/cloud/disclosure-preview') {
+    const parsed = CloudDisclosurePreviewSchema.safeParse(await readJsonBody(req, ctx.maxBodyBytes));
+    if (!parsed.success) {
+      return respondJson(res, 400, { error: { code: 'DISCLOSURE_PREVIEW_INVALID' } });
+    }
+    const disclosure = buildDeepSeekGoalDisclosure(parsed.data.goalText);
+    if (!disclosure) {
+      return respondJson(res, 400, { error: { code: 'DISCLOSURE_PREVIEW_INVALID' } });
+    }
+    return respondJson(res, 200, {
+      ok: true,
+      status: 'LOCAL_PREVIEW_ONLY',
+      projectionJson: disclosure.projectionJson,
+      sha256: disclosure.sha256,
+      consentIssued: false,
+      cloudSendAllowed: false,
+      privateBrokerReady: false,
     });
   }
 
