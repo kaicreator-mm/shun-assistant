@@ -104,9 +104,7 @@ describe('T07 F04B3a — real OS process kill: STARTED before precommit', () => 
           if (lineBuffer.includes(childMarker)) finish();
         });
         child.once('error', (error) => finish(error));
-        child.once('close', (code) =>
-          finish(new Error(`P0_CHILD_EARLY_EXIT_${code}: ${stderr}`)),
-        );
+        child.once('close', (code) => finish(new Error(`P0_CHILD_EARLY_EXIT_${code}: ${stderr}`)));
       });
       expect(child.exitCode).toBeNull(); // Definitely alive at the kill point.
       // This is a forced OS-level termination, not a throw, a voluntary exit
