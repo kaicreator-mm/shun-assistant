@@ -64,7 +64,7 @@ function childCode(): string {
     // A live process is deliberately required: parent must forcefully kill
     // it rather than observing a successful child return/normal cleanup.
     'setInterval(() => {}, 1000);',
-  ].join('\\n');
+  ].join('\n');
 }
 
 describe('T07 F04B3a — real OS process kill: STARTED before precommit', () => {
