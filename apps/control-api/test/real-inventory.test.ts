@@ -46,7 +46,7 @@ describe('T08 real local Windows inventory user journey', () => {
         'uptimeSeconds',
       ]) {
         expect(typeof snapshot[key]).toBe('number');
-        expect(Number.isFinite(snapshot[key])).toBe(true);
+        expect(Number.isFinite(snapshot[key] as number)).toBe(true);
       }
       expect((snapshot.cpuLogicalCount as number) > 0).toBe(true);
       expect((snapshot.memoryTotalBytes as number) > 0).toBe(true);
