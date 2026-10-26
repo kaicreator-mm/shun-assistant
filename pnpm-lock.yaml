@@ -25,6 +25,9 @@ importers:
       '@shun/vertical-storage':
         specifier: workspace:*
         version: link:../../packages/vertical-storage
+      '@shun/vertical-system':
+        specifier: workspace:*
+        version: link:../../packages/vertical-system
       zod:
         specifier: ^4.1.13
         version: 4.6.5

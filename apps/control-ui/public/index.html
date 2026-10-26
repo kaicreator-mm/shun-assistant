@@ -36,6 +36,17 @@
         </form>
       </section>
 
+      <section id="system-section" aria-labelledby="system-title">
+        <h2 id="system-title">Live Windows system information</h2>
+        <p class="muted">
+          Read-only facts from this computer, not simulated task results. Nothing is sent to a
+          cloud provider.
+        </p>
+        <button id="read-system-info" type="button">Read system information</button>
+        <p id="system-status" role="status">Not requested yet.</p>
+        <ul id="system-facts"></ul>
+      </section>
+
       <section id="approvals-section" aria-labelledby="approvals-title">
         <h2 id="approvals-title">Waiting for your approval</h2>
         <ul id="approval-list"></ul>

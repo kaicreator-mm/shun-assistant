@@ -419,6 +419,57 @@ function wireForm() {
   });
 }
 
+// First true user-operable T08 J0 slice: this button reads the already
+// reviewed T06 OS inventory in the local Windows backend. It does NOT run a
+// model, issue an authorization grant, or claim the scripted demo task states
+// are real. No automatic polling or external disclosure.
+function wireLiveSystem() {
+  const button = el('read-system-info');
+  button.addEventListener('click', async () => {
+    const status = el('system-status');
+    const facts = el('system-facts');
+    button.disabled = true;
+    status.textContent = 'Reading live Windows system information…';
+    facts.replaceChildren();
+    try {
+      const result = await api('/system/inventory');
+      if (
+        result.ok !== true ||
+        result.source !== 'LIVE_WINDOWS_LOCAL_READONLY' ||
+        result.snapshot?.schema !== 'shun.system-inventory.v02' ||
+        result.snapshot?.platform !== 'win32' ||
+        result.snapshot?.localOnly !== true
+      ) {
+        throw new Error('Unverified inventory response');
+      }
+      const snapshot = result.snapshot;
+      const numbers = [
+        ['Logical CPUs', snapshot.cpuLogicalCount],
+        ['Memory total (MiB)', snapshot.memoryTotalBytes / (1024 * 1024)],
+        ['Memory available (MiB)', snapshot.memoryFreeBytes / (1024 * 1024)],
+        ['Disk total (GiB)', snapshot.diskTotalBytes / (1024 * 1024 * 1024)],
+        ['Disk available (GiB)', snapshot.diskFreeBytes / (1024 * 1024 * 1024)],
+        ['Uptime (hours)', snapshot.uptimeSeconds / 3600],
+      ];
+      if (numbers.some(([, value]) => !Number.isFinite(value) || value < 0)) {
+        throw new Error('Invalid inventory facts');
+      }
+      for (const [label, value] of numbers) {
+        const item = document.createElement('li');
+        item.textContent = `${label}: ${value.toFixed(label === 'Logical CPUs' ? 0 : 1)}`;
+        facts.append(item);
+      }
+      status.textContent = 'Live local Windows facts read. No cloud call or file changes.';
+    } catch {
+      status.textContent = 'Live Windows information unavailable. Nothing was simulated.';
+      facts.replaceChildren();
+    } finally {
+      button.disabled = false;
+    }
+  });
+}
+
 wireForm();
+wireLiveSystem();
 refresh();
 setInterval(refresh, 2500);
