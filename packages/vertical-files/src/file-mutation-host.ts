@@ -122,8 +122,52 @@ export type FileMutationStage =
   | 'DRIVE_ATTESTED'
   | 'SOURCE_OPENED'
   | 'DEST_PARENT_OPENED'
+  | 'PRECOMMIT_DURABLE'
   | 'EFFECT_REFUSED'
   | 'COMPLETED_VERIFIED';
+
+/**
+ * T07 F04B2a immutable pre-effect commitment: captured AFTER both drives are
+ * attested, the source is identity-checked and fully read through one
+ * anchored handle, and the destination parent chain is verified with the
+ * destination name observed ABSENT — and durably persisted write-once
+ * BEFORE the first exclusive create or no-replace relocation exists. Plain
+ * frozen data (strings/numbers only, JSON-stable); the 64-bit FileId is a
+ * decimal string because JSON cannot carry bigint.
+ */
+export type FileMutationPrecommitment = Readonly<{
+  kind: 'file-mutation-precommit-v1';
+  actionId: string;
+  op: FileMutationOp;
+  sourcePath: string;
+  destinationPath: string;
+  source: Readonly<{
+    fileId: string;
+    volumeSerial: number;
+    size: number;
+    sha256: string;
+  }>;
+  destinationPrestate: Readonly<{ destinationExisted: false }>;
+}>;
+
+/**
+ * T07 F04B2a durable-checkpoint capability the trusted host boundary
+ * (recipe-runtime sqlite-file-mutation-host) injects into the authorized
+ * composition. `durablePrecommit` must persist the commitment write-once
+ * with a durable readback and return true BEFORE the effect proceeds;
+ * false (or a throw) refuses the mutation with ZERO destination IO. The
+ * source is then RE-observed through the same verified handle and any
+ * drift from the commitment refuses the effect. PR #186 R1 P1-01: the
+ * authorized production entry (`executeAuthorizedFileMutation`) REQUIRES
+ * the checkpoints — an absent or malformed object refuses before any IO.
+ * The only un-checkpointed F03-era composition left is the explicitly
+ * test-only package-internal seam (`executeVerifiedFileMutation`), which
+ * src/index.ts never exports; the trusted bootstrap must always supply the
+ * journal-backed implementation.
+ */
+export type FileMutationCheckpoints = Readonly<{
+  durablePrecommit: (commitment: FileMutationPrecommitment) => boolean;
+}>;
 
 class Refusal extends Error {
   constructor(public readonly code: FileMutationRefusalCode) {
@@ -393,6 +437,18 @@ interface MutationNativeAddon {
   close(handle: bigint): void;
 }
 
+export type { MutationNativeAddon };
+
+/**
+ * PACKAGE-INTERNAL accessor for the committed addon binary, shared with the
+ * read-only poststate verifier (file-mutation-poststate.ts) so exactly one
+ * loader/cache exists per process. Not exported through the package exports
+ * map.
+ */
+export function loadMutationNativeAddon(): MutationNativeAddon | null {
+  return loadNativeAddon();
+}
+
 let nativeAddon: MutationNativeAddon | null | undefined;
 
 function loadNativeAddon(): MutationNativeAddon | null {
@@ -573,6 +629,41 @@ function openBoundedSource(
   };
 }
 
+/**
+ * T07 F04B2a drift re-check: after the durable precommit checkpoint, the
+ * ORIGINAL source handle is re-observed (identity + volume serial + a full
+ * positioned re-read of [0, size) plus a 1-byte EOF probe at `size`) and
+ * every value must still equal the commitment. Any concurrent modification
+ * of the source between the checkpoint and the effect refuses the mutation
+ * before any destination IO exists — the attempt is then conservatively
+ * UNCERTAIN at the journal layer, never silently retried.
+ */
+function reverifyCommittedSource(
+  native: MutationNativeAddon,
+  handle: bigint,
+  committed: Readonly<{ fileId: string; volumeSerial: number; size: number; sha256: string }>,
+): void {
+  const identity = native.entryId(handle);
+  if (identity === null || identity.index.toString() !== committed.fileId)
+    refuse('FILE_MUTATION_EFFECT_REFUSED');
+  if (native.volumeSerial(handle) !== committed.volumeSerial)
+    refuse('FILE_MUTATION_EFFECT_REFUSED');
+  if (committed.size > 0) {
+    const back = native.readFileAt(handle, 0n, committed.size);
+    if (
+      back === null ||
+      (back.status !== 0 && back.status !== NT_STATUS_END_OF_FILE) ||
+      back.returned !== committed.size ||
+      createHash('sha256').update(back.data.subarray(0, back.returned)).digest('hex') !==
+        committed.sha256
+    )
+      refuse('FILE_MUTATION_EFFECT_REFUSED');
+  }
+  const eof = native.readFileAt(handle, BigInt(committed.size), 1);
+  if (eof === null || eof.status !== NT_STATUS_END_OF_FILE || eof.returned !== 0)
+    refuse('FILE_MUTATION_EFFECT_REFUSED');
+}
+
 function mintReceipt(actionId: string, startedAt: string): FileMutationReceipt {
   return Object.freeze({
     actionId,
@@ -592,20 +683,23 @@ function mintReceipt(actionId: string, startedAt: string): FileMutationReceipt {
 }
 
 /**
- * PACKAGE-INTERNAL physical seam (same discipline as F02B's
+ * PACKAGE-INTERNAL TEST-ONLY seam (same discipline as F02B's
  * `observeVerifiedFileDuplicates`): direct `{op, sourcePath, destinationPath}`
  * mutation of statically admitted fixed-local paths with deterministic IO
  * observation. It exists so the in-package falsifiers can prove zero
  * destination IO on every refusal; src/index.ts does NOT re-export it, so
- * nothing outside this package can reach an unmediated mutation. `owner` is
- * only the receipt's actionId. Production access is exclusively
- * `executeAuthorizedFileMutation` below, which takes no callbacks and only
- * an AuthorizedAction.
+ * nothing outside this package can reach an un-mediated mutation. `owner` is
+ * only the receipt's actionId. PR #186 R1 P1-01: this seam is the ONLY
+ * place the F03-era un-checkpointed composition (no `checkpoints`)
+ * remains admissible, explicitly for tests/audits; every production-capable
+ * path (`executeAuthorizedFileMutation`, composed through the real trusted
+ * Gate) requires the durable checkpoints.
  */
 export function executeVerifiedFileMutation(
   request: unknown,
   owner: string,
   instrument: FileMutationInstrument = {},
+  checkpoints?: FileMutationCheckpoints,
 ): FileMutationResult {
   const stage = (s: FileMutationStage, detail: string) => instrument.onStage?.(s, detail);
   try {
@@ -669,6 +763,39 @@ export function executeVerifiedFileMutation(
       stage('DEST_PARENT_OPENED', admitted.destinationAdmission.drive);
       if (admitted.op !== 'file.copy' && !sameVolumeDecision(source.volumeSerial, destVolume))
         refuse('FILE_MUTATION_CROSS_VOLUME_REFUSED');
+
+      // T07 F04B2a pre-effect checkpoint: the destination prestate is
+      // observed (name ABSENT in the verified parent — an existing name
+      // refuses as a collision BEFORE any commitment exists), the immutable
+      // commitment is built from the already-verified source identity, and
+      // the trusted durable write must succeed with zero destination IO
+      // before the effect may proceed. The source is then re-observed
+      // through the same handle; any drift refuses with zero destination IO.
+      if (checkpoints !== undefined) {
+        const existing = native.openFile(destParent, destName);
+        if (existing !== null) {
+          native.close(existing);
+          refuse('FILE_MUTATION_COLLISION_REFUSED');
+        }
+        const commitment: FileMutationPrecommitment = Object.freeze({
+          kind: 'file-mutation-precommit-v1',
+          actionId: owner,
+          op: admitted.op,
+          sourcePath: admitted.sourcePath,
+          destinationPath: admitted.destinationPath,
+          source: Object.freeze({
+            fileId: source.fileId.toString(),
+            volumeSerial: source.volumeSerial,
+            size: source.size,
+            sha256: source.digest,
+          }),
+          destinationPrestate: Object.freeze({ destinationExisted: false }),
+        });
+        if (checkpoints.durablePrecommit(commitment) !== true)
+          refuse('FILE_MUTATION_EFFECT_REFUSED');
+        stage('PRECOMMIT_DURABLE', `${source.size}B`);
+        reverifyCommittedSource(native, source.handle, commitment.source);
+      }
 
       if (admitted.op === 'file.copy') {
         // Exclusive create: an existing destination name refuses the effect
@@ -775,15 +902,28 @@ export function executeVerifiedFileMutation(
  * exclusively from the structurally admitted action, and grant-integrity /
  * per-effect currentness re-validation plus the durable STARTED ordering
  * belong to the trusted host boundary that composes this entry
- * (recipe-runtime sqlite-file-mutation-host). Structural authorization
- * failures return FILE_MUTATION_AUTHORIZATION_REFUSED before any IO;
- * physical refusals keep their own codes. Refusals (including pre-IO ones)
- * are conservatively UNCERTAIN at the journal level: the boundary never
- * replays the attempt identity.
+ * (recipe-runtime sqlite-file-mutation-host). PR #186 R1 P1-01: that
+ * boundary's F04B2a durable precommit checkpoints are MANDATORY here — an
+ * absent or malformed checkpoints object is refused before any IO (the
+ * un-checkpointed legacy composition exists only in the package-internal
+ * test seam). Structural authorization failures return
+ * FILE_MUTATION_AUTHORIZATION_REFUSED before any IO; physical refusals keep
+ * their own codes. Refusals (including pre-IO ones) are conservatively
+ * UNCERTAIN at the journal level: the boundary never replays the attempt
+ * identity.
  */
-export function executeAuthorizedFileMutation(action: unknown): FileMutationResult {
+export function executeAuthorizedFileMutation(
+  action: unknown,
+  checkpoints: FileMutationCheckpoints,
+): FileMutationResult {
   const admitted = admittedMutationAction(action);
-  if (admitted === null) {
+  const safeCheckpoints =
+    admitted !== null &&
+    plainWithExactKeys(checkpoints, ['durablePrecommit']) &&
+    typeof (checkpoints as Record<string, unknown>).durablePrecommit === 'function'
+      ? checkpoints
+      : null;
+  if (admitted === null || safeCheckpoints === null) {
     return Object.freeze({ ok: false as const, code: 'FILE_MUTATION_AUTHORIZATION_REFUSED' });
   }
   // The internal seam is invoked with NO instrument: the authorized path
@@ -796,5 +936,6 @@ export function executeAuthorizedFileMutation(action: unknown): FileMutationResu
     },
     admitted.owner,
     {},
+    safeCheckpoints,
   );
 }

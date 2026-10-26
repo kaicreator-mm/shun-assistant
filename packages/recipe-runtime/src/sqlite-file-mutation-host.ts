@@ -9,6 +9,7 @@
 // host bootstrap injects, exactly as T04 injected the scoped search; no
 // Recipe, model, HTTP or plugin code may supply or replace it here.
 import { createHash } from 'node:crypto';
+import { types } from 'node:util';
 import { ActionController, StoredGrantRecordSchema } from '@shun/authorization';
 import {
   type ActionPlan,
@@ -21,7 +22,23 @@ import {
   ExecutionReceiptSchema,
 } from '@shun/contracts';
 import { ShunStore, ShunStoreAuthorizationAdapter } from '@shun/store';
-import { FILE_MUTATION_OPS, SqliteFileMutationJournal } from './sqlite-file-mutation-journal.ts';
+import {
+  FILE_MUTATION_OPS,
+  type FileMutationReconcileDisposition,
+  SqliteFileMutationJournal,
+} from './sqlite-file-mutation-journal.ts';
+
+/**
+ * T07 F04B2a durable-checkpoint capability the boundary hands to the
+ * injected trusted mutation capability: `durablePrecommit` persists the
+ * immutable pre-effect commitment write-once (with a durable readback) on
+ * the SAME local store whose STARTED row is already visible. Structural
+ * fail-closed mirror of vertical-files FileMutationCheckpoints — the two
+ * declarations must agree.
+ */
+export type SqliteFileMutationCheckpoints = Readonly<{
+  durablePrecommit: (commitment: unknown) => boolean;
+}>;
 
 export type SqliteFileMutationGateConfig = Readonly<{
   store: ShunStore;
@@ -29,7 +46,10 @@ export type SqliteFileMutationGateConfig = Readonly<{
   /** Only the trusted host resolves immutable plan bytes by expected hash. */
   loadPlanByHash: (hash: string) => Promise<unknown>;
   /** Trusted anchored mutation capability; never supplied by user/Recipe/model. */
-  executeFileMutation: (action: AuthorizedAction) => Promise<unknown>;
+  executeFileMutation: (
+    action: AuthorizedAction,
+    checkpoints: SqliteFileMutationCheckpoints,
+  ) => Promise<unknown>;
 }>;
 
 export type FileMutationGateRefusalCode =
@@ -204,9 +224,24 @@ export class SqliteFileMutationAuthorizationBoundary {
       if (readback.ok !== true || readback.state !== 'STARTED')
         return refused('FILE_MUTATION_REFUSED');
 
+      // T07 F04B2a: journal-backed durable precommit checkpoints. The
+      // trusted mutation capability must persist the immutable commitment
+      // (source FileId/volume/size/digest + destination-absence prestate)
+      // write-once BEFORE its first create or relocate, and re-observe the
+      // source from the same verified handle afterwards; a false/throwing
+      // durablePrecommit refuses the effect with zero destination IO.
+      // PR #186 R1 P1-01: an injected capability that ignores the
+      // checkpoints and returns a positive receipt anyway gets NO verified
+      // success — the boundary re-reads the durable commitment for the
+      // exact action below and refuses without it (UNCERTAIN, unreplayable).
+      const checkpoints: SqliteFileMutationCheckpoints = {
+        durablePrecommit: (commitment: unknown) =>
+          this.journal.writePrecommit(action, commitment).ok === true,
+      };
+
       let outcome: unknown;
       try {
-        outcome = await this.executeFileMutation(action);
+        outcome = await this.executeFileMutation(action, checkpoints);
       } catch {
         // The trusted effect started and failed mid-flight (the process did
         // not crash): classify the attempt UNKNOWN durably when possible.
@@ -235,9 +270,19 @@ export class SqliteFileMutationAuthorizationBoundary {
           receipt.data.sideEffectEvidence.recoveryClassification === 'COMPLETED_VERIFIED' &&
           receipt.data.sideEffectEvidence.postStateVerified === true
         ) {
-          const evidence = createHash('sha256').update(canonicalJson(receipt.data)).digest('hex');
-          if (this.journal.recordOutcome(action, 'COMMITTED_VERIFIED', evidence))
-            return { ok: true, receipt: receipt.data };
+          // PR #186 R1 P1-01: a positive receipt is accepted ONLY when the
+          // immutable pre-effect commitment for THIS exact action is
+          // physically readable back from the journal store (readPrecommit
+          // re-validates the shape, canonical hash and the binding to the
+          // exact actionId/op/literal paths). An injected executor that
+          // never consumed the checkpoints cannot reach
+          // COMMITTED_VERIFIED: the attempt falls through to UNCERTAIN and
+          // stays unreplayable.
+          if (this.journal.readPrecommit(action).ok === true) {
+            const evidence = createHash('sha256').update(canonicalJson(receipt.data)).digest('hex');
+            if (this.journal.recordOutcome(action, 'COMMITTED_VERIFIED', evidence))
+              return { ok: true, receipt: receipt.data };
+          }
         }
       }
       // Anything else — executor refusal, invalid receipt, journal CAS
@@ -254,6 +299,133 @@ export class SqliteFileMutationAuthorizationBoundary {
       // A caller cannot distinguish corrupt policy/grant, file names, secrets
       // or backend failures; conservatively refuse.
       return refused('FILE_MUTATION_REFUSED');
+    }
+  }
+}
+
+// ---------------------------------------------------------------------------
+// T07 F04B2c trusted reconcile glue.
+// ---------------------------------------------------------------------------
+
+/**
+ * The verdict vocabulary of the independent OS poststate verifier
+ * (vertical-files file-mutation-poststate.ts), mirrored fail-closed.
+ * PR #186 R1 P1-03: no PROVEN verdict exists — a single poststate snapshot
+ * cannot witness that THIS attempt caused the observed world, so the
+ * verifier's ceiling is CONSISTENT_* / UNKNOWN and the reconciler's
+ * disposition vocabulary below carries no *_PROVEN values.
+ */
+export type FileMutationPoststateVerdict =
+  | 'CONSISTENT_WITH_COMPLETION'
+  | 'CONSISTENT_WITH_NOT_EXECUTED'
+  | 'UNKNOWN';
+
+export type FileMutationReconcileResult =
+  | {
+      ok: true;
+      disposition: FileMutationReconcileDisposition;
+      automaticRetryAllowed: false;
+      evidenceSha256: string;
+    }
+  | { ok: false; code: 'RECONCILE_REFUSED' };
+
+function refusedReconcile(): FileMutationReconcileResult {
+  return { ok: false, code: 'RECONCILE_REFUSED' };
+}
+
+const POSTSTATE_VERDICTS: readonly FileMutationPoststateVerdict[] = [
+  'CONSISTENT_WITH_COMPLETION',
+  'CONSISTENT_WITH_NOT_EXECUTED',
+  'UNKNOWN',
+];
+
+/**
+ * T07 F04B2c: the private trusted reconciler. It JOINS facts it re-reads
+ * itself — the durable journal row for the exact (task, action) identity and
+ * the immutable F04B2a precommitment — with the fixed trusted OS verifier
+ * the host bootstrap injects (vertical-files observeFileMutationPoststate),
+ * and persists the resulting disposition atomically and idempotently.
+ *
+ * It NEVER accepts a caller boolean, NEVER rewrites the journal row's
+ * STARTED/UNCERTAIN/COMMITTED_VERIFIED state, NEVER issues a grant, and
+ * NEVER authorizes a retry: automaticRetryAllowed is structurally false for
+ * every disposition (the reconcile table CHECK pins it to 0). A reconcile
+ * verdict is an analysis of what the world already looks like, not an
+ * execution. Caller-supplied labels (F04A advisory included) are not inputs
+ * here at all.
+ */
+export class SqliteFileMutationReconciler {
+  private readonly journal: SqliteFileMutationJournal;
+  private readonly verifyPoststate: (precommit: unknown) => Promise<unknown> | unknown;
+
+  constructor(config: {
+    store: ShunStore;
+    /** Trusted read-only OS verifier; never supplied by user/Recipe/model. */
+    verifyPoststate: (precommit: unknown) => Promise<unknown> | unknown;
+  }) {
+    try {
+      if (!(config?.store instanceof ShunStore) || typeof config.verifyPoststate !== 'function')
+        throw new Error('FILE_MUTATION_RECONCILER_CONFIGURATION_REFUSED');
+      this.journal = new SqliteFileMutationJournal(config.store);
+      this.verifyPoststate = config.verifyPoststate.bind(config);
+    } catch {
+      throw new Error('FILE_MUTATION_RECONCILER_CONFIGURATION_REFUSED');
+    }
+  }
+
+  async reconcile(presentation: AuthorizedAction): Promise<FileMutationReconcileResult> {
+    try {
+      const parsed = AuthorizedActionSchema.safeParse(presentation);
+      if (!parsed.success) return refusedReconcile();
+      const action = parsed.data;
+      const row = this.journal.lookup(action);
+      // Only interrupted attempts are reconcilable: STARTED (hard crash) or
+      // UNCERTAIN (surviving-process failure). A COMMITTED_VERIFIED or
+      // absent/corrupt row has nothing for this reconciler to add.
+      if (row.ok !== true || (row.state !== 'STARTED' && row.state !== 'UNCERTAIN'))
+        return refusedReconcile();
+      const precommit = this.journal.readPrecommit(action);
+      if (precommit.ok !== true) return refusedReconcile();
+
+      const observed = await this.verifyPoststate(precommit.commitment);
+      if (
+        observed === null ||
+        typeof observed !== 'object' ||
+        Array.isArray(observed) ||
+        types.isProxy(observed) ||
+        Object.getPrototypeOf(observed) !== Object.prototype
+      )
+        return refusedReconcile();
+      const result = observed as Record<string, unknown>;
+      if (result.ok !== true) {
+        // The trusted verifier could not observe (drive absent, alias,
+        // bounds, malformed precommit...): persist nothing — a later
+        // reconcile may succeed — and surface refusal, never a verdict.
+        return refusedReconcile();
+      }
+      if (
+        Reflect.ownKeys(result).length !== 3 ||
+        !Object.hasOwn(result, 'verdict') ||
+        !Object.hasOwn(result, 'evidence') ||
+        typeof result.verdict !== 'string' ||
+        !POSTSTATE_VERDICTS.includes(result.verdict as FileMutationPoststateVerdict) ||
+        result.evidence === null ||
+        typeof result.evidence !== 'object'
+      )
+        return refusedReconcile();
+      const verdict = result.verdict as FileMutationPoststateVerdict;
+      const disposition: FileMutationReconcileDisposition =
+        verdict === 'CONSISTENT_WITH_COMPLETION'
+          ? 'COMPLETED_CONSISTENT'
+          : verdict === 'CONSISTENT_WITH_NOT_EXECUTED'
+            ? 'NOT_EXECUTED_CONSISTENT'
+            : 'MANUAL_RECONCILE_REQUIRED';
+      const evidenceSha256 = createHash('sha256').update(canonicalJson(result)).digest('hex');
+      if (!this.journal.recordReconcileDisposition(action, disposition, evidenceSha256))
+        return refusedReconcile();
+      return { ok: true, disposition, automaticRetryAllowed: false, evidenceSha256 };
+    } catch {
+      return refusedReconcile();
     }
   }
 }

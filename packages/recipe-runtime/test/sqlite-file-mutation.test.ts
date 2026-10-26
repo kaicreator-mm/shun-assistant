@@ -122,6 +122,22 @@ function validReceipt(actionId: string, startedAt = fixedNow) {
   };
 }
 
+/** A structurally valid F04B2a commitment bound to one action's exact
+ * intent (PR #186 R1 P1-01: gate-level executors that report success must
+ * now durably checkpoint first, mirroring the trusted bootstrap). */
+function commitmentFor(action: AuthorizedAction): Record<string, unknown> {
+  const parameters = action.action.parameters as Record<string, unknown>;
+  return {
+    kind: 'file-mutation-precommit-v1',
+    actionId: action.actionId,
+    op: action.action.op,
+    sourcePath: parameters.sourcePath,
+    destinationPath: parameters.destinationPath,
+    source: { fileId: '123456789', volumeSerial: 1918219760, size: 3, sha256: 'c'.repeat(64) },
+    destinationPrestate: { destinationExisted: false },
+  };
+}
+
 async function world(
   options: {
     clock?: () => string;
@@ -279,11 +295,16 @@ describe('T07 F03 mutation authorization boundary (REAL grant re-entry + STARTED
       store: v.store,
       controller: v.controller,
       loadPlanByHash: async () => v.plan,
-      executeFileMutation: async (action) => {
+      // PR #186 R1 P1-01: the executor durably checkpoints through the
+      // boundary-provided capability (as the trusted bootstrap must) before
+      // reporting success — an un-checkpointed success is refused upstream.
+      executeFileMutation: async (action, checkpoints) => {
         dispatches++;
         const readback = journal.lookup(action);
         stateSeenByEffect = readback.ok ? readback.state : null;
-        return { ok: true, receipt: validReceipt(action.actionId) };
+        return checkpoints.durablePrecommit(commitmentFor(action))
+          ? { ok: true, receipt: validReceipt(action.actionId) }
+          : null;
       },
     });
     const result = await backend.execute(v.action);
@@ -400,9 +421,12 @@ describe('T07 F03 mutation authorization boundary (REAL grant re-entry + STARTED
       store: v.store,
       controller: v.controller,
       loadPlanByHash: async () => v.plan,
-      executeFileMutation: async (action) => {
+      // PR #186 R1 P1-01: checkpointed success (the trusted composition).
+      executeFileMutation: async (action, checkpoints) => {
         dispatches++;
-        return { ok: true, receipt: validReceipt(action.actionId) };
+        return checkpoints.durablePrecommit(commitmentFor(action))
+          ? { ok: true, receipt: validReceipt(action.actionId) }
+          : null;
       },
     });
     expect((await backend.execute(v.action)).ok).toBe(true);
@@ -566,8 +590,8 @@ describe.skipIf(process.platform !== 'win32')(
         store,
         controller,
         loadPlanByHash: async () => plan,
-        executeFileMutation: async (authorizedAction) =>
-          executeAuthorizedFileMutation(authorizedAction),
+        executeFileMutation: async (authorizedAction, checkpoints) =>
+          executeAuthorizedFileMutation(authorizedAction, checkpoints),
       });
       const result = await backend.execute(action);
       expect(result.ok).toBe(true);
@@ -662,8 +686,8 @@ describe.skipIf(process.platform !== 'win32')(
         store,
         controller,
         loadPlanByHash: async () => plan,
-        executeFileMutation: async (authorizedAction) =>
-          executeAuthorizedFileMutation(authorizedAction),
+        executeFileMutation: async (authorizedAction, checkpoints) =>
+          executeAuthorizedFileMutation(authorizedAction, checkpoints),
       });
       expect(await backend.execute(action)).toEqual({ ok: false, code: 'FILE_MUTATION_REFUSED' });
       // Byte-identical no-overwrite proof through the FULL authorized path.
@@ -759,7 +783,7 @@ describe.skipIf(process.platform !== 'win32')(
         store,
         controller,
         loadPlanByHash: async () => plan,
-        executeFileMutation: async (authorizedAction) => {
+        executeFileMutation: async (authorizedAction, checkpoints) => {
           const parameters = authorizedAction.action.parameters as Record<string, unknown>;
           return executeVerifiedFileMutation(
             {
@@ -776,6 +800,7 @@ describe.skipIf(process.platform !== 'win32')(
                 appendFileSync(destinationPath, 'ADVERSARIAL-APPEND-BY-CONCURRENT-ACTOR');
               },
             },
+            checkpoints,
           );
         },
       });
