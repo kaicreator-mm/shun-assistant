@@ -41,7 +41,8 @@ the same window (full numbers in the log):
 | memoryFreeBytes | 20,805,070,848 | 21,141,008,384 | Δ ≈1.6%, live free-memory drift between samples |
 | uptimeSeconds | 175,340 | 175,352.8 | Δ 12.8 s = capture interval |
 
-UI rendering cross-check: 56,516.9 MiB × 2²⁰ = 59,262,226,432 exactly. Nothing is
+UI rendering cross-check: 59,262,226,432 B = 56,516.86328125 MiB, rendered by the UI
+as "56516.9" (`toFixed(1)`); disk and uptime figures round the same way. Nothing is
 invented: the totals are physically unforgeable byte-for-byte matches, and the code path
 is the reviewed T06 collector (`node:os` + `statfsSync('C:\\')` only — no new OS native
 code, no shell; the PowerShell helpers in the same package are NOT on this path).
@@ -81,6 +82,30 @@ The new real-inventory test itself proves the negative contract: on non-Windows 
 endpoint must answer explicit 503 `LIVE_SYSTEM_INVENTORY_UNAVAILABLE`, never fabricated
 Windows numbers (the Linux CI leg exercises this; the Windows physical run above
 exercises the 200 leg).
+
+## R1 independent review — APPROVE (no P1)
+
+An independent R1 reviewer audited the PR diff (all 7 commits), the endpoint/collector/UI
+code paths, re-ran all three test suites (same counts, EXIT=0), and reconciled every number
+in the evidence log. Verdict APPROVE with two evidence-hygiene findings, both addressed in
+the amendment below:
+
+- P2: the first `ui-after-click-viewport.png` actually captured the pre-click state
+  ("Not requested yet." — the coordinate click had raced the freshly-loaded layout).
+  The after-click claim was already carried by `ui-after-click-system-section.png`
+  (verified by R1 to show the status line and the facts).
+- P3: a MiB-conversion sentence in this file overclaimed "exactly"; reworded above.
+
+### Amendment (post-R1 re-shoot)
+
+Relaunched the server, opened a fresh UI tab, let the layout settle past one 2.5 s refresh
+cycle, re-measured the button position (its settled centre is (330, 448)) and clicked. The
+fresh click re-measured the machine live (memory available 22,812.1 MiB, uptime 49.1 h —
+different from the first session's 19,981.3 MiB / 48.8 h, further proof each click is a
+real new observation, not cached data). `ui-after-click-viewport.png` was replaced with a
+full-viewport capture taken in the same instant the DOM read back
+`"Live local Windows facts read. No cloud call or file changes."` with 6 facts rendered;
+its SHA256 is in the log's amendment section. Worktree still byte-identical afterwards.
 
 ## Scope honesty
 

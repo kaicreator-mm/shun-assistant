@@ -207,3 +207,24 @@ Local only: the surface refuses non-loopback binds and non-loopback Host headers
 ccd6e3e9b0a230fa2c7197e4b26b7cd0ec49e05343658d2caf17ea50428a410b *docs/validation/v0.2/logs/t08-j0-shots/ui-after-click-system-section.png
 6d7035e862c94d7615fef83bd594851f8591aca45eb182b2af85d6ad12adf359 *docs/validation/v0.2/logs/t08-j0-shots/ui-after-click-viewport.png
 4b6540b5dbb401944edc7a28910469fe3e76971f9f46648ad0d20c5c029a2ad1 *docs/validation/v0.2/logs/t08-j0-shots/ui-before-click-fullpage.png
+
+=== Amendment: R1 follow-up re-shoot (same day, same host) ===
+R1 verdict: APPROVE, no P1. R1 finding P2-1: original ui-after-click-viewport.png
+captured the pre-click state (coordinate click raced the freshly loaded layout before
+its first 2.5s refresh settled; the working first-session evidence was the system-section
+clip). Action: relaunched server (PID 32956, same command), fresh tab, waited one
+refresh cycle, button settled centre (330,448), real coordinate click, DOM read back
+at capture instant:
+  #system-status = "Live local Windows facts read. No cloud call or file changes."
+  #system-facts rendered = 6 items:
+    Logical CPUs: 16 / Memory total (MiB): 56516.9 / Memory available (MiB): 22812.1
+    Disk total (GiB): 475.8 / Disk available (GiB): 77.8 / Uptime (hours): 49.1
+  (fresh samples differ from first session's 19981.3 MiB / 48.8 h -> every click is a
+   genuinely new OS observation, not cached data)
+ui-after-click-viewport.png REPLACED with the capture taken in that same instant.
+Updated SHA256:
+  5c35047d2e3b854f8ce9ed49b235971e6fed229731990726fdb6348cb98fd839  ui-after-click-viewport.png
+  (unchanged: ccd6e3e9b0a230fa2c7197e4b26b7cd0ec49e05343658d2caf17ea50428a410b  ui-after-click-system-section.png
+              4b6540b5dbb401944edc7a28910469fe3e76971f9f46648ad0d20c5c029a2ad1  ui-before-click-fullpage.png)
+Server stopped after re-shoot; git status --porcelain afterwards: 0 entries
+(only the intended evidence files staged for the amendment commit).
