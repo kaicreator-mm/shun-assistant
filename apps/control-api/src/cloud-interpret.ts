@@ -4,7 +4,11 @@
 // The result is an UNTRUSTED suggestion for display, NOT an executable plan.
 import { randomUUID } from 'node:crypto';
 import { isAbsolute } from 'node:path';
-import { type CloudConsentApproval, canonicalJson, type CloudConsentCurrentness } from '@shun/contracts';
+import {
+  type CloudConsentApproval,
+  type CloudConsentCurrentness,
+  canonicalJson,
+} from '@shun/contracts';
 import {
   buildDeepSeekGoalDisclosure,
   DurableCloudBudgetLedger,
@@ -29,7 +33,12 @@ export type CloudInterpretResult =
   | { ok: false; code: 'CLOUD_UNAVAILABLE' | 'CONSENT_DECLINED' | 'REMOTE_REFUSED' };
 
 export interface CloudInterpretPort {
-  status(): { enabled: boolean; provider: 'deepseek'; model: 'deepseek-flash'; osConsentRequired: true };
+  status(): {
+    enabled: boolean;
+    provider: 'deepseek';
+    model: 'deepseek-flash';
+    osConsentRequired: true;
+  };
   interpretGoal(goalText: string): Promise<CloudInterpretResult>;
 }
 
