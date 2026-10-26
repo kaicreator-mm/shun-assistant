@@ -14,14 +14,13 @@ import { GoalRequestSchema } from '@shun/contracts';
 import { buildDeepSeekGoalDisclosure } from '@shun/llm-remote';
 import { collectWindowsSystemInventory, suggestReadonlyOptimizations } from '@shun/vertical-system';
 import { z } from 'zod';
+import type { CloudInterpretPort } from './cloud-interpret.ts';
 import {
   CONTROL_ERROR_CODES,
   ControlError,
   type ControlErrorCode,
   httpStatusForCode,
 } from './errors.ts';
-import type { CloudInterpretPort } from './cloud-interpret.ts';
-import type { CloudInterpretPort } from './cloud-interpret.ts';
 import type { ControlBackend } from './ports.ts';
 
 export const CONTROL_API_REVISION = 'shun.control-api/0.1';
