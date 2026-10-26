@@ -15,10 +15,10 @@ use std::sync::mpsc;
 use std::thread;
 use std::time::{Duration, Instant};
 use windows::core::{BOOL, PCWSTR};
-use windows::Win32::Foundation::{HANDLE, HWND, LPARAM, WPARAM};
+use windows::Win32::Foundation::{HWND, LPARAM, WPARAM};
 use windows::Win32::System::StationsAndDesktops::{
-    CloseDesktop, GetUserObjectInformationW, GetThreadDesktop, OpenInputDesktop,
-    DESKTOP_CONTROL_FLAGS, DESKTOP_READOBJECTS, HDESK, UOI_NAME,
+    CloseDesktop, GetProcessWindowStation, GetThreadDesktop, GetUserObjectInformationW,
+    OpenInputDesktop, DESKTOP_CONTROL_FLAGS, DESKTOP_READOBJECTS, HDESK, UOI_NAME,
 };
 use windows::Win32::System::Threading::GetCurrentThreadId;
 use windows::Win32::UI::WindowsAndMessaging::{
@@ -40,12 +40,12 @@ pub enum DialogOutcome {
     NonInteractive,
 }
 
-fn desktop_object_name(desk: HDESK) -> Option<String> {
+fn object_name_of(handle: windows::Win32::Foundation::HANDLE) -> Option<String> {
     let mut buf = [0u16; 256];
     let mut needed = 0u32;
     let ok = unsafe {
         GetUserObjectInformationW(
-            HANDLE(desk.0),
+            handle,
             UOI_NAME,
             Some(buf.as_mut_ptr().cast()),
             (buf.len() * 2) as u32,
@@ -60,12 +60,35 @@ fn desktop_object_name(desk: HDESK) -> Option<String> {
     Some(String::from_utf16_lossy(&buf[..end]))
 }
 
+fn station_object_name(station: windows::Win32::System::StationsAndDesktops::HWINSTA) -> Option<String> {
+    object_name_of(windows::Win32::Foundation::HANDLE(station.0))
+}
+
+fn desktop_object_name(desk: HDESK) -> Option<String> {
+    object_name_of(windows::Win32::Foundation::HANDLE(desk.0))
+}
+
 /// True only when this process's current thread desktop IS the session input
 /// desktop: the confirmation would be physically displayed to the user. A
 /// broker on a service window station (OpenInputDesktop fails) or on a
 /// hidden desktop inside the interactive station (name mismatch) must refuse
 /// instead of approving invisibly.
 fn on_interactive_input_desktop() -> bool {
+    // Station assertion first: only the interactive window station (WinSta0)
+    // has a real user-facing input desktop; a same-named "Default" desktop on
+    // any other station must not pass.
+    let station = unsafe { GetProcessWindowStation() }.ok();
+    if let Some(station) = station {
+        let station_name = station_object_name(station);
+        if station_name
+            .map(|name| !name.eq_ignore_ascii_case("winsta0"))
+            .unwrap_or(true)
+        {
+            return false;
+        }
+    } else {
+        return false;
+    }
     let input = unsafe { OpenInputDesktop(DESKTOP_CONTROL_FLAGS(0), false, DESKTOP_READOBJECTS) };
     let Ok(input_desk) = input else {
         return false;

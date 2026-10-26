@@ -23,6 +23,11 @@ import {
 } from '../native/index.ts';
 
 const execFileAsync = promisify(execFile);
+
+// R1 P2-1: the dialog automation / desktop-override instruments only exist
+// behind this explicit gate; production processes never set it.
+process.env.SHUN_CONSENT_TEST_INSTRUMENTS = '1';
+
 const availability = privateConsentHostAvailability();
 const win32Real = process.platform === 'win32' && availability.ok;
 

@@ -158,6 +158,30 @@ export type BrokerFacts = Readonly<{
   exeSha256: string;
 }>;
 
+/** Fixed refusal code for the gated test instruments (R1 P2-1). */
+export const TEST_INSTRUMENTS_DISABLED = 'PRIVATE_CONSENT_TEST_INSTRUMENTS_DISABLED' as const;
+
+/**
+ * R1 P2-1/P2-2: the dialog automation, the desktop spawn override and the
+ * other test-only instruments are gated behind SHUN_CONSENT_TEST_INSTRUMENTS=1
+ * AND full artifact verification. Nothing about them is reachable in a
+ * production process, and the addon never loads unverified.
+ */
+function requireTestInstruments(): ConsentHostAddon {
+  if (process.env.SHUN_CONSENT_TEST_INSTRUMENTS !== '1') {
+    throw new Error(TEST_INSTRUMENTS_DISABLED);
+  }
+  const availability = privateConsentHostAvailability();
+  if (!availability.ok) {
+    throw new Error(`${PRIVATE_CONSENT_UNAVAILABLE}:${availability.reason}`);
+  }
+  const addon = loadAddon();
+  if (addon === null) {
+    throw new Error(`${PRIVATE_CONSENT_UNAVAILABLE}:ADDON_UNLOADABLE`);
+  }
+  return addon;
+}
+
 export class PrivateConsentBrokerSession {
   private constructor(
     private readonly session: BrokerSessionAddon,
@@ -166,10 +190,16 @@ export class PrivateConsentBrokerSession {
 
   /**
    * Spawn a fresh broker on an unguessable pipe name and adopt it. `desktop`
-   * exists ONLY for the non-interactive refusal proof (private window
-   * station); production callers pass nothing.
+   * exists ONLY for the non-interactive refusal proof and is gated behind
+   * SHUN_CONSENT_TEST_INSTRUMENTS=1; production callers pass nothing.
    */
   static open(options?: { desktop?: string }): PrivateConsentBrokerSession {
+    if (options?.desktop !== undefined) {
+      // Gate the non-production spawn path explicitly (R1 P2-1).
+      if (process.env.SHUN_CONSENT_TEST_INSTRUMENTS !== '1') {
+        throw new Error(TEST_INSTRUMENTS_DISABLED);
+      }
+    }
     const availability = privateConsentHostAvailability();
     if (!availability.ok) {
       throw new Error(`${PRIVATE_CONSENT_UNAVAILABLE}:${availability.reason}`);
@@ -270,30 +300,19 @@ export class PrivateConsentBrokerSession {
   }
 }
 
-/** Test-only instruments against the REAL broker dialog/process. */
+/**
+ * Test-only instruments against the REAL broker dialog/process. Every call
+ * re-checks the SHUN_CONSENT_TEST_INSTRUMENTS=1 gate and artifact pins, so
+ * the automation can never exist in a production process (R1 P2-1/P2-2).
+ */
 export const brokerTestInstruments = {
   armDialog(pid: number, action: 'allow' | 'deny' | 'none', findTimeoutMs: number): number | null {
-    const addon = loadAddon();
-    if (addon === null) return null;
-    return addon.armDialogAutomation(pid, action, findTimeoutMs);
+    return requireTestInstruments().armDialogAutomation(pid, action, findTimeoutMs);
   },
   collectDialog(id: number): { found: boolean; clicked: boolean; done: boolean } {
-    const addon = loadAddon();
-    if (addon === null) return { found: false, clicked: false, done: true };
-    return addon.collectDialogAutomation(id);
+    return requireTestInstruments().collectDialogAutomation(id);
   },
   inspectProcessToken(pid: number) {
-    const addon = loadAddon();
-    if (addon === null) {
-      return {
-        openable: false,
-        userSid: null,
-        logonSid: null,
-        sessionId: null,
-        image: null,
-        detail: 'addon unavailable',
-      } as const;
-    }
-    return addon.inspectProcessToken(pid);
+    return requireTestInstruments().inspectProcessToken(pid);
   },
 };

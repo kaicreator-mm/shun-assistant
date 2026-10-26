@@ -8,13 +8,11 @@ use windows::core::PWSTR;
 use windows::Win32::Foundation::{CloseHandle, HANDLE, HLOCAL, LocalFree};
 use windows::Win32::Security::Authorization::ConvertSidToStringSidW;
 use windows::Win32::Security::{
-    GetTokenInformation, TokenGroups, TokenSessionId, TokenStatistics, TokenUser, PSID,
-    TOKEN_GROUPS, TOKEN_INFORMATION_CLASS, TOKEN_QUERY, TOKEN_STATISTICS, TOKEN_USER,
+    GetTokenInformation, RevertToSelf, TokenGroups, TokenSessionId, TokenStatistics, TokenUser,
+    PSID, TOKEN_GROUPS, TOKEN_INFORMATION_CLASS, TOKEN_QUERY, TOKEN_STATISTICS, TOKEN_USER,
 };
-use windows::Win32::System::Pipes::GetNamedPipeClientProcessId;
-use windows::Win32::System::Threading::{
-    GetCurrentProcess, OpenProcess, OpenProcessToken, PROCESS_QUERY_LIMITED_INFORMATION,
-};
+use windows::Win32::System::Pipes::ImpersonateNamedPipeClient;
+use windows::Win32::System::Threading::{GetCurrentProcess, GetCurrentThread, OpenProcessToken, OpenThreadToken};
 
 #[derive(Clone, Debug, PartialEq)]
 pub struct TokenFacts {
@@ -135,19 +133,22 @@ pub fn self_facts() -> Option<TokenFacts> {
     }
 }
 
-/// Principal facts of the CONNECTING named-pipe client (OS token, never a
-/// client-claimed identity). `None` when the token cannot be opened — the
-/// caller refuses the connection in that case too.
+/// Principal facts of the CONNECTING named-pipe client, read from the
+/// IMPERSONATION token bound to the connection itself — never a pid lookup
+/// (recyclable) and never a client-claimed identity. `None` when
+/// impersonation or the token query fails — the caller refuses the
+/// connection in that case too (fail closed).
 pub fn client_facts(pipe: HANDLE) -> Option<TokenFacts> {
-    let mut pid = 0u32;
-    unsafe { GetNamedPipeClientProcessId(pipe, &mut pid) }.ok()?;
-    let process = unsafe { OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION, false, pid) }.ok()?;
-    let mut token = HANDLE::default();
-    unsafe { OpenProcessToken(process, TOKEN_QUERY, &mut token) }.ok()?;
-    let facts = token_facts(token);
     unsafe {
+        ImpersonateNamedPipeClient(pipe).ok()?;
+        let mut token = HANDLE::default();
+        if OpenThreadToken(GetCurrentThread(), TOKEN_QUERY, true, &mut token).is_err() {
+            let _ = RevertToSelf();
+            return None;
+        }
+        let facts = token_facts(token);
         let _ = CloseHandle(token);
-        let _ = CloseHandle(process);
+        let _ = RevertToSelf();
+        facts
     }
-    facts
 }

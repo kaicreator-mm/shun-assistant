@@ -231,21 +231,17 @@ impl ConsentCore {
         }
     }
 
-    fn mac_covered(
-        consent_id: &str,
-        task_id: &str,
-        digest: &str,
-        nonce: &str,
-        assertion_id: &str,
-        expires_at: &str,
-        scope_revision: &str,
-        max_calls: &str,
-        max_cost_micros: &str,
-    ) -> Vec<u8> {
-        let canonical = format!(
-            "{PROOF_FORMAT}\n{consent_id}\n{task_id}\n{digest}\n{nonce}\n{assertion_id}\n{expires_at}\n{scope_revision}\n{max_calls}\n{max_cost_micros}"
-        );
-        canonical.into_bytes()
+    /// MAC input covers the ENTIRE minted scope (serde_json's Map is a
+    /// BTreeMap, so the serialization is key-sorted and deterministic on both
+    /// mint and verify) plus the nonce and assertion id. Any post-mint
+    /// mutation of ANY scope field breaks the proof, so the broker's own
+    /// verify verdict is bound to exactly the record it approved.
+    fn mac_covered(scope_json: &str, nonce: &str, assertion_id: &str) -> Vec<u8> {
+        format!("{PROOF_FORMAT}\n{scope_json}\n{nonce}\n{assertion_id}").into_bytes()
+    }
+
+    fn scope_canonical(scope: &Map<String, Value>) -> Option<String> {
+        serde_json::to_string(&Value::Object(scope.clone())).ok()
     }
 
     /// Mint the approval AFTER a real native-dialog confirmation. Single-use
@@ -264,38 +260,10 @@ impl ConsentCore {
         scope.insert("issuedAt".into(), Value::String(issued_at));
         scope.insert("expiresAt".into(), Value::String(expires_at.clone()));
 
-        let get = |k: &str| {
-            request
-                .scope_json
-                .get(k)
-                .and_then(Value::as_str)
-                .unwrap_or("")
-                .to_string()
-        };
-        let max_calls = request
-            .scope_json
-            .get("maxCalls")
-            .and_then(Value::as_number)
-            .and_then(|n| n.as_u64())
-            .unwrap_or(0);
-        let max_cost = request
-            .scope_json
-            .get("maxCostMicros")
-            .and_then(Value::as_number)
-            .and_then(|n| n.as_u64())
-            .unwrap_or(0);
+        let scope_canonical = Self::scope_canonical(&scope)
+            .unwrap_or_else(|| "null".to_string());
 
-        let covered = Self::mac_covered(
-            &consent_id,
-            &get("taskId"),
-            &request.approved_projection_sha256,
-            &nonce,
-            &assertion_id,
-            &expires_at,
-            &get("scopeRevision"),
-            &max_calls.to_string(),
-            &max_cost.to_string(),
-        );
+        let covered = Self::mac_covered(&scope_canonical, &nonce, &assertion_id);
         let mac = crypto::base64(&crypto::hmac_sha256(&self.key, &[&covered]));
         let proof = format!("{PROOF_FORMAT}.{assertion_id}.{expires_at}.{mac}");
 
@@ -343,28 +311,16 @@ impl ConsentCore {
     /// reports a redacted reason.
     pub fn verify_consume(&mut self, approval: &Value, now_ms: i64) -> (bool, &'static str) {
         let s = |p: &str| approval.pointer(p).and_then(Value::as_str).unwrap_or("");
-        let consent_id = s("/consentId");
-        let task_id = s("/scope/taskId");
-        let digest = s("/scope/approvedProjectionSha256");
         let nonce = s("/confirmationNonce");
         let proof = s("/issuer/proof");
         let expires_at = s("/scope/expiresAt");
-        let scope_revision = s("/scope/scopeRevision");
         let assertion_id = s("/issuer/assertionId");
         let issuer_broker = s("/issuer/brokerId");
         let channel = s("/issuer/channel");
-        let max_calls = approval
-            .pointer("/scope/maxCalls")
-            .and_then(Value::as_number)
-            .and_then(|n| n.as_u64())
-            .unwrap_or(0)
-            .to_string();
-        let max_cost = approval
-            .pointer("/scope/maxCostMicros")
-            .and_then(Value::as_number)
-            .and_then(|n| n.as_u64())
-            .unwrap_or(0)
-            .to_string();
+        let presented_scope = match approval.get("scope").and_then(Value::as_object) {
+            Some(scope) => scope,
+            None => return (false, "PROOF_INVALID"),
+        };
 
         if issuer_broker != BROKER_ID || channel != "AUTHENTICATED_PRIVATE_IPC" {
             return (false, "PROOF_INVALID");
@@ -374,15 +330,9 @@ impl ConsentCore {
             return (false, "PROOF_INVALID");
         };
         let covered = Self::mac_covered(
-            consent_id,
-            task_id,
-            digest,
+            &Self::scope_canonical(presented_scope).unwrap_or_else(|| "null".to_string()),
             nonce,
             assertion_id,
-            expires_at,
-            scope_revision,
-            &max_calls,
-            &max_cost,
         );
         let expect = crypto::base64(&crypto::hmac_sha256(&self.key, &[&covered]));
         if !crypto::constant_time_eq(mac.as_bytes(), expect.as_bytes()) {

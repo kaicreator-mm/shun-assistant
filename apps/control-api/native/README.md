@@ -86,6 +86,28 @@ no test doubles claim OS proof):
   mismatch against the input desktop) → `REFUSED_NONINTERACTIVE`, no dialog;
 - usage error exit code 2; clean shutdown exit code 0.
 
+## R1 hardening applied (independent review PASS, 0 P0/P1; 6 P2 → 5 fixed here)
+
+- **P2-1/P2-2** — the dialog automation, desktop spawn override and other
+  test instruments are gated behind `SHUN_CONSENT_TEST_INSTRUMENTS=1` AND
+  artifact verification on every call (`requireTestInstruments`); the gate
+  refusal itself is asserted by the platform-boundary test file.
+- **P2-3** — the HMAC proof now covers a canonical serialization of the
+  ENTIRE minted scope (serde_json BTreeMap key order, deterministic on both
+  mint and verify) plus nonce and assertion id; any post-mint mutation of
+  any scope field invalidates the broker verdict.
+- **P2-4** — per-connection client admission reads the CONNECTING client's
+  IMPERSONATION token (`ImpersonateNamedPipeClient` → `OpenThreadToken` →
+  facts → `RevertToSelf`); no pid is ever involved, recycled or otherwise.
+  Failure at any step refuses the connection (fail closed).
+- **P2-5** — the interactive check asserts the process window station is
+  `WinSta0` before comparing desktop names, so a same-named desktop on a
+  foreign station can never pass.
+- **P2-6** — every spawned broker is assigned to a job object with
+  `JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE`; the job handle lives in the host
+  addon's registry for the host lifetime, so a crashed host can never leave
+  a live broker behind.
+
 ## Known evidence boundaries (documented, not claimed)
 
 - The interactive-dialog evidence uses an automation instrument that clicks

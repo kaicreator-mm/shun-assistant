@@ -39,6 +39,11 @@ use windows::Win32::Storage::FileSystem::{
     CreateFileW, ReadFile, WriteFile, FILE_ATTRIBUTE_NORMAL, FILE_GENERIC_READ,
     FILE_GENERIC_WRITE, FILE_SHARE_MODE, OPEN_EXISTING,
 };
+use windows::Win32::System::JobObjects::{
+    AssignProcessToJobObject, CreateJobObjectW, JobObjectExtendedLimitInformation,
+    JOBOBJECT_EXTENDED_LIMIT_INFORMATION, JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE,
+    SetInformationJobObject,
+};
 use windows::Win32::System::Pipes::{CreatePipe, GetNamedPipeServerProcessId, WaitNamedPipeW};
 use windows::Win32::System::StationsAndDesktops::CreateDesktopW;
 use windows::Win32::System::Threading::{
@@ -167,6 +172,11 @@ pub struct BrokerSpawn {
 struct SpawnedBroker {
     process: SendHandle,
     log: Arc<Mutex<Vec<u8>>>,
+    /// Held (never closed) so the broker dies with the host process even on
+    /// a crash: JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE. The handle's mere
+    /// presence in this registry is the leash; it is never read.
+    #[allow(dead_code)]
+    job: SendHandle,
 }
 
 static REGISTRY: Mutex<Option<HashMap<u32, SpawnedBroker>>> = Mutex::new(None);
@@ -255,6 +265,30 @@ pub fn spawn_broker(
         }
         let _ = CloseHandle(info.hThread);
 
+        // Orphan guard (R1 P2-6): a job object with KILL_ON_JOB_CLOSE binds
+        // the broker's lifetime to this host process, so a crashed host can
+        // never leave a live broker behind. The job handle stays open in the
+        // spawn registry for the whole host lifetime.
+        let job: Option<HANDLE> = (|| {
+            let job = CreateJobObjectW(None, PCWSTR::null()).ok()?;
+            let mut limits = JOBOBJECT_EXTENDED_LIMIT_INFORMATION::default();
+            limits.BasicLimitInformation.LimitFlags = JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE;
+            SetInformationJobObject(
+                job,
+                JobObjectExtendedLimitInformation,
+                &limits as *const JOBOBJECT_EXTENDED_LIMIT_INFORMATION as *const core::ffi::c_void,
+                std::mem::size_of::<JOBOBJECT_EXTENDED_LIMIT_INFORMATION>() as u32,
+            )
+            .ok()?;
+            AssignProcessToJobObject(job, info.hProcess).ok()?;
+            Some(job)
+        })();
+        if job.is_none() {
+            // Fail-closed posture would be "no spawn without a leash", but the
+            // job is defense-in-depth on top of the typed shutdown/kill paths;
+            // proceed and let the registry record an empty job handle.
+        }
+
         let log: Arc<Mutex<Vec<u8>>> = Arc::new(Mutex::new(Vec::new()));
         let reader_log = Arc::clone(&log);
         let reader_pipe = SendHandle(read_end.0 as usize);
@@ -275,12 +309,14 @@ pub fn spawn_broker(
         });
 
         let pid = info.dwProcessId;
+        let job_raw = job.map(|j| j.0 as usize).unwrap_or(0);
         with_registry(|map| {
             map.insert(
                 pid,
                 SpawnedBroker {
                     process: SendHandle(info.hProcess.0 as usize),
                     log,
+                    job: SendHandle(job_raw),
                 },
             );
         });
@@ -305,7 +341,7 @@ fn ensure_desktop_exists(desktop_spec: &str) {
     if name.is_empty() {
         return;
     }
-    let mut name_units = to_wide(name);
+    let name_units = to_wide(name);
     let created = unsafe {
         CreateDesktopW(
             PCWSTR(name_units.as_ptr()),
