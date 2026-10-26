@@ -507,8 +507,45 @@ function wireCloudDisclosurePreview() {
   });
 }
 
+// Only the trusted *real* backend can persist the fixed, immutable T04
+// candidate. An HTTP caller cannot choose source text, emit grants, promote
+// ACTIVE, or execute even an R0 effect from this UI path.
+function wireBuiltinRecipeSave() {
+  const button = el('save-inventory-recipe');
+  const status = el('recipe-save-status');
+  const identity = el('recipe-save-identity');
+  button.addEventListener('click', async () => {
+    button.disabled = true;
+    status.textContent = 'Saving fixed local Recipe candidate…';
+    identity.textContent = '';
+    try {
+      const saved = await api('/recipes/builtin/system-inventory/save', { body: {} });
+      if (
+        saved.ok !== true ||
+        saved.state !== 'PERSISTED_CANDIDATE_ONLY' ||
+        saved.executionAuthorized !== false ||
+        saved.modelCalls !== 0 ||
+        typeof saved.recipeId !== 'string' ||
+        !/^[a-f0-9]{64}$/.test(saved.revisionSha256)
+      ) {
+        throw new Error('Unverified Recipe candidate save');
+      }
+      identity.textContent = `Recipe: ${saved.recipeId} · SHA-256 revision: ${saved.revisionSha256}`;
+      status.textContent = saved.inserted
+        ? 'Saved immutable candidate locally. Not active or authorized to execute.'
+        : 'Existing identical candidate found. No new model call or execution.';
+    } catch {
+      status.textContent =
+        'Recipe save unavailable (real local backend required). No Recipe was executed.';
+    } finally {
+      button.disabled = false;
+    }
+  });
+}
+
 wireForm();
 wireLiveSystem();
+wireBuiltinRecipeSave();
 wireCloudDisclosurePreview();
 refresh();
 setInterval(refresh, 2500);
