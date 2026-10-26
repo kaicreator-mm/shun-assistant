@@ -2,7 +2,11 @@ import { createHash, generateKeyPairSync, sign } from 'node:crypto';
 import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
-import { type CloudConsentApproval, type CloudConsentCurrentness, canonicalJson } from '@shun/contracts';
+import {
+  type CloudConsentApproval,
+  type CloudConsentCurrentness,
+  canonicalJson,
+} from '@shun/contracts';
 import { buildDeepSeekGoalDisclosure, TrustedDeepSeekTransport } from '@shun/llm-remote';
 import { describe, expect, it } from 'vitest';
 import {
@@ -275,7 +279,7 @@ describe('T08 C03 independently signed live authority (R1 P1 correction)', () =>
             // Exercise actual T01 transport's SECOND currentness gate using
             // a signed external policy/price change AFTER the first gate.
             if (mode === 'between-reserve-and-send') {
-              h.publish({ ...h.base, pricingRevision: 'pricing-r2', inputMicrosPerToken: 2 });
+              h.publish({ ...h.base, pricingRevision: 'pricing-r2', outputMicrosPerToken: 2, maxCostMicros: 6000 });
             }
             return {
               ok: true as const,
