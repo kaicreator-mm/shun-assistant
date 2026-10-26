@@ -4,6 +4,8 @@ import {
   cloudInterpreterFromEnvironment,
   TrustedCloudInterpreter,
 } from '../src/cloud-interpret.ts';
+import { DemoShunBackend } from '../src/demo/backend.ts';
+import { createControlServer } from '../src/server.ts';
 import { startHarness } from './helpers.ts';
 
 // These are safety/interface checks, NOT a claim to have paid for a real
@@ -25,6 +27,41 @@ describe('T08 C03 real DeepSeek composition pre-send boundary', () => {
       expect((await h.get('/api/tasks')).body).toEqual({ tasks: [] });
     } finally {
       await h.close();
+    }
+  });
+
+  it('reports REMOTE only for trusted-injected cloud availability, while preserving Demo labels', async () => {
+    const backend = new DemoShunBackend();
+    const server = createControlServer({
+      backend,
+      cloud: {
+        status: () => ({
+          enabled: true,
+          provider: 'deepseek',
+          model: 'deepseek-flash',
+          osConsentRequired: true,
+        }),
+        interpretGoal: async () => ({ ok: false, code: 'CONSENT_DECLINED' }),
+      },
+    });
+    const port = await server.start();
+    try {
+      const response = await fetch(`http://127.0.0.1:${port}/api/health`);
+      expect(response.status).toBe(200);
+      expect(await response.json()).toMatchObject({
+        localOnly: false,
+        loopbackOnly: true,
+        cloudMode: 'REMOTE_OPT_IN',
+        simulated: true,
+      });
+      const status = await fetch(`http://127.0.0.1:${port}/api/cloud/status`);
+      expect(await status.json()).toMatchObject({
+        enabled: true,
+        tasksSimulated: true,
+        osConsentRequired: true,
+      });
+    } finally {
+      await server.close();
     }
   });
 
