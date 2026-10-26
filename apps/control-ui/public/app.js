@@ -507,8 +507,109 @@ function wireCloudDisclosurePreview() {
   });
 }
 
+// Trusted cloud planning is a DISTINCT real lane, not a promotion of Demo
+// task data into authoritative ActionController results. Every send still
+// requires an actual Win32 private broker Allow gesture in the local host.
+function wireTrustedCloudInterpretation() {
+  const button = el('cloud-send-button');
+  const status = el('cloud-send-status');
+  const resultText = el('cloud-result-text');
+  const goal = el('cloud-preview-goal');
+  let preflightGoal = null;
+  let available = false;
+
+  async function checkAvailability() {
+    try {
+      const state = await api('/cloud/status');
+      available =
+        state.enabled === true &&
+        state.provider === 'deepseek' &&
+        state.model === 'deepseek-flash' &&
+        state.osConsentRequired === true;
+    } catch {
+      available = false;
+    }
+    button.disabled = !available || preflightGoal !== goal.value;
+    if (!available) {
+      status.textContent = 'Trusted cloud send unavailable: Windows broker, key or host policy missing.';
+    } else {
+      status.textContent = 'Local cloud planner ready. Preview the exact goal, then confirm in Windows.';
+    }
+  }
+
+  goal.addEventListener('input', () => {
+    preflightGoal = null;
+    button.disabled = true;
+    resultText.textContent = '';
+    status.textContent = 'Goal changed. Review the disclosure again before sending.';
+  });
+  const preview = el('cloud-preview-button');
+  preview.addEventListener('click', async () => {
+    preflightGoal = null;
+    button.disabled = true;
+    // This listener runs after the preview event handler. The asynchronous
+    // preview must finish first; use a trusted local POST with the same goal
+    // solely to check projection validity, never to authorize any send.
+    const entered = goal.value;
+    try {
+      const proofOfDisplay = await api('/cloud/disclosure-preview', {
+        body: { goalText: entered },
+      });
+      if (
+        proofOfDisplay.ok === true &&
+        proofOfDisplay.status === 'LOCAL_PREVIEW_ONLY' &&
+        proofOfDisplay.cloudSendAllowed === false &&
+        proofOfDisplay.consentIssued === false &&
+        entered === goal.value
+      ) {
+        preflightGoal = entered;
+      }
+    } catch {
+      preflightGoal = null;
+    }
+    button.disabled = !available || preflightGoal !== goal.value;
+  });
+
+  button.addEventListener('click', async () => {
+    if (!available || preflightGoal === null || preflightGoal !== goal.value) {
+      status.textContent = 'The displayed goal changed. Preview before requesting consent.';
+      button.disabled = true;
+      return;
+    }
+    const goalText = preflightGoal;
+    preflightGoal = null;
+    button.disabled = true;
+    resultText.textContent = '';
+    status.textContent = 'Waiting for your separate Windows consent dialog…';
+    try {
+      const response = await api('/cloud/interpret', { body: { goalText } });
+      if (
+        response.ok !== true ||
+        response.status !== 'UNTRUSTED_REMOTE_PROPOSAL' ||
+        response.executed !== false ||
+        response.model !== 'deepseek-flash' ||
+        response.costState !== 'UNKNOWN_COST' ||
+        typeof response.proposalText !== 'string'
+      ) {
+        throw new Error('Unverified cloud response');
+      }
+      // Raw model text is UNTRUSTED, never use innerHTML or execute it.
+      resultText.textContent = response.proposalText;
+      status.textContent =
+        'Real DeepSeek response received. No action executed. Charges may be uncertain.';
+    } catch {
+      status.textContent = 'Cloud request refused or unavailable. No action was executed.';
+    } finally {
+      await checkAvailability();
+      button.disabled = true;
+    }
+  });
+  void checkAvailability();
+}
+
 wireForm();
 wireLiveSystem();
 wireCloudDisclosurePreview();
+wireTrustedCloudInterpretation();
 refresh();
 setInterval(refresh, 2500);
