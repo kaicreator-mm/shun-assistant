@@ -15,9 +15,20 @@ import {
   GoalRequestSchema,
   type TaskState,
 } from '@shun/contracts';
-import { type RegistrySnapshot, resolveGoal, ShunRegistry } from '@shun/resolver';
-import { ShunStore, ShunStoreAuthorizationAdapter, ShunStoreUiApprovalBridge } from '@shun/store';
+import {
+  type RegistrySnapshot,
+  resolveGoal,
+  ShunRegistry,
+  TrustedRecipeReadService,
+} from '@shun/resolver';
+import {
+  ImmutableRecipeRepository,
+  ShunStore,
+  ShunStoreAuthorizationAdapter,
+  ShunStoreUiApprovalBridge,
+} from '@shun/store';
 import { runStorageDiagnose } from '@shun/vertical-storage';
+import { registerBuiltinInventoryCandidate } from '../inventory-recipe.ts';
 import type {
   ControlBackend,
   DecisionOutcome,
@@ -243,6 +254,35 @@ export class RealStorageControlBackend implements ControlBackend {
     for (const row of await this.#store.listRecords('task')) {
       this.#archivedTasks.set(row.recordId, restoreStorageTask(row, this.#workspace));
     }
+  }
+
+  /**
+   * User-triggered persistence of ONE immutable built-in Recipe candidate.
+   * The trusted host owns both the database and the actual ActionController.
+   * Preview currentness is deliberately UNRESOLVABLE until T08 integrates a
+   * genuine registered `system.inventory` plan; this route never authorizes
+   * even an R0 effect, promotes ACTIVE, or runs code.
+   */
+  saveBuiltinInventoryCandidate() {
+    const repo = new ImmutableRecipeRepository(this.#store);
+    const controller = this.#controller;
+    const service = new TrustedRecipeReadService({
+      repository: {
+        append: (value) => repo.append(value),
+        get: (recipeId, sha) => repo.get(recipeId, sha),
+      },
+      currentness: () => ({ kind: 'UNRESOLVABLE' as const }),
+      loadExpectedPlan: () => {
+        throw new Error('RECIPE_NOT_ACTIVE_OR_APPROVED');
+      },
+      controller: {
+        authorizePlan: (input) =>
+          controller.authorizePlan(
+            input as Parameters<ActionController['authorizePlan']>[0],
+          ),
+      },
+    });
+    return registerBuiltinInventoryCandidate(service);
   }
 
   meta(): { policy: PolicyState; localOnly: true; simulated: false } {
