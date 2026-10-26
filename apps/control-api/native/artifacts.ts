@@ -7,10 +7,20 @@ import { existsSync, readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
+// Pinned to the R1-hardened rebuild squash-merged via #192: broker exe
+// c85420ca… is the exact committed #192 final byte pair (verified by
+// Get-FileHash on version/v0.2.0@a0a57db8, matching the #192 final report;
+// the pre-rebuild pin 5f202696… had drifted and closed every native spawn
+// with BROKER_EXE_SHA_MISMATCH). The addon was rebuilt once more with the
+// client pipe explicitly requesting Identification-level SQOS: the R1 P2-4
+// broker admission reads the CONNECTING client's impersonation token, and
+// the previous addon's SQOS-less CreateFileW only ever presented an
+// anonymous token, so the hardened broker refused its own host
+// (CLIENT_REFUSED, proven by old/new cross-pair runs on this Build Host).
 export const CONSENT_BROKER_EXE_SHA256 =
-  '5f202696a757e6678f849e50cfcc2bf088d31211fe0e48e8c5a889ad1b8a337a';
+  'c85420cabd60e264e806fdfc5025287feb2f8168ce84d766b49fb2c91732c567';
 export const CONSENT_HOST_ADDON_SHA256 =
-  'd75642429a977612c8b413c182f812ac9caeaee1b0074a5b9fa08c2382b19ffc';
+  'a616ff35c0da830f1d6a3bd9e0f4df18cc2ef4deb97e565f92bbd3b53fe05f75';
 
 const nativeDir = dirname(fileURLToPath(import.meta.url));
 

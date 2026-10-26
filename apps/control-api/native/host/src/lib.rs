@@ -37,7 +37,8 @@ use windows::Win32::Security::Cryptography::{BCryptGenRandom, BCRYPT_USE_SYSTEM_
 use windows::Win32::Security::TOKEN_QUERY;
 use windows::Win32::Storage::FileSystem::{
     CreateFileW, ReadFile, WriteFile, FILE_ATTRIBUTE_NORMAL, FILE_GENERIC_READ,
-    FILE_GENERIC_WRITE, FILE_SHARE_MODE, OPEN_EXISTING,
+    FILE_GENERIC_WRITE, FILE_SHARE_MODE, OPEN_EXISTING, SECURITY_IDENTIFICATION,
+    SECURITY_SQOS_PRESENT,
 };
 use windows::Win32::System::JobObjects::{
     AssignProcessToJobObject, CreateJobObjectW, JobObjectExtendedLimitInformation,
@@ -446,7 +447,13 @@ fn open_pipe_client(pipe_name: &str, timeout_ms: u32) -> Result<HANDLE> {
                 FILE_SHARE_MODE(0),
                 None,
                 OPEN_EXISTING,
-                FILE_ATTRIBUTE_NORMAL,
+                // The broker's admission reads the CONNECTING client's
+                // impersonation token (ImpersonateNamedPipeClient). Without an
+                // explicit SQOS the pipe server only gets an anonymous token
+                // and every query fails, so the broker refuses its own host.
+                // Identification level grants exactly the identify-only
+                // queries the broker performs — never act-on-behalf use.
+                FILE_ATTRIBUTE_NORMAL | SECURITY_SQOS_PRESENT | SECURITY_IDENTIFICATION,
                 None,
             )
         };
