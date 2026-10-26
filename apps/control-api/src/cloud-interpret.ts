@@ -15,6 +15,10 @@ import {
   TrustedDeepSeekTransport,
 } from '@shun/llm-remote';
 import {
+  createCloudAuthorityCurrentness,
+  readOperatorCloudAuthority,
+} from './cloud-authority.ts';
+import {
   type BrokerConsentRequest,
   PrivateConsentBrokerSession,
   privateConsentHostAvailability,
@@ -60,55 +64,44 @@ export interface TrustedCloudConfig {
   readApiKey: () => string | undefined;
 }
 
-function integerEnv(name: string): number {
-  const text = process.env[name];
-  if (!text || !/^[0-9]{1,13}$/.test(text)) throw new Error('CLOUD_TRUSTED_CONFIG_MISSING');
-  const value = Number(text);
-  if (!Number.isSafeInteger(value) || value <= 0) throw new Error('CLOUD_TRUSTED_CONFIG_INVALID');
-  return value;
-}
-
-/** A cloud lane is opt-in by trusted process startup, never a browser flag. */
+/** Enable actual egress only against the independent short-lived Ed25519
+ * operator source. Startup environment strings do NOT certify registry or
+ * pricing currentness; the signed source is fetched again at both send gates.
+ */
 export function cloudInterpreterFromEnvironment(): CloudInterpretPort | undefined {
   if (process.env.SHUN_CLOUD_ENABLED !== '1') return undefined;
   const ledgerFile = process.env.SHUN_CLOUD_LEDGER_FILE;
-  const registryRevision = process.env.SHUN_CLOUD_REGISTRY_REVISION;
-  const policyRevision = process.env.SHUN_CLOUD_POLICY_REVISION;
-  const scopeRevision = process.env.SHUN_CLOUD_SCOPE_REVISION;
-  const pricingRevision = process.env.SHUN_CLOUD_PRICING_REVISION;
-  if (
-    !ledgerFile ||
-    !isAbsolute(ledgerFile) ||
-    ledgerFile === ':memory:' ||
-    !registryRevision ||
-    !policyRevision ||
-    !scopeRevision ||
-    !pricingRevision
-  ) {
+  const authorityFile = process.env.SHUN_CLOUD_AUTHORITY_FILE;
+  const publicKeyFile = process.env.SHUN_CLOUD_PUBLIC_KEY_FILE;
+  const pinnedSpkiSha256 = process.env.SHUN_CLOUD_PUBLIC_KEY_SPKI_SHA256;
+  if (!ledgerFile || !isAbsolute(ledgerFile) || ledgerFile === ':memory:'
+      || !authorityFile || !publicKeyFile || !pinnedSpkiSha256) {
     throw new Error('CLOUD_TRUSTED_CONFIG_MISSING');
   }
-  const revision = {
-    registryRevision,
-    policyRevision,
-    scopeRevision,
-    pricingRevision,
-  };
+  const source = () => readOperatorCloudAuthority({
+    authorityFile,
+    publicKeyFile,
+    pinnedSpkiSha256,
+  });
+  // No signer, self-issued revision or silent fallback. If absent/expired,
+  // production startup fails closed rather than advertising a remote planner.
+  const initial = source();
   const config: TrustedCloudConfig = {
     ledgerFile,
-    ...revision,
-    revocationEpoch: 0,
-    inputMicrosPerToken: integerEnv('SHUN_CLOUD_INPUT_MICROS_PER_TOKEN'),
-    outputMicrosPerToken: integerEnv('SHUN_CLOUD_OUTPUT_MICROS_PER_TOKEN'),
-    maxInputTokens: integerEnv('SHUN_CLOUD_MAX_INPUT_TOKENS'),
-    maxOutputTokens: integerEnv('SHUN_CLOUD_MAX_OUTPUT_TOKENS'),
-    maxCostMicros: integerEnv('SHUN_CLOUD_MAX_COST_MICROS'),
+    registryRevision: initial.registryRevision,
+    policyRevision: initial.policyRevision,
+    scopeRevision: initial.scopeRevision,
+    pricingRevision: initial.pricingRevision,
+    revocationEpoch: initial.revocationEpoch,
+    inputMicrosPerToken: initial.inputMicrosPerToken,
+    outputMicrosPerToken: initial.outputMicrosPerToken,
+    maxInputTokens: initial.maxInputTokens,
+    maxOutputTokens: initial.maxOutputTokens,
+    maxCostMicros: initial.maxCostMicros,
     isOffline: () => process.env.SHUN_CLOUD_OFFLINE === '1',
     isCurrent: () =>
       process.env.SHUN_CLOUD_ENABLED === '1' &&
-      process.env.SHUN_CLOUD_REGISTRY_REVISION === revision.registryRevision &&
-      process.env.SHUN_CLOUD_POLICY_REVISION === revision.policyRevision &&
-      process.env.SHUN_CLOUD_SCOPE_REVISION === revision.scopeRevision &&
-      process.env.SHUN_CLOUD_PRICING_REVISION === revision.pricingRevision,
+      createCloudAuthorityCurrentness(source, initial)(),
     readApiKey: () => process.env.DEEPSEEK_API_KEY,
   };
   return new TrustedCloudInterpreter(config);
@@ -142,7 +135,10 @@ function stagedBrokerVerifier(
 }
 
 export class TrustedCloudInterpreter implements CloudInterpretPort {
-  constructor(private readonly trusted: TrustedCloudConfig) {
+  private readonly trusted: TrustedCloudConfig;
+
+  constructor(trusted: TrustedCloudConfig) {
+    this.trusted = trusted;
     const t = trusted;
     if (
       !isAbsolute(t.ledgerFile) ||
@@ -160,7 +156,8 @@ export class TrustedCloudInterpreter implements CloudInterpretPort {
       t.maxCostMicros < 1 ||
       t.inputMicrosPerToken < 1 ||
       t.outputMicrosPerToken < 1 ||
-      t.revocationEpoch !== 0
+      !Number.isSafeInteger(t.revocationEpoch) ||
+      t.revocationEpoch < 0
     ) {
       throw new Error('CLOUD_TRUSTED_CONFIG_INVALID');
     }
