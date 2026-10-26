@@ -114,8 +114,13 @@ async function killChildAtPhase(
       output += chunk.toString('utf8');
       if (output.includes(`PHASE_READY:${phase}`) && !parentKillAccepted) {
         // The phase point is observed inside the REAL composition; only the
-        // parent (not the child) issues the real process-kill request.
-        parentKillAccepted = child.kill('SIGKILL');
+        // parent (not the child) issues the real process-kill request. The
+        // child is verified STILL RUNNING after the acknowledgement (no exit
+        // observed yet — the windows-host-hardkill-replay discipline), so a
+        // self-crashed child can never be claimed as a parent kill.
+        if (child.exitCode === null && child.signalCode === null) {
+          parentKillAccepted = child.kill('SIGKILL');
+        }
       }
     });
     child.stderr.on('data', (chunk: Buffer) => {
@@ -260,6 +265,11 @@ type PhaseExpectation = Readonly<{
 async function killAndVerifyPhase(phase: Phase, expected: PhaseExpectation): Promise<void> {
   expect(process.version, 'F04B3b runs on the pinned Node 24 runtime').toMatch(/^v24\./);
   const folder = mkdtempSync(join(tmpdir(), `shun-f04b3b-${phase.toLowerCase()}-`));
+  // R1 P2-03: the folder (SQLite store, fixtures with HMAC grant material,
+  // payload files) is removed even when a later gate in this test fails.
+  dispose.push(() => {
+    rmSync(folder, { recursive: true, force: true });
+  });
   mkdirSync(join(folder, 'src'));
   mkdirSync(join(folder, 'dst'));
   const payload = phasePayload(phase);
@@ -291,12 +301,14 @@ async function killAndVerifyPhase(phase: Phase, expected: PhaseExpectation): Pro
   }
 
   const firstHost = new ShunStore({ file: sqliteFile });
-  const { plan, action } = await authorizeOneMutation(
-    firstHost,
-    expected.op,
-    sourcePath,
-    destinationPath,
-  );
+  let authorized: { plan: ActionPlan; action: AuthorizedAction };
+  try {
+    authorized = await authorizeOneMutation(firstHost, expected.op, sourcePath, destinationPath);
+  } catch (error) {
+    await firstHost.close();
+    throw error;
+  }
+  const { plan, action } = authorized;
   writeFileSync(fixturesFile, JSON.stringify({ action, plan }));
   await firstHost.close();
 
@@ -310,7 +322,6 @@ async function killAndVerifyPhase(phase: Phase, expected: PhaseExpectation): Pro
   const recovered = new ShunStore({ file: sqliteFile });
   dispose.push(async () => {
     await recovered.close();
-    rmSync(folder, { recursive: true, force: true });
   });
   const journal = new SqliteFileMutationJournal(recovered);
 
@@ -353,6 +364,10 @@ async function killAndVerifyPhase(phase: Phase, expected: PhaseExpectation): Pro
     }
     if (expected.destBytes === 'empty') {
       expect(observed.evidence.destMatchesCommitment).toBe(false);
+      // R1 P2-01: the exclusive-created empty destination is a NEW kernel
+      // object — it must NOT carry the committed source FileId/volume (the
+      // one phase where identity continuity is provably absent).
+      expect(observed.evidence.destIdentityContinuity).toBe(false);
     }
   }
   // Plain-fs cross-check in this fresh host (independent of the observer).
