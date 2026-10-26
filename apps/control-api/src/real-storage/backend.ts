@@ -277,9 +277,7 @@ export class RealStorageControlBackend implements ControlBackend {
       },
       controller: {
         authorizePlan: (input) =>
-          controller.authorizePlan(
-            input as Parameters<ActionController['authorizePlan']>[0],
-          ),
+          controller.authorizePlan(input as Parameters<ActionController['authorizePlan']>[0]),
       },
     });
     return registerBuiltinInventoryCandidate(service);
