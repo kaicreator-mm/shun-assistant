@@ -15,14 +15,11 @@ import {
   TrustedDeepSeekTransport,
 } from '@shun/llm-remote';
 import {
-  createCloudAuthorityCurrentness,
-  readOperatorCloudAuthority,
-} from './cloud-authority.ts';
-import {
   type BrokerConsentRequest,
   PrivateConsentBrokerSession,
   privateConsentHostAvailability,
 } from '../native/index.ts';
+import { createCloudAuthorityCurrentness, readOperatorCloudAuthority } from './cloud-authority.ts';
 
 export type CloudInterpretResult =
   | {
@@ -74,15 +71,22 @@ export function cloudInterpreterFromEnvironment(): CloudInterpretPort | undefine
   const authorityFile = process.env.SHUN_CLOUD_AUTHORITY_FILE;
   const publicKeyFile = process.env.SHUN_CLOUD_PUBLIC_KEY_FILE;
   const pinnedSpkiSha256 = process.env.SHUN_CLOUD_PUBLIC_KEY_SPKI_SHA256;
-  if (!ledgerFile || !isAbsolute(ledgerFile) || ledgerFile === ':memory:'
-      || !authorityFile || !publicKeyFile || !pinnedSpkiSha256) {
+  if (
+    !ledgerFile ||
+    !isAbsolute(ledgerFile) ||
+    ledgerFile === ':memory:' ||
+    !authorityFile ||
+    !publicKeyFile ||
+    !pinnedSpkiSha256
+  ) {
     throw new Error('CLOUD_TRUSTED_CONFIG_MISSING');
   }
-  const source = () => readOperatorCloudAuthority({
-    authorityFile,
-    publicKeyFile,
-    pinnedSpkiSha256,
-  });
+  const source = () =>
+    readOperatorCloudAuthority({
+      authorityFile,
+      publicKeyFile,
+      pinnedSpkiSha256,
+    });
   // No signer, self-issued revision or silent fallback. If absent/expired,
   // production startup fails closed rather than advertising a remote planner.
   const initial = source();
@@ -100,8 +104,7 @@ export function cloudInterpreterFromEnvironment(): CloudInterpretPort | undefine
     maxCostMicros: initial.maxCostMicros,
     isOffline: () => process.env.SHUN_CLOUD_OFFLINE === '1',
     isCurrent: () =>
-      process.env.SHUN_CLOUD_ENABLED === '1' &&
-      createCloudAuthorityCurrentness(source, initial)(),
+      process.env.SHUN_CLOUD_ENABLED === '1' && createCloudAuthorityCurrentness(source, initial)(),
     readApiKey: () => process.env.DEEPSEEK_API_KEY,
   };
   return new TrustedCloudInterpreter(config);
