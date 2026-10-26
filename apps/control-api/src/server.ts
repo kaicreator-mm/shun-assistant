@@ -237,7 +237,9 @@ async function handle(
   // trusted private IPC gesture. This route performs NO outbound I/O and has
   // no access to consent issuer, credential, ledger or transport.
   if (method === 'POST' && url.pathname === '/api/cloud/disclosure-preview') {
-    const parsed = CloudDisclosurePreviewSchema.safeParse(await readJsonBody(req, ctx.maxBodyBytes));
+    const parsed = CloudDisclosurePreviewSchema.safeParse(
+      await readJsonBody(req, ctx.maxBodyBytes),
+    );
     if (!parsed.success) {
       return respondJson(res, 400, { error: { code: 'DISCLOSURE_PREVIEW_INVALID' } });
     }
