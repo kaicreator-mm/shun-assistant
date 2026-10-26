@@ -47,6 +47,22 @@
         <ul id="system-facts"></ul>
       </section>
 
+      <section id="cloud-disclosure-section" aria-labelledby="cloud-disclosure-title">
+        <h2 id="cloud-disclosure-title">DeepSeek Flash disclosure preview</h2>
+        <p class="muted">
+          Preview exactly what Shun would share with the DeepSeek provider. This is a local
+          preview only — it does not approve a cloud call, send any data or charge tokens.
+        </p>
+        <label for="cloud-preview-goal">Goal text to preview</label>
+        <textarea id="cloud-preview-goal" rows="3" maxlength="8192"
+          placeholder="Describe a non-sensitive task for DeepSeek to plan"></textarea>
+        <button id="cloud-preview-button" type="button">Show disclosure preview</button>
+        <p id="cloud-preview-status" role="status">Cloud sending unavailable until Shun's trusted
+          Windows private consent broker is connected.</p>
+        <p id="cloud-preview-hash" class="muted"></p>
+        <pre id="cloud-preview-json"></pre>
+      </section>
+
       <section id="approvals-section" aria-labelledby="approvals-title">
         <h2 id="approvals-title">Waiting for your approval</h2>
         <ul id="approval-list"></ul>

@@ -469,7 +469,46 @@ function wireLiveSystem() {
   });
 }
 
+// T08 C01: a local, non-authoritative display of the exact T01 cloud
+// disclosure projection. Nothing in this browser can issue a broker assertion,
+// approve a model send, or change cloud budget/currentness.
+function wireCloudDisclosurePreview() {
+  const button = el('cloud-preview-button');
+  const status = el('cloud-preview-status');
+  const hash = el('cloud-preview-hash');
+  const json = el('cloud-preview-json');
+  button.addEventListener('click', async () => {
+    status.textContent = 'Calculating local disclosure preview…';
+    hash.textContent = '';
+    json.textContent = '';
+    button.disabled = true;
+    try {
+      const goalText = el('cloud-preview-goal').value;
+      const result = await api('/cloud/disclosure-preview', { body: { goalText } });
+      if (
+        result.ok !== true ||
+        result.status !== 'LOCAL_PREVIEW_ONLY' ||
+        result.consentIssued !== false ||
+        result.cloudSendAllowed !== false ||
+        result.privateBrokerReady !== false ||
+        typeof result.projectionJson !== 'string' ||
+        !/^[a-f0-9]{64}$/.test(result.sha256)
+      ) {
+        throw new Error('The server did not confirm preview-only mode.');
+      }
+      json.textContent = result.projectionJson;
+      hash.textContent = `Disclosure SHA-256: ${result.sha256}`;
+      status.textContent = 'Local preview only. No cloud request was made. Approval and sending are disabled.';
+    } catch {
+      status.textContent = 'Disclosure preview unavailable. No cloud request was made.';
+    } finally {
+      button.disabled = false;
+    }
+  });
+}
+
 wireForm();
 wireLiveSystem();
+wireCloudDisclosurePreview();
 refresh();
 setInterval(refresh, 2500);

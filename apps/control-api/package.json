@@ -19,7 +19,8 @@
     "@shun/authorization": "workspace:*",
     "@shun/store": "workspace:*",
     "@shun/vertical-storage": "workspace:*",
-    "@shun/vertical-system": "workspace:*"
+    "@shun/vertical-system": "workspace:*",
+    "@shun/llm-remote": "workspace:*"
   },
   "devDependencies": {
     "@biomejs/biome": "^2.3.8",
