@@ -1,0 +1,209 @@
+=== T08 J0 Windows real-launch validation log ===
+date: 2026-10-26 (local) / captures below timestamped in sequence
+repo: kaicreator-mm/shun-assistant  PR #190  head: a2738f5f1f9723121f94e6b6a76766d7ca2741da
+branch: task/v02-t08-j0-live-inventory-ui  base: version/v0.2.0
+host: Windows 11 专业版 build 10.0.26300.9711  user: 15549
+token: Mandatory Label\Medium Mandatory Level S-1-16-8192 (non-elevated, standard-user equivalent)
+node: v24.21.0
+
+=== T08 J0 winval test log ===
+date: 2026-10-26T07:16:40Z
+repo: kaicreator-mm/shun-assistant  PR #190  head: a2738f5f1f9723121f94e6b6a76766d7ca2741da
+node: v24.21.0  user: 15549
+
+$ pnpm test (apps/control-api, vitest run)
+
+> @shun/control-api@0.1.0 test C:\xDev\kAiCreator\shun-assistant\shun-pr190-j0-winval\apps\control-api
+> vitest run
+
+
+[1m[46m RUN [49m[22m [36mv3.2.7 [39m[90mC:/xDev/kAiCreator/shun-assistant/shun-pr190-j0-winval/apps/control-api[39m
+
+ [32m✓[39m test/real-storage-recovery.test.ts [2m([22m[2m8 tests[22m[2m)[22m[32m 17[2mms[22m[39m
+ [32m✓[39m test/registry-key-pin.test.ts [2m([22m[2m4 tests[22m[2m)[22m[32m 233[2mms[22m[39m
+ [32m✓[39m test/registry-host-facts.test.ts [2m([22m[2m3 tests[22m[2m)[22m[32m 9[2mms[22m[39m
+ [32m✓[39m test/preview-prose.test.ts [2m([22m[2m2 tests[22m[2m)[22m[32m 9[2mms[22m[39m
+ [32m✓[39m test/real-inventory.test.ts [2m([22m[2m1 test[22m[2m)[22m[32m 171[2mms[22m[39m
+ [32m✓[39m test/preview.test.ts [2m([22m[2m7 tests[22m[2m)[22m[33m 327[2mms[22m[39m
+ [32m✓[39m test/approval-status.test.ts [2m([22m[2m3 tests[22m[2m)[22m[32m 267[2mms[22m[39m
+ [32m✓[39m test/policy-failsafe.test.ts [2m([22m[2m4 tests[22m[2m)[22m[33m 383[2mms[22m[39m
+ [32m✓[39m test/csrf.test.ts [2m([22m[2m7 tests[22m[2m)[22m[33m 399[2mms[22m[39m
+ [32m✓[39m test/lifecycle.test.ts [2m([22m[2m12 tests[22m[2m)[22m[33m 410[2mms[22m[39m
+ [32m✓[39m test/policy-drift.test.ts [2m([22m[2m3 tests[22m[2m)[22m[33m 413[2mms[22m[39m
+   [33m[2m✓[22m[39m active policy revision drift fails closed (VC-P1-02)[2m > [22mrefuses an approval decided under a drifted ACTIVE policy revision [33m 306[2mms[22m[39m
+ [32m✓[39m test/recovery-honesty.test.ts [2m([22m[2m3 tests[22m[2m)[22m[33m 422[2mms[22m[39m
+ [32m✓[39m test/server.test.ts [2m([22m[2m5 tests[22m[2m)[22m[33m 425[2mms[22m[39m
+ [32m✓[39m test/approvals.test.ts [2m([22m[2m8 tests[22m[2m)[22m[33m 434[2mms[22m[39m
+ [32m✓[39m test/local-only.test.ts [2m([22m[2m7 tests[22m[2m)[22m[33m 428[2mms[22m[39m
+ [32m✓[39m test/registry-issuance.test.ts [2m([22m[2m7 tests[22m[2m)[22m[32m 27[2mms[22m[39m
+ [32m✓[39m test/simulation-label.test.ts [2m([22m[2m2 tests[22m[2m)[22m[32m 108[2mms[22m[39m
+ [32m✓[39m test/real-storage-bootstrap.test.ts [2m([22m[2m2 tests[22m[2m)[22m[32m 3[2mms[22m[39m
+
+[2m Test Files [22m [1m[32m18 passed[39m[22m[90m (18)[39m
+[2m      Tests [22m [1m[32m88 passed[39m[22m[90m (88)[39m
+[2m   Start at [22m 15:16:43
+[2m   Duration [22m 4.29s[2m (transform 2.90s, setup 0ms, collect 20.45s, tests 4.48s, environment 8ms, prepare 6.72s)[22m
+
+EXIT_control_api_test=0
+
+$ pnpm test (apps/control-ui)
+
+> @shun/control-ui@0.1.0 test C:\xDev\kAiCreator\shun-assistant\shun-pr190-j0-winval\apps\control-ui
+> vitest run
+
+
+[1m[46m RUN [49m[22m [36mv3.2.7 [39m[90mC:/xDev/kAiCreator/shun-assistant/shun-pr190-j0-winval/apps/control-ui[39m
+
+ [32m✓[39m test/view-model.test.ts [2m([22m[2m20 tests[22m[2m)[22m[32m 11[2mms[22m[39m
+
+[2m Test Files [22m [1m[32m1 passed[39m[22m[90m (1)[39m
+[2m      Tests [22m [1m[32m20 passed[39m[22m[90m (20)[39m
+[2m   Start at [22m 15:17:08
+[2m   Duration [22m 991ms[2m (transform 72ms, setup 0ms, collect 80ms, tests 11ms, environment 0ms, prepare 172ms)[22m
+
+EXIT_control_ui_test=0
+
+$ pnpm test (packages/vertical-system, T06 reuse)
+
+> @shun/vertical-system@0.2.0 test C:\xDev\kAiCreator\shun-assistant\shun-pr190-j0-winval\packages\vertical-system
+> vitest run
+
+
+[1m[46m RUN [49m[22m [36mv3.2.7 [39m[90mC:/xDev/kAiCreator/shun-assistant/shun-pr190-j0-winval/packages/vertical-system[39m
+
+ [32m✓[39m test/windows-software.test.ts [2m([22m[2m5 tests[22m[2m)[22m[32m 6[2mms[22m[39m
+ [32m✓[39m test/windows-runtime.test.ts [2m([22m[2m5 tests[22m[2m)[22m[32m 6[2mms[22m[39m
+ [32m✓[39m test/windows-pressure.test.ts [2m([22m[2m4 tests[22m[2m)[22m[32m 7[2mms[22m[39m
+ [32m✓[39m test/diagnostics.test.ts [2m([22m[2m5 tests[22m[2m)[22m[32m 6[2mms[22m[39m
+ [32m✓[39m test/inventory.test.ts [2m([22m[2m6 tests[22m[2m)[22m[32m 6[2mms[22m[39m
+
+[2m Test Files [22m [1m[32m5 passed[39m[22m[90m (5)[39m
+[2m      Tests [22m [1m[32m25 passed[39m[22m[90m (25)[39m
+[2m   Start at [22m 15:17:14
+[2m   Duration [22m 1.27s[2m (transform 403ms, setup 0ms, collect 661ms, tests 32ms, environment 1ms, prepare 1.19s)[22m
+
+EXIT_vertical_system_test=0
+
+=== J0 real-launch session transcript (manual captures, verbatim) ===
+
+--- Launch (real, documented packaging-smoke entry) ---
+$ node --experimental-transform-types apps/control-api/src/main.ts
+(node:24484) ExperimentalWarning: Transform Types is an experimental feature and might change at any time
+Shun control surface (T08 DEMO ONLY) on http://127.0.0.1:7788
+Local only: the surface refuses non-loopback binds and non-loopback Host headers.
+(server PID 24484; first attempt `node src/main.ts` without the transform flag fails with
+ ERR_UNSUPPORTED_TYPESCRIPT_SYNTAX on packages/resolver parameter properties — expected on
+ Node 24 strip-only mode; the repo-documented launch in docs/validation/closeout/packaging-smoke.md
+ is `node --experimental-transform-types apps/control-api/src/main.ts`, used here)
+
+--- GET /api/health (curl, 127.0.0.1:7788) ---
+{
+  "ok": true,
+  "api": "shun.control-api/0.1",
+  "localOnly": true,
+  "simulated": true,
+  "policy": {
+    "kind": "ACTIVE",
+    "revision": "pol-snap-2026-10-10-a"
+  }
+}
+
+--- GET /api/system/inventory (curl, 127.0.0.1:7788) ---
+{
+  "ok": true,
+  "source": "LIVE_WINDOWS_LOCAL_READONLY",
+  "localOnly": true,
+  "externalDisclosures": [],
+  "snapshot": {
+    "schema": "shun.system-inventory.v02",
+    "localOnly": true,
+    "externalDisclosures": [],
+    "provenance": "node:os+node:fs:statfs",
+    "platform": "win32",
+    "cpuLogicalCount": 16,
+    "memoryTotalBytes": 59262226432,
+    "memoryFreeBytes": 20805070848,
+    "diskTotalBytes": 510853640192,
+    "diskFreeBytes": 83743293440,
+    "uptimeSeconds": 175340
+  },
+  "suggestions": []
+}
+
+--- Windows ground truth (PowerShell Get-CimInstance, sampled seconds apart) ---
+$ Get-CimInstance Win32_ComputerSystem / Win32_OperatingSystem / Win32_LogicalDisk C:
+{
+    "cpuLogical":  16,
+    "memTotalBytes":  59262226432,
+    "memFreeBytes":  21141008384,
+    "diskTotalBytes":  510853640192,
+    "diskFreeBytes":  83743416320,
+    "lastBoot":  "\/Date(1792823782902)\/",
+    "uptimeSeconds":  175352.8253903
+}
+
+Cross-check:
+  cpuLogicalCount     16                  == 16                    exact
+  memoryTotalBytes    59262226432         == 59262226432           exact (byte-for-byte)
+  diskTotalBytes      510853640192        == 510853640192          exact (byte-for-byte)
+  diskFreeBytes       83743293440         vs 83743416320           delta 122880 B (0.00015%)
+  memoryFreeBytes     20805070848         vs 21141008384           delta ~1.6%, free memory
+                                                                  fluctuates between samples
+  uptimeSeconds       175340              vs 175352.8              delta 12.8s == interval between
+                                                                  the two captures
+
+--- Real UI click (in-app browser, viewport 1280x720) ---
+Page title: Shun Control
+Banner before click (DOM snapshot): "Simulation — this surface runs the scripted
+DemoShunBackend, not the real Action Controller. Nothing here touches a real system."
+System section before click: button "Read system information", status "Not requested yet."
+
+Click: real coordinate click at button center (330,360) — role/id locator clicks timed
+out against the 2.5s UI poll cycle, coordinate click dispatched the real pointer event.
+
+#system-status after click:
+  "Live local Windows facts read. No cloud call or file changes."
+#system-facts after click (six list items):
+  Logical CPUs: 16
+  Memory total (MiB): 56516.9
+  Memory available (MiB): 19981.3
+  Disk total (GiB): 475.8
+  Disk available (GiB): 78.0
+  Uptime (hours): 48.8
+
+UI numbers vs raw snapshot: 56516.9 MiB = 59262226432 B exact; 475.8 GiB =
+510853640192 B; 78.0 GiB = 83743293440 B; 48.8 h = ~175700 s (later sample);
+19981.3 MiB available = live free-memory sample at click time.
+
+--- No-cloud evidence (netstat -ano, server PID 24484, captured after the real click) ---
+  TCP    127.0.0.1:7788         0.0.0.0:0              LISTENING       24484
+  TCP    127.0.0.1:7788         127.0.0.1:49814        ESTABLISHED     24484
+  TCP    127.0.0.1:7788         127.0.0.1:52044        ESTABLISHED     24484
+=> every socket of the server process is loopback-only; the two ESTABLISHED
+   peers are the local curl and the local browser. No non-loopback remote address.
+
+--- No-file-modification evidence ---
+git status --porcelain before launch : 0 entries
+git status --porcelain after stop   : 0 entries
+(the whole launch + click session left the worktree byte-identical)
+
+--- Demo labelling evidence ---
+/api/health -> "simulated": true
+server banner -> "Shun control surface (T08 DEMO ONLY)"
+UI banner -> "Simulation — this surface runs the scripted DemoShunBackend, not the
+  real Action Controller. Nothing here touches a real system."
+The live-inventory section is visually separate and states the opposite provenance:
+  "Read-only facts from this computer, not simulated task results. Nothing is sent
+   to a cloud provider."
+Nothing renamed demo tasks to REAL; simulation-label tests still pass.
+
+=== server stdout (full) ===
+(node:24484) ExperimentalWarning: Transform Types is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+Shun control surface (T08 DEMO ONLY) on http://127.0.0.1:7788
+Local only: the surface refuses non-loopback binds and non-loopback Host headers.
+
+=== screenshot artifacts (sha256) ===
+ccd6e3e9b0a230fa2c7197e4b26b7cd0ec49e05343658d2caf17ea50428a410b *docs/validation/v0.2/logs/t08-j0-shots/ui-after-click-system-section.png
+6d7035e862c94d7615fef83bd594851f8591aca45eb182b2af85d6ad12adf359 *docs/validation/v0.2/logs/t08-j0-shots/ui-after-click-viewport.png
+4b6540b5dbb401944edc7a28910469fe3e76971f9f46648ad0d20c5c029a2ad1 *docs/validation/v0.2/logs/t08-j0-shots/ui-before-click-fullpage.png
