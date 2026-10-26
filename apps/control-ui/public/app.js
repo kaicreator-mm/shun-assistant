@@ -472,12 +472,13 @@ function wireLiveSystem() {
 // T08 C01: a local, non-authoritative display of the exact T01 cloud
 // disclosure projection. Nothing in this browser can issue a broker assertion,
 // approve a model send, or change cloud budget/currentness.
-function wireCloudDisclosurePreview() {
+function wireCloudDisclosurePreview(onDisplayed) {
   const button = el('cloud-preview-button');
   const status = el('cloud-preview-status');
   const hash = el('cloud-preview-hash');
   const json = el('cloud-preview-json');
   button.addEventListener('click', async () => {
+    onDisplayed(null);
     status.textContent = 'Calculating local disclosure preview…';
     hash.textContent = '';
     json.textContent = '';
@@ -485,6 +486,7 @@ function wireCloudDisclosurePreview() {
     try {
       const goalText = el('cloud-preview-goal').value;
       const result = await api('/cloud/disclosure-preview', { body: { goalText } });
+      if (goalText !== el('cloud-preview-goal').value) throw new Error('Goal changed');
       if (
         result.ok !== true ||
         result.status !== 'LOCAL_PREVIEW_ONLY' ||
@@ -498,8 +500,10 @@ function wireCloudDisclosurePreview() {
       }
       json.textContent = result.projectionJson;
       hash.textContent = `Disclosure SHA-256: ${result.sha256}`;
-      status.textContent = 'Local preview only. No cloud request was made. Approval and sending are disabled.';
+      status.textContent = 'Local preview only. No cloud request was made. A separate Windows dialog is required to send.';
+      onDisplayed(goalText);
     } catch {
+      onDisplayed(null);
       status.textContent = 'Disclosure preview unavailable. No cloud request was made.';
     } finally {
       button.disabled = false;
@@ -543,32 +547,13 @@ function wireTrustedCloudInterpretation() {
     resultText.textContent = '';
     status.textContent = 'Goal changed. Review the disclosure again before sending.';
   });
-  const preview = el('cloud-preview-button');
-  preview.addEventListener('click', async () => {
-    preflightGoal = null;
-    button.disabled = true;
-    // This listener runs after the preview event handler. The asynchronous
-    // preview must finish first; use a trusted local POST with the same goal
-    // solely to check projection validity, never to authorize any send.
-    const entered = goal.value;
-    try {
-      const proofOfDisplay = await api('/cloud/disclosure-preview', {
-        body: { goalText: entered },
-      });
-      if (
-        proofOfDisplay.ok === true &&
-        proofOfDisplay.status === 'LOCAL_PREVIEW_ONLY' &&
-        proofOfDisplay.cloudSendAllowed === false &&
-        proofOfDisplay.consentIssued === false &&
-        entered === goal.value
-      ) {
-        preflightGoal = entered;
-      }
-    } catch {
-      preflightGoal = null;
-    }
-    button.disabled = !available || preflightGoal !== goal.value;
-  });
+  // Only the one actual rendered preview can unlock the send button.
+  // Never run a second racing preflight request that could complete before
+  // the JSON and digest are visible on screen.
+  function onDisplayed(displayedGoal) {
+    preflightGoal = displayedGoal !== null && displayedGoal === goal.value ? displayedGoal : null;
+    button.disabled = !available || preflightGoal === null;
+  }
 
   button.addEventListener('click', async () => {
     if (!available || preflightGoal === null || preflightGoal !== goal.value) {
@@ -605,11 +590,12 @@ function wireTrustedCloudInterpretation() {
     }
   });
   void checkAvailability();
+  return onDisplayed;
 }
 
 wireForm();
 wireLiveSystem();
-wireCloudDisclosurePreview();
-wireTrustedCloudInterpretation();
+const onCloudDisplayed = wireTrustedCloudInterpretation();
+wireCloudDisclosurePreview(onCloudDisplayed);
 refresh();
 setInterval(refresh, 2500);
