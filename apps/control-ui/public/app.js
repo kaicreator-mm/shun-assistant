@@ -374,7 +374,7 @@ async function refresh() {
   const health = el('health');
   api('/health')
     .then((info) => {
-      health.textContent = `Local only · policy ${info.policy?.kind ?? 'UNKNOWN'} · ${info.api ?? ''}`;
+      health.textContent = `${info.cloudMode === 'REMOTE_OPT_IN' && info.localOnly === false ? 'REMOTE DeepSeek opt-in (Windows consent required)' : 'Local-only (cloud disabled)'} · policy ${info.policy?.kind ?? 'UNKNOWN'} · ${info.api ?? ''}`;
       health.className = 'muted';
       const label = simulationBanner(info);
       banner.textContent = label.text;
