@@ -18,7 +18,8 @@
     "@shun/resolver": "workspace:*",
     "@shun/authorization": "workspace:*",
     "@shun/store": "workspace:*",
-    "@shun/vertical-storage": "workspace:*"
+    "@shun/vertical-storage": "workspace:*",
+    "@shun/vertical-system": "workspace:*"
   },
   "devDependencies": {
     "@biomejs/biome": "^2.3.8",
