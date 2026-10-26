@@ -361,12 +361,14 @@ describe('T07 F04B2a boundary hands journal-backed durable checkpoints to the ef
     });
   });
 
-  it('keeps the F03-era un-checkpointed injected capability admissible (compat)', async () => {
-    // An injected capability that IGNORES the checkpoints (legacy F03 test
-    // composition) still completes: the checkpoints are the trusted host's
-    // composition contract, not a caller callback gate. Documented for the
-    // reviewer; the trusted bootstrap must always consume them (proven
-    // physically in the Windows describe below).
+  it('P1-01 adversarial: an injected capability that IGNORES the checkpoints never reaches COMMITTED_VERIFIED', async () => {
+    // PR #186 R1 P1-01 falsifier: the executor returns a fully valid
+    // SUCCEEDED / COMPLETED_VERIFIED / postStateVerified receipt WITHOUT
+    // ever persisting the immutable precommitment (exactly the one-argument
+    // legacy F03 composition). The boundary must refuse the success, leave
+    // the attempt conservatively UNCERTAIN with NO durable commitment, and
+    // refuse every replay of the identity — an un-checkpointed effect can
+    // never be reported as a verified success.
     const v = await world();
     const journal = new SqliteFileMutationJournal(v.store);
     const backend = new SqliteFileMutationAuthorizationBoundary({
@@ -375,8 +377,14 @@ describe('T07 F04B2a boundary hands journal-backed durable checkpoints to the ef
       loadPlanByHash: async () => v.plan,
       executeFileMutation: async () => ({ ok: true, receipt: validReceipt('mut-1') }),
     });
-    expect((await backend.execute(v.action)).ok).toBe(true);
+    expect(await backend.execute(v.action)).toEqual({ ok: false, code: 'FILE_MUTATION_REFUSED' });
+    expect(journal.lookup(v.action)).toMatchObject({ ok: true, state: 'UNCERTAIN' });
     expect(journal.readPrecommit(v.action)).toEqual({ ok: false, code: 'NOT_FOUND' });
+    expect(await backend.execute(v.action)).toEqual({
+      ok: false,
+      code: 'FILE_MUTATION_RECONCILE_REQUIRED',
+    });
+    console.log('F04B2A_UNCHECKPOINTED_SUCCESS_REFUSED_NO_COMMITTED_VERIFIED_NO_REPLAY=PASS');
   });
 });
 
@@ -406,7 +414,7 @@ describe('T07 F04B2c reconciler joins journal + precommit + trusted verifier', (
   it('persists an atomic idempotent disposition and NEVER touches the row state or replay ban', async () => {
     const v = await world();
     const journal = await interrupted(v);
-    const verifier = doubleVerifier('PROVEN_COMPLETED');
+    const verifier = doubleVerifier('CONSISTENT_WITH_COMPLETION');
     const reconciler = new SqliteFileMutationReconciler({
       store: v.store,
       verifyPoststate: verifier.fn,
@@ -414,7 +422,7 @@ describe('T07 F04B2c reconciler joins journal + precommit + trusted verifier', (
     const first = await reconciler.reconcile(v.action);
     expect(first.ok).toBe(true);
     if (first.ok) {
-      expect(first.disposition).toBe('COMPLETED_PROVEN');
+      expect(first.disposition).toBe('COMPLETED_CONSISTENT');
       expect(first.automaticRetryAllowed).toBe(false);
       expect(first.evidenceSha256).toMatch(/^[a-f0-9]{64}$/);
     }
@@ -423,7 +431,7 @@ describe('T07 F04B2c reconciler joins journal + precommit + trusted verifier', (
     expect(journal.lookup(v.action)).toMatchObject({ ok: true, state: 'STARTED' });
     expect(journal.readReconcileDisposition(v.action)).toMatchObject({
       ok: true,
-      disposition: 'COMPLETED_PROVEN',
+      disposition: 'COMPLETED_CONSISTENT',
       automaticRetryAllowed: false,
     });
     // Idempotent: the same verdict reconciles to the same record...
@@ -436,11 +444,12 @@ describe('T07 F04B2c reconciler joins journal + precommit + trusted verifier', (
     console.log('F04B2C_DISPOSITION_ATOMIC_IDEMPOTENT_ROW_UNTOUCHED=PASS');
   });
 
-  it('maps every verdict conservatively: UNKNOWN becomes MANUAL_RECONCILE_REQUIRED', async () => {
+  it('maps every verdict conservatively: UNKNOWN becomes MANUAL_RECONCILE_REQUIRED (P1-03: no PROVEN exists)', async () => {
+    // PR #186 R1 P1-03: the verifier vocabulary has no PROVEN_* values — a
+    // single poststate snapshot cannot witness attempt causality — so the
+    // disposition vocabulary carries no *_PROVEN values either.
     const cases: ReadonlyArray<[string, string]> = [
-      ['PROVEN_COMPLETED', 'COMPLETED_PROVEN'],
       ['CONSISTENT_WITH_COMPLETION', 'COMPLETED_CONSISTENT'],
-      ['PROVEN_NOT_EXECUTED', 'NOT_EXECUTED_PROVEN'],
       ['CONSISTENT_WITH_NOT_EXECUTED', 'NOT_EXECUTED_CONSISTENT'],
       ['UNKNOWN', 'MANUAL_RECONCILE_REQUIRED'],
     ];
@@ -457,6 +466,16 @@ describe('T07 F04B2c reconciler joins journal + precommit + trusted verifier', (
         automaticRetryAllowed: false,
       });
     }
+    // The removed PROVEN vocabulary refuses as an unknown verdict.
+    const v = await world();
+    await interrupted(v);
+    const removed = new SqliteFileMutationReconciler({
+      store: v.store,
+      verifyPoststate: () => ({ ok: true, verdict: 'PROVEN_COMPLETED', evidence: {} }),
+    });
+    expect(await removed.reconcile(v.action)).toEqual({ ok: false, code: 'RECONCILE_REFUSED' });
+    const journal = new SqliteFileMutationJournal(v.store);
+    expect(journal.readReconcileDisposition(v.action)).toEqual({ ok: false, code: 'NOT_FOUND' });
   });
 
   it('an unobservable world persists NOTHING and stays retryable', async () => {
@@ -653,13 +672,15 @@ describe.skipIf(process.platform !== 'win32')(
       console.log('F04B2_E2E_PRECOMMIT_DURABLE_BEFORE_DEST_IO=PASS REPLAY_REFUSED');
     });
 
-    it('reconciles a hard-crash STARTED move to COMPLETED_PROVEN without touching the row', async () => {
+    it('reconciles a hard-crash STARTED move to COMPLETED_CONSISTENT (never PROVEN) without touching the row', async () => {
       // Crash simulation WITHOUT a process kill (the true kill matrix is
       // F04B3): the STARTED row and the durable commitment exist, the
       // physical relocation then runs OUTSIDE the boundary (exactly what a
       // process would leave behind after dying between the effect and the
-      // journal COMMIT), and the reconciler must prove completion from OS
-      // evidence alone while the row stays STARTED and unreplayable.
+      // journal COMMIT), and the reconciler must classify the world from OS
+      // evidence alone — CONSISTENT_WITH_COMPLETION per PR #186 R1 P1-03
+      // (identity continuity is not attempt causality) — while the row
+      // stays STARTED and unreplayable.
       const stage = physicalWorld('F04B2-RECONCILE-MOVE');
       const destination = join(stage.folder, 'dst', 'moved.txt');
       const v = await world({
@@ -695,17 +716,17 @@ describe.skipIf(process.platform !== 'win32')(
       });
       expect(await reconciler.reconcile(v.action)).toMatchObject({
         ok: true,
-        disposition: 'COMPLETED_PROVEN',
+        disposition: 'COMPLETED_CONSISTENT',
         automaticRetryAllowed: false,
       });
       // Row STILL STARTED; disposition persisted; replay STILL refused.
       expect(journal.lookup(v.action)).toMatchObject({ ok: true, state: 'STARTED' });
       expect(journal.readReconcileDisposition(v.action)).toMatchObject({
         ok: true,
-        disposition: 'COMPLETED_PROVEN',
+        disposition: 'COMPLETED_CONSISTENT',
       });
       expect(journal.reserve(v.action)).toEqual({ ok: false, code: 'RECONCILE_REQUIRED' });
-      console.log('F04B2_E2E_CRASH_SIM_STARTED_RECONCILE_PROVEN_NO_REPLAY=PASS');
+      console.log('F04B2_E2E_CRASH_SIM_STARTED_RECONCILE_CONSISTENT_NO_REPLAY=PASS');
     });
 
     it('reconciles an interrupted copy (checkpoint written, effect refused) to NOT_EXECUTED_CONSISTENT', async () => {

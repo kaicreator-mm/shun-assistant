@@ -8,24 +8,35 @@
 // mutation export of the addon, so no code path here can create, write,
 // flush or rename anything.
 //
-// Classification honesty (the F04B2 admission contract):
-//   - PROVEN_COMPLETED is minted ONLY for file.move / file.rename, where the
-//     destination object carries the SAME 64-bit FileId and volume serial
-//     the precommit pinned on the source handle: object-identity continuity
-//     through the relocation is causality, not merely matching bytes.
-//   - file.copy can never be PROVEN: an identical-byte destination could
-//     have been separately recreated; matching exact size+content with the
-//     source intact is only CONSISTENT_WITH_COMPLETION.
-//   - PROVEN_NOT_EXECUTED (move) requires the committed object — same FileId
-//     — still present under its original verified name with exact content
-//     while the destination name is absent: the intended post-condition is
-//     observably not in force.
+// Classification honesty (the F04B2 admission contract, PR #186 R1 P1-03):
+//   - There is NO PROVEN verdict in this vocabulary. A single current
+//     snapshot — however identity-anchored — cannot distinguish THIS
+//     attempt's effect from an unrelated actor performing the same
+//     id-preserving relocation, or moving the committed object back after
+//     the attempt ran: object-identity continuity is NECESSARY evidence for
+//     completion but is not a causality witness bound to the attempt. The
+//     ceiling for a move world whose destination carries the committed
+//     64-bit FileId/volume and whose source name is gone is
+//     CONSISTENT_WITH_COMPLETION; the ceiling for the committed object
+//     intact under its original name with the destination kernel-confirmed
+//     absent is CONSISTENT_WITH_NOT_EXECUTED.
+//   - file.copy can never exceed CONSISTENT_* for the same reason (identical
+//     bytes prove nothing about which actor created them).
 //   - Anything else (drifted source, unexplained identities, both names
 //     gone, destination longer/shorter than committed) stays UNKNOWN:
 //     insufficient evidence is never upgraded, and no verdict here is ever
 //     replay authority — reconcile decisions belong to the trusted host
 //     boundary (recipe-runtime), which joins this verifier with the durable
 //     journal.
+//
+// Absence honesty (PR #186 R1 P1-02): a leaf name counts as ABSENT only when
+// the kernel itself reports STATUS_OBJECT_NAME_NOT_FOUND /
+// STATUS_OBJECT_PATH_NOT_FOUND through the status-aware anchored open. Every
+// other open failure (sharing violation, access denied, delete pending...)
+// is an AMBIGUOUS observation — a present-but-unopenable object must never
+// be read as absent — and refuses the whole observation (no verdict at all,
+// never a negative one). A directory occupying the leaf name is a
+// present-but-diverged object, not an absent one.
 //
 // The precommitment arrives as PLAIN DATA (typically read back from the
 // durable journal by the trusted host): it is structurally admitted
@@ -45,13 +56,26 @@ const MAX_FILE_BYTES = 8 << 20;
 
 // NTSTATUS STATUS_END_OF_FILE (0xC0000011); see file-mutation-host.ts.
 const NT_STATUS_END_OF_FILE = 0xc0000011;
+// NTSTATUS leaf/chain absence as reported by the kernel itself — the ONLY
+// failures that may be read as "absent" (PR #186 R1 P1-02).
+const NT_STATUS_OBJECT_NAME_NOT_FOUND = 0xc0000034;
+const NT_STATUS_OBJECT_PATH_NOT_FOUND = 0xc0000035;
+// NTSTATUS STATUS_FILE_IS_A_DIRECTORY: the leaf NAME exists but is occupied
+// by a directory (FILE_NON_DIRECTORY_FILE refuses the open) — a
+// present-but-diverged object, not an absent one.
+const NT_STATUS_FILE_IS_A_DIRECTORY = 0xc00000ba;
 const FILE_ATTRIBUTE_DIRECTORY = 0x00000010;
 const FILE_ATTRIBUTE_REPARSE_POINT = 0x00000400;
 
+/**
+ * PR #186 R1 P1-03: no PROVEN verdict exists. A single current snapshot
+ * cannot witness that THIS attempt caused the observed world (an unrelated
+ * actor can perform the same id-preserving relocation, or move the
+ * committed object back after the attempt ran); identity-anchored world
+ * state caps at CONSISTENT_*, and everything insufficient stays UNKNOWN.
+ */
 export type FileMutationPoststateVerdict =
-  | 'PROVEN_COMPLETED'
   | 'CONSISTENT_WITH_COMPLETION'
-  | 'PROVEN_NOT_EXECUTED'
   | 'CONSISTENT_WITH_NOT_EXECUTED'
   | 'UNKNOWN';
 
@@ -251,7 +275,13 @@ interface PoststateNative {
   dosDevice(letter: string): string | null;
   driveType(root: string): number | null;
   openDir(parent: bigint | null, name: string): bigint | null;
-  openFile(parent: bigint, name: string): bigint | null;
+  /** PR #186 R1 P1-02: status-aware twin of openFile so kernel-confirmed
+   * absence is distinguishable from ambiguous open failures. napi-rs
+   * serializes the Rust Option<BigInt> None as JS undefined. */
+  openFileStatus(
+    parent: bigint,
+    name: string,
+  ): { status: number; handle: bigint | undefined } | null;
   entryInfo(handle: bigint): number | null;
   entryId(handle: bigint): { attrs: number; index: bigint } | null;
   volumeSerial(handle: bigint): number | null;
@@ -324,6 +354,14 @@ type ObservedObject = Readonly<{
  * [0, size) with digest match plus a 1-byte EOF probe at `size` — a longer
  * or truncated-then-repadded object does NOT match, mirroring the F03
  * exact-destination discipline).
+ *
+ * PR #186 R1 P1-02: absence is a KERNEL verdict only. A failed open counts
+ * as absent exclusively on STATUS_OBJECT_NAME_NOT_FOUND /
+ * STATUS_OBJECT_PATH_NOT_FOUND; a directory occupying the name is a
+ * present-but-diverged object; every other status (sharing violation,
+ * access denied, delete pending...) is AMBIGUOUS — a present-but-unopenable
+ * object must never be read as absent — and refuses the whole observation
+ * (no verdict, never a negative one).
  */
 function observeLeaf(
   native: PoststateNative,
@@ -333,10 +371,22 @@ function observeLeaf(
   onOpened: (rel: string) => void,
 ): ObservedObject {
   const { parent, leafName } = openVerifiedParent(native, admission, openHandles);
-  const handle = native.openFile(parent, leafName);
-  if (handle === null) {
+  const opened = native.openFileStatus(parent, leafName);
+  if (opened === null) refuse('POSTSTATE_OBSERVATION_REFUSED');
+  if (opened.handle === undefined || opened.handle === null) {
+    if (opened.status === NT_STATUS_FILE_IS_A_DIRECTORY) {
+      // Present, but no longer a plain file object: an observable divergence,
+      // not an observation failure.
+      return { present: true, fileId: null, volumeSerial: null, matches: false };
+    }
+    if (
+      opened.status !== NT_STATUS_OBJECT_NAME_NOT_FOUND &&
+      opened.status !== NT_STATUS_OBJECT_PATH_NOT_FOUND
+    )
+      refuse('POSTSTATE_OBSERVATION_REFUSED');
     return { present: false, fileId: null, volumeSerial: null, matches: null };
   }
+  const handle = opened.handle;
   openHandles.push(handle);
   onOpened(`${admission.drive}${admission.components.join('\\')}`);
   const identity = native.entryId(handle);
@@ -380,9 +430,14 @@ function observeLeaf(
 
 /**
  * Pure classification of one observed world against one admitted
- * commitment (unit-testable without any IO). PROVEN_* verdicts require
- * object-identity continuity (move) or its absence with the committed
- * object intact (move not-executed); a copy can never exceed CONSISTENT_*;
+ * commitment (unit-testable without any IO). PR #186 R1 P1-03: no PROVEN
+ * verdict exists — a single snapshot cannot witness that THIS attempt
+ * caused the world. A move world whose destination carries the committed
+ * FileId/volume continuity with the source name gone caps at
+ * CONSISTENT_WITH_COMPLETION; the committed object intact at its original
+ * name with the destination kernel-confirmed absent caps at
+ * CONSISTENT_WITH_NOT_EXECUTED (an unrelated actor can produce both worlds
+ * without this attempt ever running); a copy can never exceed CONSISTENT_*;
  * everything insufficient stays UNKNOWN.
  */
 export function classifyPoststate(
@@ -402,9 +457,9 @@ export function classifyPoststate(
       observed.destIdentityContinuity === true &&
       !observed.sourcePresent
     )
-      return 'PROVEN_COMPLETED';
+      return 'CONSISTENT_WITH_COMPLETION';
     if (observed.sourcePresent && observed.sourceMatches === true && !observed.destPresent)
-      return 'PROVEN_NOT_EXECUTED';
+      return 'CONSISTENT_WITH_NOT_EXECUTED';
     return 'UNKNOWN';
   }
   if (observed.destPresent && observed.destMatches === true && observed.sourceMatches === true)

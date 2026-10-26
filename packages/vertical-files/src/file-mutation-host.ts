@@ -157,11 +157,13 @@ export type FileMutationPrecommitment = Readonly<{
  * with a durable readback and return true BEFORE the effect proceeds;
  * false (or a throw) refuses the mutation with ZERO destination IO. The
  * source is then RE-observed through the same verified handle and any
- * drift from the commitment refuses the effect. Checkpoints are OPTIONAL
- * only to preserve the F03-era internal-seam composition under test:
- * absent checkpoints keep the un-checkpointed legacy behavior inside this
- * package, and the trusted bootstrap must always supply the journal-backed
- * implementation. A present-but-malformed checkpoints object refuses.
+ * drift from the commitment refuses the effect. PR #186 R1 P1-01: the
+ * authorized production entry (`executeAuthorizedFileMutation`) REQUIRES
+ * the checkpoints — an absent or malformed object refuses before any IO.
+ * The only un-checkpointed F03-era composition left is the explicitly
+ * test-only package-internal seam (`executeVerifiedFileMutation`), which
+ * src/index.ts never exports; the trusted bootstrap must always supply the
+ * journal-backed implementation.
  */
 export type FileMutationCheckpoints = Readonly<{
   durablePrecommit: (commitment: FileMutationPrecommitment) => boolean;
@@ -681,15 +683,17 @@ function mintReceipt(actionId: string, startedAt: string): FileMutationReceipt {
 }
 
 /**
- * PACKAGE-INTERNAL physical seam (same discipline as F02B's
+ * PACKAGE-INTERNAL TEST-ONLY seam (same discipline as F02B's
  * `observeVerifiedFileDuplicates`): direct `{op, sourcePath, destinationPath}`
  * mutation of statically admitted fixed-local paths with deterministic IO
  * observation. It exists so the in-package falsifiers can prove zero
  * destination IO on every refusal; src/index.ts does NOT re-export it, so
- * nothing outside this package can reach an unmediated mutation. `owner` is
- * only the receipt's actionId. Production access is exclusively
- * `executeAuthorizedFileMutation` below, which takes no callbacks and only
- * an AuthorizedAction.
+ * nothing outside this package can reach an un-mediated mutation. `owner` is
+ * only the receipt's actionId. PR #186 R1 P1-01: this seam is the ONLY
+ * place the F03-era un-checkpointed composition (no `checkpoints`)
+ * remains admissible, explicitly for tests/audits; every production-capable
+ * path (`executeAuthorizedFileMutation`, composed through the real trusted
+ * Gate) requires the durable checkpoints.
  */
 export function executeVerifiedFileMutation(
   request: unknown,
@@ -898,33 +902,29 @@ export function executeVerifiedFileMutation(
  * exclusively from the structurally admitted action, and grant-integrity /
  * per-effect currentness re-validation plus the durable STARTED ordering
  * belong to the trusted host boundary that composes this entry
- * (recipe-runtime sqlite-file-mutation-host). That boundary additionally
- * supplies the F04B2a durable precommit checkpoints so the immutable
- * commitment is persisted BEFORE the first destination IO; checkpoints are
- * optional only for the F03-era internal composition — a present but
- * malformed checkpoints object is refused before any IO. Structural
- * authorization failures return FILE_MUTATION_AUTHORIZATION_REFUSED before
- * any IO; physical refusals keep their own codes. Refusals (including
- * pre-IO ones) are conservatively UNCERTAIN at the journal level: the
- * boundary never replays the attempt identity.
+ * (recipe-runtime sqlite-file-mutation-host). PR #186 R1 P1-01: that
+ * boundary's F04B2a durable precommit checkpoints are MANDATORY here — an
+ * absent or malformed checkpoints object is refused before any IO (the
+ * un-checkpointed legacy composition exists only in the package-internal
+ * test seam). Structural authorization failures return
+ * FILE_MUTATION_AUTHORIZATION_REFUSED before any IO; physical refusals keep
+ * their own codes. Refusals (including pre-IO ones) are conservatively
+ * UNCERTAIN at the journal level: the boundary never replays the attempt
+ * identity.
  */
 export function executeAuthorizedFileMutation(
   action: unknown,
-  checkpoints?: FileMutationCheckpoints,
+  checkpoints: FileMutationCheckpoints,
 ): FileMutationResult {
   const admitted = admittedMutationAction(action);
-  if (admitted === null) {
+  const safeCheckpoints =
+    admitted !== null &&
+    plainWithExactKeys(checkpoints, ['durablePrecommit']) &&
+    typeof (checkpoints as Record<string, unknown>).durablePrecommit === 'function'
+      ? checkpoints
+      : null;
+  if (admitted === null || safeCheckpoints === null) {
     return Object.freeze({ ok: false as const, code: 'FILE_MUTATION_AUTHORIZATION_REFUSED' });
-  }
-  let safeCheckpoints: FileMutationCheckpoints | undefined;
-  if (checkpoints !== undefined) {
-    if (
-      !plainWithExactKeys(checkpoints, ['durablePrecommit']) ||
-      typeof (checkpoints as Record<string, unknown>).durablePrecommit !== 'function'
-    ) {
-      return Object.freeze({ ok: false as const, code: 'FILE_MUTATION_AUTHORIZATION_REFUSED' });
-    }
-    safeCheckpoints = checkpoints;
   }
   // The internal seam is invoked with NO instrument: the authorized path
   // never runs caller-visible callbacks.

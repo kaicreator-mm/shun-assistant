@@ -5,13 +5,15 @@
 // prestate) BEFORE the first destination IO exists, refuse when the durable
 // write refuses, refuse when the source drifted after the checkpoint, and
 // never call the checkpoint for an already-colliding destination. The
+// authorized entry REQUIRES the checkpoints (PR #186 R1 P1-01). The
 // poststate verifier must independently reopen BOTH verified parent chains
-// and classify the world against the commitment — PROVEN only where object
-// identity establishes causality (move FileId continuity / committed object
-// intact), never for identical bytes alone (copy stays CONSISTENT), and
-// UNKNOWN wherever evidence is insufficient. Structural negatives run
-// everywhere; physical canaries run on real Windows Standard User.
-import { spawnSync } from 'node:child_process';
+// and classify the world against the commitment — the ceiling is
+// CONSISTENT_* / UNKNOWN because a single snapshot cannot witness THIS
+// attempt's causality (PR #186 R1 P1-03), absence is a kernel verdict only
+// (PR #186 R1 P1-02), and UNKNOWN wherever evidence is insufficient.
+// Structural negatives run everywhere; physical canaries run on real
+// Windows Standard User.
+import { spawn, spawnSync } from 'node:child_process';
 import {
   appendFileSync,
   copyFileSync,
@@ -19,6 +21,7 @@ import {
   mkdirSync,
   mkdtempSync,
   readFileSync,
+  renameSync,
   rmSync,
   writeFileSync,
 } from 'node:fs';
@@ -40,12 +43,83 @@ import {
 import * as publicApi from '../src/index.ts';
 
 const SYSTEM32 = join(process.env.SystemRoot ?? 'C:\\Windows', 'System32');
+const POWERSHELL = join(
+  process.env.SystemRoot ?? 'C:\\Windows',
+  'System32',
+  'WindowsPowerShell',
+  'v1.0',
+  'powershell.exe',
+);
 
 function runCmd(command: string) {
   return spawnSync(join(SYSTEM32, 'cmd.exe'), ['/d', '/c', command], {
     encoding: 'utf8',
     windowsVerbatimArguments: true,
   });
+}
+
+/** True when an exclusive (FileShare::None) holder owns `path`: a probe
+ * open with ReadWrite/None fails exactly while the holder keeps it. */
+function probeExclusivelyLocked(path: string): boolean {
+  const probe = spawnSync(
+    POWERSHELL,
+    [
+      '-NoProfile',
+      '-Command',
+      `try { $f=[System.IO.File]::Open('${path}','Open','ReadWrite','None'); $f.Close(); exit 0 } catch { exit 1 }`,
+    ],
+    { encoding: 'utf8', windowsHide: true },
+  );
+  return probe.status === 1;
+}
+
+function waitFor(predicate: () => boolean, timeoutMs: number): boolean {
+  const deadline = Date.now() + timeoutMs;
+  for (;;) {
+    if (predicate()) return true;
+    if (Date.now() >= deadline) return false;
+    Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, 250);
+  }
+}
+
+/** Hold `path` exclusively (FileShare::None) for the remainder of the test.
+ * A NORMAL child (NOT detached/unref'd): on this Windows host a detached
+ * PowerShell child dies before acquiring the handle, while a piped child
+ * holds it immediately. The holder writes `marker` ONLY AFTER the open
+ * succeeded, so waiting for the marker proves acquisition without polling
+ * PowerShell probes (cold starts under load can take seconds). The caller
+ * must stopHolder() it in finally. */
+function holdExclusively(
+  path: string,
+  marker: string,
+): { holder: ReturnType<typeof spawn>; marker: string } {
+  const holder = spawn(
+    POWERSHELL,
+    [
+      '-NoProfile',
+      '-Command',
+      `$f=[System.IO.File]::Open('${path}','Open','Read','None'); Set-Content -Path '${marker}' -Value ok; Start-Sleep -Seconds 60; $f.Close()`,
+    ],
+    { stdio: 'ignore', windowsHide: true },
+  );
+  return { holder, marker };
+}
+
+/** Wait for the holder's acquisition marker (plain fs poll). */
+function waitForLockMarker(marker: string): boolean {
+  return waitFor(() => existsSync(marker), 30_000);
+}
+
+/** Kill the holder and wait until the exclusive handle is really gone:
+ * TerminateProcess is asynchronous, and disposing the scope folder while
+ * the kernel still owns the handle fails with EPERM. */
+function stopHolder(holder: ReturnType<typeof spawn>, path: string): void {
+  try {
+    holder.kill();
+  } catch {
+    // Already exited; nothing to release.
+  }
+  waitFor(() => !probeExclusivelyLocked(path), 15_000);
 }
 
 function makeScope(prefix: string, files: Record<string, string>) {
@@ -133,13 +207,17 @@ describe('T07 F04B2 structural admission (no IO)', () => {
     expect(Object.hasOwn(publicApi, 'executeVerifiedFileMutation')).toBe(false);
   });
 
-  it('refuses a present-but-malformed checkpoints object before any IO', () => {
+  it('refuses a missing or malformed checkpoints object before any IO (P1-01)', () => {
+    // PR #186 R1 P1-01: the authorized production entry REQUIRES the durable
+    // precommit checkpoints. An absent (one-argument legacy F03 composition)
+    // or malformed object refuses structurally with zero IO.
     const action = mutationAction({
       op: 'file.copy',
       sourcePath: 'C:\\s\\a.txt',
       destinationPath: 'C:\\d\\b.txt',
     });
     const bad: unknown[] = [
+      undefined,
       null,
       42,
       {},
@@ -207,7 +285,12 @@ describe('T07 F04B2 structural admission (no IO)', () => {
     }
   });
 
-  it('classifies the pure verdict matrix: identity is causality, bytes are not', () => {
+  it('classifies the pure verdict matrix: no PROVEN exists, identity is not causality (P1-03)', () => {
+    // PR #186 R1 P1-03: a single snapshot cannot witness that THIS attempt
+    // caused the world. FileId continuity through a relocation is necessary
+    // evidence but NOT a causality witness (an unrelated actor can perform
+    // the same id-preserving move), so even the identity-continuous move
+    // world caps at CONSISTENT_WITH_COMPLETION.
     const move = (
       o: Partial<{
         sourcePresent: boolean;
@@ -225,12 +308,13 @@ describe('T07 F04B2 structural admission (no IO)', () => {
         destIdentityContinuity: true,
         ...o,
       });
-    // Move: only FileId continuity through the relocation is PROVEN.
-    expect(move({})).toBe('PROVEN_COMPLETED');
+    // Move completion: identity-continuous destination, source name gone —
+    // the honest ceiling is CONSISTENT, never PROVEN.
+    expect(move({})).toBe('CONSISTENT_WITH_COMPLETION');
     expect(move({ destIdentityContinuity: false })).toBe('UNKNOWN');
     expect(move({ destMatches: false })).toBe('UNKNOWN');
     expect(move({ sourcePresent: true, destIdentityContinuity: null })).toBe('UNKNOWN');
-    // A recreated same-byte destination (fresh FileId) is never PROVEN.
+    // A recreated same-byte destination (fresh FileId) is not even consistent.
     expect(move({ destIdentityContinuity: false, destMatches: true, sourcePresent: false })).toBe(
       'UNKNOWN',
     );
@@ -244,7 +328,9 @@ describe('T07 F04B2 structural admission (no IO)', () => {
         destIdentityContinuity: true,
       }),
     ).toBe('UNKNOWN');
-    // Move not executed: committed object intact at its name, destination absent.
+    // Move not executed: committed object intact at its name, destination
+    // kernel-confirmed absent — the ceiling is CONSISTENT (an unrelated
+    // actor can have run the move and moved the same object back).
     expect(
       move({
         sourcePresent: true,
@@ -252,9 +338,9 @@ describe('T07 F04B2 structural admission (no IO)', () => {
         destPresent: false,
         destIdentityContinuity: null,
       }),
-    ).toBe('PROVEN_NOT_EXECUTED');
+    ).toBe('CONSISTENT_WITH_NOT_EXECUTED');
     expect(move({ sourcePresent: true, sourceMatches: false, destPresent: false })).toBe('UNKNOWN');
-    // Copy: identical bytes can never establish causality.
+    // Copy: identical bytes can never establish causality either.
     const copy = (
       o: Partial<{
         sourcePresent: boolean;
@@ -475,7 +561,14 @@ describe.skipIf(process.platform !== 'win32')(
       return captured as FileMutationPrecommitment;
     }
 
-    it('PROVEN_COMPLETED for a really moved object (FileId continuity, old name gone)', () => {
+    it('CONSISTENT_WITH_COMPLETION (never PROVEN) when an UNRELATED actor relocated the committed object (P1-03)', () => {
+      // PR #186 R1 P1-03 negative, relocation direction: the effect happens
+      // OUTSIDE the checkpointed attempt — an unrelated actor performs the
+      // same id-preserving relocation. The observed world (dest carries the
+      // committed FileId, source name gone) is EXACTLY what this attempt
+      // would have left, so identity continuity cannot witness causality:
+      // the ceiling is CONSISTENT_WITH_COMPLETION and no PROVEN verdict
+      // exists to return.
       const scope = makeScope('shun-f04b2-ps1', { 'src/a.txt': 'MOVE-ME', 'dst/.keep': '' });
       try {
         const commitment = captureCommitment(
@@ -485,9 +578,6 @@ describe.skipIf(process.platform !== 'win32')(
           'dst/moved.txt',
           'mut-ps1',
         );
-        // The effect happens OUTSIDE the checkpointed attempt (a later,
-        // separately authorized run of the same physical intent): a real
-        // no-replace relocation of the SAME object.
         const moved = executeVerifiedFileMutation(
           mutationRequest(
             'file.move',
@@ -498,14 +588,14 @@ describe.skipIf(process.platform !== 'win32')(
         );
         expect(moved.ok).toBe(true);
         const result = observeFileMutationPoststate(commitment);
-        expect(result).toMatchObject({ ok: true, verdict: 'PROVEN_COMPLETED' });
+        expect(result).toMatchObject({ ok: true, verdict: 'CONSISTENT_WITH_COMPLETION' });
         if (result.ok) {
           expect(result.evidence.sourcePresent).toBe(false);
           expect(result.evidence.destPresent).toBe(true);
           expect(result.evidence.destIdentityContinuity).toBe(true);
           expect(result.evidence.destMatchesCommitment).toBe(true);
         }
-        console.log('F04B2B_MOVE_PROVEN_COMPLETED_FILEID_CONTINUITY=PASS');
+        console.log('F04B2B_THIRD_PARTY_RELOCATION_CONSISTENT_NOT_PROVEN=PASS');
       } finally {
         scope.dispose();
       }
@@ -538,7 +628,7 @@ describe.skipIf(process.platform !== 'win32')(
       }
     });
 
-    it('PROVEN_NOT_EXECUTED for a move whose committed object is intact and destination absent', () => {
+    it('CONSISTENT_WITH_NOT_EXECUTED (never PROVEN) for an intact committed object and kernel-absent destination', () => {
       const scope = makeScope('shun-f04b2-ps3', { 'src/a.txt': 'STILL-HERE', 'dst/.keep': '' });
       try {
         const commitment = captureCommitment(
@@ -549,17 +639,128 @@ describe.skipIf(process.platform !== 'win32')(
           'mut-ps3',
         );
         const result = observeFileMutationPoststate(commitment);
-        expect(result).toMatchObject({ ok: true, verdict: 'PROVEN_NOT_EXECUTED' });
+        expect(result).toMatchObject({ ok: true, verdict: 'CONSISTENT_WITH_NOT_EXECUTED' });
         if (result.ok) {
           expect(result.evidence.sourcePresent).toBe(true);
           expect(result.evidence.sourceMatchesCommitment).toBe(true);
           expect(result.evidence.destPresent).toBe(false);
         }
-        console.log('F04B2B_MOVE_PROVEN_NOT_EXECUTED=PASS');
+        console.log('F04B2B_MOVE_CONSISTENT_NOT_EXECUTED_KERNEL_ABSENCE=PASS');
       } finally {
         scope.dispose();
       }
     });
+
+    it('CONSISTENT_WITH_NOT_EXECUTED (never PROVEN) when the move RAN and an unrelated actor moved the object BACK (P1-03)', () => {
+      // PR #186 R1 P1-03 negative, move-back direction: the relocation
+      // really executes (here by an unrelated actor), then the SAME object
+      // is relocated back to its original name — a same-volume rename that
+      // preserves the FileId and every byte. The resulting world is
+      // indistinguishable from "the attempt never ran", so the honest
+      // verdict is CONSISTENT_WITH_NOT_EXECUTED and no PROVEN_NOT_EXECUTED
+      // could ever be justified from this snapshot.
+      const scope = makeScope('shun-f04b2-ps10', { 'src/a.txt': 'ROUND-TRIP', 'dst/.keep': '' });
+      try {
+        const commitment = captureCommitment(
+          scope,
+          'file.move',
+          'src/a.txt',
+          'dst/moved.txt',
+          'mut-ps10',
+        );
+        const moved = executeVerifiedFileMutation(
+          mutationRequest(
+            'file.move',
+            join(scope.dir, 'src', 'a.txt'),
+            join(scope.dir, 'dst', 'moved.txt'),
+          ),
+          'mut-ps10-unrelated',
+        );
+        expect(moved.ok).toBe(true);
+        // The unrelated actor undoes the relocation: same volume, same
+        // object, original name.
+        renameSync(join(scope.dir, 'dst', 'moved.txt'), join(scope.dir, 'src', 'a.txt'));
+        const result = observeFileMutationPoststate(commitment);
+        expect(result).toMatchObject({ ok: true, verdict: 'CONSISTENT_WITH_NOT_EXECUTED' });
+        if (result.ok) {
+          expect(result.evidence.sourcePresent).toBe(true);
+          expect(result.evidence.sourceMatchesCommitment).toBe(true);
+          expect(result.evidence.destPresent).toBe(false);
+        }
+        console.log('F04B2B_MOVE_BACK_WORLD_CONSISTENT_NOT_PROVEN=PASS');
+      } finally {
+        scope.dispose();
+      }
+    });
+
+    it('refuses (no verdict at all) when an exclusive handle makes the EXISTING destination unopenable (P1-02)', () => {
+      // PR #186 R1 P1-02 canary: a detached PowerShell process holds the
+      // destination with FileShare::None. The destination EXISTS while the
+      // original source exists and matches — the old null-only openFile
+      // conflated the sharing violation with absence and minted a false
+      // not-executed verdict. The status-aware observation must treat the
+      // ambiguous failure as unobservable: the whole observation refuses,
+      // and no CONSISTENT/PROVEN negative verdict is issued.
+      const scope = makeScope('shun-f04b2-ps11', { 'src/a.txt': 'SOURCE-INTACT', 'dst/.keep': '' });
+      let holder: ReturnType<typeof spawn> | null = null;
+      let heldPath = '';
+      try {
+        const commitment = captureCommitment(
+          scope,
+          'file.move',
+          'src/a.txt',
+          'dst/moved.txt',
+          'mut-ps11',
+        );
+        const dest = join(scope.dir, 'dst', 'moved.txt');
+        writeFileSync(dest, 'PRESENT-BUT-LOCKED');
+        heldPath = dest;
+        const held = holdExclusively(dest, join(scope.dir, 'dst', 'held.marker'));
+        holder = held.holder;
+        expect(waitForLockMarker(held.marker)).toBe(true);
+        // The lock is real: an incompatible probe open fails.
+        expect(probeExclusivelyLocked(dest)).toBe(true);
+        const result = observeFileMutationPoststate(commitment);
+        expect(result).toEqual({ ok: false, code: 'POSTSTATE_OBSERVATION_REFUSED' });
+        console.log('F04B2B_LOCKED_DEST_SHARING_VIOLATION_NO_NEGATIVE_VERDICT=PASS');
+      } finally {
+        if (holder !== null) stopHolder(holder, heldPath);
+        scope.dispose();
+      }
+    }, 90_000);
+
+    it('refuses (no verdict at all) when an exclusive handle makes the MATCHING source unopenable (P1-02)', () => {
+      // PR #186 R1 P1-02 converse canary: the source exists and would match
+      // its commitment, but an exclusive holder makes its open ambiguous.
+      // With a matching destination present, the old conflated "absent"
+      // reading of the source could have minted a false completion verdict;
+      // the observation must refuse instead.
+      const scope = makeScope('shun-f04b2-ps12', { 'src/a.txt': 'LOCKED-SOURCE', 'dst/.keep': '' });
+      let holder: ReturnType<typeof spawn> | null = null;
+      let heldPath = '';
+      try {
+        const commitment = captureCommitment(
+          scope,
+          'file.move',
+          'src/a.txt',
+          'dst/moved.txt',
+          'mut-ps12',
+        );
+        const source = join(scope.dir, 'src', 'a.txt');
+        heldPath = source;
+        const held = holdExclusively(source, join(scope.dir, 'held.marker'));
+        holder = held.holder;
+        expect(waitForLockMarker(held.marker)).toBe(true);
+        // The lock is real: an incompatible probe open fails.
+        expect(probeExclusivelyLocked(source)).toBe(true);
+        const result = observeFileMutationPoststate(commitment);
+        expect(result).toEqual({ ok: false, code: 'POSTSTATE_OBSERVATION_REFUSED' });
+        console.log('F04B2B_LOCKED_SOURCE_SHARING_VIOLATION_NO_VERDICT=PASS');
+      } finally {
+        if (holder !== null) stopHolder(holder, heldPath);
+        scope.dispose();
+      }
+    }, 90_000);
 
     it('CONSISTENT_WITH_NOT_EXECUTED for an unexecuted copy (created-then-deleted race stays honest)', () => {
       const scope = makeScope('shun-f04b2-ps4', { 'src/a.txt': 'UNTOUCHED', 'dst/.keep': '' });

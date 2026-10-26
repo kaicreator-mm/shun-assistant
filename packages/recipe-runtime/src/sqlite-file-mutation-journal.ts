@@ -42,11 +42,12 @@ export type MutationReconcileDispositionReadback =
     }
   | { ok: false; code: 'NOT_FOUND' | 'JOURNAL_REFUSED' };
 
-/** T07 F04B2c post-hoc reconcile dispositions (never execution states). */
+/** T07 F04B2c post-hoc reconcile dispositions (never execution states).
+ * PR #186 R1 P1-03: the *_PROVEN values were removed — no poststate
+ * snapshot can witness that THIS attempt caused the observed world, so a
+ * disposition may never claim proof of completion/non-execution. */
 export const FILE_MUTATION_RECONCILE_DISPOSITIONS = [
-  'COMPLETED_PROVEN',
   'COMPLETED_CONSISTENT',
-  'NOT_EXECUTED_PROVEN',
   'NOT_EXECUTED_CONSISTENT',
   'MANUAL_RECONCILE_REQUIRED',
 ] as const;
@@ -219,14 +220,20 @@ export class SqliteFileMutationJournal {
       `);
       // T07 F04B2c: post-hoc reconcile dispositions. automatic_retry_allowed
       // is a constant 0 by CHECK: no disposition ever authorizes a retry.
+      // PR #186 R1 P1-03: no *_PROVEN disposition exists (see
+      // FILE_MUTATION_RECONCILE_DISPOSITIONS). Stores created by the earlier
+      // F04B2 HEAD keep their wider historical CHECK; that superset can only
+      // admit values this code no longer writes, and readback validates
+      // against the narrowed vocabulary (an old *_PROVEN row reads
+      // JOURNAL_REFUSED — fail-closed, never served as durable fact).
       store.database.exec(`
         CREATE TABLE IF NOT EXISTS recipe_file_mutation_reconcile_v02 (
           task_id TEXT NOT NULL,
           action_id TEXT NOT NULL,
           intent_hash TEXT NOT NULL,
           disposition TEXT NOT NULL CHECK (disposition IN (
-            'COMPLETED_PROVEN', 'COMPLETED_CONSISTENT', 'NOT_EXECUTED_PROVEN',
-            'NOT_EXECUTED_CONSISTENT', 'MANUAL_RECONCILE_REQUIRED'
+            'COMPLETED_CONSISTENT', 'NOT_EXECUTED_CONSISTENT',
+            'MANUAL_RECONCILE_REQUIRED'
           )),
           evidence_sha256 TEXT NOT NULL,
           automatic_retry_allowed INTEGER NOT NULL CHECK (automatic_retry_allowed = 0),

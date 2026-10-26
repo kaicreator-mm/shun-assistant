@@ -106,8 +106,12 @@ function mutationRequest(
 // ---------------------------------------------------------------------------
 
 describe('T07 F03 structural admission and pure decisions (no IO)', () => {
+  // PR #186 R1 P1-01: checkpoints are mandatory at the authorized entry;
+  // the structural negatives below pass a VALID checkpoints object so the
+  // refusal they prove is the action's own malformed shape (the missing /
+  // malformed-checkpoints refusals live in file-mutation-reconcile.test.ts).
   const refused = (input: unknown) =>
-    expect(executeAuthorizedFileMutation(input)).toEqual({
+    expect(executeAuthorizedFileMutation(input, { durablePrecommit: () => true })).toEqual({
       ok: false,
       code: 'FILE_MUTATION_AUTHORIZATION_REFUSED',
     });
@@ -690,7 +694,9 @@ describe.skipIf(process.platform !== 'win32')(
           sourcePath: join(scope.dir, 'a.txt'),
           destinationPath: join(scope.dir, 'b.txt'),
         });
-        const result = executeAuthorizedFileMutation(action);
+        const result = executeAuthorizedFileMutation(action, {
+          durablePrecommit: () => true,
+        });
         expect(result.ok).toBe(true);
         if (result.ok) expect(result.receipt.actionId).toBe('mut-1');
         expect(readFileSync(join(scope.dir, 'b.txt'), 'utf8')).toBe('AUTHORIZED');

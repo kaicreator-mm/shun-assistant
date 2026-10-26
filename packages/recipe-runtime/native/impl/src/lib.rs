@@ -213,26 +213,22 @@ pub fn drive_type(root: String) -> Option<u32> {
     Some(unsafe { GetDriveTypeW(PCWSTR(root_bytes.as_ptr())) })
 }
 
-/// Open one regular FILE anchored at an already-verified parent directory
-/// handle: single name component, FILE_OPEN_REPARSE_POINT so a reparse entry
-/// yields the reparse point itself (attributes refused in JS; the target is
-/// never touched) and FILE_NON_DIRECTORY_FILE so only files open.
-#[napi]
-pub fn open_file(parent: BigInt, name: String) -> Option<BigInt> {
-    let mut name_bytes: Vec<u16> = name.encode_utf16().collect();
-    name_bytes.push(0);
+/// Shared NtOpenFile core of the readonly leaf probes: one regular-file name
+/// component anchored at an already-verified parent handle, FILE_OPEN_REPARSE_POINT
+/// (a reparse entry opens the reparse point itself; attributes are refused in
+/// JS, the target is never touched) and FILE_NON_DIRECTORY_FILE (only files
+/// open). Returns the raw NTSTATUS verbatim with the handle (default/null on
+/// any failure) so the status-aware twin below can classify the failure while
+/// `open_file` keeps its historical null-only contract.
+fn open_file_raw(parent: HANDLE, name: &[u16], access: u32) -> (NTSTATUS, HANDLE) {
     let unicode = UNICODE_STRING {
-        Length: ((name_bytes.len() - 1) * 2) as u16,
-        MaximumLength: (name_bytes.len() * 2) as u16,
-        Buffer: PWSTR(name_bytes.as_mut_ptr()),
-    };
-    let parent_handle = match handle_from_raw(parent) {
-        Some(handle) => handle,
-        None => return None,
+        Length: ((name.len() - 1) * 2) as u16,
+        MaximumLength: (name.len() * 2) as u16,
+        Buffer: PWSTR(name.as_ptr() as *mut _),
     };
     let attributes = OBJECT_ATTRIBUTES {
         Length: std::mem::size_of::<OBJECT_ATTRIBUTES>() as u32,
-        RootDirectory: parent_handle,
+        RootDirectory: parent,
         ObjectName: &unicode,
         Attributes: OBJECT_ATTRIBUTE_FLAGS(OBJ_CASE_INSENSITIVE),
         SecurityDescriptor: std::ptr::null(),
@@ -243,18 +239,65 @@ pub fn open_file(parent: BigInt, name: String) -> Option<BigInt> {
     let status = unsafe {
         NtOpenFile(
             &mut handle,
-            FILE_READ_DATA.0 | FILE_READ_ATTRIBUTES | SYNCHRONIZE,
+            access,
             &attributes,
             &mut iosb,
             FILE_SHARE_ALL,
             FILE_NON_DIRECTORY_FILE | FILE_SYNCHRONOUS_IO_NONALERT | FILE_OPEN_REPARSE_POINT,
         )
     };
+    (status, handle)
+}
+
+const READONLY_FILE_ACCESS: u32 = FILE_READ_DATA.0 | FILE_READ_ATTRIBUTES | SYNCHRONIZE;
+
+/// Open one regular FILE anchored at an already-verified parent directory
+/// handle: single name component, FILE_OPEN_REPARSE_POINT so a reparse entry
+/// yields the reparse point itself (attributes refused in JS; the target is
+/// never touched) and FILE_NON_DIRECTORY_FILE so only files open. Any failure
+/// is null; the status-aware poststate verifier uses `open_file_status`.
+#[napi]
+pub fn open_file(parent: BigInt, name: String) -> Option<BigInt> {
+    let parent_handle = handle_from_raw(parent)?;
+    let mut name_bytes: Vec<u16> = name.encode_utf16().collect();
+    name_bytes.push(0);
+    let (status, handle) = open_file_raw(parent_handle, &name_bytes, READONLY_FILE_ACCESS);
     if status.is_ok() {
         Some(handle_to_raw(handle))
     } else {
         None
     }
+}
+
+#[napi(object)]
+pub struct OpenFileStatus {
+    pub status: u32,
+    pub handle: Option<BigInt>,
+}
+
+/// `open_file` with the raw NTSTATUS surfaced verbatim (PR #186 R1 P1-02):
+/// the readonly independent post-state verifier must distinguish
+/// kernel-confirmed name/path absence (STATUS_OBJECT_NAME_NOT_FOUND /
+/// STATUS_OBJECT_PATH_NOT_FOUND) from every other NtOpenFile failure —
+/// sharing violation, access denied, delete pending — which the null-only
+/// `open_file` conflates into "absent". Identical access, sharing and
+/// create-options to `open_file`; `handle` is Some only on success status.
+/// Whole-call None is only a malformed parent handle (caller contract
+/// violation, refused by the JS layer like every other native null).
+#[napi]
+pub fn open_file_status(parent: BigInt, name: String) -> Option<OpenFileStatus> {
+    let parent_handle = handle_from_raw(parent)?;
+    let mut name_bytes: Vec<u16> = name.encode_utf16().collect();
+    name_bytes.push(0);
+    let (status, handle) = open_file_raw(parent_handle, &name_bytes, READONLY_FILE_ACCESS);
+    Some(OpenFileStatus {
+        status: status.0 as u32,
+        handle: if status.is_ok() {
+            Some(handle_to_raw(handle))
+        } else {
+            None
+        },
+    })
 }
 
 #[napi(object)]
