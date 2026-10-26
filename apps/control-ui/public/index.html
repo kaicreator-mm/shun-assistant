@@ -47,6 +47,19 @@
         <ul id="system-facts"></ul>
       </section>
 
+      <section id="recipe-section" aria-labelledby="recipe-title">
+        <h2 id="recipe-title">Reusable system information Recipe</h2>
+        <p class="muted">
+          Save the built-in read-only system inventory Recipe to local SQLite.
+          This only stores an immutable candidate: no model calls, no script
+          execution, no authorization grant, and no automatic activation.
+          Saving requires the real Windows backend, not Demo mode.
+        </p>
+        <button id="save-inventory-recipe" type="button">Save built-in Recipe candidate</button>
+        <p id="recipe-save-status" role="status">Not saved in this session.</p>
+        <p id="recipe-save-identity" class="muted"></p>
+      </section>
+
       <section id="cloud-disclosure-section" aria-labelledby="cloud-disclosure-title">
         <h2 id="cloud-disclosure-title">DeepSeek Flash disclosure preview</h2>
         <p class="muted">
