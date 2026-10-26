@@ -5,14 +5,14 @@ import { join, resolve } from 'node:path';
 import { canonicalJson } from '@shun/contracts';
 import { describe, expect, it } from 'vitest';
 import {
-  cloudInterpreterFromEnvironment,
-  TrustedCloudInterpreter,
-} from '../src/cloud-interpret.ts';
-import {
   CLOUD_AUTHORITY_SCHEMA,
   createCloudAuthorityCurrentness,
   readOperatorCloudAuthority,
 } from '../src/cloud-authority.ts';
+import {
+  cloudInterpreterFromEnvironment,
+  TrustedCloudInterpreter,
+} from '../src/cloud-interpret.ts';
 import { DemoShunBackend } from '../src/demo/backend.ts';
 import { createControlServer } from '../src/server.ts';
 import { startHarness } from './helpers.ts';
@@ -130,7 +130,6 @@ describe('T08 C03 real DeepSeek composition pre-send boundary', () => {
   });
 });
 
-
 // Trusted issuer is OUTSIDE the running Shun host; fixture keys are generated
 // only for this test and never used in product. Tests exercise real Ed25519
 // verification and on-disk replacement rather than faking `isCurrent=true`.
@@ -165,17 +164,21 @@ describe('T08 C03 independently signed live authority (R1 P1 correction)', () =>
     writeFileSync(publicKeyFile, pem);
     const publish = (state = base) => {
       const signature = sign(null, Buffer.from(canonicalJson(state), 'utf8'), keys.privateKey);
-      writeFileSync(authorityFile, JSON.stringify({
-        ...state,
-        signature: signature.toString('base64'),
-      }));
+      writeFileSync(
+        authorityFile,
+        JSON.stringify({
+          ...state,
+          signature: signature.toString('base64'),
+        }),
+      );
     };
-    const source = () => readOperatorCloudAuthority({
-      authorityFile,
-      publicKeyFile,
-      pinnedSpkiSha256: pin,
-      now: () => Date.parse(now),
-    });
+    const source = () =>
+      readOperatorCloudAuthority({
+        authorityFile,
+        publicKeyFile,
+        pinnedSpkiSha256: pin,
+        now: () => Date.parse(now),
+      });
     publish();
     return { base, source, publish, close: () => rmSync(dir, { recursive: true, force: true }) };
   }
