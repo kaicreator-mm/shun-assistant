@@ -20,6 +20,7 @@ import {
   type ControlErrorCode,
   httpStatusForCode,
 } from './errors.ts';
+import type { CloudInterpretPort } from './cloud-interpret.ts';
 import type { ControlBackend } from './ports.ts';
 
 export const CONTROL_API_REVISION = 'shun.control-api/0.1';
@@ -52,6 +53,8 @@ const MIME: Record<string, string> = {
 
 export interface ControlServerOptions {
   backend: ControlBackend;
+  /** Trusted process composition; never configured by an HTTP request. */
+  cloud?: CloudInterpretPort;
   /** Directory with the static control-ui app; omitted = API only. */
   uiDir?: string;
   /** Loopback host only; anything else is a construction-time refusal. */
@@ -83,7 +86,7 @@ export function createControlServer(options: ControlServerOptions): ControlServe
   const uiRoot = options.uiDir ? resolve(options.uiDir) : undefined;
 
   const server = createServer((req, res) => {
-    handle(options.backend, req, res, { host, uiRoot, maxBodyBytes }).catch((error: unknown) => {
+    handle(options.backend, req, res, { host, uiRoot, maxBodyBytes, cloud: options.cloud }).catch((error: unknown) => {
       respondError(res, error);
     });
   });
@@ -118,6 +121,7 @@ export function createControlServer(options: ControlServerOptions): ControlServe
 
 interface RouteContext {
   host: string;
+  cloud?: CloudInterpretPort;
   uiRoot?: string;
   maxBodyBytes: number;
 }
@@ -256,6 +260,40 @@ async function handle(
       cloudSendAllowed: false,
       privateBrokerReady: false,
     });
+  }
+
+  // A true REMOTE model action is available only after trusted process
+  // composition. Neither this route nor its input can create cloud consent:
+  // C02's real native interactive dialog must approve each exact projection.
+  if (method === 'GET' && url.pathname === '/api/cloud/status') {
+    return respondJson(res, 200, {
+      ...(
+        ctx.cloud?.status() ?? {
+          enabled: false,
+          provider: 'deepseek',
+          model: 'deepseek-flash',
+          osConsentRequired: true,
+        }
+      ),
+      tasksSimulated: backend.meta().simulated,
+    });
+  }
+
+  if (method === 'POST' && url.pathname === '/api/cloud/interpret') {
+    const parsed = CloudDisclosurePreviewSchema.safeParse(await readJsonBody(req, ctx.maxBodyBytes));
+    if (!parsed.success) {
+      return respondJson(res, 400, { error: { code: 'CLOUD_GOAL_INVALID' } });
+    }
+    if (!ctx.cloud?.status().enabled) {
+      return respondJson(res, 503, { error: { code: 'CLOUD_UNAVAILABLE' } });
+    }
+    const result = await ctx.cloud.interpretGoal(parsed.data.goalText);
+    if (!result.ok) {
+      return respondJson(res, result.code === 'CONSENT_DECLINED' ? 409 : 503, {
+        error: { code: result.code },
+      });
+    }
+    return respondJson(res, 200, result);
   }
 
   if (resource === 'tasks') {
