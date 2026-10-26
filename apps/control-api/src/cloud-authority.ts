@@ -16,6 +16,9 @@ export type OperatorCloudAuthority = Readonly<{
   expiresAt: string;
   enabled: boolean;
   allowExternalDisclosure: boolean;
+  providerId: 'deepseek';
+  modelId: 'deepseek-flash';
+  destination: 'https://api.deepseek.com/chat/completions';
   registryRevision: string;
   policyRevision: string;
   scopeRevision: string;
@@ -34,6 +37,9 @@ const BODY_FIELDS = [
   'expiresAt',
   'enabled',
   'allowExternalDisclosure',
+  'providerId',
+  'modelId',
+  'destination',
   'registryRevision',
   'policyRevision',
   'scopeRevision',
@@ -92,6 +98,9 @@ export function verifyOperatorCloudAuthority(
       raw.schema !== CLOUD_AUTHORITY_SCHEMA ||
       raw.enabled !== true ||
       raw.allowExternalDisclosure !== true ||
+      raw.providerId !== 'deepseek' ||
+      raw.modelId !== 'deepseek-flash' ||
+      raw.destination !== 'https://api.deepseek.com/chat/completions' ||
       !isIso(raw.issuedAt) ||
       !isIso(raw.expiresAt) ||
       !Number.isSafeInteger(nowMs)
