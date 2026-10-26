@@ -61,6 +61,15 @@
           Windows private consent broker is connected.</p>
         <p id="cloud-preview-hash" class="muted"></p>
         <pre id="cloud-preview-json"></pre>
+        <p class="muted">
+          Real DeepSeek planning requires a separate Windows desktop consent dialog.
+          A model response is a suggestion, not an executable action. Actual charges may remain unknown.
+        </p>
+        <button id="cloud-send-button" type="button" disabled>
+          Request real DeepSeek interpretation (Windows consent required)
+        </button>
+        <p id="cloud-send-status" role="status">Checking trusted local cloud availability…</p>
+        <pre id="cloud-result-text"></pre>
       </section>
 
       <section id="approvals-section" aria-labelledby="approvals-title">
