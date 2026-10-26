@@ -12,6 +12,7 @@ import { extname, normalize, resolve, sep } from 'node:path';
 import type { GoalRequest } from '@shun/contracts';
 import { GoalRequestSchema } from '@shun/contracts';
 import { buildDeepSeekGoalDisclosure } from '@shun/llm-remote';
+import type { RecipeRegistrationResult } from '@shun/resolver';
 import { collectWindowsSystemInventory, suggestReadonlyOptimizations } from '@shun/vertical-system';
 import { z } from 'zod';
 import {
@@ -53,9 +54,7 @@ const MIME: Record<string, string> = {
 export interface ControlServerOptions {
   backend: ControlBackend;
   /** Trusted backend-only candidate writer; browser never selects its source. */
-  saveBuiltinInventoryCandidate?: () =>
-    | { ok: true; state: 'PERSISTED_CANDIDATE_ONLY'; recipeId: string; revisionSha256: string; inserted: boolean; modelCalls: 0; executionAuthorized: false }
-    | { ok: false; code: 'RECIPE_SOURCE_REFUSED' | 'RECIPE_STORE_REFUSED' };
+  saveBuiltinInventoryCandidate?: () => RecipeRegistrationResult;
   /** Directory with the static control-ui app; omitted = API only. */
   uiDir?: string;
   /** Loopback host only; anything else is a construction-time refusal. */
@@ -87,7 +86,12 @@ export function createControlServer(options: ControlServerOptions): ControlServe
   const uiRoot = options.uiDir ? resolve(options.uiDir) : undefined;
 
   const server = createServer((req, res) => {
-    handle(options.backend, req, res, { host, uiRoot, maxBodyBytes, saveBuiltinInventoryCandidate: options.saveBuiltinInventoryCandidate }).catch((error: unknown) => {
+    handle(options.backend, req, res, {
+      host,
+      uiRoot,
+      maxBodyBytes,
+      saveBuiltinInventoryCandidate: options.saveBuiltinInventoryCandidate,
+    }).catch((error: unknown) => {
       respondError(res, error);
     });
   });
@@ -270,7 +274,12 @@ async function handle(
       return respondJson(res, 503, { ok: false, code: 'RECIPE_STORAGE_UNAVAILABLE' });
     }
     const body = await readJsonBody(req, ctx.maxBodyBytes);
-    if (!body || typeof body !== 'object' || Array.isArray(body) || Object.keys(body).length !== 0) {
+    if (
+      !body ||
+      typeof body !== 'object' ||
+      Array.isArray(body) ||
+      Object.keys(body).length !== 0
+    ) {
       return respondJson(res, 400, { ok: false, code: 'RECIPE_INPUT_REFUSED' });
     }
     const saved = ctx.saveBuiltinInventoryCandidate();
