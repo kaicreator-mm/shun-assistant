@@ -1,6 +1,9 @@
 import { resolve } from 'node:path';
 import { describe, expect, it } from 'vitest';
-import { TrustedCloudInterpreter, cloudInterpreterFromEnvironment } from '../src/cloud-interpret.ts';
+import {
+  cloudInterpreterFromEnvironment,
+  TrustedCloudInterpreter,
+} from '../src/cloud-interpret.ts';
 import { startHarness } from './helpers.ts';
 
 // These are safety/interface checks, NOT a claim to have paid for a real
