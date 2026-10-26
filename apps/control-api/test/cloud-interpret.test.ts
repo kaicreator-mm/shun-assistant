@@ -217,10 +217,11 @@ describe('T08 C03 independently signed live authority (R1 P1 correction)', () =>
         const goal = 'Read-only Windows disk diagnostics';
         const disclosure = buildDeepSeekGoalDisclosure(goal);
         expect(disclosure).not.toBeNull();
+        if (!disclosure) throw new Error('TEST_PROJECTION_MISSING');
         const approval: CloudConsentApproval = {
           consentId: `test-consent-${mode}`,
           confirmationNonce: `nonce-${mode}`,
-          displayedProjectionSha256: disclosure!.sha256,
+          displayedProjectionSha256: disclosure.sha256,
           displayedDisclosureCategories: ['GOAL_TEXT'],
           issuer: {
             brokerId: 'test-only',
@@ -236,7 +237,7 @@ describe('T08 C03 independently signed live authority (R1 P1 correction)', () =>
             providerId: 'deepseek',
             modelId: 'deepseek-flash',
             destination: 'https://api.deepseek.com/chat/completions',
-            approvedProjectionSha256: disclosure!.sha256,
+            approvedProjectionSha256: disclosure.sha256,
             scopeRevision: signed.scopeRevision,
             disclosureCategories: ['GOAL_TEXT'],
             registryRevision: signed.registryRevision,
@@ -279,7 +280,12 @@ describe('T08 C03 independently signed live authority (R1 P1 correction)', () =>
             // Exercise actual T01 transport's SECOND currentness gate using
             // a signed external policy/price change AFTER the first gate.
             if (mode === 'between-reserve-and-send') {
-              h.publish({ ...h.base, pricingRevision: 'pricing-r2', outputMicrosPerToken: 2, maxCostMicros: 6000 });
+              h.publish({
+                ...h.base,
+                pricingRevision: 'pricing-r2',
+                outputMicrosPerToken: 2,
+                maxCostMicros: 6000,
+              });
             }
             return {
               ok: true as const,
