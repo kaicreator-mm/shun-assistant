@@ -2,7 +2,8 @@ import { createHash, generateKeyPairSync, sign } from 'node:crypto';
 import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
-import { canonicalJson } from '@shun/contracts';
+import { type CloudConsentApproval, type CloudConsentCurrentness, canonicalJson } from '@shun/contracts';
+import { buildDeepSeekGoalDisclosure, TrustedDeepSeekTransport } from '@shun/llm-remote';
 import { describe, expect, it } from 'vitest';
 import {
   CLOUD_AUTHORITY_SCHEMA,
@@ -200,6 +201,123 @@ describe('T08 C03 independently signed live authority (R1 P1 correction)', () =>
       expect(current()).toBe(false);
     } finally {
       h.close();
+    }
+  });
+
+  it('T01 exact reserve/send gates perform zero fetch for signed policy/price revocation', async () => {
+    for (const mode of ['before-reserve', 'between-reserve-and-send'] as const) {
+      const h = harness();
+      try {
+        const signed = h.source();
+        const current = createCloudAuthorityCurrentness(h.source, signed);
+        const goal = 'Read-only Windows disk diagnostics';
+        const disclosure = buildDeepSeekGoalDisclosure(goal);
+        expect(disclosure).not.toBeNull();
+        const approval: CloudConsentApproval = {
+          consentId: `test-consent-${mode}`,
+          confirmationNonce: `nonce-${mode}`,
+          displayedProjectionSha256: disclosure!.sha256,
+          displayedDisclosureCategories: ['GOAL_TEXT'],
+          issuer: {
+            brokerId: 'test-only',
+            brokerRevision: 'r1',
+            assertionId: `assertion-${mode}`,
+            channel: 'AUTHENTICATED_PRIVATE_IPC',
+            proof: 'TEST_ONLY_SIGNED_AUTHORITY_NO_OS_BROKER',
+          },
+          scope: {
+            taskId: 'task-signed',
+            principalId: 'principal-signed',
+            sessionId: 'session-signed',
+            providerId: 'deepseek',
+            modelId: 'deepseek-flash',
+            destination: 'https://api.deepseek.com/chat/completions',
+            approvedProjectionSha256: disclosure!.sha256,
+            scopeRevision: signed.scopeRevision,
+            disclosureCategories: ['GOAL_TEXT'],
+            registryRevision: signed.registryRevision,
+            policyRevision: signed.policyRevision,
+            pricingRevision: signed.pricingRevision,
+            revocationEpoch: signed.revocationEpoch,
+            maxCalls: 1,
+            maxInputTokens: signed.maxInputTokens,
+            maxOutputTokens: signed.maxOutputTokens,
+            maxCostMicros: signed.maxCostMicros,
+            issuedAt: signed.issuedAt,
+            expiresAt: signed.expiresAt,
+          },
+        };
+        const freshness = (): CloudConsentCurrentness =>
+          current()
+            ? {
+                kind: 'CURRENT',
+                taskId: approval.scope.taskId,
+                principalId: approval.scope.principalId,
+                sessionId: approval.scope.sessionId,
+                registryRevision: signed.registryRevision,
+                policyRevision: signed.policyRevision,
+                pricingRevision: signed.pricingRevision,
+                scopeRevision: signed.scopeRevision,
+                revocationEpoch: signed.revocationEpoch,
+                nonceIsUnused: true,
+              }
+            : { kind: 'UNRESOLVABLE' };
+
+        let fetchCount = 0;
+        let reserves = 0;
+        let sendGates = 0;
+        const mockLedger = {
+          reserve: (input: { currentness: CloudConsentCurrentness }) => {
+            reserves += 1;
+            if (input.currentness.kind !== 'CURRENT') {
+              return { ok: false as const, code: 'CONSENT_STALE' as const };
+            }
+            // Exercise actual T01 transport's SECOND currentness gate using
+            // a signed external policy/price change AFTER the first gate.
+            if (mode === 'between-reserve-and-send') {
+              h.publish({ ...h.base, pricingRevision: 'pricing-r2', inputMicrosPerToken: 2 });
+            }
+            return {
+              ok: true as const,
+              attemptId: 'test-attempt',
+              requestBytesSha256: 'a'.repeat(64),
+              reservedCostMicros: 4608,
+            };
+          },
+          markMayHaveSent: (input: { currentness: CloudConsentCurrentness }) => {
+            sendGates += 1;
+            return input.currentness.kind === 'CURRENT';
+          },
+          markUnknownCost: () => true,
+        };
+        const transport = new TrustedDeepSeekTransport({
+          ledger: mockLedger,
+          currentnessFor: freshness,
+          isOffline: () => false,
+          isLocalOnly: () => false,
+          readApiKey: () => 'local-test-only-key',
+          now: () => '2026-10-26T15:00:30.000Z',
+          fetchTransport: (async () => {
+            fetchCount += 1;
+            throw new Error('FETCH_MUST_NOT_HAPPEN');
+          }) as typeof fetch,
+        });
+        if (mode === 'before-reserve') {
+          h.publish({ ...h.base, policyRevision: 'policy-r2', revocationEpoch: 3 });
+        }
+        const outcome = await transport.invoke({
+          goalText: goal,
+          attemptId: 'test-attempt',
+          approval,
+          maxOutputTokens: 128,
+        });
+        expect(outcome.ok).toBe(false);
+        expect(fetchCount).toBe(0);
+        expect(reserves).toBe(1);
+        expect(sendGates).toBe(mode === 'before-reserve' ? 0 : 1);
+      } finally {
+        h.close();
+      }
     }
   });
 
