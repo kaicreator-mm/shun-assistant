@@ -4,8 +4,8 @@ import { join } from 'node:path';
 import { TrustedRecipeReadService } from '@shun/resolver';
 import { ImmutableRecipeRepository, ShunStore } from '@shun/store';
 import { describe, expect, it } from 'vitest';
-import { registerBuiltinInventoryCandidate } from '../src/inventory-recipe.ts';
 import { DemoShunBackend } from '../src/demo/backend.ts';
+import { registerBuiltinInventoryCandidate } from '../src/inventory-recipe.ts';
 import { createControlServer } from '../src/server.ts';
 import { startHarness } from './helpers.ts';
 
@@ -64,7 +64,10 @@ describe('T08 C05 — real immutable Recipe candidate save via local UI API', ()
             body: JSON.stringify(body),
           },
         );
-        return { status: response.status, json: await response.json() as Record<string, unknown> };
+        return {
+          status: response.status,
+          json: (await response.json()) as Record<string, unknown>,
+        };
       };
       try {
         for (const forged of [
@@ -106,8 +109,9 @@ describe('T08 C05 — real immutable Recipe candidate save via local UI API', ()
           .all() as Array<{ recipe_id: string; revision_sha256: string }>;
         expect(rows).toHaveLength(1);
         expect(rows[0]?.revision_sha256).toBe(savedSha);
-        expect(repo.get(rows[0]!.recipe_id, rows[0]!.revision_sha256)?.actionGraph.nodes[0]?.op)
-          .toBe('system.inventory');
+        expect(
+          repo.get(rows[0]!.recipe_id, rows[0]!.revision_sha256)?.actionGraph.nodes[0]?.op,
+        ).toBe('system.inventory');
       } finally {
         await server.close();
       }
