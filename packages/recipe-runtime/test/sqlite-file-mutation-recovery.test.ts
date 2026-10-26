@@ -180,15 +180,20 @@ describe('T07 F04B1 private real-SQLite mutation recovery readback', () => {
   it('refuses non-mutation and malformed action instead of trusting caller assertions', async () => {
     await withDurableStore((store) => {
       const reader = new SqliteFileMutationRecoveryReader(store);
-      const forged = { ...action('bad-op'), action: { ...action('bad-op').action, op: 'shell.exec' } };
+      const forged = {
+        ...action('bad-op'),
+        action: { ...action('bad-op').action, op: 'shell.exec' },
+      };
       expect(reader.read(forged)).toEqual({
         ok: false,
         code: 'FILE_RECOVERY_JOURNAL_REFUSED',
       });
-      expect(reader.read({ state: 'COMMITTED_VERIFIED', semanticVerified: true } as never)).toEqual({
-        ok: false,
-        code: 'FILE_RECOVERY_JOURNAL_REFUSED',
-      });
+      expect(reader.read({ state: 'COMMITTED_VERIFIED', semanticVerified: true } as never)).toEqual(
+        {
+          ok: false,
+          code: 'FILE_RECOVERY_JOURNAL_REFUSED',
+        },
+      );
     });
   });
 });
