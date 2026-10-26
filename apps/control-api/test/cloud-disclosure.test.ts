@@ -51,7 +51,7 @@ describe('T08 exact DeepSeek Flash disclosure preview (NO SEND)', () => {
         { goalText: 'diagnose', authorization: 'USER_APPROVED' },
         { goalText: 'diagnose', endpoint: 'https://other-provider.invalid' },
         { goalText: 'diagnose', consentId: 'spoofed' },
-        { goalText: 'hello\\u0000world' },
+        { goalText: ['hello', String.fromCharCode(0), 'world'].join('') },
       ];
       for (const body of rejected) {
         const response = await h.post('/api/cloud/disclosure-preview', body);
