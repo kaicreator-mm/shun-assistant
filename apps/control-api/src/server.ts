@@ -11,6 +11,7 @@ import { createServer, type IncomingMessage, type Server, type ServerResponse } 
 import { extname, normalize, resolve, sep } from 'node:path';
 import type { GoalRequest } from '@shun/contracts';
 import { GoalRequestSchema } from '@shun/contracts';
+import { collectWindowsSystemInventory, suggestReadonlyOptimizations } from '@shun/vertical-system';
 import { z } from 'zod';
 import {
   CONTROL_ERROR_CODES,
@@ -199,6 +200,29 @@ async function handle(
       // real Action Controller.
       simulated: meta.simulated,
       policy: meta.policy,
+    });
+  }
+
+  // T08 J0: a genuine LOCAL read-only Windows OS observation, not the
+  // scripted ControlBackend demo and not a cloud/provider capability. The
+  // response contains aggregate memory/disk/CPU facts only; never names,
+  // file paths, credentials or arbitrary command output. No HTTP input is
+  // forwarded into the trusted T06 system-inventory collector.
+  if (method === 'GET' && url.pathname === '/api/system/inventory') {
+    const observed = collectWindowsSystemInventory();
+    if (!observed.ok) {
+      return respondJson(res, 503, {
+        ok: false,
+        code: 'LIVE_SYSTEM_INVENTORY_UNAVAILABLE',
+      });
+    }
+    return respondJson(res, 200, {
+      ok: true,
+      source: 'LIVE_WINDOWS_LOCAL_READONLY',
+      localOnly: true,
+      externalDisclosures: [],
+      snapshot: observed.snapshot,
+      suggestions: suggestReadonlyOptimizations(observed),
     });
   }
 
