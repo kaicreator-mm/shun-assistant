@@ -21,6 +21,7 @@ import {
   httpStatusForCode,
 } from './errors.ts';
 import type { CloudInterpretPort } from './cloud-interpret.ts';
+import type { CloudInterpretPort } from './cloud-interpret.ts';
 import type { ControlBackend } from './ports.ts';
 
 export const CONTROL_API_REVISION = 'shun.control-api/0.1';
@@ -86,9 +87,11 @@ export function createControlServer(options: ControlServerOptions): ControlServe
   const uiRoot = options.uiDir ? resolve(options.uiDir) : undefined;
 
   const server = createServer((req, res) => {
-    handle(options.backend, req, res, { host, uiRoot, maxBodyBytes, cloud: options.cloud }).catch((error: unknown) => {
-      respondError(res, error);
-    });
+    handle(options.backend, req, res, { host, uiRoot, maxBodyBytes, cloud: options.cloud }).catch(
+      (error: unknown) => {
+        respondError(res, error);
+      },
+    );
   });
 
   return {
@@ -267,20 +270,20 @@ async function handle(
   // C02's real native interactive dialog must approve each exact projection.
   if (method === 'GET' && url.pathname === '/api/cloud/status') {
     return respondJson(res, 200, {
-      ...(
-        ctx.cloud?.status() ?? {
-          enabled: false,
-          provider: 'deepseek',
-          model: 'deepseek-flash',
-          osConsentRequired: true,
-        }
-      ),
+      ...(ctx.cloud?.status() ?? {
+        enabled: false,
+        provider: 'deepseek',
+        model: 'deepseek-flash',
+        osConsentRequired: true,
+      }),
       tasksSimulated: backend.meta().simulated,
     });
   }
 
   if (method === 'POST' && url.pathname === '/api/cloud/interpret') {
-    const parsed = CloudDisclosurePreviewSchema.safeParse(await readJsonBody(req, ctx.maxBodyBytes));
+    const parsed = CloudDisclosurePreviewSchema.safeParse(
+      await readJsonBody(req, ctx.maxBodyBytes),
+    );
     if (!parsed.success) {
       return respondJson(res, 400, { error: { code: 'CLOUD_GOAL_INVALID' } });
     }
