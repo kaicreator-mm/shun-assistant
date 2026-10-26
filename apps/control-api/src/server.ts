@@ -207,7 +207,11 @@ async function handle(
     return respondJson(res, 200, {
       ok: true,
       api: CONTROL_API_REVISION,
-      localOnly: true,
+      // This is an actual model egress posture, not the loopback bind rule.
+      // A remote model can be enabled even while Goal task execution is demo.
+      localOnly: ctx.cloud?.status().enabled !== true,
+      loopbackOnly: true,
+      cloudMode: ctx.cloud?.status().enabled === true ? 'REMOTE_OPT_IN' : 'DISABLED',
       // Simulation disclosure (Issue #41, VC-P2-06): the UI renders a
       // prominent banner from this so the demo backend cannot pass as the
       // real Action Controller.
