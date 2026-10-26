@@ -52,6 +52,10 @@ const MIME: Record<string, string> = {
 
 export interface ControlServerOptions {
   backend: ControlBackend;
+  /** Trusted backend-only candidate writer; browser never selects its source. */
+  saveBuiltinInventoryCandidate?: () =>
+    | { ok: true; state: 'PERSISTED_CANDIDATE_ONLY'; recipeId: string; revisionSha256: string; inserted: boolean; modelCalls: 0; executionAuthorized: false }
+    | { ok: false; code: 'RECIPE_SOURCE_REFUSED' | 'RECIPE_STORE_REFUSED' };
   /** Directory with the static control-ui app; omitted = API only. */
   uiDir?: string;
   /** Loopback host only; anything else is a construction-time refusal. */
@@ -83,7 +87,7 @@ export function createControlServer(options: ControlServerOptions): ControlServe
   const uiRoot = options.uiDir ? resolve(options.uiDir) : undefined;
 
   const server = createServer((req, res) => {
-    handle(options.backend, req, res, { host, uiRoot, maxBodyBytes }).catch((error: unknown) => {
+    handle(options.backend, req, res, { host, uiRoot, maxBodyBytes, saveBuiltinInventoryCandidate: options.saveBuiltinInventoryCandidate }).catch((error: unknown) => {
       respondError(res, error);
     });
   });
@@ -120,6 +124,7 @@ interface RouteContext {
   host: string;
   uiRoot?: string;
   maxBodyBytes: number;
+  saveBuiltinInventoryCandidate?: ControlServerOptions['saveBuiltinInventoryCandidate'];
 }
 
 /**
@@ -256,6 +261,21 @@ async function handle(
       cloudSendAllowed: false,
       privateBrokerReady: false,
     });
+  }
+
+  // T08 C05: one fixed local candidate from #195, not arbitrary Recipe
+  // source, and not a browser-issued action grant. Refuse Demo/absent Host.
+  if (method === 'POST' && url.pathname === '/api/recipes/builtin/system-inventory/save') {
+    if (!ctx.saveBuiltinInventoryCandidate) {
+      return respondJson(res, 503, { ok: false, code: 'RECIPE_STORAGE_UNAVAILABLE' });
+    }
+    const body = await readJsonBody(req, ctx.maxBodyBytes);
+    if (!body || typeof body !== 'object' || Array.isArray(body) || Object.keys(body).length !== 0) {
+      return respondJson(res, 400, { ok: false, code: 'RECIPE_INPUT_REFUSED' });
+    }
+    const saved = ctx.saveBuiltinInventoryCandidate();
+    if (!saved.ok) return respondJson(res, 503, { ok: false, code: saved.code });
+    return respondJson(res, 200, saved);
   }
 
   if (resource === 'tasks') {
