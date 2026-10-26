@@ -108,13 +108,19 @@ export function verifyOperatorCloudAuthority(
     ) {
       return refuse();
     }
-    if (!REVISION_FIELDS.every((field) => typeof raw[field] === 'string' && /^[A-Za-z0-9._:/-]{1,128}$/.test(raw[field]))) {
+    if (
+      !REVISION_FIELDS.every(
+        (field) => typeof raw[field] === 'string' && /^[A-Za-z0-9._:/-]{1,128}$/.test(raw[field]),
+      )
+    ) {
       return refuse();
     }
     if (
       !Number.isSafeInteger(raw.revocationEpoch) ||
       (raw.revocationEpoch as number) < 0 ||
-      !POSITIVE_FIELDS.every((field) => Number.isSafeInteger(raw[field]) && (raw[field] as number) > 0)
+      !POSITIVE_FIELDS.every(
+        (field) => Number.isSafeInteger(raw[field]) && (raw[field] as number) > 0,
+      )
     ) {
       return refuse();
     }
@@ -127,10 +133,7 @@ export function verifyOperatorCloudAuthority(
     ) {
       return refuse();
     }
-    if (
-      typeof raw.signature !== 'string' ||
-      !/^[a-zA-Z0-9+/]{86}==$/.test(raw.signature)
-    ) {
+    if (typeof raw.signature !== 'string' || !/^[a-zA-Z0-9+/]{86}==$/.test(raw.signature)) {
       return refuse();
     }
     // Existing trusted host public-key fingerprint verifier; a file-supplied
@@ -150,7 +153,7 @@ export function verifyOperatorCloudAuthority(
     ) {
       return refuse();
     }
-    return Object.freeze(body as OperatorCloudAuthority);
+    return Object.freeze(body as unknown as OperatorCloudAuthority);
   } catch {
     return refuse();
   }
