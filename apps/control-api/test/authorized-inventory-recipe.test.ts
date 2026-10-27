@@ -2,11 +2,7 @@ import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { ActionController, AuthorizationAuthority } from '@shun/authorization';
-import {
-  ShunStore,
-  ShunStoreAuthorizationAdapter,
-  ShunStoreUiApprovalBridge,
-} from '@shun/store';
+import { ShunStore, ShunStoreAuthorizationAdapter, ShunStoreUiApprovalBridge } from '@shun/store';
 import { describe, expect, it } from 'vitest';
 import { DemoShunBackend } from '../src/demo/backend.ts';
 import { BUILTIN_INVENTORY_RECIPE_ID } from '../src/inventory-recipe.ts';
