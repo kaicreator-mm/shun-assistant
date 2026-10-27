@@ -1,3 +1,12 @@
+import { mkdtempSync, rmSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+import { ActionController, AuthorizationAuthority } from '@shun/authorization';
+import {
+  ShunStore,
+  ShunStoreAuthorizationAdapter,
+  ShunStoreUiApprovalBridge,
+} from '@shun/store';
 import { describe, expect, it } from 'vitest';
 import { DemoShunBackend } from '../src/demo/backend.ts';
 import { BUILTIN_INVENTORY_RECIPE_ID } from '../src/inventory-recipe.ts';
@@ -210,6 +219,100 @@ describe('T08 C07R — zero-model, real T02-gated Recipe replay', () => {
     expect(effectCalls).toBe(2);
     expect(passed).not.toHaveProperty('grant');
     expect(passed).not.toHaveProperty('authorization');
+  });
+
+  it('real T02 controller defaults R0-deny, then accepts only operator-adopted exact policy and authentic grant', async () => {
+    const temp = mkdtempSync(join(tmpdir(), 'shun-r0-recipe-t02-'));
+    const store = new ShunStore({ file: join(temp, 'state.sqlite') });
+    const clock = () => '2026-10-27T16:30:00.000Z';
+    try {
+      const adapter = new ShunStoreAuthorizationAdapter(store);
+      await adapter.saveAuthorityRecord({
+        authorityId: 'shun.operator.test-only',
+        authorityRevision: 'r1',
+        updatedAt: clock(),
+        policyInitialized: true,
+        priorAuthorityRevisions: [],
+      });
+      await adapter.savePolicySnapshot({
+        policySnapshotRevision: 'operator-empty-r0',
+        status: 'ACTIVE',
+        authorityId: 'shun.operator.test-only',
+        authorityRevision: 'r1',
+        revokedGrantIds: [],
+        priorRevisions: [],
+        rules: [],
+        riskGuards: [],
+        updatedAt: clock(),
+      });
+      const authority = new AuthorizationAuthority({
+        state: adapter,
+        grants: adapter,
+        integritySecret: 'test-only-hmac-integrity',
+        issuanceSecret: 'test-only-controller-issuance',
+        clock,
+      });
+      const controller = new ActionController({
+        authority,
+        policyState: adapter,
+        approvals: new ShunStoreUiApprovalBridge(store, { clock }),
+        issuanceSecret: 'test-only-controller-issuance',
+        clock,
+      });
+      let collectorCalls = 0;
+      const host = {
+        readCandidate: () => candidate,
+        current: async () => {
+          const current = await authority.currentAuthority();
+          return current.kind === 'CURRENT' && current.policyStatus === 'ACTIVE'
+            ? {
+                kind: 'CURRENT' as const,
+                policyRevision: current.policySnapshotRevision,
+                registryRevision: 'operator-signed-registry-r1',
+              }
+            : { kind: 'UNRESOLVABLE' as const };
+        },
+        controller,
+        collect: () => {
+          collectorCalls++;
+          return { ok: true as const, snapshot: SNAPSHOT };
+        },
+      };
+      expect(await runAuthorizedInventoryRecipe(host)).toEqual({
+        ok: false,
+        code: 'RECIPE_AUTHORIZATION_REFUSED',
+      });
+      expect(collectorCalls).toBe(0);
+      // The test operator changes durable policy through the *existing*
+      // real authority lifecycle, NOT via Shun HTTP or a forged grant.
+      await authority.adoptPolicy({
+        policySnapshotRevision: 'operator-inventory-r0-only',
+        rules: [
+          {
+            ruleId: 'operator-inventory-exact-r0',
+            capabilityId: 'system.inventory',
+            op: 'system.inventory',
+            maxRiskClass: 'R0',
+            privilegeLevel: 'USER',
+          },
+        ],
+        riskGuards: [],
+      });
+      const passed = await runAuthorizedInventoryRecipe(host);
+      expect(passed).toMatchObject({
+        ok: true,
+        status: 'VERIFIED_READONLY_OBSERVATION',
+        recipeId: BUILTIN_INVENTORY_RECIPE_ID,
+        revisionSha256: REVISION,
+        recipeExecuted: true,
+        modelCalls: 0,
+      });
+      expect(collectorCalls).toBe(1);
+      expect(passed).not.toHaveProperty('grant');
+    } finally {
+      await store.close();
+      rmSync(temp, { recursive: true, force: true });
+    }
   });
 
   it('never offers a runnable Recipe from the shipped Demo server or accepts arbitrary browser plans', async () => {
