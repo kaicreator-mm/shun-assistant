@@ -150,7 +150,13 @@ describe('T01 DeepSeek HTTPS: exact disclosed projection to send', () => {
         thinking: { type: 'disabled' },
         stream: false,
       });
-      expect(Object.keys(payload).sort()).toEqual(['max_tokens', 'messages', 'model', 'stream', 'thinking']);
+      expect(Object.keys(payload).sort()).toEqual([
+        'max_tokens',
+        'messages',
+        'model',
+        'stream',
+        'thinking',
+      ]);
     }
     expect(ledger.inspect('cn-attempt')?.status).toBe('UNKNOWN_COST');
     expect(ledger.inspect('en-attempt')?.status).toBe('UNKNOWN_COST');
