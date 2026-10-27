@@ -51,7 +51,11 @@ import { assertFreshVerifiedTerminalCommit, restoreStorageTask } from './recover
 import { assertSignedHostFactsCurrent } from './registry-host-facts.ts';
 import { verifyRegistryIssuance } from './registry-issuance.ts';
 import { verifyPinnedRegistryPublicKey } from './registry-key-pin.ts';
-import { createInventoryRegistrySnapshot, createStorageRegistrySnapshot } from './registry-snapshot.ts';
+import {
+  createInventoryRegistrySnapshot,
+  createStorageRegistrySnapshot,
+  hasExactIssuedInventoryBinding,
+} from './registry-snapshot.ts';
 
 const execFileAsync = promisify(execFile);
 const CAPABILITY = 'system.storage.diagnose_bounded_action';
@@ -332,10 +336,7 @@ export class RealStorageControlBackend implements ControlBackend {
         // P1-01: only the *independently signed* dual inventory catalog may
         // authorize this Recipe. A valid storage-only issuer still protects
         // C-003, but it cannot attest the inventory capability/binding.
-        if (
-          canonicalJson(signed.snapshot) !==
-          canonicalJson(createInventoryRegistrySnapshot(signed.snapshot.environment))
-        ) {
+        if (!hasExactIssuedInventoryBinding(signed.snapshot)) {
           return { kind: 'UNRESOLVABLE' as const };
         }
         return {
