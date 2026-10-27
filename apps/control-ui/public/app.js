@@ -530,13 +530,15 @@ function wireBuiltinRecipeSave() {
         saved.executionAuthorized !== false ||
         saved.modelCalls !== 0 ||
         typeof saved.recipeId !== 'string' ||
-        !/^[a-f0-9]{64}$/.test(saved.revisionSha256) ||
         typeof saved.saved !== 'boolean' ||
+        (saved.saved ? !/^[a-f0-9]{64}$/.test(saved.revisionSha256) : saved.revisionSha256 !== null) ||
         (saved.state !== 'PERSISTED_CANDIDATE_ONLY' && saved.state !== 'NOT_SAVED')
       ) {
         throw new Error('Unverified Recipe library response');
       }
-      identity.textContent = `Recipe: ${saved.recipeId} · SHA-256 revision: ${saved.revisionSha256}`;
+      identity.textContent = saved.saved
+        ? `Recipe: ${saved.recipeId} · SHA-256 revision: ${saved.revisionSha256}`
+        : `Recipe: ${saved.recipeId} · no saved revision`;
       status.textContent = saved.saved && saved.state === 'PERSISTED_CANDIDATE_ONLY'
         ? 'Verified saved candidate. Not active, no execution or model calls.'
         : 'Built-in candidate not saved yet. No execution occurred.';
