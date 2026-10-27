@@ -80,13 +80,15 @@ describe('T08 C07R — zero-model, real T02-gated Recipe replay', () => {
             capabilityId: 'system.inventory',
             recipeRef: `${BUILTIN_INVENTORY_RECIPE_ID}@${REVISION}`,
             policySnapshotRevision: CURRENT.policyRevision,
-            actions: [{
-              actionId: 'read-system-inventory',
-              op: 'system.inventory',
-              parameters: { includeProcesses: false },
-              sideEffectClass: 'R0',
-              requiredPrivilege: 'USER',
-            }],
+            actions: [
+              {
+                actionId: 'read-system-inventory',
+                op: 'system.inventory',
+                parameters: { includeProcesses: false },
+                sideEffectClass: 'R0',
+                requiredPrivilege: 'USER',
+              },
+            ],
           });
           return { ok: false, code: 'POLICY_BLOCKED', detail: 'no durable exact R0 rule' };
         },
@@ -120,14 +122,16 @@ describe('T08 C07R — zero-model, real T02-gated Recipe replay', () => {
             ok: true,
             authorization: {
               plan,
-              actions: [{
-                ...(p.actions[0] as object),
-                actionId: 'read-system-inventory',
-                authorizationRef: 'g1',
-                authorizationKind: 'AUTOMATIC',
-                planHash: p.planHash,
-                action: { op: 'system.inventory', sideEffectClass: 'R0' },
-              }],
+              actions: [
+                {
+                  ...(p.actions[0] as object),
+                  actionId: 'read-system-inventory',
+                  authorizationRef: 'g1',
+                  authorizationKind: 'AUTOMATIC',
+                  planHash: p.planHash,
+                  action: { op: 'system.inventory', sideEffectClass: 'R0' },
+                },
+              ],
               grants: [{ grantId: 'g1' }],
             },
           } as never;
@@ -158,13 +162,15 @@ describe('T08 C07R — zero-model, real T02-gated Recipe replay', () => {
             plan,
             disposition: { kind: 'AUTOMATIC', ruleIds: ['operator-approved-inventory-r0'] },
             grants: [{ grantId: 'operator-signed-grant' }],
-            actions: [{
-              actionId: 'read-system-inventory',
-              authorizationRef: 'operator-signed-grant',
-              authorizationKind: 'AUTOMATIC',
-              planHash: p.planHash,
-              action: { op: 'system.inventory', sideEffectClass: 'R0' },
-            }],
+            actions: [
+              {
+                actionId: 'read-system-inventory',
+                authorizationRef: 'operator-signed-grant',
+                authorizationKind: 'AUTOMATIC',
+                planHash: p.planHash,
+                action: { op: 'system.inventory', sideEffectClass: 'R0' },
+              },
+            ],
           },
         } as never;
       },
