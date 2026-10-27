@@ -3,7 +3,6 @@ import { canonicalJson } from '@shun/contracts';
 import { type RegistrySnapshot, snapshotFactsRevision } from '@shun/resolver';
 import { describe, expect, it } from 'vitest';
 import { BUILTIN_INVENTORY_RECIPE_ID } from '../src/inventory-recipe.ts';
-import { runAuthorizedInventoryRecipe } from '../src/recipe-inventory-run.ts';
 import {
   ISSUANCE_SCHEMA,
   type RegistryIssuanceBody,
@@ -15,6 +14,7 @@ import {
   createStorageRegistrySnapshot,
   hasExactIssuedInventoryBinding,
 } from '../src/real-storage/registry-snapshot.ts';
+import { runAuthorizedInventoryRecipe } from '../src/recipe-inventory-run.ts';
 
 const WORKSPACE = 'C:\\operator-owned';
 const NOW = '2026-10-27T16:00:30.000Z';
@@ -72,11 +72,9 @@ function externallySign(snapshotFacts: RegistrySnapshot) {
   };
   return {
     ...body,
-    signature: sign(
-      null,
-      Buffer.from(canonicalJson(body), 'utf8'),
-      signer.privateKey,
-    ).toString('base64'),
+    signature: sign(null, Buffer.from(canonicalJson(body), 'utf8'), signer.privateKey).toString(
+      'base64',
+    ),
   };
 }
 
@@ -178,12 +176,7 @@ describe('T08 C07R independently issued Registry inventory provenance', () => {
     const original = externallySign(extended);
     const altered = externallySign(changed);
     expect(() =>
-      verifyRegistryIssuance(
-        { ...original, snapshot: changed },
-        pem,
-        WORKSPACE,
-        NOW,
-      ),
+      verifyRegistryIssuance({ ...original, snapshot: changed }, pem, WORKSPACE, NOW),
     ).toThrow('REAL_STORAGE_REGISTRY_ISSUANCE_REVISION_MISMATCH');
     let sourceChecks = 0;
     let reads = 0;
