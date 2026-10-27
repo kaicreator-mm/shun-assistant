@@ -469,6 +469,83 @@ function wireLiveSystem() {
   });
 }
 
+// T08 C07: T06's deterministic, read-only diagnosis is a real Windows OS
+// observation. It is NOT a Recipe replay, not a semantic Task PASS and not
+// automatic cleanup or a cloud-generated recommendation.
+function wireReadonlyDiagnosis() {
+  const button = el('read-windows-diagnosis');
+  const status = el('diagnosis-status');
+  const facts = el('diagnosis-facts');
+  const limitation = el('diagnosis-limitation');
+  const add = (message) => {
+    const item = document.createElement('li');
+    item.textContent = message;
+    facts.append(item);
+  };
+  button.addEventListener('click', async () => {
+    button.disabled = true;
+    status.textContent = 'Collecting local read-only Windows diagnostics…';
+    facts.replaceChildren();
+    limitation.textContent = '';
+    try {
+      const result = await api('/system/diagnosis');
+      const report = result.report;
+      if (
+        result.ok !== true ||
+        result.source !== 'LIVE_WINDOWS_LOCAL_READONLY' ||
+        result.recipeExecuted !== false ||
+        result.cloudCalls !== 0 ||
+        report?.schema !== 'shun.windows-diagnostic-report.v02' ||
+        report.status !== 'OBSERVED_ONLY' ||
+        report.localOnly !== true ||
+        !Array.isArray(report.externalDisclosures) ||
+        report.externalDisclosures.length !== 0 ||
+        report.limitation !== 'SINGLE_SNAPSHOT_NO_ROOT_CAUSE_OR_SPEEDUP_CLAIM' ||
+        !Array.isArray(report.signals) ||
+        !Array.isArray(report.advice)
+      ) {
+        throw new Error('Unverified local report');
+      }
+      const evidence = report.evidence;
+      if (
+        !evidence ||
+        !Number.isSafeInteger(evidence.processCount) ||
+        evidence.processCount < 0 ||
+        !Number.isSafeInteger(evidence.startupEntryCount) ||
+        evidence.startupEntryCount < 0 ||
+        evidence.inventoryProvenance !== 'node:os+node:fs:statfs' ||
+        evidence.runtimeProvenance !== 'fixed-readonly-powershell' ||
+        report.signals.some((s) => !['LOW_DISK_SPACE', 'LOW_FREE_MEMORY'].includes(s)) ||
+        report.advice.some(
+          (a) => a.effect !== 'NONE' || !['REVIEW_STORAGE', 'REVIEW_APPLICATIONS'].includes(a.action),
+        )
+      ) {
+        throw new Error('Invalid diagnosis facts');
+      }
+      add(`Processes: ${evidence.processCount}`);
+      add(`Startup entries: ${evidence.startupEntryCount}`);
+      if (report.signals.length === 0) {
+        add('No low-space or low-memory signal in this snapshot.');
+      } else {
+        for (const signal of report.signals) {
+          add(signal === 'LOW_DISK_SPACE'
+            ? 'Low disk free space: review storage manually.'
+            : 'Low available memory: review running applications manually.');
+        }
+      }
+      status.textContent = 'Actual local diagnosis complete. Nothing was executed or sent to a model.';
+      limitation.textContent =
+        'One snapshot only. This is not a root-cause finding, speedup claim, or Recipe execution.';
+    } catch {
+      status.textContent = 'Local Windows diagnosis unavailable. No simulated result was shown.';
+      facts.replaceChildren();
+      limitation.textContent = '';
+    } finally {
+      button.disabled = false;
+    }
+  });
+}
+
 // T08 C01: a local, non-authoritative display of the exact T01 cloud
 // disclosure projection. Nothing in this browser can issue a broker assertion,
 // approve a model send, or change cloud budget/currentness.
@@ -661,6 +738,7 @@ function wireTrustedCloudInterpretation() {
 
 wireForm();
 wireLiveSystem();
+wireReadonlyDiagnosis();
 wireBuiltinRecipeSave();
 const onCloudDisplayed = wireTrustedCloudInterpretation();
 wireCloudDisclosurePreview(onCloudDisplayed);
