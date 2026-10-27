@@ -20,10 +20,14 @@ describe('T08 C07 real local read-only diagnosis route', () => {
             limitation: 'SINGLE_SNAPSHOT_NO_ROOT_CAUSE_OR_SPEEDUP_CLAIM',
           },
         });
-        const report = (outcome.body as { report: {
-          evidence: { processCount: number; startupEntryCount: number };
-          advice: Array<{ action: string; effect: string }>;
-        } }).report;
+        const report = (
+          outcome.body as {
+            report: {
+              evidence: { processCount: number; startupEntryCount: number };
+              advice: Array<{ action: string; effect: string }>;
+            };
+          }
+        ).report;
         expect(report.evidence.processCount).toBeGreaterThanOrEqual(0);
         expect(report.evidence.startupEntryCount).toBeGreaterThanOrEqual(0);
         expect(report.advice.every((advice) => advice.effect === 'NONE')).toBe(true);
