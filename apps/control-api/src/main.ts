@@ -33,7 +33,13 @@ const backend =
       })
     : new DemoShunBackend();
 
-const handle = createControlServer({ backend, uiDir, port });
+// The fixed Recipe candidate may be persisted only by the actual
+// operator-configured SQLite host. Demo mode never claims durable storage.
+const saveBuiltinInventoryCandidate =
+  backend instanceof RealStorageControlBackend
+    ? () => backend.saveBuiltinInventoryCandidate()
+    : undefined;
+const handle = createControlServer({ backend, uiDir, port, saveBuiltinInventoryCandidate });
 const bound = await handle.start();
 console.log(
   `Shun control surface (${mode === 'demo' ? 'T08 DEMO ONLY' : 'REAL bounded C-003'}) on http://127.0.0.1:${bound}`,
