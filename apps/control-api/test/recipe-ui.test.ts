@@ -90,9 +90,7 @@ describe('T08 C05 — real immutable Recipe candidate save via local UI API', ()
         }
         expect(saveCalls).toBe(0);
         const view = async () => {
-          const res = await fetch(
-            `http://127.0.0.1:${port}/api/recipes/builtin/system-inventory`,
-          );
+          const res = await fetch(`http://127.0.0.1:${port}/api/recipes/builtin/system-inventory`);
           return { status: res.status, body: (await res.json()) as Record<string, unknown> };
         };
         const unsaved = await view();
