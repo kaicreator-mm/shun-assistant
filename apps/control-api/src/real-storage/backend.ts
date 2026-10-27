@@ -34,7 +34,6 @@ import {
   readBuiltinInventoryCandidate,
   registerBuiltinInventoryCandidate,
 } from '../inventory-recipe.ts';
-import { runAuthorizedInventoryRecipe } from '../recipe-inventory-run.ts';
 import type {
   ControlBackend,
   DecisionOutcome,
@@ -47,6 +46,7 @@ import type {
   TaskSnapshot,
 } from '../ports.ts';
 import { previewForPlan } from '../preview.ts';
+import { runAuthorizedInventoryRecipe } from '../recipe-inventory-run.ts';
 import { assertFreshVerifiedTerminalCommit, restoreStorageTask } from './recovery.ts';
 import { assertSignedHostFactsCurrent } from './registry-host-facts.ts';
 import { verifyRegistryIssuance } from './registry-issuance.ts';
