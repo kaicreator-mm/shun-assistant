@@ -299,7 +299,10 @@ export class RealStorageControlBackend implements ControlBackend {
           'SELECT revision_sha256 FROM recipe_revisions_v02 WHERE recipe_id = ? ORDER BY created_at DESC LIMIT 33',
         )
         .all(BUILTIN_INVENTORY_RECIPE_ID) as Array<{ revision_sha256: string }>;
-      return readBuiltinInventoryCandidate(repository, rows.map((row) => row.revision_sha256));
+      return readBuiltinInventoryCandidate(
+        repository,
+        rows.map((row) => row.revision_sha256),
+      );
     } catch {
       return { ok: false as const, code: 'RECIPE_READ_UNAVAILABLE' as const };
     }
