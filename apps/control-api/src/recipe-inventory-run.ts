@@ -40,8 +40,7 @@ export type InventoryRecipeRunHost = Readonly<{
   readCandidate: () => BuiltinInventoryReadResult;
   /** Reads independently issued registry currentness plus real T02 policy. */
   current: () => Promise<
-    | { kind: 'CURRENT'; policyRevision: string; registryRevision: string }
-    | { kind: 'UNRESOLVABLE' }
+    { kind: 'CURRENT'; policyRevision: string; registryRevision: string } | { kind: 'UNRESOLVABLE' }
   >;
   controller: ControllerPort;
   /** Only fixed T06 collector, not caller-provided shell or process selector. */
