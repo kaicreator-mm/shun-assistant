@@ -5,6 +5,7 @@
 //   SHUN_CONTROL_UI_DIR         — static UI directory (default ../control-ui/public)
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { cloudInterpreterFromEnvironment } from './cloud-interpret.ts';
 import { DemoShunBackend } from './demo/backend.ts';
 import { RealStorageControlBackend } from './real-storage/backend.ts';
 import { createControlServer } from './server.ts';
@@ -39,7 +40,17 @@ const saveBuiltinInventoryCandidate =
   backend instanceof RealStorageControlBackend
     ? () => backend.saveBuiltinInventoryCandidate()
     : undefined;
-const handle = createControlServer({ backend, uiDir, port, saveBuiltinInventoryCandidate });
+// Remote mode is a separate opt-in trusted-host feature. Demo Goal tasks
+// remain visibly simulated; a cloud interpretation is labeled as an untrusted
+// remote proposal and can never be used as an ActionController execution grant.
+const cloud = cloudInterpreterFromEnvironment();
+const handle = createControlServer({
+  backend,
+  uiDir,
+  port,
+  saveBuiltinInventoryCandidate,
+  cloud,
+});
 const bound = await handle.start();
 console.log(
   `Shun control surface (${mode === 'demo' ? 'T08 DEMO ONLY' : 'REAL bounded C-003'}) on http://127.0.0.1:${bound}`,
