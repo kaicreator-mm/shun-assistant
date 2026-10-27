@@ -63,7 +63,7 @@ export interface ControlServerOptions {
         saved: boolean;
         state: 'PERSISTED_CANDIDATE_ONLY' | 'NOT_SAVED';
         recipeId: string;
-        revisionSha256: string;
+        revisionSha256: string | null;
         executionAuthorized: false;
         modelCalls: 0;
       }
