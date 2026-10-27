@@ -28,11 +28,13 @@ import {
   ShunStoreUiApprovalBridge,
 } from '@shun/store';
 import { runStorageDiagnose } from '@shun/vertical-storage';
+import { collectWindowsSystemInventory } from '@shun/vertical-system';
 import {
   BUILTIN_INVENTORY_RECIPE_ID,
   readBuiltinInventoryCandidate,
   registerBuiltinInventoryCandidate,
 } from '../inventory-recipe.ts';
+import { runAuthorizedInventoryRecipe } from '../recipe-inventory-run.ts';
 import type {
   ControlBackend,
   DecisionOutcome,
@@ -306,6 +308,35 @@ export class RealStorageControlBackend implements ControlBackend {
     } catch {
       return { ok: false as const, code: 'RECIPE_READ_UNAVAILABLE' as const };
     }
+  }
+
+  /** Trusted RealStorage-only R0 read path. Default empty operator rules
+   * refuse at ActionController before the Windows collector ever runs.
+   */
+  async executeBuiltinInventoryRecipe() {
+    return runAuthorizedInventoryRecipe({
+      readCandidate: () => this.readBuiltinInventoryCandidate(),
+      controller: this.#controller,
+      current: async () => {
+        // The independent host registry signer and the T02 durable policy
+        // must both still be CURRENT. These facts cannot be supplied by HTTP.
+        const signed = await this.#loadRegistryIssuance();
+        const current = await this.#authority.currentAuthority();
+        if (current.kind !== 'CURRENT' || current.policyStatus !== 'ACTIVE') {
+          return { kind: 'UNRESOLVABLE' as const };
+        }
+        assertSignedHostFactsCurrent(
+          signed.snapshot.environment,
+          await this.#observeWindowsEnvironment(),
+        );
+        return {
+          kind: 'CURRENT' as const,
+          policyRevision: current.policySnapshotRevision,
+          registryRevision: signed.currentRevision,
+        };
+      },
+      collect: collectWindowsSystemInventory,
+    });
   }
 
   meta(): { policy: PolicyState; localOnly: true; simulated: false } {
