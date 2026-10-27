@@ -53,7 +53,12 @@ function bundleFiles(root) {
 }
 
 export function publicKeyFingerprint(publicKey) {
-  const key = createPublicKey(publicKey);
+  // Node's createPublicKey rejects an already-public KeyObject; accept the
+  // trusted object returned by createPublicKey(privateKey) as-is.
+  const key =
+    publicKey && typeof publicKey === 'object' && publicKey.type === 'public'
+      ? publicKey
+      : createPublicKey(publicKey);
   if (key.asymmetricKeyType !== 'ed25519') refuse();
   return sha256(key.export({ type: 'spki', format: 'der' }));
 }
