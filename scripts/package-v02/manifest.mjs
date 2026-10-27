@@ -2,7 +2,7 @@
 // Sign only on an operator-controlled build host. Neither private key nor trust
 // root may come from the packaged browser, UI or an unsigned bundle field.
 import { createHash, createPrivateKey, createPublicKey, sign, verify } from 'node:crypto';
-import { lstatSync, readFileSync, readdirSync, writeFileSync } from 'node:fs';
+import { lstatSync, readFileSync, readdirSync, realpathSync, unlinkSync, writeFileSync } from 'node:fs';
 import { isAbsolute, join, relative, resolve, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -71,9 +71,41 @@ function canonicalManifest(root, keyPin) {
 }
 
 function requireExternalKey(root, keyPath) {
-  const path = resolve(keyPath);
-  if (path === root || inside(root, path)) refuse();
-  return fileBytes(path);
+  // Compare physical paths, not only the lexical alias. A directory junction
+  // outside staging must never make a private key inside staging look external.
+  const actualRoot = realpathSync(root);
+  const actualKey = realpathSync(resolve(keyPath));
+  if (actualKey === actualRoot || inside(actualRoot, actualKey)) refuse();
+  return fileBytes(actualKey);
+}
+
+function writeEnvelope(root, manifestBytes, signatureBytes) {
+  const files = [
+    [MANIFEST, manifestBytes],
+    [SIGNATURE, signatureBytes],
+  ];
+  // First reject both output paths if they already contain links/directories.
+  // An existing ordinary signed envelope can be replaced deterministically.
+  for (const [name] of files) {
+    try {
+      const existing = lstatSync(join(root, name));
+      if (!existing.isFile() || existing.isSymbolicLink()) refuse();
+    } catch (error) {
+      if (error?.code !== 'ENOENT') throw error;
+    }
+  }
+  for (const [name, bytes] of files) {
+    const path = join(root, name);
+    try {
+      // unlink removes the name itself, never following a link swapped in
+      // between preflight and replacement.
+      unlinkSync(path);
+    } catch (error) {
+      if (error?.code !== 'ENOENT') throw error;
+    }
+    // Exclusive create prevents a newly inserted symlink from being followed.
+    writeFileSync(path, bytes, { flag: 'wx' });
+  }
 }
 
 export function signBundle(rootPath, privateKeyPath) {
@@ -83,8 +115,7 @@ export function signBundle(rootPath, privateKeyPath) {
   const pin = publicKeyFingerprint(createPublicKey(secret));
   const bytes = canonicalManifest(root, pin);
   const signature = sign(null, bytes, secret);
-  writeFileSync(join(root, MANIFEST), bytes, { flag: 'w' });
-  writeFileSync(join(root, SIGNATURE), signature.toString('base64') + '\n', { flag: 'w' });
+  writeEnvelope(root, bytes, signature.toString('base64') + '\n');
   return { signerSpkiSha256: pin, entries: bundleFiles(root).length };
 }
 
