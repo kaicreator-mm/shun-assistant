@@ -71,3 +71,68 @@ export function createStorageRegistrySnapshot(
     environment,
   };
 }
+
+// T08 C07R: a second *fixed* operator-issued catalog shape. The issuer must
+// deliberately sign its exact bytes; Shun never upgrades an existing signed
+// storage-only snapshot or computes its own authority revision.
+export function createInventoryRegistrySnapshot(
+  environment: RegistrySnapshot['environment'],
+): RegistrySnapshot {
+  const storage = createStorageRegistrySnapshot(environment);
+  const arch = environment.arch;
+  const capability: RegistrySnapshot['capabilities'][number] = {
+    capabilityId: 'system.inventory',
+    revision: 'r1',
+    inputSchema: { type: 'object' },
+    outputSchema: { type: 'object' },
+    sideEffectClass: 'R0',
+    allowedInterfaceClasses: ['I0'],
+    verificationContract: {
+      verifierId: 'verifier.system-inventory.local-readonly',
+      verifierRevision: '1',
+      checks: [{ checkId: 'real-windows-local-snapshot-schema', required: true }],
+    },
+    requiredPolicyFacts: [],
+  };
+  const provider: RegistrySnapshot['providers'][number] = {
+    providerId: 'system.inventory.local-windows',
+    revision: '0.2.0',
+    acquisition: {
+      mechanism: 'PREINSTALLED',
+      source: '@shun/vertical-system',
+      official: true,
+      version: '0.2.0',
+    },
+    provenanceFacts: { trustState: 'TRUSTED' },
+    licenseFacts: { license: 'INTERNAL' },
+    supportedPlatforms: [{ os: 'WINDOWS', arch }],
+    lifecycle: { supportedOperations: ['CONFIGURE'] },
+    interfaces: [
+      {
+        interfaceId: 'system-inventory-readonly-i0',
+        interfaceClass: 'I0',
+        invocation: '@shun/vertical-system collectWindowsSystemInventory',
+      },
+    ],
+  };
+  const binding: RegistrySnapshot['bindings'][number] = {
+    bindingId: 'binding/shun-local-system-inventory',
+    providerId: provider.providerId,
+    capabilityId: capability.capabilityId,
+    capabilityRevisionRange: { min: 'r1', max: 'r1' },
+    adapterId: 'adapter.system-inventory.local-windows',
+    interfaceClass: 'I0',
+    environmentRequirements: {
+      backendKind: 'LOCAL_WINDOWS',
+      os: 'WINDOWS',
+      networkAccess: 'FORBIDDEN',
+    },
+    verifierId: 'verifier.system-inventory.local-readonly',
+  };
+  return {
+    capabilities: [...storage.capabilities, capability],
+    providers: [...storage.providers, provider],
+    bindings: [...storage.bindings, binding],
+    environment,
+  };
+}
