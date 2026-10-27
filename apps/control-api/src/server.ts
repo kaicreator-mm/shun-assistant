@@ -13,7 +13,6 @@ import type { GoalRequest } from '@shun/contracts';
 import { GoalRequestSchema } from '@shun/contracts';
 import { buildDeepSeekGoalDisclosure } from '@shun/llm-remote';
 import type { RecipeRegistrationResult } from '@shun/resolver';
-import type { AuthorizedInventoryRecipeResult } from './recipe-inventory-run.ts';
 import {
   collectWindowsReadonlyDiagnosis,
   collectWindowsSystemInventory,
@@ -28,6 +27,7 @@ import {
   httpStatusForCode,
 } from './errors.ts';
 import type { ControlBackend } from './ports.ts';
+import type { AuthorizedInventoryRecipeResult } from './recipe-inventory-run.ts';
 
 export const CONTROL_API_REVISION = 'shun.control-api/0.1';
 
@@ -360,7 +360,12 @@ async function handle(
       return respondJson(res, 503, { ok: false, code: 'RECIPE_EXECUTION_UNAVAILABLE' });
     }
     const body = await readJsonBody(req, ctx.maxBodyBytes);
-    if (!body || typeof body !== 'object' || Array.isArray(body) || Object.keys(body).length !== 0) {
+    if (
+      !body ||
+      typeof body !== 'object' ||
+      Array.isArray(body) ||
+      Object.keys(body).length !== 0
+    ) {
       return respondJson(res, 400, { ok: false, code: 'RECIPE_INPUT_REFUSED' });
     }
     const outcome = await ctx.executeBuiltinInventoryRecipe();
