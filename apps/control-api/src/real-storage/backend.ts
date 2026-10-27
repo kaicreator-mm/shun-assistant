@@ -51,7 +51,7 @@ import { assertFreshVerifiedTerminalCommit, restoreStorageTask } from './recover
 import { assertSignedHostFactsCurrent } from './registry-host-facts.ts';
 import { verifyRegistryIssuance } from './registry-issuance.ts';
 import { verifyPinnedRegistryPublicKey } from './registry-key-pin.ts';
-import { createStorageRegistrySnapshot } from './registry-snapshot.ts';
+import { createInventoryRegistrySnapshot, createStorageRegistrySnapshot } from './registry-snapshot.ts';
 
 const execFileAsync = promisify(execFile);
 const CAPABILITY = 'system.storage.diagnose_bounded_action';
@@ -329,6 +329,15 @@ export class RealStorageControlBackend implements ControlBackend {
           signed.snapshot.environment,
           await this.#observeWindowsEnvironment(),
         );
+        // P1-01: only the *independently signed* dual inventory catalog may
+        // authorize this Recipe. A valid storage-only issuer still protects
+        // C-003, but it cannot attest the inventory capability/binding.
+        if (
+          canonicalJson(signed.snapshot) !==
+          canonicalJson(createInventoryRegistrySnapshot(signed.snapshot.environment))
+        ) {
+          return { kind: 'UNRESOLVABLE' as const };
+        }
         return {
           kind: 'CURRENT' as const,
           policyRevision: current.policySnapshotRevision,
@@ -499,8 +508,17 @@ export class RealStorageControlBackend implements ControlBackend {
     const signed = await this.#loadRegistryIssuance();
     const environment = signed.snapshot.environment;
     assertSignedHostFactsCurrent(environment, observed);
-    const snapshot = createStorageRegistrySnapshot(environment);
-    if (canonicalJson(snapshot) !== canonicalJson(signed.snapshot)) {
+    const storageOnly = createStorageRegistrySnapshot(environment);
+    const withInventory = createInventoryRegistrySnapshot(environment);
+    // Preserve verified legacy C-003 issuances; the extended catalog must be
+    // separately operator-signed before it may also authorize the R0 Recipe.
+    const snapshot =
+      canonicalJson(storageOnly) === canonicalJson(signed.snapshot)
+        ? storageOnly
+        : canonicalJson(withInventory) === canonicalJson(signed.snapshot)
+          ? withInventory
+          : null;
+    if (!snapshot) {
       throw new Error('REAL_STORAGE_REGISTRY_SIGNED_FACT_CLASSES_MISMATCH');
     }
     const registry = await ShunRegistry.fromAttestedSnapshot(snapshot, {
