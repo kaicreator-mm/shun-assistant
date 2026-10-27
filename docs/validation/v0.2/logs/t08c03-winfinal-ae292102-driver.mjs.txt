@@ -1,0 +1,370 @@
+// T08 C03 Windows incremental canary — real merge tree aebac1a (27d9cc8 + 304f2a17).
+// Phase 0: operator Ed25519 material + real host start, status.enabled=true.
+// Phase A: external signed policy hot revoke  -> 503 / zero new reservation /
+//          zero broker spawn / zero cloud egress (DEEPSEEK_API_KEY stays set,
+//          so the ONLY thing preventing a send is the revoked policy).
+// Phase B: same-material reissue (fresh 5-min lease, identical facts) + exactly
+//          one consented real DeepSeek request -> UNTRUSTED_REMOTE_PROPOSAL /
+//          UNKNOWN_COST / one durable SQLite receipt row.
+// Server process stays production-clean (no SHUN_CONSENT_TEST_INSTRUMENTS);
+// only this driver process uses the R1-gated dialog-automation instruments.
+import { spawn, spawnSync } from 'node:child_process';
+import {
+  createHash,
+  createPublicKey,
+  generateKeyPairSync,
+  sign,
+} from 'node:crypto';
+import dnsPromises from 'node:dns/promises';
+import {
+  existsSync,
+  mkdirSync,
+  rmSync,
+  writeFileSync,
+} from 'node:fs';
+import path from 'node:path';
+import { DatabaseSync } from 'node:sqlite';
+
+const WT = 'C:/xDev/kAiCreator/shun-assistant/shun-i110-c03winfinal-zc';
+const SCRATCH = 'C:/xDev/kAiCreator/_tmp/t08c03-wininc/run';
+const PORT = 17788;
+const BASE = `http://127.0.0.1:${PORT}`;
+// One CN goal (historical full CN+EN matrix is NOT repeated per controller).
+// Kept short: the transport has a product-hardcoded 15s fetch timeout and
+// deepseek-flash is a reasoning model (long prompts risk REMOTE_UNAVAILABLE).
+const GOAL = '用一句话说明如何整理下载文件夹。';
+const EVIDENCE_LOG = path.join(SCRATCH, 'canary-evidence.log');
+const SERVER_LOG = path.join(SCRATCH, 'server.log');
+const AUTH_FILE = path.join(SCRATCH, 'cloud-authority.json');
+const PUBKEY_FILE = path.join(SCRATCH, 'cloud-authority-public.pem');
+const LEDGER_FILE = path.join(SCRATCH, 'cloud-ledger.sqlite');
+
+const { canonicalJson } = await import(
+  `file:///${WT}/packages/contracts/src/index.ts`
+);
+const { brokerTestInstruments } = await import(
+  `file:///${WT}/apps/control-api/native/index.ts`
+);
+
+const evidence = [];
+let phase = 'SETUP';
+let server = null;
+let serverLogChunks = [];
+function evid(key, value) {
+  const line = `${key}=${value}`;
+  evidence.push(line);
+  console.log(line);
+}
+
+function git(args) {
+  return spawnSync('git', args, { cwd: WT, encoding: 'utf8' }).stdout.trim();
+}
+function shunBrokerPids() {
+  const r = spawnSync('tasklist', ['/FI', 'IMAGENAME eq shun-consent-broker.exe', '/FO', 'CSV', '/NH'], {
+    encoding: 'utf8',
+  });
+  const pids = [];
+  for (const m of r.stdout.matchAll(/"shun-consent-broker\.exe","(\d+)"/g)) pids.push(m[1]);
+  return pids;
+}
+function tcpRowsToDeepseek(ips) {
+  const r = spawnSync('netstat', ['-ano', '-p', 'tcp'], { encoding: 'utf8' });
+  let active = 0;
+  const activeLines = [];
+  const residueLines = [];
+  for (const line of r.stdout.split(/\r?\n/)) {
+    const m = line.trim().match(/^TCP\s+\S+:(\d+)\s+(\S+):443\s+(\S+)\s+(\d+)$/i);
+    if (!m) continue;
+    const [, localPort, remoteAddr, state, pid] = m;
+    if (!ips.includes(remoteAddr)) continue;
+    const row = `${remoteAddr}:443 state=${state} pid=${pid} localPort=${localPort}`;
+    if (state === 'ESTABLISHED' || state === 'SYN_SENT' || state === 'CLOSE_WAIT') {
+      active += 1;
+      activeLines.push(row);
+    } else {
+      residueLines.push(row);
+    }
+  }
+  return { active, activeLines, residueLines };
+}
+function persistEvidence() {
+  try {
+    writeFileSync(EVIDENCE_LOG, `${evidence.join('\n')}\nCANARY_PHASE_AT_END=${phase}\n`);
+  } catch {}
+}
+
+try {
+  // ---------- Phase 0: material + real host ----------
+  mkdirSync(SCRATCH, { recursive: true });
+  for (const f of [AUTH_FILE, LEDGER_FILE]) {
+    if (existsSync(f)) rmSync(f);
+  }
+
+  const headSha = git(['rev-parse', 'HEAD']);
+  const treeSha = git(['rev-parse', 'HEAD^{tree}']);
+  const parents = git(['log', '-1', '--format=%P']);
+  evid('CANARY_MERGE_COMMIT', headSha);
+  evid('CANARY_EXACT_TREE', treeSha);
+  evid('CANARY_MERGE_PARENTS', parents);
+  evid('CANARY_NODE', process.version);
+  evid('CANARY_HOST', `${process.platform} ${process.arch}`);
+  if (headSha !== '15bba997f85e2a2794761dd48ceb0c08d2b3c2b5' || treeSha !== 'ae292102c8781677700f48b223103490e0bd71f0') {
+    throw new Error('CANARY_TREE_MISMATCH');
+  }
+  if (parents !== 'daef8b485ff035316371c4137711206a409fb67f 304f2a1748b027779c6d091ed98fe238c1defcf7') {
+    throw new Error('CANARY_PARENTS_MISMATCH');
+  }
+  if (!process.env.DEEPSEEK_API_KEY || process.env.DEEPSEEK_API_KEY.trim() === '') {
+    throw new Error('DEEPSEEK_API_KEY_UNSET');
+  }
+  evid('DEEPSEEK_API_KEY', 'PRESENT_IN_ENV_OF_SERVER_CHILD');
+
+  const { privateKey, publicKey } = generateKeyPairSync('ed25519');
+  const pubPem = publicKey.export({ type: 'spki', format: 'pem' }).toString();
+  writeFileSync(PUBKEY_FILE, pubPem);
+  const spkiSha256 = createHash('sha256')
+    .update(createPublicKey(pubPem).export({ type: 'spki', format: 'der' }))
+    .digest('hex');
+  evid('OPERATOR_AUTHORITY_SPKI_SHA256', spkiSha256);
+
+  const FACTS = {
+    schema: 'shun.cloud-authority/1',
+    enabled: true,
+    allowExternalDisclosure: true,
+    providerId: 'deepseek',
+    modelId: 'deepseek-flash',
+    destination: 'https://api.deepseek.com/chat/completions',
+    registryRevision: 'v02-canary-registry-1',
+    policyRevision: 'v02-canary-policy-1',
+    scopeRevision: 'v02-canary-scope-1',
+    pricingRevision: 'v02-canary-pricing-1',
+    revocationEpoch: 0,
+    inputMicrosPerToken: 1,
+    outputMicrosPerToken: 2,
+    maxInputTokens: 8192,
+    maxOutputTokens: 8192,
+    maxCostMicros: 24576,
+  };
+  function writeAuthority(leaseMs) {
+    const now = Date.now();
+    const body = {
+      ...FACTS,
+      issuedAt: new Date(now).toISOString(),
+      expiresAt: new Date(now + leaseMs).toISOString(),
+    };
+    const signature = sign(null, Buffer.from(canonicalJson(body), 'utf8'), privateKey).toString('base64');
+    writeFileSync(AUTH_FILE, JSON.stringify({ ...body, signature }));
+  }
+
+  const deepseekIps = (await dnsPromises.lookup('api.deepseek.com', { all: true })).map((a) => a.address);
+  evid('DEEPSEEK_RESOLVED_ADDRS', deepseekIps.join(','));
+
+  const brokerBeforeServer = shunBrokerPids();
+  evid('BROKER_PIDS_BASELINE', brokerBeforeServer.length === 0 ? 'NONE' : brokerBeforeServer.join(','));
+
+  writeAuthority(4 * 60_000);
+  server = spawn(process.execPath, ['--experimental-transform-types', 'src/main.ts'], {
+    cwd: `${WT}/apps/control-api`,
+    env: {
+      ...process.env,
+      SHUN_CONTROL_PORT: String(PORT),
+      SHUN_CONTROL_MODE: 'demo',
+      SHUN_CLOUD_ENABLED: '1',
+      SHUN_CLOUD_LEDGER_FILE: LEDGER_FILE,
+      SHUN_CLOUD_AUTHORITY_FILE: AUTH_FILE,
+      SHUN_CLOUD_PUBLIC_KEY_FILE: PUBKEY_FILE,
+      SHUN_CLOUD_PUBLIC_KEY_SPKI_SHA256: spkiSha256,
+      // Deliberately NOT set for the server: SHUN_CONSENT_TEST_INSTRUMENTS.
+    },
+    stdio: ['ignore', 'pipe', 'pipe'],
+  });
+  server.stdout.on('data', (d) => serverLogChunks.push(d));
+  server.stderr.on('data', (d) => serverLogChunks.push(d));
+  evid('SERVER_PID', server.pid);
+
+  async function getStatus() {
+    const r = await fetch(`${BASE}/api/cloud/status`, { signal: AbortSignal.timeout(5000) });
+    return { http: r.status, body: await r.json() };
+  }
+  async function postInterpret() {
+    const r = await fetch(`${BASE}/api/cloud/interpret`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ goalText: GOAL }),
+      signal: AbortSignal.timeout(90_000),
+    });
+    return { http: r.status, body: await r.json() };
+  }
+
+  let up = null;
+  for (let i = 0; i < 60; i += 1) {
+    await new Promise((r) => setTimeout(r, 500));
+    try {
+      up = await getStatus();
+      break;
+    } catch {}
+  }
+  if (!up || up.http !== 200) throw new Error(`SERVER_NOT_READY (log: ${serverLogChunks.join('').slice(0, 300)})`);
+  evid('SERVER_READY', 'loopback control surface listening');
+  evid('PHASE0_STATUS_HTTP', up.http);
+  evid('PHASE0_STATUS_ENABLED', up.body.enabled);
+  evid('PHASE0_CLOUD_MODE', up.body.cloudMode);
+  if (up.body.enabled !== true) throw new Error('PHASE0_EXPECTED_ENABLED');
+  evid('PHASE0_PINS_POLICY_KEY_BROKER', 'PASS');
+
+  // ---------- C05 preservation probe (PR #196 kept by the merge) ----------
+  const uiPage = await (await fetch(`${BASE}/`, { signal: AbortSignal.timeout(5000) })).text();
+  evid('PHASE_C05_UI_SAVE_BUTTON_PRESENT', uiPage.includes('save-inventory-recipe'));
+  const saveRoute = await fetch(`${BASE}/api/recipes/builtin/system-inventory/save`, {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: '{}',
+    signal: AbortSignal.timeout(5000),
+  });
+  const saveBody = await saveRoute.json();
+  evid('PHASE_C05_SAVE_ROUTE_HTTP', saveRoute.status);
+  evid('PHASE_C05_SAVE_ROUTE_CODE', saveBody?.code ?? JSON.stringify(saveBody).slice(0, 80));
+  // Demo backend must honestly refuse persistence (typed 503, NOT a 404):
+  // proves the #196 route survived the merge and Demo still never claims storage.
+  if (saveRoute.status !== 503 || saveBody?.code !== 'RECIPE_STORAGE_UNAVAILABLE') {
+    throw new Error('PHASE_C05_EXPECTED_TYPED_503_ON_DEMO');
+  }
+
+  // ---------- Phase A: external signed policy hot revoke ----------
+  phase = 'A';
+  rmSync(AUTH_FILE);
+  const t0 = Date.now();
+  const a = await postInterpret();
+  evid('PHASE_A_INTERPRET_HTTP', a.http);
+  evid('PHASE_A_INTERPRET_CODE', a.body?.error?.code ?? JSON.stringify(a.body).slice(0, 120));
+  evid('PHASE_A_INTERPRET_LATENCY_MS', Date.now() - t0);
+  if (a.http !== 503 || a.body?.error?.code !== 'CLOUD_UNAVAILABLE') {
+    throw new Error('PHASE_A_EXPECTED_503_CLOUD_UNAVAILABLE');
+  }
+  const sa = await getStatus();
+  evid('PHASE_A_STATUS_ENABLED_AFTER_REVOKE', sa.body.enabled);
+  if (sa.body.enabled !== false) throw new Error('PHASE_A_EXPECTED_DISABLED');
+  const brokersA = shunBrokerPids().filter((p) => !brokerBeforeServer.includes(p));
+  evid('PHASE_A_NEW_BROKER_SPAWNS', brokersA.length === 0 ? 'NONE' : brokersA.join(','));
+  if (brokersA.length !== 0) throw new Error('PHASE_A_EXPECTED_ZERO_BROKER');
+  const ledgerA = existsSync(LEDGER_FILE);
+  evid('PHASE_A_LEDGER_FILE', ledgerA ? 'EXISTS' : 'ABSENT (zero new reservation)');
+  if (ledgerA) throw new Error('PHASE_A_EXPECTED_NO_LEDGER');
+  const egressA = tcpRowsToDeepseek(deepseekIps);
+  evid('PHASE_A_CLOUD_EGRESS_ACTIVE_TCP_ROWS', egressA.active);
+  if (egressA.residueLines.length > 0) {
+    evid('PHASE_A_EGRESS_TIME_WAIT_RESIDUE', egressA.residueLines.join(' | ').slice(0, 300));
+  }
+  if (egressA.active !== 0) throw new Error(`PHASE_A_EXPECTED_ZERO_ACTIVE_EGRESS: ${egressA.activeLines.join(' | ')}`);
+  evid('PHASE_A_HOT_REVOKE_ZERO_SEND', 'PASS');
+
+  // ---------- Phase B: same-material reissue + exactly one consented request ----------
+  phase = 'B';
+  writeAuthority(4 * 60_000); // identical FACTS, fresh signature + fresh 5-min lease
+  const sb = await getStatus();
+  evid('PHASE_B_STATUS_ENABLED_AFTER_REISSUE', sb.body.enabled);
+  evid('PHASE_B_SERVER_PID_UNCHANGED', server.pid);
+  if (sb.body.enabled !== true) throw new Error('PHASE_B_EXPECTED_REENABLED');
+
+  let armId = null;
+  let armedPid = null;
+  let armError = null;
+  const poll = setInterval(() => {
+    if (armedPid !== null) return;
+    const fresh = shunBrokerPids().filter((p) => !brokerBeforeServer.includes(p));
+    if (fresh.length > 0) {
+      armedPid = fresh[0];
+      try {
+        armId = brokerTestInstruments.armDialog(Number(armedPid), 'allow', 30_000);
+        evid('PHASE_B_DIALOG_ARM', `pid=${armedPid} armId=${armId}`);
+      } catch (e) {
+        armError = String(e);
+        evid('PHASE_B_DIALOG_ARM_ERROR', armError);
+      }
+    }
+  }, 200);
+
+  const tB = Date.now();
+  const b = await postInterpret();
+  clearInterval(poll);
+  evid('PHASE_B_INTERPRET_LATENCY_MS', Date.now() - tB);
+  evid('PHASE_B_INTERPRET_HTTP', b.http);
+  evid('PHASE_B_INTERPRET_STATUS', b.body?.status ?? JSON.stringify(b.body).slice(0, 120));
+  evid('PHASE_B_INTERPRET_MODEL', b.body?.model);
+  evid('PHASE_B_INTERPRET_COST_STATE', b.body?.costState);
+  evid('PHASE_B_INTERPRET_EXECUTED', b.body?.executed);
+  evid('PHASE_B_INTERPRET_TASK_PREFIX', String(b.body?.taskId ?? '').slice(0, 6));
+  evid('PHASE_B_PROPOSAL_SHA256', createHash('sha256').update(String(b.body?.proposalText ?? ''), 'utf8').digest('hex'));
+  evid('PHASE_B_PROPOSAL_CHARS', String(b.body?.proposalText ?? '').length);
+  if (b.http !== 200 || b.body?.status !== 'UNTRUSTED_REMOTE_PROPOSAL' || b.body?.costState !== 'UNKNOWN_COST') {
+    const clickedEarly = armId === null ? null : brokerTestInstruments.collectDialog(armId);
+    evid('PHASE_B_DIALOG_EARLY_EVIDENCE', JSON.stringify(clickedEarly));
+    throw new Error(`PHASE_B_EXPECTED_200_UNTRUSTED_UNKNOWN_COST: ${JSON.stringify(b.body).slice(0, 200)}`);
+  }
+  const clicked = armId === null ? null : brokerTestInstruments.collectDialog(armId);
+  evid('PHASE_B_DIALOG_FOUND', clicked?.found);
+  evid('PHASE_B_DIALOG_CLICKED', clicked?.clicked);
+  evid('PHASE_B_DIALOG_DONE', clicked?.done);
+  if (!clicked?.found || !clicked?.clicked) throw new Error(`PHASE_B_DIALOG_NOT_CLICKED armError=${armError}`);
+  const brokersAfterB = shunBrokerPids().filter((p) => !brokerBeforeServer.includes(p));
+  evid('PHASE_B_BROKER_REMAINING_AFTER_RUN', brokersAfterB.length === 0 ? 'NONE(shutdown)' : brokersAfterB.join(','));
+
+  // ---------- durable receipt ----------
+  const db = new DatabaseSync(LEDGER_FILE);
+  const rows = db
+    .prepare(
+      'SELECT attempt_id, consent_id, task_id, scope_revision, pricing_revision, request_sha256, projection_sha256, cost_micros, status, created_at FROM v02_cloud_attempts',
+    )
+    .all();
+  db.close();
+  evid('LEDGER_ROWS_TOTAL', rows.length);
+  if (rows.length !== 1) throw new Error(`PHASE_B_EXPECTED_EXACTLY_1_LEDGER_ROW got ${rows.length}`);
+  const row = rows[0];
+  evid('RECEIPT_ATTEMPT_PREFIX', String(row.attempt_id).slice(0, 14));
+  evid('RECEIPT_CONSENT_ID', String(row.consent_id));
+  evid('RECEIPT_TASK_PREFIX', String(row.task_id).slice(0, 14));
+  evid('RECEIPT_SCOPE_REVISION', row.scope_revision);
+  evid('RECEIPT_PRICING_REVISION', row.pricing_revision);
+  evid('RECEIPT_REQUEST_SHA256', row.request_sha256);
+  evid('RECEIPT_PROJECTION_SHA256', row.projection_sha256);
+  evid('RECEIPT_COST_MICROS', row.cost_micros);
+  evid('RECEIPT_STATUS', row.status);
+  evid('RECEIPT_CREATED_AT', row.created_at);
+  if (row.status !== 'UNKNOWN_COST') throw new Error('RECEIPT_EXPECTED_UNKNOWN_COST');
+  if (Number(row.cost_micros) !== 24576) throw new Error('RECEIPT_EXPECTED_WORST_CASE_24576');
+
+  // ---------- teardown + sanitization guard ----------
+  phase = 'TEARDOWN';
+  const serverLogText = serverLogChunks.join('');
+  writeFileSync(SERVER_LOG, serverLogText);
+  const secret = process.env.DEEPSEEK_API_KEY;
+  const dump = evidence.join('\n') + serverLogText;
+  if (dump.includes(secret)) throw new Error('SANITIZATION_GUARD_KEY_LEAK');
+  if (/PRIVATE KEY/.test(dump)) throw new Error('SANITIZATION_GUARD_PEM_LEAK');
+  evid('SANITIZATION_GUARD', 'PASS (no API key, no private PEM in evidence/server log)');
+} finally {
+  persistEvidence();
+  if (server) {
+    if (server.exitCode === null && !server.killed) server.kill();
+    const done = server.exitCode !== null
+      ? server.exitCode
+      : await new Promise((resolve) => {
+          const t = setTimeout(() => resolve('TIMEOUT'), 5000);
+          server.on('exit', (code) => {
+            clearTimeout(t);
+            resolve(code);
+          });
+          if (server.exitCode !== null) {
+            clearTimeout(t);
+            resolve(server.exitCode);
+          }
+        });
+    evid('SERVER_EXIT_CODE', done);
+    if (!existsSync(SERVER_LOG)) writeFileSync(SERVER_LOG, serverLogChunks.join(''));
+  }
+  persistEvidence();
+}
+
+evid('CANARY_EXIT', '0');
+console.log(`evidence log: ${EVIDENCE_LOG}`);
+persistEvidence();
