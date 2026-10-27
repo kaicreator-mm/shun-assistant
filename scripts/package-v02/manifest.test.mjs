@@ -63,7 +63,7 @@ test('signature mutation and any replacement operator key or pin are rejected', 
   const { root, secret, publicFile, pin } = fixture();
   signBundle(root, secret);
   const oldSig = readFileSync(join(root, 'shun-manifest.sig'), 'utf8');
-  writeFileSync(join(root, 'shun-manifest.sig'), `A${oldSig.slice(1)}`);
+  writeFileSync(join(root, 'shun-manifest.sig'), `${oldSig[0] === 'A' ? 'B' : 'A'}${oldSig.slice(1)}`);
   refusal(() => verifyBundle(root, publicFile, pin));
   signBundle(root, secret);
   refusal(() => verifyBundle(root, publicFile, '0'.repeat(64)));
