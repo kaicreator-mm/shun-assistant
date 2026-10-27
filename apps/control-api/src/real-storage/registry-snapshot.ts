@@ -1,5 +1,6 @@
 // The production C-003 trusted catalog is fixed by source, not provided by
 // a browser Goal. The independent Windows issuer signs these exact facts.
+import { canonicalJson } from '@shun/contracts';
 import type { RegistrySnapshot } from '@shun/resolver';
 
 const CAPABILITY = 'system.storage.diagnose_bounded_action';
@@ -135,4 +136,17 @@ export function createInventoryRegistrySnapshot(
     bindings: [...storage.bindings, binding],
     environment,
   };
+}
+
+/** Exact signed source requirement for the new Recipe; storage-only valid
+ * issuer snapshots intentionally return false instead of being upgraded.
+ */
+export function hasExactIssuedInventoryBinding(snapshot: RegistrySnapshot): boolean {
+  try {
+    return (
+      canonicalJson(snapshot) === canonicalJson(createInventoryRegistrySnapshot(snapshot.environment))
+    );
+  } catch {
+    return false;
+  }
 }
