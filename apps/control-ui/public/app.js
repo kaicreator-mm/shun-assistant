@@ -518,6 +518,34 @@ function wireBuiltinRecipeSave() {
   const button = el('save-inventory-recipe');
   const status = el('recipe-save-status');
   const identity = el('recipe-save-identity');
+  const readButton = el('read-inventory-recipe');
+  readButton.addEventListener('click', async () => {
+    readButton.disabled = true;
+    identity.textContent = '';
+    status.textContent = 'Reading saved Recipe revision from local SQLite…';
+    try {
+      const saved = await api('/recipes/builtin/system-inventory');
+      if (
+        saved.ok !== true ||
+        saved.executionAuthorized !== false ||
+        saved.modelCalls !== 0 ||
+        typeof saved.recipeId !== 'string' ||
+        !/^[a-f0-9]{64}$/.test(saved.revisionSha256) ||
+        typeof saved.saved !== 'boolean' ||
+        (saved.state !== 'PERSISTED_CANDIDATE_ONLY' && saved.state !== 'NOT_SAVED')
+      ) {
+        throw new Error('Unverified Recipe library response');
+      }
+      identity.textContent = `Recipe: ${saved.recipeId} · SHA-256 revision: ${saved.revisionSha256}`;
+      status.textContent = saved.saved && saved.state === 'PERSISTED_CANDIDATE_ONLY'
+        ? 'Verified saved candidate. Not active, no execution or model calls.'
+        : 'Built-in candidate not saved yet. No execution occurred.';
+    } catch {
+      status.textContent = 'Recipe library unavailable. No Recipe was executed.';
+    } finally {
+      readButton.disabled = false;
+    }
+  });
   button.addEventListener('click', async () => {
     button.disabled = true;
     status.textContent = 'Saving fixed local Recipe candidate…';
