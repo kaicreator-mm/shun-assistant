@@ -9,7 +9,7 @@ import {
   writeFileSync,
 } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { join } from 'node:path';
+import { dirname, join } from 'node:path';
 import { afterEach, test } from 'node:test';
 import { publicKeyFingerprint, signBundle, verifyBundle } from './manifest.mjs';
 
@@ -92,4 +92,33 @@ test('file or directory symlinks are denied whenever supported by the test host'
   signBundle(root, secret);
   symlinkSync(join(root, 'node.exe'), link, 'file');
   refusal(() => verifyBundle(root, publicFile, pin));
+});
+
+test('signing never follows existing manifest or signature output symlinks', (context) => {
+  for (const name of ['shun-manifest.json', 'shun-manifest.sig']) {
+    const { root, secret } = fixture();
+    const canary = join(dirname(root), `external-${name}`);
+    writeFileSync(canary, 'OUTSIDE_CANARY_MUST_SURVIVE');
+    try {
+      symlinkSync(canary, join(root, name), 'file');
+    } catch {
+      context.skip('OS account cannot create symlink files');
+      return;
+    }
+    refusal(() => signBundle(root, secret));
+    assert.equal(readFileSync(canary, 'utf8'), 'OUTSIDE_CANARY_MUST_SURVIVE');
+  }
+});
+
+test('a directory symlink alias cannot launder a signing private key inside staging', (context) => {
+  const { root, secret } = fixture();
+  writeFileSync(join(root, 'leaked-private.pem'), readFileSync(secret), { mode: 0o600 });
+  const alias = join(dirname(root), 'operator-key-alias');
+  try {
+    symlinkSync(root, alias, 'dir');
+  } catch {
+    context.skip('OS account cannot create directory links');
+    return;
+  }
+  refusal(() => signBundle(root, join(alias, 'leaked-private.pem')));
 });
