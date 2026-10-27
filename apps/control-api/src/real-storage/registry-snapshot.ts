@@ -144,7 +144,8 @@ export function createInventoryRegistrySnapshot(
 export function hasExactIssuedInventoryBinding(snapshot: RegistrySnapshot): boolean {
   try {
     return (
-      canonicalJson(snapshot) === canonicalJson(createInventoryRegistrySnapshot(snapshot.environment))
+      canonicalJson(snapshot) ===
+      canonicalJson(createInventoryRegistrySnapshot(snapshot.environment))
     );
   } catch {
     return false;
