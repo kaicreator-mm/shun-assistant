@@ -1,12 +1,16 @@
 import { describe, expect, it } from 'vitest';
+import { DemoShunBackend } from '../src/demo/backend.ts';
 import { BUILTIN_INVENTORY_RECIPE_ID } from '../src/inventory-recipe.ts';
 import { runAuthorizedInventoryRecipe } from '../src/recipe-inventory-run.ts';
-import { DemoShunBackend } from '../src/demo/backend.ts';
 import { createControlServer } from '../src/server.ts';
 import { startHarness } from './helpers.ts';
 
 const REVISION = 'b'.repeat(64);
-const CURRENT = { kind: 'CURRENT', policyRevision: 'operator-policy-r1', registryRevision: 'registry-r1' } as const;
+const CURRENT = {
+  kind: 'CURRENT',
+  policyRevision: 'operator-policy-r1',
+  registryRevision: 'registry-r1',
+} as const;
 const SNAPSHOT = {
   schema: 'shun.system-inventory.v02',
   localOnly: true,
@@ -35,14 +39,23 @@ describe('T08 C07R — zero-model, real T02-gated Recipe replay', () => {
     let planCalls = 0;
     let observations = 0;
     const output = await runAuthorizedInventoryRecipe({
-      readCandidate: () => ({ ...candidate, saved: false, state: 'NOT_SAVED', revisionSha256: null }),
+      readCandidate: () => ({
+        ...candidate,
+        saved: false,
+        state: 'NOT_SAVED',
+        revisionSha256: null,
+      }),
       current: async () => CURRENT,
       controller: {
         authorizePlan: async () => {
           planCalls++;
           return { ok: false, code: 'POLICY_BLOCKED', detail: 'no matching operator rule' };
         },
-        authorizeEffect: async () => ({ ok: false, code: 'GRANT_NOT_AUTHENTIC', detail: 'refused' }),
+        authorizeEffect: async () => ({
+          ok: false,
+          code: 'GRANT_NOT_AUTHENTIC',
+          detail: 'refused',
+        }),
       },
       collect: () => {
         observations++;
