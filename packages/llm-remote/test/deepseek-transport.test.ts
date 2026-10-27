@@ -147,9 +147,16 @@ describe('T01 DeepSeek HTTPS: exact disclosed projection to send', () => {
         model: 'deepseek-flash',
         messages: [{ role: 'user', content: goal }],
         max_tokens: 100,
+        thinking: { type: 'disabled' },
         stream: false,
       });
-      expect(Object.keys(payload).sort()).toEqual(['max_tokens', 'messages', 'model', 'stream']);
+      expect(Object.keys(payload).sort()).toEqual([
+        'max_tokens',
+        'messages',
+        'model',
+        'stream',
+        'thinking',
+      ]);
     }
     expect(ledger.inspect('cn-attempt')?.status).toBe('UNKNOWN_COST');
     expect(ledger.inspect('en-attempt')?.status).toBe('UNKNOWN_COST');
@@ -336,6 +343,34 @@ describe('T01 DeepSeek HTTPS: exact disclosed projection to send', () => {
         maxOutputTokens: 100,
       }),
     ).toEqual({ ok: false, code: 'BUDGET_REFUSED' });
+  });
+
+  it('rejects a thinking-only HTTP 200 without publishing reasoning, retrying, or refunding cost', async () => {
+    const { transport, ledger, observed } = setup(
+      {},
+      {
+        choices: [
+          {
+            finish_reason: 'stop',
+            message: {
+              role: 'assistant',
+              content: '',
+              reasoning_content: 'not an actionable proposal',
+            },
+          },
+        ],
+      },
+    );
+    const result = await transport.invoke({
+      goalText: EN,
+      approval: approval(EN),
+      attemptId: 'reasoning-only',
+      maxOutputTokens: 100,
+    });
+    expect(result).toEqual({ ok: false, code: 'REMOTE_RESPONSE_INVALID' });
+    expect(observed).toHaveLength(1);
+    expect(JSON.parse(observed[0]?.body ?? '{}').thinking).toEqual({ type: 'disabled' });
+    expect(ledger.inspect('reasoning-only')?.status).toBe('UNKNOWN_COST');
   });
 
   it('never treats malformed or hallucinated response content as authority', async () => {

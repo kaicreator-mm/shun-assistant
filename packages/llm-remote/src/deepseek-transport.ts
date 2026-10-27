@@ -88,6 +88,11 @@ function exactRequestBytes(goalText: string, maxOutputTokens: number): Buffer {
       model: MODEL_ID,
       messages: [{ role: 'user', content: goalText }],
       max_tokens: maxOutputTokens,
+      // DeepSeek defaults to thinking=enabled, which can exhaust this bounded
+      // response budget on reasoning_content without producing final content.
+      // The UI only consumes a final untrusted proposal; never expose reasoning
+      // or retry an attempt that may already have incurred UNKNOWN_COST.
+      thinking: { type: 'disabled' },
       stream: false,
     }),
     'utf8',
