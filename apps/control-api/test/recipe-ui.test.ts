@@ -5,7 +5,11 @@ import { TrustedRecipeReadService } from '@shun/resolver';
 import { ImmutableRecipeRepository, ShunStore } from '@shun/store';
 import { describe, expect, it } from 'vitest';
 import { DemoShunBackend } from '../src/demo/backend.ts';
-import { registerBuiltinInventoryCandidate } from '../src/inventory-recipe.ts';
+import {
+  BUILTIN_INVENTORY_RECIPE_ID,
+  readBuiltinInventoryCandidate,
+  registerBuiltinInventoryCandidate,
+} from '../src/inventory-recipe.ts';
 import { createControlServer } from '../src/server.ts';
 import { startHarness } from './helpers.ts';
 
@@ -15,6 +19,10 @@ describe('T08 C05 — real immutable Recipe candidate save via local UI API', ()
     try {
       const denied = await h.post('/api/recipes/builtin/system-inventory/save', {});
       expect(denied).toEqual({
+        status: 503,
+        body: { ok: false, code: 'RECIPE_STORAGE_UNAVAILABLE' },
+      });
+      expect(await h.get('/api/recipes/builtin/system-inventory')).toEqual({
         status: 503,
         body: { ok: false, code: 'RECIPE_STORAGE_UNAVAILABLE' },
       });
@@ -53,6 +61,15 @@ describe('T08 C05 — real immutable Recipe candidate save via local UI API', ()
           saveCalls++;
           return registerBuiltinInventoryCandidate(recipeService);
         },
+        readBuiltinInventoryCandidate: () => {
+          const rows = store.database
+            .prepare('SELECT revision_sha256 FROM recipe_revisions_v02 WHERE recipe_id = ?')
+            .all(BUILTIN_INVENTORY_RECIPE_ID) as Array<{ revision_sha256: string }>;
+          return readBuiltinInventoryCandidate(
+            repo,
+            rows.map((row) => row.revision_sha256),
+          );
+        },
       });
       const port = await server.start();
       const post = async (body: unknown) => {
@@ -81,6 +98,20 @@ describe('T08 C05 — real immutable Recipe candidate save via local UI API', ()
           expect(refused.json).toEqual({ ok: false, code: 'RECIPE_INPUT_REFUSED' });
         }
         expect(saveCalls).toBe(0);
+        const view = async () => {
+          const res = await fetch(`http://127.0.0.1:${port}/api/recipes/builtin/system-inventory`);
+          return { status: res.status, body: (await res.json()) as Record<string, unknown> };
+        };
+        const unsaved = await view();
+        expect(unsaved.status).toBe(200);
+        expect(unsaved.body).toMatchObject({
+          ok: true,
+          state: 'NOT_SAVED',
+          saved: false,
+          revisionSha256: null,
+          executionAuthorized: false,
+          modelCalls: 0,
+        });
         const saved = await post({});
         expect(saved.status).toBe(200);
         expect(saved.json).toMatchObject({
@@ -100,6 +131,20 @@ describe('T08 C05 — real immutable Recipe candidate save via local UI API', ()
           executionAuthorized: false,
           revisionSha256: saved.json.revisionSha256,
         });
+        const verified = await view();
+        expect(verified.status).toBe(200);
+        expect(verified.body).toEqual({
+          ok: true,
+          saved: true,
+          state: 'PERSISTED_CANDIDATE_ONLY',
+          recipeId: saved.json.recipeId,
+          revisionSha256: saved.json.revisionSha256,
+          executionAuthorized: false,
+          modelCalls: 0,
+        });
+        expect(verified.body).not.toHaveProperty('sourceText');
+        expect(verified.body).not.toHaveProperty('actionGraph');
+        expect(verified.body).not.toHaveProperty('grant');
         expect(saveCalls).toBe(2);
         expect(controllerCalls).toBe(0);
         const savedSha = saved.json.revisionSha256;

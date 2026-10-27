@@ -56,6 +56,18 @@ export interface ControlServerOptions {
   backend: ControlBackend;
   /** Trusted backend-only candidate writer; browser never selects its source. */
   saveBuiltinInventoryCandidate?: () => RecipeRegistrationResult;
+  /** Trusted local SQLite reader; cannot be configured through HTTP. */
+  readBuiltinInventoryCandidate?: () =>
+    | {
+        ok: true;
+        saved: boolean;
+        state: 'PERSISTED_CANDIDATE_ONLY' | 'NOT_SAVED';
+        recipeId: string;
+        revisionSha256: string | null;
+        executionAuthorized: false;
+        modelCalls: 0;
+      }
+    | { ok: false; code: 'RECIPE_READ_UNAVAILABLE' };
   /** Trusted process composition; never configured by an HTTP request. */
   cloud?: CloudInterpretPort;
   /** Directory with the static control-ui app; omitted = API only. */
@@ -94,6 +106,7 @@ export function createControlServer(options: ControlServerOptions): ControlServe
       uiRoot,
       maxBodyBytes,
       saveBuiltinInventoryCandidate: options.saveBuiltinInventoryCandidate,
+      readBuiltinInventoryCandidate: options.readBuiltinInventoryCandidate,
       cloud: options.cloud,
     }).catch((error: unknown) => {
       respondError(res, error);
@@ -134,6 +147,7 @@ interface RouteContext {
   uiRoot?: string;
   maxBodyBytes: number;
   saveBuiltinInventoryCandidate?: ControlServerOptions['saveBuiltinInventoryCandidate'];
+  readBuiltinInventoryCandidate?: ControlServerOptions['readBuiltinInventoryCandidate'];
 }
 
 /**
@@ -274,6 +288,19 @@ async function handle(
       cloudSendAllowed: false,
       privateBrokerReady: false,
     });
+  }
+
+  // T08 C06: bounded real SQLite lookup of the fixed built-in Recipe ONLY.
+  // Neither caller-provided hashes nor arbitrary source can be read or run.
+  if (method === 'GET' && url.pathname === '/api/recipes/builtin/system-inventory') {
+    if (!ctx.readBuiltinInventoryCandidate) {
+      return respondJson(res, 503, { ok: false, code: 'RECIPE_STORAGE_UNAVAILABLE' });
+    }
+    const result = ctx.readBuiltinInventoryCandidate();
+    if (!result.ok) {
+      return respondJson(res, 503, { ok: false, code: result.code });
+    }
+    return respondJson(res, 200, result);
   }
 
   // T08 C05: one fixed local candidate from #195, not arbitrary Recipe

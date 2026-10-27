@@ -43,12 +43,17 @@ const saveBuiltinInventoryCandidate =
 // Remote mode is a separate opt-in trusted-host feature. Demo Goal tasks
 // remain visibly simulated; a cloud interpretation is labeled as an untrusted
 // remote proposal and can never be used as an ActionController execution grant.
+const readBuiltinInventoryCandidate =
+  backend instanceof RealStorageControlBackend
+    ? () => backend.readBuiltinInventoryCandidate()
+    : undefined;
 const cloud = cloudInterpreterFromEnvironment();
 const handle = createControlServer({
   backend,
   uiDir,
   port,
   saveBuiltinInventoryCandidate,
+  readBuiltinInventoryCandidate,
   cloud,
 });
 const bound = await handle.start();

@@ -28,7 +28,11 @@ import {
   ShunStoreUiApprovalBridge,
 } from '@shun/store';
 import { runStorageDiagnose } from '@shun/vertical-storage';
-import { registerBuiltinInventoryCandidate } from '../inventory-recipe.ts';
+import {
+  BUILTIN_INVENTORY_RECIPE_ID,
+  readBuiltinInventoryCandidate,
+  registerBuiltinInventoryCandidate,
+} from '../inventory-recipe.ts';
 import type {
   ControlBackend,
   DecisionOutcome,
@@ -281,6 +285,27 @@ export class RealStorageControlBackend implements ControlBackend {
       },
     });
     return registerBuiltinInventoryCandidate(service);
+  }
+
+  /** Read the exact current built-in candidate from real durable SQLite.
+   * Existing T03 repository.get verifies payload digest and immutable identity.
+   * This route is READ-ONLY and never performs ActionController authorization.
+   */
+  readBuiltinInventoryCandidate() {
+    try {
+      const repository = new ImmutableRecipeRepository(this.#store);
+      const rows = this.#store.database
+        .prepare(
+          'SELECT revision_sha256 FROM recipe_revisions_v02 WHERE recipe_id = ? ORDER BY created_at DESC LIMIT 33',
+        )
+        .all(BUILTIN_INVENTORY_RECIPE_ID) as Array<{ revision_sha256: string }>;
+      return readBuiltinInventoryCandidate(
+        repository,
+        rows.map((row) => row.revision_sha256),
+      );
+    } catch {
+      return { ok: false as const, code: 'RECIPE_READ_UNAVAILABLE' as const };
+    }
   }
 
   meta(): { policy: PolicyState; localOnly: true; simulated: false } {
