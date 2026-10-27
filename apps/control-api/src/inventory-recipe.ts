@@ -4,6 +4,7 @@
 // run user/model-supplied JS, or call DeepSeek.
 import { canonicalJson } from '@shun/contracts';
 import { compileLiteralRecipe, type TrustedRecipeReadService } from '@shun/resolver';
+import type { ImmutableRecipeRepository } from '@shun/store';
 
 export const BUILTIN_INVENTORY_RECIPE_ID = 'shun.builtin.system-inventory.readonly.v02';
 
@@ -49,4 +50,49 @@ export function expectedBuiltinInventoryIdentity() {
   const compiled = compileLiteralRecipe(SOURCE, PIN);
   if (!compiled.ok) throw new Error('BUILTIN_RECIPE_INVALID');
   return compiled.compiled.identity;
+}
+
+export type BuiltinInventoryReadResult =
+  | {
+      ok: true;
+      saved: boolean;
+      state: 'PERSISTED_CANDIDATE_ONLY' | 'NOT_SAVED';
+      recipeId: string;
+      revisionSha256: string;
+      executionAuthorized: false;
+      modelCalls: 0;
+    }
+  | { ok: false; code: 'RECIPE_READ_UNAVAILABLE' };
+
+/** No write, activation or effect. Existing repository.get does full hash and
+ * payload integrity verification before any saved identity is displayed.
+ */
+export function readBuiltinInventoryCandidate(
+  repository: Pick<ImmutableRecipeRepository, 'get'>,
+): BuiltinInventoryReadResult {
+  try {
+    const expected = expectedBuiltinInventoryIdentity();
+    const actual = repository.get(expected.recipeId, expected.revisionSha256);
+    if (
+      actual &&
+      (actual.identity.actionGraphSha256 !== expected.actionGraphSha256 ||
+        actual.identity.sourceSha256 !== expected.sourceSha256 ||
+        actual.actionGraph.nodes.length !== 1 ||
+        actual.actionGraph.nodes[0]?.op !== 'system.inventory' ||
+        actual.actionGraph.edges.length !== 0)
+    ) {
+      return { ok: false, code: 'RECIPE_READ_UNAVAILABLE' };
+    }
+    return {
+      ok: true,
+      saved: actual !== null,
+      state: actual ? 'PERSISTED_CANDIDATE_ONLY' : 'NOT_SAVED',
+      recipeId: expected.recipeId,
+      revisionSha256: expected.revisionSha256,
+      executionAuthorized: false,
+      modelCalls: 0,
+    };
+  } catch {
+    return { ok: false, code: 'RECIPE_READ_UNAVAILABLE' };
+  }
 }
