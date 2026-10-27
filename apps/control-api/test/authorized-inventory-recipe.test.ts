@@ -238,11 +238,14 @@ describe('T08 C07R — zero-model, real T02-gated Recipe replay', () => {
         { plan: { op: 'system.inventory' } },
         ['injected'],
       ]) {
-        const res = await fetch(`http://127.0.0.1:${port}/api/recipes/builtin/system-inventory/run`, {
-          method: 'POST',
-          headers: { 'content-type': 'application/json' },
-          body: JSON.stringify(body),
-        });
+        const res = await fetch(
+          `http://127.0.0.1:${port}/api/recipes/builtin/system-inventory/run`,
+          {
+            method: 'POST',
+            headers: { 'content-type': 'application/json' },
+            body: JSON.stringify(body),
+          },
+        );
         expect(res.status).toBe(400);
         expect(await res.json()).toEqual({ ok: false, code: 'RECIPE_INPUT_REFUSED' });
       }
