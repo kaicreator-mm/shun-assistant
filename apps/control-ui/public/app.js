@@ -625,6 +625,58 @@ function wireBuiltinRecipeSave() {
       readButton.disabled = false;
     }
   });
+  const runButton = el('run-inventory-recipe');
+  const runStatus = el('recipe-run-status');
+  const runFacts = el('recipe-run-facts');
+  runButton.addEventListener('click', async () => {
+    runButton.disabled = true;
+    runFacts.replaceChildren();
+    runStatus.textContent = 'Verifying saved Recipe, trusted R0 policy and effect grant…';
+    try {
+      const result = await api('/recipes/builtin/system-inventory/run', { body: {} });
+      const x = result.snapshot;
+      if (
+        result.ok !== true ||
+        result.status !== 'VERIFIED_READONLY_OBSERVATION' ||
+        result.recipeExecuted !== true ||
+        result.modelCalls !== 0 ||
+        !Array.isArray(result.externalDisclosures) ||
+        result.externalDisclosures.length !== 0 ||
+        !/^[a-f0-9]{64}$/.test(result.revisionSha256) ||
+        !/^[a-f0-9]{64}$/.test(result.planHash) ||
+        x?.schema !== 'shun.system-inventory.v02' ||
+        x.localOnly !== true ||
+        x.platform !== 'win32' ||
+        x.provenance !== 'node:os+node:fs:statfs' ||
+        !Number.isFinite(x.memoryTotalBytes) ||
+        !Number.isFinite(x.memoryFreeBytes) ||
+        !Number.isFinite(x.diskTotalBytes) ||
+        !Number.isFinite(x.diskFreeBytes)
+      ) {
+        throw new Error('Unverified Recipe result');
+      }
+      const facts = [
+        `Recipe revision: ${result.revisionSha256}`,
+        `Authorized plan hash: ${result.planHash}`,
+        `Available memory: ${Math.round(x.memoryFreeBytes / 1048576)} MiB`,
+        `Available disk: ${Math.round(x.diskFreeBytes / 1048576)} MiB`,
+      ];
+      for (const value of facts) {
+        const item = document.createElement('li');
+        item.textContent = value;
+        runFacts.append(item);
+      }
+      runStatus.textContent =
+        'Saved Recipe re-executed as a verified local read-only observation, under operator R0 policy. No LLM call.';
+    } catch {
+      runStatus.textContent =
+        'Recipe not executed or result not verified. Saved revision and trusted operator R0 rule are required.';
+      runFacts.replaceChildren();
+    } finally {
+      runButton.disabled = false;
+    }
+  });
+
   button.addEventListener('click', async () => {
     button.disabled = true;
     status.textContent = 'Saving fixed local Recipe candidate…';

@@ -27,6 +27,7 @@ import {
   httpStatusForCode,
 } from './errors.ts';
 import type { ControlBackend } from './ports.ts';
+import type { AuthorizedInventoryRecipeResult } from './recipe-inventory-run.ts';
 
 export const CONTROL_API_REVISION = 'shun.control-api/0.1';
 
@@ -60,6 +61,8 @@ export interface ControlServerOptions {
   backend: ControlBackend;
   /** Trusted backend-only candidate writer; browser never selects its source. */
   saveBuiltinInventoryCandidate?: () => RecipeRegistrationResult;
+  /** Explicit RealStorage-only, never browser-supplied R0 authority. */
+  executeBuiltinInventoryRecipe?: () => Promise<AuthorizedInventoryRecipeResult>;
   /** Trusted local SQLite reader; cannot be configured through HTTP. */
   readBuiltinInventoryCandidate?: () =>
     | {
@@ -110,6 +113,7 @@ export function createControlServer(options: ControlServerOptions): ControlServe
       uiRoot,
       maxBodyBytes,
       saveBuiltinInventoryCandidate: options.saveBuiltinInventoryCandidate,
+      executeBuiltinInventoryRecipe: options.executeBuiltinInventoryRecipe,
       readBuiltinInventoryCandidate: options.readBuiltinInventoryCandidate,
       cloud: options.cloud,
     }).catch((error: unknown) => {
@@ -151,6 +155,7 @@ interface RouteContext {
   uiRoot?: string;
   maxBodyBytes: number;
   saveBuiltinInventoryCandidate?: ControlServerOptions['saveBuiltinInventoryCandidate'];
+  executeBuiltinInventoryRecipe?: ControlServerOptions['executeBuiltinInventoryRecipe'];
   readBuiltinInventoryCandidate?: ControlServerOptions['readBuiltinInventoryCandidate'];
 }
 
@@ -345,6 +350,29 @@ async function handle(
     const saved = ctx.saveBuiltinInventoryCandidate();
     if (!saved.ok) return respondJson(res, 503, { ok: false, code: saved.code });
     return respondJson(res, 200, saved);
+  }
+
+  // T08 C07R: only the real host can execute a previously saved immutable
+  // fixed Recipe, and only after the REAL T02 R0 durable-policy + effect gate.
+  // Caller never supplies a SHA, plan, approval, grant, code or OS arguments.
+  if (method === 'POST' && url.pathname === '/api/recipes/builtin/system-inventory/run') {
+    if (!ctx.executeBuiltinInventoryRecipe) {
+      return respondJson(res, 503, { ok: false, code: 'RECIPE_EXECUTION_UNAVAILABLE' });
+    }
+    const body = await readJsonBody(req, ctx.maxBodyBytes);
+    if (
+      !body ||
+      typeof body !== 'object' ||
+      Array.isArray(body) ||
+      Object.keys(body).length !== 0
+    ) {
+      return respondJson(res, 400, { ok: false, code: 'RECIPE_INPUT_REFUSED' });
+    }
+    const outcome = await ctx.executeBuiltinInventoryRecipe();
+    if (!outcome.ok) {
+      return respondJson(res, 409, outcome);
+    }
+    return respondJson(res, 200, outcome);
   }
 
   // A true REMOTE model action is available only after trusted process

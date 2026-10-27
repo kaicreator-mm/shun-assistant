@@ -47,6 +47,10 @@ const readBuiltinInventoryCandidate =
   backend instanceof RealStorageControlBackend
     ? () => backend.readBuiltinInventoryCandidate()
     : undefined;
+const executeBuiltinInventoryRecipe =
+  backend instanceof RealStorageControlBackend
+    ? () => backend.executeBuiltinInventoryRecipe()
+    : undefined;
 const cloud = cloudInterpreterFromEnvironment();
 const handle = createControlServer({
   backend,
@@ -54,6 +58,7 @@ const handle = createControlServer({
   port,
   saveBuiltinInventoryCandidate,
   readBuiltinInventoryCandidate,
+  executeBuiltinInventoryRecipe,
   cloud,
 });
 const bound = await handle.start();
