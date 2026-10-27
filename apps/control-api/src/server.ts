@@ -13,7 +13,11 @@ import type { GoalRequest } from '@shun/contracts';
 import { GoalRequestSchema } from '@shun/contracts';
 import { buildDeepSeekGoalDisclosure } from '@shun/llm-remote';
 import type { RecipeRegistrationResult } from '@shun/resolver';
-import { collectWindowsSystemInventory, suggestReadonlyOptimizations } from '@shun/vertical-system';
+import {
+  collectWindowsReadonlyDiagnosis,
+  collectWindowsSystemInventory,
+  suggestReadonlyOptimizations,
+} from '@shun/vertical-system';
 import { z } from 'zod';
 import type { CloudInterpretPort } from './cloud-interpret.ts';
 import {
@@ -262,6 +266,26 @@ async function handle(
       externalDisclosures: [],
       snapshot: observed.snapshot,
       suggestions: suggestReadonlyOptimizations(observed),
+    });
+  }
+
+  // T08 C07: existing T06 deterministic Windows diagnosis. Caller cannot
+  // select processes, commands, files or a script; no ActionController/Recipe
+  // execution is claimed. All observations stay local and no model is invoked.
+  if (method === 'GET' && url.pathname === '/api/system/diagnosis') {
+    if (url.search) {
+      return respondJson(res, 400, { ok: false, code: 'DIAGNOSIS_INPUT_REFUSED' });
+    }
+    const observed = collectWindowsReadonlyDiagnosis();
+    if (!observed.ok) {
+      return respondJson(res, 503, { ok: false, code: 'LIVE_DIAGNOSIS_UNAVAILABLE' });
+    }
+    return respondJson(res, 200, {
+      ok: true,
+      source: 'LIVE_WINDOWS_LOCAL_READONLY',
+      report: observed.report,
+      recipeExecuted: false,
+      cloudCalls: 0,
     });
   }
 
