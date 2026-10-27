@@ -1,6 +1,6 @@
 import { createHash, generateKeyPairSync, sign } from 'node:crypto';
 import { canonicalJson } from '@shun/contracts';
-import { snapshotFactsRevision } from '@shun/resolver';
+import { type RegistrySnapshot, snapshotFactsRevision } from '@shun/resolver';
 import { describe, expect, it } from 'vitest';
 import { BUILTIN_INVENTORY_RECIPE_ID } from '../src/inventory-recipe.ts';
 import { runAuthorizedInventoryRecipe } from '../src/recipe-inventory-run.ts';
@@ -16,7 +16,9 @@ import {
   hasExactIssuedInventoryBinding,
 } from '../src/real-storage/registry-snapshot.ts';
 
-const ENV = {
+const WORKSPACE = 'C:\\operator-owned';
+const NOW = '2026-10-27T16:00:30.000Z';
+const ENV: RegistrySnapshot['environment'] = {
   environmentId: 'shun-real-storage-x64',
   backendKind: 'LOCAL_WINDOWS',
   os: 'WINDOWS-10.0.1',
@@ -28,18 +30,14 @@ const ENV = {
   filesystemCapabilities: ['read', 'write'],
   networkPolicy: 'OFFLINE',
   resources: { cpuCores: 8, memoryMb: 16384, freeDiskMb: 4096 },
-} as const;
-const WORKSPACE = 'C:\\operator-root';
-const NOW = '2026-10-27T16:00:30.000Z';
-const ISSUED = '2026-10-27T16:00:00.000Z';
-const EXPIRES = '2026-10-27T16:01:00.000Z';
-const signing = generateKeyPairSync('ed25519');
-const publicPem = signing.publicKey.export({ type: 'spki', format: 'pem' }).toString();
-const pin = createHash('sha256')
-  .update(signing.publicKey.export({ type: 'spki', format: 'der' }))
+};
+const signer = generateKeyPairSync('ed25519');
+const pem = signer.publicKey.export({ type: 'spki', format: 'pem' }).toString();
+const fingerprint = createHash('sha256')
+  .update(signer.publicKey.export({ type: 'spki', format: 'der' }))
   .digest('hex');
-const legacy = createStorageRegistrySnapshot(ENV as never);
-const dual = createInventoryRegistrySnapshot(ENV as never);
+const legacy = createStorageRegistrySnapshot(ENV);
+const extended = createInventoryRegistrySnapshot(ENV);
 const candidate = {
   ok: true,
   saved: true,
@@ -63,142 +61,151 @@ const snapshot = {
   uptimeSeconds: 600,
 } as const;
 
-function issue(issuedSnapshot: typeof dual) {
-  const unsigned: RegistryIssuanceBody = {
+function externallySign(snapshotFacts: RegistrySnapshot) {
+  const body: RegistryIssuanceBody = {
     schema: ISSUANCE_SCHEMA,
     workspace: WORKSPACE,
-    issuedAt: ISSUED,
-    expiresAt: EXPIRES,
-    snapshot: issuedSnapshot,
-    currentRevision: snapshotFactsRevision(issuedSnapshot),
+    issuedAt: '2026-10-27T16:00:00.000Z',
+    expiresAt: '2026-10-27T16:01:00.000Z',
+    snapshot: snapshotFacts,
+    currentRevision: snapshotFactsRevision(snapshotFacts),
   };
   return {
-    ...unsigned,
-    signature: sign(null, Buffer.from(canonicalJson(unsigned), 'utf8'), signing.privateKey).toString('base64'),
+    ...body,
+    signature: sign(
+      null,
+      Buffer.from(canonicalJson(body), 'utf8'),
+      signer.privateKey,
+    ).toString('base64'),
   };
 }
 
-function source(raw: ReturnType<typeof issue>) {
-  verifyPinnedRegistryPublicKey(publicPem, pin);
-  const proof = verifyRegistryIssuance(raw, publicPem, WORKSPACE, NOW);
-  return hasExactIssuedInventoryBinding(proof.snapshot)
-    ? { kind: 'CURRENT' as const, policyRevision: 'operator-approved-r0', registryRevision: proof.currentRevision }
-    : { kind: 'UNRESOLVABLE' as const };
+function checkedSource(proof: ReturnType<typeof externallySign>) {
+  verifyPinnedRegistryPublicKey(pem, fingerprint);
+  const issued = verifyRegistryIssuance(proof, pem, WORKSPACE, NOW);
+  if (!hasExactIssuedInventoryBinding(issued.snapshot)) {
+    return { kind: 'UNRESOLVABLE' as const };
+  }
+  return {
+    kind: 'CURRENT' as const,
+    policyRevision: 'operator-approved-r0',
+    registryRevision: issued.currentRevision,
+  };
 }
 
-describe('T08 C07R — independently signed inventory Registry source P1', () => {
-  it('refuses a legitimately signed STORAGE-ONLY catalog, before any plan or collector', async () => {
-    let planCalls = 0;
-    let collectCalls = 0;
+function approved(plan: { planHash: string }) {
+  return {
+    ok: true,
+    authorization: {
+      plan,
+      actions: [
+        {
+          actionId: 'read-system-inventory',
+          authorizationRef: 'g1',
+          authorizationKind: 'AUTOMATIC',
+          planHash: plan.planHash,
+          action: { op: 'system.inventory', sideEffectClass: 'R0' },
+        },
+      ],
+      grants: [{ grantId: 'g1' }],
+    },
+  } as never;
+}
+
+describe('T08 C07R independently issued Registry inventory provenance', () => {
+  it('signed storage-only catalog refuses BEFORE ActionController or T06', async () => {
+    let approvedCalls = 0;
+    let collected = 0;
     const result = await runAuthorizedInventoryRecipe({
       readCandidate: () => candidate,
-      current: async () => source(issue(legacy)),
+      current: async () => checkedSource(externallySign(legacy)),
       controller: {
         authorizePlan: async () => {
-          planCalls++;
-          throw new Error('Unsigned inventory source cannot enter controller');
+          approvedCalls++;
+          throw new Error('storage-only catalog cannot approve inventory');
         },
         authorizeEffect: async () => {
-          throw new Error('No effect may be authorized');
+          throw new Error('no grant');
         },
       },
       collect: () => {
-        collectCalls++;
+        collected++;
         return { ok: true, snapshot };
       },
     });
     expect(result).toEqual({ ok: false, code: 'RECIPE_AUTHORITY_UNAVAILABLE' });
-    expect(planCalls).toBe(0);
-    expect(collectCalls).toBe(0);
+    expect(approvedCalls).toBe(0);
+    expect(collected).toBe(0);
   });
 
-  it('independently signed exact inventory capability/provider/binding verifies and allows one gated read', async () => {
-    let collectCalls = 0;
-    let gates = 0;
-    const verified = source(issue(dual));
-    expect(verified.kind).toBe('CURRENT');
-    expect(hasExactIssuedInventoryBinding(dual)).toBe(true);
-    expect(dual.bindings.some((b) => b.bindingId === 'binding/shun-local-system-inventory')).toBe(true);
-    const output = await runAuthorizedInventoryRecipe({
+  it('operator-signed exact extended catalog supports the fixed authorized read', async () => {
+    let reads = 0;
+    let sourceChecks = 0;
+    expect(hasExactIssuedInventoryBinding(extended)).toBe(true);
+    const result = await runAuthorizedInventoryRecipe({
       readCandidate: () => candidate,
       current: async () => {
-        gates++;
-        return verified;
+        sourceChecks++;
+        return checkedSource(externallySign(extended));
       },
       controller: {
-        authorizePlan: async ({ plan }) => ({
-          ok: true,
-          authorization: {
-            plan,
-            actions: [{
-              actionId: 'read-system-inventory',
-              authorizationRef: 'signed-g1',
-              authorizationKind: 'AUTOMATIC',
-              planHash: plan.planHash,
-              action: { op: 'system.inventory', sideEffectClass: 'R0' },
-            }],
-            grants: [{ grantId: 'signed-g1' }],
-          },
-        }) as never,
+        authorizePlan: async ({ plan }) => approved(plan),
         authorizeEffect: async () => ({ ok: true }) as never,
       },
       collect: () => {
-        collectCalls++;
+        reads++;
         return { ok: true, snapshot };
       },
     });
-    expect(output).toMatchObject({ ok: true, status: 'VERIFIED_READONLY_OBSERVATION' });
-    expect(collectCalls).toBe(1);
-    expect(gates).toBe(2);
+    expect(result).toMatchObject({
+      ok: true,
+      status: 'VERIFIED_READONLY_OBSERVATION',
+    });
+    expect(sourceChecks).toBe(2);
+    expect(reads).toBe(1);
   });
 
-  it('refuses signed catalog changes before effect, and rejects tampered signatures', async () => {
-    const original = issue(dual);
-    expect(() => source({ ...original, snapshot: legacy })).toThrow(
-      'REAL_STORAGE_REGISTRY_ISSUANCE_REVISION_MISMATCH',
-    );
-    const wrong = { ...dual, bindings: dual.bindings.map((b) =>
-      b.bindingId === 'binding/shun-local-system-inventory'
-        ? { ...b, adapterId: 'adapter.not-the-inventory-host' }
-        : b,
-    ) };
-    const wrongIssued = issue(wrong);
-    expect(hasExactIssuedInventoryBinding(source(wrongIssued).kind === 'CURRENT' ? dual : wrong))
-      .toBe(false);
-    let calls = 0;
-    let observations = 0;
+  it('changed signed binding at second gate refuses with zero T06 reads', async () => {
+    const changed: RegistrySnapshot = {
+      ...extended,
+      bindings: extended.bindings.map((binding) =>
+        binding.bindingId === 'binding/shun-local-system-inventory'
+          ? { ...binding, adapterId: 'adapter.untrusted' }
+          : binding,
+      ),
+    };
+    expect(hasExactIssuedInventoryBinding(changed)).toBe(false);
+    const original = externallySign(extended);
+    const altered = externallySign(changed);
+    expect(() =>
+      verifyRegistryIssuance(
+        { ...original, snapshot: changed },
+        pem,
+        WORKSPACE,
+        NOW,
+      ),
+    ).toThrow('REAL_STORAGE_REGISTRY_ISSUANCE_REVISION_MISMATCH');
+    let sourceChecks = 0;
+    let reads = 0;
     const result = await runAuthorizedInventoryRecipe({
       readCandidate: () => candidate,
       current: async () => {
-        calls++;
-        return source(calls === 1 ? original : wrongIssued);
+        sourceChecks++;
+        return checkedSource(sourceChecks === 1 ? original : altered);
       },
       controller: {
-        authorizePlan: async ({ plan }) => ({
-          ok: true,
-          authorization: {
-            plan,
-            actions: [{
-              actionId: 'read-system-inventory',
-              authorizationRef: 'g1',
-              authorizationKind: 'AUTOMATIC',
-              planHash: plan.planHash,
-              action: { op: 'system.inventory', sideEffectClass: 'R0' },
-            }],
-            grants: [{ grantId: 'g1' }],
-          },
-        }) as never,
+        authorizePlan: async ({ plan }) => approved(plan),
         authorizeEffect: async () => {
-          throw new Error('Changed binding cannot cross effect gate');
+          throw new Error('no effect after signed binding change');
         },
       },
       collect: () => {
-        observations++;
+        reads++;
         return { ok: true, snapshot };
       },
     });
     expect(result).toEqual({ ok: false, code: 'RECIPE_AUTHORITY_UNAVAILABLE' });
-    expect(calls).toBe(2);
-    expect(observations).toBe(0);
+    expect(sourceChecks).toBe(2);
+    expect(reads).toBe(0);
   });
 });
