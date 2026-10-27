@@ -3,7 +3,7 @@
 // This module does NOT grant or execute system.inventory, promote ACTIVE,
 // run user/model-supplied JS, or call DeepSeek.
 import { canonicalJson } from '@shun/contracts';
-import { compileLiteralRecipe, type TrustedRecipeReadService } from '@shun/resolver';
+import type { TrustedRecipeReadService } from '@shun/resolver';
 import type { ImmutableRecipeRepository } from '@shun/store';
 
 export const BUILTIN_INVENTORY_RECIPE_ID = 'shun.builtin.system-inventory.readonly.v02';
@@ -45,50 +45,74 @@ export function registerBuiltinInventoryCandidate(
   }
 }
 
-/** Pure identity of the built-in source; never reads or writes local storage. */
-export function expectedBuiltinInventoryIdentity() {
-  const compiled = compileLiteralRecipe(SOURCE, PIN);
-  if (!compiled.ok) throw new Error('BUILTIN_RECIPE_INVALID');
-  return compiled.compiled.identity;
-}
-
 export type BuiltinInventoryReadResult =
   | {
       ok: true;
       saved: boolean;
       state: 'PERSISTED_CANDIDATE_ONLY' | 'NOT_SAVED';
       recipeId: string;
-      revisionSha256: string;
+      revisionSha256: string | null;
       executionAuthorized: false;
       modelCalls: 0;
     }
   | { ok: false; code: 'RECIPE_READ_UNAVAILABLE' };
 
-/** No write, activation or effect. Existing repository.get does full hash and
- * payload integrity verification before any saved identity is displayed.
+/**
+ * Read-only inspection of the existing immutable SQLite records.
+ * Existing repository.get validates full revision SHA and payload integrity.
+ * We require the exact trusted source/pin; an older or unrelated revision is
+ * never represented as the current built-in definition.
  */
 export function readBuiltinInventoryCandidate(
   repository: Pick<ImmutableRecipeRepository, 'get'>,
+  revisionShas: readonly string[],
 ): BuiltinInventoryReadResult {
   try {
-    const expected = expectedBuiltinInventoryIdentity();
-    const actual = repository.get(expected.recipeId, expected.revisionSha256);
-    if (
-      actual &&
-      (actual.identity.actionGraphSha256 !== expected.actionGraphSha256 ||
-        actual.identity.sourceSha256 !== expected.sourceSha256 ||
-        actual.actionGraph.nodes.length !== 1 ||
-        actual.actionGraph.nodes[0]?.op !== 'system.inventory' ||
-        actual.actionGraph.edges.length !== 0)
-    ) {
+    if (!Array.isArray(revisionShas) || revisionShas.length > 32) {
       return { ok: false, code: 'RECIPE_READ_UNAVAILABLE' };
+    }
+    for (const revisionSha256 of revisionShas) {
+      if (!/^[a-f0-9]{64}$/.test(revisionSha256)) {
+        return { ok: false, code: 'RECIPE_READ_UNAVAILABLE' };
+      }
+      const actual = repository.get(BUILTIN_INVENTORY_RECIPE_ID, revisionSha256);
+      if (!actual) continue;
+      if (
+        actual.sourceText !== SOURCE ||
+        actual.identity.contractRevision !== PIN.contractRevision ||
+        actual.identity.verifierId !== PIN.verifierId ||
+        actual.identity.verifierRevision !== PIN.verifierRevision
+      ) {
+        continue;
+      }
+      const [action] = actual.actionGraph.nodes;
+      if (
+        actual.actionGraph.nodes.length !== 1 ||
+        actual.actionGraph.edges.length !== 0 ||
+        action?.op !== 'system.inventory' ||
+        action.actionId !== 'read-system-inventory' ||
+        action.parameters.includeProcesses !== false ||
+        actual.declaredEffects.length !== 1 ||
+        actual.declaredEffects[0] !== 'system.inventory'
+      ) {
+        return { ok: false, code: 'RECIPE_READ_UNAVAILABLE' };
+      }
+      return {
+        ok: true,
+        saved: true,
+        state: 'PERSISTED_CANDIDATE_ONLY',
+        recipeId: BUILTIN_INVENTORY_RECIPE_ID,
+        revisionSha256,
+        executionAuthorized: false,
+        modelCalls: 0,
+      };
     }
     return {
       ok: true,
-      saved: actual !== null,
-      state: actual ? 'PERSISTED_CANDIDATE_ONLY' : 'NOT_SAVED',
-      recipeId: expected.recipeId,
-      revisionSha256: expected.revisionSha256,
+      saved: false,
+      state: 'NOT_SAVED',
+      recipeId: BUILTIN_INVENTORY_RECIPE_ID,
+      revisionSha256: null,
       executionAuthorized: false,
       modelCalls: 0,
     };
