@@ -294,7 +294,6 @@ export class RealStorageControlBackend implements ControlBackend {
     return readBuiltinInventoryCandidate(new ImmutableRecipeRepository(this.#store));
   }
 
-
   meta(): { policy: PolicyState; localOnly: true; simulated: false } {
     return { policy: this.#policy, localOnly: true, simulated: false };
   }
