@@ -3,7 +3,7 @@
 // This module does NOT grant or execute system.inventory, promote ACTIVE,
 // run user/model-supplied JS, or call DeepSeek.
 import { canonicalJson } from '@shun/contracts';
-import type { TrustedRecipeReadService } from '@shun/resolver';
+import { compileLiteralRecipe, type TrustedRecipeReadService } from '@shun/resolver';
 
 export const BUILTIN_INVENTORY_RECIPE_ID = 'shun.builtin.system-inventory.readonly.v02';
 
@@ -42,4 +42,11 @@ export function registerBuiltinInventoryCandidate(
   } catch {
     return { ok: false, code: 'RECIPE_STORE_REFUSED' };
   }
+}
+
+/** Pure identity of the built-in source; never reads or writes local storage. */
+export function expectedBuiltinInventoryIdentity() {
+  const compiled = compileLiteralRecipe(SOURCE, PIN);
+  if (!compiled.ok) throw new Error('BUILTIN_RECIPE_INVALID');
+  return compiled.compiled.identity;
 }
