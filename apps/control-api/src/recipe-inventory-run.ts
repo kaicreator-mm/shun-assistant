@@ -4,7 +4,7 @@
 // Missing specific operator-provisioned R0 policy => no collector invocation.
 import { randomUUID } from 'node:crypto';
 import type { ActionController } from '@shun/authorization';
-import { type ActionPlan, ActionPlanSchema, computePlanHash } from '@shun/contracts';
+import { ActionPlanSchema, computePlanHash } from '@shun/contracts';
 import type { SystemInventoryResult } from '@shun/vertical-system';
 import {
   BUILTIN_INVENTORY_RECIPE_ID,
@@ -101,9 +101,16 @@ export async function runAuthorizedInventoryRecipe(
         retryAllowedWhen: 'DECLARED_IDEMPOTENT',
       },
     } as const;
-    const parsed = ActionPlanSchema.safeParse({
+    // Validate the entire host-owned plan against the actual contract before
+    // deriving the final canonical hash; no unsafe assertion is necessary.
+    const proposed = ActionPlanSchema.safeParse({
       ...planWithoutHash,
-      planHash: computePlanHash({ ...planWithoutHash, planHash: '0'.repeat(64) } as ActionPlan),
+      planHash: '0'.repeat(64),
+    });
+    if (!proposed.success) return refuse('RECIPE_PLAN_REFUSED');
+    const parsed = ActionPlanSchema.safeParse({
+      ...proposed.data,
+      planHash: computePlanHash(proposed.data),
     });
     if (!parsed.success) return refuse('RECIPE_PLAN_REFUSED');
     const plan = parsed.data;
