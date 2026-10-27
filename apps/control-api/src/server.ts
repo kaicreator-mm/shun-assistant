@@ -14,6 +14,7 @@ import { GoalRequestSchema } from '@shun/contracts';
 import { buildDeepSeekGoalDisclosure } from '@shun/llm-remote';
 import { collectWindowsSystemInventory, suggestReadonlyOptimizations } from '@shun/vertical-system';
 import { z } from 'zod';
+import type { CloudInterpretPort } from './cloud-interpret.ts';
 import {
   CONTROL_ERROR_CODES,
   ControlError,
@@ -52,6 +53,8 @@ const MIME: Record<string, string> = {
 
 export interface ControlServerOptions {
   backend: ControlBackend;
+  /** Trusted process composition; never configured by an HTTP request. */
+  cloud?: CloudInterpretPort;
   /** Directory with the static control-ui app; omitted = API only. */
   uiDir?: string;
   /** Loopback host only; anything else is a construction-time refusal. */
@@ -83,9 +86,11 @@ export function createControlServer(options: ControlServerOptions): ControlServe
   const uiRoot = options.uiDir ? resolve(options.uiDir) : undefined;
 
   const server = createServer((req, res) => {
-    handle(options.backend, req, res, { host, uiRoot, maxBodyBytes }).catch((error: unknown) => {
-      respondError(res, error);
-    });
+    handle(options.backend, req, res, { host, uiRoot, maxBodyBytes, cloud: options.cloud }).catch(
+      (error: unknown) => {
+        respondError(res, error);
+      },
+    );
   });
 
   return {
@@ -118,6 +123,7 @@ export function createControlServer(options: ControlServerOptions): ControlServe
 
 interface RouteContext {
   host: string;
+  cloud?: CloudInterpretPort;
   uiRoot?: string;
   maxBodyBytes: number;
 }
@@ -201,7 +207,11 @@ async function handle(
     return respondJson(res, 200, {
       ok: true,
       api: CONTROL_API_REVISION,
-      localOnly: true,
+      // This is an actual model egress posture, not the loopback bind rule.
+      // A remote model can be enabled even while Goal task execution is demo.
+      localOnly: ctx.cloud?.status().enabled !== true,
+      loopbackOnly: true,
+      cloudMode: ctx.cloud?.status().enabled === true ? 'REMOTE_OPT_IN' : 'DISABLED',
       // Simulation disclosure (Issue #41, VC-P2-06): the UI renders a
       // prominent banner from this so the demo backend cannot pass as the
       // real Action Controller.
@@ -256,6 +266,40 @@ async function handle(
       cloudSendAllowed: false,
       privateBrokerReady: false,
     });
+  }
+
+  // A true REMOTE model action is available only after trusted process
+  // composition. Neither this route nor its input can create cloud consent:
+  // C02's real native interactive dialog must approve each exact projection.
+  if (method === 'GET' && url.pathname === '/api/cloud/status') {
+    return respondJson(res, 200, {
+      ...(ctx.cloud?.status() ?? {
+        enabled: false,
+        provider: 'deepseek',
+        model: 'deepseek-flash',
+        osConsentRequired: true,
+      }),
+      tasksSimulated: backend.meta().simulated,
+    });
+  }
+
+  if (method === 'POST' && url.pathname === '/api/cloud/interpret') {
+    const parsed = CloudDisclosurePreviewSchema.safeParse(
+      await readJsonBody(req, ctx.maxBodyBytes),
+    );
+    if (!parsed.success) {
+      return respondJson(res, 400, { error: { code: 'CLOUD_GOAL_INVALID' } });
+    }
+    if (!ctx.cloud?.status().enabled) {
+      return respondJson(res, 503, { error: { code: 'CLOUD_UNAVAILABLE' } });
+    }
+    const result = await ctx.cloud.interpretGoal(parsed.data.goalText);
+    if (!result.ok) {
+      return respondJson(res, result.code === 'CONSENT_DECLINED' ? 409 : 503, {
+        error: { code: result.code },
+      });
+    }
+    return respondJson(res, 200, result);
   }
 
   if (resource === 'tasks') {
