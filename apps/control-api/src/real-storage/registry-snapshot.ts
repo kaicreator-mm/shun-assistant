@@ -81,6 +81,9 @@ export function createInventoryRegistrySnapshot(
 ): RegistrySnapshot {
   const storage = createStorageRegistrySnapshot(environment);
   const arch = environment.arch;
+  if (arch !== 'X64' && arch !== 'ARM64') {
+    throw new Error('REAL_INVENTORY_REGISTRY_UNSUPPORTED_ARCH');
+  }
   const capability: RegistrySnapshot['capabilities'][number] = {
     capabilityId: 'system.inventory',
     revision: 'r1',
