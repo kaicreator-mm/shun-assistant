@@ -65,7 +65,10 @@ describe('T08 C05 — real immutable Recipe candidate save via local UI API', ()
           const rows = store.database
             .prepare('SELECT revision_sha256 FROM recipe_revisions_v02 WHERE recipe_id = ?')
             .all(BUILTIN_INVENTORY_RECIPE_ID) as Array<{ revision_sha256: string }>;
-          return readBuiltinInventoryCandidate(repo, rows.map((row) => row.revision_sha256));
+          return readBuiltinInventoryCandidate(
+            repo,
+            rows.map((row) => row.revision_sha256),
+          );
         },
       });
       const port = await server.start();
