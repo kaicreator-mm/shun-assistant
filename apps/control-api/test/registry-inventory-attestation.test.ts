@@ -1,5 +1,5 @@
 import { createHash, generateKeyPairSync, sign } from 'node:crypto';
-import { canonicalJson } from '@shun/contracts';
+import { ActionPlanSchema, canonicalJson } from '@shun/contracts';
 import { type RegistrySnapshot, snapshotFactsRevision } from '@shun/resolver';
 import { describe, expect, it } from 'vitest';
 import { BUILTIN_INVENTORY_RECIPE_ID } from '../src/inventory-recipe.ts';
@@ -91,17 +91,18 @@ function checkedSource(proof: ReturnType<typeof externallySign>) {
   };
 }
 
-function approved(plan: { planHash: string }) {
+function approved(plan: unknown) {
+  const validated = ActionPlanSchema.parse(plan);
   return {
     ok: true,
     authorization: {
-      plan,
+      plan: validated,
       actions: [
         {
           actionId: 'read-system-inventory',
           authorizationRef: 'g1',
           authorizationKind: 'AUTOMATIC',
-          planHash: plan.planHash,
+          planHash: validated.planHash,
           action: { op: 'system.inventory', sideEffectClass: 'R0' },
         },
       ],
