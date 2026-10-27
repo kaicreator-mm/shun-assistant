@@ -29,7 +29,7 @@ import {
 } from '@shun/store';
 import { runStorageDiagnose } from '@shun/vertical-storage';
 import {
-  expectedBuiltinInventoryIdentity,
+  readBuiltinInventoryCandidate,
   registerBuiltinInventoryCandidate,
 } from '../inventory-recipe.ts';
 import type {
@@ -290,44 +290,10 @@ export class RealStorageControlBackend implements ControlBackend {
    * Existing T03 repository.get verifies payload digest and immutable identity.
    * This route is READ-ONLY and never performs ActionController authorization.
    */
-  readBuiltinInventoryCandidate():
-    | {
-        ok: true;
-        saved: boolean;
-        state: 'PERSISTED_CANDIDATE_ONLY' | 'NOT_SAVED';
-        recipeId: string;
-        revisionSha256: string;
-        executionAuthorized: false;
-        modelCalls: 0;
-      }
-    | { ok: false; code: 'RECIPE_READ_UNAVAILABLE' } {
-    try {
-      const expected = expectedBuiltinInventoryIdentity();
-      const repository = new ImmutableRecipeRepository(this.#store);
-      const actual = repository.get(expected.recipeId, expected.revisionSha256);
-      if (
-        actual &&
-        (actual.identity.actionGraphSha256 !== expected.actionGraphSha256 ||
-          actual.identity.sourceSha256 !== expected.sourceSha256 ||
-          actual.actionGraph.nodes.length !== 1 ||
-          actual.actionGraph.nodes[0]?.op !== 'system.inventory' ||
-          actual.actionGraph.edges.length !== 0)
-      ) {
-        return { ok: false, code: 'RECIPE_READ_UNAVAILABLE' };
-      }
-      return {
-        ok: true,
-        saved: actual !== null,
-        state: actual ? 'PERSISTED_CANDIDATE_ONLY' : 'NOT_SAVED',
-        recipeId: expected.recipeId,
-        revisionSha256: expected.revisionSha256,
-        executionAuthorized: false,
-        modelCalls: 0,
-      };
-    } catch {
-      return { ok: false, code: 'RECIPE_READ_UNAVAILABLE' };
-    }
+  readBuiltinInventoryCandidate() {
+    return readBuiltinInventoryCandidate(new ImmutableRecipeRepository(this.#store));
   }
+
 
   meta(): { policy: PolicyState; localOnly: true; simulated: false } {
     return { policy: this.#policy, localOnly: true, simulated: false };
