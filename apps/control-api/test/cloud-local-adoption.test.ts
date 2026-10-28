@@ -230,6 +230,9 @@ describe('#212 host-only cloud suggestion to bounded local C003 selection', () =
           code: 'INTENT_RECONFIRM_REQUIRED',
           effectExecuted: false,
           authorizationGranted: false,
+        },
+      }),
+    ).toEqual({ ok: false, code: 'CANDIDATE_REFUSED' });
     expect(real.submitted).toEqual([]);
   });
 
