@@ -244,14 +244,18 @@ describe('#212 host-only cloud suggestion to bounded local C003 selection', () =
       admission: admitted(request),
     });
     if (!candidate.ok) throw new Error('TEST_EXPECTED_OFFER');
-    expect(await h.adoption.select({
-      candidateId: candidate.candidateId,
-      userChoice: CHOICE,
-    })).toEqual({ ok: false, code: 'LOCAL_HOST_UNAVAILABLE' });
-    expect(await h.adoption.select({
-      candidateId: candidate.candidateId,
-      userChoice: CHOICE,
-    })).toEqual({ ok: false, code: 'SELECTION_REFUSED' });
+    expect(
+      await h.adoption.select({
+        candidateId: candidate.candidateId,
+        userChoice: CHOICE,
+      }),
+    ).toEqual({ ok: false, code: 'LOCAL_HOST_UNAVAILABLE' });
+    expect(
+      await h.adoption.select({
+        candidateId: candidate.candidateId,
+        userChoice: CHOICE,
+      }),
+    ).toEqual({ ok: false, code: 'SELECTION_REFUSED' });
     expect(h.submitted).toHaveLength(1);
   });
 
@@ -259,17 +263,20 @@ describe('#212 host-only cloud suggestion to bounded local C003 selection', () =
     const original = host();
     expect(original.submitted).toHaveLength(0);
     for (const root of ['relative', '/tmp/unsafe', 'C:\\safe-c003-workspace\\.']) {
-      expect(() => new CloudLocalC003Adoption({
-        backend: {
-          meta: () => ({
-            policy: { kind: 'ACTIVE', revision: 'r1' },
-            localOnly: true,
-            simulated: false,
+      expect(
+        () =>
+          new CloudLocalC003Adoption({
+            backend: {
+              meta: () => ({
+                policy: { kind: 'ACTIVE', revision: 'r1' },
+                localOnly: true,
+                simulated: false,
+              }),
+              submitGoal: async () => ({ taskId: 'none' }),
+            },
+            trustedWorkspace: root,
           }),
-          submitGoal: async () => ({ taskId: 'none' }),
-        },
-        trustedWorkspace: root,
-      })).toThrow('C003_TRUSTED_WORKSPACE_REQUIRED');
+      ).toThrow('C003_TRUSTED_WORKSPACE_REQUIRED');
     }
   });
 });
