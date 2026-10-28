@@ -94,12 +94,8 @@ export async function admitTypedCloudProposal(input: {
     const parsed = GoalProposalSchema.safeParse(json);
     if (!parsed.success) return refused('SCHEMA_REFUSED');
     const contract = parsed.data.goalContract;
-    const selectedObjectIdentities = request.objects
-      .map((o) => `${o.kind}:${o.ref}`)
-      .sort();
-    const proposedObjectIdentities = contract.objects
-      .map((o) => `${o.kind}:${o.ref}`)
-      .sort();
+    const selectedObjectIdentities = request.objects.map((o) => `${o.kind}:${o.ref}`).sort();
+    const proposedObjectIdentities = contract.objects.map((o) => `${o.kind}:${o.ref}`).sort();
     if (
       contract.taskId !== request.taskId ||
       !equal(contract.privacyPolicy, request.policyContext.privacyPolicy) ||
