@@ -166,8 +166,12 @@ test('two concurrent attempts under maxCalls=1 produce at most one HTTP send', a
   assert.equal(results.filter((r) => r.ok).length, 1);
   assert.equal(results.filter((r) => !r.ok && r.code === 'BUDGET_REFUSED').length, 1);
   assert.equal(sent.length, 1);
-  assert.equal(['UNKNOWN_COST', null].filter((v) =>
-    v === ledger.inspect('race-a')?.status || v === ledger.inspect('race-b')?.status).length >= 1, true);
+  const statuses = [
+    ledger.inspect('race-a')?.status ?? null,
+    ledger.inspect('race-b')?.status ?? null,
+  ];
+  assert.equal(statuses.filter((value) => value === 'UNKNOWN_COST').length, 1);
+  assert.equal(statuses.filter((value) => value === null).length, 1);
 });
 
 test('changed display projection and revoked source-currentness both cause zero HTTP sends', async (t) => {
