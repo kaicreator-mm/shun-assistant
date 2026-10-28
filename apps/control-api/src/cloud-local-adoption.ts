@@ -172,8 +172,7 @@ export class CloudLocalC003Adoption {
 
   #readyHost(): boolean {
     const state = this.#backend.meta();
-    return state.simulated === false && state.localOnly === true &&
-      state.policy.kind === 'ACTIVE';
+    return state.simulated === false && state.localOnly === true && state.policy.kind === 'ACTIVE';
   }
 }
 
