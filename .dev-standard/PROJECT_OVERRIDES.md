@@ -12,7 +12,7 @@
 
 - **v0.1.0** historical release/tag at `2313ba2773dac7aa535570e22760147d9b383b65`. No retroactive changes to historical source, PASS/FAIL or qualification.
 - **v0.2.0** uses integration branch `version/v0.2.0`. Product Freeze (including DeepSeek-first re-freeze #96), L2 Freeze #101 and Task DAG Freeze #102 are completed. Frozen P0 DAG: **11 mandatory tasks, 26 dependency edges**; owner is `docs/planning/TASK-DAG-FREEZE-v0.2.md`.
-- **Current stage:** implementation and scoped verification, not Product/L1 or L2 candidate. At this adoption checkpoint T00 #103, T01 #104 (source-ready admission), T03 #105, T06 #107 are closed (**4/11**). T04 #108 and T05 #106 remain open; T07–T11 are not qualified. No v0.2 Release PASS.
+- **v0.2 at that historical adoption checkpoint:** implementation and scoped verification, not Product/L1 or L2 candidate. At this adoption checkpoint T00 #103, T01 #104 (source-ready admission), T03 #105, T06 #107 are closed (**4/11**). T04 #108 and T05 #106 remain open; T07–T11 are not qualified. No v0.2 Release PASS.
 - **Active predecessor-source work:** PR #150 (T05) and PR #152 (T04) were authored under existing ADS v4.9.0; independent reviews #151/#153 have blocking P1 findings, so neither PR is merge-eligible. The ADS adoption does not rebind their accepted task identity, source evidence or review to a new standard.
 
 
@@ -42,11 +42,11 @@
 
 ## Repository / execution profile
 
-- Version-branch integration: `version/v0.2.0`; one concern → short PR → required exact-SHA CI/source review → merge after currentness, not per-change full release regression.
+- **v0.2 prior integration profile:** `version/v0.2.0`; one concern → short PR → required exact-SHA CI/source review → merge after currentness, not per-change full release regression. **v0.3 integration target:** `version/v0.3.0` (see version-specific section above).
 - This standards-only migration changes the current project's future/checkpointed development instructions. No frozen Product/L2/Task DAG, runtime, interface, security permission, code, GitHub dependencies, evidence or release status is changed.
 - **In-flight isolation:** T04 #108 / PR #152 and T05 #106 / PR #150 retain ADS `4.9.0@7929012f36a2202dcc2edc7a414b8163adc7afbd` for their already-authored/reviewed source and accepted Task work until their lawful next checkpoint. No existing CI/Review PASS is upgraded by assertion. Eligible new/checkpointed work adopts `4.13.1@f35fcdb153ff171aaa0027b6e1b9c7592f28d3cd`.
 - Behavior/authority compatibility: retain self-declared logical Actor identity (GitHub account is transport only), no Owner-credential gate, no mandatory independent review for every fix, risk-based required Review, exact-source Validation and PR PASS ≠ Release PASS. New v4.13 optional tooling/profiles remain disabled; no schema, runtime or external effects migrate.
-- Root adoption: `AGENTS.md`, `.dev-standard/VERSION`, and this `PROJECT_OVERRIDES.md` are the effective root files. Exactly one operative `v4.adoption_level`. Check immutable ADS `VERSION=4.13.1` at the pinned release commit, not ADS main.
+- Root adoption: `AGENTS.md`, `.dev-standard/VERSION`, and this `PROJECT_OVERRIDES.md` are the effective root files. Exactly one operative `v4.adoption_level`. **v0.2** remains historically pinned to qualified ADS `4.13.1`; **v0.3** resolves the distinct immutable full SHA actually recorded by its own `.dev-standard/VERSION`. Do not infer effective adoption from mutable ADS main or an unmerged PR.
 
 ## Product hard boundaries
 
