@@ -4,7 +4,7 @@
 > Controller: [#214](https://github.com/kaicreator-mm/shun-assistant/issues/214)  
 > Standard planning authority: ADS v4.18.0 **qualified main source** `2c395c55569fe2edf3f4135f12d3d069e526d0b7` (not v4.19 intake).  
 > Shun **planning-only** snapshot: `version/v0.2.0@f01233a002f65b9bfea04828f6e56914666a160a`. v0.2 is not a qualified v0.3 final baseline; #112/#113/#212 remain independent v0.2 delivery gates.  
-> DomainHarness v0.10.3 `version/v0.10.3@7d571858bd6524ffd13a7985227183dbecb2924a` observed as **candidate**. Final exact SDK release/packaging/API/ABI selection is explicitly pending.  
+> DomainHarness v0.10.3 Product / data Contract / L2 **have passed independent review and are frozen**: selected design baseline `version/v0.10.3@7d571858bd6524ffd13a7985227183dbecb2924a` (moving branch, snapshot not final package identity). **Contract choice is confirmed for v0.3 development**; final SDK implementation/package hash, installed-consumer verification, and Release/RQ remain pending. No v0.10.2 fallback or speculative ABI redesign.  
 > Related L1: [L1 parity and risk inventory](./L1-v0.3-domain-harness-parity-R0.md).  
 > This draft is a Product decision request, not L2 Freeze, Task DAG, code permission, approval grant, Windows evidence, or release.
 
@@ -36,7 +36,10 @@ v0.2 achieved substantive Windows, authorization, privacy, provider and Recipe c
 7. **Lifecycle & recovery.** SQLite WAL local fixed disk, authoritative state/recovery history, idempotence and UNC/mapped-path limitations stated honestly; no duplicated physical effects across restart, concurrent requests or replay.
 8. **User packaging.** The v0.2 selected Windows Home/Pro x64, ordinary-user constraints, trusted release origin and native portable requirements remain in scope as inherited product obligations. Source and mock tests are not a real Windows acceptance substitute.
 
-**P1 (only when independently justified)**: improve plugin/recipe authoring UX and optional guided-step UI *after parity*. No new feature may be treated as a P0 migration prerequisite unless an explicit Product review amendment makes it so.
+9. **Guided user interaction (v0.10.3 contract adoption).** Reuse approved `StepTemplate`, `FormSchema`, `ChoiceCatalog`, `StepSpec`, `StepOutcome` and bounded advisory for missing path/scope, clarification, privacy disclosure and explicit plan confirmation. Offline and zero-model paths must work. Shun UI renders the selected step; Host supplies current facts; template/catalog choices are fixed and versioned. Dynamic step selection **does not create approval, grant or K Permit**. Scope this to one meaningful Windows critical journey, not a generic auto-generated UI platform.
+10. **Feedback and experience reuse.** Reuse selected DomainHarness `meta-feedback`/candidate-validation and public Host `runMetaFeedbackWorkflow` to capture user feedback plus verified task outcomes (with redaction and opt-in). Create bounded candidate → independent validation → shadow evidence → explicit operator acceptance → future immutable BUILD; no automatic self-improving production permissions, unapproved telemetry, or raw user data in feedback. Keep `task-meta` optional for execution metadata, not an invented hard product dependency.
+
+**P1 beyond minimum reuse:** improve more advanced UI/Recipe authoring and additional guided journeys after completing the first real integrated user loop. Do not build a new form renderer/meta-learning engine merely because an SDK example exists.
 
 ## 3. Domain App direction and owner boundaries (L2 design inputs, not pre-approved source contract)
 
@@ -47,7 +50,9 @@ Proposed composition: external selected DomainHarness BUILD → one selected K/M
 - **B**: typed system-diagnosis, storage, file, Provider lifecycle and Recipe operations; own human-visible business states and selected tool intent.
 - **C**: declared operations that execute only after K Permit; split internal deterministic calculation from externally observable Windows, cloud and Provider effects.
 - **Windows Host**: retain existing executor, physical file identity/path constraints, ActionController/private consent/UAC/OS account/permissions. **A valid K Permit alone never authorizes Windows writes.** A Shun grant alone likewise never bypasses K admission.
-- **LLM Host**: real DeepSeek endpoint/model/key and independent budget/disclosure checks, not model-selected endpoint; selected DomainHarness LLM C only where its observed public contract fits these existing safeguards.
+- **LLM Host**: real DeepSeek endpoint/model/key and independent budget/disclosure checks, not model-selected endpoint; reuse the confirmed v0.10.3 neutral `dh.llm.generate/1` with explicit `llm.openai.generate` C/Host binding for Shun's DeepSeek. Anthropic C remains selectable by SDK but **is not an extra Shun P0 service dependency**. No model-name implicit routing, keys in B/Prompt, or automatic retry on uncertain post-send state.
+- **Guided Journey / form**: B chooses exactly one next approved step from Host-observed current context; UI displays bounded form and captures `StepOutcome`. Optional `LLMAdvisory` is untrusted, not a new template, change to approval authority or execution permit. Real UI/authorization integration is Shun-owned beyond the SDK's offline example.
+- **Feedback / Meta**: reuse selected S `meta-feedback`, candidate-validation, Host shadow/feedback workflow; Shun owns feedback provenance, privacy, and user/operator acceptance. Candidate promotion creates a **new** approved BUILD, never mutates the current active workflow or its K state.
 - **Control UI/API**: preserve user gestures, separate approved plan, refusal and recoverable evidence, avoid UI-as-authority.
 
 **Key architecture unknowns needing falsification before L2 Freeze**:
@@ -56,7 +61,9 @@ B. Can public selected SDK handle Windows and cloud UNKNOWN without replaying an
 C. Can existing ShunStore data/journal/Recipe IDs map to K stable identities without loss, ambiguity or a dual-writer period?  
 D. Can native NAPI-RS/UAC/helper and signed Provider be bound through public C/Host ABI without bypassing selected public API?  
 E. Can Shun private consent and budget reservation guarantee no forbidden DeepSeek request under SDK LLM effect scheduling?  
-F. Is SDK v0.10.3 a qualified/public consumable baseline, and what is the minimal compatible adaptation otherwise?
+F. The v0.10.3 Contract/L2 is frozen; which exact public package/export set and source SHA will be used for development, and which installed-consumer/Release checks remain before shipping? This is a packaging/evidence question, **not a reason to reopen frozen contract selection**.
+G. Can Shun Guided Journey advance/recover across actual UI, changing Host observations and human approval without treating an LLM advisory/StepOutcome as K authority?
+H. Can redacted feedback + observed outcome enter public Meta workflow and remain candidate-only until explicit future-BUILD operator approval, including negative forged/cross-user feedback cases?
 
 Keep UNKNOWN explicit. A `NOT_RUN` real host or public-consumer journey is **not** an architecture PASS.
 
@@ -82,6 +89,8 @@ Evaluate actual source reuse, count of removed duplicated orchestration responsi
 | J05 | Curated Provider genuine first-use JIT signature, cache/offline reuse | changed binary, wrong signature, stolen user assets, unknown ABI → refuse | Windows Host |
 | J06 | CAS/replay/crash recovery with real selected SDK | duplicate effect, dropped ACK, UNKNOWN remote timeout, poisoned DTO before send → no unsafe replay | SDK external consumer + Host |
 | J07 | Portable Windows Home/Pro product journeys and trusted first entrypoint | unsupported OS/launcher provenance, missing native permissions, package tamper → hold | Physical Windows + independent RQ |
+| J08 | Current Windows facts → one approved guided StepSpec → user choices/StepOutcome → correct resumed step | stale case, forged outcome, unapproved choice, model advisory override → refuse; model absent still works | UI/Business + Windows Host |
+| J09 | User feedback + verified task receipt → bounded Meta candidate → validation/Shadow → explicit operator-approved future BUILD | fabricated feedback/provenance, secret in telemetry, unapproved self-promotion, current-build mutation → refuse | Host/Meta + independent Review |
 
 Carry forward genuine unproved v0.2 evidence as `UNKNOWN`, **not** migrated PASS. v0.3 only claims a user journey when the real chosen public SDK, Shun Host and bounded user-facing path are wired end-to-end.
 
@@ -89,18 +98,18 @@ Carry forward genuine unproved v0.2 evidence as `UNKNOWN`, **not** migrated PASS
 
 1. **Stage 0 / Product R0 now:** issue #214, proposal docs and exact frozen-input references on `planning/v0.3-domain-harness-product-r0`; risk-based Product independent Review **required** because authority/migration sensitive. `version/v0.3.0` is only a staging branch; neither a new frozen base nor a runtime permission.
 2. **Product R1:** selected independent exact-HEAD review; Product owner explicitly authorizes any Product Freeze. Reviewer judgement alone cannot freeze.
-3. **Stage 2:** L2 derives from frozen Product, selects exact SDK and K/S/B/C/Host ABI, answers high-impact UNKNOWNs with bounded real tests; independent architecture review and explicit L2 Freeze.
-4. **Task DAG:** concern-first, source owners and non-conflicting parallel lanes. At least separated lanes for host Windows, domain business workflows, semantic/LLM, state/Recipe migration, API/UI composition and real integration; shared exports & composition owned by one integrator. Dependencies are materialized as **native GitHub Issue Dependencies** and read back. No L3 dispatch from a prose DAG alone.
+3. **Stage 2:** L2 derives from frozen Product, **reuses confirmed DomainHarness v0.10.3 Product/Contract/L2**, maps the existing public K/S/B/C/Host interfaces and resolves Shun-specific UNKNOWNs through bounded tests; independent Shun architecture review and explicit Shun L2 Freeze. Do **not** re-specify the already-frozen SDK ABI.
+4. **Task DAG:** concern-first, source owners and non-conflicting parallel lanes. At least separated lanes for host Windows, domain business workflows, semantic/LLM, guided forms/UI, feedback/Meta, state/Recipe migration and real integration; shared exports & composition owned by one integrator. Dependencies are materialized as **native GitHub Issue Dependencies** and read back. No L3 dispatch from a prose DAG alone.
 5. **Implementation:** legal actual Task Claim, exact SHA, allowed write sets, independent review where required; WEB+CI first, LOCAL only for physical missing proof. No double writers. Correct branch and exact-SHA validation. SDK gaps raised to `kaicreator-mm/domain-harness`, with minimal repro and no private data.
 6. **Version closeout:** full regression/selected real Windows/DeepSeek/Provider/Hidden/packaging and independent RQ. Keep `main`, v0.2 frozen scope, public tags and real user secrets untouched until qualified authorization.
 
-**Critical baseline gate:** v0.3 planning snapshot is v0.2 source `f01233a...`, NOT v0.2 finished code. Before v0.3 source implementation dispatch, owner must adopt an exact eligible successor from completed v0.2 and revalidate all migration assumptions. A v0.2 Release HOLD cannot be bypassed by invoking new v0.3 architecture; parity claims against missing v0.2 cases remain UNKNOWN.
+**Critical baseline gate:** v0.3 planning snapshot is v0.2 source `f01233a...`, NOT final v0.2 release. **After Shun Product/L2/DAG/Claim authorization, independent v0.3 implementation lanes may develop against an explicitly pinned v0.2 source snapshot in isolation while v0.2 T10/T11 finish.** Each impacted component must rebase/reconcile v0.2 accepted successor before final v0.3 integration, with currentness/CI and independent review. No v0.3 implementation may overwrite v0.2 source, re-use unqualified v0.2 release receipts, or claim shipped parity from unresolved v0.2 cases.
 
 **ADS adoption:** shun v0.2 currently pins `.dev-standard/VERSION = 4.13.1@f35fcdb...`; changing that historical pin is forbidden here. For v0.3, request an explicit qualified ADS v4.18 source-revision adoption with compatibility/role/Claim review; do not silently edit the pin in Product R0.
 
 ## 7. Product decisions requested
 
-- Approve **functional parity before new features** and the selective DomainHarness migration as the preferred, reversible hypothesis.
+- Approve **functional parity plus bounded v0.10.3 LLM/Guided Journey/Meta integration** as the v0.3 baseline, and selective DomainHarness migration as the preferred, reversible hypothesis.
 - Preserve existing private consent + ActionController / Windows authorization for physical effects, subject to L2 proof of composition with single K.
 - Approve independent Product R1 for this security-sensitive rewrite; do **not** infer Product Freeze from this document.
 - Keep v0.2 release path separate; no v0.3 source implementation until qualified baseline, L2 and native Task admissions exist.
@@ -109,7 +118,10 @@ Carry forward genuine unproved v0.2 evidence as `UNKNOWN`, **not** migrated PASS
 PRODUCT_R0=REVIEW_CANDIDATE
 PRODUCT_FREEZE=NO
 L2_FREEZE=NO
-SDK_ABI_PIN=NOT_SELECTED
+SDK_CONTRACT=v0.10.3_PRODUCT_DATA_L2_FROZEN
+SDK_DEV_SOURCE_SNAPSHOT=7d571858bd6524ffd13a7985227183dbecb2924a
+SDK_PUBLIC_PACKED_CONSUMER=NOT_RUN
+SDK_RELEASE_PIN=PENDING_RQ
 REBASE_V02_RELEASE=REQUIRED_BEFORE_IMPLEMENTATION
 NATIVE_TASK_DAG=NOT_CREATED
 IMPLEMENTATION_AUTHORIZED=NO
