@@ -1,0 +1,63 @@
+# Shun Assistant v0.2 — T10 scoped L2 successor B: typed DeepSeek semantics + Host-private binding
+
+> ARCHITECTURE_CANDIDATE — NOT L2_FREEZE_READY until independent exact-SHA adversarial review and Architecture Owner terminal.
+> Product Owner choice B_TYPED_HOST_BOUND authorized at Issue #224 comment 6479331140. Exact version base db5299ff37ce70b78e19b9a596c60085226f4988. Architecture correction #221, parent #212/T10 #112. Immutable L2 #101, old frozen Product #96 and 11-node/26-edge DAG are untouched.
+
+## 1. First-principles source correction
+
+Current deepseek-transport.ts sends only the GOAL_TEXT user message. cloud-interpret.ts creates a separate private cloud taskId and uses native C02 private consent. cloud-proposal-admission.ts requires a model-authored full GoalProposal with exact private taskId, workspace objects, privacy and environment policy, which a model never received. cloud-local-adoption.ts requires that strict READY plus an exact canonical local cleanup goal. Simply wiring these to server.ts/app.js cannot produce a realistic CN/EN positive. A test double constructing the missing private fields is NOT a conforming positive test.
+
+**New minimum:** model-authored semantic fragment -> trusted Host deterministic admission/binding -> typed GoalProposal with no authority -> separate visible user local selection (when applicable) -> original RealStorage backend plan preview -> separate exact-planHash human approval through ActionController -> independently observed effect/verification. Do not create an alternate executor, grant issuer, workflow controller, budget engine or storage journal.
+
+## 2. Concrete wire and parsing contract (proposed protocol)
+
+**Public protocol**: SHUN_T10_SEMANTIC_V1, one static pinned English instruction (interprets CN/EN user goal without revealing host identity) and exactly the previously previewed user goal text; a model-generated strict JSON object with EXACT keys:
+    { "protocol": "SHUN_T10_SEMANTIC_V1", "intent": "STORAGE_READ_ONLY_DIAGNOSIS", "decision": "READY" }
+
+The only acceptable protocol value is SHUN_T10_SEMANTIC_V1. Allowed intent values are STORAGE_READ_ONLY_DIAGNOSIS, STORAGE_CACHE_CLEANUP_CANDIDATE, and UNRESOLVED. Allowed decision values are READY and NEEDS_CLARIFICATION; force NOT_READY whenever intent=UNRESOLVED or decision=NEEDS_CLARIFICATION, or when the Host cannot prove objective compatibility. No model-origin path, task ID, policy, tool name, command, script, approval, provenance or arbitrary object list is admissible. Reject unparseable or markdown-wrapped JSON, duplicate/extra fields, unsupported enum, unbounded body or nonterminal response. The parser is strict and deterministic; no LLM repair/retry for invalid JSON.
+
+This closed enum only establishes *candidate semantics*; it does not authorize cleanup. In particular, a model suggesting CACHE_CLEANUP_CANDIDATE for an original read-only diagnosis produces a read-only recommendation or NOT_READY, never a cleanup task. If a cleaned schema or model text includes an executable string, it has no action authority.
+
+**Host binding:** use the immutable original host-selected GoalRequest taskId, goal, objects, constraints, privacy/environment policy, verification intent and observed registry currentness. Host must check the typed model intent against registered C003 capability and the original literal/verified user intent. Preserve existing strict GoalProposalSchema and deterministic remotePlannerAdapter / interpretGoalViaPlanner for the final constructed proposal; explicitly define a small adapter from model-semantic-fragment to Host-private contract, do NOT rewrite the entire Resolver or change contracts merely to fit the LLM output. Where existing #213 helper requires model-authored full GoalProposal, it cannot be fed the fragment without a separate trusted Host adapter and an exact independent review of that interface. No fabricated model evidence: bind only actual trusted transport attempt identifiers, model ID as observed, with immutable model revision UNKNOWN where unproven.
+
+## 3. Actual outbound bytes, display and C02 signature are one gate
+
+The current fixed signed GOAL_TEXT projection **does not prove consent to hidden additional system messages**. T01 is the only owner of the DeepSeek request-builder/transport. An approved v0.2 successor MUST explicitly define:
+- Exact canonical outbound body including fixed public instruction, exact original user content, allowed output-format controls and fixed provider/model/destination, thinking disabled, stream false, token budget. A public protocol revision and instruction SHA256 must be pinned. Do not dynamically interpolate user-provided tool schemas, other host/private facts or uncontrolled prompts.
+- Preview and C02 approval MUST be based on the same final serialization, or on a separately proved canonical projection that covers EVERY field that can affect disclosure and the pinned public instructions. Send bytes must be recomputed/checked immediately before MAY_HAVE_SENT against the privately signed projection SHA, current source revisions and budget/nonce. Never display GOAL_TEXT-only and then silently append a system message after private Allow.
+- The existing BrokerConsentRequest has a closed GOAL_TEXT-only category/projection whitelist. If it cannot attest a new field or actual body digest, introduce a **separate, minimal reviewed T01/C02 native ABI successor**, not a JS bypass or a fake signing blob. Prefer keeping only GOAL_TEXT as user-private disclosure category and adding an explicit public protocol/body identity binding rather than uploading host-private data. The exact technical shape (whole byte digest or schema-constrained projection with identity pins) MUST be decided in independent architecture/security review BEFORE source writing.
+- C02 approval authorizes a single disclosure only; no local effect consent. Enforce existing maxCalls, per-request token and cost budgets with atomic SQLite reserve, UNKNOWN_COST on ambiguous network send, no blind retry. The expected HTTP response is still **untrusted**; even JSON that matches the schema cannot create a grant.
+
+**Privacy negative:** Local-only, FORBIDDEN, offline, missing/expired native C02 consent, source drift, changed prompt/protocol, unknown registry, changed destination/model, invalid signature, consent replay, more than one attempt or over-budget causes zero outbound POST. No raw prompts, private errors or credentials in outward errors/journal.
+
+## 4. Human and local action trust boundary
+
+Cloud consent is a specific signed Win32 private IPC broker approval for outbound DeepSeek GOAL_TEXT. Its principal SID/session binding MUST NOT be reinterpreted as local cleanup approval. A loopback Origin/JSON CSRF check blocks many cross-site writes but does NOT attest the same OS human explicitly selected a cleanup.
+
+**Minimal v0.2 authority model (Product B without a new native purpose):** the model contribution is an untrusted typed suggestion; the trusted application shows it. If a local effect is desired, display a distinct local fixed-operation offer and have the user create an independent local task, explicitly labeled as **separate from cloud consent**. The RealStorage backend creates the actual fixed workspace/LOCAL_ONLY/FORBIDDEN GoalRequest; its existing ActionController exact-planHash preview + human approval must be independently entered before any effect. Do not claim a cryptographic same-human end-to-end cloud→local causal chain. For a Product requirement that truly demands such a chain, STOP and request a new separately reviewed native OS-user gesture purpose; avoid self-asserted browser session or token as authorization.
+
+No route accepts model-origin GoalProposal, raw commands, grant, approval, planHash or taskId as an authority assertion. Any cloud attempt link displayed with local task is informational only unless privately authenticated; positive test must say whether one human continuity was actually proven. No local cleanup choice can override original readOnly/RETAIN/verification constraints. Existing accepted #220 conservative exact English-only cleanup gate stays unchanged until an explicitly approved source-compatibility successor is reviewed; CN/EN models must be tested via the new *typed semantic* path, not by trying to trick #220 into accepting prose.
+
+## 5. Source ownership and safe lanes (candidate, no authorization yet)
+
+**Lane A / T01+C02 transport source** — exact outbound serialization + protocol identity + Win32 consent digest/currentness: packages/llm-remote/src/deepseek-transport.ts; associated packages/llm-remote test files; apps/control-api/src/cloud-interpret.ts only if the approved trust/preview API requires a change; apps/control-api/native/** only after a **separate** exact ABI claimant and native security review. No work in this lane until C02 exact byte/projection architecture is independently frozen.
+
+**Lane B / T08-derived typed admission** — new small trusted typed-semantic parser/binder files in apps/control-api/src and corresponding apps/control-api/test; strictly minimal integration to cloud handling if separately claimed. Existing packages/resolver/src/planner-seam.ts is **read-only reuse**, not an implied edit. Retain #213/#220 independently accepted source with original semantics unless separately approved after reviewer proves reuse or incompatibility.
+
+**Lane C / T08-derived Host/UI workflow** — apps/control-api/src/main.ts, server.ts, apps/control-ui/public/app.js and index.html, plus narrow Control API tests, after Lane A+B reviewed interface and exact disjoint source claim. Do not add a second approval mechanism. UI selects an explicitly separate local task; use existing /api/tasks, /api/approvals and planHash flow.
+
+**Lane D / T10 integration** — exclusive tests/integration/v02/**, validates actual public API behavior, genuine provider receipt and real local poststate. No write to A/B/C source. T11 packaging/release remains its own lane.
+
+These candidate paths are a planning outline, NOT a dispatch/merge grant. Claims must name exact files, owners, git SHA, boundary dependencies and separate reviewer; no concurrent overlap.
+
+## 6. Minimum experiments / negative matrix
+
+- Deterministic T01 transport test: exact CN/EN final request bytes are the previewed/signed bytes, including fixed instruction/protocol; change one byte in prompt, maxTokens, destination or user goal after private consent -> ZERO provider POST.
+- Model parser: genuine strict semantic fragment accepted as DATA only; prose/extra field, unsupported enum, conflicting intent, injected shell/approval/path, truncation, excessive response or provider error -> NOT_READY, no local task/grant.
+- Host binder: authentic ORIGINAL request + observed registered capability/currentness -> typed canonical Proposal when model intent compatible; mismatched taskId/object/privacy/policy, missing directory/changed host, inspect→cleanup, forbidden disclosure or forged private provenance -> no effect and no untrusted-to-authorized promotion.
+- Local action: preview clearly distinguishes remote consent from local operation; separate local task and exact planHash human approval; decline, stale hash, source rotation, forged HTTP/browser identity, replay and changed workspace -> zero unauthorized effects. Independently verify actual Windows before/after for a permitted fixed C003 operation. Existing T09 Recipe/Host evidence may be reused where identity still matches.
+- Live T10: fix historical CN 503 with passive diagnostics before new paid calls; operator separately authorizes the revised exact new CN and EN C02 projection and possible real model charges; capture only bounded shape/model/receipt metadata, not keys or user text. Do not claim live success from double tests. T11 Home+Pro provenance/full hidden/RQ remain HOLD.
+
+## 7. Owner terminals and quality gate
+
+A Product Owner B choice is recorded, but this L2 document and companion Product successor must pass **fresh independent exact-HEAD Product R1 and Architecture R1/R2**, followed by explicit owner adoption terminals referencing reviewed blobs and version HEAD. Only then Controller issues task-level source write claims for Lane A/B/C, one concern per PR. An unresolved C02 wire/digest mismatch is P1 BLOCK, not a small prompt patch. Frozen v0.2 DAG topology unchanged; source-correction sublanes are scoped additions to T01/T08/T10 ownership, not new mandatory DAG nodes. No paying provider, Windows execution, main merge, Product Freeze or Release PASS is implied by docs or CI.
