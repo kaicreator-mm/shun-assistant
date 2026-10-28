@@ -68,6 +68,9 @@ if (!EXPLICIT) {
     assert.match(pin, /^[a-f0-9]{64}$/);
     const childEnv = {
       ...process.env,
+      // A real human must click each native OS dialog. Do not inherit
+      // any prior unit-test-only dialog automation override.
+      SHUN_CONSENT_TEST_INSTRUMENTS: '0',
       SHUN_CLOUD_ENABLED: '1',
       SHUN_CLOUD_LEDGER_FILE: ledgerPath,
       SHUN_CLOUD_AUTHORITY_FILE: authorityPath,
