@@ -5,16 +5,12 @@
 // browser/LLM cannot inject a trustworthy CloudInterpretPort.
 import {
   canonicalJson,
-  GoalProposalSchema,
-  GoalRequestSchema,
   type GoalProposal,
+  GoalProposalSchema,
   type GoalRequest,
+  GoalRequestSchema,
 } from '@shun/contracts';
-import {
-  interpretGoalViaPlanner,
-  remotePlannerAdapter,
-  type ShunRegistry,
-} from '@shun/resolver';
+import { interpretGoalViaPlanner, remotePlannerAdapter, type ShunRegistry } from '@shun/resolver';
 import type { CloudInterpretPort } from './cloud-interpret.ts';
 
 export type CloudTypedProposalAdmission =
@@ -33,8 +29,9 @@ export type CloudTypedProposalAdmission =
       authorizationGranted: false;
     };
 
-const refused = (code: 'REMOTE_UNAVAILABLE' | 'SCOPE_REFUSED' | 'SCHEMA_REFUSED'):
-  CloudTypedProposalAdmission => ({
+const refused = (
+  code: 'REMOTE_UNAVAILABLE' | 'SCOPE_REFUSED' | 'SCHEMA_REFUSED',
+): CloudTypedProposalAdmission => ({
   status: 'PROPOSAL_REFUSED',
   code,
   effectExecuted: false,
@@ -65,15 +62,21 @@ export async function admitTypedCloudProposal(input: {
       request.policyContext.privacyPolicy.localOnly ||
       request.policyContext.privacyPolicy.externalDisclosure === 'FORBIDDEN' ||
       request.constraints.other?.offline === true
-    ) return refused('SCOPE_REFUSED');
+    )
+      return refused('SCOPE_REFUSED');
 
     // This gate precedes the paid model call; no silent remote fallback.
     if (input.cloud.status().enabled !== true) return refused('REMOTE_UNAVAILABLE');
     const remote = await input.cloud.interpretGoal(request.goal);
-    if (!remote.ok || remote.status !== 'UNTRUSTED_REMOTE_PROPOSAL' ||
-      remote.executed !== false || remote.model !== 'deepseek-flash' ||
-      remote.costState !== 'UNKNOWN_COST' || input.cloud.status().enabled !== true
-    ) return refused('REMOTE_UNAVAILABLE');
+    if (
+      !remote.ok ||
+      remote.status !== 'UNTRUSTED_REMOTE_PROPOSAL' ||
+      remote.executed !== false ||
+      remote.model !== 'deepseek-flash' ||
+      remote.costState !== 'UNKNOWN_COST' ||
+      input.cloud.status().enabled !== true
+    )
+      return refused('REMOTE_UNAVAILABLE');
 
     // No guessing, prose-to-command conversion, or model-issued grants.
     let json: unknown;
@@ -94,7 +97,8 @@ export async function admitTypedCloudProposal(input: {
       !equal(contract.verificationIntent ?? null, request.verificationIntent ?? null) ||
       contract.lifecyclePolicy !== undefined ||
       contract.objects.some((o) => !requestedObjects.has(`${o.kind}:${o.ref}`))
-    ) return refused('SCOPE_REFUSED');
+    )
+      return refused('SCOPE_REFUSED');
 
     // Never trust model-supplied provenance. Bind it to the actual cloud
     // attempt returned by the separately private-consented host port.
