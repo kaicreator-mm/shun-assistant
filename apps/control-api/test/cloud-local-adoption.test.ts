@@ -162,16 +162,23 @@ describe('#212 host-only cloud suggestion to bounded local C003 selection', () =
       })).toEqual({ ok: false, code: 'LOCAL_HOST_UNAVAILABLE' });
       expect(h.submitted).toEqual([]);
     }
-    const h = host({ stalePolicy: false });
+    const policy = { stalePolicy: false };
+    const h = host(policy);
     const offer = h.adoption.offer({
       originalHumanRequest: original,
       admission: admitted(original),
     });
     if (!offer.ok) throw new Error('TEST_EXPECTED_OFFER');
-    // An inactive backend at selection must refuse before submitGoal.
-    // Stale after offer is simulated through the separately injected Host
-    // mode below; do not claim this stub is a real OS policy revocation.
-    expect(offer.userChoice).toBe(CHOICE);
+    policy.stalePolicy = true;
+    expect(
+      await h.adoption.select({ candidateId: offer.candidateId, userChoice: CHOICE }),
+    ).toEqual({ ok: false, code: 'LOCAL_HOST_UNAVAILABLE' });
+    expect(h.submitted).toEqual([]);
+    // The opaque one-use selection cannot be replayed after policy recovery.
+    policy.stalePolicy = false;
+    expect(
+      await h.adoption.select({ candidateId: offer.candidateId, userChoice: CHOICE }),
+    ).toEqual({ ok: false, code: 'SELECTION_REFUSED' });
   });
 
   it('refuses an incorrect local choice and consumes the opaque candidate', async () => {
