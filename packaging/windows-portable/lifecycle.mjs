@@ -32,13 +32,19 @@ function assertCanonicalLayout(layout) {
   // Exported helpers must NEVER accept an arbitrary caller-selected directory
   // as 'core': uninstall/core replacement would otherwise delete user state.
   if (root !== resolve(dirname(root), 'ShunAssistant')) refuse();
-  if (resolve(layout.core) !== join(root, 'core')) refuse();
-  if (resolve(layout.state) !== join(root, 'state')) refuse();
-  if (resolve(layout.core) === resolve(layout.state)) refuse();
+  const core = join(root, 'core');
+  const state = join(root, 'state');
+  // Caller spelling must be exact, not merely path.resolve()-equivalent:
+  // fs operations on "alias/../core" can cross a parent symlink and delete
+  // a physically different directory than the resolved path checked here.
+  if (layout.root !== root || layout.core !== core || layout.state !== state) refuse();
+  if (core === state) refuse();
   assertPlainDirectory(root);
-  assertPlainDirectory(resolve(layout.core));
-  assertPlainDirectory(resolve(layout.state));
-  return root;
+  assertPlainDirectory(core);
+  assertPlainDirectory(state);
+  // Return only the derived paths. No caller-owned path string may reach
+  // renameSync/rmSync/cpSync even after validation.
+  return { root, core, state };
 }
 
 export function perUserLayout(localAppData) {
@@ -85,7 +91,8 @@ export function installSignedCore({ stageDir, publicKeyPath, trustedSpkiPin, lay
   const source = resolve(stageDir);
   const src = lstatSync(source);
   if (!src.isDirectory() || src.isSymbolicLink()) refuse();
-  const root = assertCanonicalLayout(layout);
+  layout = assertCanonicalLayout(layout);
+  const root = layout.root;
   // The staging tree and the installed app root must be disjoint; never
   // recursively copy a directory into itself (or replace a staging parent).
   const sourceFromRoot = relative(root, source);
@@ -137,7 +144,7 @@ export function installSignedCore({ stageDir, publicKeyPath, trustedSpkiPin, lay
 
 /** Removes only the Shun-owned replaceable Core, never user/other data. */
 export function uninstallCore({ layout }) {
-  assertCanonicalLayout(layout);
+  layout = assertCanonicalLayout(layout);
   if (existsSync(layout.core)) {
     assertPlainDirectory(layout.core);
     rmSync(layout.core, { recursive: true, force: false });
