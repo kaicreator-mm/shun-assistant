@@ -37,7 +37,7 @@ function registry() {
 }
 
 function request(): GoalRequest {
-  const r = goalRequest({ goal: 'make vacation photos smaller' });
+  const r = goalRequest({ goal: 'image.batch_process: make vacation photos smaller' });
   r.policyContext.privacyPolicy = { localOnly: false, externalDisclosure: 'ALLOWED' };
   return r;
 }
@@ -49,7 +49,7 @@ function typed(input: GoalRequest): GoalProposal {
     plannerEvidence: { operationId: 'forged', modelEvidence: 'forged-model' },
     goalContract: {
       taskId: input.taskId,
-      objective: 'image.batch_process: make my vacation photos smaller',
+      objective: input.goal,
       objects: input.objects.map((object) => ({ ...object })),
       constraints: { ...input.constraints },
       privacyPolicy: input.policyContext.privacyPolicy,
@@ -160,17 +160,87 @@ describe('#212 T08-derived typed remote proposal admission, no action authority'
       localOnly: true,
       externalDisclosure: 'FORBIDDEN',
     };
-    for (const malicious of [outOfScope, policy]) {
+    const added = await admitTypedCloudProposal({
+      request: r,
+      cloud: cloud(outOfScope),
+      registry: registry(),
+      objectExists: () => true,
+    });
+    expect(added).toMatchObject({
+      status: 'PROPOSAL_NOT_READY',
+      code: 'OBJECT_RECONFIRM_REQUIRED',
+      authorizationGranted: false,
+      effectExecuted: false,
+    });
+    const changedPolicy = await admitTypedCloudProposal({
+      request: r,
+      cloud: cloud(policy),
+      registry: registry(),
+      objectExists: () => true,
+    });
+    expect(changedPolicy).toMatchObject({
+      status: 'PROPOSAL_REFUSED',
+      code: 'SCOPE_REFUSED',
+      authorizationGranted: false,
+    });
+  });
+
+  it('does not let a registered model capability silently overwrite the human objective', async () => {
+    const original = request();
+    const malicious = typed(original);
+    // The model retains all schema, task, policy and selected object fields.
+    // A registered capability id by itself does NOT authorize a new action.
+    malicious.goalContract.objective = 'image.batch_process: permanently overwrite originals';
+    const result = await admitTypedCloudProposal({
+      request: original,
+      cloud: cloud(malicious),
+      registry: registry(),
+      objectExists: () => true,
+    });
+    expect(result).toMatchObject({
+      status: 'PROPOSAL_NOT_READY',
+      code: 'INTENT_RECONFIRM_REQUIRED',
+      authorizationGranted: false,
+      effectExecuted: false,
+    });
+  });
+
+  it('keeps an ordinary model paraphrase reviewable but never auto-ready', async () => {
+    const original = request();
+    const paraphrase = typed(original);
+    paraphrase.goalContract.objective = 'image.batch_process: resize the selected photos';
+    const result = await admitTypedCloudProposal({
+      request: original,
+      cloud: cloud(paraphrase),
+      registry: registry(),
+      objectExists: () => true,
+    });
+    expect(result).toMatchObject({
+      status: 'PROPOSAL_NOT_READY',
+      code: 'INTENT_RECONFIRM_REQUIRED',
+      authorizationGranted: false,
+      effectExecuted: false,
+    });
+  });
+
+  it('does not return READY when the model omits or duplicates the user-selected objects', async () => {
+    const original = request();
+    const omitted = typed(original);
+    omitted.goalContract.objects = [];
+    const duplicated = typed(original);
+    duplicated.goalContract.objects.push({ ...duplicated.goalContract.objects[0] });
+    for (const proposal of [omitted, duplicated]) {
       const result = await admitTypedCloudProposal({
-        request: r,
-        cloud: cloud(malicious),
+        request: original,
+        cloud: cloud(proposal),
         registry: registry(),
         objectExists: () => true,
       });
       expect(result).toMatchObject({
-        status: 'PROPOSAL_REFUSED',
-        code: 'SCOPE_REFUSED',
+        status: 'PROPOSAL_NOT_READY',
+        code: 'OBJECT_RECONFIRM_REQUIRED',
         authorizationGranted: false,
+        effectExecuted: false,
       });
     }
   });
