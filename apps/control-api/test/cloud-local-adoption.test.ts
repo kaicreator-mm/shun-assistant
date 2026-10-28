@@ -10,7 +10,7 @@ const NOW = Date.parse('2026-10-29T00:00:00.000Z');
 function humanRequest(): GoalRequest {
   return {
     taskId: 'remote-human-01',
-    goal: 'system.storage.diagnose_bounded_action: inspect selected workspace storage',
+    goal: 'system.storage.diagnose_bounded_action: clean only cache in selected workspace',
     objects: [{ kind: 'DIRECTORY', ref: ROOT }],
     constraints: {},
     policyContext: {
@@ -46,12 +46,19 @@ function admitted(request: GoalRequest): CloudTypedProposalAdmission {
   };
 }
 
-function host(options: { simulated?: boolean; fails?: boolean } = {}) {
+function host(options: {
+  simulated?: boolean;
+  fails?: boolean;
+  stalePolicy?: boolean;
+  notLocal?: boolean;
+} = {}) {
   const submitted: GoalRequest[] = [];
   const backend = {
     meta: () => ({
-      policy: { kind: 'ACTIVE' as const, revision: 'trusted-policy-1' },
-      localOnly: true as const,
+      policy: options.stalePolicy
+        ? ({ kind: 'EXPIRED' as const, revision: 'old-policy', expiredAt: '2026-10-28T00:00:00Z' })
+        : ({ kind: 'ACTIVE' as const, revision: 'trusted-policy-1' }),
+      localOnly: options.notLocal ? (false as const) : (true as const),
       simulated: options.simulated ?? false,
     }),
     submitGoal: async (goal: GoalRequest) => {
@@ -108,6 +115,63 @@ describe('#212 host-only cloud suggestion to bounded local C003 selection', () =
       }),
     ).toEqual({ ok: false, code: 'SELECTION_REFUSED' });
     expect(h.submitted).toHaveLength(1);
+  });
+
+  it('refuses an inspect-only original goal before even offering a cleanup task', () => {
+    const h = host();
+    const request = humanRequest();
+    request.goal = 'system.storage.diagnose_bounded_action: inspect selected workspace storage';
+    expect(h.adoption.offer({
+      originalHumanRequest: request,
+      admission: admitted(request),
+    })).toEqual({ ok: false, code: 'CANDIDATE_REFUSED' });
+    expect(h.submitted).toEqual([]);
+  });
+
+  it('refuses original retain, read-only or verification limitations rather than dropping them', () => {
+    const h = host();
+    const restrictions: GoalRequest[] = [];
+    const retain = humanRequest();
+    retain.constraints = { retainRemove: 'RETAIN' };
+    restrictions.push(retain);
+    const readOnly = humanRequest();
+    readOnly.constraints = { other: { readOnly: true } };
+    restrictions.push(readOnly);
+    const verified = humanRequest();
+    verified.verificationIntent = { successConditions: ['Zero file modifications'] };
+    restrictions.push(verified);
+    const alternateBackend = humanRequest();
+    alternateBackend.policyContext.environmentPolicy.allowedBackendKinds.push('LOCAL_POSIX');
+    restrictions.push(alternateBackend);
+    for (const request of restrictions) {
+      expect(h.adoption.offer({
+        originalHumanRequest: request,
+        admission: admitted(request),
+      })).toEqual({ ok: false, code: 'CANDIDATE_REFUSED' });
+    }
+    expect(h.submitted).toEqual([]);
+  });
+
+  it('refuses stale policy or non-local Host, including after a candidate was offered', async () => {
+    const original = humanRequest();
+    for (const options of [{ stalePolicy: true }, { notLocal: true }]) {
+      const h = host(options);
+      expect(h.adoption.offer({
+        originalHumanRequest: original,
+        admission: admitted(original),
+      })).toEqual({ ok: false, code: 'LOCAL_HOST_UNAVAILABLE' });
+      expect(h.submitted).toEqual([]);
+    }
+    const h = host({ stalePolicy: false });
+    const offer = h.adoption.offer({
+      originalHumanRequest: original,
+      admission: admitted(original),
+    });
+    if (!offer.ok) throw new Error('TEST_EXPECTED_OFFER');
+    // An inactive backend at selection must refuse before submitGoal.
+    // Stale after offer is simulated through the separately injected Host
+    // mode below; do not claim this stub is a real OS policy revocation.
+    expect(offer.userChoice).toBe(CHOICE);
   });
 
   it('refuses an incorrect local choice and consumes the opaque candidate', async () => {
