@@ -46,18 +46,15 @@ function admitted(request: GoalRequest): CloudTypedProposalAdmission {
   };
 }
 
-function host(options: {
-  simulated?: boolean;
-  fails?: boolean;
-  stalePolicy?: boolean;
-  notLocal?: boolean;
-} = {}) {
+function host(
+  options: { simulated?: boolean; fails?: boolean; stalePolicy?: boolean; notLocal?: boolean } = {},
+) {
   const submitted: GoalRequest[] = [];
   const backend = {
     meta: () => ({
       policy: options.stalePolicy
-        ? ({ kind: 'EXPIRED' as const, revision: 'old-policy', expiredAt: '2026-10-28T00:00:00Z' })
-        : ({ kind: 'ACTIVE' as const, revision: 'trusted-policy-1' }),
+        ? { kind: 'EXPIRED' as const, revision: 'old-policy', expiredAt: '2026-10-28T00:00:00Z' }
+        : { kind: 'ACTIVE' as const, revision: 'trusted-policy-1' },
       localOnly: options.notLocal ? (false as const) : (true as const),
       simulated: options.simulated ?? false,
     }),
@@ -121,10 +118,12 @@ describe('#212 host-only cloud suggestion to bounded local C003 selection', () =
     const h = host();
     const request = humanRequest();
     request.goal = 'system.storage.diagnose_bounded_action: inspect selected workspace storage';
-    expect(h.adoption.offer({
-      originalHumanRequest: request,
-      admission: admitted(request),
-    })).toEqual({ ok: false, code: 'CANDIDATE_REFUSED' });
+    expect(
+      h.adoption.offer({
+        originalHumanRequest: request,
+        admission: admitted(request),
+      }),
+    ).toEqual({ ok: false, code: 'CANDIDATE_REFUSED' });
     expect(h.submitted).toEqual([]);
   });
 
@@ -144,10 +143,12 @@ describe('#212 host-only cloud suggestion to bounded local C003 selection', () =
     alternateBackend.policyContext.environmentPolicy.allowedBackendKinds.push('LOCAL_POSIX');
     restrictions.push(alternateBackend);
     for (const request of restrictions) {
-      expect(h.adoption.offer({
-        originalHumanRequest: request,
-        admission: admitted(request),
-      })).toEqual({ ok: false, code: 'CANDIDATE_REFUSED' });
+      expect(
+        h.adoption.offer({
+          originalHumanRequest: request,
+          admission: admitted(request),
+        }),
+      ).toEqual({ ok: false, code: 'CANDIDATE_REFUSED' });
     }
     expect(h.submitted).toEqual([]);
   });
@@ -156,10 +157,12 @@ describe('#212 host-only cloud suggestion to bounded local C003 selection', () =
     const original = humanRequest();
     for (const options of [{ stalePolicy: true }, { notLocal: true }]) {
       const h = host(options);
-      expect(h.adoption.offer({
-        originalHumanRequest: original,
-        admission: admitted(original),
-      })).toEqual({ ok: false, code: 'LOCAL_HOST_UNAVAILABLE' });
+      expect(
+        h.adoption.offer({
+          originalHumanRequest: original,
+          admission: admitted(original),
+        }),
+      ).toEqual({ ok: false, code: 'LOCAL_HOST_UNAVAILABLE' });
       expect(h.submitted).toEqual([]);
     }
     const policy = { stalePolicy: false };
@@ -170,15 +173,15 @@ describe('#212 host-only cloud suggestion to bounded local C003 selection', () =
     });
     if (!offer.ok) throw new Error('TEST_EXPECTED_OFFER');
     policy.stalePolicy = true;
-    expect(
-      await h.adoption.select({ candidateId: offer.candidateId, userChoice: CHOICE }),
-    ).toEqual({ ok: false, code: 'LOCAL_HOST_UNAVAILABLE' });
+    expect(await h.adoption.select({ candidateId: offer.candidateId, userChoice: CHOICE })).toEqual(
+      { ok: false, code: 'LOCAL_HOST_UNAVAILABLE' },
+    );
     expect(h.submitted).toEqual([]);
     // The opaque one-use selection cannot be replayed after policy recovery.
     policy.stalePolicy = false;
-    expect(
-      await h.adoption.select({ candidateId: offer.candidateId, userChoice: CHOICE }),
-    ).toEqual({ ok: false, code: 'SELECTION_REFUSED' });
+    expect(await h.adoption.select({ candidateId: offer.candidateId, userChoice: CHOICE })).toEqual(
+      { ok: false, code: 'SELECTION_REFUSED' },
+    );
   });
 
   it('refuses an incorrect local choice and consumes the opaque candidate', async () => {
