@@ -79,8 +79,14 @@ export function installSignedCore({ stageDir, publicKeyPath, trustedSpkiPin, lay
   const root = resolve(layout.root);
   assertContained(root, resolve(layout.core));
   assertContained(root, resolve(layout.state));
-  if (root === source || relative(root, source).startsWith(`..${sep}`) === false &&
-      relative(root, source) !== '..' && relative(root, source) !== '') refuse();
+  // The staging tree and the installed app root must be disjoint; never
+  // recursively copy a directory into itself (or replace a staging parent).
+  const sourceFromRoot = relative(root, source);
+  const rootFromSource = relative(source, root);
+  const within = (relativePath) =>
+    relativePath === '' || (relativePath !== '..' &&
+      !relativePath.startsWith(`..${sep}`) && !isAbsolute(relativePath));
+  if (within(sourceFromRoot) || within(rootFromSource)) refuse();
 
   verifyBundle(source, publicKeyPath, trustedSpkiPin);
   // A self-contained Core staging artifact must be runnable without user
