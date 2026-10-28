@@ -13,11 +13,13 @@ function registry() {
   return ShunRegistry.fromSnapshot({
     capabilities: [capabilityDef({ capabilityId: 'image.batch_process' })],
     providers: [providerDef({ providerId: 'imageProvider.imagemagick' })],
-    bindings: [bindingDef({
-      bindingId: 'b-im',
-      providerId: 'imageProvider.imagemagick',
-      capabilityId: 'image.batch_process',
-    })],
+    bindings: [
+      bindingDef({
+        bindingId: 'b-im',
+        providerId: 'imageProvider.imagemagick',
+        capabilityId: 'image.batch_process',
+      }),
+    ],
     environment: {
       environmentId: 'env',
       backendKind: 'LOCAL_WINDOWS',
@@ -61,8 +63,10 @@ function cloud(response: unknown, enabled = true) {
   let calls = 0;
   return {
     status: () => ({
-      enabled, provider: 'deepseek' as const,
-      model: 'deepseek-flash' as const, osConsentRequired: true as const,
+      enabled,
+      provider: 'deepseek' as const,
+      model: 'deepseek-flash' as const,
+      osConsentRequired: true as const,
     }),
     interpretGoal: async (_goal: string) => {
       calls++;
@@ -85,10 +89,16 @@ describe('#212 T08-derived typed remote proposal admission, no action authority'
     const r = request();
     r.policyContext.privacyPolicy.localOnly = true;
     const model = cloud(typed(r));
-    const result = await admitTypedCloudProposal({ request: r, cloud: model, registry: registry() });
+    const result = await admitTypedCloudProposal({
+      request: r,
+      cloud: model,
+      registry: registry(),
+    });
     expect(result).toMatchObject({
-      status: 'PROPOSAL_REFUSED', code: 'SCOPE_REFUSED',
-      effectExecuted: false, authorizationGranted: false,
+      status: 'PROPOSAL_REFUSED',
+      code: 'SCOPE_REFUSED',
+      effectExecuted: false,
+      authorizationGranted: false,
     });
     expect(model.calls()).toBe(0);
   });
@@ -96,7 +106,11 @@ describe('#212 T08-derived typed remote proposal admission, no action authority'
   it('rejects disabled trusted host before model invocation', async () => {
     const r = request();
     const model = cloud(typed(r), false);
-    const result = await admitTypedCloudProposal({ request: r, cloud: model, registry: registry() });
+    const result = await admitTypedCloudProposal({
+      request: r,
+      cloud: model,
+      registry: registry(),
+    });
     expect(result.status).toBe('PROPOSAL_REFUSED');
     expect(model.calls()).toBe(0);
   });
@@ -105,7 +119,10 @@ describe('#212 T08-derived typed remote proposal admission, no action authority'
     const r = request();
     const model = cloud(typed(r));
     const result = await admitTypedCloudProposal({
-      request: r, cloud: model, registry: registry(), objectExists: () => true,
+      request: r,
+      cloud: model,
+      registry: registry(),
+      objectExists: () => true,
     });
     expect(model.calls()).toBe(1);
     expect(result.status).toBe('TYPED_PROPOSAL_ONLY');
@@ -122,11 +139,14 @@ describe('#212 T08-derived typed remote proposal admission, no action authority'
   it('refuses raw prose rather than creating a typed goal from arbitrary model text', async () => {
     const r = request();
     const result = await admitTypedCloudProposal({
-      request: r, cloud: cloud('please run a shell command to clean C:'),
+      request: r,
+      cloud: cloud('please run a shell command to clean C:'),
       registry: registry(),
     });
     expect(result).toMatchObject({
-      status: 'PROPOSAL_REFUSED', code: 'SCHEMA_REFUSED', effectExecuted: false,
+      status: 'PROPOSAL_REFUSED',
+      code: 'SCHEMA_REFUSED',
+      effectExecuted: false,
     });
     expect(JSON.stringify(result)).not.toContain('shell command');
   });
@@ -137,15 +157,19 @@ describe('#212 T08-derived typed remote proposal admission, no action authority'
     outOfScope.goalContract.objects.push({ kind: 'DIRECTORY', ref: 'D:\\private' });
     const policy = typed(r);
     policy.goalContract.privacyPolicy = {
-      localOnly: true, externalDisclosure: 'FORBIDDEN',
+      localOnly: true,
+      externalDisclosure: 'FORBIDDEN',
     };
     for (const malicious of [outOfScope, policy]) {
       const result = await admitTypedCloudProposal({
-        request: r, cloud: cloud(malicious),
-        registry: registry(), objectExists: () => true,
+        request: r,
+        cloud: cloud(malicious),
+        registry: registry(),
+        objectExists: () => true,
       });
       expect(result).toMatchObject({
-        status: 'PROPOSAL_REFUSED', code: 'SCOPE_REFUSED',
+        status: 'PROPOSAL_REFUSED',
+        code: 'SCOPE_REFUSED',
         authorizationGranted: false,
       });
     }
@@ -154,11 +178,15 @@ describe('#212 T08-derived typed remote proposal admission, no action authority'
   it('keeps a valid typed model proposal NOT_READY when observed object proof is absent', async () => {
     const r = request();
     const result = await admitTypedCloudProposal({
-      request: r, cloud: cloud(typed(r)), registry: registry(),
+      request: r,
+      cloud: cloud(typed(r)),
+      registry: registry(),
     });
     expect(result).toMatchObject({
-      status: 'PROPOSAL_NOT_READY', code: 'UNRESOLVED',
-      authorizationGranted: false, effectExecuted: false,
+      status: 'PROPOSAL_NOT_READY',
+      code: 'UNRESOLVED',
+      authorizationGranted: false,
+      effectExecuted: false,
     });
   });
 });
