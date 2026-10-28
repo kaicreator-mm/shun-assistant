@@ -70,7 +70,7 @@ shun-assistant/                # existing pnpm monorepo (Node >=24)
 
 Generate *only* three workspace package manifests, minimal TypeScript configs, empty non-effectful module entrypoints and contracts derived from **actual selected** SDK public exports, plus one Node24 test verifying a clean public import; keep all adapters `NOT_IMPLEMENTED` and no-op **only where no side effects are possible**. No fake permit, mock authorized Windows effect or stale v0.10.2 selected ABI declared v0.10.3.
 
-T00 may select *published package* by exact qualified tarball/SHA after upstream Release, or developer snapshot by verified source SHA and independently built local package artifacts; **never** publish an unqualified `0.10.2-rc.0` as npm v0.10.3. The imported dependencies are:
+**T00 SDK dependency is now qualified Git source, NOT a missing upstream release.** Pin `kaicreator-mm/domain-harness` Git tag `v0.10.3` at exact main/tag SHA `061376f4a023070f215f9feffad5c24d96d503cb`, source tree `099cdc831aef63befd62aaede7e7a853d1be468f` (identical to reviewed candidate `7d571858bd6524ffd13a7985227183dbecb2924a`). Release Qualification is CONDITIONAL Git-source-only (RQ P0/P1/P2=0/0/3); npm v0.10.3 was NOT published, package workspace manifests are still versioned `0.10.2-rc.0`. Build/pack four public SDK workspace packages **locally from this exact tag**, install pinned pack artifacts with SHA256 into an isolated Node>=24 consumer; never resolve them as supposedly public npm `v0.10.3`. Avoid relying on `docs/current`/default Skill (still v0.10.2); use `docs/guides/v0.10.3` and tag-qualified exports. This is now a deterministic T00 acceptance obligation, not a reason to wait. The imported dependencies are:
 ```text
 @kaicreator/domain-harness-contracts
 @kaicreator/domain-harness-build     # BUILD producer only
@@ -94,11 +94,13 @@ Package metadata must not add postinstall/install scripts, privileged effects, d
 
 ## 2. Scaffold effect/safety guardrails
 
-- **No executable public App** is available before T09/T11; the Scaffold is structural proof, not a bypass execution path.
+- **No executable public App** is available before T09/T11; the Scaffold is structural proof, not a bypass execution path. The qualified upstream Git tag itself does NOT prove the Shun packed/installed external consumer succeeded.
 - **No second K, no second effect Journal, no arbitrary code evaluation, no execution via chat/LLM advisory, no automatic permission, no broad install commands.**
 - **No file copy or migration of private ShunStore/Windows user data.** Existing v0.2 modules remain in place.
 - Source subdirectories are reserved by concern; task code must not edit sibling manifest/export/entrypoint. Composition/build `packages/domain-app/src/build/**` and `src/index.ts` have separate owners.
 - CI tests run on Node 24; **actual compiler/pack/install result** must use the exact Node24 and SDK source. The plan itself has `EXIT=NOT_RUN`, never PASS.
+
+**Known published SDK safety limitation (#1437):** raw untrusted `DomainApp.send()` may write K Effect Journal before rejecting malformed Case input. T09 creates one pre-send trusted Control API source/Case gateway; T11 owns route wiring without a second raw-send. T00 must **not** expose `DomainApp.send` to callers, invent a recovery API, mark a malformed Case safe to replay or confuse a poisoned Case with a no-effect guarantee. Later negative tests show malformed Case rejected with **zero calls into the facade** and zero K Effect Journal rows; next valid same Case permitted only under genuine authorization.
 
 ## 3. ADS §2.4A scaffold admission (mandatory, current fail-closed)
 
