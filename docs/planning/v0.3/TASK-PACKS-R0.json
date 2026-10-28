@@ -7,7 +7,7 @@
   "product_proposal_pr": 215,
   "product_proposal_head": "4c2f8e84b6e6f3f5b526e52d01356159f2dce0e7",
   "product_freeze": "YES_EXPLICIT_PRODUCT_OWNER_ISSUE214_6477255283_CHECKPOINT_C8334C7723EECF7FBBB6895B1DEFD6439EDC6B95",
-  "l2_freeze": null,
+  "l2_freeze": "YES_ARCHITECTURE_OWNER_EXACT_BLOB_8c555aff66d3006a1dbd4fb523e350f70c5db490_VERSION_CHECKPOINT_3358080bd8fabd097347ef6df12f9b7e9b223fd0",
   "domain_harness_contract": "v0.10.3_GIT_TAG_MAIN_061376f4a023070f215f9feffad5c24d96d503cb_TREE_099cdc831aef63befd62aaede7e7a853d1be468f",
   "sdk_release_qualified": "CONDITIONAL_GIT_SOURCE_ONLY_P0_0_P1_0_P2_3_NPM_UNPUBLISHED",
   "initial_version_base": "f01233a002f65b9bfea04828f6e56914666a160a",
@@ -186,8 +186,8 @@
         "direct effect without Kernel and Host authorization"
       ],
       "acceptance": {
-        "positive": "Selected DH capability-llm-openai-compatible llm.openai.generate C imports only static domain-harness-openai-host.generate; Shun Host adapter injects existing TrustedCloudInterpreter.interpretGoal via trusted T11 wiring, not optional createOpenAIHostClient; existing TrustedDeepSeekTransport passes identical canonical Buffer with thinking:{type:'disabled'} to ledger.reserve, markMayHaveSent and sole fetch; strict neutral DTO single user goal/outputFormat text, no extra options; real zero-paid Host/C boundary test",
-        "negative": "Changed model/messages/options, injected system prompt/tool/schema/temperature, stale signed consent/price/scope, missing broker, duplicate attempt, unapproved disclosure all zero HTTP; no selected-C bypass, no second SDK client HTTP; any ambiguous REMOTE_REFUSED without documented zero-send maps to K UNKNOWN and preserves UNKNOWN_COST, no blind retry/refund; B040 never forwarded"
+        "positive": "Selected DH capability-llm-openai-compatible llm.openai.generate C imports only static domain-harness-openai-host.generate; Shun Host adapter injects existing TrustedCloudInterpreter.interpretGoal via trusted T11 wiring, not optional createOpenAIHostClient; existing TrustedDeepSeekTransport passes identical canonical Buffer with thinking:{type:'disabled'} to ledger.reserve, markMayHaveSent and sole fetch; strict neutral DTO single user goal/outputFormat text, no extra options; real zero-paid Host/C boundary test; real selected C→Shun trusted Host fake-HTTP zero-paid contract MUST prove each neutral request maxOutputTokens is honored by actual approved sender's <= configured ceiling OR explicitly rejected before sending, and deadlineUnixMs is enforced so effective timeout never silently exceeds remaining approved deadline; exact completed/refused/failed/unknown result mapping at both selected C and Kernel/UI surfaces, no false terminal success",
+        "negative": "Changed model/messages/options, injected system prompt/tool/schema/temperature, stale signed consent/price/scope, missing broker, duplicate attempt, unapproved disclosure all zero HTTP; no selected-C bypass, no second SDK client HTTP; any ambiguous REMOTE_REFUSED without documented zero-send maps to K UNKNOWN and preserves UNKNOWN_COST, no blind retry/refund; B040 never forwarded; unsupported maxOutputTokens/deadline or already expired deadline => zero HTTP before ledger MAY_HAVE_SENT; duplicate requestId NEVER mints approval/idempotency or replaces the durable original Shun attempt/nonce; failed/refused/unknown never reclassified as completed, unknown K fence + UNKNOWN_COST retained without blind retry, refund or alternate sender"
       },
       "merge_target": "version/v0.3.0",
       "source_authority": "PENDING_SHUN_PRODUCT_L2_AND_NATIVE_TASK_DAG_FREEZE",
@@ -434,8 +434,8 @@
         "direct effect without Kernel and Host authorization"
       ],
       "acceptance": {
-        "positive": "one installed selected K/Host Windows flow + DeepSeek proposal/Guided Journey/Meta connected; CN/EN equivalent scope/approval/refusal and B-040 zero-egress support report; T04 host port wired from actual cloud-interpret.ts singleton with canonical exact bytes and no extra SDK HTTP sender; only approved T09 gateway forwards to selected K public send, never export unrestricted DomainApp.send to UI/HTTP",
-        "negative": "double journal, wrong scope, unchecked SDK package, unapproved promotion, fake host PASS reject; support-context accidental remote forwarding and non-equivalent locale approval reject; prohibited second WorkflowEffectJournal alongside K for identical Case; preserved ShunStore business writes must not be mislabeled second Kernel Journal; raw public send bypass, poisoned Case reuse/retry after failed effect or QUERY_NOT_FOUND as write permit rejected"
+        "positive": "one installed selected K/Host Windows flow + DeepSeek proposal/Guided Journey/Meta connected; CN/EN equivalent scope/approval/refusal and B-040 zero-egress support report; T04 host port wired from actual cloud-interpret.ts singleton with canonical exact bytes and no extra SDK HTTP sender; only approved T09 gateway forwards to selected K public send, never export unrestricted DomainApp.send to UI/HTTP; actual selected-C binding must demonstrably propagate T04 maxOutputTokens/deadlineUnixMs and completed/refused/failed/unknown semantic status into trusted Control API/UI without double-sending; verify one immutable approved request Buffer and original ledger/consent journey",
+        "negative": "double journal, wrong scope, unchecked SDK package, unapproved promotion, fake host PASS reject; support-context accidental remote forwarding and non-equivalent locale approval reject; prohibited second WorkflowEffectJournal alongside K for identical Case; preserved ShunStore business writes must not be mislabeled second Kernel Journal; raw public send bypass, poisoned Case reuse/retry after failed effect or QUERY_NOT_FOUND as write permit rejected; late/expired per-request deadline, unhonored token ceiling and refused/failed/unknown mislabeled as UI completed must block acceptance, not rely on mocked Host PASS or old string-only CloudInterpretPort"
       },
       "merge_target": "version/v0.3.0",
       "source_authority": "PENDING_SHUN_PRODUCT_L2_AND_NATIVE_TASK_DAG_FREEZE",
@@ -467,8 +467,8 @@
         "direct effect without Kernel and Host authorization"
       ],
       "acceptance": {
-        "positive": "actual selected SDK package, Windows critical journeys, real CN/EN DeepSeek as required, recipe/JIT, forms, meta, recovery; actual tag-pinned pack/install + real selected K/Host positive source-gateway invalid-then-valid same-Case evidence",
-        "negative": "UNKNOWN as success, secret leak, stale grant, duplicate Windows effect, zero calls proof where denied; invalid Case must yield sendCallCount=0 and K Effect Journal=0 before successful next valid same-Case, not merely post-handler refusal"
+        "positive": "actual selected SDK package, Windows critical journeys, real CN/EN DeepSeek as required, recipe/JIT, forms, meta, recovery; actual tag-pinned pack/install + real selected K/Host positive source-gateway invalid-then-valid same-Case evidence; independently replay T04/T11 zero-paid selected packed C/Host tests on final candidate exact source covering approved per-request maxOutputTokens/deadlineUnixMs and all completed/refused/failed/unknown statuses, alongside existing paid-call scope if separately authorized",
+        "negative": "UNKNOWN as success, secret leak, stale grant, duplicate Windows effect, zero calls proof where denied; invalid Case must yield sendCallCount=0 and K Effect Journal=0 before successful next valid same-Case, not merely post-handler refusal; an expired deadline sending HTTP, a DTO maxOutputTokens overrun, duplicate requestId as permission, any refused/failed/unknown reported completed or UNKNOWN_COST auto-refund MUST fail integrated qualification"
       },
       "merge_target": "version/v0.3.0",
       "source_authority": "PENDING_SHUN_PRODUCT_L2_AND_NATIVE_TASK_DAG_FREEZE",
@@ -603,13 +603,13 @@
   ],
   "product_independent_r1": "BLOCK_P1_B040_P2_REBASE_UI_OLD_SHA",
   "product_independent_r2": "PASS_P0_0_P1_0_P2_0_EXACT_4c2f8e84",
-  "task_update_note": "R1 P1 B-040 added within existing T02, preserving exactly 14 nodes/22 edges and unchanged write ownership. CN/EN UI clarified in T10/T11. Planning only. L2 source review corrected Store business-data receipt vs old WorkflowEffectJournal; no extra tasks/edges. Product Owner frozen version source; U03 selects single public DH C/Host send after private ledger/approval; all Task source Claim gates stay not admitted. L2 R1 P1/U03 reuses original trusted exact-body transport behind public selected C Host instead of SDK OpenAI client; P2 thinking:disabled retained. Unchanged 14 nodes/22 edges/write ownership. DomainHarness v0.10.3 Git tag MAIN 061376/tree099cdc published CONDITIONAL source-only; npm not published/manifest0.10.2-rc.0. T00 pack/install local Git-tag public packages. Upstream #1437 raw-send poisoned Case limitation becomes existing T09/T11 pre-send gateway + V01 negative, not a new DAG node.",
+  "task_update_note": "R1 P1 B-040 added within existing T02, preserving exactly 14 nodes/22 edges and unchanged write ownership. CN/EN UI clarified in T10/T11. Planning only. L2 source review corrected Store business-data receipt vs old WorkflowEffectJournal; no extra tasks/edges. Product Owner frozen version source; U03 selects single public DH C/Host send after private ledger/approval; all Task source Claim gates stay not admitted. L2 R1 P1/U03 reuses original trusted exact-body transport behind public selected C Host instead of SDK OpenAI client; P2 thinking:disabled retained. Unchanged 14 nodes/22 edges/write ownership. DomainHarness v0.10.3 Git tag MAIN 061376/tree099cdc published CONDITIONAL source-only; npm not published/manifest0.10.2-rc.0. T00 pack/install local Git-tag public packages. Upstream #1437 raw-send poisoned Case limitation becomes existing T09/T11 pre-send gateway + V01 negative, not a new DAG node. DAG independent #218 R1 at frozen version 3358080 BLOCK P0/P1/P2=0/1/1: retain 14 nodes/22 edges/write sets and patch only T04/T11/V01 real zero-paid per-call maxOutputTokens, deadlineUnixMs, requestId and terminal-status mapping hard predicates; restore true L2 owner-frozen metadata. Pending new exact-SHA independent DAG R2 and separate DAG Owner Freeze; no native Issues or source Claims.",
   "product_reviewed_head": "4c2f8e84b6e6f3f5b526e52d01356159f2dce0e7",
   "product_reviewed_blob": "f062b7f2c3dc3bf4aeeb7594ab5c2bc75b34d0ab",
   "l1_reviewed_blob": "4c703c3f0c283f4d3918babef8f87f56869698e5",
-  "l2_architecture_r1": "NOT_RUN",
+  "l2_architecture_r1": "BLOCK_P0_0_P1_1_P2_1_EXACT_e081645a2d178db424e1f5bfda5950773f479434",
   "l2_independent_r1": "BLOCK_P0_0_P1_1_P2_1_EXACT_e081645a2d178db424e1f5bfda5950773f479434",
-  "l2_independent_r2": "NOT_RUN",
+  "l2_independent_r2": "PASS_P0_0_P1_0_P2_2_EXACT_ce6846021056ef5f89f8009ceeccec58c359d745",
   "l2_u03_disposition": "DESIGN_STATIC_EXISTING_EXACT_BYTE_SENDER_AS_SELECTED_DH_C_TRUSTED_HOST__ADAPTER_ZERO_PAID_TEST_PENDING_T04",
   "sdk_tag": "v0.10.3",
   "sdk_tag_commit": "061376f4a023070f215f9feffad5c24d96d503cb",
@@ -617,5 +617,12 @@
   "sdk_qualified_version_parent": "7d571858bd6524ffd13a7985227183dbecb2924a",
   "sdk_public_npm_0_10_3": "NOT_PUBLISHED",
   "sdk_workspace_manifest_version": "0.10.2-rc.0",
-  "sdk_shun_external_consumer": "NOT_RUN"
+  "sdk_shun_external_consumer": "NOT_RUN",
+  "l2_freeze_document": "docs/architecture/v0.3/L2-FREEZE.md",
+  "l2_freeze_checkpoint_blob": "2f1601de193ad79c12bd3ccd660039836bac56f9",
+  "l2_frozen_source_blob": "8c555aff66d3006a1dbd4fb523e350f70c5db490",
+  "l2_owner_approval_issue_comment": "kaicreator-mm/shun-assistant#217:6478493811",
+  "l2_version_checkpoint": "3358080bd8fabd097347ef6df12f9b7e9b223fd0",
+  "task_dag_independent_r1": "BLOCK_P0_0_P1_1_P2_1_EXACT_3358080bd8fabd097347ef6df12f9b7e9b223fd0",
+  "task_dag_owner_freeze": "NOT_AUTHORIZED"
 }
