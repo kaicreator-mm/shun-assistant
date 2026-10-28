@@ -1,0 +1,621 @@
+{
+  "schema": "shun/v0.3/provisional-task-packs-r0",
+  "authority": "DOCUMENT_PROPOSAL_ONLY_NOT_FROZEN_NOT_NATIVE_DAG",
+  "version": "v0.3.0",
+  "ads_qualified_source": "2c395c55569fe2edf3f4135f12d3d069e526d0b7",
+  "effective_pin_in_repo": "4.13.1_NOT_UPGRADED",
+  "product_proposal_pr": 215,
+  "product_proposal_head": "4c2f8e84b6e6f3f5b526e52d01356159f2dce0e7",
+  "product_freeze": "YES_EXPLICIT_PRODUCT_OWNER_ISSUE214_6477255283_CHECKPOINT_C8334C7723EECF7FBBB6895B1DEFD6439EDC6B95",
+  "l2_freeze": null,
+  "domain_harness_contract": "v0.10.3_GIT_TAG_MAIN_061376f4a023070f215f9feffad5c24d96d503cb_TREE_099cdc831aef63befd62aaede7e7a853d1be468f",
+  "sdk_release_qualified": "CONDITIONAL_GIT_SOURCE_ONLY_P0_0_P1_0_P2_3_NPM_UNPUBLISHED",
+  "initial_version_base": "f01233a002f65b9bfea04828f6e56914666a160a",
+  "live_native_issue_dependencies": "NOT_MATERIALIZED",
+  "scaffold_source_status": "NOT_CREATED",
+  "rules": {
+    "scaffold_admission": "ADS §2.4A only after frozen Product/L2, effective qualified standard, source planning authorization, accepted CAS Builder Claim and native currentness; default T00 post-DAG",
+    "native_issue_edges": "MUST_WRITE_AND_READ_BACK_BEFORE_DISPATCH",
+    "single_writers": "one task/one disjoint protected source write-set; central export and lockfile T11 only",
+    "sdk_rule": "Use released Git-only v0.10.3 tag exact SHA/tree, build/pack four public SDK workspaces locally, install content-addressed tarballs in isolated Node>=24 Shun consumer; do NOT assume npm v0.10.3 or active docs/current; record exact tarball hashes and Q limits.",
+    "release_rule": "No v0.3 effect/merge/release claims from proposal docs"
+  },
+  "counts": {
+    "nodes": 14,
+    "edges": 22
+  },
+  "tasks": [
+    {
+      "id": "T00",
+      "concern": "3-package domain scaffold + exact public DH v0.10.3 source-only import smoke",
+      "stage": "PLANNED_PROVISIONAL_NOT_DISPATCHABLE",
+      "blocked_by_planned": [],
+      "role": "LOCAL_BUILDER",
+      "execution_environment": "WEB_BUILD_OR_LOCAL",
+      "review_policy": "required",
+      "allowed_write_set": [
+        "packages/domain-computer/package.json",
+        "packages/domain-computer/tsconfig.json",
+        "packages/domain-computer/src/contracts/**",
+        "packages/domain-host/package.json",
+        "packages/domain-host/tsconfig.json",
+        "packages/domain-app/package.json",
+        "packages/domain-app/tsconfig.json",
+        "tests/integration/v03/t00-scaffold/**"
+      ],
+      "forbidden": [
+        "version/v0.2.0",
+        "main",
+        "SDK private imports",
+        "protected user data and credentials",
+        "sibling Task write sets",
+        "direct effect without Kernel and Host authorization"
+      ],
+      "acceptance": {
+        "positive": "Build/pack real four public SDK workspaces from immutable v0.10.3 Git tag 061376f4 / tree 099cdc83, record SHA256 tarball identities and install in independent clean Node>=24 consumer; verify actual public imports/selected external BUILD separate from App runtime, no side effects; do not call npm published v0.10.3",
+        "negative": "private SDK deep imports or unselected Provider fail; absent Claim no source write; mistaken resolution of npm public v0.10.3 / active docs-current v0.10.2, postinstall network, unsigned tarball or opaque private import must refuse"
+      },
+      "merge_target": "version/v0.3.0",
+      "source_authority": "PENDING_SHUN_PRODUCT_L2_AND_NATIVE_TASK_DAG_FREEZE",
+      "validation": "SCOPED_POSITIVE_NEGATIVE+EXACT_SHA_ACTUAL_CI_AND_HOST_WHERE_REQUIRED",
+      "claim": "NOT_CREATED",
+      "branch": "JIT_only_task/v0.3.0-t00",
+      "fallback": "HOLD_AND_REPORT_ONLY_WHEN_SOURCE_OR_CLAIM_UNQUALIFIED"
+    },
+    {
+      "id": "T01",
+      "concern": "Windows Host authorization/currentness and preserve ShunStore business-data application semantics; migrate old workflow journal ownership",
+      "stage": "PLANNED_PROVISIONAL_NOT_DISPATCHABLE",
+      "blocked_by_planned": [
+        "T00"
+      ],
+      "role": "LOCAL_BUILDER",
+      "execution_environment": "WEB_PLUS_CI_OR_LOCAL",
+      "review_policy": "required",
+      "allowed_write_set": [
+        "packages/domain-host/src/windows/**",
+        "packages/domain-host/src/state/**",
+        "tests/integration/v03/t01-host/**"
+      ],
+      "forbidden": [
+        "version/v0.2.0",
+        "main",
+        "SDK private imports",
+        "protected user data and credentials",
+        "sibling Task write sets",
+        "direct effect without Kernel and Host authorization"
+      ],
+      "acceptance": {
+        "positive": "real K-issued Permit + Shun ActionController.authorizeEffect/current OS authority on same bounded effect; preserve ShunStore business records and transactional apply(effectId) idempotency; retire old WorkflowEffectJournal as active dispatcher for migrated Case; selected public K→C adapter must call real ActionController.authorizeEffect immediately before actual Windows effect",
+        "negative": "fake K permit, stale path/grant, two active workflow dispatchers for same effect, mismatched effectId/payload, uncertain replay; no physical effect without both guards"
+      },
+      "merge_target": "version/v0.3.0",
+      "source_authority": "PENDING_SHUN_PRODUCT_L2_AND_NATIVE_TASK_DAG_FREEZE",
+      "validation": "SCOPED_POSITIVE_NEGATIVE+EXACT_SHA_ACTUAL_CI_AND_HOST_WHERE_REQUIRED",
+      "claim": "NOT_CREATED",
+      "branch": "JIT_only_task/v0.3.0-t01",
+      "fallback": "HOLD_AND_REPORT_ONLY_WHEN_SOURCE_OR_CLAIM_UNQUALIFIED"
+    },
+    {
+      "id": "T02",
+      "concern": "Windows diagnostics + frozen B-040 local support-context read-only B and selected-folder observations",
+      "stage": "PLANNED_PROVISIONAL_NOT_DISPATCHABLE",
+      "blocked_by_planned": [
+        "T00"
+      ],
+      "role": "LOCAL_BUILDER",
+      "execution_environment": "WEB_PLUS_CI_OR_LOCAL",
+      "review_policy": "required",
+      "allowed_write_set": [
+        "packages/domain-computer/src/computer/**",
+        "tests/integration/v03/t02-computer/**"
+      ],
+      "forbidden": [
+        "version/v0.2.0",
+        "main",
+        "SDK private imports",
+        "protected user data and credentials",
+        "sibling Task write sets",
+        "direct effect without Kernel and Host authorization"
+      ],
+      "acceptance": {
+        "positive": "offline real OS/folder diagnosis plus original collectWindowsSupportContext/minimizeSupportContext path retaining shun.support-context.v1 localOnly:true externalDisclosures:[] with no model dependency",
+        "negative": "arbitrary root, forged observation, malformed DTO; B-040 env/process args/secret/sensitive path/unrelated body leak, automatic LLM/Meta/error/SDK issue forwarding or network egress all rejected"
+      },
+      "merge_target": "version/v0.3.0",
+      "source_authority": "PENDING_SHUN_PRODUCT_L2_AND_NATIVE_TASK_DAG_FREEZE",
+      "validation": "SCOPED_POSITIVE_NEGATIVE+EXACT_SHA_ACTUAL_CI_AND_HOST_WHERE_REQUIRED",
+      "claim": "NOT_CREATED",
+      "branch": "JIT_only_task/v0.3.0-t02",
+      "fallback": "HOLD_AND_REPORT_ONLY_WHEN_SOURCE_OR_CLAIM_UNQUALIFIED"
+    },
+    {
+      "id": "T03",
+      "concern": "Typed Goal/Proposal semantic S and registered capability selection",
+      "stage": "PLANNED_PROVISIONAL_NOT_DISPATCHABLE",
+      "blocked_by_planned": [
+        "T00"
+      ],
+      "role": "LOCAL_BUILDER",
+      "execution_environment": "WEB_PLUS_CI_OR_LOCAL",
+      "review_policy": "required",
+      "allowed_write_set": [
+        "packages/domain-computer/src/semantic/**",
+        "tests/integration/v03/t03-semantic/**"
+      ],
+      "forbidden": [
+        "version/v0.2.0",
+        "main",
+        "SDK private imports",
+        "protected user data and credentials",
+        "sibling Task write sets",
+        "direct effect without Kernel and Host authorization"
+      ],
+      "acceptance": {
+        "positive": "Shun existing strict schema and provenance mapping to chosen S/B",
+        "negative": "model widening selected folder, fake evidence, undeclared command/grant rejected"
+      },
+      "merge_target": "version/v0.3.0",
+      "source_authority": "PENDING_SHUN_PRODUCT_L2_AND_NATIVE_TASK_DAG_FREEZE",
+      "validation": "SCOPED_POSITIVE_NEGATIVE+EXACT_SHA_ACTUAL_CI_AND_HOST_WHERE_REQUIRED",
+      "claim": "NOT_CREATED",
+      "branch": "JIT_only_task/v0.3.0-t03",
+      "fallback": "HOLD_AND_REPORT_ONLY_WHEN_SOURCE_OR_CLAIM_UNQUALIFIED"
+    },
+    {
+      "id": "T04",
+      "concern": "Shun exact-byte DeepSeek trusted sender mounted behind DH selected C/Host public binding; signed approval/ledger/UNKNOWN, no new transport",
+      "stage": "PLANNED_PROVISIONAL_NOT_DISPATCHABLE",
+      "blocked_by_planned": [
+        "T00"
+      ],
+      "role": "LOCAL_BUILDER",
+      "execution_environment": "WEB_PLUS_CI_OR_LOCAL",
+      "review_policy": "required",
+      "allowed_write_set": [
+        "packages/domain-computer/src/cloud/**",
+        "packages/domain-host/src/cloud/**",
+        "tests/integration/v03/t04-cloud/**"
+      ],
+      "forbidden": [
+        "version/v0.2.0",
+        "main",
+        "SDK private imports",
+        "protected user data and credentials",
+        "sibling Task write sets",
+        "direct effect without Kernel and Host authorization"
+      ],
+      "acceptance": {
+        "positive": "Selected DH capability-llm-openai-compatible llm.openai.generate C imports only static domain-harness-openai-host.generate; Shun Host adapter injects existing TrustedCloudInterpreter.interpretGoal via trusted T11 wiring, not optional createOpenAIHostClient; existing TrustedDeepSeekTransport passes identical canonical Buffer with thinking:{type:'disabled'} to ledger.reserve, markMayHaveSent and sole fetch; strict neutral DTO single user goal/outputFormat text, no extra options; real zero-paid Host/C boundary test",
+        "negative": "Changed model/messages/options, injected system prompt/tool/schema/temperature, stale signed consent/price/scope, missing broker, duplicate attempt, unapproved disclosure all zero HTTP; no selected-C bypass, no second SDK client HTTP; any ambiguous REMOTE_REFUSED without documented zero-send maps to K UNKNOWN and preserves UNKNOWN_COST, no blind retry/refund; B040 never forwarded"
+      },
+      "merge_target": "version/v0.3.0",
+      "source_authority": "PENDING_SHUN_PRODUCT_L2_AND_NATIVE_TASK_DAG_FREEZE",
+      "validation": "SCOPED_POSITIVE_NEGATIVE+EXACT_SHA_ACTUAL_CI_AND_HOST_WHERE_REQUIRED; real fake-HTTP selected C/Host bridge binding proof must run before accepting adapter; existing legacy deepseek-transport tests are component precedent, not migrated PASS",
+      "claim": "NOT_CREATED",
+      "branch": "JIT_only_task/v0.3.0-t04",
+      "fallback": "HOLD_AND_REPORT_ONLY_WHEN_SOURCE_OR_CLAIM_UNQUALIFIED"
+    },
+    {
+      "id": "T05",
+      "concern": "Bounded Guided Journey one-step form and answer provenance",
+      "stage": "PLANNED_PROVISIONAL_NOT_DISPATCHABLE",
+      "blocked_by_planned": [
+        "T00"
+      ],
+      "role": "LOCAL_BUILDER",
+      "execution_environment": "WEB_PLUS_CI_OR_LOCAL",
+      "review_policy": "required",
+      "allowed_write_set": [
+        "packages/domain-computer/src/guided/**",
+        "tests/integration/v03/t05-guided/**"
+      ],
+      "forbidden": [
+        "version/v0.2.0",
+        "main",
+        "SDK private imports",
+        "protected user data and credentials",
+        "sibling Task write sets",
+        "direct effect without Kernel and Host authorization"
+      ],
+      "acceptance": {
+        "positive": "offline approved one StepSpec from trusted observation and bound StepOutcome",
+        "negative": "unapproved template, old StepOutcome, advisory-made grant all reject"
+      },
+      "merge_target": "version/v0.3.0",
+      "source_authority": "PENDING_SHUN_PRODUCT_L2_AND_NATIVE_TASK_DAG_FREEZE",
+      "validation": "SCOPED_POSITIVE_NEGATIVE+EXACT_SHA_ACTUAL_CI_AND_HOST_WHERE_REQUIRED",
+      "claim": "NOT_CREATED",
+      "branch": "JIT_only_task/v0.3.0-t05",
+      "fallback": "HOLD_AND_REPORT_ONLY_WHEN_SOURCE_OR_CLAIM_UNQUALIFIED"
+    },
+    {
+      "id": "T06",
+      "concern": "Opt-in redacted feedback+verified Meta candidate/Shadow",
+      "stage": "PLANNED_PROVISIONAL_NOT_DISPATCHABLE",
+      "blocked_by_planned": [
+        "T00"
+      ],
+      "role": "LOCAL_BUILDER",
+      "execution_environment": "WEB_PLUS_CI_OR_LOCAL",
+      "review_policy": "required",
+      "allowed_write_set": [
+        "packages/domain-computer/src/feedback/**",
+        "tests/integration/v03/t06-meta/**"
+      ],
+      "forbidden": [
+        "version/v0.2.0",
+        "main",
+        "SDK private imports",
+        "protected user data and credentials",
+        "sibling Task write sets",
+        "direct effect without Kernel and Host authorization"
+      ],
+      "acceptance": {
+        "positive": "selected meta-feedback, Host runMetaFeedbackWorkflow, future-build candidate only",
+        "negative": "cross-user evidence, raw secrets, no operator or self-promotion cannot activate"
+      },
+      "merge_target": "version/v0.3.0",
+      "source_authority": "PENDING_SHUN_PRODUCT_L2_AND_NATIVE_TASK_DAG_FREEZE",
+      "validation": "SCOPED_POSITIVE_NEGATIVE+EXACT_SHA_ACTUAL_CI_AND_HOST_WHERE_REQUIRED",
+      "claim": "NOT_CREATED",
+      "branch": "JIT_only_task/v0.3.0-t06",
+      "fallback": "HOLD_AND_REPORT_ONLY_WHEN_SOURCE_OR_CLAIM_UNQUALIFIED"
+    },
+    {
+      "id": "T07",
+      "concern": "Recipe deterministic replay B, exact source and graph identity",
+      "stage": "PLANNED_PROVISIONAL_NOT_DISPATCHABLE",
+      "blocked_by_planned": [
+        "T00"
+      ],
+      "role": "LOCAL_BUILDER",
+      "execution_environment": "WEB_PLUS_CI_OR_LOCAL",
+      "review_policy": "required",
+      "allowed_write_set": [
+        "packages/domain-computer/src/recipes/**",
+        "tests/integration/v03/t07-recipes/**"
+      ],
+      "forbidden": [
+        "version/v0.2.0",
+        "main",
+        "SDK private imports",
+        "protected user data and credentials",
+        "sibling Task write sets",
+        "direct effect without Kernel and Host authorization"
+      ],
+      "acceptance": {
+        "positive": "same Recipe replay with zero LLM requests, K mediated when effectful",
+        "negative": "tampered graph/source, unknown effect, stale approval reject"
+      },
+      "merge_target": "version/v0.3.0",
+      "source_authority": "PENDING_SHUN_PRODUCT_L2_AND_NATIVE_TASK_DAG_FREEZE",
+      "validation": "SCOPED_POSITIVE_NEGATIVE+EXACT_SHA_ACTUAL_CI_AND_HOST_WHERE_REQUIRED",
+      "claim": "NOT_CREATED",
+      "branch": "JIT_only_task/v0.3.0-t07",
+      "fallback": "HOLD_AND_REPORT_ONLY_WHEN_SOURCE_OR_CLAIM_UNQUALIFIED"
+    },
+    {
+      "id": "T08",
+      "concern": "Curated Provider JIT B and signed trusted Host adapter",
+      "stage": "PLANNED_PROVISIONAL_NOT_DISPATCHABLE",
+      "blocked_by_planned": [
+        "T00"
+      ],
+      "role": "LOCAL_BUILDER",
+      "execution_environment": "WEB_PLUS_CI_OR_LOCAL",
+      "review_policy": "required",
+      "allowed_write_set": [
+        "packages/domain-computer/src/provider/**",
+        "packages/domain-host/src/provider/**",
+        "tests/integration/v03/t08-provider/**"
+      ],
+      "forbidden": [
+        "version/v0.2.0",
+        "main",
+        "SDK private imports",
+        "protected user data and credentials",
+        "sibling Task write sets",
+        "direct effect without Kernel and Host authorization"
+      ],
+      "acceptance": {
+        "positive": "real curated signed Provider/selected ABI and offline cache",
+        "negative": "tampered binary, unsupported npm graph or fake Host trust root reject"
+      },
+      "merge_target": "version/v0.3.0",
+      "source_authority": "PENDING_SHUN_PRODUCT_L2_AND_NATIVE_TASK_DAG_FREEZE",
+      "validation": "SCOPED_POSITIVE_NEGATIVE+EXACT_SHA_ACTUAL_CI_AND_HOST_WHERE_REQUIRED",
+      "claim": "NOT_CREATED",
+      "branch": "JIT_only_task/v0.3.0-t08",
+      "fallback": "HOLD_AND_REPORT_ONLY_WHEN_SOURCE_OR_CLAIM_UNQUALIFIED"
+    },
+    {
+      "id": "T09",
+      "concern": "Single domain BUILD composition + v03 Control API seam",
+      "stage": "PLANNED_PROVISIONAL_NOT_DISPATCHABLE",
+      "blocked_by_planned": [
+        "T01",
+        "T02",
+        "T03",
+        "T04",
+        "T07",
+        "T08"
+      ],
+      "role": "LOCAL_BUILDER",
+      "execution_environment": "WEB_PLUS_CI_OR_LOCAL",
+      "review_policy": "required",
+      "allowed_write_set": [
+        "packages/domain-app/src/build/**",
+        "packages/domain-app/src/api/**",
+        "apps/control-api/src/v03/**",
+        "tests/integration/v03/t09-api/**"
+      ],
+      "forbidden": [
+        "version/v0.2.0",
+        "main",
+        "SDK private imports",
+        "protected user data and credentials",
+        "sibling Task write sets",
+        "direct effect without Kernel and Host authorization"
+      ],
+      "acceptance": {
+        "positive": "actual BUILD/public SDK selected K,S,B,C, API contract refuses untrusted pre-send payload; selected C module import maps static domain-harness-openai-host to existing trusted Shun interpreter port, not double sender; single trusted Control API Host gateway validates bounded source data, CaseId, typed Goal/target/currentness/approval before ANY DomainApp.send, no raw facade to UI/model/remote caller",
+        "negative": "runtime import of BUILD, private SDK export, unsupported capability/forged consent zero effect; malformed Alias/JSON, stale/fake Case/goal or wrong scope must yield zero facade.send calls and zero K Effect Journal entries; same stable Case valid successor remains admissible"
+      },
+      "merge_target": "version/v0.3.0",
+      "source_authority": "PENDING_SHUN_PRODUCT_L2_AND_NATIVE_TASK_DAG_FREEZE",
+      "validation": "SCOPED_POSITIVE_NEGATIVE+EXACT_SHA_ACTUAL_CI_AND_HOST_WHERE_REQUIRED",
+      "claim": "NOT_CREATED",
+      "branch": "JIT_only_task/v0.3.0-t09",
+      "fallback": "HOLD_AND_REPORT_ONLY_WHEN_SOURCE_OR_CLAIM_UNQUALIFIED"
+    },
+    {
+      "id": "T10",
+      "concern": "Bounded v03 Control UI views, guided step and explicit approval",
+      "stage": "PLANNED_PROVISIONAL_NOT_DISPATCHABLE",
+      "blocked_by_planned": [
+        "T03",
+        "T05"
+      ],
+      "role": "LOCAL_BUILDER",
+      "execution_environment": "WEB_BUILD_OR_LOCAL",
+      "review_policy": "recommended",
+      "allowed_write_set": [
+        "apps/control-ui/public/v03/**",
+        "tests/integration/v03/t10-ui/**"
+      ],
+      "forbidden": [
+        "version/v0.2.0",
+        "main",
+        "SDK private imports",
+        "protected user data and credentials",
+        "sibling Task write sets",
+        "direct effect without Kernel and Host authorization"
+      ],
+      "acceptance": {
+        "positive": "CN/EN real nondeveloper Control UI current guided step, selected-root scope, explicit R2 human approval, progress/history and truthful refusal/UNKNOWN",
+        "negative": "replayed StepOutcome, spoofed grant, advice as authority, missing locale-bound scope/consent, Chinese vs English authorization semantic drift reject"
+      },
+      "merge_target": "version/v0.3.0",
+      "source_authority": "PENDING_SHUN_PRODUCT_L2_AND_NATIVE_TASK_DAG_FREEZE",
+      "validation": "SCOPED_POSITIVE_NEGATIVE+EXACT_SHA_ACTUAL_CI_AND_HOST_WHERE_REQUIRED",
+      "claim": "NOT_CREATED",
+      "branch": "JIT_only_task/v0.3.0-t10",
+      "fallback": "HOLD_AND_REPORT_ONLY_WHEN_SOURCE_OR_CLAIM_UNQUALIFIED"
+    },
+    {
+      "id": "T11",
+      "concern": "Integration wiring, shared exports/lockfile, activate one real installed journey",
+      "stage": "PLANNED_PROVISIONAL_NOT_DISPATCHABLE",
+      "blocked_by_planned": [
+        "T05",
+        "T06",
+        "T09",
+        "T10"
+      ],
+      "role": "LOCAL_INTEGRATOR",
+      "execution_environment": "WEB_PLUS_CI_OR_LOCAL",
+      "review_policy": "required",
+      "allowed_write_set": [
+        "packages/domain-app/src/index.ts",
+        "packages/domain-computer/src/index.ts",
+        "packages/domain-host/src/index.ts",
+        "apps/control-api/src/server.ts",
+        "apps/control-ui/public/app.js",
+        "pnpm-lock.yaml",
+        "tests/integration/v03/t11-runtime/**"
+      ],
+      "forbidden": [
+        "version/v0.2.0",
+        "main",
+        "SDK private imports",
+        "protected user data and credentials",
+        "sibling Task write sets",
+        "direct effect without Kernel and Host authorization"
+      ],
+      "acceptance": {
+        "positive": "one installed selected K/Host Windows flow + DeepSeek proposal/Guided Journey/Meta connected; CN/EN equivalent scope/approval/refusal and B-040 zero-egress support report; T04 host port wired from actual cloud-interpret.ts singleton with canonical exact bytes and no extra SDK HTTP sender; only approved T09 gateway forwards to selected K public send, never export unrestricted DomainApp.send to UI/HTTP",
+        "negative": "double journal, wrong scope, unchecked SDK package, unapproved promotion, fake host PASS reject; support-context accidental remote forwarding and non-equivalent locale approval reject; prohibited second WorkflowEffectJournal alongside K for identical Case; preserved ShunStore business writes must not be mislabeled second Kernel Journal; raw public send bypass, poisoned Case reuse/retry after failed effect or QUERY_NOT_FOUND as write permit rejected"
+      },
+      "merge_target": "version/v0.3.0",
+      "source_authority": "PENDING_SHUN_PRODUCT_L2_AND_NATIVE_TASK_DAG_FREEZE",
+      "validation": "SCOPED_POSITIVE_NEGATIVE+EXACT_SHA_ACTUAL_CI_AND_HOST_WHERE_REQUIRED",
+      "claim": "NOT_CREATED",
+      "branch": "JIT_only_task/v0.3.0-t11",
+      "fallback": "HOLD_AND_REPORT_ONLY_WHEN_SOURCE_OR_CLAIM_UNQUALIFIED"
+    },
+    {
+      "id": "V01",
+      "concern": "Independent version candidate validation on Node24, real Windows and controlled DeepSeek",
+      "stage": "PLANNED_PROVISIONAL_NOT_DISPATCHABLE",
+      "blocked_by_planned": [
+        "T11"
+      ],
+      "role": "INDEPENDENT_VALIDATOR",
+      "execution_environment": "CI_PLUS_REAL_WINDOWS",
+      "review_policy": "required",
+      "allowed_write_set": [
+        "tests/integration/v03/t12-qualification/**",
+        "docs/validation/v0.3/**"
+      ],
+      "forbidden": [
+        "version/v0.2.0",
+        "main",
+        "SDK private imports",
+        "protected user data and credentials",
+        "sibling Task write sets",
+        "direct effect without Kernel and Host authorization"
+      ],
+      "acceptance": {
+        "positive": "actual selected SDK package, Windows critical journeys, real CN/EN DeepSeek as required, recipe/JIT, forms, meta, recovery; actual tag-pinned pack/install + real selected K/Host positive source-gateway invalid-then-valid same-Case evidence",
+        "negative": "UNKNOWN as success, secret leak, stale grant, duplicate Windows effect, zero calls proof where denied; invalid Case must yield sendCallCount=0 and K Effect Journal=0 before successful next valid same-Case, not merely post-handler refusal"
+      },
+      "merge_target": "version/v0.3.0",
+      "source_authority": "PENDING_SHUN_PRODUCT_L2_AND_NATIVE_TASK_DAG_FREEZE",
+      "validation": "SCOPED_POSITIVE_NEGATIVE+EXACT_SHA_ACTUAL_CI_AND_HOST_WHERE_REQUIRED",
+      "claim": "NOT_CREATED",
+      "branch": "JIT_only_task/v0.3.0-v01",
+      "fallback": "HOLD_AND_REPORT_ONLY_WHEN_SOURCE_OR_CLAIM_UNQUALIFIED"
+    },
+    {
+      "id": "R01",
+      "concern": "Whole-version independent RQ and version/main integration authority",
+      "stage": "PLANNED_PROVISIONAL_NOT_DISPATCHABLE",
+      "blocked_by_planned": [
+        "V01"
+      ],
+      "role": "INDEPENDENT_RELEASE_QUALIFIER",
+      "execution_environment": "INDEPENDENT_REVIEW",
+      "review_policy": "required",
+      "allowed_write_set": [
+        "docs/implementation/v0.3/release/**",
+        "docs/release/v0.3/**"
+      ],
+      "forbidden": [
+        "version/v0.2.0",
+        "main",
+        "SDK private imports",
+        "protected user data and credentials",
+        "sibling Task write sets",
+        "direct effect without Kernel and Host authorization"
+      ],
+      "acceptance": {
+        "positive": "full actual candidate SHA/tree, independent RQ verdict and allowed version/main integration",
+        "negative": "no tag/main/release from source PASS only; cannot waive P0/independent CJ"
+      },
+      "merge_target": "version/v0.3.0",
+      "source_authority": "PENDING_SHUN_PRODUCT_L2_AND_NATIVE_TASK_DAG_FREEZE",
+      "validation": "SCOPED_POSITIVE_NEGATIVE+EXACT_SHA_ACTUAL_CI_AND_HOST_WHERE_REQUIRED",
+      "claim": "NOT_CREATED",
+      "branch": "JIT_only_task/v0.3.0-r01",
+      "fallback": "HOLD_AND_REPORT_ONLY_WHEN_SOURCE_OR_CLAIM_UNQUALIFIED"
+    }
+  ],
+  "edges": [
+    {
+      "from": "T00",
+      "to": "T01"
+    },
+    {
+      "from": "T00",
+      "to": "T02"
+    },
+    {
+      "from": "T00",
+      "to": "T03"
+    },
+    {
+      "from": "T00",
+      "to": "T04"
+    },
+    {
+      "from": "T00",
+      "to": "T05"
+    },
+    {
+      "from": "T00",
+      "to": "T06"
+    },
+    {
+      "from": "T00",
+      "to": "T07"
+    },
+    {
+      "from": "T00",
+      "to": "T08"
+    },
+    {
+      "from": "T01",
+      "to": "T09"
+    },
+    {
+      "from": "T02",
+      "to": "T09"
+    },
+    {
+      "from": "T03",
+      "to": "T09"
+    },
+    {
+      "from": "T04",
+      "to": "T09"
+    },
+    {
+      "from": "T07",
+      "to": "T09"
+    },
+    {
+      "from": "T08",
+      "to": "T09"
+    },
+    {
+      "from": "T03",
+      "to": "T10"
+    },
+    {
+      "from": "T05",
+      "to": "T10"
+    },
+    {
+      "from": "T05",
+      "to": "T11"
+    },
+    {
+      "from": "T06",
+      "to": "T11"
+    },
+    {
+      "from": "T09",
+      "to": "T11"
+    },
+    {
+      "from": "T10",
+      "to": "T11"
+    },
+    {
+      "from": "T11",
+      "to": "V01"
+    },
+    {
+      "from": "V01",
+      "to": "R01"
+    }
+  ],
+  "product_independent_r1": "BLOCK_P1_B040_P2_REBASE_UI_OLD_SHA",
+  "product_independent_r2": "PASS_P0_0_P1_0_P2_0_EXACT_4c2f8e84",
+  "task_update_note": "R1 P1 B-040 added within existing T02, preserving exactly 14 nodes/22 edges and unchanged write ownership. CN/EN UI clarified in T10/T11. Planning only. L2 source review corrected Store business-data receipt vs old WorkflowEffectJournal; no extra tasks/edges. Product Owner frozen version source; U03 selects single public DH C/Host send after private ledger/approval; all Task source Claim gates stay not admitted. L2 R1 P1/U03 reuses original trusted exact-body transport behind public selected C Host instead of SDK OpenAI client; P2 thinking:disabled retained. Unchanged 14 nodes/22 edges/write ownership. DomainHarness v0.10.3 Git tag MAIN 061376/tree099cdc published CONDITIONAL source-only; npm not published/manifest0.10.2-rc.0. T00 pack/install local Git-tag public packages. Upstream #1437 raw-send poisoned Case limitation becomes existing T09/T11 pre-send gateway + V01 negative, not a new DAG node.",
+  "product_reviewed_head": "4c2f8e84b6e6f3f5b526e52d01356159f2dce0e7",
+  "product_reviewed_blob": "f062b7f2c3dc3bf4aeeb7594ab5c2bc75b34d0ab",
+  "l1_reviewed_blob": "4c703c3f0c283f4d3918babef8f87f56869698e5",
+  "l2_architecture_r1": "NOT_RUN",
+  "l2_independent_r1": "BLOCK_P0_0_P1_1_P2_1_EXACT_e081645a2d178db424e1f5bfda5950773f479434",
+  "l2_independent_r2": "NOT_RUN",
+  "l2_u03_disposition": "DESIGN_STATIC_EXISTING_EXACT_BYTE_SENDER_AS_SELECTED_DH_C_TRUSTED_HOST__ADAPTER_ZERO_PAID_TEST_PENDING_T04",
+  "sdk_tag": "v0.10.3",
+  "sdk_tag_commit": "061376f4a023070f215f9feffad5c24d96d503cb",
+  "sdk_qualified_source_tree": "099cdc831aef63befd62aaede7e7a853d1be468f",
+  "sdk_qualified_version_parent": "7d571858bd6524ffd13a7985227183dbecb2924a",
+  "sdk_public_npm_0_10_3": "NOT_PUBLISHED",
+  "sdk_workspace_manifest_version": "0.10.2-rc.0",
+  "sdk_shun_external_consumer": "NOT_RUN"
+}
