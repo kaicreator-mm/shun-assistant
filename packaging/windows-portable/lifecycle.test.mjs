@@ -8,10 +8,11 @@ import {
   mkdtempSync,
   readFileSync,
   rmSync,
+  symlinkSync,
   writeFileSync,
 } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { join } from 'node:path';
+import { join, sep } from 'node:path';
 import { afterEach, test } from 'node:test';
 import { publicKeyFingerprint, signBundle } from '../../scripts/package-v02/manifest.mjs';
 import { installSignedCore, perUserLayout, uninstallCore } from './lifecycle.mjs';
@@ -148,4 +149,34 @@ test('failure after moving old Core rolls it back, preserving state', () => {
   assert.equal(injected, true);
   assert.equal(readFileSync(join(layout.core, 'node.exe'), 'utf8'), 'fixture-v1');
   assert.equal(readFileSync(join(layout.state, 'must-survive.txt'), 'utf8'), 'STATE_CANARY');
+});
+
+test('a symlink-parent/.. alias cannot redirect uninstall to an unrelated directory', (context) => {
+  const { temp, stage, layout, pub, pin, makeStage } = fixture();
+  makeStage(stage, 'v1');
+  installSignedCore({ stageDir: stage, publicKeyPath: pub, trustedSpkiPin: pin, layout });
+  writeFileSync(join(layout.state, 'state-canary.txt'), 'STATE_CANARY');
+  const foreign = join(temp, 'unrelated-parent');
+  mkdirSync(join(foreign, 'folder'), { recursive: true });
+  mkdirSync(join(foreign, 'core'));
+  writeFileSync(join(foreign, 'core', 'foreign-canary.txt'), 'FOREIGN_CANARY');
+  const alias = join(layout.root, 'alias');
+  try {
+    symlinkSync(join(foreign, 'folder'), alias, process.platform === 'win32' ? 'junction' : 'dir');
+  } catch {
+    context.diagnostic('Host cannot create directory link: lexical rejection still tested');
+  }
+  // Do NOT use join()/resolve(): they erase the crafted dot-dot before fs sees it.
+  const coreAlias = `${layout.root}${sep}alias${sep}..${sep}core`;
+  const bad = { ...layout, core: coreAlias };
+  assert.throws(() => uninstallCore({ layout: bad }), /SHUN_PORTABLE_LIFECYCLE_REFUSED/);
+  assert.throws(() => installSignedCore({
+    stageDir: stage, publicKeyPath: pub, trustedSpkiPin: pin, layout: bad,
+  }), /SHUN_PORTABLE_LIFECYCLE_REFUSED/);
+  assert.equal(readFileSync(join(layout.core, 'node.exe'), 'utf8'), 'fixture-v1');
+  assert.equal(readFileSync(join(layout.state, 'state-canary.txt'), 'utf8'), 'STATE_CANARY');
+  assert.equal(
+    readFileSync(join(foreign, 'core', 'foreign-canary.txt'), 'utf8'),
+    'FOREIGN_CANARY',
+  );
 });
