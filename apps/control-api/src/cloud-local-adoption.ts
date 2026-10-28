@@ -4,7 +4,7 @@
 // actions or verify effects. The original ActionController remains exclusive.
 import { randomUUID } from 'node:crypto';
 import { win32 } from 'node:path';
-import { canonicalJson, GoalRequestSchema, type GoalRequest } from '@shun/contracts';
+import { canonicalJson, type GoalRequest, GoalRequestSchema } from '@shun/contracts';
 import type { CloudTypedProposalAdmission } from './cloud-proposal-admission.ts';
 import type { ControlBackend } from './ports.ts';
 
@@ -46,7 +46,11 @@ export class CloudLocalC003Adoption {
   readonly #now: () => number;
   readonly #pending = new Map<string, Pending>();
 
-  constructor(input: { backend: LocalTaskSubmitter; trustedWorkspace: string; now?: () => number }) {
+  constructor(input: {
+    backend: LocalTaskSubmitter;
+    trustedWorkspace: string;
+    now?: () => number;
+  }) {
     if (
       !win32.isAbsolute(input.trustedWorkspace) ||
       !input.trustedWorkspace.trim() ||
@@ -94,7 +98,8 @@ export class CloudLocalC003Adoption {
       canonicalJson(proposal.verificationIntent ?? null) !==
         canonicalJson(original.verificationIntent ?? null) ||
       proposal.lifecyclePolicy !== undefined
-    ) return reject('CANDIDATE_REFUSED');
+    )
+      return reject('CANDIDATE_REFUSED');
 
     const now = this.#now();
     for (const [id, pending] of this.#pending) {
@@ -157,10 +162,7 @@ export class CloudLocalC003Adoption {
   }
 }
 
-function sameObjects(
-  left: GoalRequest['objects'],
-  right: GoalRequest['objects'],
-): boolean {
+function sameObjects(left: GoalRequest['objects'], right: GoalRequest['objects']): boolean {
   const identities = (objects: GoalRequest['objects']) =>
     objects.map((x) => `${x.kind}:${x.ref}`).sort();
   return canonicalJson(identities(left)) === canonicalJson(identities(right));
