@@ -48,8 +48,8 @@ function typed(input: GoalRequest): GoalProposal {
     goalContract: {
       taskId: input.taskId,
       objective: 'image.batch_process: make my vacation photos smaller',
-      objects: input.objects,
-      constraints: input.constraints,
+      objects: input.objects.map((object) => ({ ...object })),
+      constraints: { ...input.constraints },
       privacyPolicy: input.policyContext.privacyPolicy,
       environmentPolicy: input.policyContext.environmentPolicy,
       ambiguityDisposition: 'READY',
