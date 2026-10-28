@@ -15,6 +15,7 @@ user does not need pnpm or a separately installed Node.js.
 node --version # v24.x
 pnpm install --frozen-lockfile
 node packaging/windows-portable/build.mjs "$env:TEMP\shun-v02-stage-clean"
+node packaging/windows-portable/smoke.mjs "$env:TEMP\shun-v02-stage-clean"
 ```
 
 The stage directory must be absent or empty. The command refuses non-Windows
