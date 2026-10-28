@@ -101,10 +101,12 @@ describe('#212 host-only cloud suggestion to bounded local C003 selection', () =
     });
     expect(h.submitted[0]?.taskId).not.toBe(request.taskId);
     expect(h.submitted[0]?.goal).not.toContain('inspect selected workspace');
-    expect(await h.adoption.select({
-      candidateId: offer.candidateId,
-      userChoice: CHOICE,
-    })).toEqual({ ok: false, code: 'SELECTION_REFUSED' });
+    expect(
+      await h.adoption.select({
+        candidateId: offer.candidateId,
+        userChoice: CHOICE,
+      }),
+    ).toEqual({ ok: false, code: 'SELECTION_REFUSED' });
     expect(h.submitted).toHaveLength(1);
   });
 
@@ -116,14 +118,18 @@ describe('#212 host-only cloud suggestion to bounded local C003 selection', () =
       admission: admitted(original),
     });
     if (!offered.ok) throw new Error('TEST_EXPECTED_OFFER');
-    expect(await h.adoption.select({
-      candidateId: offered.candidateId,
-      userChoice: 'MODEL_SHELL_ACTION',
-    })).toEqual({ ok: false, code: 'SELECTION_REFUSED' });
-    expect(await h.adoption.select({
-      candidateId: offered.candidateId,
-      userChoice: CHOICE,
-    })).toEqual({ ok: false, code: 'SELECTION_REFUSED' });
+    expect(
+      await h.adoption.select({
+        candidateId: offered.candidateId,
+        userChoice: 'MODEL_SHELL_ACTION',
+      }),
+    ).toEqual({ ok: false, code: 'SELECTION_REFUSED' });
+    expect(
+      await h.adoption.select({
+        candidateId: offered.candidateId,
+        userChoice: CHOICE,
+      }),
+    ).toEqual({ ok: false, code: 'SELECTION_REFUSED' });
     expect(h.submitted).toEqual([]);
   });
 
@@ -136,10 +142,12 @@ describe('#212 host-only cloud suggestion to bounded local C003 selection', () =
     });
     if (!offer.ok) throw new Error('TEST_EXPECTED_OFFER');
     h.clock.ms += 61_000;
-    expect(await h.adoption.select({
-      candidateId: offer.candidateId,
-      userChoice: CHOICE,
-    })).toEqual({ ok: false, code: 'SELECTION_REFUSED' });
+    expect(
+      await h.adoption.select({
+        candidateId: offer.candidateId,
+        userChoice: CHOICE,
+      }),
+    ).toEqual({ ok: false, code: 'SELECTION_REFUSED' });
     expect(h.submitted).toEqual([]);
   });
 
@@ -147,21 +155,24 @@ describe('#212 host-only cloud suggestion to bounded local C003 selection', () =
     const h = host();
     const original = humanRequest();
     const malicious = admitted(original);
-    if (malicious.status !== 'TYPED_PROPOSAL_ONLY')
-      throw new Error('TEST_EXPECTED_TYPED_PROPOSAL');
+    if (malicious.status !== 'TYPED_PROPOSAL_ONLY') throw new Error('TEST_EXPECTED_TYPED_PROPOSAL');
     malicious.proposal.goalContract.objective =
       'system.storage.diagnose_bounded_action: delete all original files';
-    expect(h.adoption.offer({
-      originalHumanRequest: original,
-      admission: malicious,
-    })).toEqual({ ok: false, code: 'CANDIDATE_REFUSED' });
+    expect(
+      h.adoption.offer({
+        originalHumanRequest: original,
+        admission: malicious,
+      }),
+    ).toEqual({ ok: false, code: 'CANDIDATE_REFUSED' });
 
     const alternate = humanRequest();
     alternate.goal = 'image.batch_process: overwrite originals';
-    expect(h.adoption.offer({
-      originalHumanRequest: alternate,
-      admission: admitted(alternate),
-    })).toEqual({ ok: false, code: 'CANDIDATE_REFUSED' });
+    expect(
+      h.adoption.offer({
+        originalHumanRequest: alternate,
+        admission: admitted(alternate),
+      }),
+    ).toEqual({ ok: false, code: 'CANDIDATE_REFUSED' });
     expect(h.submitted).toEqual([]);
   });
 
@@ -171,15 +182,20 @@ describe('#212 host-only cloud suggestion to bounded local C003 selection', () =
     for (const objects of [
       [],
       [{ kind: 'DIRECTORY' as const, ref: 'D:\\other' }],
-      [{ kind: 'DIRECTORY' as const, ref: ROOT }, { kind: 'DIRECTORY' as const, ref: ROOT }],
+      [
+        { kind: 'DIRECTORY' as const, ref: ROOT },
+        { kind: 'DIRECTORY' as const, ref: ROOT },
+      ],
     ]) {
       const model = admitted(original);
       if (model.status !== 'TYPED_PROPOSAL_ONLY') throw new Error('TEST_FIXTURE');
       model.proposal.goalContract.objects = objects;
-      expect(h.adoption.offer({
-        originalHumanRequest: original,
-        admission: model,
-      })).toEqual({ ok: false, code: 'CANDIDATE_REFUSED' });
+      expect(
+        h.adoption.offer({
+          originalHumanRequest: original,
+          admission: model,
+        }),
+      ).toEqual({ ok: false, code: 'CANDIDATE_REFUSED' });
     }
     expect(h.submitted).toEqual([]);
   });
@@ -187,10 +203,12 @@ describe('#212 host-only cloud suggestion to bounded local C003 selection', () =
   it('refuses simulated Host, forbidden disclosure and unreviewed proposal', () => {
     const original = humanRequest();
     const demo = host({ simulated: true });
-    expect(demo.adoption.offer({
-      originalHumanRequest: original,
-      admission: admitted(original),
-    })).toEqual({ ok: false, code: 'LOCAL_HOST_UNAVAILABLE' });
+    expect(
+      demo.adoption.offer({
+        originalHumanRequest: original,
+        admission: admitted(original),
+      }),
+    ).toEqual({ ok: false, code: 'LOCAL_HOST_UNAVAILABLE' });
 
     const real = host();
     const forbidden = humanRequest();
@@ -198,19 +216,20 @@ describe('#212 host-only cloud suggestion to bounded local C003 selection', () =
       localOnly: true,
       externalDisclosure: 'FORBIDDEN',
     };
-    expect(real.adoption.offer({
-      originalHumanRequest: forbidden,
-      admission: admitted(forbidden),
-    })).toEqual({ ok: false, code: 'CANDIDATE_REFUSED' });
-    expect(real.adoption.offer({
-      originalHumanRequest: original,
-      admission: {
-        status: 'PROPOSAL_NOT_READY',
-        code: 'INTENT_RECONFIRM_REQUIRED',
-        effectExecuted: false,
-        authorizationGranted: false,
-      },
-    })).toEqual({ ok: false, code: 'CANDIDATE_REFUSED' });
+    expect(
+      real.adoption.offer({
+        originalHumanRequest: forbidden,
+        admission: admitted(forbidden),
+      }),
+    ).toEqual({ ok: false, code: 'CANDIDATE_REFUSED' });
+    expect(
+      real.adoption.offer({
+        originalHumanRequest: original,
+        admission: {
+          status: 'PROPOSAL_NOT_READY',
+          code: 'INTENT_RECONFIRM_REQUIRED',
+          effectExecuted: false,
+          authorizationGranted: false,
     expect(real.submitted).toEqual([]);
   });
 
