@@ -1,6 +1,6 @@
 # Shun v0.3 — Provisional Task DAG R0 (14 Nodes, 22 Edges)
 
-**Status:** `PLANNED_PROVISIONAL / NOT_FROZEN / NATIVE_ISSUE_DEPENDENCIES_NOT_MATERIALIZED / NO_CLAIMS`. Source authority: **Product Owner Frozen** checkpoint `version/v0.3.0@c8334c7723eecf7fbbb6895b1defd6439edc6b95` with independently reviewed PR #215 source `4c2f8e84b6e6f3f5b526e52d01356159f2dce0e7` (R2 0/0/0) and owner issue #214 comment 6477255283; current PR only L2/DAG proposal, L2 [#217](https://github.com/kaicreator-mm/shun-assistant/issues/217) draft; ADS project adoption #216 pending. This DAG is **not** an executable authorization even if an Issue exists.
+**Status:** `PLANNED_PROVISIONAL / NOT_FROZEN / NATIVE_ISSUE_DEPENDENCIES_NOT_MATERIALIZED / NO_CLAIMS`. Source authority: **Product Owner Frozen** checkpoint `version/v0.3.0@c8334c7723eecf7fbbb6895b1defd6439edc6b95` with independently reviewed PR #215 source `4c2f8e84b6e6f3f5b526e52d01356159f2dce0e7` (R2 0/0/0) and owner issue #214 comment 6477255283; L2 [#217](https://github.com/kaicreator-mm/shun-assistant/issues/217) **Architecture Owner Frozen** in actual `version/v0.3.0@3358080bd8fabd097347ef6df12f9b7e9b223fd0`, freeze record [`L2-FREEZE.md`](../../architecture/v0.3/L2-FREEZE.md) blob `2f1601de193ad79c12bd3ccd660039836bac56f9` and immutable frozen L2 blob `8c555aff66d3006a1dbd4fb523e350f70c5db490` (independent R2 PASS 0/0/2). This **DAG** is still provisional: independent #218 R1 at that snapshot returned **BLOCK 0/1/1**; the present candidate addresses only the reported P1 acceptance and P2 stale metadata, and requires fresh exact-HEAD independent R2. ADS project adoption #216 still not effective. This DAG is **not** an executable authorization even if an Issue exists.
 
 Canonical proposed task descriptions, write sets, roles, Review and acceptance: [machine-readable Task Packs](TASK-PACKS-R0.json). Real post-freeze GitHub **native Issue Dependencies** replace this document as live DAG; Markdown edges alone do not authorize Task dispatch.
 
@@ -91,7 +91,7 @@ ADS v4.18 exact-source project adoption [#216] (qualified source, project-local 
              \
 Product PR #215 R2 PASS → Product Owner Freeze ✓ exact version checkpoint c8334c7
                                       \
-L2 #217 independent R1 on accepted Product → L2 owner explicit Freeze
+L2 #217 R1 BLOCK → independent R2 PASS 0/0/2 → Owner L2 Freeze ✓ blob 8c555aff, checkpoint 3358080b
                                            \
 Task DAG v0.3 R1 source/proportionate Review → Task DAG owner explicit Freeze
                                                    \
@@ -105,6 +105,12 @@ Claim/Dispatch per Task + exact-version/allow-write-set currentness
 ```
 
 **No auto permission:** Creating these docs, a planning Issue, draft PR or source branch **never** changes Product/L2/DAG gates or grants source write. A full 40-character installed v0.10.3 SDK source/package identity must be registered before required consumer verification; upstream contract already frozen and does **not** need to be redesigned.
+
+### R1 blocking finding → bounded Task acceptance repair (not yet a PASS)
+
+The independent [DAG R1](https://github.com/kaicreator-mm/shun-assistant/issues/218#issuecomment-6478737511) at frozen version `3358080bd8fabd097347ef6df12f9b7e9b223fd0` found **P1-01**: the actual `T04`, `T11`, `V01` Task Pack acceptance had weakened the frozen L2 R2 **P2-01** by omitting per-call neutral `maxOutputTokens`, `deadlineUnixMs`, expired-deadline **zero HTTP**, duplicate `requestId` non-authority and truthfully mapped `completed/refused/failed/unknown`. They are now explicit **hard acceptance** in [machine-readable Task Packs](TASK-PACKS-R0.json), including actual selected C→trusted Shun Host, unchanged canonical Buffer/ledger/source approval, zero-paid negatives and K/UNKNOWN_COST fencing. If the existing string-only `CloudInterpretPort` cannot honor an individual bounded DTO, the task must **refuse pre-send** rather than silently relax the ceiling/deadline. No new SDK or generic framework required.
+
+R1 **P2-01** was stale machine planning metadata: the new Task Pack correctly binds genuine L2 R1 historical BLOCK, independently PASSed R2, Owner freeze source blob and version checkpoint; this DAG and handoff now say **L2 FROZEN** but **Task DAG NOT FROZEN**. A reviewer must recheck this new exact candidate HEAD/blobs and issue its own R2 PASS/BLOCK. Existing topology stays **14 nodes/22 edges; 44 declared write entries, no path overlaps**, eight parallel lanes. No native Issues/dependencies or accepted CAS Claims have been created.
 
 ## 5. Real GitHub native DAG materialization recipe (AFTER freezes)
 
@@ -121,9 +127,9 @@ Claim/Dispatch per Task + exact-version/allow-write-set currentness
 | --- | --- |
 | Product independent R2 | PASS 0/0/0 at 4c2f8e8 |
 | Product Freeze | YES at version checkpoint c8334c7 (frozen product/l1 blobs) |
-| Shun L2 independent R1/Freeze | NOT_RUN / NO |
+| Shun L2 independent R1/R2/Owner Freeze | R1 BLOCK 0/1/1 (historical) → exact R2 PASS 0/0/2 → Owner Freeze YES, L2 blob `8c555aff66d3006a1dbd4fb523e350f70c5db490`, checkpoint `3358080bd8fabd097347ef6df12f9b7e9b223fd0` |
 | v0.3 ADS 4.18 activation | NOT_APPLIED |
-| Task DAG Freeze | NO |
+| Task DAG independent R1 / Freeze | R1 BLOCK 0/1/1 at frozen L2 checkpoint; new acceptance/metadata repair is an R2 **candidate**, not yet re-reviewed; DAG Freeze NO |
 | Native Issue Dependencies | NOT_WRITTEN / NOT_READBACK |
 | Task Issues | NOT_CREATED |
 | Task accepted Builder Claims | NONE |
