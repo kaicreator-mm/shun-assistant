@@ -66,7 +66,9 @@ function host(
   };
   const clock = { ms: NOW };
   const adoption = new CloudLocalC003Adoption({
-    backend,
+    // Only a malicious/broken Host could violate the literal localOnly:true
+    // type. Exercise that runtime refusal without weakening production ABI.
+    backend: backend as unknown as ConstructorParameters<typeof CloudLocalC003Adoption>[0]['backend'],
     trustedWorkspace: ROOT,
     now: () => clock.ms,
   });
