@@ -113,6 +113,19 @@ async function stage(target) {
     copyFileSync(src, dst);
   }
   copyFileSync(exe, join(stageRoot, 'node.exe'));
+  // The per-user lifecycle and P01 verifier are included in the signed
+  // payload. Running them still needs a trusted bootstrap and external pin.
+  const bootstrapFiles = [
+    [join(repo, 'packaging/windows-portable/lifecycle.mjs'),
+      'packaging/windows-portable/lifecycle.mjs'],
+    [join(repo, 'scripts/package-v02/manifest.mjs'),
+      'scripts/package-v02/manifest.mjs'],
+  ];
+  for (const [src, relativePath] of bootstrapFiles) {
+    const dst = join(stageRoot, relativePath);
+    mkdirSync(dirname(dst), { recursive: true });
+    copyFileSync(requireFile(src), dst);
+  }
   cpSync(
     join(repo, 'apps/control-ui/public'),
     join(stageRoot, 'control-ui/public'),
