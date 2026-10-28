@@ -30,7 +30,7 @@ shun-assistant/                # existing pnpm monorepo (Node >=24)
 │   │   ├── tsconfig.json
 │   │   └── src/
 │   │       ├── windows/       # T01 real ActionController & OS gate; no duplicate K
-│   │       ├── cloud/         # T04 trusted endpoint/key/privacy/budget
+│   │       ├── cloud/         # T04 strict DTO→CloudInterpretPort bridge; one legacy exact-byte Host sender
 │   │       ├── provider/      # T08 real signed artifact/ABI
 │   │       └── state/         # T01 old-workflow-journal read-only + authorized ShunStore business-record bridge
 │   ├── domain-app/           # NEW, T00 skeleton / T09 assembly and T11 activation only
@@ -77,7 +77,7 @@ T00 may select *published package* by exact qualified tarball/SHA after upstream
 @kaicreator/domain-harness-microkernel
 @kaicreator/domain-harness-host-node
 ```
-Use only documented package roots and the exact `/llm/openai` Host subpath if enabled. `llm.generate` neutral ABI, explicit selected OpenAI C and no implicit fallback. Unit scaffolding alone does not prove installed consumer semantics.
+Use only documented package roots. The optional `@kaicreator/domain-harness-host-node/llm/openai` client exists but **must NOT be installed as a second physical sender for Shun v0.3**: it independently serializes its body without the existing Shun ledger's actual-wire-byte callback. Selected `capability-llm-openai-compatible` C imports the trusted static deployment-provided `domain-harness-openai-host.generate`, which T04 maps to the existing signed-approval `TrustedCloudInterpreter.interpretGoal` via a strict one-user-goal neutral DTO adapter and T11's real Control API wiring. The original `TrustedDeepSeekTransport` alone constructs/sends the identical approved ledger-checked bytes (`thinking:disabled`). T00 is structural only and must **not** fake this wiring or send traffic. No provider fallback, no Host-owned model choice from untrusted payload. Unit scaffolding alone does not prove the installed consumer/Host semantics.
 
 **T00 source allowed writes, and no others**:
 ```text
