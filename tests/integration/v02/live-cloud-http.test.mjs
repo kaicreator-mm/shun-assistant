@@ -19,7 +19,41 @@ import { cloudInterpreterFromEnvironment } from '../../../apps/control-api/src/c
 import { DemoShunBackend } from '../../../apps/control-api/src/demo/backend.ts';
 import { createControlServer } from '../../../apps/control-api/src/server.ts';
 
-const enabled = process.env.SHUN_T10_LIVE === '1';
+// Both deliberate operator choices are mandatory, even for direct invocation.
+const enabled = process.env.SHUN_T10_LIVE === '1'
+  && process.env.SHUN_T10_APPROVE_TWO_PAID_REQUESTS === 'YES';
+const PROVIDER_ENDPOINT = 'https://api.deepseek.com/chat/completions';
+const VALID_FINISH = new Set(['stop', 'length', 'tool_calls', 'content_filter']);
+
+/**
+ * PASSIVE test-only classification of the same genuine provider response.
+ * No extra request; no API key, prompt, completion, provider error message,
+ * raw response body or request headers are persisted or logged.
+ */
+async function redactedProviderResponse(response) {
+  const info = {
+    httpStatus: response.status,
+    json: response.headers.get('content-type')?.includes('application/json') === true,
+    finishReason: 'UNOBSERVED',
+    hasFinalContent: 'UNOBSERVED',
+    hasProviderError: false,
+  };
+  if (!info.json) return info;
+  const length = Number(response.headers.get('content-length'));
+  if (Number.isFinite(length) && length > 256 * 1024) return info;
+  try {
+    const body = await response.clone().json();
+    const choice = Array.isArray(body?.choices) ? body.choices[0] : null;
+    info.finishReason = VALID_FINISH.has(choice?.finish_reason)
+      ? choice.finish_reason : 'OTHER_OR_MISSING';
+    info.hasFinalContent = typeof choice?.message?.content === 'string'
+      && choice.message.content.length > 0;
+    info.hasProviderError = body?.error !== undefined && body.error !== null;
+  } catch {
+    info.finishReason = 'UNREADABLE_JSON';
+  }
+  return info;
+}
 const goals = [
   '请给出所选磁盘空间问题的只读诊断建议，不要执行任何操作。',
   'Suggest read-only steps to diagnose disk usage in my selected folder; do not execute actions.',
@@ -45,8 +79,38 @@ test('live CN+EN operator-consented cloud-only proposal via actual loopback API'
   assert.ok(cloud, 'Operator-signed cloud interpreter must be instantiated');
   assert.equal(cloud.status().enabled, true, 'Trusted OS private broker and authority unavailable');
 
-  const server = createControlServer({ backend: new DemoShunBackend(), cloud });
-  const port = await server.start();
+  const originalFetch = globalThis.fetch;
+  const providerEvents = [];
+  // Observe the SAME network operation used by production T01. The wrapper
+  // returns the untouched original Response to the actual product parser.
+  globalThis.fetch = async (input, init) => {
+    const target = typeof input === 'string' ? input : input?.url ?? String(input);
+    const isProvider = target === PROVIDER_ENDPOINT && init?.method === 'POST';
+    if (!isProvider) return originalFetch(input, init);
+    try {
+      const response = await originalFetch(input, init);
+      providerEvents.push(await redactedProviderResponse(response));
+      return response;
+    } catch {
+      providerEvents.push({ networkFailure: true, httpStatus: null });
+      throw new Error('PROVIDER_NETWORK_FAILED_REDACTED');
+    }
+  };
+  let server;
+  try {
+    server = createControlServer({ backend: new DemoShunBackend(), cloud });
+  } catch {
+    globalThis.fetch = originalFetch;
+    throw new Error('CLOUD_HOST_CONFIGURATION_REFUSED');
+  }
+  let port;
+  try {
+    port = await server.start();
+  } catch {
+    globalThis.fetch = originalFetch;
+    await server.close();
+    throw new Error('CLOUD_HOST_START_REFUSED');
+  }
   const url = `http://127.0.0.1:${port}`;
   const post = (body) => fetch(`${url}/api/cloud/interpret`, {
     method: 'POST',
@@ -93,6 +157,13 @@ test('live CN+EN operator-consented cloud-only proposal via actual loopback API'
     const tasks = await tasksResponse.json();
     assert.deepEqual(tasks.tasks, [], 'Cloud model output must never become an executable GoalRequest');
   } finally {
+    globalThis.fetch = originalFetch;
+    // A genuine HTTP 200 can still fail the product's conservative
+    // finish_reason/content checks. Report only bounded shape metadata.
+    console.info('T10_PROVIDER_RESPONSE_DIAG=' + JSON.stringify({
+      observedProviderPostAttempts: providerEvents.length,
+      events: providerEvents,
+    }));
     await server.close();
   }
 });
