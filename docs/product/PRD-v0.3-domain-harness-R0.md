@@ -28,13 +28,13 @@ v0.2 achieved substantive Windows, authorization, privacy, provider and Recipe c
 **P0 parity** (a feature is accepted only at its real supported v0.2 scope; if v0.2 acceptance remains incomplete, carry an explicit GAP/UNKNOWN until proved on the final v0.3 source):
 
 1. **Goal / semantic normalization.** Reuse strict GoalRequest, GoalProposal, registry-selected capability and environment facts. Remote output is always untrusted proposal data; unsupported target/path/privacy/command/authority is rejected or clarified.
-2. **User-facing diagnostics.** Genuine native Windows system inventory, scope-bounded folder diagnosis, evidence and uncertainty; no model dependency for deterministic read-only functions; user interface remains functional.
+2. **User-facing diagnostics and local support context (frozen B-040).** Retain genuine native Windows system inventory, scope-bounded folder diagnosis and the existing `packages/vertical-support/**` `collectWindowsSupportContext` → `minimizeSupportContext` path. Preserve report schema `shun.support-context.v1`, `localOnly:true`, `externalDisclosures:[]`, and deterministic minimization of environment/process names/command lines, unrelated document content, secrets and absolute paths. No network, LLM, Meta feedback, external error report or SDK issue upload receives these local-only reports automatically; any separately authorized support-sharing flow requires an independently scoped consent, explicit redaction and distinct source data, not silent B-040 reclassification. Offline read-only functions must not require model access.
 3. **Scoped effects.** Selected-folder preview/manifest → separate R2 human plan approval → exact-scope Windows effect → independently checked poststate and protected canaries; policy drift, aliases, moved targets, UAC refusal, insufficient rights and stale grants fail closed.
 4. **Reproducible Recipes.** Immutable source+graph+parameter identity and revalidation; user-selected deterministic replay generates zero LLM requests; no unbounded script execution.
 5. **DeepSeek/LLM integration.** Host-configured OpenAI-compatible DeepSeek with independently authenticated user disclosure/cost consent; at-most-once-send reservations, no blind retry/refund for `MAY_HAVE_SENT/UNKNOWN_COST`; CN/EN real provider and privacy zero-call evidence at the release gate.
 6. **Provider lifecycle.** Curated, signed/pinned, JIT acquired Provider artifacts; trusted deployment and native ABI binding; no user file reclassified as Provider-owned, safe offline reuse and uninstall.
 7. **Lifecycle & recovery.** SQLite WAL local fixed disk, authoritative state/recovery history, idempotence and UNC/mapped-path limitations stated honestly; no duplicated physical effects across restart, concurrent requests or replay.
-8. **User packaging.** The v0.2 selected Windows Home/Pro x64, ordinary-user constraints, trusted release origin and native portable requirements remain in scope as inherited product obligations. Source and mock tests are not a real Windows acceptance substitute.
+8. **User packaging and bilingual UI.** The v0.2 selected Windows Home/Pro x64, ordinary-user constraints, trusted release origin and native portable requirements remain inherited obligations. Preserve actual nondeveloper **Chinese and English** Control UI journeys for selected-root input, user-understandable independent approvals, scope/risk, truthful progress/history and refusal/UNKNOWN explanations; not merely CN/EN model responses. Source and mocks are not real Windows acceptance substitutes.
 
 9. **Guided user interaction (v0.10.3 contract adoption).** Reuse approved `StepTemplate`, `FormSchema`, `ChoiceCatalog`, `StepSpec`, `StepOutcome` and bounded advisory for missing path/scope, clarification, privacy disclosure and explicit plan confirmation. Offline and zero-model paths must work. Shun UI renders the selected step; Host supplies current facts; template/catalog choices are fixed and versioned. Dynamic step selection **does not create approval, grant or K Permit**. Scope this to one meaningful Windows critical journey, not a generic auto-generated UI platform.
 10. **Feedback and experience reuse.** Reuse selected DomainHarness `meta-feedback`/candidate-validation and public Host `runMetaFeedbackWorkflow` to capture user feedback plus verified task outcomes (with redaction and opt-in). Create bounded candidate → independent validation → shadow evidence → explicit operator acceptance → future immutable BUILD; no automatic self-improving production permissions, unapproved telemetry, or raw user data in feedback. Keep `task-meta` optional for execution metadata, not an invented hard product dependency.
@@ -82,14 +82,14 @@ Evaluate actual source reuse, count of removed duplicated orchestration responsi
 
 | ID | Required journey | Essential negative falsifiers | Evidence owner |
 | --- | --- | --- | --- |
-| J01 | Windows real read-only system/folder diagnosis via selected App | No LLM, unsupported facts → honest no-effect | Windows Host + CI |
+| J01 | Windows real read-only system/folder diagnosis via selected App **plus frozen B-040** `collectWindowsSupportContext` → `minimizeSupportContext`, exact `shun.support-context.v1` / `localOnly:true` / `externalDisclosures:[]` | No LLM; no auto network/Meta/LLM/SDK issue forwarding of support report; secret words, environment values/keys, process names/args, unrelated document bodies, sensitive paths must be minimized; unsupported facts → honest no-effect | Windows Host + CI |
 | J02 | Folder plan, separate human R2, scope-locked effect, independently verified bytes/canary | forged/stale grant, path alias, UI assertion, mutation between preview and effect → 0 effect | Windows Host + independent Review |
 | J03 | CN & EN genuine DeepSeek advice → strict typed proposal → **separate** plan acceptance → verified real effect | private content without consent, stale cost permit, hallucinated operation, model grant spoofing → 0 forbidden calls/effects | Local Windows + genuine controlled cloud |
 | J04 | Immutable Recipe replay without LLM call | script/graph/param drift, stale approvals → refuse | CI + Windows |
 | J05 | Curated Provider genuine first-use JIT signature, cache/offline reuse | changed binary, wrong signature, stolen user assets, unknown ABI → refuse | Windows Host |
 | J06 | CAS/replay/crash recovery with real selected SDK | duplicate effect, dropped ACK, UNKNOWN remote timeout, poisoned DTO before send → no unsafe replay | SDK external consumer + Host |
-| J07 | Portable Windows Home/Pro product journeys and trusted first entrypoint | unsupported OS/launcher provenance, missing native permissions, package tamper → hold | Physical Windows + independent RQ |
-| J08 | Current Windows facts → one approved guided StepSpec → user choices/StepOutcome → correct resumed step | stale case, forged outcome, unapproved choice, model advisory override → refuse; model absent still works | UI/Business + Windows Host |
+| J07 | Portable Windows Home/Pro product journeys, trusted first entrypoint and **CN/EN nondeveloper UI** for selected root, approval, progress/history and clear refusal/UNKNOWN in same supported workflow | unsupported OS/launcher provenance, missing rights or package tamper → hold; either locale must not hide scope, consent or refusal | Physical Windows + independent RQ |
+| J08 | Current Windows facts → one approved guided StepSpec → user choices/StepOutcome → correct resumed step, rendered in Chinese and English with equivalent risk/approval semantics | stale case, forged outcome, unapproved choice, missing locale-bound consent or model advisory override → refuse; model absent still works | UI/Business + Windows Host |
 | J09 | User feedback + verified task receipt → bounded Meta candidate → validation/Shadow → explicit operator-approved future BUILD | fabricated feedback/provenance, secret in telemetry, unapproved self-promotion, current-build mutation → refuse | Host/Meta + independent Review |
 
 Carry forward genuine unproved v0.2 evidence as `UNKNOWN`, **not** migrated PASS. v0.3 only claims a user journey when the real chosen public SDK, Shun Host and bounded user-facing path are wired end-to-end.
@@ -122,7 +122,8 @@ SDK_CONTRACT=v0.10.3_PRODUCT_DATA_L2_FROZEN
 SDK_DEV_SOURCE_SNAPSHOT=7d571858bd6524ffd13a7985227183dbecb2924a
 SDK_PUBLIC_PACKED_CONSUMER=NOT_RUN
 SDK_RELEASE_PIN=PENDING_RQ
-REBASE_V02_RELEASE=REQUIRED_BEFORE_IMPLEMENTATION
+ISOLATED_SOURCE_WORK_ALLOWED_AFTER_V03_L2_DAG_CLAIM=YES
+V02_ACCEPTED_DELTA_RECONCILIATION=REQUIRED_BEFORE_V03_FINAL_INTEGRATION
 NATIVE_TASK_DAG=NOT_CREATED
 IMPLEMENTATION_AUTHORIZED=NO
 RELEASE_READY=NO
