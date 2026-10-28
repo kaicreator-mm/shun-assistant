@@ -47,7 +47,7 @@ flowchart TD
   V01 --> R01
 ```
 
-**14 nodes, 22 unique edges, acyclic by construction.** The legacy `ShunStore` retains business data and idempotent application receipts, whereas the old `WorkflowEffectJournal` must not remain a second physical-effect dispatcher beside selected K. Each edge exists because the downstream step consumes an actual contract/source, or is a release qualification gate; the graph **does not** chain unrelated tasks merely for coordination.
+**14 nodes, 22 unique edges, acyclic by construction.** Upstream DomainHarness v0.10.3 [Git-source-only tag](https://github.com/kaicreator-mm/domain-harness/tree/v0.10.3) now exists at `061376f4a023070f215f9feffad5c24d96d503cb` (tree `099cdc831aef63befd62aaede7e7a853d1be468f`); it has CONDITIONAL RQ and **no npm v0.10.3 publish**. T00 consumes independently built/pinned four public workspace packs; do not create an SDK publication predecessor or extra task. DH [#1437](https://github.com/kaicreator-mm/domain-harness/issues/1437) remains a raw `DomainApp.send` malformed input/Case poisoning risk; T09's existing Control API seam owns validation **before** send, T11 owns single exposed endpoint and V01 proves invalid→valid same Case zero-journal denial. No new DAG node/edge from this known SDK limitation. The legacy `ShunStore` retains business data and idempotent application receipts, whereas the old `WorkflowEffectJournal` must not remain a second physical-effect dispatcher beside selected K. Each edge exists because the downstream step consumes an actual contract/source, or is a release qualification gate; the graph **does not** chain unrelated tasks merely for coordination.
 
 ### Workfront view
 
