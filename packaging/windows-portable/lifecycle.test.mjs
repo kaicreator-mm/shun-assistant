@@ -1,5 +1,7 @@
 import assert from 'node:assert/strict';
 import { generateKeyPairSync } from 'node:crypto';
+import fs from 'node:fs';
+import { syncBuiltinESMExports } from 'node:module';
 import {
   existsSync,
   mkdirSync,
@@ -91,4 +93,59 @@ test('source must not overlap the destination runtime or user state', () => {
     stageDir: layout.core, publicKeyPath: pub, trustedSpkiPin: pin, layout,
   }));
   assert.equal(existsSync(join(layout.core, 'node.exe')), true);
+});
+
+test('exported entrypoints refuse state-as-core and sibling-as-core without touching canaries', () => {
+  const { stage, layout, pub, pin, makeStage } = fixture();
+  makeStage(stage, 'v1');
+  installSignedCore({ stageDir: stage, publicKeyPath: pub, trustedSpkiPin: pin, layout });
+  writeFileSync(join(layout.state, 'must-survive.txt'), 'STATE_CANARY');
+
+  const dangerous = [
+    { ...layout, core: layout.state },
+    { ...layout, core: join(layout.root, 'unrelated') },
+  ];
+  mkdirSync(join(layout.root, 'unrelated'));
+  writeFileSync(join(layout.root, 'unrelated', 'must-survive.txt'), 'OTHER_CANARY');
+  for (const bad of dangerous) {
+    assert.throws(() => uninstallCore({ layout: bad }), /SHUN_PORTABLE_LIFECYCLE_REFUSED/);
+    assert.throws(() => installSignedCore({
+      stageDir: stage, publicKeyPath: pub, trustedSpkiPin: pin, layout: bad,
+    }), /SHUN_PORTABLE_LIFECYCLE_REFUSED/);
+  }
+  assert.equal(readFileSync(join(layout.state, 'must-survive.txt'), 'utf8'), 'STATE_CANARY');
+  assert.equal(
+    readFileSync(join(layout.root, 'unrelated', 'must-survive.txt'), 'utf8'),
+    'OTHER_CANARY',
+  );
+  assert.equal(readFileSync(join(layout.core, 'node.exe'), 'utf8'), 'fixture-v1');
+});
+
+test('failure after moving old Core rolls it back, preserving state', () => {
+  const { stage, stage2, layout, pub, pin, makeStage } = fixture();
+  makeStage(stage, 'v1');
+  makeStage(stage2, 'v2');
+  installSignedCore({ stageDir: stage, publicKeyPath: pub, trustedSpkiPin: pin, layout });
+  writeFileSync(join(layout.state, 'must-survive.txt'), 'STATE_CANARY');
+  const realRename = fs.renameSync;
+  let injected = false;
+  try {
+    fs.renameSync = (src, dest) => {
+      if (!injected && String(src).includes('core.next-') && dest === layout.core) {
+        injected = true;
+        throw new Error('INJECTED_RENAME_FAILURE');
+      }
+      return realRename(src, dest);
+    };
+    syncBuiltinESMExports();
+    assert.throws(() => installSignedCore({
+      stageDir: stage2, publicKeyPath: pub, trustedSpkiPin: pin, layout,
+    }), /SHUN_PORTABLE_LIFECYCLE_REFUSED/);
+  } finally {
+    fs.renameSync = realRename;
+    syncBuiltinESMExports();
+  }
+  assert.equal(injected, true);
+  assert.equal(readFileSync(join(layout.core, 'node.exe'), 'utf8'), 'fixture-v1');
+  assert.equal(readFileSync(join(layout.state, 'must-survive.txt'), 'utf8'), 'STATE_CANARY');
 });
