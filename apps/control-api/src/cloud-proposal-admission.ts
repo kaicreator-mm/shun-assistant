@@ -24,7 +24,13 @@ export type CloudTypedProposalAdmission =
     }
   | {
       status: 'PROPOSAL_NOT_READY' | 'PROPOSAL_REFUSED';
-      code: 'UNRESOLVED' | 'REMOTE_UNAVAILABLE' | 'SCOPE_REFUSED' | 'SCHEMA_REFUSED';
+      code:
+        | 'UNRESOLVED'
+        | 'INTENT_RECONFIRM_REQUIRED'
+        | 'OBJECT_RECONFIRM_REQUIRED'
+        | 'REMOTE_UNAVAILABLE'
+        | 'SCOPE_REFUSED'
+        | 'SCHEMA_REFUSED';
       effectExecuted: false;
       authorizationGranted: false;
     };
@@ -88,17 +94,47 @@ export async function admitTypedCloudProposal(input: {
     const parsed = GoalProposalSchema.safeParse(json);
     if (!parsed.success) return refused('SCHEMA_REFUSED');
     const contract = parsed.data.goalContract;
-    const requestedObjects = new Set(request.objects.map((o) => `${o.kind}:${o.ref}`));
+    const selectedObjectIdentities = request.objects
+      .map((o) => `${o.kind}:${o.ref}`)
+      .sort();
+    const proposedObjectIdentities = contract.objects
+      .map((o) => `${o.kind}:${o.ref}`)
+      .sort();
     if (
       contract.taskId !== request.taskId ||
       !equal(contract.privacyPolicy, request.policyContext.privacyPolicy) ||
       !equal(contract.environmentPolicy, request.policyContext.environmentPolicy) ||
       !equal(contract.constraints, request.constraints) ||
       !equal(contract.verificationIntent ?? null, request.verificationIntent ?? null) ||
-      contract.lifecyclePolicy !== undefined ||
-      contract.objects.some((o) => !requestedObjects.has(`${o.kind}:${o.ref}`))
+      contract.lifecyclePolicy !== undefined
     )
       return refused('SCOPE_REFUSED');
+
+    // A registered capability name is NOT evidence that the model preserved
+    // the human's requested action. Do not claim READY on model-changed
+    // objective; a later separate trusted human selection may adopt it.
+    // Equal original text is a safe fast path, NOT a requirement that a
+    // paraphrase is forever forbidden.
+    if (contract.objective !== request.goal) {
+      return {
+        status: 'PROPOSAL_NOT_READY',
+        code: 'INTENT_RECONFIRM_REQUIRED',
+        effectExecuted: false,
+        authorizationGranted: false,
+      };
+    }
+
+    // Resolve/verify precisely the same object identities as the user
+    // selected. A model-dropped or duplicated object must not turn a READY
+    // normalization over the original objects into a different outward DTO.
+    if (!equal(proposedObjectIdentities, selectedObjectIdentities)) {
+      return {
+        status: 'PROPOSAL_NOT_READY',
+        code: 'OBJECT_RECONFIRM_REQUIRED',
+        effectExecuted: false,
+        authorizationGranted: false,
+      };
+    }
 
     // Never trust model-supplied provenance. Bind it to the actual cloud
     // attempt returned by the separately private-consented host port.
