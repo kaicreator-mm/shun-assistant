@@ -228,7 +228,9 @@ describe('#212 T08-derived typed remote proposal admission, no action authority'
     const omitted = typed(original);
     omitted.goalContract.objects = [];
     const duplicated = typed(original);
-    duplicated.goalContract.objects.push({ ...duplicated.goalContract.objects[0] });
+    const selected = duplicated.goalContract.objects[0];
+    if (!selected) throw new Error('TEST_FIXTURE_OBJECT_MISSING');
+    duplicated.goalContract.objects.push({ ...selected });
     for (const proposal of [omitted, duplicated]) {
       const result = await admitTypedCloudProposal({
         request: original,
