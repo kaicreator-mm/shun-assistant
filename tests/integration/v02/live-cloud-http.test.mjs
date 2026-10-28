@@ -33,6 +33,8 @@ const VALID_FINISH = new Set(['stop', 'length', 'tool_calls', 'content_filter'])
 async function redactedProviderResponse(response) {
   const info = {
     httpStatus: response.status,
+    redirected: response.redirected,
+    expectedResponseUrl: response.url === PROVIDER_ENDPOINT,
     json: response.headers.get('content-type')?.includes('application/json') === true,
     finishReason: 'UNOBSERVED',
     hasFinalContent: 'UNOBSERVED',
