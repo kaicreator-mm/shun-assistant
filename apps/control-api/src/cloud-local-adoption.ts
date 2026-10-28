@@ -8,7 +8,10 @@ import { canonicalJson, type GoalRequest, GoalRequestSchema } from '@shun/contra
 import type { CloudTypedProposalAdmission } from './cloud-proposal-admission.ts';
 import type { ControlBackend } from './ports.ts';
 
-const C003 = 'system.storage.diagnose_bounded_action';
+// A host-owned, deliberately narrow fixed action class. Never treat generic
+// "inspect"/"diagnose" text as permission to propose even bounded cleanup.
+const EXPLICIT_CLEANUP_GOAL =
+  'system.storage.diagnose_bounded_action: clean only cache in selected workspace';
 const USER_CHOICE = 'C003_BOUNDED_LOCAL_STORAGE' as const;
 const LEASE_MS = 60_000;
 const MAX_PENDING = 16;
@@ -69,7 +72,7 @@ export class CloudLocalC003Adoption {
     originalHumanRequest: GoalRequest;
     admission: CloudTypedProposalAdmission;
   }): CloudLocalChoiceResult {
-    if (this.#backend.meta().simulated) return reject('LOCAL_HOST_UNAVAILABLE');
+    if (!this.#readyHost()) return reject('LOCAL_HOST_UNAVAILABLE');
     const request = GoalRequestSchema.safeParse(input.originalHumanRequest);
     if (!request.success || input.admission.status !== 'TYPED_PROPOSAL_ONLY')
       return reject('CANDIDATE_REFUSED');
@@ -78,7 +81,13 @@ export class CloudLocalC003Adoption {
     const proposal = input.admission.proposal.goalContract;
     if (
       original.goal !== proposal.objective ||
-      !original.goal.startsWith(`${C003}:`) ||
+      original.goal !== EXPLICIT_CLEANUP_GOAL ||
+      // This fixed C003 backend cannot prove it honored any additional user
+      // constraints or verification intents. Refuse instead of discarding.
+      canonicalJson(original.constraints) !== '{}' ||
+      original.verificationIntent !== undefined ||
+      canonicalJson(original.policyContext.environmentPolicy) !==
+        canonicalJson({ allowedBackendKinds: ['LOCAL_WINDOWS'], allowElevation: false }) ||
       original.policyContext.privacyPolicy.localOnly ||
       original.policyContext.privacyPolicy.externalDisclosure === 'FORBIDDEN' ||
       input.admission.authorizationGranted !== false ||
@@ -133,7 +142,7 @@ export class CloudLocalC003Adoption {
     this.#pending.delete(input.candidateId);
     if (pending.expiresMs <= this.#now() || input.userChoice !== USER_CHOICE)
       return reject('SELECTION_REFUSED');
-    if (this.#backend.meta().simulated) return reject('LOCAL_HOST_UNAVAILABLE');
+    if (!this.#readyHost()) return reject('LOCAL_HOST_UNAVAILABLE');
 
     // Host-chosen fixed local C003 action, NEVER from model or browser text.
     // Existing RealStorageControlBackend.submitGoal independently rechecks
@@ -159,6 +168,12 @@ export class CloudLocalC003Adoption {
     } catch {
       return reject('LOCAL_HOST_UNAVAILABLE');
     }
+  }
+
+  #readyHost(): boolean {
+    const state = this.#backend.meta();
+    return state.simulated === false && state.localOnly === true &&
+      state.policy.kind === 'ACTIVE';
   }
 }
 
