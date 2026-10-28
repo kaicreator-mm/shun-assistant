@@ -164,7 +164,7 @@
     },
     {
       "id": "T04",
-      "concern": "DeepSeek neutral LLM route and private Host send/budget fence",
+      "concern": "Shun exact-byte DeepSeek trusted sender mounted behind DH selected C/Host public binding; signed approval/ledger/UNKNOWN, no new transport",
       "stage": "PLANNED_PROVISIONAL_NOT_DISPATCHABLE",
       "blocked_by_planned": [
         "T00"
@@ -186,12 +186,12 @@
         "direct effect without Kernel and Host authorization"
       ],
       "acceptance": {
-        "positive": "Exactly one selected DH v0.10.3 llm.openai.generate C via static domain-harness-openai-host binding and public createOpenAIHostClient(OpenAI,pinnedPolicy).generate after Shun private signed OS consent + durable budget reserve/MAY_HAVE_SENT; SDK maxRetries=0; old TrustedDeepSeekTransport must not independently send HTTP on migrated attempt",
-        "negative": "missing/stale consent, model/scope/cost revision, provider mismatch, wrong attempt or invalid DTO means zero outbound; ambiguous after-send preserves K fence plus UNKNOWN_COST, no auto retry/refund or second old transport; sanitized output"
+        "positive": "Selected DH capability-llm-openai-compatible llm.openai.generate C imports only static domain-harness-openai-host.generate; Shun Host adapter injects existing TrustedCloudInterpreter.interpretGoal via trusted T11 wiring, not optional createOpenAIHostClient; existing TrustedDeepSeekTransport passes identical canonical Buffer with thinking:{type:'disabled'} to ledger.reserve, markMayHaveSent and sole fetch; strict neutral DTO single user goal/outputFormat text, no extra options; real zero-paid Host/C boundary test",
+        "negative": "Changed model/messages/options, injected system prompt/tool/schema/temperature, stale signed consent/price/scope, missing broker, duplicate attempt, unapproved disclosure all zero HTTP; no selected-C bypass, no second SDK client HTTP; any ambiguous REMOTE_REFUSED without documented zero-send maps to K UNKNOWN and preserves UNKNOWN_COST, no blind retry/refund; B040 never forwarded"
       },
       "merge_target": "version/v0.3.0",
       "source_authority": "PENDING_SHUN_PRODUCT_L2_AND_NATIVE_TASK_DAG_FREEZE",
-      "validation": "SCOPED_POSITIVE_NEGATIVE+EXACT_SHA_ACTUAL_CI_AND_HOST_WHERE_REQUIRED",
+      "validation": "SCOPED_POSITIVE_NEGATIVE+EXACT_SHA_ACTUAL_CI_AND_HOST_WHERE_REQUIRED; real fake-HTTP selected C/Host bridge binding proof must run before accepting adapter; existing legacy deepseek-transport tests are component precedent, not migrated PASS",
       "claim": "NOT_CREATED",
       "branch": "JIT_only_task/v0.3.0-t04",
       "fallback": "HOLD_AND_REPORT_ONLY_WHEN_SOURCE_OR_CLAIM_UNQUALIFIED"
@@ -359,7 +359,7 @@
         "direct effect without Kernel and Host authorization"
       ],
       "acceptance": {
-        "positive": "actual BUILD/public SDK selected K,S,B,C, API contract refuses untrusted pre-send payload",
+        "positive": "actual BUILD/public SDK selected K,S,B,C, API contract refuses untrusted pre-send payload; selected C module import maps static domain-harness-openai-host to existing trusted Shun interpreter port, not double sender",
         "negative": "runtime import of BUILD, private SDK export, unsupported capability/forged consent zero effect"
       },
       "merge_target": "version/v0.3.0",
@@ -434,7 +434,7 @@
         "direct effect without Kernel and Host authorization"
       ],
       "acceptance": {
-        "positive": "one installed selected K/Host Windows flow + DeepSeek proposal/Guided Journey/Meta connected; CN/EN equivalent scope/approval/refusal and B-040 zero-egress support report",
+        "positive": "one installed selected K/Host Windows flow + DeepSeek proposal/Guided Journey/Meta connected; CN/EN equivalent scope/approval/refusal and B-040 zero-egress support report; T04 host port wired from actual cloud-interpret.ts singleton with canonical exact bytes and no extra SDK HTTP sender",
         "negative": "double journal, wrong scope, unchecked SDK package, unapproved promotion, fake host PASS reject; support-context accidental remote forwarding and non-equivalent locale approval reject; prohibited second WorkflowEffectJournal alongside K for identical Case; preserved ShunStore business writes must not be mislabeled second Kernel Journal"
       },
       "merge_target": "version/v0.3.0",
@@ -603,9 +603,12 @@
   ],
   "product_independent_r1": "BLOCK_P1_B040_P2_REBASE_UI_OLD_SHA",
   "product_independent_r2": "PASS_P0_0_P1_0_P2_0_EXACT_4c2f8e84",
-  "task_update_note": "R1 P1 B-040 added within existing T02, preserving exactly 14 nodes/22 edges and unchanged write ownership. CN/EN UI clarified in T10/T11. Planning only. L2 source review corrected Store business-data receipt vs old WorkflowEffectJournal; no extra tasks/edges. Product Owner frozen version source; U03 selects single public DH C/Host send after private ledger/approval; all Task source Claim gates stay not admitted.",
+  "task_update_note": "R1 P1 B-040 added within existing T02, preserving exactly 14 nodes/22 edges and unchanged write ownership. CN/EN UI clarified in T10/T11. Planning only. L2 source review corrected Store business-data receipt vs old WorkflowEffectJournal; no extra tasks/edges. Product Owner frozen version source; U03 selects single public DH C/Host send after private ledger/approval; all Task source Claim gates stay not admitted. L2 R1 P1/U03 reuses original trusted exact-body transport behind public selected C Host instead of SDK OpenAI client; P2 thinking:disabled retained. Unchanged 14 nodes/22 edges/write ownership.",
   "product_reviewed_head": "4c2f8e84b6e6f3f5b526e52d01356159f2dce0e7",
   "product_reviewed_blob": "f062b7f2c3dc3bf4aeeb7594ab5c2bc75b34d0ab",
   "l1_reviewed_blob": "4c703c3f0c283f4d3918babef8f87f56869698e5",
-  "l2_architecture_r1": "NOT_RUN"
+  "l2_architecture_r1": "NOT_RUN",
+  "l2_independent_r1": "BLOCK_P0_0_P1_1_P2_1_EXACT_e081645a2d178db424e1f5bfda5950773f479434",
+  "l2_independent_r2": "NOT_RUN",
+  "l2_u03_disposition": "DESIGN_STATIC_EXISTING_EXACT_BYTE_SENDER_AS_SELECTED_DH_C_TRUSTED_HOST__ADAPTER_ZERO_PAID_TEST_PENDING_T04"
 }
