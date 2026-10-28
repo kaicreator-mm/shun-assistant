@@ -15,7 +15,7 @@
 
 **B. ADS v4.18 adoption**: #216 exact `4.13.1 → 4.18.0` project-local compatibility and pre-merge activation. Do not rewrite v0.2 pin or retroactively rebind older tasks. Actual adopted `.dev-standard/VERSION` on v0.3 branch determines effective standard; proposed version alone is not effective.
 
-**C. L2 (NEXT)**: [L2 R0](../../architecture/v0.3/L2-DOMAIN-HARNESS-R0.md) rebound to approved Product. U01 source-backed K Permit + Shun ActionController; U02 single K orchestration Journal with existing ShunStore business receipts; U03 selected **single** DomainHarness OpenAI C / Host sender after private broker/ledger. Independent exact-HEAD L2 R1, P0/P1/P2 and `L2_FREEZE_READY` now required; Architecture Owner explicitly freezes afterwards. Scoped runtime tests belong to T01/T04/T11/V01 unless reviewer finds static basis insufficient to choose ABI or failure semantics.
+**C. L2 (R1 BLOCK → R2 candidate)**: Independent R1 exact `e081645a2d178db424e1f5bfda5950773f479434` returned `P0/P1/P2=0/1/1 BLOCK`: U03 optional SDK OpenAI Host re-serializes unapproved wire body; DeepSeek `thinking:disabled` missing. Revised L2 chooses selected `capability-llm-openai-compatible` C static `domain-harness-openai-host.generate` bound by trusted Shun Host to existing `TrustedCloudInterpreter.interpretGoal → TrustedDeepSeekTransport`. Only original transport sends HTTPS; the same exact canonical Buffer flows through reserve, markMayHaveSent and fetch. Neutral DTO restricted to one user goal, no other options, and generic remote failure maps conservative UNKNOWN. Existing legacy fake-HTTP component tests are reused; T04 must validate selected C/Host bridge before accepting code. Independent exact-current-HEAD L2 R2 and Architecture Owner Freeze still required.
 
 **D. DAG / Scaffold**: review [Task DAG](TASK-DAG-v0.3-R0.md), [Task Packs](TASK-PACKS-R0.json), [Scaffold Layout](SCAFFOLD-LAYOUT.md) against frozen L2 and current v0.2 eligible source. Obtain proportional independent DAG review and explicit freeze. Materialize 14 native GitHub Task Issues + 22 native `blocked_by` edges and read back; **without native-write/readback, HOLD all dispatch**. Do not split a second parallel mini-DAG merely to generate Scaffold. The first local Builder only gets **T00**.
 
@@ -53,7 +53,7 @@ exact SHA 和 GitHub 原生 Issue/Claim 准入来执行，不凭聊天/README �
 
 ## Review prompts
 
-**Independent L2 R1 reviewer trigger:** `按 ADS v4.18 #1241，独立只读审核 Shun Assistant v0.3 PR #219 当前精确 HEAD，冻结 Product version/v0.3.0@c8334c7723eecf7fbbb6895b1defd6439edc6b95。审查 U01 K Permit 与 Shun ActionController 终态授权；U02 唯一 K effect Journal 与 ShunStore 业务记录/幂等回执；U03 DeepSeek 单 HTTP sender 与签名同意/费用台账/UNKNOWN，及动态表单、Meta、B-040、中英文验收。输出 P0/P1/P2、PASS/BLOCK、L2_FREEZE_READY，写回 #217/PR #219。只读、不修改、不合并、不运行付费 API、不触碰 v0.2/main。`
+**Independent L2 R2 reviewer trigger:** `按 ADS v4.18 #1241，独立只读审核 shun-assistant PR #219 当前新精确 HEAD。复核原 R1 P1 U03 / P2 thinking：selected C 的 domain-harness-openai-host 静态 Host 绑定到原 TrustedCloudInterpreter/TrustedDeepSeekTransport，原 exactRequestBytes 同一 Buffer 用于 reserve、markMayHaveSent 和真实 fetch，保持 thinking:disabled。核验严格单 user goal DTO、错误 UNKNOWN、不经可选 SDK OpenAI 客户端重序列化、T04 零付费集成负例、U01/U02 与冻结 Product。输出 P0/P1/P2、PASS/BLOCK、L2_FREEZE_READY 并写回 #217/PR #219。只读、不合并、不付费。`
 
 **Independent L2 R1 (only after Product Freeze):** `审查 shun-assistant L2 R0 当前 PR exact HEAD；核验 frozen Product 精确 blob/适用性、U01–U03、公开选定 SDK 路由、State/Journal 所有权、三包最小 scaffold、数据迁移/Windows Host/隐私成本。P0/P1/P2、PASS/BLOCK、L2_FREEZE_READY。只读。`
 
