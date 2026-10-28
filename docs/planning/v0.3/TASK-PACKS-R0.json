@@ -8,8 +8,8 @@
   "product_proposal_head": "4c2f8e84b6e6f3f5b526e52d01356159f2dce0e7",
   "product_freeze": "YES_EXPLICIT_PRODUCT_OWNER_ISSUE214_6477255283_CHECKPOINT_C8334C7723EECF7FBBB6895B1DEFD6439EDC6B95",
   "l2_freeze": null,
-  "domain_harness_contract": "v0.10.3_FROZEN",
-  "sdk_release_qualified": null,
+  "domain_harness_contract": "v0.10.3_GIT_TAG_MAIN_061376f4a023070f215f9feffad5c24d96d503cb_TREE_099cdc831aef63befd62aaede7e7a853d1be468f",
+  "sdk_release_qualified": "CONDITIONAL_GIT_SOURCE_ONLY_P0_0_P1_0_P2_3_NPM_UNPUBLISHED",
   "initial_version_base": "f01233a002f65b9bfea04828f6e56914666a160a",
   "live_native_issue_dependencies": "NOT_MATERIALIZED",
   "scaffold_source_status": "NOT_CREATED",
@@ -17,7 +17,7 @@
     "scaffold_admission": "ADS §2.4A only after frozen Product/L2, effective qualified standard, source planning authorization, accepted CAS Builder Claim and native currentness; default T00 post-DAG",
     "native_issue_edges": "MUST_WRITE_AND_READ_BACK_BEFORE_DISPATCH",
     "single_writers": "one task/one disjoint protected source write-set; central export and lockfile T11 only",
-    "sdk_rule": "Frozen contract usable for design; actual packed public v0.10.3 consumer/RQ before release",
+    "sdk_rule": "Use released Git-only v0.10.3 tag exact SHA/tree, build/pack four public SDK workspaces locally, install content-addressed tarballs in isolated Node>=24 Shun consumer; do NOT assume npm v0.10.3 or active docs/current; record exact tarball hashes and Q limits.",
     "release_rule": "No v0.3 effect/merge/release claims from proposal docs"
   },
   "counts": {
@@ -52,8 +52,8 @@
         "direct effect without Kernel and Host authorization"
       ],
       "acceptance": {
-        "positive": "Node24 clean packed-public import, no side effects, no BUILD runtime dependency",
-        "negative": "private SDK deep imports or unselected Provider fail; absent Claim no source write"
+        "positive": "Build/pack real four public SDK workspaces from immutable v0.10.3 Git tag 061376f4 / tree 099cdc83, record SHA256 tarball identities and install in independent clean Node>=24 consumer; verify actual public imports/selected external BUILD separate from App runtime, no side effects; do not call npm published v0.10.3",
+        "negative": "private SDK deep imports or unselected Provider fail; absent Claim no source write; mistaken resolution of npm public v0.10.3 / active docs-current v0.10.2, postinstall network, unsigned tarball or opaque private import must refuse"
       },
       "merge_target": "version/v0.3.0",
       "source_authority": "PENDING_SHUN_PRODUCT_L2_AND_NATIVE_TASK_DAG_FREEZE",
@@ -359,8 +359,8 @@
         "direct effect without Kernel and Host authorization"
       ],
       "acceptance": {
-        "positive": "actual BUILD/public SDK selected K,S,B,C, API contract refuses untrusted pre-send payload; selected C module import maps static domain-harness-openai-host to existing trusted Shun interpreter port, not double sender",
-        "negative": "runtime import of BUILD, private SDK export, unsupported capability/forged consent zero effect"
+        "positive": "actual BUILD/public SDK selected K,S,B,C, API contract refuses untrusted pre-send payload; selected C module import maps static domain-harness-openai-host to existing trusted Shun interpreter port, not double sender; single trusted Control API Host gateway validates bounded source data, CaseId, typed Goal/target/currentness/approval before ANY DomainApp.send, no raw facade to UI/model/remote caller",
+        "negative": "runtime import of BUILD, private SDK export, unsupported capability/forged consent zero effect; malformed Alias/JSON, stale/fake Case/goal or wrong scope must yield zero facade.send calls and zero K Effect Journal entries; same stable Case valid successor remains admissible"
       },
       "merge_target": "version/v0.3.0",
       "source_authority": "PENDING_SHUN_PRODUCT_L2_AND_NATIVE_TASK_DAG_FREEZE",
@@ -434,8 +434,8 @@
         "direct effect without Kernel and Host authorization"
       ],
       "acceptance": {
-        "positive": "one installed selected K/Host Windows flow + DeepSeek proposal/Guided Journey/Meta connected; CN/EN equivalent scope/approval/refusal and B-040 zero-egress support report; T04 host port wired from actual cloud-interpret.ts singleton with canonical exact bytes and no extra SDK HTTP sender",
-        "negative": "double journal, wrong scope, unchecked SDK package, unapproved promotion, fake host PASS reject; support-context accidental remote forwarding and non-equivalent locale approval reject; prohibited second WorkflowEffectJournal alongside K for identical Case; preserved ShunStore business writes must not be mislabeled second Kernel Journal"
+        "positive": "one installed selected K/Host Windows flow + DeepSeek proposal/Guided Journey/Meta connected; CN/EN equivalent scope/approval/refusal and B-040 zero-egress support report; T04 host port wired from actual cloud-interpret.ts singleton with canonical exact bytes and no extra SDK HTTP sender; only approved T09 gateway forwards to selected K public send, never export unrestricted DomainApp.send to UI/HTTP",
+        "negative": "double journal, wrong scope, unchecked SDK package, unapproved promotion, fake host PASS reject; support-context accidental remote forwarding and non-equivalent locale approval reject; prohibited second WorkflowEffectJournal alongside K for identical Case; preserved ShunStore business writes must not be mislabeled second Kernel Journal; raw public send bypass, poisoned Case reuse/retry after failed effect or QUERY_NOT_FOUND as write permit rejected"
       },
       "merge_target": "version/v0.3.0",
       "source_authority": "PENDING_SHUN_PRODUCT_L2_AND_NATIVE_TASK_DAG_FREEZE",
@@ -467,8 +467,8 @@
         "direct effect without Kernel and Host authorization"
       ],
       "acceptance": {
-        "positive": "actual selected SDK package, Windows critical journeys, real CN/EN DeepSeek as required, recipe/JIT, forms, meta, recovery",
-        "negative": "UNKNOWN as success, secret leak, stale grant, duplicate Windows effect, zero calls proof where denied"
+        "positive": "actual selected SDK package, Windows critical journeys, real CN/EN DeepSeek as required, recipe/JIT, forms, meta, recovery; actual tag-pinned pack/install + real selected K/Host positive source-gateway invalid-then-valid same-Case evidence",
+        "negative": "UNKNOWN as success, secret leak, stale grant, duplicate Windows effect, zero calls proof where denied; invalid Case must yield sendCallCount=0 and K Effect Journal=0 before successful next valid same-Case, not merely post-handler refusal"
       },
       "merge_target": "version/v0.3.0",
       "source_authority": "PENDING_SHUN_PRODUCT_L2_AND_NATIVE_TASK_DAG_FREEZE",
@@ -603,12 +603,19 @@
   ],
   "product_independent_r1": "BLOCK_P1_B040_P2_REBASE_UI_OLD_SHA",
   "product_independent_r2": "PASS_P0_0_P1_0_P2_0_EXACT_4c2f8e84",
-  "task_update_note": "R1 P1 B-040 added within existing T02, preserving exactly 14 nodes/22 edges and unchanged write ownership. CN/EN UI clarified in T10/T11. Planning only. L2 source review corrected Store business-data receipt vs old WorkflowEffectJournal; no extra tasks/edges. Product Owner frozen version source; U03 selects single public DH C/Host send after private ledger/approval; all Task source Claim gates stay not admitted. L2 R1 P1/U03 reuses original trusted exact-body transport behind public selected C Host instead of SDK OpenAI client; P2 thinking:disabled retained. Unchanged 14 nodes/22 edges/write ownership.",
+  "task_update_note": "R1 P1 B-040 added within existing T02, preserving exactly 14 nodes/22 edges and unchanged write ownership. CN/EN UI clarified in T10/T11. Planning only. L2 source review corrected Store business-data receipt vs old WorkflowEffectJournal; no extra tasks/edges. Product Owner frozen version source; U03 selects single public DH C/Host send after private ledger/approval; all Task source Claim gates stay not admitted. L2 R1 P1/U03 reuses original trusted exact-body transport behind public selected C Host instead of SDK OpenAI client; P2 thinking:disabled retained. Unchanged 14 nodes/22 edges/write ownership. DomainHarness v0.10.3 Git tag MAIN 061376/tree099cdc published CONDITIONAL source-only; npm not published/manifest0.10.2-rc.0. T00 pack/install local Git-tag public packages. Upstream #1437 raw-send poisoned Case limitation becomes existing T09/T11 pre-send gateway + V01 negative, not a new DAG node.",
   "product_reviewed_head": "4c2f8e84b6e6f3f5b526e52d01356159f2dce0e7",
   "product_reviewed_blob": "f062b7f2c3dc3bf4aeeb7594ab5c2bc75b34d0ab",
   "l1_reviewed_blob": "4c703c3f0c283f4d3918babef8f87f56869698e5",
   "l2_architecture_r1": "NOT_RUN",
   "l2_independent_r1": "BLOCK_P0_0_P1_1_P2_1_EXACT_e081645a2d178db424e1f5bfda5950773f479434",
   "l2_independent_r2": "NOT_RUN",
-  "l2_u03_disposition": "DESIGN_STATIC_EXISTING_EXACT_BYTE_SENDER_AS_SELECTED_DH_C_TRUSTED_HOST__ADAPTER_ZERO_PAID_TEST_PENDING_T04"
+  "l2_u03_disposition": "DESIGN_STATIC_EXISTING_EXACT_BYTE_SENDER_AS_SELECTED_DH_C_TRUSTED_HOST__ADAPTER_ZERO_PAID_TEST_PENDING_T04",
+  "sdk_tag": "v0.10.3",
+  "sdk_tag_commit": "061376f4a023070f215f9feffad5c24d96d503cb",
+  "sdk_qualified_source_tree": "099cdc831aef63befd62aaede7e7a853d1be468f",
+  "sdk_qualified_version_parent": "7d571858bd6524ffd13a7985227183dbecb2924a",
+  "sdk_public_npm_0_10_3": "NOT_PUBLISHED",
+  "sdk_workspace_manifest_version": "0.10.2-rc.0",
+  "sdk_shun_external_consumer": "NOT_RUN"
 }
