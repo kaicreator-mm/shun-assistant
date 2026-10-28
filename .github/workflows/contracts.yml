@@ -19,3 +19,5 @@ jobs:
       - run: pnpm lint
       - run: pnpm typecheck
       - run: pnpm test
+      # T10 deterministic actual Control API boundary (no DeepSeek, no Win32 consent).
+      - run: node --experimental-transform-types --test tests/integration/v02/advisory-no-promotion.test.mjs
