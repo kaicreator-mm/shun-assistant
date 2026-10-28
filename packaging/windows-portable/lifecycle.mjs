@@ -26,9 +26,19 @@ function assertPlainDirectory(path) {
   if (!stats.isDirectory() || stats.isSymbolicLink()) refuse();
 }
 
-function assertContained(parent, child) {
-  const rel = relative(parent, child);
-  if (!rel || rel === '..' || rel.startsWith(`..${sep}`) || isAbsolute(rel)) refuse();
+function assertCanonicalLayout(layout) {
+  if (!layout || !layout.root || !layout.core || !layout.state) refuse();
+  const root = resolve(layout.root);
+  // Exported helpers must NEVER accept an arbitrary caller-selected directory
+  // as 'core': uninstall/core replacement would otherwise delete user state.
+  if (root !== resolve(dirname(root), 'ShunAssistant')) refuse();
+  if (resolve(layout.core) !== join(root, 'core')) refuse();
+  if (resolve(layout.state) !== join(root, 'state')) refuse();
+  if (resolve(layout.core) === resolve(layout.state)) refuse();
+  assertPlainDirectory(root);
+  assertPlainDirectory(resolve(layout.core));
+  assertPlainDirectory(resolve(layout.state));
+  return root;
 }
 
 export function perUserLayout(localAppData) {
@@ -75,10 +85,7 @@ export function installSignedCore({ stageDir, publicKeyPath, trustedSpkiPin, lay
   const source = resolve(stageDir);
   const src = lstatSync(source);
   if (!src.isDirectory() || src.isSymbolicLink()) refuse();
-  if (!layout || !layout.root || !layout.core || !layout.state) refuse();
-  const root = resolve(layout.root);
-  assertContained(root, resolve(layout.core));
-  assertContained(root, resolve(layout.state));
+  const root = assertCanonicalLayout(layout);
   // The staging tree and the installed app root must be disjoint; never
   // recursively copy a directory into itself (or replace a staging parent).
   const sourceFromRoot = relative(root, source);
@@ -130,11 +137,7 @@ export function installSignedCore({ stageDir, publicKeyPath, trustedSpkiPin, lay
 
 /** Removes only the Shun-owned replaceable Core, never user/other data. */
 export function uninstallCore({ layout }) {
-  if (!layout || !layout.root || !layout.core || !layout.state) refuse();
-  assertContained(resolve(layout.root), resolve(layout.core));
-  assertContained(resolve(layout.root), resolve(layout.state));
-  assertPlainDirectory(layout.root);
-  assertPlainDirectory(layout.state);
+  assertCanonicalLayout(layout);
   if (existsSync(layout.core)) {
     assertPlainDirectory(layout.core);
     rmSync(layout.core, { recursive: true, force: false });
