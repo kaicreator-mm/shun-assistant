@@ -1,0 +1,71 @@
+schema: shun-t00-test-matrix/v1
+task_id: T00
+baseline_sha: 936548fef7fa9252049c0caa29656d293a585472
+required_runtime:
+  node: ">=24"
+  preferred_node: "24.21.0"
+  package_manager: "pnpm@10.34.5 for Shun; npm with frozen package-lock for DomainHarness source build"
+tests:
+  - id: source-identity
+    kind: identity
+    environment: local
+    steps:
+      - verify DomainHarness tag v0.10.3 resolves to commit 061376f4a023070f215f9feffad5c24d96d503cb
+      - verify tag tree equals 099cdc831aef63befd62aaede7e7a853d1be468f
+      - verify Shun base, ADS pin, Task Pack blob and dispatch currentness
+    expected: PASS
+  - id: public-sdk-pack
+    kind: build-and-package
+    environment: local
+    steps:
+      - install dependencies in an isolated checkout of the exact DomainHarness source tag using its committed lockfile
+      - build and pack the four named public SDK workspaces in dependency order
+      - record each tarball SHA256 and source tag/tree
+    expected: PASS
+  - id: isolated-consumer
+    kind: integration-smoke
+    environment: clean Node >=24 consumer
+    steps:
+      - install only local file tarballs with registry access disabled
+      - import actual public contracts, microkernel, host-node root, and BUILD exports
+      - verify BUILD is build-time only and not wired as App runtime
+      - prove the install resolves from the recorded tarballs, not npm registry or current docs source
+    expected: PASS
+  - id: package-boundary-negative
+    kind: negative
+    environment: clean Node >=24 consumer
+    steps:
+      - select an actual private SDK package/path from the exact tag and prove Shun consumer cannot resolve it
+      - prove no source import or installed direct dependency targets @kaicreator/domain-harness-host-node/llm/openai
+      - prove unsupported deep imports are rejected
+    expected: PASS
+  - id: artifact-integrity-negative
+    kind: negative
+    environment: offline fixture
+    steps:
+      - absent source identity or absent SHA256 receipt refuses
+      - a deliberately mismatched expected SHA256 refuses
+      - missing/tampered tarball is not accepted as the pinned source package
+    expected: PASS
+  - id: no-install-effects
+    kind: source-inspection
+    environment: isolated package fixtures
+    steps:
+      - all three Shun package manifests contain no dependencies, devDependencies or scripts
+      - inspect the four SDK manifests for install/preinstall/postinstall scripts; none may run an unreviewed network/effect hook
+      - no API keys, paid LLM requests, credentials or real Windows effects
+    expected: PASS
+  - id: scoped-validation
+    kind: focused
+    environment: Windows Node 24 preferred; CI may run equivalent source-only checks
+    commands:
+      - node --test tests/integration/v03/t00-scaffold/
+      - typecheck each of the three new package tsconfigs using existing workspace TypeScript
+      - run Biome on only the new T00 paths
+      - git diff --exit-code -- pnpm-lock.yaml
+      - assert no sibling T01-T11/V01/R01 source paths changed
+    expected: PASS
+notes:
+  - These tests are not automatically discovered by the current top-level test runner; invoke the T00 test directory explicitly.
+  - Preserve actual command exit codes; do not pipe the command under test through tail or a formatter that masks failure.
+  - No test is PASS until it has actually run on the exact checked-out source and its result is recorded.
