@@ -1,0 +1,27 @@
+schema: shun-t03-failure-matrix/v1
+task_id: T03
+failures:
+  - case: malformed GoalRequest or GoalProposal
+    expected_rejection: strict schema refusal
+  - case: proposal widens selected folder, root, object or operation
+    expected_rejection: reject; selected scope unchanged
+  - case: missing or forged Host observation provenance
+    expected_rejection: reject; no trusted evidence
+  - case: undeclared capability or command
+    expected_rejection: registry lookup refusal; no dispatch
+  - case: proposal asserts grant or approval
+    expected_rejection: reject; semantic layer has no authority to issue either
+  - case: stale source or currentness identity
+    expected_rejection: reject and require fresh evidence
+  - case: path outside frozen write set
+    expected_rejection: BLOCKED; route to owning Task
+defect_routing:
+  product_defect: route to Product Owner
+  architecture_contradiction: route to L2 Owner
+  environment_inability: BLOCKED, not PASS
+  execution_pack_invalid: stop before source mutation
+negative_oracle:
+  - selected scope cannot be widened by model text
+  - forged provenance is not accepted
+  - undeclared capability or command never resolves
+  - no grant, approval or effect is produced by this Task
