@@ -1,0 +1,29 @@
+schema: shun-t08-failure-matrix/v1
+task_id: T08
+failures:
+  - case: unsigned, tampered or digest-mismatched provider artifact
+    expected_rejection: reject before staging/loading
+  - case: fake/untrusted Host root or unresolvable signer
+    expected_rejection: reject; no provider activation
+  - case: selected ABI does not match current host/capability contract
+    expected_rejection: typed incompatibility; no fallback ABI
+  - case: unsupported npm dependency graph or unapproved package source
+    expected_rejection: reject; no registry/network fallback
+  - case: cache path/name points to different bytes or stale revision
+    expected_rejection: re-hash and reject; cache is not authority
+  - case: real install, native activation, OS mutation or external download is requested
+    expected_rejection: BLOCKED; zero physical/network effects
+  - case: no existing curated signed artifact/trust root can be verified
+    expected_rejection: BLOCKED; do not mint a new production trust root
+  - case: path outside frozen write set or shared package wiring changes
+    expected_rejection: BLOCKED; route to T11/owning Task
+ defect_routing:
+  product_defect: route to Product Owner
+  architecture_contradiction: stop and route to L2 Owner
+  environment_inability: BLOCKED, not PASS
+  execution_pack_invalid: stop before source mutation
+negative_oracle:
+  - tampered/unsigned artifact never reaches staging or loading
+  - selected ABI and capability binding must both match
+  - fake Host trust root and unsupported npm graph reject
+  - offline test proves zero network and zero real activation

@@ -1,0 +1,30 @@
+schema: shun-t08-test-matrix/v1
+task_id: T08
+baseline_sha: 1165a70a9271f570cbb313210f20aa013db72f86
+focused:
+  - name: t08-provider-positive-negative
+    command: pnpm --filter @shun/provider-loader exec vitest run --config ../../tests/integration/v03/t08-provider/vitest.config.ts
+    expected: EXIT=0; curated signature, digest, selected ABI, offline cache and fake Host trust checks pass
+  - name: t08-typecheck
+    command: pnpm --filter @shun/provider-loader exec tsc --noEmit -p ../../tests/integration/v03/t08-provider/tsconfig.json
+    expected: EXIT=0
+  - name: t08-lint
+    command: pnpm --filter @shun/provider-loader exec biome check ../../packages/domain-computer/src/provider ../../packages/domain-host/src/provider ../../tests/integration/v03/t08-provider
+    expected: EXIT=0
+required:
+  - name: provider-loader-regression
+    command: pnpm --filter @shun/provider-loader test && pnpm --filter @shun/vertical-jit test
+    expected: EXIT=0; existing provider loader and curated-provider behavior preserved
+  - name: contracts-regression
+    command: pnpm --filter @shun/contracts test
+    expected: EXIT=0
+  - name: offline-and-write-set-guard
+    command: verify no network download/install path; git diff --exit-code -- pnpm-lock.yaml and compare paths to the three frozen patterns
+    expected: offline only; no out-of-scope path
+task_owned_platform:
+  - name: real Windows Provider installation/activation
+    command: NOT_RUN — Owner explicitly excludes real Windows side effects
+    expected: NOT_RUN; fake Host and offline artifacts only
+  - name: external Provider download
+    command: NOT_RUN — no network download is authorized
+    expected: zero network requests
