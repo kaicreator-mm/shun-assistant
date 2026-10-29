@@ -1,0 +1,27 @@
+schema: shun-t03-test-matrix/v1
+task_id: T03
+baseline_sha: 1165a70a9271f570cbb313210f20aa013db72f86
+focused:
+  - name: t03-semantic-positive-negative
+    command: pnpm --filter @shun/resolver exec vitest run --config ../../tests/integration/v03/t03-semantic/vitest.config.ts
+    expected: EXIT=0; strict schema, provenance and registered capability selection pass
+  - name: t03-typecheck
+    command: pnpm --filter @shun/resolver exec tsc --noEmit -p ../../tests/integration/v03/t03-semantic/tsconfig.json
+    expected: EXIT=0
+  - name: t03-lint
+    command: pnpm --filter @shun/resolver exec biome check ../../packages/domain-computer/src/semantic ../../tests/integration/v03/t03-semantic
+    expected: EXIT=0
+required:
+  - name: resolver-regression
+    command: pnpm --filter @shun/resolver test
+    expected: EXIT=0
+  - name: contracts-regression
+    command: pnpm --filter @shun/contracts test
+    expected: EXIT=0
+  - name: lockfile-and-scope
+    command: git diff --exit-code -- pnpm-lock.yaml; verify changed paths against the two frozen patterns
+    expected: EXIT=0; no out-of-scope path
+task_owned_platform:
+  - name: Windows physical effect
+    command: NOT_APPLICABLE — T03 is semantic/selection only
+    expected: no OS effect or command execution
