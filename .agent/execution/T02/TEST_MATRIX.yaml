@@ -1,0 +1,27 @@
+schema: shun-t02-test-matrix/v1
+task_id: T02
+baseline_sha: 1165a70a9271f570cbb313210f20aa013db72f86
+focused:
+  - name: t02-computer-positive-negative
+    command: pnpm --filter @shun/vertical-support exec vitest run --config ../../tests/integration/v03/t02-computer/vitest.config.ts
+    expected: EXIT=0; B-040 schema, minimization, provenance and zero-egress negatives pass
+  - name: b040-regression
+    command: node --test tests/integration/b040-run.test.mjs
+    expected: EXIT=0
+  - name: t02-typecheck
+    command: pnpm --filter @shun/vertical-support exec tsc --noEmit -p ../../tests/integration/v03/t02-computer/tsconfig.json
+    expected: EXIT=0
+  - name: t02-lint
+    command: pnpm --filter @shun/vertical-support exec biome check ../../packages/domain-computer/src/computer ../../tests/integration/v03/t02-computer
+    expected: EXIT=0
+required:
+  - name: read-only-windows-host
+    command: node --test tests/integration/v03/t02-computer/windows-readonly.test.mjs
+    expected: real Windows read-only collection; no file/process/system mutation; record actual Node/Windows build and exit
+  - name: lockfile-and-scope
+    command: git diff --exit-code -- pnpm-lock.yaml; verify changed paths against the two frozen patterns
+    expected: EXIT=0; no out-of-scope path
+task_owned_platform:
+  - name: physical Windows mutation
+    command: NOT_RUN — not part of T02; no physical side effects authorized
+    expected: NOT_RUN
