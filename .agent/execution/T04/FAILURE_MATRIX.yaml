@@ -17,7 +17,7 @@ failures:
     expected_rejection: zero HTTP; disclosure denied
   - case: paid model request, real credential, second sender or out-of-scope path
     expected_rejection: BLOCKED; no action
- defect_routing:
+defect_routing:
   product_defect: route to Product Owner
   architecture_contradiction: stop and route to L2 Owner
   environment_inability: BLOCKED, not PASS
