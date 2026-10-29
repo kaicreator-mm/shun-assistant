@@ -1,0 +1,27 @@
+schema: shun-t07-failure-matrix/v1
+task_id: T07
+failures:
+  - case: Recipe source/revision or canonical graph hash is missing or mismatched
+    expected_rejection: reject before replay; no fallback to latest mutable identity
+  - case: graph/action order or source is tampered
+    expected_rejection: integrity failure; no action dispatched
+  - case: capability/effect identifier is unknown or unregistered
+    expected_rejection: typed refusal; no Host call
+  - case: approval/grant is stale, missing or bound to another effect/scope
+    expected_rejection: K/Host refusal; zero effect
+  - case: replay tries to reconstruct through LLM/model
+    expected_rejection: test FAIL; model call count must remain zero
+  - case: effectful step bypasses Kernel/authorization or invokes OS directly
+    expected_rejection: zero physical effect; BLOCKED
+  - case: path outside frozen write set or shared wiring is changed
+    expected_rejection: BLOCKED; route to owning Task
+ defect_routing:
+  product_defect: route to Product Owner
+  architecture_contradiction: stop and route to L2 Owner
+  environment_inability: BLOCKED, not PASS
+  execution_pack_invalid: stop before source mutation
+negative_oracle:
+  - tampered graph/source and unknown effects never resolve
+  - stale approval never authorizes a replay
+  - repeated valid replay is deterministic and sends zero LLM requests
+  - effectful actions require Kernel mediation and no direct OS calls occur

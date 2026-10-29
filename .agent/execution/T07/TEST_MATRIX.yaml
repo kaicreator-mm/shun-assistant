@@ -1,0 +1,30 @@
+schema: shun-t07-test-matrix/v1
+task_id: T07
+baseline_sha: 1165a70a9271f570cbb313210f20aa013db72f86
+focused:
+  - name: t07-recipe-replay-positive-negative
+    command: pnpm --filter @shun/recipe-runtime exec vitest run --config ../../tests/integration/v03/t07-recipes/vitest.config.ts
+    expected: EXIT=0; exact recipe/source/graph identity, deterministic replay and zero-LLM behavior pass
+  - name: t07-typecheck
+    command: pnpm --filter @shun/recipe-runtime exec tsc --noEmit -p ../../tests/integration/v03/t07-recipes/tsconfig.json
+    expected: EXIT=0
+  - name: t07-lint
+    command: pnpm --filter @shun/recipe-runtime exec biome check ../../packages/domain-computer/src/recipes ../../tests/integration/v03/t07-recipes
+    expected: EXIT=0
+required:
+  - name: resolver-recipe-runtime-regression
+    command: pnpm --filter @shun/resolver test && pnpm --filter @shun/recipe-runtime test
+    expected: EXIT=0
+  - name: store-workflow-regression
+    command: pnpm --filter @shun/store test && pnpm --filter @shun/workflow test
+    expected: EXIT=0
+  - name: lockfile-and-write-set
+    command: git diff --exit-code -- pnpm-lock.yaml; verify changed paths against the two frozen patterns
+    expected: EXIT=0; no out-of-scope path
+task_owned_platform:
+  - name: real Windows/OS effect
+    command: NOT_RUN — Owner explicitly forbids real Windows side effects
+    expected: NOT_RUN; fake Kernel/Host boundary only
+  - name: LLM request
+    command: assert replay request count equals zero
+    expected: zero model/network requests
