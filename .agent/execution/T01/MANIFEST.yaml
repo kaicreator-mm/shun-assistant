@@ -1,0 +1,48 @@
+pack_id: shun-v03-t01-1165a70-execution-pack-v1
+task_id: T01
+repository: kaicreator-mm/shun-assistant
+version: v0.3.0
+base_sha: 1165a70a9271f570cbb313210f20aa013db72f86
+task_pack_ref: docs/planning/v0.3/TASK-PACKS-R0.json@blob:8aef87cac27297cc32e4e79e0141658a712484fb
+branch: JIT_only_task/v0.3.0-t01
+parent_issue: "#229"
+agent_freedom: F1_BOUNDED_IMPLEMENTATION
+pinned_standard_revision: 2c395c55569fe2edf3f4135f12d3d069e526d0b7
+generated_by: chatgpt-web:shun-v03-wave1-scheduler
+generated_at: 2026-10-30
+dependency_completion:
+  - "T00@1165a70a9271f570cbb313210f20aa013db72f86"
+material_paths:
+  - "packages/authorization/src/controller.ts"
+  - "packages/authorization/src/authority.ts"
+  - "packages/authorization/src/policy.ts"
+  - "packages/executor-windows/src/**"
+  - "packages/store/src/shun-store.ts"
+  - "packages/store/src/authorization-adapter.ts"
+  - "packages/store/src/recipe-repository.ts"
+  - "packages/workflow/src/kernel.ts"
+  - "packages/workflow/src/journal.ts"
+  - "packages/workflow/src/recovery.ts"
+  - "packages/recipe-runtime/src/sqlite-effect-boundary.ts"
+  - "packages/recipe-runtime/src/sqlite-r0-effect-journal.ts"
+  - "packages/domain-computer/src/contracts/**"
+  - "packages/domain-host/tsconfig.json"
+  - "packages/domain-host/src/windows/**"
+  - "packages/domain-host/src/state/**"
+  - "tests/integration/v03/t01-host/**"
+core_artifacts:
+  - MANIFEST.yaml
+  - EXECUTION_CONTRACT.md
+  - TEST_MATRIX.yaml
+  - FAILURE_MATRIX.yaml
+  - IMPLEMENTATION_MAP.md
+  - REVIEW_CHECKLIST.md
+optional_artifacts: []
+retention: durable
+package_excluded: true
+pack_state_at_generation: PACK_CURRENT
+owner_authorization_ref: "#218@6510839827"
+jit_source_base: 1165a70a9271f570cbb313210f20aa013db72f86
+dispatch_generation: 1
+admission_mode: SINGLE_WRITER_ADMISSION
+protected_claim_key: "kaicreator-mm/shun-assistant#229:builder:__default__"
