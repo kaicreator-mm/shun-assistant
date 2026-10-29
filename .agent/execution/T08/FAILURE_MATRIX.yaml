@@ -17,7 +17,7 @@ failures:
     expected_rejection: BLOCKED; do not mint a new production trust root
   - case: path outside frozen write set or shared package wiring changes
     expected_rejection: BLOCKED; route to T11/owning Task
- defect_routing:
+defect_routing:
   product_defect: route to Product Owner
   architecture_contradiction: stop and route to L2 Owner
   environment_inability: BLOCKED, not PASS
