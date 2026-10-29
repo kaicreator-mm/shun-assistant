@@ -1,0 +1,30 @@
+schema: shun-t06-failure-matrix/v1
+task_id: T06
+failures:
+  - case: feedback not explicitly selected/opted in
+    expected_rejection: no payload and no Host workflow call
+  - case: consent missing, stale or for a different candidate/scope
+    expected_rejection: reject; no candidate persisted
+  - case: raw prompt, secret, environment, process arg, sensitive path or unrelated body survives redaction
+    expected_rejection: test FAIL; no Host handoff
+  - case: evidence belongs to another user/tenant or operator attribution is missing
+    expected_rejection: reject; no aggregation
+  - case: forged source provenance, mutable source identity or unverified Meta candidate
+    expected_rejection: reject; no candidate accepted
+  - case: candidate is promoted/activated or current runtime behavior changes
+    expected_rejection: reject; Shadow/future-build only
+  - case: external network/disclosure is attempted
+    expected_rejection: zero egress; BLOCKED pending explicit authorization
+  - case: path outside frozen write set is required
+    expected_rejection: BLOCKED; route to owning Task/authority
+ defect_routing:
+  product_defect: route to Product Owner
+  architecture_contradiction: stop and route to L2 Owner
+  environment_inability: BLOCKED, not PASS
+  execution_pack_invalid: stop before source mutation
+negative_oracle:
+  - no opt-in means no feedback workflow invocation
+  - all forbidden sensitive fields are absent after redaction
+  - no cross-user evidence or self-declared operator is accepted
+  - candidate remains inactive and affects no current build/runtime
+  - fake Host only; no network or external disclosure

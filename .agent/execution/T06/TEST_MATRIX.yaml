@@ -1,0 +1,24 @@
+schema: shun-t06-test-matrix/v1
+task_id: T06
+baseline_sha: 1165a70a9271f570cbb313210f20aa013db72f86
+focused:
+  - name: t06-feedback-positive-negative
+    command: pnpm --filter @shun/workflow exec vitest run --config ../../tests/integration/v03/t06-meta/vitest.config.ts
+    expected: EXIT=0; opt-in selection, allowlist redaction, provenance and Shadow-only behavior pass with fake Host
+  - name: t06-typecheck
+    command: pnpm --filter @shun/workflow exec tsc --noEmit -p ../../tests/integration/v03/t06-meta/tsconfig.json
+    expected: EXIT=0
+  - name: t06-lint
+    command: pnpm --filter @shun/workflow exec biome check ../../packages/domain-computer/src/feedback ../../tests/integration/v03/t06-meta
+    expected: EXIT=0
+required:
+  - name: workflow-store-contract-regression
+    command: pnpm --filter @shun/workflow test && pnpm --filter @shun/store test && pnpm --filter @shun/contracts test
+    expected: EXIT=0
+  - name: local-only-and-write-set-guard
+    command: verify no network-capable sender/import, no raw sensitive fields, git diff --exit-code -- pnpm-lock.yaml and compare paths to the two frozen patterns
+    expected: no external disclosure, no cross-user data, no out-of-scope path
+task_owned_platform:
+  - name: external Meta/feedback submission
+    command: NOT_RUN — Owner has not authorized external data disclosure
+    expected: NOT_RUN; only synthetic local fixtures and fake Host port are allowed
