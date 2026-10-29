@@ -1,0 +1,45 @@
+pack_id: shun-v03-t03-1165a70-execution-pack-v1
+task_id: T03
+repository: kaicreator-mm/shun-assistant
+version: v0.3.0
+base_sha: 1165a70a9271f570cbb313210f20aa013db72f86
+task_pack_ref: docs/planning/v0.3/TASK-PACKS-R0.json@blob:8aef87cac27297cc32e4e79e0141658a712484fb
+branch: JIT_only_task/v0.3.0-t03
+parent_issue: "#231"
+agent_freedom: F1_BOUNDED_IMPLEMENTATION
+pinned_standard_revision: 2c395c55569fe2edf3f4135f12d3d069e526d0b7
+generated_by: chatgpt-web:shun-v03-wave1-scheduler
+generated_at: 2026-10-30
+dependency_completion:
+  - "T00@1165a70a9271f570cbb313210f20aa013db72f86"
+material_paths:
+  - "packages/contracts/src/goal.ts"
+  - "packages/contracts/src/capability.ts"
+  - "packages/contracts/src/registry.ts"
+  - "packages/contracts/src/environment.ts"
+  - "packages/contracts/src/schema/goal-request.schema.json"
+  - "packages/contracts/src/schema/goal-contract.schema.json"
+  - "packages/resolver/src/normalize.ts"
+  - "packages/resolver/src/planner-seam.ts"
+  - "packages/resolver/src/registry.ts"
+  - "packages/resolver/src/feasibility.ts"
+  - "packages/resolver/src/gates.ts"
+  - "packages/resolver/src/resolve.ts"
+  - "packages/domain-computer/src/contracts/**"
+  - "packages/domain-computer/src/semantic/**"
+  - "tests/integration/v03/t03-semantic/**"
+core_artifacts:
+  - MANIFEST.yaml
+  - EXECUTION_CONTRACT.md
+  - TEST_MATRIX.yaml
+  - FAILURE_MATRIX.yaml
+  - IMPLEMENTATION_MAP.md
+  - REVIEW_CHECKLIST.md
+optional_artifacts: []
+retention: durable
+package_excluded: true
+pack_state_at_generation: PACK_CURRENT
+owner_authorization_ref: "#218@6510839827"
+dispatch_generation: 1
+admission_mode: SINGLE_WRITER_ADMISSION
+protected_claim_key: "kaicreator-mm/shun-assistant#231:builder:__default__"
