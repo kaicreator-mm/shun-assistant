@@ -15,7 +15,7 @@ failures:
     expected_rejection: zero physical effect; BLOCKED
   - case: path outside frozen write set or shared wiring is changed
     expected_rejection: BLOCKED; route to owning Task
- defect_routing:
+defect_routing:
   product_defect: route to Product Owner
   architecture_contradiction: stop and route to L2 Owner
   environment_inability: BLOCKED, not PASS
