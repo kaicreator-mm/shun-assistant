@@ -1,0 +1,42 @@
+schema: shun-t00-failure-matrix/v1
+task_id: T00
+failures:
+  - condition: source tag or tree differs from frozen DomainHarness identity
+    disposition: BLOCKED
+    action: stop before packaging; report exact ref and SHA mismatch
+  - condition: no accepted current CAS DISPATCH_CLAIMED or active dispatch is ambiguous
+    disposition: BLOCKED
+    action: no source write, no dependency installation, no retry under a new dispatch id
+  - condition: integration base, ADS pin, Task Pack or native dependency state drifted
+    disposition: STALE
+    action: stop; request currentness re-evaluation, do not silently rebind
+  - condition: package resolution contacts npm registry or uses npm-published DomainHarness 0.10.3
+    disposition: BLOCKED
+    action: stop; rebuild from the exact Git source tag and use local tarballs
+  - condition: any private SDK package/deep import or prohibited host-node llm/openai path is used
+    disposition: BLOCKED
+    action: remove from scope only with existing authority; do not introduce a second sender
+  - condition: tarball missing, source provenance absent, or SHA256 mismatch
+    disposition: BLOCKED
+    action: reject artifact; regenerate from the exact tag and record fresh digest
+  - condition: package manifest adds dependencies, devDependencies, or scripts
+    disposition: BLOCKED
+    action: remove additions; any required shared dependency/lockfile change belongs to T11 and needs its own admission
+  - condition: pnpm-lock.yaml changes
+    disposition: BLOCKED
+    action: restore only under a separately authorized owner; T00 must not edit it
+  - condition: any path outside the eight-path allowed write set changes
+    disposition: BLOCKED
+    action: stop and route to owning Task; no opportunistic cleanup
+  - condition: tests cannot prove local tarball resolution or public import behavior
+    disposition: BLOCKED
+    action: report exact failure and source evidence; do not claim SDK compatibility
+  - condition: real Windows effect, paid API request, credential access, or postinstall network effect is requested
+    disposition: BLOCKED
+    action: do not execute; request separate explicit authority if product scope requires it
+unknowns:
+  - missing native readback or incomplete API pagination
+  - claim write succeeded but acknowledgement/readback is ambiguous
+  - branch/base mismatch or unknown current active owner
+  - CI status absent or stale
+rule: UNKNOWN is HOLD/BLOCKED; never infer zero effects or PASS from silence.
