@@ -1,0 +1,44 @@
+# T00 SDK source identity — DomainHarness v0.10.3 (Git-source-only)
+
+Contract: frozen Task Pack blob 8aef87cac27297cc32e4e79e0141658a712484fb,
+Task DAG freeze record blob b47e02f59704ed1699c651b89fd8f26291312ff0,
+DAG blob 73d06cb67e08187d3ee6ae1a820c5b1f99a169e4.
+
+sdk_repository=kaicreator-mm/domain-harness
+sdk_tag=v0.10.3
+sdk_tag_commit=061376f4a023070f215f9feffad5c24d96d503cb
+sdk_tree=099cdc831aef63befd62aaede7e7a853d1be468f
+shun_base=936548fef7fa9252049c0caa29656d293a585472
+shun_integration_target=version/v0.3.0
+ads_pin=4.18.0@2c395c55569fe2edf3f4135f12d3d069e526d0b7
+dispatch_id=shun-v03-t00-local-builder-r1
+claim_ref=228#issuecomment-6505284817
+npm_v0.10.3_published=NO
+packed_versions=0.10.2-rc.0 (expected source-tag evidence; NOT rewritten to a fake npm 0.10.3)
+packed_at=2026-10-30
+packed_by=LOCAL_BUILDER dispatch shun-v03-t00-local-builder-r1 (zcode-local operator)
+
+packed_tarballs=4
+  kaicreator-domain-harness-contracts-0.10.2-rc.0.tgz   (packages/contracts, public ".")
+  kaicreator-domain-harness-microkernel-0.10.2-rc.0.tgz (packages/microkernel, public "." "./host-seam")
+  kaicreator-domain-harness-host-node-0.10.2-rc.0.tgz   (packages/host-node, public "."; "./llm/openai" FORBIDDEN for Shun)
+  kaicreator-domain-harness-build-0.10.2-rc.0.tgz       (tooling/build, public ".", build-time only)
+
+Per-tarball SHA256: see SHA256SUMS.txt in this directory.
+
+build_provenance:
+  source checkout: local bare mirror _mirror/domain-harness.git, worktree at refs/tags/v0.10.3
+    HEAD == 061376f4a023070f215f9feffad5c24d96d503cb
+    HEAD^{tree} == 099cdc831aef63befd62aaede7e7a853d1be468f
+  install: npm ci --ignore-scripts --registry=https://registry.npmmirror.com (DH root package-lock.json)
+  build:   npm run build --workspace <pkg> (tsc) in dependency order:
+           contracts -> microkernel -> build -> host-node; all EXIT=0
+  pack:    npm pack per package directory (no prepack/prepare scripts exist in the four manifests)
+  consumer: isolated temp dir, npm install --offline --legacy-peer-deps of the four local file: tarballs
+            (offline success proves resolution never contacted any registry)
+
+forbidden_subpath_note:
+  @kaicreator/domain-harness-host-node/llm/openai exists in the SDK exports map but must NOT be
+  installed, imported or referenced by Shun v0.3 (single physical sender rule, L2 freeze decision 3).
+  The negative oracle in t00-scaffold.test.mjs proves Shun manifests carry zero dependencies and
+  no Shun T00 source references the subpath — it does NOT claim the SDK rejects its own export.
