@@ -1,0 +1,30 @@
+schema: shun-t04-failure-matrix/v1
+task_id: T04
+failures:
+  - case: changed model/messages/options or injected system prompt/tool/schema/temperature
+    expected_rejection: zero HTTP; strict neutral DTO refusal
+  - case: stale/unsigned consent, mismatched price/scope, missing broker or duplicate attempt
+    expected_rejection: zero HTTP and no new approval/nonce
+  - case: unsupported maxOutputTokens, token ceiling exceeded or expired deadlineUnixMs
+    expected_rejection: reject before MAY_HAVE_SENT and before HTTP
+  - case: canonical request Buffer changes between reserve, markMayHaveSent and fetch
+    expected_rejection: identity mismatch; zero send or typed refusal
+  - case: ambiguous transport refusal or timeout without zero-send proof
+    expected_rejection: K UNKNOWN and UNKNOWN_COST retained; no retry/refund/alternate sender
+  - case: failed/refused/unknown mapped as completed
+    expected_rejection: contract/test failure; no false terminal success
+  - case: B-040 or protected user data included in remote request
+    expected_rejection: zero HTTP; disclosure denied
+  - case: paid model request, real credential, second sender or out-of-scope path
+    expected_rejection: BLOCKED; no action
+ defect_routing:
+  product_defect: route to Product Owner
+  architecture_contradiction: stop and route to L2 Owner
+  environment_inability: BLOCKED, not PASS
+  execution_pack_invalid: stop before source mutation
+negative_oracle:
+  - fake HTTP records byte-for-byte same Buffer identity through every send stage
+  - expired deadline and unsupported token ceiling produce zero network calls
+  - ambiguous send remains UNKNOWN and never blind-retries
+  - no real DeepSeek credential or paid endpoint is accessed
+  - only selected C binding can reach the existing trusted sender

@@ -1,0 +1,33 @@
+schema: shun-t04-test-matrix/v1
+task_id: T04
+baseline_sha: 1165a70a9271f570cbb313210f20aa013db72f86
+focused:
+  - name: t04-selected-c-host-fake-http
+    command: pnpm --filter @shun/llm-remote exec vitest run --config ../../tests/integration/v03/t04-cloud/vitest.config.ts
+    expected: EXIT=0; selected C-to-Host binding, canonical Buffer identity, signed approval, token ceiling, deadline and result mapping pass with fake HTTP only
+  - name: t04-typecheck
+    command: pnpm --filter @shun/llm-remote exec tsc --noEmit -p ../../tests/integration/v03/t04-cloud/tsconfig.json
+    expected: EXIT=0
+  - name: t04-lint
+    command: pnpm --filter @shun/llm-remote exec biome check ../../packages/domain-computer/src/cloud ../../packages/domain-host/src/cloud ../../tests/integration/v03/t04-cloud
+    expected: EXIT=0
+required:
+  - name: llm-remote-regression
+    command: pnpm --filter @shun/llm-remote test
+    expected: EXIT=0; existing sender behavior preserved
+  - name: contracts-workflow-regression
+    command: pnpm --filter @shun/contracts test && pnpm --filter @shun/workflow test
+    expected: EXIT=0
+  - name: lockfile-and-write-set
+    command: git diff --exit-code -- pnpm-lock.yaml; verify changed paths against the three frozen patterns
+    expected: EXIT=0; no out-of-scope path
+  - name: zero-paid-guard
+    command: inspect test harness for fake HTTP only and assert no live transport/key access
+    expected: no paid request, no external disclosure, no MAY_HAVE_SENT on rejected input
+task_owned_platform:
+  - name: real DeepSeek request
+    command: NOT_RUN — Owner explicitly forbids paid DeepSeek requests
+    expected: NOT_RUN; fake-HTTP contract is the only authorized transport proof
+  - name: physical Windows effect
+    command: NOT_RUN — not required and not authorized
+    expected: NOT_RUN
