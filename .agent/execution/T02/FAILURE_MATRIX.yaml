@@ -1,0 +1,27 @@
+schema: shun-t02-failure-matrix/v1
+task_id: T02
+failures:
+  - case: arbitrary root, traversal, UNC path or forged observation
+    expected_rejection: zero observation disclosure; typed refusal
+  - case: malformed SupportObservation or unexpected DTO fields
+    expected_rejection: strict schema refusal
+  - case: B-040 environment values/key names, process args, secrets, sensitive paths or unrelated body appear in output
+    expected_rejection: test FAIL; no report emitted
+  - case: localOnly is not true or externalDisclosures is nonempty
+    expected_rejection: reject; never infer local-only from missing fields
+  - case: automatic model, Meta, error reporter, SDK issue or network forwarding
+    expected_rejection: zero egress; no sender invoked
+  - case: changes to vertical-support or vertical-system source
+    expected_rejection: BLOCKED; route to owning Task
+  - case: physical mutation or paid API requested
+    expected_rejection: BLOCKED; no execution
+defect_routing:
+  product_defect: route to Product Owner
+  architecture_contradiction: route to L2 Owner
+  environment_inability: BLOCKED, not PASS
+  execution_pack_invalid: stop before source write
+negative_oracle:
+  - arbitrary filesystem root is rejected
+  - forged host observation is not treated as real Windows evidence
+  - secret/path/process/document content never appears in minimized report
+  - no external network/model/Meta/error/SDK issue call occurs
