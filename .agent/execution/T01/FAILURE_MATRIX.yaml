@@ -1,0 +1,30 @@
+schema: shun-t01-failure-matrix/v1
+task_id: T01
+failures:
+  - case: K Permit absent, forged, stale or for another effect
+    expected_rejection: zero Windows effect; typed refusal
+  - case: Shun ActionController authorization/currentness absent or stale
+    expected_rejection: zero Windows effect even with a valid K Permit
+  - case: authorizeEffect is not immediately adjacent to the real Host effect boundary
+    expected_rejection: contract/test failure; do not substitute a cached check
+  - case: effectId or payload differs between K Permit, Shun authorization and ShunStore apply
+    expected_rejection: zero effect and no business-state commit
+  - case: duplicate active WorkflowEffectJournal and K dispatcher for one migrated Case
+    expected_rejection: reject dual ownership; no second dispatch
+  - case: uncertain replay or partial transaction
+    expected_rejection: preserve UNKNOWN/reconciliation state; no blind replay
+  - case: request requires physical Windows mutation during this dispatch
+    expected_rejection: BLOCKED pending separate Owner authorization
+  - case: any source path outside the frozen write set or pnpm-lock changes
+    expected_rejection: BLOCKED; restore/reroute under owning Task
+defect_routing:
+  product_defect: publish and route; no Product widening
+  architecture_contradiction: stop and route to L2 Owner
+  environment_inability: BLOCKED, never PASS
+  execution_pack_invalid: stop before source mutation
+negative_oracle:
+  - fake K Permit cannot pass Host authorization
+  - valid K Permit cannot bypass Shun ActionController currentness
+  - stale path/grant and effectId/payload mismatch cause zero effect
+  - uncertain replay does not duplicate apply(effectId)
+  - old WorkflowEffectJournal cannot remain a second active dispatcher
