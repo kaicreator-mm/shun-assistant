@@ -1,0 +1,27 @@
+schema: shun-t05-failure-matrix/v1
+task_id: T05
+failures:
+  - case: unapproved or unknown template
+    expected_rejection: no StepSpec emitted
+  - case: source observation missing, forged or not trusted
+    expected_rejection: no step; typed refusal
+  - case: StepOutcome from an old/superseded step or another Case
+    expected_rejection: stale identity rejection; no state advance
+  - case: unknown answer field, malformed value or incomplete required evidence
+    expected_rejection: strict schema refusal
+  - case: advisory answer asserts grant/approval/capability
+    expected_rejection: no authority effect; reject or retain as untrusted text only
+  - case: attempt to launch command, call model/provider or mutate Windows
+    expected_rejection: zero call/effect; BLOCKED outside Task scope
+  - case: UI/API/export or sibling Task path is modified
+    expected_rejection: BLOCKED; route to T10/T11 or owning Task
+ defect_routing:
+  product_defect: route to Product Owner
+  architecture_contradiction: stop and route to L2 Owner
+  environment_inability: BLOCKED, not PASS
+  execution_pack_invalid: stop before source mutation
+negative_oracle:
+  - one approved observation creates at most one current StepSpec
+  - stale/replayed/cross-Case outcomes never advance the journey
+  - answer content cannot mint grants, approvals or effects
+  - no model, provider, OS or external calls occur
