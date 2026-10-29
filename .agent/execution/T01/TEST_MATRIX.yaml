@@ -1,0 +1,27 @@
+schema: shun-t01-test-matrix/v1
+task_id: T01
+baseline_sha: 1165a70a9271f570cbb313210f20aa013db72f86
+focused:
+  - name: t01-host-positive-negative
+    command: pnpm --filter @shun/authorization exec vitest run --config ../../tests/integration/v03/t01-host/vitest.config.ts
+    expected: EXIT=0; real ActionController + real K permit path tested with an instrumented no-physical-effect OS seam
+  - name: t01-host-typecheck
+    command: pnpm --filter @shun/authorization exec tsc --noEmit -p ../../tests/integration/v03/t01-host/tsconfig.json
+    expected: EXIT=0
+  - name: t01-host-lint
+    command: pnpm --filter @shun/authorization exec biome check ../../packages/domain-host/src/windows ../../packages/domain-host/src/state ../../tests/integration/v03/t01-host
+    expected: EXIT=0
+required:
+  - name: authorization-store-workflow-regression
+    command: pnpm --filter @shun/authorization test && pnpm --filter @shun/store test && pnpm --filter @shun/workflow test
+    expected: all selected package suites EXIT=0; do not run real-effect evidence tests
+  - name: lockfile-guard
+    command: git diff --exit-code -- pnpm-lock.yaml
+    expected: EXIT=0
+  - name: write-set-guard
+    command: git diff --name-only against exact base; compare every path to the three frozen patterns
+    expected: no out-of-scope path
+task_owned_platform:
+  - name: real Windows physical effect
+    command: NOT_RUN — Owner explicitly did not authorize real Windows side effects
+    expected: NOT_RUN/BLOCKED; fake/instrumented boundary tests do not count as real physical-effect validation
