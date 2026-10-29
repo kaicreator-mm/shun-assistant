@@ -15,7 +15,7 @@ failures:
     expected_rejection: zero call/effect; BLOCKED outside Task scope
   - case: UI/API/export or sibling Task path is modified
     expected_rejection: BLOCKED; route to T10/T11 or owning Task
- defect_routing:
+defect_routing:
   product_defect: route to Product Owner
   architecture_contradiction: stop and route to L2 Owner
   environment_inability: BLOCKED, not PASS
