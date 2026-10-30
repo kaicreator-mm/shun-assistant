@@ -149,11 +149,14 @@ function safeUnixMs(value: unknown): value is number {
 }
 
 /**
- * The only producer of evidence accepted by selectGoalSemantic. The trusted
- * Host composition (T11) calls this with its private observation result; UI,
- * model, request and public callers have no path to it. The issued value is
- * frozen, marked in a module-private WeakSet, and carries a Host-issued
- * validity window and exact task scope binding.
+ * The only producer of evidence accepted by selectGoalSemantic. In the
+ * single-process trusted-computing base, untrusted inputs (model output,
+ * request JSON, UI data) are data and cannot execute code, so they cannot
+ * call this issuer; process-internal code that should not mint evidence is
+ * kept out by composition: only the trusted Host composition (T11) wires
+ * this issuer to its private observation result. The issued value is frozen,
+ * marked in a module-private WeakSet, and carries a Host-issued validity
+ * window and exact task scope binding.
  */
 export function issueHostObjectObservation(raw: unknown): HostObjectObservationEvidence | null {
   try {
@@ -231,6 +234,7 @@ type ParsedHostObservation =
  * the caller-provided now, and — checked by the caller — exact task scope.
  */
 function parseHostObservation(value: unknown, nowUnixMs: number): ParsedHostObservation {
+  if (!safeUnixMs(nowUnixMs)) return { ok: false, code: 'HOST_OBSERVATION_INVALID' };
   if (!isRecord(value)) return { ok: false, code: 'HOST_OBSERVATION_INVALID' };
   if (!ISSUED_HOST_OBSERVATIONS.has(value)) {
     return { ok: false, code: 'HOST_OBSERVATION_UNTRUSTED_SOURCE' };
@@ -470,7 +474,7 @@ export function selectGoalSemantic(input: {
     ...(proposal
       ? {
           proposalId: proposal.proposalId,
-          plannerEvidence: proposal.plannerEvidence!,
+          plannerEvidence: proposal.plannerEvidence,
         }
       : {}),
   });
@@ -487,10 +491,7 @@ export function selectGoalSemantic(input: {
   // selections do not consume; a further accepted selection requires a fresh
   // Host-issued observation. Durable cross-process replay fencing stays with
   // the trusted Host observation adapter.
-  if (
-    typeof input.hostObservation === 'object' &&
-    input.hostObservation !== null
-  ) {
+  if (typeof input.hostObservation === 'object' && input.hostObservation !== null) {
     CONSUMED_HOST_OBSERVATIONS.add(input.hostObservation);
   }
 

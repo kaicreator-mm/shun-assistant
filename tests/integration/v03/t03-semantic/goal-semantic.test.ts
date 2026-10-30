@@ -269,6 +269,16 @@ describe('T03 typed Goal/Proposal semantic and registered capability selection',
       }),
     ).toMatchObject({ status: 'REJECTED', code: 'HOST_OBSERVATION_INVALID' });
 
+    // A non-finite caller clock must fail closed, never pass the window check.
+    expect(
+      selectGoalSemantic({
+        nowUnixMs: Number.NaN,
+        request,
+        registry,
+        hostObservation: hostObservation(request),
+      }),
+    ).toMatchObject({ status: 'REJECTED', code: 'HOST_OBSERVATION_INVALID' });
+
     // Any plain object — wrong schema or exact valid shape — lacks the
     // private Host issuance mark and is refused as untrusted source.
     expect(
