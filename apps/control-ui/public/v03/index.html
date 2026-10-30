@@ -1,0 +1,55 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Shun Bounded Control (v0.3)</title>
+    <link rel="stylesheet" href="./styles.css" />
+  </head>
+  <body>
+    <header>
+      <h1 id="v03-title">Shun Bounded Control (v0.3)</h1>
+      <p id="v03-subtitle" class="muted">
+        One guided step at a time. Nothing takes effect without your explicit approval.
+      </p>
+      <p id="v03-banner" class="unknown" role="status">
+        Connecting to the local Shun surface…
+      </p>
+    </header>
+
+    <main>
+      <section id="v03-scope-section" aria-labelledby="v03-scope-title">
+        <h2 id="v03-scope-title">Selected scope</h2>
+        <div id="v03-scope"></div>
+      </section>
+
+      <section id="v03-step-section" aria-labelledby="v03-step-title">
+        <h2 id="v03-step-title">Current guided step</h2>
+        <div id="v03-step"></div>
+        <form id="v03-step-form"></form>
+        <button id="v03-approve" type="button" class="approve">Approve this step</button>
+        <button id="v03-refuse" type="button" class="refuse">Refuse this step</button>
+        <p id="v03-decision-feedback" role="status"></p>
+      </section>
+
+      <section id="v03-history-section" aria-labelledby="v03-history-title">
+        <h2 id="v03-history-title">History</h2>
+        <ul id="v03-history"></ul>
+      </section>
+
+      <section id="v03-advisory-section" aria-labelledby="v03-advisory-title">
+        <h2 id="v03-advisory-title">Suggestion (advisory only)</h2>
+        <div id="v03-advisory"></div>
+      </section>
+    </main>
+
+    <footer>
+      <p class="muted">
+        This surface relays your decisions only. It cannot create authorization and never approves
+        anything by itself.
+      </p>
+    </footer>
+
+    <script type="module" src="./app.js"></script>
+  </body>
+</html>
