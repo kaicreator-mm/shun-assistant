@@ -6,18 +6,18 @@
  * effect, or authorization/approval API.
  */
 import {
-  CapabilityDefinitionSchema,
-  GoalContractSchema,
-  GoalProposalSchema,
-  GoalRequestSchema,
   type CapabilityDefinition,
+  CapabilityDefinitionSchema,
   type GoalContract,
+  GoalContractSchema,
   type GoalProposal,
+  GoalProposalSchema,
   type GoalRequest,
+  GoalRequestSchema,
   type ObjectRef,
 } from '../../../contracts/src/index.ts';
-import { normalizeGoal, type GoalNormalization } from '../../../resolver/src/normalize.ts';
-import { RESOLVER_REVISION, ShunRegistry } from '../../../resolver/src/registry.ts';
+import { type GoalNormalization, normalizeGoal } from '../../../resolver/src/normalize.ts';
+import { RESOLVER_REVISION, type ShunRegistry } from '../../../resolver/src/registry.ts';
 
 export const GOAL_SEMANTIC_SCHEMA = 'shun.goal-semantic.v1' as const;
 export const HOST_OBJECT_OBSERVATION_SCHEMA = 'shun.host-object-observation.v1' as const;
@@ -28,8 +28,13 @@ export interface HostObjectObservationEvidence {
   readonly sourceRef: string;
   /** Host-issued observation revision; caller-computed hashes are not currentness proof. */
   readonly revision: string;
+  /** Exact task/Case scope this observation was issued for. */
+  readonly taskId: string;
   /** Exact typed object identities observed by the Host: KIND:ref. */
   readonly observedObjectRefs: readonly string[];
+  /** Host-issued validity window; the semantic selector rechecks it at use time. */
+  readonly issuedAtUnixMs: number;
+  readonly expiresAtUnixMs: number;
 }
 
 export interface GoalSemanticProvenance {
@@ -65,6 +70,9 @@ export type GoalSemanticRejectionCode =
   | 'PROPOSAL_NOT_READY'
   | 'HOST_OBSERVATION_REQUIRED'
   | 'HOST_OBSERVATION_INVALID'
+  | 'HOST_OBSERVATION_UNTRUSTED_SOURCE'
+  | 'HOST_OBSERVATION_EXPIRED'
+  | 'HOST_OBSERVATION_REPLAY'
   | 'HOST_OBSERVATION_SCOPE_MISMATCH'
   | 'REGISTRY_CURRENTNESS_INSUFFICIENT'
   | 'CAPABILITY_SELECTION_INVARIANT'
@@ -87,10 +95,7 @@ export type GoalSemanticSelection =
       readonly detail: string;
     };
 
-function rejected(
-  code: GoalSemanticRejectionCode,
-  detail: string,
-): GoalSemanticSelection {
+function rejected(code: GoalSemanticRejectionCode, detail: string): GoalSemanticSelection {
   return { status: 'REJECTED', code, detail };
 }
 
@@ -130,34 +135,114 @@ function deepFreeze<T>(value: T): T {
 }
 
 /**
- * The Host observation is an injected trusted port result, not model data.
- * Strict shape + source reference + revision + exact selected-object coverage
- * are checked here; the composition root remains responsible for wiring this
- * value only from the trusted Host adapter.
+ * Module-private registries backing the Host-issued observation capability.
+ * Accepted evidence is produced only by issueHostObjectObservation, which is
+ * the trusted private Host Observation Port surface; a caller-constructed
+ * plain object can never obtain the mark, so structural similarity to the
+ * evidence shape is not Host provenance.
  */
-function parseHostObservation(value: unknown): HostObjectObservationEvidence | null {
-  if (!isRecord(value)) return null;
-  const allowed = ['schema', 'sourceRef', 'revision', 'observedObjectRefs'];
-  const keys = Object.keys(value);
-  if (keys.length !== allowed.length || keys.some((key) => !allowed.includes(key))) return null;
-  if (value.schema !== HOST_OBJECT_OBSERVATION_SCHEMA) return null;
-  if (typeof value.sourceRef !== 'string' || value.sourceRef.trim().length === 0 || value.sourceRef.trim() !== value.sourceRef) return null;
-  if (typeof value.revision !== 'string' || value.revision.trim().length === 0 || value.revision.trim() !== value.revision) return null;
-  if (
-    !Array.isArray(value.observedObjectRefs) ||
-    !value.observedObjectRefs.every(
-      (entry) => typeof entry === 'string' && entry.length > 0 && entry.trim() === entry,
+const ISSUED_HOST_OBSERVATIONS = new WeakSet<object>();
+const CONSUMED_HOST_OBSERVATIONS = new WeakSet<object>();
+
+function safeUnixMs(value: unknown): value is number {
+  return typeof value === 'number' && Number.isSafeInteger(value);
+}
+
+/**
+ * The only producer of evidence accepted by selectGoalSemantic. The trusted
+ * Host composition (T11) calls this with its private observation result; UI,
+ * model, request and public callers have no path to it. The issued value is
+ * frozen, marked in a module-private WeakSet, and carries a Host-issued
+ * validity window and exact task scope binding.
+ */
+export function issueHostObjectObservation(raw: unknown): HostObjectObservationEvidence | null {
+  try {
+    if (!isRecord(raw)) return null;
+    const allowed = [
+      'schema',
+      'sourceRef',
+      'revision',
+      'taskId',
+      'observedObjectRefs',
+      'issuedAtUnixMs',
+      'expiresAtUnixMs',
+    ];
+    const keys = Object.keys(raw);
+    if (keys.length !== allowed.length || keys.some((key) => !allowed.includes(key))) return null;
+    if (raw.schema !== HOST_OBJECT_OBSERVATION_SCHEMA) return null;
+    if (
+      typeof raw.sourceRef !== 'string' ||
+      raw.sourceRef.trim().length === 0 ||
+      raw.sourceRef.trim() !== raw.sourceRef
     )
-  ) {
+      return null;
+    if (
+      typeof raw.revision !== 'string' ||
+      raw.revision.trim().length === 0 ||
+      raw.revision.trim() !== raw.revision
+    )
+      return null;
+    if (
+      typeof raw.taskId !== 'string' ||
+      raw.taskId.trim().length === 0 ||
+      raw.taskId.trim() !== raw.taskId
+    )
+      return null;
+    if (
+      !Array.isArray(raw.observedObjectRefs) ||
+      !raw.observedObjectRefs.every(
+        (entry) => typeof entry === 'string' && entry.length > 0 && entry.trim() === entry,
+      )
+    )
+      return null;
+    if (new Set(raw.observedObjectRefs).size !== raw.observedObjectRefs.length) return null;
+    if (!safeUnixMs(raw.issuedAtUnixMs) || !safeUnixMs(raw.expiresAtUnixMs)) return null;
+    if (raw.expiresAtUnixMs <= raw.issuedAtUnixMs) return null;
+    const evidence: HostObjectObservationEvidence = Object.freeze({
+      schema: HOST_OBJECT_OBSERVATION_SCHEMA,
+      sourceRef: raw.sourceRef,
+      revision: raw.revision,
+      taskId: raw.taskId,
+      observedObjectRefs: Object.freeze([...raw.observedObjectRefs]),
+      issuedAtUnixMs: raw.issuedAtUnixMs,
+      expiresAtUnixMs: raw.expiresAtUnixMs,
+    });
+    ISSUED_HOST_OBSERVATIONS.add(evidence);
+    return evidence;
+  } catch {
     return null;
   }
-  if (new Set(value.observedObjectRefs).size !== value.observedObjectRefs.length) return null;
-  return Object.freeze({
-    schema: HOST_OBJECT_OBSERVATION_SCHEMA,
-    sourceRef: value.sourceRef,
-    revision: value.revision,
-    observedObjectRefs: Object.freeze([...value.observedObjectRefs]),
-  });
+}
+
+type ParsedHostObservation =
+  | { readonly ok: true; readonly evidence: HostObjectObservationEvidence }
+  | {
+      readonly ok: false;
+      readonly code:
+        | 'HOST_OBSERVATION_INVALID'
+        | 'HOST_OBSERVATION_UNTRUSTED_SOURCE'
+        | 'HOST_OBSERVATION_EXPIRED';
+    };
+
+/**
+ * The Host observation is an issued trusted capability result, not model data.
+ * Acceptance requires the module-private issuance mark (never constructible
+ * from a plain object), the frozen evidence shape, a live validity window at
+ * the caller-provided now, and — checked by the caller — exact task scope.
+ */
+function parseHostObservation(value: unknown, nowUnixMs: number): ParsedHostObservation {
+  if (!isRecord(value)) return { ok: false, code: 'HOST_OBSERVATION_INVALID' };
+  if (!ISSUED_HOST_OBSERVATIONS.has(value)) {
+    return { ok: false, code: 'HOST_OBSERVATION_UNTRUSTED_SOURCE' };
+  }
+  const evidence = value as unknown as HostObjectObservationEvidence;
+  if (evidence.schema !== HOST_OBJECT_OBSERVATION_SCHEMA) {
+    return { ok: false, code: 'HOST_OBSERVATION_INVALID' };
+  }
+  if (nowUnixMs < evidence.issuedAtUnixMs || nowUnixMs > evidence.expiresAtUnixMs) {
+    return { ok: false, code: 'HOST_OBSERVATION_EXPIRED' };
+  }
+  return { ok: true, evidence };
 }
 
 function proposalAuthorityRefusal(
@@ -166,7 +251,10 @@ function proposalAuthorityRefusal(
 ): GoalSemanticSelection | null {
   const proposed = proposal.goalContract;
   if (proposed.taskId !== request.taskId) {
-    return rejected('PROPOSAL_TASK_SCOPE_MISMATCH', 'proposal taskId differs from the user request');
+    return rejected(
+      'PROPOSAL_TASK_SCOPE_MISMATCH',
+      'proposal taskId differs from the user request',
+    );
   }
   if (!structurallyEqual(proposed.objects, request.objects)) {
     return rejected(
@@ -231,6 +319,9 @@ function proposalAuthorityRefusal(
 export function selectGoalSemantic(input: {
   readonly request: unknown;
   readonly registry: ShunRegistry;
+  /** Caller-provided current time; the Host observation window is checked against it. */
+  readonly nowUnixMs: number;
+  /** Only issueHostObjectObservation results are accepted; plain data is refused. */
   readonly hostObservation?: unknown;
   /** Already-produced untrusted proposal data; never a PlannerPort. */
   readonly proposal?: unknown;
@@ -245,24 +336,41 @@ export function selectGoalSemantic(input: {
   const request = requestResult.data;
 
   if (!input.registry.currentnessAttested) {
-    return rejected(
-      'REGISTRY_CURRENTNESS_INSUFFICIENT',
-      input.registry.currentnessExplanation,
-    );
+    return rejected('REGISTRY_CURRENTNESS_INSUFFICIENT', input.registry.currentnessExplanation);
   }
 
   let hostObservation: HostObjectObservationEvidence | undefined;
   let observedRefs: Set<string> | undefined;
   if (input.hostObservation !== undefined) {
-    const parsedObservation = parseHostObservation(input.hostObservation);
-    if (!parsedObservation) {
+    if (
+      typeof input.hostObservation === 'object' &&
+      input.hostObservation !== null &&
+      CONSUMED_HOST_OBSERVATIONS.has(input.hostObservation)
+    ) {
       return rejected(
-        'HOST_OBSERVATION_INVALID',
-        'Host observation evidence is malformed, stale-shaped, or contains unrecognized fields',
+        'HOST_OBSERVATION_REPLAY',
+        'each Host-issued observation is single-use for one accepted selection; request a fresh Host observation',
       );
     }
-    hostObservation = parsedObservation;
-    observedRefs = new Set(parsedObservation.observedObjectRefs);
+    const parsedObservation = parseHostObservation(input.hostObservation, input.nowUnixMs);
+    if (!parsedObservation.ok) {
+      return rejected(
+        parsedObservation.code,
+        parsedObservation.code === 'HOST_OBSERVATION_UNTRUSTED_SOURCE'
+          ? 'Host observation evidence must come from the private Host Observation Port via issueHostObjectObservation; caller-shaped data is never Host provenance'
+          : parsedObservation.code === 'HOST_OBSERVATION_EXPIRED'
+            ? 'the Host-issued observation validity window is not live at the provided now'
+            : 'Host observation evidence is malformed or contains unrecognized fields',
+      );
+    }
+    hostObservation = parsedObservation.evidence;
+    if (hostObservation.taskId !== request.taskId) {
+      return rejected(
+        'HOST_OBSERVATION_SCOPE_MISMATCH',
+        'the Host-issued observation was issued for a different task scope',
+      );
+    }
+    observedRefs = new Set(hostObservation.observedObjectRefs);
   }
 
   if (request.objects.length > 0) {
@@ -304,7 +412,10 @@ export function selectGoalSemantic(input: {
       ? (ref: string) =>
           (() => {
             const matching = request.objects.filter((object) => object.ref === ref);
-            return matching.length > 0 && matching.every((object) => observedRefs?.has(objectIdentity(object)) === true);
+            return (
+              matching.length > 0 &&
+              matching.every((object) => observedRefs?.has(objectIdentity(object)) === true)
+            );
           })()
       : undefined;
 
@@ -371,6 +482,17 @@ export function selectGoalSemantic(input: {
     capabilityRevision: capabilityResult.data.revision,
     provenance,
   }) satisfies GoalSemantic;
+
+  // One accepted selection consumes the observation. Retried/failed
+  // selections do not consume; a further accepted selection requires a fresh
+  // Host-issued observation. Durable cross-process replay fencing stays with
+  // the trusted Host observation adapter.
+  if (
+    typeof input.hostObservation === 'object' &&
+    input.hostObservation !== null
+  ) {
+    CONSUMED_HOST_OBSERVATIONS.add(input.hostObservation);
+  }
 
   return {
     status: 'SELECTED',

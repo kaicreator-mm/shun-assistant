@@ -1,18 +1,16 @@
 import { describe, expect, it } from 'vitest';
+import type { GoalProposal, GoalRequest } from '../../../../packages/contracts/src/index.ts';
 import {
   HOST_OBJECT_OBSERVATION_SCHEMA,
+  issueHostObjectObservation,
   selectGoalSemantic,
 } from '../../../../packages/domain-computer/src/semantic/goal-semantic.ts';
-import {
-  ShunRegistry,
-  snapshotFactsRevision,
-} from '../../../../packages/resolver/src/registry.ts';
+import { ShunRegistry, snapshotFactsRevision } from '../../../../packages/resolver/src/registry.ts';
 import {
   capabilityDef,
   ENV_LOCAL,
   goalRequest,
 } from '../../../../packages/resolver/test/scenarios.ts';
-import type { GoalProposal, GoalRequest } from '../../../../packages/contracts/src/index.ts';
 
 function snapshot(capabilityIds = ['image.batch_process']) {
   return {
@@ -32,13 +30,19 @@ async function attestedRegistry(capabilityIds?: string[]) {
   });
 }
 
-function hostObservation(request: GoalRequest) {
-  return {
+const NOW = 1_765_000_000_000;
+
+function hostObservation(request: GoalRequest, overrides: Record<string, unknown> = {}) {
+  return issueHostObjectObservation({
     schema: HOST_OBJECT_OBSERVATION_SCHEMA,
     sourceRef: 'host-observation:fixture-01',
     revision: 'obs-0042',
+    taskId: request.taskId,
     observedObjectRefs: request.objects.map((object) => `${object.kind}:${object.ref}`),
-  };
+    issuedAtUnixMs: NOW - 1_000,
+    expiresAtUnixMs: NOW + 60_000,
+    ...overrides,
+  });
 }
 
 function validProposal(request: GoalRequest): GoalProposal {
@@ -66,6 +70,7 @@ describe('T03 typed Goal/Proposal semantic and registered capability selection',
     const registry = await attestedRegistry();
     const request = goalRequest({ goal: 'image.batch_process: resize my photos' });
     const result = selectGoalSemantic({
+      nowUnixMs: NOW,
       request,
       registry,
       hostObservation: hostObservation(request),
@@ -88,6 +93,7 @@ describe('T03 typed Goal/Proposal semantic and registered capability selection',
     const request = goalRequest({ goal: 'please make my selected photos smaller' });
     const proposal = validProposal(request);
     const result = selectGoalSemantic({
+      nowUnixMs: NOW,
       request,
       proposal,
       registry,
@@ -110,7 +116,9 @@ describe('T03 typed Goal/Proposal semantic and registered capability selection',
     expect(result.semantic.goalContract.objects).toEqual(request.objects);
     expect(result.semantic.goalContract.constraints).toEqual(request.constraints);
     expect(result.semantic.goalContract.privacyPolicy).toEqual(request.policyContext.privacyPolicy);
-    expect(result.semantic.goalContract.environmentPolicy).toEqual(request.policyContext.environmentPolicy);
+    expect(result.semantic.goalContract.environmentPolicy).toEqual(
+      request.policyContext.environmentPolicy,
+    );
   });
 
   it('rejects a proposal that widens or changes the selected folder/object set', async () => {
@@ -122,6 +130,7 @@ describe('T03 typed Goal/Proposal semantic and registered capability selection',
       { kind: 'DIRECTORY', ref: 'D:\\outside-selected-root' },
     ];
     const result = selectGoalSemantic({
+      nowUnixMs: NOW,
       request,
       proposal,
       registry,
@@ -140,26 +149,54 @@ describe('T03 typed Goal/Proposal semantic and registered capability selection',
 
     const constraints = validProposal(request);
     constraints.goalContract.constraints = { format: 'PNG' };
-    expect(selectGoalSemantic({ request, proposal: constraints, registry, hostObservation: host }))
-      .toMatchObject({ status: 'REJECTED', code: 'PROPOSAL_CONSTRAINTS_CHANGED' });
+    expect(
+      selectGoalSemantic({
+        request,
+        nowUnixMs: NOW,
+        proposal: constraints,
+        registry,
+        hostObservation: host,
+      }),
+    ).toMatchObject({ status: 'REJECTED', code: 'PROPOSAL_CONSTRAINTS_CHANGED' });
 
     const privacy = validProposal(request);
     privacy.goalContract.privacyPolicy = { localOnly: false, externalDisclosure: 'ALLOWED' };
-    expect(selectGoalSemantic({ request, proposal: privacy, registry, hostObservation: host }))
-      .toMatchObject({ status: 'REJECTED', code: 'PROPOSAL_PRIVACY_CHANGED' });
+    expect(
+      selectGoalSemantic({
+        request,
+        nowUnixMs: NOW,
+        proposal: privacy,
+        registry,
+        hostObservation: host,
+      }),
+    ).toMatchObject({ status: 'REJECTED', code: 'PROPOSAL_PRIVACY_CHANGED' });
 
     const environment = validProposal(request);
     environment.goalContract.environmentPolicy = {
       allowedBackendKinds: ['LOCAL_WINDOWS', 'REMOTE_ECF'],
       allowElevation: true,
     };
-    expect(selectGoalSemantic({ request, proposal: environment, registry, hostObservation: host }))
-      .toMatchObject({ status: 'REJECTED', code: 'PROPOSAL_ENVIRONMENT_CHANGED' });
+    expect(
+      selectGoalSemantic({
+        request,
+        nowUnixMs: NOW,
+        proposal: environment,
+        registry,
+        hostObservation: host,
+      }),
+    ).toMatchObject({ status: 'REJECTED', code: 'PROPOSAL_ENVIRONMENT_CHANGED' });
 
     const verification = validProposal(request);
     verification.goalContract.verificationIntent = { successConditions: ['unrelated condition'] };
-    expect(selectGoalSemantic({ request, proposal: verification, registry, hostObservation: host }))
-      .toMatchObject({ status: 'REJECTED', code: 'PROPOSAL_VERIFICATION_CHANGED' });
+    expect(
+      selectGoalSemantic({
+        request,
+        nowUnixMs: NOW,
+        proposal: verification,
+        registry,
+        hostObservation: host,
+      }),
+    ).toMatchObject({ status: 'REJECTED', code: 'PROPOSAL_VERIFICATION_CHANGED' });
   });
 
   it('rejects model-invented lifecycle authority and missing planner evidence', async () => {
@@ -172,17 +209,27 @@ describe('T03 typed Goal/Proposal semantic and registered capability selection',
         lifecyclePolicy: { retention: 'JIT_REMOVE_AFTER_VERIFIED_USE' },
       },
     };
-    expect(selectGoalSemantic({ request, proposal: lifecycle, registry, hostObservation: hostObservation(request) }))
-      .toMatchObject({ status: 'REJECTED', code: 'PROPOSAL_LIFECYCLE_POLICY_UNAUTHORIZED' });
+    expect(
+      selectGoalSemantic({
+        request,
+        nowUnixMs: NOW,
+        proposal: lifecycle,
+        registry,
+        hostObservation: hostObservation(request),
+      }),
+    ).toMatchObject({ status: 'REJECTED', code: 'PROPOSAL_LIFECYCLE_POLICY_UNAUTHORIZED' });
 
     const missingEvidence = validProposal(request);
     delete missingEvidence.plannerEvidence;
-    expect(selectGoalSemantic({
-      request,
-      proposal: missingEvidence,
-      registry,
-      hostObservation: hostObservation(request),
-    })).toMatchObject({ status: 'REJECTED', code: 'PROPOSAL_EVIDENCE_MISSING' });
+    expect(
+      selectGoalSemantic({
+        nowUnixMs: NOW,
+        request,
+        proposal: missingEvidence,
+        registry,
+        hostObservation: hostObservation(request),
+      }),
+    ).toMatchObject({ status: 'REJECTED', code: 'PROPOSAL_EVIDENCE_MISSING' });
   });
 
   it('rejects extra command/grant fields through the frozen strict GoalProposal schema', async () => {
@@ -193,54 +240,151 @@ describe('T03 typed Goal/Proposal semantic and registered capability selection',
       grant: { approved: true },
       command: 'delete everything',
     };
-    expect(selectGoalSemantic({
-      request,
-      proposal,
-      registry,
-      hostObservation: hostObservation(request),
-    })).toMatchObject({ status: 'REJECTED', code: 'PROPOSAL_SCHEMA_REFUSED' });
+    expect(
+      selectGoalSemantic({
+        nowUnixMs: NOW,
+        request,
+        proposal,
+        registry,
+        hostObservation: hostObservation(request),
+      }),
+    ).toMatchObject({ status: 'REJECTED', code: 'PROPOSAL_SCHEMA_REFUSED' });
   });
 
-  it('rejects missing, malformed, forged or scope-mismatched Host observation evidence', async () => {
+  it('rejects missing, malformed, forged, untrusted, expired or scope-mismatched observation evidence', async () => {
     const registry = await attestedRegistry();
     const request = goalRequest({ goal: 'image.batch_process: resize photos' });
 
-    expect(selectGoalSemantic({ request, registry }))
-      .toMatchObject({ status: 'REJECTED', code: 'HOST_OBSERVATION_REQUIRED' });
+    expect(selectGoalSemantic({ request, nowUnixMs: NOW, registry })).toMatchObject({
+      status: 'REJECTED',
+      code: 'HOST_OBSERVATION_REQUIRED',
+    });
 
-    expect(selectGoalSemantic({
-      request,
-      registry,
-      hostObservation: { schema: 'shun.fake-observation.v1', sourceRef: 'fake', revision: '1', observedObjectRefs: [] },
-    })).toMatchObject({ status: 'REJECTED', code: 'HOST_OBSERVATION_INVALID' });
+    expect(
+      selectGoalSemantic({
+        nowUnixMs: NOW,
+        request,
+        registry,
+        hostObservation: null,
+      }),
+    ).toMatchObject({ status: 'REJECTED', code: 'HOST_OBSERVATION_INVALID' });
 
-    expect(selectGoalSemantic({
-      request,
-      registry,
-      hostObservation: {
-        schema: HOST_OBJECT_OBSERVATION_SCHEMA,
-        sourceRef: 'host-observation:fixture-02',
-        revision: 'obs-0043',
-        observedObjectRefs: ['DIRECTORY:C:\\different-folder'],
-      },
-    })).toMatchObject({ status: 'REJECTED', code: 'HOST_OBSERVATION_SCOPE_MISMATCH' });
+    // Any plain object — wrong schema or exact valid shape — lacks the
+    // private Host issuance mark and is refused as untrusted source.
+    expect(
+      selectGoalSemantic({
+        nowUnixMs: NOW,
+        request,
+        registry,
+        hostObservation: { schema: 'shun.fake-observation.v1', sourceRef: 'fake', revision: '1' },
+      }),
+    ).toMatchObject({ status: 'REJECTED', code: 'HOST_OBSERVATION_UNTRUSTED_SOURCE' });
+
+    // A valid-shaped plain object covering the exact selected refs is still
+    // not Host provenance: it lacks the private Host issuance mark.
+    expect(
+      selectGoalSemantic({
+        nowUnixMs: NOW,
+        request,
+        registry,
+        hostObservation: {
+          schema: HOST_OBJECT_OBSERVATION_SCHEMA,
+          sourceRef: 'host-observation:fixture-01',
+          revision: 'obs-0042',
+          taskId: request.taskId,
+          observedObjectRefs: request.objects.map((object) => `${object.kind}:${object.ref}`),
+          issuedAtUnixMs: NOW - 1_000,
+          expiresAtUnixMs: NOW + 60_000,
+        },
+      }),
+    ).toMatchObject({ status: 'REJECTED', code: 'HOST_OBSERVATION_UNTRUSTED_SOURCE' });
+
+    // Expired Host-issued window at the provided now.
+    expect(
+      selectGoalSemantic({
+        nowUnixMs: NOW,
+        request,
+        registry,
+        hostObservation: hostObservation(request, {
+          issuedAtUnixMs: NOW - 120_000,
+          expiresAtUnixMs: NOW - 1_000,
+        }),
+      }),
+    ).toMatchObject({ status: 'REJECTED', code: 'HOST_OBSERVATION_EXPIRED' });
+
+    // Host-issued observation bound to a different task scope.
+    expect(
+      selectGoalSemantic({
+        nowUnixMs: NOW,
+        request,
+        registry,
+        hostObservation: hostObservation(request, { taskId: 'task-other' }),
+      }),
+    ).toMatchObject({ status: 'REJECTED', code: 'HOST_OBSERVATION_SCOPE_MISMATCH' });
+
+    // Host-issued observation that does not cover the selected objects.
+    expect(
+      selectGoalSemantic({
+        nowUnixMs: NOW,
+        request,
+        registry,
+        hostObservation: hostObservation(request, {
+          observedObjectRefs: ['DIRECTORY:C:\\different-folder'],
+        }),
+      }),
+    ).toMatchObject({ status: 'REJECTED', code: 'HOST_OBSERVATION_SCOPE_MISMATCH' });
+  });
+
+  it('consumes each accepted Host observation once and refuses replay', async () => {
+    const registry = await attestedRegistry();
+    const request = goalRequest({ goal: 'image.batch_process: resize photos' });
+    const observation = hostObservation(request);
+    expect(
+      selectGoalSemantic({
+        nowUnixMs: NOW,
+        request,
+        registry,
+        hostObservation: observation,
+      }).status,
+    ).toBe('SELECTED');
+    expect(
+      selectGoalSemantic({
+        nowUnixMs: NOW,
+        request,
+        registry,
+        hostObservation: observation,
+      }),
+    ).toMatchObject({ status: 'REJECTED', code: 'HOST_OBSERVATION_REPLAY' });
+    // Rejected selections do not consume; a fresh observation selects again.
+    expect(
+      selectGoalSemantic({
+        nowUnixMs: NOW,
+        request,
+        registry,
+        hostObservation: hostObservation(request),
+      }).status,
+    ).toBe('SELECTED');
   });
 
   it('rejects unattested registry currentness before selecting any capability', async () => {
     const facts = snapshot();
     const registry = ShunRegistry.fromSnapshot(facts);
     const request = goalRequest({ goal: 'image.batch_process: resize photos' });
-    expect(selectGoalSemantic({
-      request,
-      registry,
-      hostObservation: hostObservation(request),
-    })).toMatchObject({ status: 'REJECTED', code: 'REGISTRY_CURRENTNESS_INSUFFICIENT' });
+    expect(
+      selectGoalSemantic({
+        nowUnixMs: NOW,
+        request,
+        registry,
+        hostObservation: hostObservation(request),
+      }),
+    ).toMatchObject({ status: 'REJECTED', code: 'REGISTRY_CURRENTNESS_INSUFFICIENT' });
   });
 
   it('does not select an undeclared or ambiguous capability', async () => {
     const registry = await attestedRegistry();
     const unknown = goalRequest({ goal: 'cook pasta for dinner' });
     const unknownResult = selectGoalSemantic({
+      nowUnixMs: NOW,
       request: unknown,
       registry,
       hostObservation: hostObservation(unknown),
@@ -258,6 +402,7 @@ describe('T03 typed Goal/Proposal semantic and registered capability selection',
       goal: 'image.batch_process and system.storage.diagnose_bounded_action',
     });
     const ambiguousResult = selectGoalSemantic({
+      nowUnixMs: NOW,
       request: ambiguous,
       registry: ambiguousRegistry,
       hostObservation: hostObservation(ambiguous),
@@ -274,7 +419,7 @@ describe('T03 typed Goal/Proposal semantic and registered capability selection',
       goal: 'image.batch_process: resize photos',
       objects: [],
     });
-    const result = selectGoalSemantic({ request, registry });
+    const result = selectGoalSemantic({ request, nowUnixMs: NOW, registry });
     expect(result.status).toBe('SELECTED');
     if (result.status !== 'SELECTED') return;
     expect(Object.keys(result.semantic).sort()).toEqual([
