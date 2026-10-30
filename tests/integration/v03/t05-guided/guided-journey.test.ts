@@ -151,6 +151,9 @@ describe('T05 bounded one-step Guided Journey and answer provenance', () => {
     });
     expect(result.step).not.toHaveProperty('grant');
     expect(result.step).not.toHaveProperty('approval');
+    const repeated = createNextGuidedStep({ semanticSelection: selectedSemantic(), observation, nowUnixMs: NOW });
+    expect(repeated.status).toBe('STEP');
+    if (repeated.status === 'STEP') expect(repeated.step.stepId).toBe(result.step.stepId);
   });
 
   it('uses T03 typed NOT_READY outcomes for clarification, never raw model text', () => {
@@ -204,6 +207,33 @@ describe('T05 bounded one-step Guided Journey and answer provenance', () => {
     }
     expect(result.step).not.toHaveProperty('grant');
     expect(result.step).not.toHaveProperty('externalDisclosureConsent');
+    const acknowledgement = userOutcome(result.step, 'privacyRoute', 'keep-local');
+    const accepted = validate(result.step, selectedSemantic(), observation, acknowledgement);
+    expect(accepted.status).toBe('ACCEPTED');
+    if (accepted.status === 'ACCEPTED') {
+      expect(accepted.outcome).not.toHaveProperty('grant');
+      expect(accepted.outcome).not.toHaveProperty('externalDisclosureConsent');
+    }
+  });
+
+  it('accepts a bounded user folder answer as local data, not as Host observation proof', () => {
+    const observation = hostObservation();
+    const semantic = selectedSemantic();
+    const step = issueStep(semantic, observation);
+    const candidatePath = 'C:\\\\Users\\\\15549\\\\Pictures';
+    const outcome = userOutcome(step, 'selectedRoot', candidatePath);
+    const result = validate(step, semantic, observation, outcome);
+    expect(result.status).toBe('ACCEPTED');
+    if (result.status !== 'ACCEPTED') return;
+    expect(result.outcome.answers[0]?.value).toBe(candidatePath);
+    expect(result.answerProvenance).toMatchObject({
+      source: 'USER',
+      sourceRef: 'ui:session-01',
+      stepId: step.stepId,
+      caseRef: observation.caseRef,
+    });
+    expect(result.outcome).not.toHaveProperty('grant');
+    expect(result.outcome).not.toHaveProperty('approval');
   });
 
   it('uses a review-plan step for a Host-issued preview; continuing is not approval', () => {
