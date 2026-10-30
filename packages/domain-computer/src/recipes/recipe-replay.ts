@@ -8,11 +8,11 @@
  * Kernel / ActionController path to revalidate independently.
  */
 import {
+  type ActionPlanProposal,
   ActionPlanProposalSchema,
   RecipeCandidatesSchema,
   RecipeCurrentnessResultSchema,
   RecipeDefinitionSchema,
-  type ActionPlanProposal,
   type RecipeResolverPort,
 } from '../../../contracts/src/ports.ts';
 import {
@@ -21,6 +21,7 @@ import {
 } from '../../../resolver/src/active-recipe-resolver.ts';
 
 const SHA256 = /^[a-f0-9]{64}$/;
+// biome-ignore lint/suspicious/noControlCharactersInRegex: control characters are exactly what this fail-closed filter rejects
 const CONTROL = /[\u0000-\u001f\u007f]/;
 
 export type DomainRecipeReplayRefusal =
@@ -82,7 +83,11 @@ function parseIntent(value: unknown): ReplayIntent | null {
     if (!isRecord(value)) return null;
     const keys = Object.keys(value).sort();
     if (keys.join(',') !== 'constraints,objective,objects') return null;
-    if (!safeText(value.objective, 256) || !Array.isArray(value.objects) || value.objects.length > 32) {
+    if (
+      !safeText(value.objective, 256) ||
+      !Array.isArray(value.objects) ||
+      value.objects.length > 32
+    ) {
       return null;
     }
     if (!value.objects.every((item) => safeText(item, 256))) return null;
@@ -112,7 +117,8 @@ function snapshotFacts(value: unknown): Record<string, unknown> | null {
           typeof item === 'boolean' ||
           (typeof item === 'number' && Number.isFinite(item))
         )
-      ) return null;
+      )
+        return null;
       copy[key] = item;
     }
     return copy;
@@ -145,7 +151,8 @@ function validProposal(
     proposal.capabilityId !== capabilityId ||
     capabilityId !== 'file.search' ||
     proposal.candidateActions.length !== 1
-  ) return null;
+  )
+    return null;
 
   const action = proposal.candidateActions[0];
   if (
@@ -157,7 +164,8 @@ function validProposal(
     Object.keys(action.parameters).sort().join(',') !== 'query,root' ||
     !safeText(action.parameters.root, 32768) ||
     !safeText(action.parameters.query, 256)
-  ) return null;
+  )
+    return null;
 
   return parsed.data;
 }
@@ -183,7 +191,8 @@ export class DomainComputerRecipeReplayAdapter {
         typeof taskId !== 'function' ||
         typeof currentFacts !== 'function' ||
         typeof previewExact !== 'function'
-      ) throw new Error('DOMAIN_RECIPE_CONFIGURATION_REFUSED');
+      )
+        throw new Error('DOMAIN_RECIPE_CONFIGURATION_REFUSED');
 
       const stableAuthority: TrustedActiveRecipeAuthority = Object.freeze({
         list: list.bind(authority),
@@ -205,7 +214,12 @@ export class DomainComputerRecipeReplayAdapter {
    */
   async proposeExactReplay(input: unknown): Promise<DomainRecipeReplayResult> {
     const intent = parseIntent(input);
-    if (!intent) return { status: 'REFUSED', code: 'INVALID_REQUEST', modelCalls: 0 };
+    if (intent?.objects.length !== 0) {
+      // Replay is pinned to the resolver's frozen selected source identity;
+      // caller-supplied objects are unsupported parameters, never a benign
+      // no-match query surface.
+      return { status: 'REFUSED', code: 'INVALID_REQUEST', modelCalls: 0 };
+    }
 
     let candidates: unknown;
     try {

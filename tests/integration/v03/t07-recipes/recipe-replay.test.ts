@@ -1,9 +1,9 @@
 import { describe, expect, it } from 'vitest';
 import type { RecipeDefinition } from '../../../../packages/contracts/src/ports.ts';
 import type { RecipeActionGraph } from '../../../../packages/contracts/src/v02.ts';
+import { DomainComputerRecipeReplayAdapter } from '../../../../packages/domain-computer/src/recipes/recipe-replay.ts';
 import type { TrustedActiveRecipeAuthority } from '../../../../packages/resolver/src/active-recipe-resolver.ts';
 import type { RecipeReplayPreview } from '../../../../packages/resolver/src/recipe-resolver.ts';
-import { DomainComputerRecipeReplayAdapter } from '../../../../packages/domain-computer/src/recipes/recipe-replay.ts';
 
 const REVISION = 'a'.repeat(64);
 const GRAPH_SHA = 'b'.repeat(64);
@@ -41,16 +41,18 @@ function recipe(): RecipeDefinition {
 
 type Mode = 'valid' | 'corrupt-source' | 'tampered-graph' | 'unknown-effect' | 'stale-currentness';
 
-function harness(options: {
-  mode?: Mode;
-  lifecycle?: 'ACTIVE' | 'CANDIDATE' | 'RETIRED';
-  duplicate?: boolean;
-} = {}) {
+function harness(
+  options: {
+    mode?: Mode;
+    lifecycle?: 'ACTIVE' | 'CANDIDATE' | 'RETIRED';
+    duplicate?: boolean;
+  } = {},
+) {
   const selected = recipe();
   const mode = options.mode ?? 'valid';
   let listCalls = 0;
   let previewCalls = 0;
-  let modelCalls = 0;
+  const modelCalls = 0;
   const previewInputs: Array<{ taskId: string; recipeId: string; revisionSha256: string }> = [];
   const candidate = {
     recipe: selected,
@@ -89,23 +91,31 @@ function harness(options: {
       previewInputs.push(input);
       if (mode === 'corrupt-source') return { ok: false, code: 'RECIPE_CORRUPT' };
       if (mode === 'stale-currentness') return { ok: false, code: 'RECIPE_CURRENTNESS_STALE' };
-      const actionGraph = mode === 'unknown-effect'
-        ? {
-            nodes: [{
-              actionId: 'unknown-01',
-              op: 'file.move',
-              parameters: { sourcePath: 'C:/selected/a.txt', destinationPath: 'C:/other/a.txt' },
-            }],
-            edges: [],
-          }
-        : {
-            nodes: [{
-              actionId: 'search-01',
-              op: 'file.search' as const,
-              parameters: { root: 'C:/selected', query: '*.txt' },
-            }],
-            edges: [],
-          };
+      const actionGraph =
+        mode === 'unknown-effect'
+          ? {
+              nodes: [
+                {
+                  actionId: 'unknown-01',
+                  op: 'file.move',
+                  parameters: {
+                    sourcePath: 'C:/selected/a.txt',
+                    destinationPath: 'C:/other/a.txt',
+                  },
+                },
+              ],
+              edges: [],
+            }
+          : {
+              nodes: [
+                {
+                  actionId: 'search-01',
+                  op: 'file.search' as const,
+                  parameters: { root: 'C:/selected', query: '*.txt' },
+                },
+              ],
+              edges: [],
+            };
       return {
         ok: true,
         state: 'PREVIEW_ONLY',
@@ -156,11 +166,13 @@ describe('T07 deterministic exact-identity Recipe replay adapter', () => {
         proposalId: `recipe:recipe-search-01@${REVISION}`,
         recipeRef: `recipe-search-01@${REVISION}`,
         capabilityId: 'file.search',
-        candidateActions: [{
-          actionId: 'search-01',
-          op: 'file.search',
-          parameters: { root: 'C:/selected', query: '*.txt' },
-        }],
+        candidateActions: [
+          {
+            actionId: 'search-01',
+            op: 'file.search',
+            parameters: { root: 'C:/selected', query: '*.txt' },
+          },
+        ],
       },
       declaredEffects: ['file.search'],
       modelCalls: 0,
@@ -185,7 +197,11 @@ describe('T07 deterministic exact-identity Recipe replay adapter', () => {
     for (const mode of ['corrupt-source', 'tampered-graph', 'stale-currentness'] as const) {
       const h = harness({ mode });
       const result = await h.adapter.proposeExactReplay(intent);
-      expect(result).toMatchObject({ status: 'REFUSED', code: 'RECIPE_NOT_CURRENT', modelCalls: 0 });
+      expect(result).toMatchObject({
+        status: 'REFUSED',
+        code: 'RECIPE_NOT_CURRENT',
+        modelCalls: 0,
+      });
       expect(h.previewCalls()).toBe(1);
     }
   });
@@ -239,12 +255,16 @@ describe('T07 deterministic exact-identity Recipe replay adapter', () => {
 
   it('fails closed if the trusted currentness source is unavailable', async () => {
     const authority: TrustedActiveRecipeAuthority = {
-      list: () => [{
-        recipe: recipe(),
-        lifecycle: { recipeId: 'recipe-search-01', revision: REVISION, state: 'ACTIVE' },
-      }],
+      list: () => [
+        {
+          recipe: recipe(),
+          lifecycle: { recipeId: 'recipe-search-01', revision: REVISION, state: 'ACTIVE' },
+        },
+      ],
       taskId: () => 'task-01',
-      currentFacts: () => { throw new Error('private authority detail'); },
+      currentFacts: () => {
+        throw new Error('private authority detail');
+      },
       previewExact: () => ({ ok: false, code: 'RECIPE_UNAVAILABLE' }),
     };
     const adapter = new DomainComputerRecipeReplayAdapter(authority);
@@ -256,8 +276,13 @@ describe('T07 deterministic exact-identity Recipe replay adapter', () => {
   });
 
   it('snapshots trusted host methods once and refuses hostile configuration getters', () => {
-    expect(() => new DomainComputerRecipeReplayAdapter({
-      get list(): never { throw new Error('private host secret'); },
-    } as never)).toThrow('DOMAIN_RECIPE_CONFIGURATION_REFUSED');
+    expect(
+      () =>
+        new DomainComputerRecipeReplayAdapter({
+          get list(): never {
+            throw new Error('private host secret');
+          },
+        } as never),
+    ).toThrow('DOMAIN_RECIPE_CONFIGURATION_REFUSED');
   });
 });
