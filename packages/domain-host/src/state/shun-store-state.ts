@@ -1,0 +1,35 @@
+/**
+ * T01 — ShunStore business-state adapter for K-mediated writes.
+ *
+ * This is deliberately NOT a second journal or physical-effect dispatcher.
+ * It delegates to the existing ShunStore.apply(effectId, mutation) transaction
+ * and receipt table. The effectId is read from K's dispatch context, never
+ * accepted as a separate caller field.
+ */
+import { readKernelEffectPermit } from '../windows/effect-host.ts';
+
+export interface ShunStoreBusinessPort {
+  apply(effectId: string, mutation: unknown): Promise<unknown>;
+  getEffectReceipt(effectId: string): Promise<unknown>;
+}
+
+export function createShunStoreStateAdapter(store: ShunStoreBusinessPort) {
+  if (typeof store?.apply !== 'function' || typeof store?.getEffectReceipt !== 'function') {
+    throw new TypeError('SHUN_STORE_STATE_CONFIGURATION_REFUSED');
+  }
+
+  return Object.freeze({
+    async applyBusinessMutation(context: unknown, mutation: unknown): Promise<unknown> {
+      const permit = readKernelEffectPermit(context);
+      if (!permit) throw new Error('K_PERMIT_REQUIRED');
+      return store.apply(permit.effectId, mutation);
+    },
+
+    async readBusinessReceipt(effectId: string): Promise<unknown> {
+      if (typeof effectId !== 'string' || !/^[A-Za-z][A-Za-z0-9._:-]{0,127}$/.test(effectId)) {
+        throw new Error('SHUN_STORE_EFFECT_ID_INVALID');
+      }
+      return store.getEffectReceipt(effectId);
+    },
+  });
+}
