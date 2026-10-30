@@ -1,3 +1,4 @@
+import { createHash } from 'node:crypto';
 import { describe, expect, it, vi } from 'vitest';
 import {
   META_FEEDBACK_SCOPE,
@@ -8,6 +9,20 @@ import {
 } from '../../../../packages/domain-computer/src/feedback/meta-feedback.ts';
 
 const NOW = '2026-10-30T00:00:00.000Z';
+
+function stableValue(value: unknown): unknown {
+  if (Array.isArray(value)) return value.map(stableValue);
+  if (value !== null && typeof value === 'object') {
+    const record = value as Record<string, unknown>;
+    return Object.fromEntries(Object.keys(record).sort().map((key) => [key, stableValue(record[key])]));
+  }
+  return value;
+}
+
+function candidateDigest(candidate: unknown): string {
+  return createHash('sha256').update(JSON.stringify(stableValue(candidate)), 'utf8').digest('hex');
+}
+
 const SELECTION: MetaFeedbackSelection = {
   selected: true,
   caseRef: 'case-01',
@@ -47,12 +62,12 @@ function harness(options: {
     if (options.authorizeError) throw new Error('private consent detail');
     return options.authorization ?? authorization();
   });
-  const runMetaFeedbackWorkflow = vi.fn(async (_input: Parameters<MetaFeedbackHostPort['runMetaFeedbackWorkflow']>[0]) => {
+  const runMetaFeedbackWorkflow = vi.fn(async (input: Parameters<MetaFeedbackHostPort['runMetaFeedbackWorkflow']>[0]) => {
     if (options.workflowError) throw new Error('private store detail');
     return options.result ?? {
       status: 'SHADOW_STORED',
       candidateRef: 'meta-candidate-01',
-      candidateDigest: 'b'.repeat(64),
+      candidateDigest: candidateDigest(input.candidate),
       active: false,
     };
   });
@@ -76,10 +91,14 @@ describe('T06 opt-in redacted Meta feedback Shadow adapter', () => {
 
   it('sends only the allowlisted selection to Host and stores a frozen future-build Shadow candidate', async () => {
     const h = harness();
-    expect(await h.adapter.submit(SELECTION)).toEqual({
+    const result = await h.adapter.submit(SELECTION);
+    const call = h.runMetaFeedbackWorkflow.mock.calls[0]?.[0];
+    expect(call).toBeDefined();
+    if (!call) throw new Error('expected Host workflow call');
+    expect(result).toEqual({
       status: 'STORED_SHADOW',
       candidateRef: 'meta-candidate-01',
-      candidateDigest: 'b'.repeat(64),
+      candidateDigest: candidateDigest(call.candidate),
       active: false,
     });
     expect(h.authorizeCurrentFeedback).toHaveBeenCalledWith({
@@ -88,9 +107,6 @@ describe('T06 opt-in redacted Meta feedback Shadow adapter', () => {
       sourceRevision: 'revision-07',
       selection: SELECTION,
     });
-    const call = h.runMetaFeedbackWorkflow.mock.calls[0]?.[0];
-    expect(call).toBeDefined();
-    if (!call) throw new Error('expected Host workflow call');
     expect(Object.isFrozen(call.candidate)).toBe(true);
     expect(Object.isFrozen(call.candidate.feedback)).toBe(true);
     expect(call.candidate).toMatchObject({
@@ -191,6 +207,7 @@ describe('T06 opt-in redacted Meta feedback Shadow adapter', () => {
       { status: 'SHADOW_STORED', candidateRef: 'meta-candidate-01', candidateDigest: 'b'.repeat(64), active: true },
       { status: 'ACTIVE', candidateRef: 'meta-candidate-01', candidateDigest: 'b'.repeat(64), active: true },
       { status: 'SHADOW_STORED', candidateRef: 'another-candidate', candidateDigest: 'b'.repeat(64), active: false },
+      { status: 'SHADOW_STORED', candidateRef: 'meta-candidate-01', candidateDigest: 'c'.repeat(64), active: false },
     ]) {
       const h = harness({ result });
       expect(await h.adapter.submit(SELECTION)).toEqual({

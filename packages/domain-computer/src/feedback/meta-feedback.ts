@@ -1,3 +1,5 @@
+import { createHash } from 'node:crypto';
+
 /**
  * T06 — opt-in, allowlist-only feedback projection for future-build Shadow.
  *
@@ -308,7 +310,24 @@ function buildCandidate(
   });
 }
 
-function validShadowResult(raw: unknown): raw is {
+function stableValue(value: unknown): unknown {
+  if (Array.isArray(value)) return value.map(stableValue);
+  if (isRecord(value)) {
+    return Object.fromEntries(
+      Object.keys(value).sort().map((key) => [key, stableValue(value[key])]),
+    );
+  }
+  return value;
+}
+
+/** SHA-256 of canonical candidate JSON; Host must return this exact digest. */
+function digestCandidate(candidate: MetaFeedbackShadowCandidate): string {
+  return createHash('sha256')
+    .update(JSON.stringify(stableValue(candidate)), 'utf8')
+    .digest('hex');
+}
+
+function validShadowResult(raw: unknown, expectedDigest: string): raw is {
   status: 'SHADOW_STORED';
   candidateRef: string;
   candidateDigest: string;
@@ -320,6 +339,7 @@ function validShadowResult(raw: unknown): raw is {
     isSafeRef(raw.candidateRef) &&
     typeof raw.candidateDigest === 'string' &&
     SHA256.test(raw.candidateDigest) &&
+    raw.candidateDigest === expectedDigest &&
     raw.active === false;
 }
 
@@ -327,9 +347,20 @@ export function createMetaFeedbackAdapter(
   host: MetaFeedbackHostPort,
   now: () => string = () => new Date().toISOString(),
 ) {
-  if (!isRecord(host) ||
-      typeof host.authorizeCurrentFeedback !== 'function' ||
-      typeof host.runMetaFeedbackWorkflow !== 'function') {
+  let authorizeCurrentFeedback: MetaFeedbackHostPort['authorizeCurrentFeedback'];
+  let runMetaFeedbackWorkflow: MetaFeedbackHostPort['runMetaFeedbackWorkflow'];
+  try {
+    if (!isRecord(host)) throw new Error('META_FEEDBACK_HOST_PORT_REQUIRED');
+    const authorize = host.authorizeCurrentFeedback;
+    const run = host.runMetaFeedbackWorkflow;
+    if (typeof authorize !== 'function' || typeof run !== 'function') {
+      throw new Error('META_FEEDBACK_HOST_PORT_REQUIRED');
+    }
+    // Snapshot trusted methods once; a mutable/getter-backed Host object
+    // cannot swap the persistence operation between consent and commit.
+    authorizeCurrentFeedback = authorize.bind(host);
+    runMetaFeedbackWorkflow = run.bind(host);
+  } catch {
     throw new TypeError('META_FEEDBACK_HOST_PORT_REQUIRED');
   }
 
@@ -349,7 +380,7 @@ export function createMetaFeedbackAdapter(
 
       let rawAuthorization: unknown;
       try {
-        rawAuthorization = await host.authorizeCurrentFeedback({
+        rawAuthorization = await authorizeCurrentFeedback({
           scope: META_FEEDBACK_SCOPE,
           caseRef: selection.caseRef,
           sourceRevision: selection.sourceRevision,
@@ -382,9 +413,10 @@ export function createMetaFeedbackAdapter(
       }
 
       const candidate = buildCandidate(selection, authorization);
+      const expectedCandidateDigest = digestCandidate(candidate);
       let rawResult: unknown;
       try {
-        rawResult = await host.runMetaFeedbackWorkflow({ candidate, authorization });
+        rawResult = await runMetaFeedbackWorkflow({ candidate, authorization });
       } catch {
         // The Host may have committed before losing its response. Never retry
         // or claim refusal; the caller must reconcile the stable candidateId.
@@ -398,7 +430,7 @@ export function createMetaFeedbackAdapter(
         active: false;
       } | null = null;
       try {
-        if (validShadowResult(rawResult)) shadowResult = rawResult;
+        if (validShadowResult(rawResult, expectedCandidateDigest)) shadowResult = rawResult;
       } catch {
         shadowResult = null;
       }
