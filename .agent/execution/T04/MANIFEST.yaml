@@ -1,4 +1,4 @@
-pack_id: shun-v03-t04-1165a70-execution-pack-v1
+pack_id: shun-v03-t04-1165a70-execution-pack-g2
 task_id: T04
 repository: kaicreator-mm/shun-assistant
 version: v0.3.0
@@ -35,6 +35,6 @@ retention: durable
 package_excluded: true
 pack_state_at_generation: PACK_CURRENT
 owner_authorization_ref: "#218@6510839827"
-dispatch_generation: 1
+dispatch_generation: 2
 admission_mode: SINGLE_WRITER_ADMISSION
 protected_claim_key: "kaicreator-mm/shun-assistant#232:builder:__default__"
