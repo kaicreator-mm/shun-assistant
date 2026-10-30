@@ -13,8 +13,8 @@
 import {
   collectWindowsSupportContext,
   minimizeSupportContext,
-  SupportContextResultSchema,
   type SupportContextResult,
+  SupportContextResultSchema,
 } from '@shun/vertical-support';
 
 export const COMPUTER_SUPPORT_CONTEXT_SCHEMA = 'shun.computer.support-context.v03' as const;

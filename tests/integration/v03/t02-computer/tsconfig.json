@@ -9,8 +9,5 @@
       "vitest": ["../../../../packages/vertical-support/node_modules/vitest/dist/index.d.ts"]
     }
   },
-  "include": [
-    "../../../../packages/domain-computer/src/computer/**/*.ts",
-    "./**/*.test.ts"
-  ]
+  "include": ["../../../../packages/domain-computer/src/computer/**/*.ts", "./**/*.test.ts"]
 }

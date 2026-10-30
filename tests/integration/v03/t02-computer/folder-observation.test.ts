@@ -92,7 +92,9 @@ describe('T02 selected-folder read-only observation adapter', () => {
     });
 
     const unavailable = createComputerFolderObservationAdapter({
-      observeCurrentSelectedFolder: async () => { throw new Error('private path detail'); },
+      observeCurrentSelectedFolder: async () => {
+        throw new Error('private path detail');
+      },
     });
     await expect(unavailable.observeCurrentSelectedFolder()).resolves.toEqual({
       ok: false,
@@ -111,16 +113,19 @@ describe('T02 selected-folder read-only observation adapter', () => {
       'Pictures\\private',
     ]) {
       const adapter = createComputerFolderObservationAdapter({
-        observeCurrentSelectedFolder: async () => hostObservation({
-          directories: [{
-            relativePath,
-            bytes: 1_500,
-            files: 1,
-            lastModifiedMs: 1_760_000_000_000,
-            inaccessibleCount: 0,
-          }],
-          rootFiles: { count: 0, bytes: 0 },
-        }),
+        observeCurrentSelectedFolder: async () =>
+          hostObservation({
+            directories: [
+              {
+                relativePath,
+                bytes: 1_500,
+                files: 1,
+                lastModifiedMs: 1_760_000_000_000,
+                inaccessibleCount: 0,
+              },
+            ],
+            rootFiles: { count: 0, bytes: 0 },
+          }),
       });
       await expect(adapter.observeCurrentSelectedFolder()).resolves.toEqual({
         ok: false,
@@ -145,16 +150,32 @@ describe('T02 selected-folder read-only observation adapter', () => {
       observeCurrentSelectedFolder: async () => hostObservation(),
     });
     const result = await adapter.observeCurrentSelectedFolder();
-    expect(result).toMatchObject({ ok: true, observation: { directories: [{ lastModifiedMs: 1_760_000_000_000.5 }] } });
+    expect(result).toMatchObject({
+      ok: true,
+      observation: {
+        directories: [
+          { relativePath: 'Documents', lastModifiedMs: 1_760_000_000_000 },
+          { relativePath: 'Pictures', lastModifiedMs: 1_760_000_000_000.5 },
+        ],
+      },
+    });
   });
 
   it('rejects inconsistent totals, duplicate names and unbounded reports', async () => {
     const cases = [
       hostObservation({ totalBytes: 1_499 }),
-      hostObservation({ directories: [hostObservation().directories[0], hostObservation().directories[0]] }),
-      hostObservation({ directories: Array.from({ length: 257 }, (_, i) => ({
-        relativePath: `dir-${i}`, bytes: 0, files: 0, lastModifiedMs: 0, inaccessibleCount: 0,
-      })) }),
+      hostObservation({
+        directories: [hostObservation().directories[0], hostObservation().directories[0]],
+      }),
+      hostObservation({
+        directories: Array.from({ length: 257 }, (_, i) => ({
+          relativePath: `dir-${i}`,
+          bytes: 0,
+          files: 0,
+          lastModifiedMs: 0,
+          inaccessibleCount: 0,
+        })),
+      }),
     ];
     for (const value of cases) {
       const adapter = createComputerFolderObservationAdapter({
@@ -179,21 +200,34 @@ describe('T02 selected-folder read-only observation adapter', () => {
       totalBytes: 100,
       rootFiles: { count: 1, bytes: 100 },
     });
-    const adapter = createComputerFolderObservationAdapter({ observeCurrentSelectedFolder: async () => raw });
-    await expect(adapter.observeCurrentSelectedFolder()).resolves.toEqual({ ok: false, code: 'FOLDER_OBSERVATION_INVALID' });
+    const adapter = createComputerFolderObservationAdapter({
+      observeCurrentSelectedFolder: async () => raw,
+    });
+    await expect(adapter.observeCurrentSelectedFolder()).resolves.toEqual({
+      ok: false,
+      code: 'FOLDER_OBSERVATION_INVALID',
+    });
     expect(iteratorCalled).toBe(false);
   });
 
   it('snapshots the trusted Host method and refuses hostile configuration getters', async () => {
     const first = vi.fn(async () => hostObservation());
-    const host = { observeCurrentSelectedFolder: first };
+    const host: { observeCurrentSelectedFolder: () => Promise<unknown> } = {
+      observeCurrentSelectedFolder: first,
+    };
     const adapter = createComputerFolderObservationAdapter(host);
-    host.observeCurrentSelectedFolder = async () => { throw new Error('swapped host'); };
+    host.observeCurrentSelectedFolder = async () => {
+      throw new Error('swapped host');
+    };
     await adapter.observeCurrentSelectedFolder();
     expect(first).toHaveBeenCalledTimes(1);
 
-    expect(() => createComputerFolderObservationAdapter({
-      get observeCurrentSelectedFolder(): never { throw new Error('private host detail'); },
-    } as never)).toThrow('COMPUTER_FOLDER_HOST_CONFIGURATION_REFUSED');
+    expect(() =>
+      createComputerFolderObservationAdapter({
+        get observeCurrentSelectedFolder(): never {
+          throw new Error('private host detail');
+        },
+      } as never),
+    ).toThrow('COMPUTER_FOLDER_HOST_CONFIGURATION_REFUSED');
   });
 });

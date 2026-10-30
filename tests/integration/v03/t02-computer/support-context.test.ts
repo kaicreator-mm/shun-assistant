@@ -1,12 +1,10 @@
+import { SupportContextResultSchema } from '@shun/vertical-support';
 import { describe, expect, it, vi } from 'vitest';
 import {
   COMPUTER_SUPPORT_CONTEXT_SCHEMA,
   collectLocalComputerSupportContext,
   minimizeComputerSupportFixture,
 } from '../../../../packages/domain-computer/src/computer/support-context.ts';
-import {
-  SupportContextResultSchema,
-} from '@shun/vertical-support';
 
 const CANARY = 'SHUN_FAKE_API_KEY_123_SECRET_DO_NOT_EXPORT';
 function rawObservation() {
@@ -18,11 +16,13 @@ function rawObservation() {
       API_KEY: CANARY,
       PATH: 'C:\\fixture\\private\\documents',
     },
-    processes: [{
-      name: 'private-sensitive-process',
-      command_line: '--token=' + CANARY,
-    }],
-    unrelated_document: 'Unrelated private text: ' + CANARY,
+    processes: [
+      {
+        name: 'private-sensitive-process',
+        command_line: `--token=${CANARY}`,
+      },
+    ],
+    unrelated_document: `Unrelated private text: ${CANARY}`,
   };
 }
 
@@ -73,14 +73,18 @@ describe('T02 B-040 local-only Computer Business adapter', () => {
     const extra = { ...rawObservation(), grant: { approved: true } };
     expect(() => minimizeComputerSupportFixture(extra)).toThrow('SUPPORT_CONTEXT_INVALID');
     expect(() => minimizeComputerSupportFixture(null)).toThrow('SUPPORT_CONTEXT_INVALID');
-    expect(() => minimizeComputerSupportFixture({
-      ...rawObservation(),
-      os: { name: 'Windows', build: '' },
-    })).toThrow('SUPPORT_CONTEXT_INVALID');
-    expect(() => minimizeComputerSupportFixture({
-      ...rawObservation(),
-      externalDisclosures: ['https://example.invalid'],
-    })).toThrow('SUPPORT_CONTEXT_INVALID');
+    expect(() =>
+      minimizeComputerSupportFixture({
+        ...rawObservation(),
+        os: { name: 'Windows', build: '' },
+      }),
+    ).toThrow('SUPPORT_CONTEXT_INVALID');
+    expect(() =>
+      minimizeComputerSupportFixture({
+        ...rawObservation(),
+        externalDisclosures: ['https://example.invalid'],
+      }),
+    ).toThrow('SUPPORT_CONTEXT_INVALID');
   });
 
   it('never turns untrusted fixture data into actual Host provenance', () => {

@@ -47,15 +47,14 @@ export type ComputerFolderObservationResult =
   | Readonly<{ ok: true; observation: ComputerFolderObservation }>
   | Readonly<{
       ok: false;
-      code:
-        | 'FOLDER_NOT_SELECTED'
-        | 'FOLDER_OBSERVATION_UNAVAILABLE'
-        | 'FOLDER_OBSERVATION_INVALID';
+      code: 'FOLDER_NOT_SELECTED' | 'FOLDER_OBSERVATION_UNAVAILABLE' | 'FOLDER_OBSERVATION_INVALID';
     }>;
 
 const SAFE_REF = /^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$/;
+// biome-ignore lint/suspicious/noControlCharactersInRegex: control/bidi characters are exactly what this fail-closed filter rejects
 const CONTROL_OR_BIDI = /[\u0000-\u001f\u007f-\u009f\u202a-\u202e\u2066-\u2069]/u;
-const RESERVED_DOS = /^(con|prn|aux|nul|com[1-9\u00b9\u00b2\u00b3]|lpt[1-9\u00b9\u00b2\u00b3])(?:\.|$)/i;
+const RESERVED_DOS =
+  /^(con|prn|aux|nul|com[1-9\u00b9\u00b2\u00b3]|lpt[1-9\u00b9\u00b2\u00b3])(?:\.|$)/i;
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   try {
@@ -67,19 +66,25 @@ function isRecord(value: unknown): value is Record<string, unknown> {
   }
 }
 
-function exactDataKeys(value: unknown, expected: readonly string[]): value is Record<string, unknown> {
+function exactDataKeys(
+  value: unknown,
+  expected: readonly string[],
+): value is Record<string, unknown> {
   try {
     if (!isRecord(value)) return false;
     const descriptors = Object.getOwnPropertyDescriptors(value);
     const keys = Reflect.ownKeys(descriptors);
-    return keys.length === expected.length &&
-      keys.every((key) =>
-        typeof key === 'string' &&
-        expected.includes(key) &&
-        Object.hasOwn(descriptors[key] ?? {}, 'value') &&
-        descriptors[key]?.get === undefined &&
-        descriptors[key]?.set === undefined
-      );
+    return (
+      keys.length === expected.length &&
+      keys.every(
+        (key) =>
+          typeof key === 'string' &&
+          expected.includes(key) &&
+          Object.hasOwn(descriptors[key] ?? {}, 'value') &&
+          descriptors[key]?.get === undefined &&
+          descriptors[key]?.set === undefined,
+      )
+    );
   } catch {
     return false;
   }
@@ -88,7 +93,8 @@ function exactDataKeys(value: unknown, expected: readonly string[]): value is Re
 function safeRelativePath(value: unknown): value is string {
   // vertical-storage emits one entry per direct child directory of the
   // selected root. Do not accept nested paths or caller-selected descendants.
-  return typeof value === 'string' &&
+  return (
+    typeof value === 'string' &&
     value.length > 0 &&
     value.length <= 255 &&
     value !== '.' &&
@@ -101,7 +107,8 @@ function safeRelativePath(value: unknown): value is string {
     !/[<>:"|?*]/u.test(value) &&
     !CONTROL_OR_BIDI.test(value) &&
     !RESERVED_DOS.test(value) &&
-    !/[. ]$/u.test(value);
+    !/[. ]$/u.test(value)
+  );
 }
 
 function nonnegativeSafeInteger(value: unknown): value is number {
@@ -109,20 +116,41 @@ function nonnegativeSafeInteger(value: unknown): value is number {
 }
 
 function finiteTimestamp(value: unknown): value is number {
-  return typeof value === 'number' && Number.isFinite(value) && Math.abs(value) <= Number.MAX_SAFE_INTEGER;
+  return (
+    typeof value === 'number' &&
+    Number.isFinite(value) &&
+    Math.abs(value) <= Number.MAX_SAFE_INTEGER
+  );
 }
 
 function safeArrayItems(value: unknown, maximum: number): unknown[] | null {
   try {
-    if (!Array.isArray(value) || types.isProxy(value) || Object.getPrototypeOf(value) !== Array.prototype) return null;
+    if (
+      !Array.isArray(value) ||
+      types.isProxy(value) ||
+      Object.getPrototypeOf(value) !== Array.prototype
+    )
+      return null;
     const lengthDescriptor = Object.getOwnPropertyDescriptor(value, 'length');
     const length = lengthDescriptor?.value;
-    if (typeof length !== 'number' || !Number.isSafeInteger(length) || length < 0 || length > maximum) return null;
+    if (
+      typeof length !== 'number' ||
+      !Number.isSafeInteger(length) ||
+      length < 0 ||
+      length > maximum
+    )
+      return null;
     if (Reflect.ownKeys(value).length !== length + 1) return null;
     const items: unknown[] = [];
     for (let index = 0; index < length; index++) {
       const descriptor = Object.getOwnPropertyDescriptor(value, String(index));
-      if (!descriptor || !Object.hasOwn(descriptor, 'value') || descriptor.get !== undefined || descriptor.set !== undefined) return null;
+      if (
+        !descriptor ||
+        !Object.hasOwn(descriptor, 'value') ||
+        descriptor.get !== undefined ||
+        descriptor.set !== undefined
+      )
+        return null;
       items.push(descriptor.value);
     }
     return items;
@@ -132,7 +160,8 @@ function safeArrayItems(value: unknown, maximum: number): unknown[] | null {
 }
 
 function canonicalUtc(value: unknown): value is string {
-  if (typeof value !== 'string' || !/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/.test(value)) return false;
+  if (typeof value !== 'string' || !/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/.test(value))
+    return false;
   const parsed = Date.parse(value);
   return Number.isFinite(parsed) && new Date(parsed).toISOString() === value;
 }
@@ -161,19 +190,31 @@ function parseHostObservation(raw: unknown): ParsedHostObservation | 'NOT_SELECT
       exactDataKeys(raw, ['schema', 'status']) &&
       raw.schema === HOST_FOLDER_OBSERVATION_SCHEMA &&
       raw.status === 'NOT_SELECTED'
-    ) return 'NOT_SELECTED';
+    )
+      return 'NOT_SELECTED';
 
-    if (!exactDataKeys(raw, [
-      'schema', 'status', 'rootRef', 'scopeRevision', 'observedAt',
-      'totalBytes', 'directories', 'rootFiles',
-    ])) return null;
+    if (
+      !exactDataKeys(raw, [
+        'schema',
+        'status',
+        'rootRef',
+        'scopeRevision',
+        'observedAt',
+        'totalBytes',
+        'directories',
+        'rootFiles',
+      ])
+    )
+      return null;
     const directoryItems = safeArrayItems(raw.directories, 256);
     const rootFilesRaw = raw.rootFiles;
     if (
       raw.schema !== HOST_FOLDER_OBSERVATION_SCHEMA ||
       raw.status !== 'OBSERVED_ONLY' ||
-      typeof raw.rootRef !== 'string' || !SAFE_REF.test(raw.rootRef) ||
-      typeof raw.scopeRevision !== 'string' || !SAFE_REF.test(raw.scopeRevision) ||
+      typeof raw.rootRef !== 'string' ||
+      !SAFE_REF.test(raw.rootRef) ||
+      typeof raw.scopeRevision !== 'string' ||
+      !SAFE_REF.test(raw.scopeRevision) ||
       !canonicalUtc(raw.observedAt) ||
       !nonnegativeSafeInteger(raw.totalBytes) ||
       directoryItems === null ||
@@ -181,13 +222,23 @@ function parseHostObservation(raw: unknown): ParsedHostObservation | 'NOT_SELECT
       !nonnegativeSafeInteger(rootFilesRaw.count) ||
       rootFilesRaw.count > 4096 ||
       !nonnegativeSafeInteger(rootFilesRaw.bytes)
-    ) return null;
+    )
+      return null;
 
     const directories: ComputerFolderDirectoryStat[] = [];
     const seen = new Set<string>();
     let aggregateBytes = rootFilesRaw.bytes;
     for (const item of directoryItems) {
-      if (!exactDataKeys(item, ['relativePath', 'bytes', 'files', 'lastModifiedMs', 'inaccessibleCount'])) return null;
+      if (
+        !exactDataKeys(item, [
+          'relativePath',
+          'bytes',
+          'files',
+          'lastModifiedMs',
+          'inaccessibleCount',
+        ])
+      )
+        return null;
       if (
         !safeRelativePath(item.relativePath) ||
         !nonnegativeSafeInteger(item.bytes) ||
@@ -196,7 +247,8 @@ function parseHostObservation(raw: unknown): ParsedHostObservation | 'NOT_SELECT
         !nonnegativeSafeInteger(item.inaccessibleCount) ||
         item.files > 1_000_000 ||
         item.inaccessibleCount > 1_000_000
-      ) return null;
+      )
+        return null;
       const collision = item.relativePath.toLocaleLowerCase('en-US');
       if (seen.has(collision)) return null;
       seen.add(collision);
@@ -211,9 +263,12 @@ function parseHostObservation(raw: unknown): ParsedHostObservation | 'NOT_SELECT
       });
     }
     if (aggregateBytes !== raw.totalBytes) return null;
-    directories.sort((a, b) =>
-      a.relativePath.toLocaleLowerCase('en-US').localeCompare(b.relativePath.toLocaleLowerCase('en-US'), 'en-US') ||
-      a.relativePath.localeCompare(b.relativePath, 'en-US')
+    directories.sort(
+      (a, b) =>
+        a.relativePath
+          .toLocaleLowerCase('en-US')
+          .localeCompare(b.relativePath.toLocaleLowerCase('en-US'), 'en-US') ||
+        a.relativePath.localeCompare(b.relativePath, 'en-US'),
     );
 
     return {
@@ -237,7 +292,8 @@ export function createComputerFolderObservationAdapter(host: ComputerFolderObser
   let observeCurrentSelectedFolder: ComputerFolderObservationHostPort['observeCurrentSelectedFolder'];
   try {
     const rawObserve = host?.observeCurrentSelectedFolder;
-    if (typeof rawObserve !== 'function') throw new Error('COMPUTER_FOLDER_HOST_CONFIGURATION_REFUSED');
+    if (typeof rawObserve !== 'function')
+      throw new Error('COMPUTER_FOLDER_HOST_CONFIGURATION_REFUSED');
     observeCurrentSelectedFolder = rawObserve.bind(host);
   } catch {
     throw new TypeError('COMPUTER_FOLDER_HOST_CONFIGURATION_REFUSED');
