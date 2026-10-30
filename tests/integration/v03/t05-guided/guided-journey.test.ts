@@ -19,7 +19,11 @@ function stableValue(value: unknown): unknown {
   if (Array.isArray(value)) return value.map(stableValue);
   if (value !== null && typeof value === 'object') {
     const record = value as Record<string, unknown>;
-    return Object.fromEntries(Object.keys(record).sort().map((key) => [key, stableValue(record[key])]));
+    return Object.fromEntries(
+      Object.keys(record)
+        .sort()
+        .map((key) => [key, stableValue(record[key])]),
+    );
   }
   return value;
 }
@@ -143,7 +147,11 @@ describe('T05 bounded one-step Guided Journey and answer provenance', () => {
     expect(result.step.templateRef.artifactId).toBe('shun.guided.select-root');
     expect(result.step.caseRef).toEqual(observation.caseRef);
     expect(result.step.formSchema.fields).toHaveLength(1);
-    expect(result.step.formSchema.fields[0]).toMatchObject({ id: 'selectedRoot', type: 'TEXT', required: true });
+    expect(result.step.formSchema.fields[0]).toMatchObject({
+      id: 'selectedRoot',
+      type: 'TEXT',
+      required: true,
+    });
     expect(result.step.capabilityRef).toMatchObject({
       capabilityId: 'system.storage.diagnose_bounded_action',
       revision: 'r1',
@@ -151,7 +159,11 @@ describe('T05 bounded one-step Guided Journey and answer provenance', () => {
     });
     expect(result.step).not.toHaveProperty('grant');
     expect(result.step).not.toHaveProperty('approval');
-    const repeated = createNextGuidedStep({ semanticSelection: selectedSemantic(), observation, nowUnixMs: NOW });
+    const repeated = createNextGuidedStep({
+      semanticSelection: selectedSemantic(),
+      observation,
+      nowUnixMs: NOW,
+    });
     expect(repeated.status).toBe('STEP');
     if (repeated.status === 'STEP') expect(repeated.step.stepId).toBe(result.step.stepId);
   });
@@ -176,11 +188,13 @@ describe('T05 bounded one-step Guided Journey and answer provenance', () => {
       status: 'STEP',
       step: { templateRef: { artifactId: 'shun.guided.clarify-goal' } },
     });
-    expect(createNextGuidedStep({
-      semanticSelection: notReadySemantic('REGISTRY_CURRENTNESS_INSUFFICIENT'),
-      observation,
-      nowUnixMs: NOW,
-    })).toMatchObject({ status: 'BLOCKED', code: 'GUIDED_STEP_NOT_ELIGIBLE' });
+    expect(
+      createNextGuidedStep({
+        semanticSelection: notReadySemantic('REGISTRY_CURRENTNESS_INSUFFICIENT'),
+        observation,
+        nowUnixMs: NOW,
+      }),
+    ).toMatchObject({ status: 'BLOCKED', code: 'GUIDED_STEP_NOT_ELIGIBLE' });
   });
 
   it('requires privacy notice acknowledgement before exposing a disclosure preview step', () => {
@@ -203,7 +217,10 @@ describe('T05 bounded one-step Guided Journey and answer provenance', () => {
     if (!field) return;
     expect(field).toMatchObject({ id: 'privacyRoute', type: 'CHOICE' });
     if (field.type === 'CHOICE') {
-      expect(field.options.map((option) => option.id)).toEqual(['keep-local', 'show-disclosure-preview']);
+      expect(field.options.map((option) => option.id)).toEqual([
+        'keep-local',
+        'show-disclosure-preview',
+      ]);
     }
     expect(result.step).not.toHaveProperty('grant');
     expect(result.step).not.toHaveProperty('externalDisclosureConsent');
@@ -280,10 +297,12 @@ describe('T05 bounded one-step Guided Journey and answer provenance', () => {
       occurredAtUnixMs: 2_500,
     };
     expect(validate(step, semantic, observation, receipt).status).toBe('ACCEPTED');
-    expect(validate(step, semantic, observation, {
-      ...receipt,
-      sourceRef: 'host:forged',
-    })).toMatchObject({ status: 'REJECTED', code: 'OBSERVATION_RECEIPT_PROVENANCE_REFUSED' });
+    expect(
+      validate(step, semantic, observation, {
+        ...receipt,
+        sourceRef: 'host:forged',
+      }),
+    ).toMatchObject({ status: 'REJECTED', code: 'OBSERVATION_RECEIPT_PROVENANCE_REFUSED' });
   });
 
   it('rejects old, replayed, consumed and cross-Case outcomes', () => {
@@ -292,34 +311,43 @@ describe('T05 bounded one-step Guided Journey and answer provenance', () => {
     const step = issueStep(semantic, observation);
     const outcome = userOutcome(step, 'continue', 'continue-to-independent-approval');
 
-    expect(validate(step, semantic, observation, outcome, { currentStepId: 'guided:old-step' }))
-      .toMatchObject({ status: 'REJECTED', code: 'STEP_SUPERSEDED' });
-    expect(validate(step, semantic, observation, outcome, { currentStepState: 'CONSUMED' }))
-      .toMatchObject({ status: 'REJECTED', code: 'STEP_ALREADY_CONSUMED_OR_SUPERSEDED' });
-    expect(validate(step, semantic, observation, outcome, { currentStepState: 'SUPERSEDED' }))
-      .toMatchObject({ status: 'REJECTED', code: 'STEP_ALREADY_CONSUMED_OR_SUPERSEDED' });
+    expect(
+      validate(step, semantic, observation, outcome, { currentStepId: 'guided:old-step' }),
+    ).toMatchObject({ status: 'REJECTED', code: 'STEP_SUPERSEDED' });
+    expect(
+      validate(step, semantic, observation, outcome, { currentStepState: 'CONSUMED' }),
+    ).toMatchObject({ status: 'REJECTED', code: 'STEP_ALREADY_CONSUMED_OR_SUPERSEDED' });
+    expect(
+      validate(step, semantic, observation, outcome, { currentStepState: 'SUPERSEDED' }),
+    ).toMatchObject({ status: 'REJECTED', code: 'STEP_ALREADY_CONSUMED_OR_SUPERSEDED' });
 
     const changedCase = hostObservation({
       selectedRootRef: 'host:root:01',
       caseRef: { snapshotId: 'snapshot-02', digest: 'b'.repeat(64) },
     });
-    expect(validateGuidedStepOutcome({
-      stepSpec: step,
-      currentObservation: changedCase,
-      currentSemanticSelection: semantic,
-      currentStepId: step.stepId,
-      currentStepState: 'CURRENT',
-      outcome,
-      nowUnixMs: 3_000,
-    })).toMatchObject({ status: 'REJECTED', code: 'STEP_SPEC_STALE_OR_UNAPPROVED' });
+    expect(
+      validateGuidedStepOutcome({
+        stepSpec: step,
+        currentObservation: changedCase,
+        currentSemanticSelection: semantic,
+        currentStepId: step.stepId,
+        currentStepState: 'CURRENT',
+        outcome,
+        nowUnixMs: 3_000,
+      }),
+    ).toMatchObject({ status: 'REJECTED', code: 'STEP_SPEC_STALE_OR_UNAPPROVED' });
   });
 
   it('rejects missing required answers, invalid choices and undeclared authority fields', () => {
     const rootObservation = hostObservation();
     const rootStep = issueStep(selectedSemantic(), rootObservation);
-    const missing = userOutcome(rootStep, 'selectedRoot', 'C:\\Users\\15549\\Pictures', { answers: [] });
-    expect(validate(rootStep, selectedSemantic(), rootObservation, missing))
-      .toMatchObject({ status: 'REJECTED', code: 'ANSWER_REQUIRED_FIELD_MISSING' });
+    const missing = userOutcome(rootStep, 'selectedRoot', 'C:\\Users\\15549\\Pictures', {
+      answers: [],
+    });
+    expect(validate(rootStep, selectedSemantic(), rootObservation, missing)).toMatchObject({
+      status: 'REJECTED',
+      code: 'ANSWER_REQUIRED_FIELD_MISSING',
+    });
 
     const privacyObservation = hostObservation({
       selectedRootRef: 'host:root:01',
@@ -327,42 +355,53 @@ describe('T05 bounded one-step Guided Journey and answer provenance', () => {
     });
     const privacyStep = issueStep(selectedSemantic(), privacyObservation);
     const invalidChoice = userOutcome(privacyStep, 'privacyRoute', 'auto-consent');
-    expect(validate(privacyStep, selectedSemantic(), privacyObservation, invalidChoice))
-      .toMatchObject({ status: 'REJECTED', code: 'ANSWER_VALUE_REFUSED' });
+    expect(
+      validate(privacyStep, selectedSemantic(), privacyObservation, invalidChoice),
+    ).toMatchObject({ status: 'REJECTED', code: 'ANSWER_VALUE_REFUSED' });
 
     const forged = {
       ...userOutcome(rootStep, 'selectedRoot', 'C:\\Users\\15549\\Pictures'),
       grant: { approved: true },
       approval: true,
     };
-    expect(validate(rootStep, selectedSemantic(), rootObservation, forged))
-      .toMatchObject({ status: 'REJECTED', code: 'STEP_OUTCOME_SCHEMA_REFUSED' });
+    expect(validate(rootStep, selectedSemantic(), rootObservation, forged)).toMatchObject({
+      status: 'REJECTED',
+      code: 'STEP_OUTCOME_SCHEMA_REFUSED',
+    });
   });
 
   it('rejects missing, forged, expired and malformed Host observations', () => {
-    expect(createNextGuidedStep({
-      semanticSelection: selectedSemantic(),
-      observation: null,
-      nowUnixMs: NOW,
-    })).toMatchObject({ status: 'BLOCKED', code: 'HOST_OBSERVATION_INVALID' });
+    expect(
+      createNextGuidedStep({
+        semanticSelection: selectedSemantic(),
+        observation: null,
+        nowUnixMs: NOW,
+      }),
+    ).toMatchObject({ status: 'BLOCKED', code: 'HOST_OBSERVATION_INVALID' });
 
-    expect(createNextGuidedStep({
-      semanticSelection: selectedSemantic(),
-      observation: { ...hostObservation(), schema: 'shun.fake-host-observation.v1' },
-      nowUnixMs: NOW,
-    })).toMatchObject({ status: 'BLOCKED', code: 'HOST_OBSERVATION_INVALID' });
+    expect(
+      createNextGuidedStep({
+        semanticSelection: selectedSemantic(),
+        observation: { ...hostObservation(), schema: 'shun.fake-host-observation.v1' },
+        nowUnixMs: NOW,
+      }),
+    ).toMatchObject({ status: 'BLOCKED', code: 'HOST_OBSERVATION_INVALID' });
 
-    expect(createNextGuidedStep({
-      semanticSelection: selectedSemantic(),
-      observation: hostObservation({ validUntilUnixMs: 1_500 }),
-      nowUnixMs: NOW,
-    })).toMatchObject({ status: 'BLOCKED', code: 'HOST_OBSERVATION_INVALID' });
+    expect(
+      createNextGuidedStep({
+        semanticSelection: selectedSemantic(),
+        observation: hostObservation({ validUntilUnixMs: 1_500 }),
+        nowUnixMs: NOW,
+      }),
+    ).toMatchObject({ status: 'BLOCKED', code: 'HOST_OBSERVATION_INVALID' });
 
-    expect(createNextGuidedStep({
-      semanticSelection: selectedSemantic(),
-      observation: hostObservation({ evidenceRefs: ['ui:forged-evidence'] }),
-      nowUnixMs: NOW,
-    })).toMatchObject({ status: 'BLOCKED', code: 'HOST_OBSERVATION_INVALID' });
+    expect(
+      createNextGuidedStep({
+        semanticSelection: selectedSemantic(),
+        observation: hostObservation({ evidenceRefs: ['ui:forged-evidence'] }),
+        nowUnixMs: NOW,
+      }),
+    ).toMatchObject({ status: 'BLOCKED', code: 'HOST_OBSERVATION_INVALID' });
   });
 
   it('keeps optional advisory text-only and refuses advisory grant/approval fields', () => {
@@ -376,7 +415,9 @@ describe('T05 bounded one-step Guided Journey and answer provenance', () => {
       explanation: 'The selected folder is ready for a read-only inspection.',
       evidenceRefs: ['host:scope:01'],
     };
-    expect(validateGuidedAdvisory(advisory, observation, NOW)).toMatchObject({ status: 'ADVISORY_ONLY' });
+    expect(validateGuidedAdvisory(advisory, observation, NOW)).toMatchObject({
+      status: 'ADVISORY_ONLY',
+    });
     const withAdvisory = createNextGuidedStep({
       semanticSelection: semantic,
       observation,
@@ -389,15 +430,23 @@ describe('T05 bounded one-step Guided Journey and answer provenance', () => {
       advisory: { reasonCode: 'SCOPE_CLARIFICATION' },
     });
 
-    const forgedAdvisory = { ...advisory, grant: { approved: true }, templateId: 'shun.guided.review-plan' };
-    expect(validateGuidedAdvisory(forgedAdvisory, observation, NOW))
-      .toMatchObject({ status: 'REJECTED', code: 'ADVISORY_SCHEMA_REFUSED' });
-    expect(createNextGuidedStep({
-      semanticSelection: semantic,
-      observation,
-      nowUnixMs: NOW,
-      advisory: forgedAdvisory,
-    })).toMatchObject({ status: 'BLOCKED', code: 'ADVISORY_SCHEMA_REFUSED' });
+    const forgedAdvisory = {
+      ...advisory,
+      grant: { approved: true },
+      templateId: 'shun.guided.review-plan',
+    };
+    expect(validateGuidedAdvisory(forgedAdvisory, observation, NOW)).toMatchObject({
+      status: 'REJECTED',
+      code: 'ADVISORY_SCHEMA_REFUSED',
+    });
+    expect(
+      createNextGuidedStep({
+        semanticSelection: semantic,
+        observation,
+        nowUnixMs: NOW,
+        advisory: forgedAdvisory,
+      }),
+    ).toMatchObject({ status: 'BLOCKED', code: 'ADVISORY_SCHEMA_REFUSED' });
   });
 
   it('does not accept a forged StepSpec or a mismatched T03 semantic selection', () => {
@@ -408,9 +457,17 @@ describe('T05 bounded one-step Guided Journey and answer provenance', () => {
       ...step,
       templateRef: { ...step.templateRef, digest: 'f'.repeat(64) },
     };
-    expect(validate(step, semantic, observation, userOutcome(step, 'continue', 'continue-to-independent-approval'), {
-      stepSpec: forgedStep,
-    })).toMatchObject({ status: 'REJECTED', code: 'STEP_SPEC_STALE_OR_UNAPPROVED' });
+    expect(
+      validate(
+        step,
+        semantic,
+        observation,
+        userOutcome(step, 'continue', 'continue-to-independent-approval'),
+        {
+          stepSpec: forgedStep,
+        },
+      ),
+    ).toMatchObject({ status: 'REJECTED', code: 'STEP_SPEC_STALE_OR_UNAPPROVED' });
 
     const wrongSemantic = {
       status: 'SELECTED',
@@ -420,10 +477,12 @@ describe('T05 bounded one-step Guided Journey and answer provenance', () => {
         goalContract: { taskId: 'other-task', objective: 'different' },
       },
     };
-    expect(createNextGuidedStep({
-      semanticSelection: wrongSemantic,
-      observation,
-      nowUnixMs: NOW,
-    })).toMatchObject({ status: 'BLOCKED', code: 'GOAL_SEMANTIC_SELECTION_INVALID' });
+    expect(
+      createNextGuidedStep({
+        semanticSelection: wrongSemantic,
+        observation,
+        nowUnixMs: NOW,
+      }),
+    ).toMatchObject({ status: 'BLOCKED', code: 'GOAL_SEMANTIC_SELECTION_INVALID' });
   });
 });

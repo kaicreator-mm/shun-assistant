@@ -168,12 +168,28 @@ export interface GuidedAdvisory {
 /** Fixed user-facing choices; selecting either option never grants disclosure or execution authority. */
 export const GUIDED_CHOICE_CATALOG: ChoiceCatalog = Object.freeze({
   privacyRoute: Object.freeze([
-    Object.freeze({ id: 'keep-local', labelKey: 'guided.privacyNotice.keepLocal', eligible: true as const }),
-    Object.freeze({ id: 'show-disclosure-preview', labelKey: 'guided.privacyNotice.showPreview', eligible: true as const }),
+    Object.freeze({
+      id: 'keep-local',
+      labelKey: 'guided.privacyNotice.keepLocal',
+      eligible: true as const,
+    }),
+    Object.freeze({
+      id: 'show-disclosure-preview',
+      labelKey: 'guided.privacyNotice.showPreview',
+      eligible: true as const,
+    }),
   ]),
   planReview: Object.freeze([
-    Object.freeze({ id: 'continue-to-independent-approval', labelKey: 'guided.reviewPlan.continue', eligible: true as const }),
-    Object.freeze({ id: 'return-to-edit', labelKey: 'guided.reviewPlan.back', eligible: true as const }),
+    Object.freeze({
+      id: 'continue-to-independent-approval',
+      labelKey: 'guided.reviewPlan.continue',
+      eligible: true as const,
+    }),
+    Object.freeze({
+      id: 'return-to-edit',
+      labelKey: 'guided.reviewPlan.back',
+      eligible: true as const,
+    }),
   ]),
 });
 
@@ -184,16 +200,18 @@ export const APPROVED_STEP_TEMPLATES: readonly StepTemplate[] = Object.freeze([
     digest: '302be72afe19223915035e1c565bf438de28b51af65d3b8fcac880069e98bc0e',
     kind: 'ASK' as const,
     titleKey: 'guided.selectRoot.title',
-    formSchema: Object.freeze({ fields: Object.freeze([
-      Object.freeze({
-        /** Untrusted user path candidate; Host must canonicalize and re-observe before use. */
-        id: 'selectedRoot',
-        type: 'TEXT' as const,
-        labelKey: 'guided.selectRoot.path',
-        required: true,
-        maxLength: 1024,
-      }),
-    ]) }),
+    formSchema: Object.freeze({
+      fields: Object.freeze([
+        Object.freeze({
+          /** Untrusted user path candidate; Host must canonicalize and re-observe before use. */
+          id: 'selectedRoot',
+          type: 'TEXT' as const,
+          labelKey: 'guided.selectRoot.path',
+          required: true,
+          maxLength: 1024,
+        }),
+      ]),
+    }),
     allowedEvents: Object.freeze(['USER_SUBMIT', 'BACK', 'PAUSE', 'RESUME'] as const),
   }),
   Object.freeze({
@@ -202,15 +220,17 @@ export const APPROVED_STEP_TEMPLATES: readonly StepTemplate[] = Object.freeze([
     digest: '6571cfe6eb3214713d1246dada9d1ff435b99b9e9b2aebab5b6ef060fae45e58',
     kind: 'ASK' as const,
     titleKey: 'guided.clarifyGoal.title',
-    formSchema: Object.freeze({ fields: Object.freeze([
-      Object.freeze({
-        id: 'clarification',
-        type: 'TEXT' as const,
-        labelKey: 'guided.clarifyGoal.detail',
-        required: true,
-        maxLength: 256,
-      }),
-    ]) }),
+    formSchema: Object.freeze({
+      fields: Object.freeze([
+        Object.freeze({
+          id: 'clarification',
+          type: 'TEXT' as const,
+          labelKey: 'guided.clarifyGoal.detail',
+          required: true,
+          maxLength: 256,
+        }),
+      ]),
+    }),
     allowedEvents: Object.freeze(['USER_SUBMIT', 'BACK', 'PAUSE', 'RESUME'] as const),
   }),
   Object.freeze({
@@ -219,15 +239,17 @@ export const APPROVED_STEP_TEMPLATES: readonly StepTemplate[] = Object.freeze([
     digest: '2818ffb61d2bbf8e5a199248b1e615a04b373d754b36e457e0b2b30436471ff0',
     kind: 'ASK' as const,
     titleKey: 'guided.privacyNotice.title',
-    formSchema: Object.freeze({ fields: Object.freeze([
-      Object.freeze({
-        id: 'privacyRoute',
-        type: 'CHOICE' as const,
-        labelKey: 'guided.privacyNotice.route',
-        required: true,
-        options: GUIDED_CHOICE_CATALOG.privacyRoute,
-      }),
-    ]) }),
+    formSchema: Object.freeze({
+      fields: Object.freeze([
+        Object.freeze({
+          id: 'privacyRoute',
+          type: 'CHOICE' as const,
+          labelKey: 'guided.privacyNotice.route',
+          required: true,
+          options: GUIDED_CHOICE_CATALOG.privacyRoute,
+        }),
+      ]),
+    }),
     allowedEvents: Object.freeze(['USER_SUBMIT', 'BACK', 'PAUSE', 'RESUME'] as const),
   }),
   Object.freeze({
@@ -236,15 +258,17 @@ export const APPROVED_STEP_TEMPLATES: readonly StepTemplate[] = Object.freeze([
     digest: 'fd91e725aa76bb66a31424a2c46f961c6869c7ffc92f969f3a9c50b7a8f11cfc',
     kind: 'REVIEW_EFFECT' as const,
     titleKey: 'guided.reviewPlan.title',
-    formSchema: Object.freeze({ fields: Object.freeze([
-      Object.freeze({
-        id: 'continue',
-        type: 'CHOICE' as const,
-        labelKey: 'guided.reviewPlan.action',
-        required: true,
-        options: GUIDED_CHOICE_CATALOG.planReview,
-      }),
-    ]) }),
+    formSchema: Object.freeze({
+      fields: Object.freeze([
+        Object.freeze({
+          id: 'continue',
+          type: 'CHOICE' as const,
+          labelKey: 'guided.reviewPlan.action',
+          required: true,
+          options: GUIDED_CHOICE_CATALOG.planReview,
+        }),
+      ]),
+    }),
     allowedEvents: Object.freeze(['USER_SUBMIT', 'BACK', 'PAUSE', 'RESUME'] as const),
   }),
   Object.freeze({

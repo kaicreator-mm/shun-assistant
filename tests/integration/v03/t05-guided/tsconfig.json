@@ -8,8 +8,5 @@
       "vitest": ["../../../../packages/resolver/node_modules/vitest/dist/index.d.ts"]
     }
   },
-  "include": [
-    "../../../../packages/domain-computer/src/guided/**/*.ts",
-    "./**/*.test.ts"
-  ]
+  "include": ["../../../../packages/domain-computer/src/guided/**/*.ts", "./**/*.test.ts"]
 }

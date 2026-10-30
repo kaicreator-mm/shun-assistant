@@ -7,8 +7,8 @@
  * authority, or performs an OS/Kernel effect.
  */
 import {
-  findApprovedStepTemplate,
   type CaseRef,
+  findApprovedStepTemplate,
   type GuidedAdvisory,
   type GuidedEvent,
   type GuidedGoalSemanticSelection,
@@ -51,10 +51,16 @@ function isRecord(value: unknown): value is Record<string, unknown> {
   return prototype === Object.prototype || prototype === null;
 }
 
-function exactKeys(value: Record<string, unknown>, required: readonly string[], optional: readonly string[] = []): boolean {
+function exactKeys(
+  value: Record<string, unknown>,
+  required: readonly string[],
+  optional: readonly string[] = [],
+): boolean {
   const allowed = new Set([...required, ...optional]);
   const keys = Object.keys(value);
-  return required.every((key) => Object.hasOwn(value, key)) && keys.every((key) => allowed.has(key));
+  return (
+    required.every((key) => Object.hasOwn(value, key)) && keys.every((key) => allowed.has(key))
+  );
 }
 
 function safeToken(value: unknown, maxLength = 128): value is string {
@@ -83,7 +89,11 @@ function stableValue(value: unknown): unknown {
   if (Array.isArray(value)) return value.map(stableValue);
   if (value !== null && typeof value === 'object') {
     const record = value as Record<string, unknown>;
-    return Object.fromEntries(Object.keys(record).sort().map((key) => [key, stableValue(record[key])]));
+    return Object.fromEntries(
+      Object.keys(record)
+        .sort()
+        .map((key) => [key, stableValue(record[key])]),
+    );
   }
   return value;
 }
@@ -109,14 +119,39 @@ function parseCaseRef(value: unknown): CaseRef | null {
 function parseHostObservation(value: unknown, nowUnixMs: number): HostGuidedObservation | null {
   if (!isRecord(value)) return null;
   const required = [
-    'schema', 'taskId', 'journeyId', 'sourceRef', 'revision', 'caseRef',
-    'observedAtUnixMs', 'validUntilUnixMs', 'evidenceRefs',
+    'schema',
+    'taskId',
+    'journeyId',
+    'sourceRef',
+    'revision',
+    'caseRef',
+    'observedAtUnixMs',
+    'validUntilUnixMs',
+    'evidenceRefs',
   ];
-  const optional = ['selectedRootRef', 'externalDisclosureRequired', 'privacyNoticeAcknowledged', 'actionPreviewRef'];
+  const optional = [
+    'selectedRootRef',
+    'externalDisclosureRequired',
+    'privacyNoticeAcknowledged',
+    'actionPreviewRef',
+  ];
   if (!exactKeys(value, required, optional)) return null;
   if (value.schema !== 'shun.guided.host-observation.v1') return null;
-  if (!safeToken(value.taskId, 96) || !safeToken(value.journeyId, 48) || !safeToken(value.revision, 64)) return null;
-  if (typeof value.sourceRef !== 'string' || !value.sourceRef.startsWith('host:') || value.sourceRef.length <= 5 || value.sourceRef.length > 256 || value.sourceRef.trim() !== value.sourceRef || hasControlCharacters(value.sourceRef)) return null;
+  if (
+    !safeToken(value.taskId, 96) ||
+    !safeToken(value.journeyId, 48) ||
+    !safeToken(value.revision, 64)
+  )
+    return null;
+  if (
+    typeof value.sourceRef !== 'string' ||
+    !value.sourceRef.startsWith('host:') ||
+    value.sourceRef.length <= 5 ||
+    value.sourceRef.length > 256 ||
+    value.sourceRef.trim() !== value.sourceRef ||
+    hasControlCharacters(value.sourceRef)
+  )
+    return null;
   const caseRef = parseCaseRef(value.caseRef);
   if (!caseRef) return null;
   if (
@@ -128,17 +163,53 @@ function parseHostObservation(value: unknown, nowUnixMs: number): HostGuidedObse
     value.validUntilUnixMs <= value.observedAtUnixMs ||
     nowUnixMs < value.observedAtUnixMs ||
     nowUnixMs > value.validUntilUnixMs
-  ) return null;
+  )
+    return null;
   if (
     !Array.isArray(value.evidenceRefs) ||
     value.evidenceRefs.length > 24 ||
-    !value.evidenceRefs.every((entry) => typeof entry === 'string' && entry.startsWith('host:') && entry.length > 5 && entry.length <= 256 && entry.trim() === entry && !hasControlCharacters(entry))
-  ) return null;
+    !value.evidenceRefs.every(
+      (entry) =>
+        typeof entry === 'string' &&
+        entry.startsWith('host:') &&
+        entry.length > 5 &&
+        entry.length <= 256 &&
+        entry.trim() === entry &&
+        !hasControlCharacters(entry),
+    )
+  )
+    return null;
   if (new Set(value.evidenceRefs).size !== value.evidenceRefs.length) return null;
-  if (value.selectedRootRef !== undefined && (typeof value.selectedRootRef !== 'string' || !value.selectedRootRef.startsWith('host:') || value.selectedRootRef.length <= 5 || value.selectedRootRef.length > 256 || value.selectedRootRef.trim() !== value.selectedRootRef || hasControlCharacters(value.selectedRootRef))) return null;
-  if (value.actionPreviewRef !== undefined && (typeof value.actionPreviewRef !== 'string' || !value.actionPreviewRef.startsWith('host:') || value.actionPreviewRef.length <= 5 || value.actionPreviewRef.length > 256 || value.actionPreviewRef.trim() !== value.actionPreviewRef || hasControlCharacters(value.actionPreviewRef))) return null;
-  if (value.externalDisclosureRequired !== undefined && typeof value.externalDisclosureRequired !== 'boolean') return null;
-  if (value.privacyNoticeAcknowledged !== undefined && typeof value.privacyNoticeAcknowledged !== 'boolean') return null;
+  if (
+    value.selectedRootRef !== undefined &&
+    (typeof value.selectedRootRef !== 'string' ||
+      !value.selectedRootRef.startsWith('host:') ||
+      value.selectedRootRef.length <= 5 ||
+      value.selectedRootRef.length > 256 ||
+      value.selectedRootRef.trim() !== value.selectedRootRef ||
+      hasControlCharacters(value.selectedRootRef))
+  )
+    return null;
+  if (
+    value.actionPreviewRef !== undefined &&
+    (typeof value.actionPreviewRef !== 'string' ||
+      !value.actionPreviewRef.startsWith('host:') ||
+      value.actionPreviewRef.length <= 5 ||
+      value.actionPreviewRef.length > 256 ||
+      value.actionPreviewRef.trim() !== value.actionPreviewRef ||
+      hasControlCharacters(value.actionPreviewRef))
+  )
+    return null;
+  if (
+    value.externalDisclosureRequired !== undefined &&
+    typeof value.externalDisclosureRequired !== 'boolean'
+  )
+    return null;
+  if (
+    value.privacyNoticeAcknowledged !== undefined &&
+    typeof value.privacyNoticeAcknowledged !== 'boolean'
+  )
+    return null;
   return deepFreeze({
     schema: 'shun.guided.host-observation.v1',
     taskId: value.taskId,
@@ -150,8 +221,12 @@ function parseHostObservation(value: unknown, nowUnixMs: number): HostGuidedObse
     validUntilUnixMs: value.validUntilUnixMs,
     evidenceRefs: [...value.evidenceRefs],
     ...(value.selectedRootRef === undefined ? {} : { selectedRootRef: value.selectedRootRef }),
-    ...(value.externalDisclosureRequired === undefined ? {} : { externalDisclosureRequired: value.externalDisclosureRequired }),
-    ...(value.privacyNoticeAcknowledged === undefined ? {} : { privacyNoticeAcknowledged: value.privacyNoticeAcknowledged }),
+    ...(value.externalDisclosureRequired === undefined
+      ? {}
+      : { externalDisclosureRequired: value.externalDisclosureRequired }),
+    ...(value.privacyNoticeAcknowledged === undefined
+      ? {}
+      : { privacyNoticeAcknowledged: value.privacyNoticeAcknowledged }),
     ...(value.actionPreviewRef === undefined ? {} : { actionPreviewRef: value.actionPreviewRef }),
   });
 }
@@ -175,11 +250,13 @@ function validateSemanticSelection(
       !safeToken(semantic.capabilityRevision) ||
       !isRecord(semantic.provenance) ||
       !safeToken(semantic.provenance.resolverRevision)
-    ) return null;
+    )
+      return null;
     return value as unknown as GuidedGoalSemanticSelection;
   }
   if (value.status === 'NOT_READY') {
-    if (!isRecord(value.normalization) || typeof value.normalization.failureCode !== 'string') return null;
+    if (!isRecord(value.normalization) || typeof value.normalization.failureCode !== 'string')
+      return null;
     return value as unknown as GuidedGoalSemanticSelection;
   }
   if (value.status === 'REJECTED') {
@@ -201,7 +278,8 @@ function chooseTemplate(
   if (semantic.status === 'REJECTED') {
     if (
       !observation.selectedRootRef &&
-      (semantic.code === 'HOST_OBSERVATION_REQUIRED' || semantic.code === 'HOST_OBSERVATION_SCOPE_MISMATCH')
+      (semantic.code === 'HOST_OBSERVATION_REQUIRED' ||
+        semantic.code === 'HOST_OBSERVATION_SCOPE_MISMATCH')
     ) {
       const template = findApprovedStepTemplate('shun.guided.select-root');
       return template ? { template, eligibilityCode: semantic.code } : null;
@@ -246,7 +324,17 @@ export function validateGuidedAdvisory(
 ): GuidedAdvisoryResult {
   const observation = parseHostObservation(observationValue, nowUnixMs);
   if (!observation) return { status: 'REJECTED', code: 'HOST_OBSERVATION_INVALID' };
-  if (!isRecord(value) || !exactKeys(value, ['schema', 'journeyId', 'caseRef', 'reasonCode', 'explanation', 'evidenceRefs'])) {
+  if (
+    !isRecord(value) ||
+    !exactKeys(value, [
+      'schema',
+      'journeyId',
+      'caseRef',
+      'reasonCode',
+      'explanation',
+      'evidenceRefs',
+    ])
+  ) {
     return { status: 'REJECTED', code: 'ADVISORY_SCHEMA_REFUSED' };
   }
   const caseRef = parseCaseRef(value.caseRef);
@@ -262,9 +350,12 @@ export function validateGuidedAdvisory(
     hasControlCharacters(value.explanation) ||
     !Array.isArray(value.evidenceRefs) ||
     value.evidenceRefs.length > 24 ||
-    !value.evidenceRefs.every((entry) => typeof entry === 'string' && observation.evidenceRefs.includes(entry)) ||
+    !value.evidenceRefs.every(
+      (entry) => typeof entry === 'string' && observation.evidenceRefs.includes(entry),
+    ) ||
     new Set(value.evidenceRefs).size !== value.evidenceRefs.length
-  ) return { status: 'REJECTED', code: 'ADVISORY_PROVENANCE_REFUSED' };
+  )
+    return { status: 'REJECTED', code: 'ADVISORY_PROVENANCE_REFUSED' };
   return {
     status: 'ADVISORY_ONLY',
     reasonCode: value.reasonCode,
@@ -347,9 +438,20 @@ function validateStepSpec(
 ): StepSpec | null {
   if (!isRecord(value)) return null;
   const required = [
-    'schema', 'journeyId', 'taskId', 'stepId', 'caseRef', 'eligibilityCode', 'templateRef',
-    'kind', 'titleKey', 'formSchema', 'allowedEvents', 'evidenceRefs',
-    'issuedAtUnixMs', 'validUntilUnixMs',
+    'schema',
+    'journeyId',
+    'taskId',
+    'stepId',
+    'caseRef',
+    'eligibilityCode',
+    'templateRef',
+    'kind',
+    'titleKey',
+    'formSchema',
+    'allowedEvents',
+    'evidenceRefs',
+    'issuedAtUnixMs',
+    'validUntilUnixMs',
   ];
   const optional = ['capabilityRef', 'actionPreviewRef'];
   if (!exactKeys(value, required, optional)) return null;
@@ -364,13 +466,15 @@ function validateStepSpec(
     typeof value.templateRef.artifactId !== 'string' ||
     typeof value.templateRef.version !== 'string' ||
     typeof value.templateRef.digest !== 'string'
-  ) return null;
+  )
+    return null;
   const expectedSelection = chooseTemplate(semantic, observation);
   const template = findApprovedStepTemplate(value.templateRef.artifactId);
   if (
     !expectedSelection ||
     !template ||
-    value.stepId !== `guided:${observation.journeyId}:${template.templateId}:${observation.revision}:${observation.caseRef.digest.slice(0, 12)}` ||
+    value.stepId !==
+      `guided:${observation.journeyId}:${template.templateId}:${observation.revision}:${observation.caseRef.digest.slice(0, 12)}` ||
     expectedSelection.template.templateId !== template.templateId ||
     expectedSelection.eligibilityCode !== value.eligibilityCode ||
     value.templateRef.version !== template.version ||
@@ -380,7 +484,8 @@ function validateStepSpec(
     !equal(value.formSchema, template.formSchema) ||
     !equal(value.allowedEvents, template.allowedEvents) ||
     !equal(value.evidenceRefs, observation.evidenceRefs)
-  ) return null;
+  )
+    return null;
   if (
     typeof value.issuedAtUnixMs !== 'number' ||
     typeof value.validUntilUnixMs !== 'number' ||
@@ -392,16 +497,19 @@ function validateStepSpec(
     value.validUntilUnixMs > value.issuedAtUnixMs + 5 * 60_000 ||
     nowUnixMs < value.issuedAtUnixMs ||
     nowUnixMs > value.validUntilUnixMs
-  ) return null;
-  const expectedActionPreviewRef = template.templateId === 'shun.guided.review-plan' ? observation.actionPreviewRef : undefined;
+  )
+    return null;
+  const expectedActionPreviewRef =
+    template.templateId === 'shun.guided.review-plan' ? observation.actionPreviewRef : undefined;
   if (value.actionPreviewRef !== expectedActionPreviewRef) return null;
-  const expectedCapabilityRef = semantic.status === 'SELECTED'
-    ? {
-        capabilityId: semantic.semantic.capabilityId,
-        revision: semantic.semantic.capabilityRevision,
-        resolverRevision: semantic.semantic.provenance.resolverRevision,
-      }
-    : undefined;
+  const expectedCapabilityRef =
+    semantic.status === 'SELECTED'
+      ? {
+          capabilityId: semantic.semantic.capabilityId,
+          revision: semantic.semantic.capabilityRevision,
+          resolverRevision: semantic.semantic.provenance.resolverRevision,
+        }
+      : undefined;
   if (!equal(value.capabilityRef, expectedCapabilityRef)) return null;
   if (value.capabilityRef !== undefined) {
     if (
@@ -410,12 +518,16 @@ function validateStepSpec(
       !safeToken(value.capabilityRef.capabilityId) ||
       !safeToken(value.capabilityRef.revision) ||
       !safeToken(value.capabilityRef.resolverRevision)
-    ) return null;
+    )
+      return null;
   }
   return value as unknown as StepSpec;
 }
 
-function validateAnswerValue(field: StepSpec['formSchema']['fields'][number], value: unknown): boolean {
+function validateAnswerValue(
+  field: StepSpec['formSchema']['fields'][number],
+  value: unknown,
+): boolean {
   if (field.type === 'TEXT') {
     return (
       typeof value === 'string' &&
@@ -426,7 +538,10 @@ function validateAnswerValue(field: StepSpec['formSchema']['fields'][number], va
     );
   }
   if (field.type === 'CHOICE') {
-    return typeof value === 'string' && field.options.some((option) => option.id === value && option.eligible);
+    return (
+      typeof value === 'string' &&
+      field.options.some((option) => option.id === value && option.eligible)
+    );
   }
   return typeof value === 'boolean';
 }
@@ -462,8 +577,17 @@ export function validateGuidedStepOutcome(input: {
   }
   const value = input.outcome;
   const required = [
-    'schema', 'journeyId', 'taskId', 'stepId', 'caseRef', 'event',
-    'source', 'sourceRef', 'answers', 'evidenceRefs', 'occurredAtUnixMs',
+    'schema',
+    'journeyId',
+    'taskId',
+    'stepId',
+    'caseRef',
+    'event',
+    'source',
+    'sourceRef',
+    'answers',
+    'evidenceRefs',
+    'occurredAtUnixMs',
   ];
   if (!isRecord(value) || !exactKeys(value, required)) {
     return { status: 'REJECTED', code: 'STEP_OUTCOME_SCHEMA_REFUSED' };
@@ -481,14 +605,17 @@ export function validateGuidedStepOutcome(input: {
     !Array.isArray(value.answers) ||
     !Array.isArray(value.evidenceRefs) ||
     value.evidenceRefs.length > 24 ||
-    !value.evidenceRefs.every((entry) => typeof entry === 'string' && observation.evidenceRefs.includes(entry)) ||
+    !value.evidenceRefs.every(
+      (entry) => typeof entry === 'string' && observation.evidenceRefs.includes(entry),
+    ) ||
     new Set(value.evidenceRefs).size !== value.evidenceRefs.length ||
     typeof value.occurredAtUnixMs !== 'number' ||
     !Number.isSafeInteger(value.occurredAtUnixMs) ||
     value.occurredAtUnixMs < step.issuedAtUnixMs ||
     value.occurredAtUnixMs > step.validUntilUnixMs ||
     value.occurredAtUnixMs > input.nowUnixMs
-  ) return { status: 'REJECTED', code: 'STEP_OUTCOME_PROVENANCE_REFUSED' };
+  )
+    return { status: 'REJECTED', code: 'STEP_OUTCOME_PROVENANCE_REFUSED' };
 
   if (value.event === 'OBSERVATION_RECEIPT') {
     if (
@@ -496,18 +623,31 @@ export function validateGuidedStepOutcome(input: {
       value.sourceRef !== observation.sourceRef ||
       value.answers.length !== 0 ||
       value.evidenceRefs.length === 0
-    ) return { status: 'REJECTED', code: 'OBSERVATION_RECEIPT_PROVENANCE_REFUSED' };
+    )
+      return { status: 'REJECTED', code: 'OBSERVATION_RECEIPT_PROVENANCE_REFUSED' };
   } else {
-    if (value.source !== 'USER' || value.sourceRef.length <= 3 || value.sourceRef.length > 256 || !value.sourceRef.startsWith('ui:') || value.sourceRef.trim() !== value.sourceRef || hasControlCharacters(value.sourceRef)) {
+    if (
+      value.source !== 'USER' ||
+      value.sourceRef.length <= 3 ||
+      value.sourceRef.length > 256 ||
+      !value.sourceRef.startsWith('ui:') ||
+      value.sourceRef.trim() !== value.sourceRef ||
+      hasControlCharacters(value.sourceRef)
+    ) {
       return { status: 'REJECTED', code: 'USER_ANSWER_SOURCE_REFUSED' };
     }
   }
 
   const answers = value.answers as unknown[];
-  if (answers.length > step.formSchema.fields.length) return { status: 'REJECTED', code: 'ANSWER_COUNT_EXCEEDED' };
+  if (answers.length > step.formSchema.fields.length)
+    return { status: 'REJECTED', code: 'ANSWER_COUNT_EXCEEDED' };
   const seen = new Set<string>();
   for (const answer of answers) {
-    if (!isRecord(answer) || !exactKeys(answer, ['fieldId', 'value']) || typeof answer.fieldId !== 'string') {
+    if (
+      !isRecord(answer) ||
+      !exactKeys(answer, ['fieldId', 'value']) ||
+      typeof answer.fieldId !== 'string'
+    ) {
       return { status: 'REJECTED', code: 'ANSWER_SCHEMA_REFUSED' };
     }
     if (seen.has(answer.fieldId)) return { status: 'REJECTED', code: 'ANSWER_DUPLICATE_FIELD' };
@@ -522,7 +662,13 @@ export function validateGuidedStepOutcome(input: {
     if (step.formSchema.fields.some((field) => field.required && !seen.has(field.id))) {
       return { status: 'REJECTED', code: 'ANSWER_REQUIRED_FIELD_MISSING' };
     }
-  } else if (value.answers.length !== 0 || value.evidenceRefs.length !== 0) {
+  } else if (
+    value.event !== 'OBSERVATION_RECEIPT' &&
+    (value.answers.length !== 0 || value.evidenceRefs.length !== 0)
+  ) {
+    // OBSERVATION_RECEIPT is exempt: its dedicated provenance branch above
+    // already requires HOST source, the observation's own sourceRef and
+    // non-empty matching evidence refs.
     return { status: 'REJECTED', code: 'NON_SUBMIT_EVENT_HAS_ANSWERS_OR_EVIDENCE' };
   }
 
