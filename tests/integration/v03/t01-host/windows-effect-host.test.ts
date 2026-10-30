@@ -1,14 +1,16 @@
 import { describe, expect, it, vi } from 'vitest';
+import { createShunStoreStateAdapter } from '../../../../packages/domain-host/src/state/shun-store-state.ts';
 import {
   createWindowsEffectHost,
   type KernelEffectDispatchContext,
 } from '../../../../packages/domain-host/src/windows/effect-host.ts';
-import { createShunStoreStateAdapter } from '../../../../packages/domain-host/src/state/shun-store-state.ts';
 
 const PLAN_HASH = 'a'.repeat(64);
 const PAYLOAD = { actionRef: 'action-01', planRef: PLAN_HASH, grantRef: 'grant-01' };
 
-function context(overrides: Partial<KernelEffectDispatchContext> = {}): KernelEffectDispatchContext {
+function context(
+  overrides: Partial<KernelEffectDispatchContext> = {},
+): KernelEffectDispatchContext {
   return {
     capabilityId: 'cap.windows',
     operationId: 'windows.execute',
@@ -35,18 +37,22 @@ function authorizationContext(effectId = 'effect-01') {
   };
 }
 
-function harness(options: {
-  osCurrent?: boolean;
-  shunCurrent?: boolean;
-  resolved?: unknown;
-  receipt?: unknown;
-  throwExecute?: boolean;
-} = {}) {
+function harness(
+  options: {
+    osCurrent?: boolean;
+    shunCurrent?: boolean;
+    resolved?: unknown;
+    receipt?: unknown;
+    throwExecute?: boolean;
+  } = {},
+) {
   const order: string[] = [];
   const authorization = {
-    resolve: vi.fn(async (input: { effectId: string }) => {
+    resolve: vi.fn(async () => {
       order.push('resolve');
-      return options.resolved ?? authorizationContext(input.effectId);
+      // The trusted authorization storage holds exactly this effect-01
+      // context; a permit claiming any other effectId must mismatch here.
+      return options.resolved ?? authorizationContext();
     }),
   };
   const osAuthority = {
@@ -65,14 +71,16 @@ function harness(options: {
     execute: vi.fn(async () => {
       order.push('windows-effect');
       if (options.throwExecute) throw new Error('private executor detail');
-      return options.receipt ?? {
-        actionId: 'action-01',
-        terminal: 'SUCCEEDED',
-        sideEffectEvidence: {
-          recoveryClassification: 'COMPLETED_VERIFIED',
-          postStateVerified: true,
-        },
-      };
+      return (
+        options.receipt ?? {
+          actionId: 'action-01',
+          terminal: 'SUCCEEDED',
+          sideEffectEvidence: {
+            recoveryClassification: 'COMPLETED_VERIFIED',
+            postStateVerified: true,
+          },
+        }
+      );
     }),
   };
   const host = createWindowsEffectHost({
@@ -92,17 +100,24 @@ describe('T01 K-gated Windows Host authorization boundary', () => {
       phase: 'terminal',
       outcome: { ok: false, error: { code: 'K_PERMIT_REQUIRED' } },
     });
-    expect(await h.host.dispatch(PAYLOAD, {
-      capabilityId: 'cap.windows',
-      operationId: 'windows.execute',
-      effectPermit: { effectId: 'effect-01', durableControlTurnId: '', attempt: 1 },
-    })).toMatchObject({
+    expect(
+      await h.host.dispatch(PAYLOAD, {
+        capabilityId: 'cap.windows',
+        operationId: 'windows.execute',
+        effectPermit: { effectId: 'effect-01', durableControlTurnId: '', attempt: 1 },
+      }),
+    ).toMatchObject({
       phase: 'terminal',
       outcome: { ok: false, error: { code: 'K_PERMIT_REQUIRED' } },
     });
-    expect(await h.host.dispatch(PAYLOAD, context({
-      effectPermit: { effectId: 'effect-other', durableControlTurnId: 'turn-01', attempt: 1 },
-    }))).toMatchObject({
+    expect(
+      await h.host.dispatch(
+        PAYLOAD,
+        context({
+          effectPermit: { effectId: 'effect-other', durableControlTurnId: 'turn-01', attempt: 1 },
+        }),
+      ),
+    ).toMatchObject({
       phase: 'terminal',
       outcome: { ok: false, error: { code: 'SHUN_AUTHORIZATION_IDENTITY_MISMATCH' } },
     });
@@ -111,10 +126,12 @@ describe('T01 K-gated Windows Host authorization boundary', () => {
 
   it('binds capability, operation, effectId, plan, action and grant identity', async () => {
     const h = harness();
-    expect(await h.host.dispatch(PAYLOAD, context({ operationId: 'windows.other' }))).toMatchObject({
-      phase: 'terminal',
-      outcome: { ok: false, error: { code: 'K_BINDING_MISMATCH' } },
-    });
+    expect(await h.host.dispatch(PAYLOAD, context({ operationId: 'windows.other' }))).toMatchObject(
+      {
+        phase: 'terminal',
+        outcome: { ok: false, error: { code: 'K_BINDING_MISMATCH' } },
+      },
+    );
     const mismatch = harness({ resolved: authorizationContext('effect-other') });
     expect(await mismatch.host.dispatch(PAYLOAD, context())).toMatchObject({
       phase: 'terminal',
@@ -191,6 +208,69 @@ describe('T01 K-gated Windows Host authorization boundary', () => {
     expect('dispatchAction' in h.host).toBe(false);
     expect('journal' in h.host).toBe(false);
   });
+
+  it('snapshots privileged callbacks at construction against getter-backed replacement', async () => {
+    let hostile = false;
+    const resolveCalls = vi.fn(async () => authorizationContext());
+    const osRecheck = vi.fn(async () => ({ ok: true }));
+    const shunAuthorize = vi.fn(async () => ({ ok: true }));
+    const execute = vi.fn(async () => ({
+      actionId: 'action-01',
+      terminal: 'SUCCEEDED',
+      sideEffectEvidence: { recoveryClassification: 'COMPLETED_VERIFIED', postStateVerified: true },
+    }));
+    const host = createWindowsEffectHost({
+      binding: { capabilityId: 'cap.windows', operationId: 'windows.execute' },
+      authorization: {
+        get resolve() {
+          if (hostile) return async () => authorizationContext('effect-evil');
+          return resolveCalls;
+        },
+      },
+      osAuthority: { recheck: osRecheck },
+      actionController: { authorizeEffect: shunAuthorize },
+      windows: { execute },
+    });
+    hostile = true;
+    await expect(host.dispatch(PAYLOAD, context())).resolves.toMatchObject({
+      phase: 'terminal',
+      outcome: { ok: true, output: { terminal: 'SUCCEEDED' } },
+    });
+    expect(resolveCalls).toHaveBeenCalledTimes(1);
+    expect(osRecheck).toHaveBeenCalledTimes(1);
+    expect(shunAuthorize).toHaveBeenCalledTimes(1);
+    expect(execute).toHaveBeenCalledTimes(1);
+  });
+
+  it('refuses post-construction replacement of the binding or the final effect port', async () => {
+    const h = harness();
+    const executeSpy = h.windows.execute;
+    const binding = { capabilityId: 'cap.windows', operationId: 'windows.execute' };
+    const mutatingHost = createWindowsEffectHost({
+      binding,
+      authorization: h.authorization,
+      osAuthority: h.osAuthority,
+      actionController: h.actionController,
+      windows: h.windows,
+    });
+    binding.capabilityId = 'cap.evil';
+    (h.windows as { execute: unknown }).execute = async () => ({
+      actionId: 'action-01',
+      terminal: 'SUCCEEDED',
+      sideEffectEvidence: { recoveryClassification: 'COMPLETED_VERIFIED', postStateVerified: true },
+    });
+    await expect(mutatingHost.dispatch(PAYLOAD, context())).resolves.toMatchObject({
+      phase: 'terminal',
+      outcome: { ok: true, output: { terminal: 'SUCCEEDED' } },
+    });
+    await expect(
+      mutatingHost.dispatch(PAYLOAD, context({ capabilityId: 'cap.evil' })),
+    ).resolves.toMatchObject({
+      phase: 'terminal',
+      outcome: { ok: false, error: { code: 'K_BINDING_MISMATCH' } },
+    });
+    expect(executeSpy).toHaveBeenCalledTimes(1);
+  });
 });
 
 describe('T01 ShunStore business state adapter', () => {
@@ -199,7 +279,11 @@ describe('T01 ShunStore business state adapter', () => {
     const store = {
       apply: vi.fn(async (effectId: string, mutation: unknown) => {
         calls.push([effectId, mutation]);
-        return { effectId, applied: calls.length === 1, receiptRef: 'shunstore://effect/effect-01' };
+        return {
+          effectId,
+          applied: calls.length === 1,
+          receiptRef: 'shunstore://effect/effect-01',
+        };
       }),
       getEffectReceipt: vi.fn(async (effectId: string) => ({ effectId })),
     };
@@ -210,10 +294,39 @@ describe('T01 ShunStore business state adapter', () => {
     const mutation = { recordKind: 'case', recordId: 'case-01', payload: { state: 'ready' } };
     await adapter.applyBusinessMutation(context(), mutation);
     await adapter.applyBusinessMutation(context(), mutation);
-    expect(calls).toEqual([['effect-01', mutation], ['effect-01', mutation]]);
-    await expect(adapter.readBusinessReceipt('effect-01')).resolves.toEqual({ effectId: 'effect-01' });
+    expect(calls).toEqual([
+      ['effect-01', mutation],
+      ['effect-01', mutation],
+    ]);
+    await expect(adapter.readBusinessReceipt('effect-01')).resolves.toEqual({
+      effectId: 'effect-01',
+    });
     await expect(adapter.applyBusinessMutation({}, mutation)).rejects.toThrow('K_PERMIT_REQUIRED');
-    await expect(adapter.applyBusinessMutation(context({ operationId: 'windows.other' }), mutation))
-      .rejects.toThrow('K_PERMIT_REQUIRED');
+    await expect(
+      adapter.applyBusinessMutation(context({ operationId: 'windows.other' }), mutation),
+    ).rejects.toThrow('K_PERMIT_REQUIRED');
+  });
+
+  it('snapshots store methods and binding at construction against later mutation', async () => {
+    const apply = vi.fn(async (effectId: string) => ({ effectId }));
+    const getEffectReceipt = vi.fn(async (effectId: string) => ({ effectId }));
+    const store = { apply, getEffectReceipt };
+    const binding = { capabilityId: 'cap.windows', operationId: 'windows.execute' };
+    const adapter = createShunStoreStateAdapter(store, binding);
+    (store as { apply: unknown }).apply = async () => {
+      throw new Error('swapped store');
+    };
+    binding.operationId = 'windows.evil';
+    const mutation = { recordKind: 'case', recordId: 'case-01', payload: { state: 'ready' } };
+    await expect(adapter.applyBusinessMutation(context(), mutation)).resolves.toEqual({
+      effectId: 'effect-01',
+    });
+    expect(apply).toHaveBeenCalledTimes(1);
+    await expect(
+      adapter.applyBusinessMutation(context({ operationId: 'windows.evil' }), mutation),
+    ).rejects.toThrow('K_PERMIT_REQUIRED');
+    await expect(adapter.applyBusinessMutation(context(), mutation)).resolves.toEqual({
+      effectId: 'effect-01',
+    });
   });
 });

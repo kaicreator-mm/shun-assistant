@@ -61,18 +61,12 @@ export interface ShunActionControllerPort {
 
 export interface WindowsOsAuthorityPort {
   /** Fresh OS/UAC/path/object currentness for this exact effect/action. */
-  recheck(input: {
-    readonly effectId: string;
-    readonly action: unknown;
-  }): Promise<unknown>;
+  recheck(input: { readonly effectId: string; readonly action: unknown }): Promise<unknown>;
 }
 
 export interface WindowsEffectPort {
   /** One effect boundary. T11 binds the existing trusted Windows executor. */
-  execute(input: {
-    readonly effectId: string;
-    readonly action: unknown;
-  }): Promise<unknown>;
+  execute(input: { readonly effectId: string; readonly action: unknown }): Promise<unknown>;
 }
 
 export type WindowsHostEnvelope =
@@ -81,7 +75,10 @@ export type WindowsHostEnvelope =
       readonly externalRef: string;
       readonly outcome:
         | { readonly ok: true; readonly output: unknown }
-        | { readonly ok: false; readonly error: { readonly code: string; readonly message: string } };
+        | {
+            readonly ok: false;
+            readonly error: { readonly code: string; readonly message: string };
+          };
     }
   | { readonly phase: 'running'; readonly externalRef: string };
 
@@ -94,8 +91,10 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 
 function exactKeys(value: Record<string, unknown>, expected: readonly string[]): boolean {
   const keys = Object.keys(value).sort();
-  return keys.length === expected.length &&
-    keys.every((key, index) => key === [...expected].sort()[index]);
+  return (
+    keys.length === expected.length &&
+    keys.every((key, index) => key === [...expected].sort()[index])
+  );
 }
 
 function safeId(value: unknown): value is string {
@@ -113,19 +112,20 @@ export function readKernelEffectPermit(
   binding?: WindowsEffectBinding,
 ): KernelEffectPermitIdentity | null {
   try {
-    if (!isRecord(raw) ||
-        !exactKeys(raw, ['capabilityId', 'operationId', 'effectPermit']) ||
-        !safeId(raw.capabilityId) ||
-        !safeId(raw.operationId) ||
-        (binding !== undefined && (
-          raw.capabilityId !== binding.capabilityId || raw.operationId !== binding.operationId
-        )) ||
-        !isRecord(raw.effectPermit) ||
-        !exactKeys(raw.effectPermit, ['effectId', 'durableControlTurnId', 'attempt']) ||
-        !safeId(raw.effectPermit.effectId) ||
-        !safeId(raw.effectPermit.durableControlTurnId) ||
-        !Number.isSafeInteger(raw.effectPermit.attempt) ||
-        (raw.effectPermit.attempt as number) < 1) {
+    if (
+      !isRecord(raw) ||
+      !exactKeys(raw, ['capabilityId', 'operationId', 'effectPermit']) ||
+      !safeId(raw.capabilityId) ||
+      !safeId(raw.operationId) ||
+      (binding !== undefined &&
+        (raw.capabilityId !== binding.capabilityId || raw.operationId !== binding.operationId)) ||
+      !isRecord(raw.effectPermit) ||
+      !exactKeys(raw.effectPermit, ['effectId', 'durableControlTurnId', 'attempt']) ||
+      !safeId(raw.effectPermit.effectId) ||
+      !safeId(raw.effectPermit.durableControlTurnId) ||
+      !Number.isSafeInteger(raw.effectPermit.attempt) ||
+      (raw.effectPermit.attempt as number) < 1
+    ) {
       return null;
     }
     return Object.freeze({
@@ -140,12 +140,14 @@ export function readKernelEffectPermit(
 
 function parsePayload(raw: unknown): WindowsEffectPayload | null {
   try {
-    if (!isRecord(raw) ||
-        !exactKeys(raw, ['actionRef', 'planRef', 'grantRef']) ||
-        !safeId(raw.actionRef) ||
-        typeof raw.planRef !== 'string' ||
-        !SHA256.test(raw.planRef) ||
-        !safeId(raw.grantRef)) {
+    if (
+      !isRecord(raw) ||
+      !exactKeys(raw, ['actionRef', 'planRef', 'grantRef']) ||
+      !safeId(raw.actionRef) ||
+      typeof raw.planRef !== 'string' ||
+      !SHA256.test(raw.planRef) ||
+      !safeId(raw.grantRef)
+    ) {
       return null;
     }
     return Object.freeze({
@@ -163,21 +165,26 @@ function identityMatches(
   permit: KernelEffectPermitIdentity,
   payload: WindowsEffectPayload,
 ): resolved is ResolvedWindowsAuthorization {
-  if (!isRecord(resolved) ||
-      !exactKeys(resolved, ['effectId', 'plan', 'action', 'grant']) ||
-      resolved.effectId !== permit.effectId ||
-      !isRecord(resolved.plan) ||
-      !isRecord(resolved.action) ||
-      !isRecord(resolved.grant)) return false;
+  if (
+    !isRecord(resolved) ||
+    !exactKeys(resolved, ['effectId', 'plan', 'action', 'grant']) ||
+    resolved.effectId !== permit.effectId ||
+    !isRecord(resolved.plan) ||
+    !isRecord(resolved.action) ||
+    !isRecord(resolved.grant)
+  )
+    return false;
 
-  return resolved.plan.planHash === payload.planRef &&
+  return (
+    resolved.plan.planHash === payload.planRef &&
     resolved.action.actionId === payload.actionRef &&
     resolved.action.authorizationRef === payload.grantRef &&
     resolved.action.planHash === payload.planRef &&
     resolved.action.taskId === resolved.plan.taskId &&
     resolved.grant.grantId === payload.grantRef &&
     resolved.grant.planHash === payload.planRef &&
-    resolved.grant.taskId === resolved.plan.taskId;
+    resolved.grant.taskId === resolved.plan.taskId
+  );
 }
 
 function failed(effectId: string, code: string): WindowsHostEnvelope {
@@ -189,21 +196,25 @@ function failed(effectId: string, code: string): WindowsHostEnvelope {
 }
 
 function completedReceipt(raw: unknown, actionId: string): boolean {
-  return isRecord(raw) &&
+  return (
+    isRecord(raw) &&
     raw.actionId === actionId &&
     raw.terminal === 'SUCCEEDED' &&
     isRecord(raw.sideEffectEvidence) &&
     raw.sideEffectEvidence.recoveryClassification === 'COMPLETED_VERIFIED' &&
-    raw.sideEffectEvidence.postStateVerified === true;
+    raw.sideEffectEvidence.postStateVerified === true
+  );
 }
 
 function failedBeforeEffect(raw: unknown, actionId: string): boolean {
-  return isRecord(raw) &&
+  return (
+    isRecord(raw) &&
     raw.actionId === actionId &&
     raw.terminal === 'FAILED' &&
     isRecord(raw.sideEffectEvidence) &&
     raw.sideEffectEvidence.recoveryClassification === 'FAILED_BEFORE_EFFECT' &&
-    raw.sideEffectEvidence.postStateVerified === false;
+    raw.sideEffectEvidence.postStateVerified === false
+  );
 }
 
 export function createWindowsEffectHost(input: {
@@ -213,13 +224,29 @@ export function createWindowsEffectHost(input: {
   readonly osAuthority: WindowsOsAuthorityPort;
   readonly windows: WindowsEffectPort;
 }) {
-  if (!safeId(input.binding.capabilityId) || !safeId(input.binding.operationId) ||
-      typeof input.authorization?.resolve !== 'function' ||
-      typeof input.actionController?.authorizeEffect !== 'function' ||
-      typeof input.osAuthority?.recheck !== 'function' ||
-      typeof input.windows?.execute !== 'function') {
+  if (
+    !safeId(input.binding?.capabilityId) ||
+    !safeId(input.binding?.operationId) ||
+    typeof input.authorization?.resolve !== 'function' ||
+    typeof input.actionController?.authorizeEffect !== 'function' ||
+    typeof input.osAuthority?.recheck !== 'function' ||
+    typeof input.windows?.execute !== 'function'
+  ) {
     throw new TypeError('WINDOWS_HOST_CONFIGURATION_REFUSED');
   }
+
+  // Snapshot each privileged method exactly once and copy/freeze the binding.
+  // A getter-backed or later-mutated configuration must not be able to swap
+  // the authorization, ActionController or OS effect callback after the
+  // constructor has validated it.
+  const resolveAuthorization = input.authorization.resolve.bind(input.authorization);
+  const recheckOsAuthority = input.osAuthority.recheck.bind(input.osAuthority);
+  const authorizeShunEffect = input.actionController.authorizeEffect.bind(input.actionController);
+  const executeWindowsEffect = input.windows.execute.bind(input.windows);
+  const binding: WindowsEffectBinding = Object.freeze({
+    capabilityId: input.binding.capabilityId,
+    operationId: input.binding.operationId,
+  });
 
   return Object.freeze({
     /**
@@ -230,9 +257,11 @@ export function createWindowsEffectHost(input: {
       const permit = readKernelEffectPermit(contextRaw);
       if (!permit) return failed('unbound', 'K_PERMIT_REQUIRED');
 
-      if (!isRecord(contextRaw) ||
-          contextRaw.capabilityId !== input.binding.capabilityId ||
-          contextRaw.operationId !== input.binding.operationId) {
+      if (
+        !isRecord(contextRaw) ||
+        contextRaw.capabilityId !== binding.capabilityId ||
+        contextRaw.operationId !== binding.operationId
+      ) {
         return failed(permit.effectId, 'K_BINDING_MISMATCH');
       }
 
@@ -241,7 +270,7 @@ export function createWindowsEffectHost(input: {
 
       let resolved: unknown;
       try {
-        resolved = await input.authorization.resolve({
+        resolved = await resolveAuthorization({
           effectId: permit.effectId,
           actionRef: payload.actionRef,
           planRef: payload.planRef,
@@ -256,7 +285,7 @@ export function createWindowsEffectHost(input: {
 
       let osCurrent: unknown;
       try {
-        osCurrent = await input.osAuthority.recheck({
+        osCurrent = await recheckOsAuthority({
           effectId: permit.effectId,
           action: resolved.action,
         });
@@ -271,7 +300,7 @@ export function createWindowsEffectHost(input: {
       // between this real ActionController call and entering the effect port.
       let shunVerdict: unknown;
       try {
-        shunVerdict = await input.actionController.authorizeEffect({
+        shunVerdict = await authorizeShunEffect({
           plan: resolved.plan,
           action: resolved.action,
           grant: resolved.grant,
@@ -285,7 +314,7 @@ export function createWindowsEffectHost(input: {
 
       let receipt: unknown;
       try {
-        receipt = await input.windows.execute({
+        receipt = await executeWindowsEffect({
           effectId: permit.effectId,
           action: resolved.action,
         });
