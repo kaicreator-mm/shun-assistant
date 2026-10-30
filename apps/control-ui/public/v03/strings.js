@@ -45,6 +45,59 @@ export const STRINGS = {
       text: 'One guided step at a time. Nothing takes effect without your explicit approval.',
       authorityRelevant: false,
     },
+    'guided.selectRoot.title': {
+      text: 'Choose the folder to work in',
+      authorityRelevant: false,
+    },
+    'guided.clarifyGoal.title': {
+      text: 'Tell Shun more about the goal',
+      authorityRelevant: false,
+    },
+    'guided.privacyNotice.title': {
+      text: 'Privacy notice',
+      authorityRelevant: false,
+    },
+    'guided.reviewPlan.title': {
+      text: 'Review the plan before approval',
+      authorityRelevant: false,
+    },
+    'guided.inspectScope.title': {
+      text: 'Inspecting the selected folder',
+      authorityRelevant: false,
+    },
+    'guided.selectRoot.path': {
+      text: 'Folder path',
+      authorityRelevant: false,
+    },
+    'guided.clarifyGoal.detail': {
+      text: 'More detail about the goal',
+      authorityRelevant: false,
+    },
+    'guided.privacyNotice.route': {
+      text: 'How do you want to continue?',
+      authorityRelevant: false,
+    },
+    'guided.reviewPlan.action': {
+      text: 'Your decision for this plan',
+      authorityRelevant: false,
+    },
+    'guided.privacyNotice.keepLocal': {
+      text: 'Keep everything on this computer',
+      authorityRelevant: false,
+    },
+    'guided.privacyNotice.showPreview': {
+      text: 'Show the disclosure preview first',
+      authorityRelevant: false,
+    },
+    'guided.reviewPlan.continue': {
+      text: 'Continue to the independent approval',
+      authorityRelevant: true,
+      polarity: 'CONSENT',
+    },
+    'guided.reviewPlan.back': {
+      text: 'Go back and edit',
+      authorityRelevant: false,
+    },
     'state.currentStep': {
       text: 'Current guided step',
       authorityRelevant: false,
@@ -61,6 +114,15 @@ export const STRINGS = {
     'state.history': {
       text: 'History',
       authorityRelevant: false,
+    },
+    'progress.stepOf': {
+      text: 'Step {0} of {1}',
+      authorityRelevant: false,
+    },
+    'progress.unknown': {
+      text: 'The journey position is unknown. Nothing is guessed.',
+      authorityRelevant: true,
+      polarity: 'UNKNOWN',
     },
     'state.refused': {
       text: 'Refused',
@@ -203,6 +265,59 @@ export const STRINGS = {
       text: '一次只显示一个引导步骤。没有您的明确批准，任何操作都不会生效。',
       authorityRelevant: false,
     },
+    'guided.selectRoot.title': {
+      text: '选择要处理的文件夹',
+      authorityRelevant: false,
+    },
+    'guided.clarifyGoal.title': {
+      text: '请再告诉 Shun 一些目标细节',
+      authorityRelevant: false,
+    },
+    'guided.privacyNotice.title': {
+      text: '隐私提示',
+      authorityRelevant: false,
+    },
+    'guided.reviewPlan.title': {
+      text: '批准前请审阅计划',
+      authorityRelevant: false,
+    },
+    'guided.inspectScope.title': {
+      text: '正在检查所选文件夹',
+      authorityRelevant: false,
+    },
+    'guided.selectRoot.path': {
+      text: '文件夹路径',
+      authorityRelevant: false,
+    },
+    'guided.clarifyGoal.detail': {
+      text: '关于目标的更多说明',
+      authorityRelevant: false,
+    },
+    'guided.privacyNotice.route': {
+      text: '您想如何继续？',
+      authorityRelevant: false,
+    },
+    'guided.reviewPlan.action': {
+      text: '您对此计划的决定',
+      authorityRelevant: false,
+    },
+    'guided.privacyNotice.keepLocal': {
+      text: '所有内容都保留在这台电脑上',
+      authorityRelevant: false,
+    },
+    'guided.privacyNotice.showPreview': {
+      text: '先查看披露预览',
+      authorityRelevant: false,
+    },
+    'guided.reviewPlan.continue': {
+      text: '继续前往独立批准',
+      authorityRelevant: true,
+      polarity: 'CONSENT',
+    },
+    'guided.reviewPlan.back': {
+      text: '返回并修改',
+      authorityRelevant: false,
+    },
     'state.currentStep': {
       text: '当前引导步骤',
       authorityRelevant: false,
@@ -219,6 +334,15 @@ export const STRINGS = {
     'state.history': {
       text: '历史',
       authorityRelevant: false,
+    },
+    'progress.stepOf': {
+      text: '第 {0} 步，共 {1} 步',
+      authorityRelevant: false,
+    },
+    'progress.unknown': {
+      text: '旅程位置未知。不做任何猜测。',
+      authorityRelevant: true,
+      polarity: 'UNKNOWN',
     },
     'state.refused': {
       text: '已拒绝',
@@ -396,6 +520,25 @@ export function t(locale, key) {
     };
   }
   return { ok: true, text: entry.text };
+}
+
+/**
+ * Fail-closed lookup with {0},{1},… placeholder substitution, so a sentence's
+ * word order can differ per locale. Same refusal rules as t().
+ *
+ * @param {string} locale
+ * @param {string} key
+ * @param {readonly (string|number)[]} params
+ * @returns {TextResult}
+ */
+export function tf(locale, key, params) {
+  const line = t(locale, key);
+  if (!line.ok) return line;
+  let substituted = line.text;
+  params.forEach((value, index) => {
+    substituted = substituted.replaceAll(`{${index}}`, String(value));
+  });
+  return { ok: true, text: substituted };
 }
 
 /**

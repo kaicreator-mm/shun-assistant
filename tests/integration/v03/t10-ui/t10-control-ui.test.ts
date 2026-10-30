@@ -6,6 +6,7 @@ import {
   type StringEntry,
   stringsAudit,
   t,
+  tf,
 } from '../../../../apps/control-ui/public/v03/strings.js';
 import {
   APPROVED_TEMPLATE_IDS,
@@ -15,6 +16,7 @@ import {
   currentStepModel,
   historyModel,
   outcomeStatusView,
+  progressModel,
   refusalView,
   replayGuard,
   scopeContentGuard,
@@ -244,6 +246,106 @@ describe('T10 CN/EN string catalog: parity and authority semantics', () => {
     expect(zh.ok).toBe(true);
     if (en.ok && zh.ok) expect(zh.text).not.toBe(en.text);
   });
+
+  it('substitutes {0}/{1} placeholders and fails closed like t()', () => {
+    expect(tf('en', 'progress.stepOf', [2, 5])).toEqual({ ok: true, text: 'Step 2 of 5' });
+    expect(tf('zh', 'progress.stepOf', [2, 5])).toEqual({ ok: true, text: '第 2 步，共 5 步' });
+    expect(tf('fr', 'progress.stepOf', [2, 5]).ok).toBe(false);
+    expect(tf('en', 'guided.missing.key', [2, 5]).ok).toBe(false);
+  });
+
+  it('binds every T05 template title, field and option key in both locales — exactly', () => {
+    // Derived mechanically from the frozen T05 catalog: the guided.* keys in
+    // the UI catalog must cover exactly these keys, no more and no fewer.
+    const expected = new Set<string>();
+    for (const template of APPROVED_STEP_TEMPLATES) {
+      expected.add(template.titleKey);
+      for (const field of template.formSchema.fields) {
+        expected.add(field.labelKey);
+        if (field.type === 'CHOICE') {
+          for (const option of field.options) expected.add(option.labelKey);
+        }
+      }
+    }
+    const catalogGuidedKeys = Object.keys(bucket('en')).filter((key) => key.startsWith('guided.'));
+    expect(new Set(catalogGuidedKeys)).toEqual(expected);
+    for (const key of expected) {
+      expect(t('en', key).ok, `missing EN text for ${key}`).toBe(true);
+      expect(t('zh', key).ok, `missing ZH text for ${key}`).toBe(true);
+    }
+    // The approval-flow choice names authorization semantics in both locales.
+    expect(entry('en', 'guided.reviewPlan.continue')).toMatchObject({
+      authorityRelevant: true,
+      polarity: 'CONSENT',
+    });
+    expect(entry('zh', 'guided.reviewPlan.continue')).toMatchObject({
+      authorityRelevant: true,
+      polarity: 'CONSENT',
+    });
+  });
+});
+
+describe('T10 progress and paused panel model (no fabricated progress)', () => {
+  it('renders a real journey position and RUNNING state in both locales', () => {
+    const en = progressModel({ position: 2, total: 5, paused: false }, 'en');
+    expect(en.ok).toBe(true);
+    if (!en.ok) return;
+    expect(en.status).toBe('RUNNING');
+    expect(en.position).toEqual({ known: true, text: 'Step 2 of 5' });
+    expect(en.pausedReason).toBeUndefined();
+
+    const zh = progressModel({ position: 2, total: 5, paused: false }, 'zh');
+    expect(zh.ok).toBe(true);
+    if (!zh.ok) return;
+    expect(zh.status).toBe('RUNNING');
+    expect(zh.position).toEqual({ known: true, text: '第 2 步，共 5 步' });
+  });
+
+  it('shows PAUSED explicitly with its localized reason', () => {
+    const en = progressModel({ position: 3, total: 5, paused: true }, 'en');
+    expect(en.ok).toBe(true);
+    if (!en.ok) return;
+    expect(en.status).toBe('PAUSED');
+    expect(en.position.known).toBe(true);
+    expect(en.pausedReason).toContain('paused');
+
+    const zh = progressModel({ position: 3, total: 5, paused: true }, 'zh');
+    expect(zh.ok).toBe(true);
+    if (!zh.ok) return;
+    expect(zh.status).toBe('PAUSED');
+    expect(zh.pausedReason).toContain('暂停');
+  });
+
+  it('never fabricates progress: an unusable position is an explicit UNKNOWN', () => {
+    for (const bad of [
+      undefined,
+      {},
+      { position: 0, total: 5, paused: false },
+      { position: 6, total: 5, paused: false },
+      { position: 2.5, total: 5, paused: false },
+      { position: '2', total: '5', paused: false },
+    ]) {
+      const model = progressModel(bad, 'en');
+      expect(model.ok, `progress must stay honest for ${JSON.stringify(bad)}`).toBe(true);
+      if (!model.ok) return;
+      expect(model.position.known).toBe(false);
+      expect(model.position.text.toLowerCase()).toContain('unknown');
+      expect(model.status).toBe('UNKNOWN');
+    }
+  });
+
+  it('treats a missing or malformed paused flag as UNKNOWN, never as RUNNING', () => {
+    const noPausedFlag = progressModel({ position: 2, total: 5 }, 'en');
+    expect(noPausedFlag.ok).toBe(true);
+    if (noPausedFlag.ok) {
+      expect(noPausedFlag.status).toBe('UNKNOWN');
+      expect(noPausedFlag.position.known, 'a valid position still renders').toBe(true);
+    }
+    const malformedPaused = progressModel({ position: 2, total: 5, paused: 'yes' }, 'en');
+    expect(malformedPaused.ok).toBe(true);
+    if (malformedPaused.ok) expect(malformedPaused.status).toBe('UNKNOWN');
+    expect(progressModel({ position: 1, total: 2, paused: false }, 'fr').ok).toBe(false);
+  });
 });
 
 describe('T10 current guided step rendering (real StepSpec)', () => {
@@ -396,6 +498,13 @@ describe('T10 explicit R2 approval relay (the UI is not a grant source)', () => 
     expect(relay.caseRef).toEqual(reviewStep.caseRef);
     expect(relay.outcome.answers).toEqual([{ fieldId: 'continue', value: continueChoice }]);
     expect(Object.isFrozen(relay)).toBe(true);
+    // The embedded outcome is frozen too: the relayed decision record is
+    // immutable end to end (P2-4).
+    expect(Object.isFrozen(relay.outcome)).toBe(true);
+    expect(Object.isFrozen(relay.outcome.answers)).toBe(true);
+    expect(Object.isFrozen(relay.outcome.answers[0])).toBe(true);
+    expect(Object.isFrozen(relay.outcome.caseRef)).toBe(true);
+    expect(Object.isFrozen(relay.outcome.evidenceRefs)).toBe(true);
     assertNoAuthorityShape(relay);
   });
 

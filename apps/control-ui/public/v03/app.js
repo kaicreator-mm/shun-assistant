@@ -13,6 +13,7 @@ import {
   consentView,
   currentStepModel,
   historyModel,
+  progressModel,
   refusalView,
   replayGuard,
   scopeSummary,
@@ -41,9 +42,15 @@ function setText(id, text) {
   if (node) node.textContent = text;
 }
 
+/**
+ * Loud-fail lookup: a missing or unbound key throws instead of rendering the
+ * raw key name. Callers catch and show the reason as an UNKNOWN/error state,
+ * so a future catalog gap can never silently degrade into machine text.
+ */
 function text(key) {
   const line = t(locale, key);
-  return line.ok ? line.text : key;
+  if (!line.ok) throw new Error(`${line.code}: ${line.reason}`);
+  return line.text;
 }
 
 /**
@@ -74,8 +81,7 @@ function renderScope(scope) {
   box.innerHTML = '';
   const line = document.createElement('p');
   if (model.status === 'REFUSED') {
-    line.className = 'refused';
-    line.textContent = `${text('state.refused')} — ${model.reason}`;
+    throw new Error(model.reason);
   } else if (model.status === 'NONE') {
     line.className = 'muted';
     line.textContent = model.label;
@@ -89,6 +95,37 @@ function renderScope(scope) {
   box.append(line);
 }
 
+/**
+ * Journey progress / paused panel. Renders only what the guided state
+ * actually carries: a real position ("Step x of y") or an explicit UNKNOWN,
+ * plus the paused reason when the journey is paused.
+ */
+function renderProgress(journey) {
+  const box = el('v03-progress');
+  if (!box) return;
+  box.innerHTML = '';
+  const model = progressModel(journey, locale);
+  if (!model.ok) {
+    throw new Error(model.reason);
+  }
+  const positionLine = document.createElement('p');
+  positionLine.textContent = model.position.text;
+  positionLine.className = model.position.known ? 'muted' : 'unknown';
+  box.append(positionLine);
+  if (model.status === 'PAUSED') {
+    const pausedLine = document.createElement('p');
+    pausedLine.className = 'warn';
+    pausedLine.textContent = `${text('state.paused')} — ${model.pausedReason ?? ''}`;
+    box.append(pausedLine);
+  } else if (model.status === 'UNKNOWN') {
+    // The paused flag was not a clean true/false: say Unknown, never coerce.
+    const unknownLine = document.createElement('p');
+    unknownLine.className = 'unknown';
+    unknownLine.textContent = text('state.unknown');
+    box.append(unknownLine);
+  }
+}
+
 function renderStep(step) {
   const box = el('v03-step');
   if (!box) return;
@@ -98,20 +135,21 @@ function renderStep(step) {
   const detail = document.createElement('p');
   if (model.status === 'REFUSED') {
     const refusal = refusalView(model.code, locale);
+    if (!refusal.ok) throw new Error(refusal.reason);
     heading.className = 'refused';
     heading.textContent = text('state.refused');
     detail.className = 'refused';
-    detail.textContent = refusal.ok ? refusal.text : model.reason;
+    detail.textContent = refusal.text;
   } else if (model.status === 'UNKNOWN') {
     heading.className = 'unknown';
     heading.textContent = text('state.unknown');
     detail.className = 'unknown';
     detail.textContent = model.reason;
   } else {
-    heading.textContent = `${text('state.currentStep')} — ${model.templateId}`;
+    heading.textContent = `${text('state.currentStep')} — ${text(model.titleKey)}`;
     detail.className = 'muted';
     detail.textContent =
-      `${model.journeyId} · ${model.taskId} · ${model.stepId} · digest ${model.templateDigest.slice(0, 12)}…`;
+      `${model.templateId} · ${model.journeyId} · ${model.taskId} · ${model.stepId} · digest ${model.templateDigest.slice(0, 12)}…`;
   }
   box.append(heading, detail);
 }
@@ -122,11 +160,7 @@ function renderHistory(entries) {
   box.innerHTML = '';
   const model = historyModel(entries, locale);
   if (!model.ok) {
-    const line = document.createElement('p');
-    line.className = 'unknown';
-    line.textContent = `${text('state.unknown')} — ${model.reason}`;
-    box.append(line);
-    return;
+    throw new Error(model.reason);
   }
   if (model.lines.length === 0) {
     const line = document.createElement('p');
@@ -166,6 +200,7 @@ function renderUnknownState(reason) {
     banner.textContent = `${text('state.unknown')} — ${reason}`;
   }
   renderStep(undefined);
+  renderProgress(undefined);
   renderHistory([]);
 }
 
@@ -178,49 +213,57 @@ function renderUnknownState(reason) {
 async function decide(decision) {
   const feedback = el('v03-decision-feedback');
   if (!feedback || !currentStep) return;
-  const confirmed = true;
-  const built = buildStepOutcome({
-    step: currentStep,
-    answers: collectAnswers(),
-    sourceRef: 'ui:v03-session',
-    occurredAtUnixMs: Date.now(),
-  });
-  if (!built.ok) {
-    feedback.className = 'refused';
-    feedback.textContent = `${text('state.refused')} — ${built.reason}`;
-    return;
-  }
-  const relay = userDecisionRelay({
-    step: currentStep,
-    outcome: built.outcome,
-    decision,
-    confirmed,
-    nowUnixMs: Date.now(),
-  });
-  if (!relay.ok) {
-    const refusal = refusalView(relay.code, locale);
-    feedback.className = 'refused';
-    feedback.textContent = `${text('state.refused')} — ${refusal.ok ? refusal.text : relay.reason}`;
-    return;
-  }
-  const replay = replayGuard(relayedKeys, built.outcome);
-  if (!replay.allowed) {
-    const refusal = refusalView(replay.code, locale);
-    feedback.className = 'refused';
-    feedback.textContent = refusal.ok ? refusal.text : replay.reason;
-    return;
-  }
-  relayedKeys.push(replay.key);
-  feedback.className = 'muted';
-  feedback.textContent = text('step.relayPending');
   try {
+    const confirmed = true;
+    const built = buildStepOutcome({
+      step: currentStep,
+      answers: collectAnswers(),
+      sourceRef: 'ui:v03-session',
+      occurredAtUnixMs: Date.now(),
+    });
+    if (!built.ok) {
+      feedback.className = 'refused';
+      feedback.textContent = `${text('state.refused')} — ${built.reason}`;
+      return;
+    }
+    const relay = userDecisionRelay({
+      step: currentStep,
+      outcome: built.outcome,
+      decision,
+      confirmed,
+      nowUnixMs: Date.now(),
+    });
+    if (!relay.ok) {
+      const refusal = refusalView(relay.code, locale);
+      if (!refusal.ok) throw new Error(relay.reason);
+      feedback.className = 'refused';
+      feedback.textContent = `${text('state.refused')} — ${refusal.text}`;
+      return;
+    }
+    const replay = replayGuard(relayedKeys, built.outcome);
+    if (!replay.allowed) {
+      const refusal = refusalView(replay.code, locale);
+      if (!refusal.ok) throw new Error(refusal.reason);
+      feedback.className = 'refused';
+      feedback.textContent = refusal.text;
+      return;
+    }
+    feedback.className = 'muted';
+    feedback.textContent = text('step.relayPending');
     const result = await api(DECISION_ENDPOINT, { body: relay });
+    // Record the replay key only after the relay succeeded: a network failure
+    // must not permanently occupy the identity in this session (the Host's
+    // CONSUMED state remains the authoritative replay fence).
+    relayedKeys.push(replay.key);
     renderHistory(Array.isArray(result?.history) ? result.history : []);
     feedback.className = 'muted';
     feedback.textContent = `${text('state.ok')} — ${text('consent.notGrant')}`;
   } catch (error) {
+    const unknown = t(locale, 'state.unknown');
     feedback.className = 'unknown';
-    feedback.textContent = `${text('state.unknown')} — ${error instanceof Error ? error.message : String(error)}`;
+    feedback.textContent = `${unknown.ok ? unknown.text : 'UNKNOWN'} — ${
+      error instanceof Error ? error.message : String(error)
+    }`;
   }
 }
 
@@ -248,8 +291,7 @@ function renderForm(model) {
   form.innerHTML = '';
   for (const field of model.fields) {
     const label = document.createElement('label');
-    const localized = t(locale, field.labelKey);
-    label.textContent = localized.ok ? localized.text : field.labelKey;
+    label.textContent = text(field.labelKey);
     label.className = 'muted';
     /** @type {HTMLInputElement | HTMLSelectElement} */
     let input;
@@ -261,8 +303,7 @@ function renderForm(model) {
       for (const option of field.options ?? []) {
         const choice = document.createElement('option');
         choice.value = option.id;
-        const optionText = t(locale, option.labelKey);
-        choice.textContent = optionText.ok ? optionText.text : option.labelKey;
+        choice.textContent = text(option.labelKey);
         /** @type {HTMLSelectElement} */ (input).append(choice);
       }
     } else {
@@ -273,9 +314,10 @@ function renderForm(model) {
     form.append(label, input);
   }
   const consent = consentView(locale);
+  if (!consent.ok) throw new Error(consent.reason);
   const note = document.createElement('p');
   note.className = model.requiresExplicitApproval ? 'warn' : 'muted';
-  note.textContent = consent.ok && model.requiresExplicitApproval ? consent.lines.join(' ') : '';
+  note.textContent = model.requiresExplicitApproval ? consent.lines.join(' ') : '';
   form.append(note);
 }
 
@@ -286,6 +328,7 @@ async function refresh() {
     const banner = el('v03-banner');
     if (banner) banner.textContent = '';
     renderScope(state?.scope);
+    renderProgress(state?.journey);
     renderStep(currentStep);
     const model = currentStepModel(currentStep, Date.now());
     if (model.status === 'CURRENT') renderForm(model);
@@ -311,9 +354,14 @@ if (refuseButton) {
   });
 }
 
-setText('v03-title', text('app.title'));
-setText('v03-subtitle', text('app.subtitle'));
-setText('v03-scope-title', text('state.selectedScope'));
-setText('v03-history-title', text('state.history'));
+try {
+  setText('v03-title', text('app.title'));
+  setText('v03-subtitle', text('app.subtitle'));
+  setText('v03-scope-title', text('state.selectedScope'));
+  setText('v03-progress-title', text('state.progress'));
+  setText('v03-history-title', text('state.history'));
+} catch (error) {
+  renderUnknownState(error instanceof Error ? error.message : String(error));
+}
 
 void refresh();

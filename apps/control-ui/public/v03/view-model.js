@@ -15,7 +15,7 @@
 // Plain ES with JSDoc types so the browser loads it without a build step and
 // the tests type-check the same file via checkJs.
 
-import { t } from './strings.js';
+import { t, tf } from './strings.js';
 
 /** Template ids approved for guided steps (T05 catalog, pinned by tests). */
 export const APPROVED_TEMPLATE_IDS = Object.freeze([
@@ -432,6 +432,24 @@ export function buildStepOutcome({ step, answers, sourceRef, occurredAtUnixMs })
 }
 
 /**
+ * Deep-freeze a plain data object (no cycles: relay payloads are built here).
+ * @template T
+ * @param {T} value
+ * @returns {T}
+ */
+function freezeDeep(value) {
+  if (Array.isArray(value)) {
+    for (const item of value) freezeDeep(item);
+    return Object.freeze(value);
+  }
+  if (value !== null && typeof value === 'object') {
+    for (const item of Object.values(value)) freezeDeep(item);
+    return Object.freeze(value);
+  }
+  return value;
+}
+
+/**
  * @typedef {Object} DecisionRelay
  * @property {'USER_DECISION_RELAY'} kind Marks this as a relay envelope for a
  *   human decision — it is NOT a grant, approval or permit object and must
@@ -523,7 +541,7 @@ export function userDecisionRelay({ step, outcome, decision, confirmed, nowUnixM
     stepId: outcomeValue.stepId,
     stepDigest: spec.templateRef.digest,
     caseRef: { snapshotId: outcomeValue.caseRef.snapshotId, digest: outcomeValue.caseRef.digest },
-    outcome: outcomeValue,
+    outcome: freezeDeep(outcomeValue),
   };
   return { ok: true, relay: Object.freeze(relay) };
 }
@@ -735,6 +753,87 @@ export function historyModel(entries, locale) {
     });
   }
   return { ok: true, lines };
+}
+
+/**
+ * @typedef {Object} ProgressKnown
+ * @property {true} known
+ * @property {string} text
+ * @property {undefined} [code]
+ */
+/**
+ * @typedef {Object} ProgressPositionUnknown
+ * @property {false} known
+ * @property {string} text The explicit UNKNOWN sentence, never a guess.
+ * @property {undefined} [code]
+ */
+/** @typedef {ProgressKnown|ProgressPositionUnknown} ProgressPosition */
+/**
+ * @typedef {Object} ProgressModel
+ * @property {true} ok
+ * @property {'RUNNING'|'PAUSED'|'UNKNOWN'} status PAUSED wins over UNKNOWN;
+ *   an unusable paused flag or an unknown position degrades honestly.
+ * @property {ProgressPosition} position
+ * @property {string | undefined} pausedReason Set only when status is PAUSED.
+ */
+/**
+ * @typedef {Object} ProgressRefused
+ * @property {false} ok
+ * @property {'LOCALE_UNBOUND'} code
+ * @property {string} reason
+ */
+/** @typedef {ProgressModel|ProgressRefused} ProgressResult */
+
+/**
+ * Journey progress / paused panel model. Honesty rules:
+ * - position renders only from real numbers (1 ≤ position ≤ total ≥ 1);
+ *   anything else is an explicit UNKNOWN, never a fabricated position;
+ * - the paused flag must be exactly true/false; any other value renders as
+ *   UNKNOWN instead of being coerced into running or paused.
+ *
+ * @param {{ position?: unknown, total?: unknown, paused?: unknown } | undefined} journey
+ * @param {string} locale
+ * @returns {ProgressResult}
+ */
+export function progressModel(journey, locale) {
+  const unknownLine = t(locale, 'progress.unknown');
+  if (!unknownLine.ok) {
+    return { ok: false, code: 'LOCALE_UNBOUND', reason: unknownLine.reason };
+  }
+  const record = /** @type {Record<string, unknown> | undefined} */ (journey);
+  const position = record?.position;
+  const total = record?.total;
+  const positionValid =
+    typeof position === 'number' &&
+    Number.isInteger(position) &&
+    position >= 1 &&
+    typeof total === 'number' &&
+    Number.isInteger(total) &&
+    total >= 1 &&
+    position <= total;
+  /** @type {ProgressPosition} */
+  let positionView;
+  if (positionValid) {
+    const stepOf = tf(locale, 'progress.stepOf', [position, total]);
+    if (!stepOf.ok) {
+      return { ok: false, code: 'LOCALE_UNBOUND', reason: stepOf.reason };
+    }
+    positionView = { known: true, text: stepOf.text };
+  } else {
+    positionView = { known: false, text: unknownLine.text };
+  }
+  const paused = record?.paused;
+  if (paused === true) {
+    const reason = t(locale, 'paused.reason');
+    if (!reason.ok) {
+      return { ok: false, code: 'LOCALE_UNBOUND', reason: reason.reason };
+    }
+    return Object.freeze({ ok: true, status: 'PAUSED', position: positionView, pausedReason: reason.text });
+  }
+  if (paused === false && positionView.known) {
+    return Object.freeze({ ok: true, status: 'RUNNING', position: positionView, pausedReason: undefined });
+  }
+  return Object.freeze({ ok: true, status: 'UNKNOWN', position: positionView, pausedReason: undefined });
 }
 
 /**
