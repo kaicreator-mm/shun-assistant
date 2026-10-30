@@ -3,27 +3,31 @@ import type {
   CloudConsentApproval,
   CloudConsentCurrentness,
 } from '../../../../packages/contracts/src/index.ts';
+import { buildNeutralGoalRequest } from '../../../../packages/domain-computer/src/cloud/goal-request.ts';
 import type {
   ShunLlmGenerateRequestV1,
   ShunLlmGenerateResultV1,
 } from '../../../../packages/domain-computer/src/contracts/llm-generate-v1.ts';
 import {
-  buildDeepSeekGoalDisclosure,
-  DEEPSEEK_FLASH_DESTINATION,
-  TrustedDeepSeekTransport,
-  type TrustedDeepSeekHost,
-} from '../../../../packages/llm-remote/src/deepseek-transport.ts';
-import {
-  MINIMUM_SENDER_DEADLINE_BUDGET_MS,
   type CloudRequestJournalDecision,
   type DurableCloudRequestJournal,
+  MINIMUM_PRE_SEND_DEADLINE_BUDGET_MS,
+  MINIMUM_SENDER_DEADLINE_BUDGET_MS,
   type TrustedCloudHostBindingConfig,
   type TrustedCloudInterpretResult,
 } from '../../../../packages/domain-host/src/cloud/openai-host.ts';
-import { buildNeutralGoalRequest } from '../../../../packages/domain-computer/src/cloud/goal-request.ts';
+import {
+  buildDeepSeekGoalDisclosure,
+  DEEPSEEK_FLASH_DESTINATION,
+  type TrustedDeepSeekHost,
+  TrustedDeepSeekTransport,
+} from '../../../../packages/llm-remote/src/deepseek-transport.ts';
 import { generate as selectedCapabilityGenerate } from './capability-llm-openai-compatible.mjs';
-import { generate as hostGenerate } from './host-binding-fixture.ts';
-import { configureFakeHost, resetFakeHost } from './host-binding-fixture.ts';
+import {
+  configureFakeHost,
+  generate as hostGenerate,
+  resetFakeHost,
+} from './host-binding-fixture.ts';
 
 type CapabilityTerminalResult = Readonly<{
   phase: 'terminal';
@@ -34,7 +38,7 @@ type CapabilityTerminalResult = Readonly<{
 async function invokeSelectedCapability(
   value: ShunLlmGenerateRequestV1,
 ): Promise<ShunLlmGenerateResultV1> {
-  const result = await selectedCapabilityGenerate(value) as CapabilityTerminalResult;
+  const result = (await selectedCapabilityGenerate(value)) as CapabilityTerminalResult;
   if (result.phase !== 'terminal' || result.outcome?.ok !== true) {
     throw new Error('SELECTED_C_TERMINAL_CONTRACT_INVALID');
   }
@@ -61,9 +65,7 @@ function memoryJournal() {
         return { status: 'RESERVED' };
       }
       if (prior.requestSha256 !== input.requestSha256) return { status: 'CONFLICT' };
-      return prior.result
-        ? { status: 'REPLAY', result: prior.result }
-        : { status: 'IN_FLIGHT' };
+      return prior.result ? { status: 'REPLAY', result: prior.result } : { status: 'IN_FLIGHT' };
     },
     complete: async (input) => {
       completeCalls++;
@@ -81,8 +83,10 @@ function memoryJournal() {
   };
 }
 
+type InterpreterGoalInput = Readonly<{ goalText: string; deadlineUnixMs: number }>;
+
 function interpreter(
-  handler: (goalText: string) => Promise<TrustedCloudInterpretResult> = async () => ({
+  handler: (input: InterpreterGoalInput) => Promise<TrustedCloudInterpretResult> = async () => ({
     ok: true,
     taskId: 'cloud-task-01',
     status: 'UNTRUSTED_REMOTE_PROPOSAL',
@@ -101,9 +105,9 @@ function interpreter(
       model: 'deepseek-flash' as const,
       osConsentRequired: true as const,
     }),
-    interpretGoal: async (goalText: string) => {
+    interpretGoal: async (input: InterpreterGoalInput) => {
       calls++;
-      return handler(goalText);
+      return handler(input);
     },
   };
   return { port, calls: () => calls };
@@ -216,19 +220,23 @@ describe('T04 selected C / trusted Shun Host exact-byte bridge', () => {
       maxOutputTokens: 256,
       outputFormat: 'text',
     });
-    expect(buildNeutralGoalRequest({
-      requestId: 'request-02',
-      goalText: GOAL,
-      deadlineUnixMs: HOST_NOW + MINIMUM_SENDER_DEADLINE_BUDGET_MS,
-      maxOutputTokens: 256,
-      systemPrompt: 'override',
-    })).toBeNull();
-    expect(buildNeutralGoalRequest({
-      requestId: 'request-03',
-      goalText: GOAL,
-      deadlineUnixMs: HOST_NOW + MINIMUM_SENDER_DEADLINE_BUDGET_MS,
-      maxOutputTokens: 8193,
-    })).toBeNull();
+    expect(
+      buildNeutralGoalRequest({
+        requestId: 'request-02',
+        goalText: GOAL,
+        deadlineUnixMs: HOST_NOW + MINIMUM_SENDER_DEADLINE_BUDGET_MS,
+        maxOutputTokens: 256,
+        systemPrompt: 'override',
+      }),
+    ).toBeNull();
+    expect(
+      buildNeutralGoalRequest({
+        requestId: 'request-03',
+        goalText: GOAL,
+        deadlineUnixMs: HOST_NOW + MINIMUM_SENDER_DEADLINE_BUDGET_MS,
+        maxOutputTokens: 8193,
+      }),
+    ).toBeNull();
   });
 
   it('uses the static selected C binding and preserves completed/refused/failed/unknown results', async () => {
@@ -249,7 +257,9 @@ describe('T04 selected C / trusted Shun Host exact-byte bridge', () => {
           selectedCapabilityGenerate(request({ requestId: `status-${item.code}` })),
         ).rejects.toMatchObject({ code: 'OPENAI_OUTCOME_UNKNOWN' });
       } else {
-        const result = await invokeSelectedCapability(request({ requestId: `status-${item.code}` }));
+        const result = await invokeSelectedCapability(
+          request({ requestId: `status-${item.code}` }),
+        );
         expect(result.status).toBe(item.expected);
       }
       expect(fake.calls()).toBe(1);
@@ -257,7 +267,9 @@ describe('T04 selected C / trusted Shun Host exact-byte bridge', () => {
 
     const successful = interpreter();
     configureFakeHost(config(successful.port));
-    const completedEnvelope = await selectedCapabilityGenerate(request({ requestId: 'status-completed' }));
+    const completedEnvelope = await selectedCapabilityGenerate(
+      request({ requestId: 'status-completed' }),
+    );
     expect(completedEnvelope).toMatchObject({
       phase: 'terminal',
       externalRef: 'local-correlation:status-completed',
@@ -281,24 +293,30 @@ describe('T04 selected C / trusted Shun Host exact-byte bridge', () => {
     const journal = memoryJournal();
     configureFakeHost(config(fake.port, journal.journal));
 
-    const tokenRefused = await invokeSelectedCapability(request({
-      requestId: 'wrong-token-ceiling',
-      maxOutputTokens: 128,
-    }));
+    const tokenRefused = await invokeSelectedCapability(
+      request({
+        requestId: 'wrong-token-ceiling',
+        maxOutputTokens: 128,
+      }),
+    );
     expect(tokenRefused).toMatchObject({
       status: 'refused',
       errorCategory: 'UNSUPPORTED_FEATURE',
       reasonCode: 'OUTPUT_TOKEN_CEILING_UNSUPPORTED',
     });
 
-    const deadlineRefused = await invokeSelectedCapability(request({
-      requestId: 'short-deadline',
-      deadlineUnixMs: HOST_NOW + MINIMUM_SENDER_DEADLINE_BUDGET_MS - 1,
-    }));
-    const expiredRefused = await invokeSelectedCapability(request({
-      requestId: 'expired-deadline',
-      deadlineUnixMs: HOST_NOW - 1,
-    }));
+    const deadlineRefused = await invokeSelectedCapability(
+      request({
+        requestId: 'short-deadline',
+        deadlineUnixMs: HOST_NOW + MINIMUM_SENDER_DEADLINE_BUDGET_MS - 1,
+      }),
+    );
+    const expiredRefused = await invokeSelectedCapability(
+      request({
+        requestId: 'expired-deadline',
+        deadlineUnixMs: HOST_NOW - 1,
+      }),
+    );
     expect(deadlineRefused).toMatchObject({
       status: 'refused',
       errorCategory: 'DEADLINE',
@@ -345,10 +363,12 @@ describe('T04 selected C / trusted Shun Host exact-byte bridge', () => {
 
     const first = await invokeSelectedCapability(request({ requestId: 'same-request' }));
     const replay = await invokeSelectedCapability(request({ requestId: 'same-request' }));
-    const conflict = await invokeSelectedCapability(request({
-      requestId: 'same-request',
-      goalText: 'A different goal must not replace the original request.',
-    }));
+    const conflict = await invokeSelectedCapability(
+      request({
+        requestId: 'same-request',
+        goalText: 'A different goal must not replace the original request.',
+      }),
+    );
 
     expect(first.status).toBe('completed');
     expect(replay).toEqual(first);
@@ -380,7 +400,7 @@ describe('T04 selected C / trusted Shun Host exact-byte bridge', () => {
     const approved = approval(goalText);
     let reservedBytes: Uint8Array | undefined;
     let mayHaveSentBytes: Uint8Array | undefined;
-    let sentBody: BodyInit | null | undefined;
+    let sentBody: RequestInit['body'];
     let fetchCalls = 0;
     let keyReads = 0;
     let unknownCostCalls = 0;
@@ -416,16 +436,21 @@ describe('T04 selected C / trusted Shun Host exact-byte bridge', () => {
       fetchTransport: (async (_url: string | URL | Request, options?: RequestInit) => {
         fetchCalls++;
         sentBody = options?.body;
-        return new Response(JSON.stringify({
-          choices: [{
-            finish_reason: 'stop',
-            message: { role: 'assistant', content: '{"proposalId":"fake-http-proposal"}' },
-          }],
-        }), { status: 200, headers: { 'content-type': 'application/json' } });
+        return new Response(
+          JSON.stringify({
+            choices: [
+              {
+                finish_reason: 'stop',
+                message: { role: 'assistant', content: '{"proposalId":"fake-http-proposal"}' },
+              },
+            ],
+          }),
+          { status: 200, headers: { 'content-type': 'application/json' } },
+        );
       }) as typeof fetch,
     };
     const transport = new TrustedDeepSeekTransport(senderHost);
-    const fakeInterpreter = interpreter(async (receivedGoal) => {
+    const fakeInterpreter = interpreter(async ({ goalText: receivedGoal }) => {
       const sent = await transport.invoke({
         goalText: receivedGoal,
         attemptId: 'transport-attempt-01',
@@ -467,7 +492,11 @@ describe('T04 selected C / trusted Shun Host exact-byte bridge', () => {
       stream: false,
     });
     expect(Object.keys(payload).sort()).toEqual([
-      'max_tokens', 'messages', 'model', 'stream', 'thinking',
+      'max_tokens',
+      'messages',
+      'model',
+      'stream',
+      'thinking',
     ]);
     expect(unknownCostCalls).toBe(1);
     expect(keyReads).toBe(1);
@@ -496,17 +525,18 @@ describe('T04 selected C / trusted Shun Host exact-byte bridge', () => {
     let reserveCalls = 0;
     let keyReads = 0;
     const ledger = {
-      reserve: (input: { currentness: CloudConsentCurrentness }) => {
+      reserve: (input: { attemptId: string }) => {
         reserveCalls++;
-        if (input.currentness.kind !== 'CURRENT') return { ok: false as const, code: 'STALE' };
         return {
           ok: true as const,
-          attemptId: 'must-not-reserve',
+          attemptId: input.attemptId,
           requestBytesSha256: 'a'.repeat(64),
           reservedCostMicros: 1,
         };
       },
-      markMayHaveSent: () => true,
+      // The trusted send fence refuses an UNRESOLVABLE consent currentness
+      // after reservation, which is the transport's CONSENT_STALE path.
+      markMayHaveSent: () => false,
       markUnknownCost: () => true,
     };
     const baseHost: TrustedDeepSeekHost = {
@@ -514,7 +544,10 @@ describe('T04 selected C / trusted Shun Host exact-byte bridge', () => {
       currentnessFor: () => ({ kind: 'UNRESOLVABLE' }),
       isOffline: () => false,
       isLocalOnly: () => false,
-      readApiKey: () => { keyReads++; return 'test-placeholder-no-secret'; },
+      readApiKey: () => {
+        keyReads++;
+        return 'test-placeholder-no-secret';
+      },
       now: () => '2026-10-30T00:00:00.000Z',
       fetchTransport: (async () => {
         fetchCalls++;
@@ -522,12 +555,14 @@ describe('T04 selected C / trusted Shun Host exact-byte bridge', () => {
       }) as typeof fetch,
     };
     const stale = new TrustedDeepSeekTransport(baseHost);
-    expect(await stale.invoke({
-      goalText: GOAL,
-      approval: approved,
-      attemptId: 'stale-consent',
-      maxOutputTokens: 128,
-    })).toEqual({ ok: false, code: 'CONSENT_STALE' });
+    expect(
+      await stale.invoke({
+        goalText: GOAL,
+        approval: approved,
+        attemptId: 'stale-consent',
+        maxOutputTokens: 128,
+      }),
+    ).toEqual({ ok: false, code: 'CONSENT_STALE' });
     expect(fetchCalls).toBe(0);
     expect(reserveCalls).toBe(1);
 
@@ -535,14 +570,17 @@ describe('T04 selected C / trusted Shun Host exact-byte bridge', () => {
       ...baseHost,
       currentnessFor: currentness,
     });
-    expect(await unapproved.invoke({
-      goalText: GOAL,
-      approval: approval('A different goal not shown to the user.'),
-      attemptId: 'unapproved-disclosure',
-      maxOutputTokens: 128,
-    })).toEqual({ ok: false, code: 'DISCLOSURE_SCOPE_DRIFT' });
+    expect(
+      await unapproved.invoke({
+        goalText: GOAL,
+        approval: approval('A different goal not shown to the user.'),
+        attemptId: 'unapproved-disclosure',
+        maxOutputTokens: 128,
+      }),
+    ).toEqual({ ok: false, code: 'DISCLOSURE_SCOPE_DRIFT' });
     expect(fetchCalls).toBe(0);
-    expect(reserveCalls).toBe(0);
+    // The unapproved disclosure adds no reservation beyond the stale leg.
+    expect(reserveCalls).toBe(1);
     expect(keyReads).toBe(1);
   });
 
@@ -573,34 +611,46 @@ describe('T04 selected C / trusted Shun Host exact-byte bridge', () => {
       now: () => '2026-10-30T00:00:00.000Z',
       fetchTransport: (async () => {
         fetchCalls++;
-        return new Response(JSON.stringify({
-          choices: [{
-            finish_reason: 'stop',
-            message: { role: 'assistant', content: '{"proposalId":"one-attempt"}' },
-          }],
-        }), { status: 200, headers: { 'content-type': 'application/json' } });
+        return new Response(
+          JSON.stringify({
+            choices: [
+              {
+                finish_reason: 'stop',
+                message: { role: 'assistant', content: '{"proposalId":"one-attempt"}' },
+              },
+            ],
+          }),
+          { status: 200, headers: { 'content-type': 'application/json' } },
+        );
       }) as typeof fetch,
     });
-    expect(await transport.invoke({
-      goalText: GOAL,
-      approval: approved,
-      attemptId: 'same-underlying-attempt',
-      maxOutputTokens: 128,
-    })).toMatchObject({ ok: true, costState: 'UNKNOWN_COST' });
-    expect(await transport.invoke({
-      goalText: GOAL,
-      approval: approved,
-      attemptId: 'same-underlying-attempt',
-      maxOutputTokens: 128,
-    })).toEqual({ ok: false, code: 'BUDGET_REFUSED' });
+    expect(
+      await transport.invoke({
+        goalText: GOAL,
+        approval: approved,
+        attemptId: 'same-underlying-attempt',
+        maxOutputTokens: 128,
+      }),
+    ).toMatchObject({ ok: true, costState: 'UNKNOWN_COST' });
+    expect(
+      await transport.invoke({
+        goalText: GOAL,
+        approval: approved,
+        attemptId: 'same-underlying-attempt',
+        maxOutputTokens: 128,
+      }),
+    ).toEqual({ ok: false, code: 'BUDGET_REFUSED' });
     expect(fetchCalls).toBe(1);
   });
 
   it('refuses missing broker and a deadline consumed during preflight before entering consent', async () => {
-    const unavailable = interpreter(async () => ({
-      ok: false,
-      code: 'CLOUD_UNAVAILABLE',
-    }), false);
+    const unavailable = interpreter(
+      async () => ({
+        ok: false,
+        code: 'CLOUD_UNAVAILABLE',
+      }),
+      false,
+    );
     const unavailableJournal = memoryJournal();
     configureFakeHost(config(unavailable.port, unavailableJournal.journal));
     expect(await invokeSelectedCapability(request({ requestId: 'missing-broker' }))).toMatchObject({
@@ -614,13 +664,17 @@ describe('T04 selected C / trusted Shun Host exact-byte bridge', () => {
     const expiring = interpreter();
     const expiringJournal = memoryJournal();
     let clockReads = 0;
-    configureFakeHost(config(expiring.port, expiringJournal.journal, {
-      now: () => {
-        clockReads++;
-        return HOST_NOW + (clockReads >= 3 ? 1 : 0);
-      },
-    }));
-    expect(await invokeSelectedCapability(request({ requestId: 'deadline-preflight' }))).toMatchObject({
+    configureFakeHost(
+      config(expiring.port, expiringJournal.journal, {
+        now: () => {
+          clockReads++;
+          return HOST_NOW + (clockReads >= 3 ? 1 : 0);
+        },
+      }),
+    );
+    expect(
+      await invokeSelectedCapability(request({ requestId: 'deadline-preflight' })),
+    ).toMatchObject({
       status: 'refused',
       errorCategory: 'DEADLINE',
       reasonCode: 'DEADLINE_BUDGET_UNSUPPORTED',
@@ -634,15 +688,17 @@ describe('T04 selected C / trusted Shun Host exact-byte bridge', () => {
     const fake = interpreter();
     const journal = memoryJournal();
     let clockReads = 0;
-    configureFakeHost(config(fake.port, journal.journal, {
-      now: () => {
-        clockReads++;
-        return clockReads >= 4
-          ? HOST_NOW + MINIMUM_SENDER_DEADLINE_BUDGET_MS + 1
-          : HOST_NOW;
-      },
-    }));
-    await expect(selectedCapabilityGenerate(request({ requestId: 'late-result' }))).rejects.toMatchObject({
+    configureFakeHost(
+      config(fake.port, journal.journal, {
+        now: () => {
+          clockReads++;
+          return clockReads >= 4 ? HOST_NOW + MINIMUM_SENDER_DEADLINE_BUDGET_MS + 1 : HOST_NOW;
+        },
+      }),
+    );
+    await expect(
+      selectedCapabilityGenerate(request({ requestId: 'late-result' })),
+    ).rejects.toMatchObject({
       code: 'OPENAI_OUTCOME_UNKNOWN',
     });
     expect(clockReads).toBe(4);
@@ -650,12 +706,171 @@ describe('T04 selected C / trusted Shun Host exact-byte bridge', () => {
     expect(journal.completeCalls()).toBe(1);
   });
 
+  it('keeps zero HTTP when delayed consent crosses the absolute deadline before the send boundary', async () => {
+    const approved = approval(GOAL);
+    let fetchCalls = 0;
+    let budgetReserveCalls = 0;
+    let markMayHaveSentCalls = 0;
+    const ledger = {
+      reserve: () => {
+        budgetReserveCalls++;
+        return {
+          ok: true as const,
+          attemptId: 'delayed-consent-attempt',
+          requestBytesSha256: 'c'.repeat(64),
+          reservedCostMicros: 1,
+        };
+      },
+      markMayHaveSent: () => {
+        markMayHaveSentCalls++;
+        return true;
+      },
+      markUnknownCost: () => true,
+    };
+    const transport = new TrustedDeepSeekTransport({
+      ledger: ledger as unknown as TrustedDeepSeekHost['ledger'],
+      currentnessFor: currentness,
+      isOffline: () => false,
+      isLocalOnly: () => false,
+      readApiKey: () => 'test-placeholder-no-real-credential',
+      now: () => '2026-10-30T00:00:00.000Z',
+      fetchTransport: (async () => {
+        fetchCalls++;
+        return new Response('{}', { status: 200, headers: { 'content-type': 'application/json' } });
+      }) as typeof fetch,
+    });
+    let clock = HOST_NOW;
+    const journal = memoryJournal();
+    let receivedDeadline: number | undefined;
+    // Models the port contract T11 must honor: the absolute deadline is
+    // rechecked at the final pre-send / MAY_HAVE_SENT boundary, after consent
+    // and broker resolution, immediately before the sender is entered.
+    const delayed = interpreter(async (input) => {
+      receivedDeadline = input.deadlineUnixMs;
+      // Consent stalls past its five-minute window; only five seconds remain,
+      // which can no longer cover the sender timeout plus its guard.
+      clock = input.deadlineUnixMs - 5_000;
+      if (input.deadlineUnixMs - clock < MINIMUM_PRE_SEND_DEADLINE_BUDGET_MS) {
+        return { ok: false, code: 'DEADLINE_EXPIRED' };
+      }
+      const sent = await transport.invoke({
+        goalText: input.goalText,
+        attemptId: 'delayed-consent-attempt',
+        approval: approved,
+        maxOutputTokens: 256,
+      });
+      return sent.ok
+        ? {
+            ok: true,
+            taskId: 'cloud-task-delayed',
+            status: 'UNTRUSTED_REMOTE_PROPOSAL',
+            proposalText: sent.proposalText,
+            model: 'deepseek-flash',
+            costState: 'UNKNOWN_COST',
+            executed: false,
+          }
+        : { ok: false, code: 'REMOTE_REFUSED' };
+    });
+    configureFakeHost(config(delayed.port, journal.journal, { now: () => clock }));
+
+    const result = await invokeSelectedCapability(
+      request({ requestId: 'delayed-consent-zero-send' }),
+    );
+    expect(result).toMatchObject({
+      status: 'refused',
+      errorCategory: 'DEADLINE',
+      reasonCode: 'DEADLINE_EXPIRED',
+    });
+    expect(receivedDeadline).toBe(HOST_NOW + MINIMUM_SENDER_DEADLINE_BUDGET_MS);
+    expect(fetchCalls).toBe(0);
+    expect(budgetReserveCalls).toBe(0);
+    expect(markMayHaveSentCalls).toBe(0);
+    expect(journal.completeCalls()).toBe(1);
+  });
+
+  it('keeps zero HTTP when the deadline fully expires during preflight with the real sender composed', async () => {
+    const approved = approval(GOAL);
+    let fetchCalls = 0;
+    let budgetReserveCalls = 0;
+    const ledger = {
+      reserve: () => {
+        budgetReserveCalls++;
+        return {
+          ok: true as const,
+          attemptId: 'expired-attempt',
+          requestBytesSha256: 'd'.repeat(64),
+          reservedCostMicros: 1,
+        };
+      },
+      markMayHaveSent: () => true,
+      markUnknownCost: () => true,
+    };
+    const transport = new TrustedDeepSeekTransport({
+      ledger: ledger as unknown as TrustedDeepSeekHost['ledger'],
+      currentnessFor: currentness,
+      isOffline: () => false,
+      isLocalOnly: () => false,
+      readApiKey: () => 'test-placeholder-no-real-credential',
+      now: () => '2026-10-30T00:00:00.000Z',
+      fetchTransport: (async () => {
+        fetchCalls++;
+        return new Response('{}', { status: 200, headers: { 'content-type': 'application/json' } });
+      }) as typeof fetch,
+    });
+    const expiring = interpreter(async (input) => {
+      const sent = await transport.invoke({
+        goalText: input.goalText,
+        attemptId: 'expired-attempt',
+        approval: approved,
+        maxOutputTokens: 256,
+      });
+      return sent.ok
+        ? {
+            ok: true,
+            taskId: 'cloud-task-expired',
+            status: 'UNTRUSTED_REMOTE_PROPOSAL',
+            proposalText: sent.proposalText,
+            model: 'deepseek-flash',
+            costState: 'UNKNOWN_COST',
+            executed: false,
+          }
+        : { ok: false, code: 'REMOTE_REFUSED' };
+    });
+    let clockReads = 0;
+    const journal = memoryJournal();
+    configureFakeHost(
+      config(expiring.port, journal.journal, {
+        now: () => {
+          clockReads++;
+          // The third read is the final recheck immediately before the
+          // interpreter entry; the absolute deadline has fully expired by then.
+          return clockReads >= 3 ? HOST_NOW + MINIMUM_SENDER_DEADLINE_BUDGET_MS + 1 : HOST_NOW;
+        },
+      }),
+    );
+
+    expect(
+      await invokeSelectedCapability(request({ requestId: 'expired-before-send' })),
+    ).toMatchObject({
+      status: 'refused',
+      errorCategory: 'DEADLINE',
+      reasonCode: 'DEADLINE_BUDGET_UNSUPPORTED',
+    });
+    expect(clockReads).toBe(3);
+    expect(expiring.calls()).toBe(0);
+    expect(fetchCalls).toBe(0);
+    expect(budgetReserveCalls).toBe(0);
+    expect(journal.completeCalls()).toBe(1);
+  });
+
   it('refuses an unconfigured or non-durable Host journal', () => {
-    expect(() => configureFakeHost({
-      interpreter: interpreter().port,
-      journal: { durability: 'MEMORY_ONLY' } as unknown as DurableCloudRequestJournal,
-      configuredMaxOutputTokens: 256,
-      now: () => HOST_NOW,
-    })).toThrow('CLOUD_HOST_CONFIGURATION_REFUSED');
+    expect(() =>
+      configureFakeHost({
+        interpreter: interpreter().port,
+        journal: { durability: 'MEMORY_ONLY' } as unknown as DurableCloudRequestJournal,
+        configuredMaxOutputTokens: 256,
+        now: () => HOST_NOW,
+      }),
+    ).toThrow('CLOUD_HOST_CONFIGURATION_REFUSED');
   });
 });

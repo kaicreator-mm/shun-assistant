@@ -31,18 +31,22 @@ export function buildNeutralGoalRequest(input: unknown): ShunLlmGenerateRequestV
       goalText.length > 8192 ||
       goalText.trim().length === 0 ||
       goalText.includes('\0')
-    ) return null;
+    )
+      return null;
     if (!Number.isSafeInteger(deadlineUnixMs) || (deadlineUnixMs as number) <= 0) return null;
-    if (!Number.isSafeInteger(maxOutputTokens) || (maxOutputTokens as number) < 1 || (maxOutputTokens as number) > 8192) return null;
+    if (
+      !Number.isSafeInteger(maxOutputTokens) ||
+      (maxOutputTokens as number) < 1 ||
+      (maxOutputTokens as number) > 8192
+    )
+      return null;
 
     return Object.freeze({
       contractVersion: 'dh.llm.generate/1',
       requestId,
       modelId: 'deepseek-flash',
       deadlineUnixMs: deadlineUnixMs as number,
-      messages: Object.freeze([
-        Object.freeze({ role: 'user' as const, content: goalText }),
-      ]),
+      messages: Object.freeze([Object.freeze({ role: 'user' as const, content: goalText })]),
       maxOutputTokens: maxOutputTokens as number,
       outputFormat: 'text' as const,
     });
