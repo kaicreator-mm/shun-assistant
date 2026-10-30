@@ -8,8 +8,5 @@
       "vitest": ["../../../../packages/workflow/node_modules/vitest/dist/index.d.ts"]
     }
   },
-  "include": [
-    "../../../../packages/domain-computer/src/feedback/**/*.ts",
-    "./**/*.test.ts"
-  ]
+  "include": ["../../../../packages/domain-computer/src/feedback/**/*.ts", "./**/*.test.ts"]
 }

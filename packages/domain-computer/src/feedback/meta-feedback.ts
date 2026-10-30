@@ -114,7 +114,10 @@ export type MetaFeedbackSubmitResult =
       readonly candidateDigest: string;
       readonly active: false;
     }
-  | { readonly status: 'UNKNOWN'; readonly code: 'HOST_OUTCOME_UNKNOWN' | 'HOST_RESULT_UNVERIFIABLE' };
+  | {
+      readonly status: 'UNKNOWN';
+      readonly code: 'HOST_OUTCOME_UNKNOWN' | 'HOST_RESULT_UNVERIFIABLE';
+    };
 
 const SAFE_REF = /^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$/;
 const SHA256 = /^[a-f0-9]{64}$/;
@@ -148,8 +151,9 @@ function hasExactKeys(
 ): boolean {
   const keys = Object.keys(value).sort();
   const allowed = [...required, ...optional].sort();
-  return required.every((key) => Object.hasOwn(value, key)) &&
-    keys.every((key) => allowed.includes(key));
+  return (
+    required.every((key) => Object.hasOwn(value, key)) && keys.every((key) => allowed.includes(key))
+  );
 }
 
 function isSafeRef(value: unknown): value is string {
@@ -157,45 +161,52 @@ function isSafeRef(value: unknown): value is string {
 }
 
 function isIsoUtc(value: unknown): value is string {
-  return typeof value === 'string' &&
+  return (
+    typeof value === 'string' &&
     ISO_UTC.test(value) &&
     Number.isFinite(Date.parse(value)) &&
-    new Date(Date.parse(value)).toISOString() === value;
+    new Date(Date.parse(value)).toISOString() === value
+  );
 }
 
 function sameSelection(a: MetaFeedbackSelection, b: unknown): boolean {
   if (!isRecord(b)) return false;
-  if (!hasExactKeys(
-    b,
-    ['selected', 'caseRef', 'sourceRevision', 'rating', 'category'],
-    ['correction'],
-  )) return false;
-  return b.selected === true &&
+  if (
+    !hasExactKeys(
+      b,
+      ['selected', 'caseRef', 'sourceRevision', 'rating', 'category'],
+      ['correction'],
+    )
+  )
+    return false;
+  return (
+    b.selected === true &&
     b.caseRef === a.caseRef &&
     b.sourceRevision === a.sourceRevision &&
     b.rating === a.rating &&
     b.category === a.category &&
-    (a.correction === undefined
-      ? b.correction === undefined
-      : b.correction === a.correction);
+    (a.correction === undefined ? b.correction === undefined : b.correction === a.correction)
+  );
 }
 
 function parseSelection(raw: unknown): MetaFeedbackSelection | null {
-  if (!isRecord(raw) ||
-      !hasExactKeys(
-        raw,
-        ['selected', 'caseRef', 'sourceRevision', 'rating', 'category'],
-        ['correction'],
-      ) ||
-      raw.selected !== true ||
-      !isSafeRef(raw.caseRef) ||
-      !isSafeRef(raw.sourceRevision) ||
-      typeof raw.rating !== 'string' ||
-      !RATINGS.includes(raw.rating) ||
-      typeof raw.category !== 'string' ||
-      !CATEGORIES.includes(raw.category) ||
-      (raw.correction !== undefined &&
-        (typeof raw.correction !== 'string' || !CORRECTIONS.includes(raw.correction)))) {
+  if (
+    !isRecord(raw) ||
+    !hasExactKeys(
+      raw,
+      ['selected', 'caseRef', 'sourceRevision', 'rating', 'category'],
+      ['correction'],
+    ) ||
+    raw.selected !== true ||
+    !isSafeRef(raw.caseRef) ||
+    !isSafeRef(raw.sourceRevision) ||
+    typeof raw.rating !== 'string' ||
+    !RATINGS.includes(raw.rating) ||
+    typeof raw.category !== 'string' ||
+    !CATEGORIES.includes(raw.category) ||
+    (raw.correction !== undefined &&
+      (typeof raw.correction !== 'string' || !CORRECTIONS.includes(raw.correction)))
+  ) {
     return null;
   }
 
@@ -217,23 +228,27 @@ function parseAuthorization(
   selection: MetaFeedbackSelection,
   nowIso: string,
 ): MetaFeedbackAuthorization | null {
-  if (!isRecord(raw) || !hasExactKeys(raw, [
-    'status',
-    'scope',
-    'candidateId',
-    'caseRef',
-    'sourceRevision',
-    'sourceDigest',
-    'evidenceOwnerRef',
-    'operatorSubjectRef',
-    'operatorId',
-    'consentRef',
-    'consentRevision',
-    'consentExpiresAt',
-    'authorizationRevision',
-    'currentnessRef',
-    'selection',
-  ])) return null;
+  if (
+    !isRecord(raw) ||
+    !hasExactKeys(raw, [
+      'status',
+      'scope',
+      'candidateId',
+      'caseRef',
+      'sourceRevision',
+      'sourceDigest',
+      'evidenceOwnerRef',
+      'operatorSubjectRef',
+      'operatorId',
+      'consentRef',
+      'consentRevision',
+      'consentExpiresAt',
+      'authorizationRevision',
+      'currentnessRef',
+      'selection',
+    ])
+  )
+    return null;
 
   if (
     raw.status !== 'AUTHORIZED' ||
@@ -254,7 +269,8 @@ function parseAuthorization(
     !isSafeRef(raw.authorizationRevision) ||
     !isSafeRef(raw.currentnessRef) ||
     !sameSelection(selection, raw.selection)
-  ) return null;
+  )
+    return null;
 
   return Object.freeze({
     status: 'AUTHORIZED',
@@ -314,7 +330,9 @@ function stableValue(value: unknown): unknown {
   if (Array.isArray(value)) return value.map(stableValue);
   if (isRecord(value)) {
     return Object.fromEntries(
-      Object.keys(value).sort().map((key) => [key, stableValue(value[key])]),
+      Object.keys(value)
+        .sort()
+        .map((key) => [key, stableValue(value[key])]),
     );
   }
   return value;
@@ -327,20 +345,25 @@ function digestCandidate(candidate: MetaFeedbackShadowCandidate): string {
     .digest('hex');
 }
 
-function validShadowResult(raw: unknown, expectedDigest: string): raw is {
+function validShadowResult(
+  raw: unknown,
+  expectedDigest: string,
+): raw is {
   status: 'SHADOW_STORED';
   candidateRef: string;
   candidateDigest: string;
   active: false;
 } {
-  return isRecord(raw) &&
+  return (
+    isRecord(raw) &&
     hasExactKeys(raw, ['status', 'candidateRef', 'candidateDigest', 'active']) &&
     raw.status === 'SHADOW_STORED' &&
     isSafeRef(raw.candidateRef) &&
     typeof raw.candidateDigest === 'string' &&
     SHA256.test(raw.candidateDigest) &&
     raw.candidateDigest === expectedDigest &&
-    raw.active === false;
+    raw.active === false
+  );
 }
 
 export function createMetaFeedbackAdapter(
