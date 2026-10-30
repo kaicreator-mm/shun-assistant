@@ -21,7 +21,7 @@ function hostObservation(overrides: Record<string, unknown> = {}) {
         inaccessibleCount: 0,
       },
       {
-        relativePath: 'Documents/Archive',
+        relativePath: 'Documents',
         bytes: 400,
         files: 4,
         lastModifiedMs: 1_760_000_000_000,
@@ -51,7 +51,7 @@ describe('T02 selected-folder read-only observation adapter', () => {
         totalBytes: 1_500,
         directories: [
           { relativePath: 'Pictures', bytes: 1_000, files: 12 },
-          { relativePath: 'Documents/Archive', bytes: 400, files: 4, inaccessibleCount: 2 },
+          { relativePath: 'Documents', bytes: 400, files: 4, inaccessibleCount: 2 },
         ],
         rootFiles: { count: 3, bytes: 100 },
         localOnly: true,
@@ -106,6 +106,7 @@ describe('T02 selected-folder read-only observation adapter', () => {
       '/Users/private',
       '../private',
       'Pictures/../../private',
+      'Pictures/Archive',
       '\\\\server\\share',
       'Pictures\\private',
     ]) {

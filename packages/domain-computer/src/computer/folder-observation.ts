@@ -86,19 +86,22 @@ function exactDataKeys(value: unknown, expected: readonly string[]): value is Re
 }
 
 function safeRelativePath(value: unknown): value is string {
-  if (typeof value !== 'string' || value.length < 1 || value.length > 1024) return false;
-  if (value.startsWith('/') || value.startsWith('\\') || /^[a-z]:/i.test(value) || value.includes('\\')) return false;
-  const parts = value.split('/');
-  return parts.every((part) =>
-    part.length > 0 &&
-    part.length <= 255 &&
-    part !== '.' &&
-    part !== '..' &&
-    !/[<>:"|?*]/u.test(part) &&
-    !CONTROL_OR_BIDI.test(part) &&
-    !RESERVED_DOS.test(part) &&
-    !/[. ]$/u.test(part)
-  );
+  // vertical-storage emits one entry per direct child directory of the
+  // selected root. Do not accept nested paths or caller-selected descendants.
+  return typeof value === 'string' &&
+    value.length > 0 &&
+    value.length <= 255 &&
+    value !== '.' &&
+    value !== '..' &&
+    !value.startsWith('/') &&
+    !value.startsWith('\\') &&
+    !/^[a-z]:/i.test(value) &&
+    !value.includes('/') &&
+    !value.includes('\\') &&
+    !/[<>:"|?*]/u.test(value) &&
+    !CONTROL_OR_BIDI.test(value) &&
+    !RESERVED_DOS.test(value) &&
+    !/[. ]$/u.test(value);
 }
 
 function nonnegativeSafeInteger(value: unknown): value is number {
