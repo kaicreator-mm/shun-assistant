@@ -203,12 +203,17 @@ describe('T01 ShunStore business state adapter', () => {
       }),
       getEffectReceipt: vi.fn(async (effectId: string) => ({ effectId })),
     };
-    const adapter = createShunStoreStateAdapter(store);
+    const adapter = createShunStoreStateAdapter(store, {
+      capabilityId: 'cap.windows',
+      operationId: 'windows.execute',
+    });
     const mutation = { recordKind: 'case', recordId: 'case-01', payload: { state: 'ready' } };
     await adapter.applyBusinessMutation(context(), mutation);
     await adapter.applyBusinessMutation(context(), mutation);
     expect(calls).toEqual([['effect-01', mutation], ['effect-01', mutation]]);
     await expect(adapter.readBusinessReceipt('effect-01')).resolves.toEqual({ effectId: 'effect-01' });
     await expect(adapter.applyBusinessMutation({}, mutation)).rejects.toThrow('K_PERMIT_REQUIRED');
+    await expect(adapter.applyBusinessMutation(context({ operationId: 'windows.other' }), mutation))
+      .rejects.toThrow('K_PERMIT_REQUIRED');
   });
 });

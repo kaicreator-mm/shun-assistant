@@ -13,14 +13,19 @@ export interface ShunStoreBusinessPort {
   getEffectReceipt(effectId: string): Promise<unknown>;
 }
 
-export function createShunStoreStateAdapter(store: ShunStoreBusinessPort) {
-  if (typeof store?.apply !== 'function' || typeof store?.getEffectReceipt !== 'function') {
+export function createShunStoreStateAdapter(
+  store: ShunStoreBusinessPort,
+  binding: Readonly<{ capabilityId: string; operationId: string }>,
+) {
+  if (typeof store?.apply !== 'function' || typeof store?.getEffectReceipt !== 'function' ||
+      !/^[A-Za-z][A-Za-z0-9._:-]{0,127}$/.test(binding?.capabilityId ?? '') ||
+      !/^[A-Za-z][A-Za-z0-9._:-]{0,127}$/.test(binding?.operationId ?? '')) {
     throw new TypeError('SHUN_STORE_STATE_CONFIGURATION_REFUSED');
   }
 
   return Object.freeze({
     async applyBusinessMutation(context: unknown, mutation: unknown): Promise<unknown> {
-      const permit = readKernelEffectPermit(context);
+      const permit = readKernelEffectPermit(context, binding);
       if (!permit) throw new Error('K_PERMIT_REQUIRED');
       return store.apply(permit.effectId, mutation);
     },

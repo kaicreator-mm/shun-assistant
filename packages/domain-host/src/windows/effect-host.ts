@@ -108,12 +108,18 @@ function safeId(value: unknown): value is string {
  * wiring, and T11 must bind it only behind the real selected K external-effect
  * gate. The K gate itself performs the durable permit/journal/fence read.
  */
-export function readKernelEffectPermit(raw: unknown): KernelEffectPermitIdentity | null {
+export function readKernelEffectPermit(
+  raw: unknown,
+  binding?: WindowsEffectBinding,
+): KernelEffectPermitIdentity | null {
   try {
     if (!isRecord(raw) ||
         !exactKeys(raw, ['capabilityId', 'operationId', 'effectPermit']) ||
         !safeId(raw.capabilityId) ||
         !safeId(raw.operationId) ||
+        (binding !== undefined && (
+          raw.capabilityId !== binding.capabilityId || raw.operationId !== binding.operationId
+        )) ||
         !isRecord(raw.effectPermit) ||
         !exactKeys(raw.effectPermit, ['effectId', 'durableControlTurnId', 'attempt']) ||
         !safeId(raw.effectPermit.effectId) ||
