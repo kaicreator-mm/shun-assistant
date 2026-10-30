@@ -50,7 +50,7 @@ export type FormField =
     };
 
 export interface FormSchema {
-  readonly formSchema: FormSchema;
+  readonly fields: readonly FormField[];
 }
 
 export interface StepTemplate {
