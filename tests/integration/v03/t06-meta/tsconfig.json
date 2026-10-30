@@ -1,0 +1,12 @@
+{
+  "extends": "../../../../tsconfig.base.json",
+  "compilerOptions": {
+    "baseUrl": ".",
+    "types": ["node"],
+    "typeRoots": ["../../../../packages/workflow/node_modules/@types"],
+    "paths": {
+      "vitest": ["../../../../packages/workflow/node_modules/vitest/dist/index.d.ts"]
+    }
+  },
+  "include": ["../../../../packages/domain-computer/src/feedback/**/*.ts", "./**/*.test.ts"]
+}
