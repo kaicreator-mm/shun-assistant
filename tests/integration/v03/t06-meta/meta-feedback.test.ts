@@ -168,6 +168,24 @@ describe('T06 opt-in redacted Meta feedback Shadow adapter', () => {
     expect(drifted.runMetaFeedbackWorkflow).not.toHaveBeenCalled();
   });
 
+  it('checks consent expiry after the asynchronous Host authority lookup', async () => {
+    const host = {
+      authorizeCurrentFeedback: vi.fn(async () => authorization()),
+      runMetaFeedbackWorkflow: vi.fn(async () => ({
+        status: 'SHADOW_STORED',
+        candidateRef: 'meta-candidate-01',
+        candidateDigest: 'b'.repeat(64),
+        active: false,
+      })),
+    };
+    const adapter = createMetaFeedbackAdapter(host, () => '2026-10-30T00:05:00.000Z');
+    expect(await adapter.submit(SELECTION)).toMatchObject({
+      status: 'REFUSED',
+      code: 'FEEDBACK_AUTHORIZATION_INVALID',
+    });
+    expect(host.runMetaFeedbackWorkflow).not.toHaveBeenCalled();
+  });
+
   it('does not claim success when the Host returns an activated or malformed candidate', async () => {
     for (const result of [
       { status: 'SHADOW_STORED', candidateRef: 'meta-candidate-01', candidateDigest: 'b'.repeat(64), active: true },

@@ -339,18 +339,13 @@ export function createMetaFeedbackAdapter(
       // material, no consent lookup, no payload construction and no Host call.
       if (isRecord(raw) && raw.selected === false) return { status: 'NOT_SELECTED' };
 
-      const selection = parseSelection(raw);
-      if (!selection) return { status: 'REFUSED', code: 'FEEDBACK_INPUT_INVALID' };
-
-      let currentTime: string;
+      let selection: MetaFeedbackSelection | null;
       try {
-        currentTime = now();
+        selection = parseSelection(raw);
       } catch {
-        return { status: 'REFUSED', code: 'FEEDBACK_CURRENTNESS_UNRESOLVABLE' };
+        selection = null;
       }
-      if (!isIsoUtc(currentTime)) {
-        return { status: 'REFUSED', code: 'FEEDBACK_CURRENTNESS_UNRESOLVABLE' };
-      }
+      if (!selection) return { status: 'REFUSED', code: 'FEEDBACK_INPUT_INVALID' };
 
       let rawAuthorization: unknown;
       try {
@@ -364,7 +359,24 @@ export function createMetaFeedbackAdapter(
         return { status: 'REFUSED', code: 'FEEDBACK_AUTHORITY_UNAVAILABLE' };
       }
 
-      const authorization = parseAuthorization(rawAuthorization, selection, currentTime);
+      // Check expiry AFTER the asynchronous Host consent/source resolution;
+      // the Host must still recheck atomically when it persists the candidate.
+      let currentTime: string;
+      try {
+        currentTime = now();
+      } catch {
+        return { status: 'REFUSED', code: 'FEEDBACK_CURRENTNESS_UNRESOLVABLE' };
+      }
+      if (!isIsoUtc(currentTime)) {
+        return { status: 'REFUSED', code: 'FEEDBACK_CURRENTNESS_UNRESOLVABLE' };
+      }
+
+      let authorization: MetaFeedbackAuthorization | null;
+      try {
+        authorization = parseAuthorization(rawAuthorization, selection, currentTime);
+      } catch {
+        authorization = null;
+      }
       if (!authorization) {
         return { status: 'REFUSED', code: 'FEEDBACK_AUTHORIZATION_INVALID' };
       }
@@ -379,13 +391,24 @@ export function createMetaFeedbackAdapter(
         return { status: 'UNKNOWN', code: 'HOST_OUTCOME_UNKNOWN' };
       }
 
-      if (!validShadowResult(rawResult) || rawResult.candidateRef !== authorization.candidateId) {
+      let shadowResult: {
+        status: 'SHADOW_STORED';
+        candidateRef: string;
+        candidateDigest: string;
+        active: false;
+      } | null = null;
+      try {
+        if (validShadowResult(rawResult)) shadowResult = rawResult;
+      } catch {
+        shadowResult = null;
+      }
+      if (!shadowResult || shadowResult.candidateRef !== authorization.candidateId) {
         return { status: 'UNKNOWN', code: 'HOST_RESULT_UNVERIFIABLE' };
       }
       return {
         status: 'STORED_SHADOW',
-        candidateRef: rawResult.candidateRef,
-        candidateDigest: rawResult.candidateDigest,
+        candidateRef: shadowResult.candidateRef,
+        candidateDigest: shadowResult.candidateDigest,
         active: false,
       };
     },
