@@ -168,6 +168,7 @@ function parseHostObservation(raw: unknown): ParsedHostObservation | 'NOT_SELECT
       'totalBytes', 'directories', 'rootFiles',
     ])) return null;
     const directoryItems = safeArrayItems(raw.directories, 256);
+    const rootFilesRaw = raw.rootFiles;
     if (
       raw.schema !== HOST_FOLDER_OBSERVATION_SCHEMA ||
       raw.status !== 'OBSERVED_ONLY' ||
@@ -176,15 +177,15 @@ function parseHostObservation(raw: unknown): ParsedHostObservation | 'NOT_SELECT
       !canonicalUtc(raw.observedAt) ||
       !nonnegativeSafeInteger(raw.totalBytes) ||
       directoryItems === null ||
-      !exactDataKeys(raw.rootFiles, ['count', 'bytes']) ||
-      !nonnegativeSafeInteger(raw.rootFiles.count) ||
-      raw.rootFiles.count > 4096 ||
-      !nonnegativeSafeInteger(raw.rootFiles.bytes)
+      !exactDataKeys(rootFilesRaw, ['count', 'bytes']) ||
+      !nonnegativeSafeInteger(rootFilesRaw.count) ||
+      rootFilesRaw.count > 4096 ||
+      !nonnegativeSafeInteger(rootFilesRaw.bytes)
     ) return null;
 
     const directories: ComputerFolderDirectoryStat[] = [];
     const seen = new Set<string>();
-    let aggregateBytes = raw.rootFiles.bytes;
+    let aggregateBytes = rootFilesRaw.bytes;
     for (const item of directoryItems) {
       if (!exactDataKeys(item, ['relativePath', 'bytes', 'files', 'lastModifiedMs', 'inaccessibleCount'])) return null;
       if (
@@ -221,7 +222,7 @@ function parseHostObservation(raw: unknown): ParsedHostObservation | 'NOT_SELECT
       observedAt: raw.observedAt,
       totalBytes: raw.totalBytes,
       directories,
-      rootFiles: { count: raw.rootFiles.count, bytes: raw.rootFiles.bytes },
+      rootFiles: { count: rootFilesRaw.count, bytes: rootFilesRaw.bytes },
     };
   } catch {
     return null;

@@ -50,8 +50,8 @@ describe('T02 selected-folder read-only observation adapter', () => {
         scopeRevision: 'scope-revision-07',
         totalBytes: 1_500,
         directories: [
-          { relativePath: 'Pictures', bytes: 1_000, files: 12 },
           { relativePath: 'Documents', bytes: 400, files: 4, inaccessibleCount: 2 },
+          { relativePath: 'Pictures', bytes: 1_000, files: 12 },
         ],
         rootFiles: { count: 3, bytes: 100 },
         localOnly: true,
