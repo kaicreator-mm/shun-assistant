@@ -136,6 +136,7 @@ function parseRequest(value: unknown): ParsedRequest | null {
       (deadlineUnixMs as number) <= 0 ||
       !Number.isSafeInteger(maxOutputTokens) ||
       (maxOutputTokens as number) < 1 ||
+      (maxOutputTokens as number) > 8192 ||
       !Array.isArray(messages) ||
       messages.length !== 1
     ) return null;
@@ -226,7 +227,7 @@ function validResult(value: unknown, requestId: string): value is ShunLlmGenerat
           .every((key) => keys.includes(key)) &&
         typeof value.text === 'string' &&
         value.text.length > 0 &&
-        value.text.length <= 256 * 1024 &&
+        value.text.length <= 65_536 &&
         (value.finishReason === 'stop' || value.finishReason === 'length' ||
          value.finishReason === 'tool_proposal' || value.finishReason === 'content_filtered' ||
          value.finishReason === 'other') &&
@@ -239,7 +240,11 @@ function validResult(value: unknown, requestId: string): value is ShunLlmGenerat
       !['contractVersion', 'modelId', 'providerKind', 'requestId', 'status', 'usage', 'errorCategory', 'reasonCode']
         .every((key) => keys.includes(key)) ||
       typeof value.reasonCode !== 'string' ||
-      !/^[A-Z0-9_]{1,64}$/.test(value.reasonCode)
+      !/^[A-Z0-9_]{1,64}$/.test(value.reasonCode) ||
+      (value.providerRequestId !== undefined &&
+        (typeof value.providerRequestId !== 'string' || value.providerRequestId.length > 256)) ||
+      (value.receiptRef !== undefined &&
+        (typeof value.receiptRef !== 'string' || value.receiptRef.length > 256))
     ) return false;
     if (value.status === 'unknown') return value.errorCategory === 'OUTCOME_UNKNOWN';
     if (value.status === 'failed') return value.errorCategory === 'UNAVAILABLE';
@@ -268,8 +273,8 @@ function mapInterpreterResult(
         value.costState !== 'UNKNOWN_COST' ||
         value.executed !== false ||
         typeof value.proposalText !== 'string' ||
-        value.proposalText.length === 0 ||
-        value.proposalText.length > 256 * 1024 ||
+        value.proposalText.trim().length === 0 ||
+        value.proposalText.length > 65_536 ||
         typeof value.taskId !== 'string' || value.taskId.length === 0
       ) return unknown(requestId, 'REMOTE_OUTCOME_UNRESOLVED');
       return completed(requestId, value.proposalText);
@@ -312,7 +317,8 @@ export function createTrustedCloudHostBinding(config: TrustedCloudHostBindingCon
       typeof rawReserve !== 'function' ||
       typeof rawComplete !== 'function' ||
       !Number.isSafeInteger(rawConfiguredMaxOutputTokens) ||
-      (rawConfiguredMaxOutputTokens as number) < 1
+      (rawConfiguredMaxOutputTokens as number) < 1 ||
+      (rawConfiguredMaxOutputTokens as number) > 8192
     ) throw new Error('CLOUD_HOST_CONFIGURATION_REFUSED');
     status = rawStatus.bind(interpreter);
     interpretGoal = rawInterpret.bind(interpreter);

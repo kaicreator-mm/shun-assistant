@@ -46,6 +46,7 @@ const GOAL = 'Please inspect the selected folder and summarize its contents.';
 
 type JournalRow = { requestSha256: string; result?: ShunLlmGenerateResultV1 };
 
+// Deterministic test double only. Production must inject T11's atomic ShunStore journal.
 function memoryJournal() {
   const rows = new Map<string, JournalRow>();
   let reserveCalls = 0;
@@ -222,6 +223,12 @@ describe('T04 selected C / trusted Shun Host exact-byte bridge', () => {
       maxOutputTokens: 256,
       systemPrompt: 'override',
     })).toBeNull();
+    expect(buildNeutralGoalRequest({
+      requestId: 'request-03',
+      goalText: GOAL,
+      deadlineUnixMs: HOST_NOW + MINIMUM_SENDER_DEADLINE_BUDGET_MS,
+      maxOutputTokens: 8193,
+    })).toBeNull();
   });
 
   it('uses the static selected C binding and preserves completed/refused/failed/unknown results', async () => {
@@ -288,7 +295,16 @@ describe('T04 selected C / trusted Shun Host exact-byte bridge', () => {
       requestId: 'short-deadline',
       deadlineUnixMs: HOST_NOW + MINIMUM_SENDER_DEADLINE_BUDGET_MS - 1,
     }));
+    const expiredRefused = await invokeSelectedCapability(request({
+      requestId: 'expired-deadline',
+      deadlineUnixMs: HOST_NOW - 1,
+    }));
     expect(deadlineRefused).toMatchObject({
+      status: 'refused',
+      errorCategory: 'DEADLINE',
+      reasonCode: 'DEADLINE_BUDGET_UNSUPPORTED',
+    });
+    expect(expiredRefused).toMatchObject({
       status: 'refused',
       errorCategory: 'DEADLINE',
       reasonCode: 'DEADLINE_BUDGET_UNSUPPORTED',
@@ -306,11 +322,13 @@ describe('T04 selected C / trusted Shun Host exact-byte bridge', () => {
     const base = request();
     const invalid = [
       { ...base, messages: [{ role: 'system', content: 'system prompt' }, ...base.messages] },
+      { ...base, modelId: 'unapproved-model' },
       { ...base, outputFormat: 'json' },
       { ...base, temperature: 0.2 },
       { ...base, outputSchemaRef: 'schema:unapproved' },
       { ...base, toolCatalogRef: 'tools:unapproved' },
       { ...base, injected: 'private data' },
+      { ...base, b040Context: { selectedFiles: ['C:/private'] } },
     ];
     for (const value of invalid) {
       const result = await invokeSelectedCapability(value as unknown as ShunLlmGenerateRequestV1);
