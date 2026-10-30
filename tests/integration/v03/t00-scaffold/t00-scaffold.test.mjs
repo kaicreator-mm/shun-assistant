@@ -12,8 +12,11 @@
 //    carry no lifecycle hooks, and the real public roots + microkernel host-seam import cleanly.
 //  - package-boundary-negative: private SDK packages and unsupported deep imports are rejected.
 //  - artifact-integrity-negative: tampered tarball bytes refuse against the recorded SHA256.
-//  - no-install-effects: the three Shun manifests are zero-dep/no-scripts; no public entrypoints;
-//    sibling lane paths remain unclaimed; no second-sender (`llm/openai`) references in Shun sources.
+//  - no-install-effects: the three Shun manifests are zero-dep/no-scripts; public exports
+//    stay reserved to T11; the T00 scaffold lanes remain present; no second-sender
+//    (`llm/openai`) references in Shun sources. (T00 admission-time exclusivity snapshots —
+//    "only src/contracts exists", "sibling lanes unclaimed" — were checkpoint-scoped and are
+//    superseded once frozen tasks claim their declared subdirectories.)
 import { test, after } from 'node:test';
 import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';
@@ -244,13 +247,24 @@ test('no-install-effects: Shun scaffold shape — zero-dep manifests, no entrypo
     assert.equal(base.compilerOptions.strict, true);
     assert.equal(base.compilerOptions.noEmit, true);
   }
-  // No package-level public entrypoints at T00.
-  assert.equal(existsSync(join(repoRoot, 'packages', 'domain-computer', 'src', 'index.ts')), false);
-  // Sibling lane directories remain unclaimed by T00.
-  assert.equal(existsSync(join(repoRoot, 'packages', 'domain-host', 'src')), false);
-  assert.equal(existsSync(join(repoRoot, 'packages', 'domain-app', 'src')), false);
-  const computerSrc = readdirSync(join(repoRoot, 'packages', 'domain-computer', 'src'));
-  assert.deepEqual(computerSrc, ['contracts'], 'T00 owns only src/contracts inside domain-computer');
+  // Stage-aware scaffold invariants. The T00 admission-time exclusivity
+  // assertions (sibling lane directories unclaimed, domain-computer/src
+  // exactly ['contracts'], no package index.ts) described the scaffold at the
+  // T00 checkpoint only: frozen tasks T01..T07 legitimately claim their own
+  // declared subdirectories and T11 owns the shared public entrypoints. The
+  // durable protections are the manifest assertions above (private,
+  // zero-dep, no scripts, exports reserved to T11) and the
+  // forbidden-second-sender scan below.
+  assert.ok(
+    existsSync(join(repoRoot, 'packages', 'domain-computer', 'src', 'contracts', 'index.ts')),
+    'T00 scaffold contracts lane must remain present',
+  );
+  assert.ok(
+    existsSync(
+      join(repoRoot, 'packages', 'domain-computer', 'src', 'contracts', 'llm-generate-v1.ts'),
+    ),
+    'T00 scaffold llm-generate contract must remain present',
+  );
   // Shun-owned sources must not reference the forbidden second-sender subpath or its native
   // driver. Scan scope: contracts TS + the three manifests/tsconfigs. (This test file and the
   // fixture provenance note necessarily name the forbidden subpath to assert its absence.)
