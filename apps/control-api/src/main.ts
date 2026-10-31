@@ -4,6 +4,7 @@
 //   SHUN_CONTROL_PORT           — port (default 7788)
 //   SHUN_CONTROL_UI_DIR         — static UI directory (default ../control-ui/public)
 import { dirname, resolve } from 'node:path';
+import { HostGuidedService } from '../../../packages/domain-host/src/guided/host-guided-service.ts';
 import { fileURLToPath } from 'node:url';
 import { cloudInterpreterFromEnvironment } from './cloud-interpret.ts';
 import { DemoShunBackend } from './demo/backend.ts';
@@ -51,6 +52,17 @@ const executeBuiltinInventoryRecipe =
   backend instanceof RealStorageControlBackend
     ? () => backend.executeBuiltinInventoryRecipe()
     : undefined;
+// Guided state is a real, operator-owned local SQLite store. A selected
+// StepSpec may be staged ONLY by trusted Host composition, not by the browser;
+// absence of that binding exposes UNKNOWN, not a fabricated seeded journey.
+const guidedDb = process.env.SHUN_V03_GUIDED_DATABASE;
+if (guidedDb && mode !== 'real-storage') {
+  throw new Error('V03_GUIDED_REQUIRES_REAL_STORAGE_MODE');
+}
+const guided = guidedDb && mode === 'real-storage'
+  ? new HostGuidedService(resolve(guidedDb))
+  : undefined;
+
 const cloud = cloudInterpreterFromEnvironment();
 const handle = createControlServer({
   backend,
@@ -60,6 +72,7 @@ const handle = createControlServer({
   readBuiltinInventoryCandidate,
   executeBuiltinInventoryRecipe,
   cloud,
+  v03Guided: guided,
 });
 const bound = await handle.start();
 console.log(
