@@ -27,7 +27,10 @@ export interface TrustedHostObserver {
 
 export function createPrivateHostObservationIssuer(
   observer: TrustedHostObserver,
-  replayFence: { accept(record: TrustedHostObservation, nowUnixMs: number): boolean },
+  replayFence: { accept(record: {
+    taskId: string; sourceRef: string; revision: string;
+    issuedAtUnixMs: number; expiresAtUnixMs: number;
+  }, nowUnixMs: number): boolean },
 ) {
   if (!observer || typeof observer.observe !== 'function' ||
       !replayFence || typeof replayFence.accept !== 'function') {
@@ -48,7 +51,11 @@ export function createPrivateHostObservationIssuer(
           record.expiresAtUnixMs <= nowUnixMs) return null;
       // A crash/restart cannot make an old Host revision reusable. This
       // persisted fence must commit before the single-process WeakSet mark.
-      if (!replayFence.accept(record, nowUnixMs)) return null;
+      if (!replayFence.accept({
+        taskId, sourceRef: record.sourceRef, revision: record.revision,
+        issuedAtUnixMs: record.observedAtUnixMs,
+        expiresAtUnixMs: record.expiresAtUnixMs,
+      }, nowUnixMs)) return null;
       return issueHostObjectObservation({
         schema: 'shun.host-object-observation.v1',
         sourceRef: record.sourceRef,
