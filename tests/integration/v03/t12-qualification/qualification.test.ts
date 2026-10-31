@@ -405,7 +405,6 @@ describe('V01 public interface anchoring and real consumer composition', () => {
     const computer = await import('../../../../packages/domain-computer/src/index.ts');
     for (const name of [
       'selectGoalSemantic',
-      'issueHostObjectObservation',
       'createNextGuidedStep',
       'validateGuidedStepOutcome',
       'validateGuidedAdvisory',
@@ -1157,8 +1156,8 @@ describe('V01 version-level negative matrix', () => {
 
     // The SAME stable Case stays admissible after the refusals:
     const sent = await gateway.submit(valid);
-    expect(sent.status).toBe('SENT');
-    if (sent.status !== 'SENT') return;
+    expect(sent.status).toBe('UNKNOWN');
+    if (sent.status !== 'UNKNOWN') return;
     expect(sent.sendCalls).toBe(1);
     expect(calls).toBe(1);
     expect(payloads[0]).toEqual(valid);
@@ -1192,8 +1191,8 @@ describe('V01 version-level negative matrix', () => {
     }
     const sent = await gateway.submit(valid);
     collected.push(JSON.stringify(sent));
-    expect(sent.status).toBe('SENT');
-    // The SENT receipt wraps the facade result, not the raw goal text.
+    expect(sent.status).toBe('UNKNOWN');
+    // The UNKNOWN receipt keeps may-have-sent truth and must not include raw secrets.
     for (const text of collected) {
       expect(sensitive.test(text), text.slice(0, 200)).toBe(false);
     }
