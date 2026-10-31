@@ -13,6 +13,14 @@ export interface ShunStoreBusinessPort {
   getEffectReceipt(effectId: string): Promise<unknown>;
 }
 
+// Same kernel-issued identifier grammar as the Windows effect host: the real
+// selected Kernel derives effectIds with inherent '/' separators.
+const KERNEL_EFFECT_ID = /^[A-Za-z0-9][A-Za-z0-9._:/-]{0,127}$/;
+
+function kernelEffectId(value: unknown): value is string {
+  return typeof value === 'string' && !value.includes('..') && KERNEL_EFFECT_ID.test(value);
+}
+
 export function createShunStoreStateAdapter(
   store: ShunStoreBusinessPort,
   binding: Readonly<{ capabilityId: string; operationId: string }>,
@@ -44,7 +52,7 @@ export function createShunStoreStateAdapter(
     },
 
     async readBusinessReceipt(effectId: string): Promise<unknown> {
-      if (typeof effectId !== 'string' || !/^[A-Za-z][A-Za-z0-9._:-]{0,127}$/.test(effectId)) {
+      if (!kernelEffectId(effectId)) {
         throw new Error('SHUN_STORE_EFFECT_ID_INVALID');
       }
       return readEffectReceipt(effectId);

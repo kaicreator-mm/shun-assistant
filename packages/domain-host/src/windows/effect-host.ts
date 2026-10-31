@@ -83,6 +83,12 @@ export type WindowsHostEnvelope =
   | { readonly phase: 'running'; readonly externalRef: string };
 
 const SAFE_ID = /^[A-Za-z][A-Za-z0-9._:-]{0,127}$/;
+// Kernel-issued identifiers: the real selected Kernel derives every effectId
+// as `${turnId}/effect/${ordinal}` with turnId `turn:{workflowId}:{instanceKey}`
+// (+ optional `:message:{id}` / `:child:...` segments) — the '/' is inherent to
+// the kernel grammar. Still a bounded single path-style token: no traversal,
+// no control characters, no whitespace, no backslashes.
+const KERNEL_ID = /^[A-Za-z0-9][A-Za-z0-9._:/-]{0,127}$/;
 const SHA256 = /^[a-f0-9]{64}$/;
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -99,6 +105,10 @@ function exactKeys(value: Record<string, unknown>, expected: readonly string[]):
 
 function safeId(value: unknown): value is string {
   return typeof value === 'string' && SAFE_ID.test(value);
+}
+
+function kernelId(value: unknown): value is string {
+  return typeof value === 'string' && !value.includes('..') && KERNEL_ID.test(value);
 }
 
 /**
@@ -121,8 +131,8 @@ export function readKernelEffectPermit(
         (raw.capabilityId !== binding.capabilityId || raw.operationId !== binding.operationId)) ||
       !isRecord(raw.effectPermit) ||
       !exactKeys(raw.effectPermit, ['effectId', 'durableControlTurnId', 'attempt']) ||
-      !safeId(raw.effectPermit.effectId) ||
-      !safeId(raw.effectPermit.durableControlTurnId) ||
+      !kernelId(raw.effectPermit.effectId) ||
+      !kernelId(raw.effectPermit.durableControlTurnId) ||
       !Number.isSafeInteger(raw.effectPermit.attempt) ||
       (raw.effectPermit.attempt as number) < 1
     ) {

@@ -3,6 +3,7 @@ import { createShunStoreStateAdapter } from '../../../../packages/domain-host/sr
 import {
   createWindowsEffectHost,
   type KernelEffectDispatchContext,
+  readKernelEffectPermit,
 } from '../../../../packages/domain-host/src/windows/effect-host.ts';
 
 const PLAN_HASH = 'a'.repeat(64);
@@ -122,6 +123,67 @@ describe('T01 K-gated Windows Host authorization boundary', () => {
       outcome: { ok: false, error: { code: 'SHUN_AUTHORIZATION_IDENTITY_MISMATCH' } },
     });
     expect(h.windows.execute).not.toHaveBeenCalled();
+  });
+
+  it('accepts the real selected-Kernel identifier grammar and still refuses hostile identities', async () => {
+    // The real Kernel derives effectId as `${turnId}/effect/${ordinal}` with
+    // turnId `turn:{workflowId}:{instanceKey}[:message:{id}|:child:...]`.
+    const kernelTurnId = 'turn:wf-journey:instance-01:message:msg-9';
+    const kernelEffectId = `${kernelTurnId}/effect/2`;
+    const h = harness({ resolved: authorizationContext(kernelEffectId) });
+    await expect(
+      h.host.dispatch(
+        PAYLOAD,
+        context({
+          effectPermit: {
+            effectId: kernelEffectId,
+            durableControlTurnId: kernelTurnId,
+            attempt: 2,
+          },
+        }),
+      ),
+    ).resolves.toMatchObject({
+      phase: 'terminal',
+      outcome: { ok: true, output: { terminal: 'SUCCEEDED' } },
+    });
+    expect(h.windows.execute).toHaveBeenCalledTimes(1);
+
+    for (const bad of [
+      '../escape',
+      'turn:..:x/effect/1',
+      'turn:wf:inst/effect/1\\..\\escape',
+      'turn:wf:inst/effect/1 with space',
+      'turn:wf:inst/effect/1\n',
+      `${'y'.repeat(129)}/effect/1`,
+      '',
+    ]) {
+      expect(
+        readKernelEffectPermit({
+          capabilityId: 'cap.windows',
+          operationId: 'windows.execute',
+          effectPermit: { effectId: bad, durableControlTurnId: 'turn:wf:inst', attempt: 1 },
+        }),
+      ).toBeNull();
+    }
+    expect(
+      readKernelEffectPermit({
+        capabilityId: 'cap.windows',
+        operationId: 'windows.execute',
+        effectPermit: { effectId: kernelEffectId, durableControlTurnId: kernelTurnId, attempt: 2 },
+      }),
+    ).toMatchObject({ effectId: kernelEffectId, durableControlTurnId: kernelTurnId, attempt: 2 });
+
+    const apply = vi.fn(async (effectId: string) => ({ effectId }));
+    const adapter = createShunStoreStateAdapter(
+      { apply, getEffectReceipt: async (effectId: string) => ({ effectId }) },
+      { capabilityId: 'cap.windows', operationId: 'windows.execute' },
+    );
+    await expect(adapter.readBusinessReceipt(kernelEffectId)).resolves.toEqual({
+      effectId: kernelEffectId,
+    });
+    await expect(adapter.readBusinessReceipt('../escape')).rejects.toThrow(
+      'SHUN_STORE_EFFECT_ID_INVALID',
+    );
   });
 
   it('binds capability, operation, effectId, plan, action and grant identity', async () => {
