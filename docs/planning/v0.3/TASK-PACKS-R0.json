@@ -86,7 +86,7 @@
         "direct effect without Kernel and Host authorization"
       ],
       "acceptance": {
-        "positive": "real K-issued Permit + Shun ActionController.authorizeEffect/current OS authority on same bounded effect; preserve ShunStore business records and transactional apply(effectId) idempotency; retire old WorkflowEffectJournal as active dispatcher for migrated Case; selected public K→C adapter must call real ActionController.authorizeEffect immediately before actual Windows effect",
+        "positive": "real K-issued Permit + Shun ActionController.authorizeEffect/current OS authority on same bounded no-side-effect adapter path; preserve ShunStore business records and transactional apply(effectId) idempotency at the adapter port level; host adapter and no-effect tests only (real public selected-K integration proof and legacy dispatcher retirement moved to T11 per owner_amendment_r1)",
         "negative": "fake K permit, stale path/grant, two active workflow dispatchers for same effect, mismatched effectId/payload, uncertain replay; no physical effect without both guards"
       },
       "merge_target": "version/v0.3.0",
@@ -423,7 +423,8 @@
         "apps/control-api/src/server.ts",
         "apps/control-ui/public/app.js",
         "pnpm-lock.yaml",
-        "tests/integration/v03/t11-runtime/**"
+        "tests/integration/v03/t11-runtime/**",
+        "apps/control-api/src/cloud-interpret.ts"
       ],
       "forbidden": [
         "version/v0.2.0",
@@ -434,7 +435,7 @@
         "direct effect without Kernel and Host authorization"
       ],
       "acceptance": {
-        "positive": "one installed selected K/Host Windows flow + DeepSeek proposal/Guided Journey/Meta connected; CN/EN equivalent scope/approval/refusal and B-040 zero-egress support report; T04 host port wired from actual cloud-interpret.ts singleton with canonical exact bytes and no extra SDK HTTP sender; only approved T09 gateway forwards to selected K public send, never export unrestricted DomainApp.send to UI/HTTP; actual selected-C binding must demonstrably propagate T04 maxOutputTokens/deadlineUnixMs and completed/refused/failed/unknown semantic status into trusted Control API/UI without double-sending; verify one immutable approved request Buffer and original ledger/consent journey",
+        "positive": "one installed selected K/Host Windows flow + DeepSeek proposal/Guided Journey/Meta connected; CN/EN equivalent scope/approval/refusal and B-040 zero-egress support report; T04 host port wired from actual cloud-interpret.ts singleton with canonical exact bytes and no extra SDK HTTP sender; only approved T09 gateway forwards to selected K public send, never export unrestricted DomainApp.send to UI/HTTP; actual selected-C binding must demonstrably propagate T04 maxOutputTokens/deadlineUnixMs and completed/refused/failed/unknown semantic status into trusted Control API/UI without double-sending; verify one immutable approved request Buffer and original ledger/consent journey; real public selected-K Permit positive/negative integration proof; retire old WorkflowEffectJournal as active dispatcher for the migrated Case (owner_amendment_r1); production Interpreter realizes the frozen T04 TrustedCloudInterpreterPort with deadlineUnixMs rechecked at the final pre-send/MAY_HAVE_SENT boundary, DEADLINE_EXPIRED as a documented zero-send, UNKNOWN preserved without blind retry, and the single existing sender",
         "negative": "double journal, wrong scope, unchecked SDK package, unapproved promotion, fake host PASS reject; support-context accidental remote forwarding and non-equivalent locale approval reject; prohibited second WorkflowEffectJournal alongside K for identical Case; preserved ShunStore business writes must not be mislabeled second Kernel Journal; raw public send bypass, poisoned Case reuse/retry after failed effect or QUERY_NOT_FOUND as write permit rejected; late/expired per-request deadline, unhonored token ceiling and refused/failed/unknown mislabeled as UI completed must block acceptance, not rely on mocked Host PASS or old string-only CloudInterpretPort"
       },
       "merge_target": "version/v0.3.0",
@@ -624,5 +625,6 @@
   "l2_owner_approval_issue_comment": "kaicreator-mm/shun-assistant#217:6478493811",
   "l2_version_checkpoint": "3358080bd8fabd097347ef6df12f9b7e9b223fd0",
   "task_dag_independent_r1": "BLOCK_P0_0_P1_1_P2_1_EXACT_3358080bd8fabd097347ef6df12f9b7e9b223fd0",
-  "task_dag_owner_freeze": "NOT_AUTHORIZED"
+  "task_dag_owner_freeze": "NOT_AUTHORIZED",
+  "owner_amendment_r1": "APPROVED_BY_OWNER_20261031: (1) T01 real public selected-K Permit positive/negative integration proof and migrated-Case old WorkflowEffectJournal dispatcher retirement proof moved to T11 central integration acceptance (T01 keeps its own Host adapter and no-side-effect tests); (2) T11 allowed_write_set += apps/control-api/src/cloud-interpret.ts - repairs the frozen-acceptance inconsistency that T11 must wire the actual cloud-interpret.ts singleton without owning the file; (3) T11 acceptance += production Interpreter realizes the frozen T04 TrustedCloudInterpreterPort with deadlineUnixMs rechecked at the final pre-send/MAY_HAVE_SENT boundary, DEADLINE_EXPIRED as a documented zero-send, UNKNOWN preserved without blind retry, and the single existing sender"
 }
