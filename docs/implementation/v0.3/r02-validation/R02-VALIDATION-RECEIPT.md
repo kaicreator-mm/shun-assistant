@@ -30,9 +30,10 @@ below; OWNER_DEFERRED rows were never executed and are never claimed PASS.
 
 ## Command / exit-code record (local Windows Node v24.21.0)
 
-Executed in the worktree at HEAD `9ff6b20f75c52832fd8ed0a5f8673336da1ff98f`
-(branch `wip/v0.3.0-r02-owner-repairs`; earlier milestones at `e51aba3`,
-`e6eeb5f`, `e50ec5c`, `0004893`):
+Executed in the worktree (branch `wip/v0.3.0-r02-owner-repairs`); final
+all-green local gates at HEAD `9980a9e0f543d2d9b993b4111759b91e0f115fb6`
+(milestones: `e51aba3` A, `e6eeb5f` E, `e50ec5c`/`0004893` repairs,
+`7526e6f`/`9ff6b20` V journeys, `2b25f78`/`120b68a`/`9980a9e` CI gating):
 
 ```text
 pnpm install --registry=https://registry.npmmirror.com --ignore-scripts   EXIT=0

@@ -28,7 +28,7 @@ merge consent.
 | F06 J01–J09 evidence | V #270 | Executed zero-paid/zero-physical subset on real Windows Node 24 with receipts | `R02-VALIDATION-RECEIPT.md` | J02/J03/J05 OWNER_DEFERRED; J09 UNKNOWN |
 | Q01 label hygiene | done pre-R02 | #229–#241 CLOSED + state:done | — | none |
 | Q02/Q05 docs | D1 #266 | Bilingual operator/provider guides + README | docs review | installer/packaging physical validation deferred |
-| Q03 CI gate | D2 #267 | Woodpecker repo activated (id 35); local-backend Node 24 pipeline: lint+typecheck+all nested suites+fail-closed verifier | `WOODPECKER-CI-RECEIPT.md` | — |
+| Q03 CI gate | D2 #267 | Woodpecker repo activated (id 35); local-backend Node 24 pipeline green at `9980a9e` (push #14 + PR #15): lint+typecheck+all nested suites+fail-closed verifier; a fail-open wrapper defect was caught via the persisted trace and fixed with `set -eo pipefail` | `WOODPECKER-CI-RECEIPT.md` | — |
 | Q04 ABI mirror drift | A #262 | Legacy placeholder BUILD no longer used by production activation (manifest-driven trusted bytes) | `r02-a-build` | historical T09 composition kept as declaration-only artifact |
 | Q06 B-040 encoding | D3 #268 | PowerShell UTF-8 collector + CN regression; real zh-CN caption captured in J01 | V suite J01 receipt | historical V01 JSON untouched |
 
