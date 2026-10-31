@@ -1,0 +1,5 @@
+9553dc358cc4bad969603217c9ffb15fc7c5ce1c68429d45e109578454a0ca06  curator-trust-root.prod.public.pem
+f7ba2d8b21675bc23b15f9f96c7eed7c608a057e3bb9ee1e4807fec14381743e  catalog-manifest.r1.canonical.json
+7042bad63e36367ac0a681ac3f2e26ee21d6a3e87bb0c443f6cf116899c10019  binding-evidence.r1.canonical.json
+84c04a3be92600920198a59495b48aebb98b6886820327b2dbdc466e5c729407  provider-catalog-artifact.rg-14.1.1.canonical.json
+f162b54de2adfc72d78adb1dbada2dedda111ae0a5e2f6e9500f4f909664c5d2  artifacts/rg.exe
