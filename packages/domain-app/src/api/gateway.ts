@@ -37,6 +37,7 @@ export type GatewayRefusalCode =
   | 'CURRENTNESS_REF_INVALID'
   | 'APPROVAL_REF_INVALID';
 
+/** Do not equate a resolved send() Promise with a Kernel permit or terminal effect. */
 export type SendReceipt =
   | Readonly<{
       status: 'REFUSED';
@@ -46,7 +47,30 @@ export type SendReceipt =
       journalEntries: 0;
       refusedAtUnixMs: number;
     }>
-  | Readonly<{ status: 'SENT'; sendCalls: 1; result: unknown }>;
+  | Readonly<{
+      status: 'KERNEL_REFUSED';
+      code: 'KERNEL_REFUSED';
+      sendCalls: 1;
+      result: unknown;
+    }>
+  | Readonly<{
+      status: 'ADMITTED';
+      sendCalls: 1;
+      /** K accepted the turn, but a terminal effect is not proven. */
+      result: unknown;
+    }>
+  | Readonly<{
+      status: 'COMPLETED';
+      sendCalls: 1;
+      result: unknown;
+    }>
+  | Readonly<{
+      status: 'UNKNOWN';
+      code: 'KERNEL_RESULT_UNKNOWN' | 'EFFECT_RESULT_UNKNOWN' | 'SEND_OUTCOME_UNKNOWN';
+      sendCalls: 1;
+      /** A response may not exist after MAY_HAVE_SENT; never retry blindly. */
+      result?: unknown;
+    }>;
 
 export interface ControlApiGateway {
   /** The ONLY surface: pre-validated admission in front of the facade. */
@@ -226,8 +250,15 @@ export function createControlApiGateway(input: ControlApiGatewayInput): ControlA
         if (!parsed.ok) return refused(parsed.code, parsed.detail, atUnixMs);
         // Forward exactly the validated canonical submission — no rewrite of
         // the payload, no second admission path.
-        const result = await send(deepFreeze(parsed.value));
-        return { status: 'SENT', sendCalls: 1, result };
+        // Once send() starts, even a rejection may mean the Kernel recorded an
+        // effect. Never retry or claim zero Journal entries after this point.
+        let result: unknown;
+        try {
+          result = await send(deepFreeze(parsed.value));
+        } catch {
+          return { status: 'UNKNOWN', code: 'SEND_OUTCOME_UNKNOWN', sendCalls: 1 };
+        }
+        return classifyKernelResult(result);
       },
     }) satisfies ControlApiGateway;
   } catch {
@@ -241,4 +272,45 @@ function deepFreeze<T>(value: T): T {
     Object.freeze(value);
   }
   return value;
+}
+
+/**
+ * DomainHarness public send() reports a top-level K decision. Its resolved
+ * payload is NOT automatically terminal. Only the K-admitted envelope with
+ * explicitly terminal, executed and successful effects can be COMPLETED.
+ * Unknown/partial/rejected post-send outcomes retain the may-have-sent fact.
+ */
+function classifyKernelResult(result: unknown): SendReceipt {
+  if (!isRecord(result)) {
+    return { status: 'UNKNOWN', code: 'KERNEL_RESULT_UNKNOWN', sendCalls: 1, result };
+  }
+  if (result.status === 'refused' || result.status === 'rejected') {
+    return { status: 'KERNEL_REFUSED', code: 'KERNEL_REFUSED', sendCalls: 1, result };
+  }
+  if (result.status !== 'admitted') {
+    return { status: 'UNKNOWN', code: 'KERNEL_RESULT_UNKNOWN', sendCalls: 1, result };
+  }
+  const admitted = result.admitted;
+  if (!isRecord(admitted) || !Array.isArray(admitted.effects)) {
+    return { status: 'UNKNOWN', code: 'KERNEL_RESULT_UNKNOWN', sendCalls: 1, result };
+  }
+  // A K-admitted turn with no scheduled external effects may be admissible,
+  // but it proves no terminal external effect. HTTP must not call it complete.
+  if (admitted.effects.length === 0) {
+    return { status: 'ADMITTED', sendCalls: 1, result };
+  }
+  const effects = admitted.effects;
+  for (const effect of effects) {
+    if (!isRecord(effect) || effect.disposition !== 'executed' ||
+        !isRecord(effect.output) || effect.output.phase !== 'terminal' ||
+        !isRecord(effect.output.outcome)) {
+      return { status: 'UNKNOWN', code: 'EFFECT_RESULT_UNKNOWN', sendCalls: 1, result };
+    }
+    if (effect.output.outcome.ok !== true) {
+      return effect.output.outcome.ok === false
+        ? { status: 'KERNEL_REFUSED', code: 'KERNEL_REFUSED', sendCalls: 1, result }
+        : { status: 'UNKNOWN', code: 'EFFECT_RESULT_UNKNOWN', sendCalls: 1, result };
+    }
+  }
+  return { status: 'COMPLETED', sendCalls: 1, result };
 }
