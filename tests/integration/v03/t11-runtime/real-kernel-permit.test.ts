@@ -19,6 +19,14 @@
 //     deployment package);
 //   - the REAL ShunStore business receipt transaction.
 //
+// REPAIR CHAIN: the first cut of this suite pinned a fail-closed finding —
+// the T01 adapter's SAFE_ID refused the genuine kernel effectId grammar
+// (`${turnId}/effect/${ordinal}`). The T01 grammar fix (PR #256, merge
+// fa80955: KERNEL_ID for effectId/durableControlTurnId, '..' refused, strict
+// SAFE_ID kept for capabilityId/operationId/actionRef/grantRef, ShunStore
+// readBusinessReceipt aligned) lets the REAL K-issued permit run the FULL
+// positive chain asserted below.
+//
 // What is FAKE here (zero side effects, zero paid calls): the trusted
 // authorization storage, the Shun ActionController verdict, the OS authority
 // and the Windows executor (a recording-only journal). No real Windows
@@ -356,7 +364,7 @@ describe('T11 real selected-K Permit journey (public SDK, real kernel bytes)', (
     expect(typeof journey.kernelProtocol.effectAuthorityView).toBe('function');
   });
 
-  it('real K gate: a live kernel-minted permit authorizes the adapter dispatch (fail-closed witness)', async () => {
+  it('positive: a live kernel-minted permit drives the full adapter chain to a terminal receipt', async () => {
     const permitsBefore = journey.facade.kCounters(BUSINESS_PACKAGE_ID).effectPermitsMinted ?? 0;
     const receipt = await journey.facade.send({
       intentType: 'submitWindowsAction',
@@ -395,23 +403,37 @@ describe('T11 real selected-K Permit journey (public SDK, real kernel bytes)', (
     expect(context.effectPermit.durableControlTurnId).toBeTruthy();
     expect(context.effectPermit.attempt).toBe(1);
 
-    // INTEGRATION CONTRACT FINDING (documented, fail-closed, zero physical
-    // effect): the frozen T01 adapter re-parses the K permit context with
-    // SAFE_ID = /^[A-Za-z][A-Za-z0-9._:-]{0,127}$/, while the REAL selected
-    // Kernel derives every effectId as `${turnId}/effect/${ordinal}` — the
-    // '/' is inherent to the kernel grammar, so the frozen T01 identity
-    // check refuses the genuine permit identity. The adapter holds
-    // fail-closed (typed K_PERMIT_REQUIRED, no authority call, no physical
-    // effect) instead of guessing. The minimal owner-authorized repair is a
-    // T01-side identity-grammar widening (or an explicit kernel-grammar
-    // branch in readKernelEffectPermit); both files are outside the frozen
-    // T11 write set, so this suite pins the finding instead of patching it.
+    // REPAIR CHAIN: the T01 adapter identity grammar originally refused the
+    // genuine kernel effectId (SAFE_ID had no '/'); the T01 grammar fix
+    // (PR #256, merge fa80955: KERNEL_ID for effectId/durableControlTurnId,
+    // '..' still refused, strict SAFE_ID kept for
+    // capabilityId/operationId/actionRef/grantRef) lets the REAL K-issued
+    // permit drive the FULL chain: adapter dispatch -> trusted authorization
+    // resolve -> OS authority -> Shun ActionController -> staged (fake,
+    // recording-only) Windows executor -> terminal SUCCEEDED receipt.
     expect(realEffectId).toMatch(/\/effect\/\d+$/);
-    expect(/^[A-Za-z][A-Za-z0-9._:-]{0,127}$/.test(realEffectId)).toBe(false);
-    expect(effect.output?.outcome?.ok).toBe(false);
-    expect(effect.output?.outcome?.error?.code).toBe('K_PERMIT_REQUIRED');
-    expect(evidence.adapterOrder).toHaveLength(0);
-    expect(evidence.physicalEffects).toHaveLength(0);
+    expect(/^[A-Za-z0-9][A-Za-z0-9._:/-]{0,127}$/.test(realEffectId)).toBe(true);
+    expect(effect.output?.phase).toBe('terminal');
+    expect(effect.output?.outcome?.ok).toBe(true);
+    expect(effect.output?.outcome?.output).toMatchObject({
+      actionId: 'action-01',
+      terminal: 'SUCCEEDED',
+      recoveryClassification: 'COMPLETED_VERIFIED',
+      postStateVerified: true,
+    });
+    // The T01 adapter ordering, reached only past the real K gate:
+    // resolve -> OS authority -> ActionController -> execute.
+    expect(evidence.adapterOrder).toEqual([
+      'resolve',
+      'os-authority',
+      'action-controller',
+      'windows-execute',
+    ]);
+    // The executor is the staged FAKE (recording-only): exactly one physical
+    // record for exactly this kernel-minted effectId, nothing else.
+    expect(evidence.physicalEffects).toHaveLength(1);
+    expect(evidence.physicalEffects[0]?.effectId).toBe(realEffectId);
+    expect(evidence.physicalEffects[0]?.actionId).toBe('action-01');
   });
 
   it('negative: the permitless route is typed-refused with zero adapter dispatch', async () => {
@@ -566,6 +588,41 @@ describe('T11 real selected-K Permit journey (public SDK, real kernel bytes)', (
     expect(forged.outcome.ok).toBe(false);
     expect(forged.outcome.error?.code).toBe('SHUN_AUTHORIZATION_IDENTITY_MISMATCH');
     expect(physical).toHaveLength(1);
+  });
+
+  it('negative: an expired grant fails honestly UNDER a live real-K permit, zero physical effect', async () => {
+    const before = host.t11WindowsHostEvidence();
+    const permitsBefore = journey.facade.kCounters(BUSINESS_PACKAGE_ID).effectPermitsMinted ?? 0;
+    const receipt = await journey.facade.send({
+      intentType: 'submitWindowsAction',
+      instanceKey: 'instance-win-exp',
+      messageId: 'msg-win-exp',
+      input: {
+        actionRef: 'action-expired',
+        planRef: PLAN_HASH,
+        grantRef: 'grant-01',
+        taskId: 'task-t11-01',
+      },
+    });
+    // The REAL K gate minted a live permit for this turn (authority held),
+    // but the LAST Shun check — the ActionController, immediately adjacent to
+    // the effect call — refuses the expired grant: the adapter answers a
+    // terminal ok:false and the executor is never reached.
+    const permitsAfter = journey.facade.kCounters(BUSINESS_PACKAGE_ID).effectPermitsMinted;
+    expect(permitsAfter).toBe(permitsBefore + 1);
+    const effect = firstEffect(receipt);
+    expect(effect.disposition).toBe('executed');
+    expect(effect.output?.phase).toBe('terminal');
+    expect(effect.output?.outcome?.ok).toBe(false);
+    expect(effect.output?.outcome?.error?.code).toBe('SHUN_AUTHORIZATION_REFUSED');
+    const after = host.t11WindowsHostEvidence();
+    expect(after.gateDispatches).toHaveLength(before.gateDispatches.length + 1);
+    expect(after.adapterOrder.slice(before.adapterOrder.length)).toEqual([
+      'resolve',
+      'os-authority',
+      'action-controller',
+    ]);
+    expect(after.physicalEffects).toHaveLength(before.physicalEffects.length);
   });
 
   it('retires the legacy WorkflowEffectJournal: the migrated Case never appends to it', async () => {
@@ -733,14 +790,21 @@ describe('T11 real selected-K Permit journey (public SDK, real kernel bytes)', (
     expect(kernelReceipt.status).toBe('admitted');
     const effect = firstEffect(kernelReceipt);
     expect(effect.disposition).toBe('executed');
-    // The real-K permit context reached the adapter through the gateway
-    // journey; the honest Host projection of this journey (the frozen T01
-    // grammar finding above keeps the physical effect at zero) is BLOCKED,
-    // never a fabricated success.
-    expect(effect.output?.outcome?.ok).toBe(false);
+    // Post T01 grammar fix (PR #256): the real-K permit context reaches the
+    // adapter through the gateway journey and the effect completes — terminal
+    // SUCCEEDED over the staged (fake, recording-only) executor.
+    expect(effect.output?.phase).toBe('terminal');
+    expect(effect.output?.outcome?.ok).toBe(true);
+    expect(effect.output?.outcome?.output).toMatchObject({
+      actionId: 'action-gw',
+      terminal: 'SUCCEEDED',
+      recoveryClassification: 'COMPLETED_VERIFIED',
+      postStateVerified: true,
+    });
     const after = host.t11WindowsHostEvidence();
     expect(after.gateDispatches).toHaveLength(before.gateDispatches.length + 1);
-    expect(after.physicalEffects).toHaveLength(before.physicalEffects.length);
+    expect(after.physicalEffects).toHaveLength(before.physicalEffects.length + 1);
+    expect(after.physicalEffects.at(-1)?.actionId).toBe('action-gw');
 
     // The journey result lands in the T10 UI view-model consumption shapes:
     // history, progress, scope and outcome status render from the Host
@@ -749,11 +813,11 @@ describe('T11 real selected-K Permit journey (public SDK, real kernel bytes)', (
       const audit = stringsAudit(STRINGS);
       expect(audit.ok).toBe(true);
       const history = historyModel(
-        [{ at: new Date(BASE_MS).toISOString(), status: 'BLOCKED', stepId: 'action-gw' }],
+        [{ at: new Date(BASE_MS).toISOString(), status: 'ACCEPTED', stepId: 'action-gw' }],
         locale,
       );
       expect(history.ok).toBe(true);
-      if (history.ok) expect(history.lines[0]?.success).toBe(false);
+      if (history.ok) expect(history.lines[0]?.success).toBe(true);
       const progress = progressModel({ position: 1, total: 2, paused: false }, locale);
       expect(progress.ok).toBe(true);
       if (progress.ok) expect(progress.status).toBe('RUNNING');
