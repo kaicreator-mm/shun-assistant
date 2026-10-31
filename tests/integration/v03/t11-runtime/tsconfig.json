@@ -5,6 +5,7 @@
     "types": ["node"],
     "typeRoots": ["../../../../packages/vertical-support/node_modules/@types"],
     "paths": {
+      "@shun/vertical-support": ["../../../../packages/vertical-support/src/index.ts"],
       "vitest": ["../../../../packages/vertical-support/node_modules/vitest/dist/index.d.ts"]
     }
   },

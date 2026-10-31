@@ -169,7 +169,7 @@ function harness(options: {
   };
 
   const fetchTransport = (async (
-    input: RequestInfo | URL,
+    input: Parameters<typeof fetch>[0],
     init?: RequestInit,
   ): Promise<Response> => {
     fetchCalls += 1;

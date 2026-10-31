@@ -7,6 +7,10 @@ export default {
   root,
   resolve: {
     alias: {
+      // The zero-dep domain-computer manifest cannot declare this workspace
+      // dep; the T02 suite aliases it the same way (frozen-contract workaround,
+      // not a dependency change).
+      '@shun/vertical-support': resolve(root, '../../../../packages/vertical-support/src/index.ts'),
       vitest: resolve(root, '../../../../packages/vertical-support/node_modules/vitest'),
     },
   },
