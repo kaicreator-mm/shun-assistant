@@ -11,6 +11,7 @@ import { DemoShunBackend } from './demo/backend.ts';
 import { RealStorageControlBackend } from './real-storage/backend.ts';
 import { createControlServer } from './server.ts';
 import { createProductionV03Gateway } from './v03/composition-production.ts';
+import { provisionGuidedCaseFromHostFile } from './v03/composition-guided.ts';
 
 const here = dirname(fileURLToPath(import.meta.url));
 const port = Number.parseInt(process.env.SHUN_CONTROL_PORT ?? '7788', 10);
@@ -63,6 +64,16 @@ if (guidedDb && mode !== 'real-storage') {
 const guided = guidedDb && mode === 'real-storage'
   ? new HostGuidedService(resolve(guidedDb))
   : undefined;
+
+// Restore or stage only operator-pinned Host observations. A browser cannot
+// supply an authority-bearing semantic selection or a selected root.
+if (guided && process.env.SHUN_V03_GUIDED_CASE_FILE) {
+  provisionGuidedCaseFromHostFile({
+    service: guided,
+    file: process.env.SHUN_V03_GUIDED_CASE_FILE,
+    sha256: requiredEnv('SHUN_V03_GUIDED_CASE_SHA256'),
+  });
+}
 
 // Production v0.3 is an explicit, operator-pinned mode. Missing genuine
 // SDK/BUILD/Host state fails before an HTTP listener is opened; no demo
