@@ -29,13 +29,13 @@ flowchart LR
   V --> R[R02-R closeout]
 ```
 
-All seven predecessor lanes A/B/C1/C2/D1/D2/D3 can start concurrently **after** native GraphQL issue dependency readback and valid CAS Builder Claim. Proposed issue source scope and acceptance: `R02-REPAIR-TASK-PACKS-R1.json` in this directory. No sibling writes, duplicate writers, uncontrolled node/process permissions, weakening negative tests or migration of frozen prior-task write sets.
+All seven predecessor lanes A/B/C1/C2/D1/D2/D3 are eligible for independent parallel dispatch **after** native GraphQL issue dependency readback and valid CAS Builder Claim. Proposed issue source scope and acceptance: `R02-REPAIR-TASK-PACKS-R1.json` in this directory. No sibling writes, duplicate writers, uncontrolled node/process permissions, weakening negative tests or migration of frozen prior-task write sets.
 
 ## Pre-dispatch required steps
 
 - Independent review this *exact planning-PR HEAD/tree* for scope conflicts, SDK public ABI, GraphQL edge direction and final literal allowed_write_set.
 - Land approved planning records **only to `version/v0.3.0`** following proper independent plan review. No main/v0.2.
-- Create exact 10 new GitHub Task Issues; native `blocked_by` write+readback **9 edges**, no Markdown-only substitutes.
+- Confirm the existing exact ten GitHub Task Issues #262–#271 and each immutable Task Pack identity; write/read back native `blocked_by` **9 edges**, no Markdown-only substitutes. Never recreate or duplicate these Issues.
 - One current accepted CAS `DISPATCH_CLAIMED` per root builder, unique protected key, explicit operator identity/currentness and Task Pack SHA before any source byte or dependency install. Source tasks do not inherit T00–R01 closed Claims.
 - Existing Woodpecker backend must actually execute tests and return observable exit codes; if unavailable, remain UNKNOWN/blocked.
 
