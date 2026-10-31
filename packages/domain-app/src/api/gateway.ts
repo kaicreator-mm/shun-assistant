@@ -51,7 +51,6 @@ export type SendReceipt =
       status: 'KERNEL_REFUSED';
       code: 'KERNEL_REFUSED';
       sendCalls: 1;
-      result: unknown;
     }>
   | Readonly<{
       status: 'ADMITTED';
@@ -68,8 +67,7 @@ export type SendReceipt =
       status: 'UNKNOWN';
       code: 'KERNEL_RESULT_UNKNOWN' | 'EFFECT_RESULT_UNKNOWN' | 'SEND_OUTCOME_UNKNOWN';
       sendCalls: 1;
-      /** A response may not exist after MAY_HAVE_SENT; never retry blindly. */
-      result?: unknown;
+      /** No raw backend payload: post-send evidence may contain private input. */
     }>;
 
 export interface ControlApiGateway {
@@ -282,17 +280,17 @@ function deepFreeze<T>(value: T): T {
  */
 function classifyKernelResult(result: unknown): SendReceipt {
   if (!isRecord(result)) {
-    return { status: 'UNKNOWN', code: 'KERNEL_RESULT_UNKNOWN', sendCalls: 1, result };
+    return { status: 'UNKNOWN', code: 'KERNEL_RESULT_UNKNOWN', sendCalls: 1 };
   }
   if (result.status === 'refused' || result.status === 'rejected') {
-    return { status: 'KERNEL_REFUSED', code: 'KERNEL_REFUSED', sendCalls: 1, result };
+    return { status: 'KERNEL_REFUSED', code: 'KERNEL_REFUSED', sendCalls: 1 };
   }
   if (result.status !== 'admitted') {
-    return { status: 'UNKNOWN', code: 'KERNEL_RESULT_UNKNOWN', sendCalls: 1, result };
+    return { status: 'UNKNOWN', code: 'KERNEL_RESULT_UNKNOWN', sendCalls: 1 };
   }
   const admitted = result.admitted;
   if (!isRecord(admitted) || !Array.isArray(admitted.effects)) {
-    return { status: 'UNKNOWN', code: 'KERNEL_RESULT_UNKNOWN', sendCalls: 1, result };
+    return { status: 'UNKNOWN', code: 'KERNEL_RESULT_UNKNOWN', sendCalls: 1 };
   }
   // A K-admitted turn with no scheduled external effects may be admissible,
   // but it proves no terminal external effect. HTTP must not call it complete.
@@ -304,12 +302,12 @@ function classifyKernelResult(result: unknown): SendReceipt {
     if (!isRecord(effect) || effect.disposition !== 'executed' ||
         !isRecord(effect.output) || effect.output.phase !== 'terminal' ||
         !isRecord(effect.output.outcome)) {
-      return { status: 'UNKNOWN', code: 'EFFECT_RESULT_UNKNOWN', sendCalls: 1, result };
+      return { status: 'UNKNOWN', code: 'EFFECT_RESULT_UNKNOWN', sendCalls: 1 };
     }
     if (effect.output.outcome.ok !== true) {
       return effect.output.outcome.ok === false
-        ? { status: 'KERNEL_REFUSED', code: 'KERNEL_REFUSED', sendCalls: 1, result }
-        : { status: 'UNKNOWN', code: 'EFFECT_RESULT_UNKNOWN', sendCalls: 1, result };
+        ? { status: 'KERNEL_REFUSED', code: 'KERNEL_REFUSED', sendCalls: 1 }
+        : { status: 'UNKNOWN', code: 'EFFECT_RESULT_UNKNOWN', sendCalls: 1 };
     }
   }
   return { status: 'COMPLETED', sendCalls: 1, result };
