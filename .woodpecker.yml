@@ -1,0 +1,19 @@
+# Shun v0.3 R02 — real CI gate; do not use GitHub Actions.
+# This runs repository tests including every nested v0.3 suite and exposes
+# the actual failing command/exit code. A red build is never a release gate PASS.
+when:
+  - event: push
+  - event: pull_request
+
+steps:
+  - name: node24-full-qualification
+    image: node:24-bookworm
+    commands:
+      - corepack enable
+      - corepack prepare pnpm@10.34.5 --activate
+      - node --version
+      - pnpm --version
+      - pnpm install --frozen-lockfile
+      - pnpm -r --if-present run lint
+      - pnpm -r --if-present run typecheck
+      - pnpm -r --if-present run test
