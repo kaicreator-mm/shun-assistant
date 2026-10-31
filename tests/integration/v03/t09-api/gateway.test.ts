@@ -106,7 +106,8 @@ describe('createControlApiGateway pre-send admission', () => {
       'currentnessRef',
       'request',
     ]);
-    expect(receipt.result).toBe(facade.reply);
+    // Raw K result must not leak when the Kernel truth is unknown.
+    expect('result' in receipt).toBe(false);
   });
 
   it('strips getters by canonical projection before validation and send', async () => {
