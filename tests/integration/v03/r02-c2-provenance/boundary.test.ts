@@ -51,7 +51,7 @@ describe('R02-C2 Host issuer public capability boundary', () => {
     expect(reopened.accept({
       sourceRef: 'host-observation:r02', revision: 'revision-1', taskId: 'safe-task',
       observedObjectRefs: ['FOLDER:workspace'],
-      observedAtUnixMs: 100, expiresAtUnixMs: 200,
+      issuedAtUnixMs: 100, expiresAtUnixMs: 200,
     }, 120)).toBe(false);
     reopened.close();
     rmSync(dir, { recursive: true, force: true });
