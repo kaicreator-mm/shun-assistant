@@ -1,0 +1,45 @@
+pack_id: shun-v030-r02-e-cedf9ce-execution-pack-g1
+task_id: R02-E
+issue: "#269"
+repository: kaicreator-mm/shun-assistant
+version: v0.3.0
+base_sha: cedf9ce30c5bd9640a325e2fa0a5981aa7bd73f1
+task_pack_ref: docs/planning/v0.3/R02-REPAIR-TASK-PACKS-R1.json@blob:93247874e37d492b49f241d294017fd2fa6cb431
+branch: wip/v0.3.0-r02-owner-repairs
+parent_issue: "#259"
+owner_authorization_ref: "#260 OWNER_SHUN_V030_R02_AMENDMENT_R1_APPROVE"
+pinned_standard_revision: 2c395c55569fe2edf3f4135f12d3d069e526d0b7
+generated_by: zcode:shun-v030-r02-repairs-zc
+generated_at: 2026-11-01
+admission_mode: SINGLE_WRITER_ADMISSION
+protected_claim_key: "kaicreator-mm/shun-assistant#269:builder:__default__"
+allowed_write_set:
+  - apps/control-api/src/main.ts
+  - apps/control-api/src/server.ts
+  - apps/control-api/src/v03/composition-*.ts
+  - apps/control-ui/public/v03/**
+  - apps/control-api/package.json
+  - packages/domain-app/package.json
+  - packages/domain-computer/package.json
+  - packages/domain-host/package.json
+  - packages/domain-app/src/index.ts
+  - packages/domain-computer/src/index.ts
+  - packages/domain-host/src/index.ts
+  - pnpm-lock.yaml
+  - tests/integration/v03/r02-e-production/**
+plan:
+  - step: E-1-real-sdk-install-composition
+    deliverable: "Install real v0.10.3-tag public SDK closure as actual package deps; shipping composition uses installed SDK bytes, SHA-pinned manifest, durable SQLite K doc store, Host observation/guided ports"
+    capability: LOCAL
+    state: PLANNED
+  - step: E-2-shipping-entry-journeys
+    deliverable: "main.ts real-storage startup: UI->HTTP->Gateway->selected real BUILD K->Host->ActionController->Journal/History positive + invalid/replay/stale/UNKNOWN/boot-fail negatives, CN/EN"
+    capability: LOCAL (real Windows Node>=24, zero side effects)
+    state: PLANNED
+  - step: E-3-exact-sha-ci
+    deliverable: "r02-e-production tests green at exact HEAD; Woodpecker run"
+    capability: CI
+    state: PLANNED
+forbidden:
+  - fake facade positives; second K/sender/dispatcher; duplicate approval paths; paid DeepSeek; physical effects; main or version/v0.2.0; tag/release
+notes: Blocked_by #262 #263 #264 #265 native edges verified. Historical WIP predates Claim; Claim governs forward writes.

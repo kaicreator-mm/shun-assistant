@@ -1,0 +1,31 @@
+pack_id: shun-v030-r02-c2-cedf9ce-execution-pack-g1
+task_id: R02-C2
+issue: "#265"
+repository: kaicreator-mm/shun-assistant
+version: v0.3.0
+base_sha: cedf9ce30c5bd9640a325e2fa0a5981aa7bd73f1
+task_pack_ref: docs/planning/v0.3/R02-REPAIR-TASK-PACKS-R1.json@blob:93247874e37d492b49f241d294017fd2fa6cb431
+branch: wip/v0.3.0-r02-owner-repairs
+parent_issue: "#259"
+owner_authorization_ref: "#260 OWNER_SHUN_V030_R02_AMENDMENT_R1_APPROVE"
+pinned_standard_revision: 2c395c55569fe2edf3f4135f12d3d069e526d0b7
+generated_by: zcode:shun-v030-r02-repairs-zc
+generated_at: 2026-11-01
+admission_mode: SINGLE_WRITER_ADMISSION
+protected_claim_key: "kaicreator-mm/shun-assistant#265:builder:__default__"
+allowed_write_set:
+  - packages/domain-computer/src/semantic/**
+  - packages/domain-host/src/observation/**
+  - tests/integration/v03/r02-c2-provenance/**
+plan:
+  - step: C2-1-verify-issuer-isolation
+    deliverable: "Confirm public @shun/domain-computer cannot mint Host provenance; Host-only durable issuer with cross-process/currentness/replay negatives; fix defects found during E wiring"
+    capability: LOCAL
+    state: PLANNED
+  - step: C2-2-exact-sha-tests
+    deliverable: "tests/integration/v03/r02-c2-provenance/** green under Vitest + tsc at exact HEAD; Woodpecker run"
+    capability: LOCAL + CI
+    state: PLANNED
+forbidden:
+  - static prefix/sha as trust; public issuer exports; paths outside allowed_write_set; main or version/v0.2.0; paid or physical effects
+notes: Existing WIP commits (655a79b..7455ae1 lineage) predate the accepted Claim and stay UNQUALIFIED; Claim on #265 governs forward writes.

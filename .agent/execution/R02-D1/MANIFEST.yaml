@@ -1,0 +1,27 @@
+pack_id: shun-v030-r02-d1-cedf9ce-execution-pack-g1
+task_id: R02-D1
+issue: "#266"
+repository: kaicreator-mm/shun-assistant
+version: v0.3.0
+base_sha: cedf9ce30c5bd9640a325e2fa0a5981aa7bd73f1
+task_pack_ref: docs/planning/v0.3/R02-REPAIR-TASK-PACKS-R1.json@blob:93247874e37d492b49f241d294017fd2fa6cb431
+branch: wip/v0.3.0-r02-owner-repairs
+parent_issue: "#259"
+owner_authorization_ref: "#260 OWNER_SHUN_V030_R02_AMENDMENT_R1_APPROVE"
+pinned_standard_revision: 2c395c55569fe2edf3f4135f12d3d069e526d0b7
+generated_by: zcode:shun-v030-r02-repairs-zc
+generated_at: 2026-11-01
+admission_mode: SINGLE_WRITER_ADMISSION
+protected_claim_key: "kaicreator-mm/shun-assistant#266:builder:__default__"
+allowed_write_set:
+  - README.md
+  - docs/guide/v0.3/**
+  - docs/provider/v0.3/**
+plan:
+  - step: D1-1-truthful-readiness
+    deliverable: "Bilingual README/guid/provider docs updated to actual validated state after real Windows/CI runs; verified vs UNKNOWN matrix, no false PASS claims"
+    capability: LOCAL (WEB-authored docs)
+    state: PLANNED
+forbidden:
+  - private keys into repo/artifacts; test fixtures described as production trust roots; version bumps breaking lockfile
+notes: Docs must be finalized AFTER local+CI validation so claims match evidence.

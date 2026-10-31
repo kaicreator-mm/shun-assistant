@@ -1,0 +1,32 @@
+pack_id: shun-v030-r02-c1-cedf9ce-execution-pack-g1
+task_id: R02-C1
+issue: "#264"
+repository: kaicreator-mm/shun-assistant
+version: v0.3.0
+base_sha: cedf9ce30c5bd9640a325e2fa0a5981aa7bd73f1
+task_pack_ref: docs/planning/v0.3/R02-REPAIR-TASK-PACKS-R1.json@blob:93247874e37d492b49f241d294017fd2fa6cb431
+branch: wip/v0.3.0-r02-owner-repairs
+parent_issue: "#259"
+owner_authorization_ref: "#260 OWNER_SHUN_V030_R02_AMENDMENT_R1_APPROVE"
+pinned_standard_revision: 2c395c55569fe2edf3f4135f12d3d069e526d0b7
+generated_by: zcode:shun-v030-r02-repairs-zc
+generated_at: 2026-11-01
+admission_mode: SINGLE_WRITER_ADMISSION
+protected_claim_key: "kaicreator-mm/shun-assistant#264:builder:__default__"
+allowed_write_set:
+  - packages/domain-app/src/api/gateway.ts
+  - apps/control-api/src/v03/gateway-route.ts
+  - tests/integration/v03/r02-c1-gateway/**
+plan:
+  - step: C1-1-verify-truthful-statuses
+    deliverable: "Confirm forwarded/admitted/verified-terminal/UNKNOWN/refused separation is correct incl. redaction; fix defects found while integrating with real K/Host execution in R02-E"
+    capability: LOCAL
+    state: PLANNED
+  - step: C1-2-exact-sha-tests
+    deliverable: "tests/integration/v03/r02-c1-gateway/** green under Vitest + tsc at exact HEAD; Woodpecker run; adversarial runtime matrix executed on real Windows Node>=24"
+    capability: LOCAL + CI
+    state: PLANNED
+forbidden:
+  - blind retry on uncertain results; SENT wording for refused/UNKNOWN; invalid-input send/journal
+  - paths outside allowed_write_set; main or version/v0.2.0; paid or physical effects
+notes: Existing WIP commits (70b5d34..e47b208 lineage) predate the accepted Claim and stay UNQUALIFIED; Claim on #264 governs forward writes.
