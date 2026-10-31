@@ -32,3 +32,17 @@
 DomainHarness v0.10.3 is selected from immutable Git Tag `v0.10.3`, not an assumed public npm publication. Build only documented public SDK workspaces and verify immutable package digests. See [Provider custody](../../provider/v0.3/TRUST.en.md).
 
 Real Windows Node>=24 and Woodpecker exact-SHA evidence is required for J01–J09. Mark unexecuted real-model/physical OS steps UNKNOWN or OWNER_DEFERRED, not PASS.
+
+## Trusted v0.3 production BUILD setup (not yet runtime-qualified)
+
+Build/verify the four **public** DomainHarness v0.10.3 Git-tag SDK packages; source real K/S Domain Package artifacts from the installed immutable public packages and reviewed Shun-specific B/C source artifacts. In a trusted local directory prepare a JSON spec with `appId`, `audience`, `buildId`, `targetProfile: node24-esm/1`, `routes`, `hardBudget`, and exactly four `modules`. Each entry contains public BUILD module metadata (`packageId`, `role`, `abiVersion`, `endpoint`, `provides`, `requires` etc), an absolute `sourceFile`, verified `sourceSha256`, and `provenance` (`PUBLIC_DOMAIN_PACKAGE_V0103` for K/S; `SHUN_TRUSTED_DOMAIN_PACKAGE` for B/C).
+
+On Windows Node>=24, run:
+
+```text
+node scripts/v03-ci/assemble-trusted-build.mjs C:\\ShunHost\\build-spec.json C:\\ShunHost\\shun-v03.build.json
+```
+
+Pin the output SHA-256 separately as `SHUN_V03_BUILD_SHA256` and pass `SHUN_V03_BUILD_FILE`, `SHUN_V03_SDK_CONSUMER_DIR`, `SHUN_V03_KERNEL_DOC_DATABASE`, `SHUN_V03_DEPLOYMENT_ROOT`, `SHUN_V03_TENANT_ID`, `SHUN_V03_DEPLOYED_APP_ID` through the trusted Host bootstrap. Guided persistence uses `SHUN_V03_GUIDED_DATABASE`; an independently authenticated selected Host Case may be pinned with `SHUN_V03_GUIDED_CASE_FILE` and `SHUN_V03_GUIDED_CASE_SHA256`.
+
+These inputs do **not** manufacture disclosure consent, ActionController approval or a Kernel Effect Permit. Without a current trusted Host Case, real authorization and qualified module package source, the production journey must remain unavailable. Run exact Windows/CI qualification before claiming success.
