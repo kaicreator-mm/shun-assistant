@@ -15,6 +15,9 @@ const fromEvent = {
   llmRequest: { source: 'event', path: ['payload', 'llmRequest'] },
   approvalRef: { source: 'event', path: ['payload', 'approvalRef'] },
   currentnessRef: { source: 'event', path: ['payload', 'currentnessRef'] },
+  // Kernel admission consumes this safe-token field for the idempotency
+  // fence; the effect handler forwards only the three C-contract fields.
+  idempotencyToken: { source: 'event', path: ['payload', 'idempotencyToken'] },
 };
 const definition = {
   workflowKey: 'shun-goal', initialState: 'ready', initialContext: {},
@@ -26,7 +29,9 @@ const definition = {
       targetState: 'ready',
       effectIntents: [{
         effectType: 'effect:goal-interpret', inputFrom: fromEvent,
-        idempotencyKeyFrom: { template: 'goal:{approvalRef}' },
+        // The idempotency token is the Host-issued request id (safe-token
+        // charset); namespace-carrying refs would fail Kernel admission.
+        idempotencyKeyFrom: { template: 'goal:{idempotencyToken}' },
       }],
     }] },
   ],
@@ -55,6 +60,7 @@ export function getPolicy() {
           llmRequest: 'llmRequest',
           approvalRef: 'approvalRef',
           currentnessRef: 'currentnessRef',
+          idempotencyToken: 'idempotencyToken',
         },
       },
     },

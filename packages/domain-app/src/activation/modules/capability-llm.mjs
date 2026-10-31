@@ -18,6 +18,9 @@ export const HANDLERS = [{ operationId: 'interpretGoal', handler: 'interpretGoal
 
 /** This is called ONLY after K external Effect Permit and Host policy gates.
  * Its one dependency resolves only through the trusted fixed import map.
+ * Envelope grammar follows the upstream v0.10.3 public capability bytes
+ * (061376f4): terminal receipts only; an unresolved outcome throws so the
+ * existing K Journal/fence owns UNKNOWN — never a fake terminal success.
  */
 export async function interpretGoal(input) {
   if (!input || typeof input !== 'object' || Array.isArray(input) ||
@@ -48,5 +51,15 @@ export async function interpretGoal(input) {
   }
   // The existing trusted T04 host rechecks actual deadline, consent, Journal,
   // immutable bytes and cost. This C has no credential or network handle.
-  return generate(request);
+  const result = await generate(request);
+  if (result.status === 'unknown') {
+    const error = new Error('OpenAI external outcome requires reconciliation');
+    error.code = 'OPENAI_OUTCOME_UNKNOWN';
+    throw error; // Existing K Journal/fence owns UNKNOWN, never a terminal success.
+  }
+  return {
+    phase: 'terminal',
+    externalRef: result.providerRequestId ?? `local-correlation:${result.requestId}`,
+    outcome: { ok: true, output: result },
+  };
 }
