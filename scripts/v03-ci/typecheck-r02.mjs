@@ -5,7 +5,7 @@ import { fileURLToPath } from 'node:url';
 const root=resolve(dirname(fileURLToPath(import.meta.url)), '../..');
 const ts=join(root,'packages/vertical-support/node_modules/typescript/bin/tsc');
 const folders=['r02-a-build','r02-b-guided','r02-c1-gateway','r02-c2-provenance',
-  'r02-d2-gate','r02-e-production'];
+  'r02-d2-gate','r02-e-production','r02-v-journeys'];
 if(!existsSync(ts)) {
   console.error('[r02-typecheck] TSC_MISSING');
   process.exit(1);
