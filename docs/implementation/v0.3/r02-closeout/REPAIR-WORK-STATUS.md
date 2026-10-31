@@ -20,12 +20,21 @@ Current implementation branch: `wip/v0.3.0-r02-owner-repairs`. Read GitHub curre
 | Q04 frozen ABI mirror | New exact source manifest + real SDK activation (doesn't use legacy dummy BUILD for production) | Remove/retire historical placeholder BUILD as positive production claim |
 | Q06 B-040 | PowerShell stdout UTF-8, CN unit regression; future t12 receipts no longer overwrite immutable historical JSON | Actual zh-CN Windows read-only host proof and CI provenance |
 
-## Nonwaivable facts
+## Nonwaivable facts — updated 2026-11-01 by the local ZCode builder session
 
-- GitHub **native issue dependencies** #269 ← #262–#265, #270 ← #269/#266–#268, #271 ← #270 have not been created because the connected GitHub write tool lacks that mutation. Task Pack planned edges are not native dependencies.
-- New R02 accepted CAS Claims / execution dispatches have not been created. No source change on this WIP branch should be misrepresented as an ADS-admitted Builder task.
-- This conversation lacks access to the user's real Windows Node>=24 environment and Woodpecker logs. Tests **NOT RUN**; `pnpm lint/typecheck/test` PASS **NOT CLAIMED**.
-- No paid DeepSeek request, real OS side effects, tag, main/v0.2 merge, release or independent R03 self-approval.
+- GitHub native issue dependencies (9/9) were materialized via GraphQL
+  `addBlockedBy` and read back (#269 ← #262–#265, #270 ← #269/#266–#268,
+  #271 ← #270).
+- Execution Packs (`.agent/execution/R02-*`) committed at `710b2dc`; accepted
+  `DISPATCH_CLAIMED` CAS events posted on #262–#271 under Owner approval
+  #260. Source writes after `710b2dc` on this branch are Claim-covered.
+- Real Windows Node v24.21.0 execution completed: `pnpm lint`/`typecheck`/
+  `test` all EXIT=0 (integration 22/22 suites); see
+  `docs/implementation/v0.3/r02-validation/R02-VALIDATION-RECEIPT.md`.
+- Woodpecker repo registered and the exact-SHA pipeline executed; see
+  `WOODPECKER-CI-RECEIPT.md`.
+- Still true: no paid DeepSeek request, no real OS side effect, no tag, no
+  main/v0.2 merge, no release, no independent R03 self-approval.
 
 ## Remaining delivery work before Owner's single final review
 
