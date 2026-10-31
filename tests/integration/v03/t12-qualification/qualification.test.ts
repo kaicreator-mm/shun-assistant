@@ -157,7 +157,15 @@ function recordNegative(id: string, name: string): void {
 
 afterAll(() => {
   results.meta.finishedAtUnixMs = Date.now();
-  writeFileSync(join(here, 'qualification-results.json'), `${JSON.stringify(results, null, 2)}\n`);
+  // Historical V01 evidence is immutable: never overwrite the committed
+  // qualification-results.json. All new runs get a unique UTF-8 receipt.
+  const reportRoot = process.env.SHUN_V03_QUALIFICATION_REPORT_DIR ?? tmpdir();
+  const destination = join(reportRoot, `shun-v03-r02-qualification-${process.pid}.json`);
+  if (resolve(destination) === resolve(join(here, 'qualification-results.json'))) {
+    throw new Error('IMMUTABLE_V01_REPORT_REFUSED');
+  }
+  writeFileSync(destination, `${JSON.stringify(results, null, 2)}\n`, { encoding: 'utf8', flag: 'wx' });
+  console.info(`[v03-qualification] report=${destination} source=${results.meta.qualificationHeadSha}`);
 });
 
 // ---- 1. Candidate identity -------------------------------------------------
