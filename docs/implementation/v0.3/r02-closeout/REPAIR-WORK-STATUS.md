@@ -8,9 +8,9 @@ Current implementation branch: `wip/v0.3.0-r02-owner-repairs`. Read GitHub curre
 
 | Finding | Bounded implementation now present | Not yet proven / remaining |
 |---|---|---|
-| F01 production route | Trusted manifest/real public SDK K/Host composition and shipping startup option; Guided routes and SQLite K docs | Full domain Business/Capability signed binaries, verified trusted Host data, first run on physical Windows, all J01–J09; trusted operator Case now has separately pinned SHA256 startup file |
+| F01 production route | Trusted manifest/real public SDK K/Host composition and shipping startup option; Guided routes and SQLite K docs | Draft Shun B/C Domain Package sources now exist with one governed K Permit and exact T04 LLM request shape, but installed/signed production module artifacts, full Host trust/request resolution, Windows execution and J01–J09 remain unproven; trusted Host Case accepts only SHA256-pinned startup source |
 | F02 Guided | Host SQLite single-use Step, replay/409, real HTTP State/Decision, UI relay and host-pinned trusted Case startup | Live selected root creation and complete preview/R2/Kernel journeys |
-| F03 BUILD | SHA-256-verified real selected K/S/B/C source admission, public SDK BUILD/activation against same bytes, fake facade rejection, offline trusted manifest assembler | Actual v0.10.3 package closure and production K/S/B/C binary/exports binding positive |
+| F03 BUILD | SHA-256-verified real selected K/S/B/C source admission, public SDK BUILD/activation against same bytes, fake facade rejection, offline trusted manifest assembler | Actual v0.10.3 package closure and integrated B/C binary/exports + existing T04 Host sender binding positive; prepared B/C source is not activated evidence |
 | F04 Gateway | K admitted != terminal, COMPLETED/UNKNOWN/refused typed mapping, redacted unknown/refused results, 202/409/422, no blind retry, tests | Exact-sha real K/Host execution, adversarial runtime tests not yet run |
 | F05 provenance | Public barrel issuer removed, package exports locked, Host internal issuance, durable SQLite issue/replay fence + restart tests | Trusted Host composition must actually wire the new durable fence/observation adapter, and end-to-end currentness must be validated |
 | F06 release J01–J09 | New evidence matrix, unchanged real-host acceptance requirement | Actual Windows Node>=24 and Woodpecker evidence; paid/physical steps Owner deferred |
@@ -29,4 +29,4 @@ Current implementation branch: `wip/v0.3.0-r02-owner-repairs`. Read GitHub curre
 
 ## Remaining delivery work before Owner's single final review
 
-Provision genuine public SDK v0.10.3 install with real package bytes, complete selected Shun B/C implementation, bind real Host currentness/query/action/consent, run nested CI and real Windows J01–J09 within authorized effect-free scope, record exact result/evidence (do not rewrite old V01 JSON). Only then submit a non-draft complete candidate for Owner's unified code/architecture/quality review.
+Provision genuine public SDK v0.10.3 install with real package bytes, finish and activate the new selected Shun B/C sources, bind real Host immutable LLM request/currentness/query/action/consent, run nested CI and real Windows J01–J09 within authorized effect-free scope, record exact result/evidence (do not rewrite old V01 JSON). Only then submit a non-draft complete candidate for Owner's unified code/architecture/quality review.
