@@ -305,10 +305,12 @@ describe('R02-V real-product journeys (zero paid, zero physical effects)', () =>
     }
   });
 
-  it('J01: real Windows read-only B-040 collection, localOnly, zero egress', async () => {
-    if (process.platform !== 'win32') {
-      throw new Error('J01 journey requires the real Windows host');
-    }
+  // The B-040 read-only journey runs ONLY on a real Windows host; the Linux
+  // CI agent skips it (the recorded Windows evidence lives in the R02-V
+  // validation receipt, not in this CI run).
+  it.skipIf(process.platform !== 'win32')(
+    'J01: real Windows read-only B-040 collection, localOnly, zero egress',
+    async () => {
     const collected = await collectWindowsSupportContext();
     expect(collected.localOnly).toBe(true);
     expect(collected.externalDisclosures).toEqual([]);
@@ -322,7 +324,8 @@ describe('R02-V real-product journeys (zero paid, zero physical effects)', () =>
     };
     console.log('[J01] real read-only host record:', JSON.stringify(record));
     expect(typeof collected.report.os?.name).toBe('string');
-  });
+    },
+  );
 
   it('J07: the real HTTP surface serves the UI and guided state truthfully', async () => {
     const ui = await fetch(`http://127.0.0.1:${port}/v03/index.html`);
