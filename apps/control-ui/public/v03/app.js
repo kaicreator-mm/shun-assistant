@@ -250,7 +250,13 @@ async function decide(decision) {
     }
     feedback.className = 'muted';
     feedback.textContent = text('step.relayPending');
-    const result = await api(DECISION_ENDPOINT, { body: relay });
+    // userDecisionRelay returns {ok,relay}; only the bounded relay payload is
+    // accepted by the server. Do not serialize UI-local status as authority.
+    const result = await api(DECISION_ENDPOINT, { body: relay.relay });
+    if (result?.status !== 'RECORDED' || result?.humanGrantIssued !== false ||
+        result?.effectSent !== false) {
+      throw new Error('GUIDED_DECISION_OUTCOME_UNKNOWN');
+    }
     // Record the replay key only after the relay succeeded: a network failure
     // must not permanently occupy the identity in this session (the Host's
     // CONSUMED state remains the authoritative replay fence).
@@ -258,6 +264,7 @@ async function decide(decision) {
     renderHistory(Array.isArray(result?.history) ? result.history : []);
     feedback.className = 'muted';
     feedback.textContent = `${text('state.ok')} — ${text('consent.notGrant')}`;
+    await refresh();
   } catch (error) {
     const unknown = t(locale, 'state.unknown');
     feedback.className = 'unknown';
