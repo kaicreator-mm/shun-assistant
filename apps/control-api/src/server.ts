@@ -9,7 +9,6 @@
 import { createReadStream, existsSync, statSync } from 'node:fs';
 import { createServer, type IncomingMessage, type Server, type ServerResponse } from 'node:http';
 import { extname, normalize, resolve, sep } from 'node:path';
-import type { GoalRequest } from '@shun/contracts';
 import { GoalRequestSchema } from '@shun/contracts';
 import { buildDeepSeekGoalDisclosure } from '@shun/llm-remote';
 import type { RecipeRegistrationResult } from '@shun/resolver';
@@ -19,6 +18,7 @@ import {
   suggestReadonlyOptimizations,
 } from '@shun/vertical-system';
 import { z } from 'zod';
+import { MINIMUM_SENDER_DEADLINE_BUDGET_MS } from '../../../packages/domain-host/src/cloud/openai-host.ts';
 import type { CloudInterpretPort } from './cloud-interpret.ts';
 import {
   CONTROL_ERROR_CODES,
@@ -400,7 +400,14 @@ async function handle(
     if (!ctx.cloud?.status().enabled) {
       return respondJson(res, 503, { error: { code: 'CLOUD_UNAVAILABLE' } });
     }
-    const result = await ctx.cloud.interpretGoal(parsed.data.goalText);
+    // T11 (Amendment R1): the absolute request deadline is computed on the
+    // trusted side — never from HTTP input — using the same window the T04
+    // Host binding requires for a fresh request (consent window + pre-send
+    // floor). The interpreter rechecks it at the final pre-send boundary.
+    const result = await ctx.cloud.interpretGoal({
+      goalText: parsed.data.goalText,
+      deadlineUnixMs: Date.now() + MINIMUM_SENDER_DEADLINE_BUDGET_MS,
+    });
     if (!result.ok) {
       return respondJson(res, result.code === 'CONSENT_DECLINED' ? 409 : 503, {
         error: { code: result.code },
