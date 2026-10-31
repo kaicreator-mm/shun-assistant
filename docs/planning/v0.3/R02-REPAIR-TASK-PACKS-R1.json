@@ -10,7 +10,7 @@
   "ads_version": "4.18.0",
   "ads_sha": "2c395c55569fe2edf3f4135f12d3d069e526d0b7",
   "owner_approved": "YES",
-  "planning_branch_status": "OWNER_APPROVED__AWAIT_INDEPENDENT_AMENDMENT_REVIEW_AND_NATIVE_DEPENDENCY_READBACK",
+  "planning_branch_status": "OWNER_APPROVED__TASK_ISSUES_CREATED__NATIVE_DEPENDENCY_AND_INDEPENDENT_PR_REVIEW_PENDING",
   "forbidden": [
     "main",
     "version/v0.2.0",
@@ -53,7 +53,9 @@
       "execution_target": "version/v0.3.0",
       "cas_claim": "REQUIRED_BEFORE_SOURCE_WRITE",
       "native_blockers": "WRITE_AND_READBACK_BEFORE_DISPATCH",
-      "jit_branch": true
+      "jit_branch": true,
+      "issue_number": 262,
+      "native_blocked_by_expected": []
     },
     {
       "id": "R02-B",
@@ -79,7 +81,9 @@
       "execution_target": "version/v0.3.0",
       "cas_claim": "REQUIRED_BEFORE_SOURCE_WRITE",
       "native_blockers": "WRITE_AND_READBACK_BEFORE_DISPATCH",
-      "jit_branch": true
+      "jit_branch": true,
+      "issue_number": 263,
+      "native_blocked_by_expected": []
     },
     {
       "id": "R02-C1",
@@ -105,7 +109,9 @@
       "execution_target": "version/v0.3.0",
       "cas_claim": "REQUIRED_BEFORE_SOURCE_WRITE",
       "native_blockers": "WRITE_AND_READBACK_BEFORE_DISPATCH",
-      "jit_branch": true
+      "jit_branch": true,
+      "issue_number": 264,
+      "native_blocked_by_expected": []
     },
     {
       "id": "R02-C2",
@@ -131,7 +137,9 @@
       "execution_target": "version/v0.3.0",
       "cas_claim": "REQUIRED_BEFORE_SOURCE_WRITE",
       "native_blockers": "WRITE_AND_READBACK_BEFORE_DISPATCH",
-      "jit_branch": true
+      "jit_branch": true,
+      "issue_number": 265,
+      "native_blocked_by_expected": []
     },
     {
       "id": "R02-D1",
@@ -159,7 +167,9 @@
       "execution_target": "version/v0.3.0",
       "cas_claim": "REQUIRED_BEFORE_SOURCE_WRITE",
       "native_blockers": "WRITE_AND_READBACK_BEFORE_DISPATCH",
-      "jit_branch": true
+      "jit_branch": true,
+      "issue_number": 266,
+      "native_blocked_by_expected": []
     },
     {
       "id": "R02-D2",
@@ -172,7 +182,7 @@
       "paths": [
         "tests/integration/package.json",
         "tests/integration/run-tests.mjs",
-        "tests/integration/v03/t12-qualification/** EXCEPT tests/integration/v03/t12-qualification/qualification-results.json",
+        "tests/integration/v03/t12-qualification/**",
         ".woodpecker.yml",
         ".woodpecker/**",
         "scripts/v03-ci/**"
@@ -189,7 +199,12 @@
       "execution_target": "version/v0.3.0",
       "cas_claim": "REQUIRED_BEFORE_SOURCE_WRITE",
       "native_blockers": "WRITE_AND_READBACK_BEFORE_DISPATCH",
-      "jit_branch": true
+      "jit_branch": true,
+      "issue_number": 267,
+      "native_blocked_by_expected": [],
+      "forbidden_write_set": [
+        "tests/integration/v03/t12-qualification/qualification-results.json"
+      ]
     },
     {
       "id": "R02-D3",
@@ -215,7 +230,9 @@
       "execution_target": "version/v0.3.0",
       "cas_claim": "REQUIRED_BEFORE_SOURCE_WRITE",
       "native_blockers": "WRITE_AND_READBACK_BEFORE_DISPATCH",
-      "jit_branch": true
+      "jit_branch": true,
+      "issue_number": 268,
+      "native_blocked_by_expected": []
     },
     {
       "id": "R02-E",
@@ -260,7 +277,14 @@
       "execution_target": "version/v0.3.0",
       "cas_claim": "REQUIRED_BEFORE_SOURCE_WRITE",
       "native_blockers": "WRITE_AND_READBACK_BEFORE_DISPATCH",
-      "jit_branch": true
+      "jit_branch": true,
+      "issue_number": 269,
+      "native_blocked_by_expected": [
+        262,
+        263,
+        264,
+        265
+      ]
     },
     {
       "id": "R02-V",
@@ -290,7 +314,14 @@
       "execution_target": "version/v0.3.0",
       "cas_claim": "REQUIRED_BEFORE_SOURCE_WRITE",
       "native_blockers": "WRITE_AND_READBACK_BEFORE_DISPATCH",
-      "jit_branch": true
+      "jit_branch": true,
+      "issue_number": 270,
+      "native_blocked_by_expected": [
+        269,
+        266,
+        267,
+        268
+      ]
     },
     {
       "id": "R02-R",
@@ -327,7 +358,11 @@
       "execution_target": "version/v0.3.0",
       "cas_claim": "REQUIRED_BEFORE_SOURCE_WRITE",
       "native_blockers": "WRITE_AND_READBACK_BEFORE_DISPATCH",
-      "jit_branch": true
+      "jit_branch": true,
+      "issue_number": 271,
+      "native_blocked_by_expected": [
+        270
+      ]
     }
   ]
 }
