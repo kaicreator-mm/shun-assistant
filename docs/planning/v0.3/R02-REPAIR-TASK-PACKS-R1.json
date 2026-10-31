@@ -1,0 +1,333 @@
+{
+  "schema": "shun/v0.3/r02-repair-task-packs-r1",
+  "parent_issue": 259,
+  "amendment_issue": 260,
+  "owner_approval_event": "https://github.com/kaicreator-mm/shun-assistant/issues/260#issuecomment-6545077384",
+  "baseline_commit": "b97fad6c435c8b4895cf24af2c0f26353a60d3af",
+  "baseline_tree": "891a749a1164e5ccb150c80340d5f172b2ab62e9",
+  "predecessor_taskpack_blob": "e988ccc6962d35bb1612f82c469086f54958dc1e",
+  "domain_harness_tag": "v0.10.3",
+  "ads_version": "4.18.0",
+  "ads_sha": "2c395c55569fe2edf3f4135f12d3d069e526d0b7",
+  "owner_approved": "YES",
+  "planning_branch_status": "OWNER_APPROVED__AWAIT_INDEPENDENT_AMENDMENT_REVIEW_AND_NATIVE_DEPENDENCY_READBACK",
+  "forbidden": [
+    "main",
+    "version/v0.2.0",
+    "SDK private src",
+    "fake production facade",
+    "second Kernel",
+    "second LLM sender",
+    "second effect dispatcher",
+    "paid DeepSeek",
+    "real Windows physical effects",
+    "release tag",
+    "GitHub release",
+    "self-R03"
+  ],
+  "task_nodes": 10,
+  "task_edges": 9,
+  "tasks": [
+    {
+      "id": "R02-A",
+      "lane": "A",
+      "findings": [
+        "F03",
+        "Q04"
+      ],
+      "goal": "Use the same production Shun BUILD for public v0.10.3 buildV10App and activateV10App; eliminate dead K/S/B placeholders and unverified local ABI mirrors.",
+      "paths": [
+        "packages/domain-app/src/build/**",
+        "packages/domain-app/src/activation/**",
+        "tests/integration/v03/r02-a-build/**"
+      ],
+      "deps": [],
+      "accept": [
+        "Positive real selected K/S/B/C production artifact activates through public SDK + verified Host ports with same package/module IDs; no alternate T11 fixture BUILD in positive acceptance",
+        "Negative mismatch/tamper/private import/refusal/UNKNOWN and no second Kernel or sender",
+        "Node>=24 Vitest, TS, Biome + exact-SHA Woodpecker; independent source review"
+      ],
+      "task_kind": "implementation_or_validation",
+      "state": "planned",
+      "review_policy": "independent_required",
+      "execution_target": "version/v0.3.0",
+      "cas_claim": "REQUIRED_BEFORE_SOURCE_WRITE",
+      "native_blockers": "WRITE_AND_READBACK_BEFORE_DISPATCH",
+      "jit_branch": true
+    },
+    {
+      "id": "R02-B",
+      "lane": "B",
+      "findings": [
+        "F02"
+      ],
+      "goal": "Real Host-persistent Guided State/Decision service; no HTTP route/server.ts edits in this lane.",
+      "paths": [
+        "apps/control-api/src/v03/guided-*.ts",
+        "packages/domain-host/src/guided/**",
+        "tests/integration/v03/r02-b-guided/**"
+      ],
+      "deps": [],
+      "accept": [
+        "Typed State/Decision shape for current scoped StepSpec/Case/selected-root/currentness/locale, durable single-consumption and pause/resume/recovery",
+        "Refusal/409/replay/expired/UNKNOWN CN/EN, no implicit grant, disclosure, Permit or second approver",
+        "No edit to shared server.ts, main.ts or v03 UI until E"
+      ],
+      "task_kind": "implementation_or_validation",
+      "state": "planned",
+      "review_policy": "independent_required",
+      "execution_target": "version/v0.3.0",
+      "cas_claim": "REQUIRED_BEFORE_SOURCE_WRITE",
+      "native_blockers": "WRITE_AND_READBACK_BEFORE_DISPATCH",
+      "jit_branch": true
+    },
+    {
+      "id": "R02-C1",
+      "lane": "C1",
+      "findings": [
+        "F04"
+      ],
+      "goal": "Truthful Gateway/HTTP status separation for forwarded/admitted/refused/unknown/terminal effect.",
+      "paths": [
+        "packages/domain-app/src/api/gateway.ts",
+        "apps/control-api/src/v03/gateway-route.ts",
+        "tests/integration/v03/r02-c1-gateway/**"
+      ],
+      "deps": [],
+      "accept": [
+        "Typed forwarded vs Kernel admitted vs effect terminal outcomes, no SENT=success assumption",
+        "Resolved {status:unknown/refused}, top-level admitted without valid terminal receipt, rejected-after-may-send all fail-closed UNKNOWN/non-2xx; never auto retry",
+        "Invalid source performs 0 sends and zero Kernel Journal entries; same Case remains reusable"
+      ],
+      "task_kind": "implementation_or_validation",
+      "state": "planned",
+      "review_policy": "independent_required",
+      "execution_target": "version/v0.3.0",
+      "cas_claim": "REQUIRED_BEFORE_SOURCE_WRITE",
+      "native_blockers": "WRITE_AND_READBACK_BEFORE_DISPATCH",
+      "jit_branch": true
+    },
+    {
+      "id": "R02-C2",
+      "lane": "C2",
+      "findings": [
+        "F05"
+      ],
+      "goal": "Remove Host Observation issuer from public domain-computer capability surface and bind issuer to trusted Host-only authority.",
+      "paths": [
+        "packages/domain-computer/src/semantic/**",
+        "packages/domain-host/src/observation/**",
+        "tests/integration/v03/r02-c2-provenance/**"
+      ],
+      "deps": [],
+      "accept": [
+        "Public domain-computer cannot issue Host observation evidence; actual selected Host issuer, provenance/currentness and scope remain verified",
+        "Cross-process forged/replay/stale observation cannot mint authority; same-process untrusted imported public package cannot reach issuer",
+        "No public export/shared index edit in this lane; E owns public barrel exports"
+      ],
+      "task_kind": "implementation_or_validation",
+      "state": "planned",
+      "review_policy": "independent_required",
+      "execution_target": "version/v0.3.0",
+      "cas_claim": "REQUIRED_BEFORE_SOURCE_WRITE",
+      "native_blockers": "WRITE_AND_READBACK_BEFORE_DISPATCH",
+      "jit_branch": true
+    },
+    {
+      "id": "R02-D1",
+      "lane": "D1",
+      "findings": [
+        "Q02",
+        "Q05",
+        "Q06"
+      ],
+      "goal": "Bilingual v0.3 product guide, Windows modes and release limits, provider licensing/custody/rotation and rollback without claiming readiness.",
+      "paths": [
+        "README.md",
+        "docs/guide/v0.3/**",
+        "docs/provider/v0.3/**"
+      ],
+      "deps": [],
+      "accept": [
+        "ZH/EN install/start/recovery guides; truthful 0.3 private workspace version and v0.10.3 Git-only SDK artifact sourcing",
+        "Production trust root/custody and signed descriptor provisioning distinct from test fixtures; no private key copy or test-key promotion",
+        "R01 P2 ledger provenance, never rewrite historical evidence"
+      ],
+      "task_kind": "implementation_or_validation",
+      "state": "planned",
+      "review_policy": "independent_required",
+      "execution_target": "version/v0.3.0",
+      "cas_claim": "REQUIRED_BEFORE_SOURCE_WRITE",
+      "native_blockers": "WRITE_AND_READBACK_BEFORE_DISPATCH",
+      "jit_branch": true
+    },
+    {
+      "id": "R02-D2",
+      "lane": "D2",
+      "findings": [
+        "Q03",
+        "Q06"
+      ],
+      "goal": "Make nested task-local suites, static checks and V01 qualification discoverable and mandatory in Woodpecker, with nonzero propagation and future encoding fix.",
+      "paths": [
+        "tests/integration/package.json",
+        "tests/integration/run-tests.mjs",
+        "tests/integration/v03/t12-qualification/** EXCEPT tests/integration/v03/t12-qualification/qualification-results.json",
+        ".woodpecker.yml",
+        ".woodpecker/**",
+        "scripts/v03-ci/**"
+      ],
+      "deps": [],
+      "accept": [
+        "Node >=24 native Windows/CI gate runs actual nested Vitest/TS/Biome plus targeted/full t12 qualification",
+        "Fault-injected nested failure causes Woodpecker nonzero, followed by exact-SHA green; CI does not use GitHub Actions",
+        "No overwrite of historical results JSON; future UTF-8 writer with source provenance"
+      ],
+      "task_kind": "implementation_or_validation",
+      "state": "planned",
+      "review_policy": "independent_required",
+      "execution_target": "version/v0.3.0",
+      "cas_claim": "REQUIRED_BEFORE_SOURCE_WRITE",
+      "native_blockers": "WRITE_AND_READBACK_BEFORE_DISPATCH",
+      "jit_branch": true
+    },
+    {
+      "id": "R02-D3",
+      "lane": "D3",
+      "findings": [
+        "Q06"
+      ],
+      "goal": "Correct true zh-CN Windows B-040 OS caption encoding at collector boundary, without expanding read-only scope.",
+      "paths": [
+        "packages/vertical-support/src/internal/windows-runner.ts",
+        "packages/vertical-support/test/support-context.test.ts",
+        "tests/integration/v03/r02-d3-b040/**"
+      ],
+      "deps": [],
+      "accept": [
+        "Collector explicitly produces UTF-8 stdout prior to JS decode, preserving localOnly:true/zero egress",
+        "CN character roundtrip, invalid JSON and stderr negatives, no untrusted command injection",
+        "Real Windows zh-CN read-only evidence, otherwise UNKNOWN (no invented PASS)"
+      ],
+      "task_kind": "implementation_or_validation",
+      "state": "planned",
+      "review_policy": "independent_required",
+      "execution_target": "version/v0.3.0",
+      "cas_claim": "REQUIRED_BEFORE_SOURCE_WRITE",
+      "native_blockers": "WRITE_AND_READBACK_BEFORE_DISPATCH",
+      "jit_branch": true
+    },
+    {
+      "id": "R02-E",
+      "lane": "E",
+      "findings": [
+        "F01",
+        "F02",
+        "F03",
+        "F04",
+        "F05"
+      ],
+      "goal": "Sole production integrator: shipping main.ts startup, guided/submit HTTP, real selected BUILD/K/Host and UI/Journal/History.",
+      "paths": [
+        "apps/control-api/src/main.ts",
+        "apps/control-api/src/server.ts",
+        "apps/control-api/src/v03/composition-*.ts",
+        "apps/control-ui/public/v03/**",
+        "apps/control-api/package.json",
+        "packages/domain-app/package.json",
+        "packages/domain-computer/package.json",
+        "packages/domain-host/package.json",
+        "packages/domain-app/src/index.ts",
+        "packages/domain-computer/src/index.ts",
+        "packages/domain-host/src/index.ts",
+        "pnpm-lock.yaml",
+        "tests/integration/v03/r02-e-production/**"
+      ],
+      "deps": [
+        "R02-A",
+        "R02-B",
+        "R02-C1",
+        "R02-C2"
+      ],
+      "accept": [
+        "Default shipping startup must actually construct same real Shun BUILD K/Host/DomainApp; UI→HTTP→Gateway→K→Host/ActionController→Windows Effect/verification→Journal/History, with no fake facade",
+        "Guided State/Decision CN/EN, approval vs Permit separation, SQLite recovery, no second sender/dispatcher and no v0.2 regression",
+        "Invalid/replay/stale/UNKNOWN/boot fail all truthful & zero unauthorized effects; exact SHA CI and independent review"
+      ],
+      "task_kind": "implementation_or_validation",
+      "state": "planned",
+      "review_policy": "independent_required",
+      "execution_target": "version/v0.3.0",
+      "cas_claim": "REQUIRED_BEFORE_SOURCE_WRITE",
+      "native_blockers": "WRITE_AND_READBACK_BEFORE_DISPATCH",
+      "jit_branch": true
+    },
+    {
+      "id": "R02-V",
+      "lane": "V",
+      "findings": [
+        "F06"
+      ],
+      "goal": "Independent real Windows Node>=24 user-journey J01–J09 qualification over production entry.",
+      "paths": [
+        "tests/integration/v03/r02-v-journeys/**",
+        "docs/implementation/v0.3/r02-validation/**"
+      ],
+      "deps": [
+        "R02-E",
+        "R02-D1",
+        "R02-D2",
+        "R02-D3"
+      ],
+      "accept": [
+        "J01–J09 matrix PROVEN/UNKNOWN/DEFERRED_BY_OWNER with exact source SHA, test exit, selected BUILD identity, real Windows startup evidence",
+        "Zero-paid and zero-physical validation now; paid DeepSeek and physical OS effect remain UNKNOWN until separate authorization",
+        "No fixture path substituted for production app, no fabricated results, independent validator"
+      ],
+      "task_kind": "implementation_or_validation",
+      "state": "planned",
+      "review_policy": "independent_required",
+      "execution_target": "version/v0.3.0",
+      "cas_claim": "REQUIRED_BEFORE_SOURCE_WRITE",
+      "native_blockers": "WRITE_AND_READBACK_BEFORE_DISPATCH",
+      "jit_branch": true
+    },
+    {
+      "id": "R02-R",
+      "lane": "R",
+      "findings": [
+        "F01",
+        "F02",
+        "F03",
+        "F04",
+        "F05",
+        "F06",
+        "Q01",
+        "Q02",
+        "Q03",
+        "Q04",
+        "Q05",
+        "Q06"
+      ],
+      "goal": "Repair index and readiness handoff, not independent R03 PASS or release.",
+      "paths": [
+        "docs/implementation/v0.3/r02-closeout/**"
+      ],
+      "deps": [
+        "R02-V"
+      ],
+      "accept": [
+        "Issue #259 complete F/Q → Task/PR/Merge SHA index, final version SHA/tree and exact CI results",
+        "All J01–J09 evidence and residual P2/UNKNOWN with Owner actions clearly marked",
+        "READY_FOR_INDEPENDENT_R03_REVIEW only if independently eligible; never close #259, merge main or tag/release"
+      ],
+      "task_kind": "implementation_or_validation",
+      "state": "planned",
+      "review_policy": "independent_required",
+      "execution_target": "version/v0.3.0",
+      "cas_claim": "REQUIRED_BEFORE_SOURCE_WRITE",
+      "native_blockers": "WRITE_AND_READBACK_BEFORE_DISPATCH",
+      "jit_branch": true
+    }
+  ]
+}
