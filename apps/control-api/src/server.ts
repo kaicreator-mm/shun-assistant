@@ -30,6 +30,7 @@ import {
 import type { ControlBackend } from './ports.ts';
 import type { AuthorizedInventoryRecipeResult } from './recipe-inventory-run.ts';
 import { createV03GatewayRoute, type V03GatewayRoute } from './v03/gateway-route.ts';
+import { createV03GuidedRoute, type V03GuidedPort, type V03GuidedRoute } from './v03/guided-route.ts';
 
 export const CONTROL_API_REVISION = 'shun.control-api/0.1';
 
@@ -87,6 +88,8 @@ export interface ControlServerOptions {
    * the T09 `ControlApiGateway.submit` admission surface — never a raw send.
    */
   v03Gateway?: ControlApiGateway | (() => ControlApiGateway);
+  /** Trusted process-side selected Guided Host state, never created from HTTP. */
+  v03Guided?: V03GuidedPort;
   /** Directory with the static control-ui app; omitted = API only. */
   uiDir?: string;
   /** Loopback host only; anything else is a construction-time refusal. */
@@ -137,6 +140,9 @@ export function createControlServer(options: ControlServerOptions): ControlServe
     return v03Route;
   };
 
+  const v03GuidedRoute: V03GuidedRoute | undefined =
+    options.v03Guided === undefined ? undefined : createV03GuidedRoute(options.v03Guided);
+
   const server = createServer((req, res) => {
     handle(options.backend, req, res, {
       host,
@@ -147,6 +153,7 @@ export function createControlServer(options: ControlServerOptions): ControlServe
       readBuiltinInventoryCandidate: options.readBuiltinInventoryCandidate,
       cloud: options.cloud,
       v03RouteFor,
+      v03GuidedRoute,
     }).catch((error: unknown) => {
       respondError(res, error);
     });
@@ -189,6 +196,7 @@ interface RouteContext {
   executeBuiltinInventoryRecipe?: ControlServerOptions['executeBuiltinInventoryRecipe'];
   readBuiltinInventoryCandidate?: ControlServerOptions['readBuiltinInventoryCandidate'];
   v03RouteFor: () => V03GatewayRoute | undefined;
+  v03GuidedRoute?: V03GuidedRoute;
 }
 
 /**
@@ -446,6 +454,23 @@ async function handle(
       });
     }
     return respondJson(res, 200, result);
+  }
+
+  // R02 Guided routes operate solely on trusted Host-owned durable state.
+  // They never accept a grant, full approval payload or Kernel Permit from
+  // the caller. Decisions are atomic single-use acknowledgement records.
+  if (method === 'GET' && url.pathname === '/api/v03/guided/state') {
+    if (!ctx.v03GuidedRoute) {
+      return respondJson(res, 503, { ok: false, code: 'V03_GUIDED_UNAVAILABLE' });
+    }
+    return respondJson(res, 200, ctx.v03GuidedRoute.state());
+  }
+  if (method === 'POST' && url.pathname === '/api/v03/guided/decision') {
+    if (!ctx.v03GuidedRoute) {
+      return respondJson(res, 503, { ok: false, code: 'V03_GUIDED_UNAVAILABLE' });
+    }
+    const result = ctx.v03GuidedRoute.decide(await readJsonBody(req, ctx.maxBodyBytes));
+    return respondJson(res, ctx.v03GuidedRoute.httpStatus(result), result);
   }
 
   // T11 — the single v0.3 submission surface. Bounded JSON in, one T09
