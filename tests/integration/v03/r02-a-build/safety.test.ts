@@ -25,6 +25,20 @@ function input() {
   };
 }
 describe('R02-A public SDK production source gates',()=>{
+  it('Shun B owns one K-governed non-idempotent external LLM effect', async()=>{
+    const business = await import(
+      '../../../../packages/domain-app/src/activation/modules/business-goal.mjs'
+    );
+    const policy = business.getPolicy();
+    expect(policy.packageId).toBe(business.MODULE_ID);
+    expect(policy.intentBindings['goal-interpret'].roles).toEqual(['requester']);
+    const effect = policy.effectBindings['effect:goal-interpret'];
+    expect(effect.semantics).toBe('non-idempotent');
+    expect(effect.external.await).toBe('terminal');
+    expect(effect.resource).toEqual({key:'llm',operation:'interpretGoal'});
+    expect(typeof effect.handler).toBe('function');
+  });
+
   it('rejects placeholder K, missing real source and wrong source digest',()=>{
     const original=input();
     const badSource={...original,modules:original.modules.map((m,i)=>i===0?
