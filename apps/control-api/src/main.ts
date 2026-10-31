@@ -10,6 +10,7 @@ import { cloudInterpreterFromEnvironment } from './cloud-interpret.ts';
 import { DemoShunBackend } from './demo/backend.ts';
 import { RealStorageControlBackend } from './real-storage/backend.ts';
 import { createControlServer } from './server.ts';
+import { createProductionV03Gateway } from './v03/composition-production.ts';
 
 const here = dirname(fileURLToPath(import.meta.url));
 const port = Number.parseInt(process.env.SHUN_CONTROL_PORT ?? '7788', 10);
@@ -63,6 +64,26 @@ const guided = guidedDb && mode === 'real-storage'
   ? new HostGuidedService(resolve(guidedDb))
   : undefined;
 
+// Production v0.3 is an explicit, operator-pinned mode. Missing genuine
+// SDK/BUILD/Host state fails before an HTTP listener is opened; no demo
+// fallback is ever mislabeled as a real v0.3 DomainApp.
+const productionBuild = process.env.SHUN_V03_BUILD_FILE;
+if (productionBuild && (!guided || mode !== 'real-storage')) {
+  throw new Error('V03_PRODUCTION_REQUIRES_GUIDED_TRUSTED_REAL_STORAGE');
+}
+const production = productionBuild && guided
+  ? await createProductionV03Gateway({
+      buildFile: productionBuild,
+      buildFileSha256: requiredEnv('SHUN_V03_BUILD_SHA256'),
+      sdkConsumerDir: requiredEnv('SHUN_V03_SDK_CONSUMER_DIR'),
+      kDocDatabaseFile: requiredEnv('SHUN_V03_KERNEL_DOC_DATABASE'),
+      deploymentRoot: requiredEnv('SHUN_V03_DEPLOYMENT_ROOT'),
+      tenantId: requiredEnv('SHUN_V03_TENANT_ID'),
+      deployedAppId: requiredEnv('SHUN_V03_DEPLOYED_APP_ID'),
+      selectedCase: guided,
+    })
+  : undefined;
+
 const cloud = cloudInterpreterFromEnvironment();
 const handle = createControlServer({
   backend,
@@ -73,12 +94,31 @@ const handle = createControlServer({
   executeBuiltinInventoryRecipe,
   cloud,
   v03Guided: guided,
+  v03Gateway: production?.gateway,
 });
 const bound = await handle.start();
 console.log(
   `Shun control surface (${mode === 'demo' ? 'T08 DEMO ONLY' : 'REAL bounded C-003'}) on http://127.0.0.1:${bound}`,
 );
 console.log('Local only: the surface refuses non-loopback binds and non-loopback Host headers.');
+if (production) {
+  console.log(`v0.3 public DomainHarness activated: subjectDigest=${production.subjectDigest}`);
+} else {
+  console.log('v0.3 production BUILD inactive; /api/v03/gateway/submit remains unavailable.');
+}
+// Release trusted durable K/Host handles only when the server terminates.
+// This is cleanup, not an effect or a replacement authorization path.
+let closing = false;
+for (const signal of ['SIGINT', 'SIGTERM'] as const) {
+  process.once(signal, () => {
+    if (closing) return;
+    closing = true;
+    void handle.close().finally(() => {
+      try { production?.dispose(); } finally { guided?.close(); }
+    });
+  });
+}
+
 
 function requiredEnv(key: string): string {
   const value = process.env[key];
