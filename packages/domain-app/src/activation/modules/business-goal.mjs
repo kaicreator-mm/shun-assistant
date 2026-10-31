@@ -12,7 +12,7 @@ export const INTENT_TYPES = ['goal-interpret'];
 export const EFFECT_TYPES = ['effect:goal-interpret'];
 
 const fromEvent = {
-  request: { source: 'event', path: ['payload', 'request'] },
+  llmRequest: { source: 'event', path: ['payload', 'llmRequest'] },
   approvalRef: { source: 'event', path: ['payload', 'approvalRef'] },
   currentnessRef: { source: 'event', path: ['payload', 'currentnessRef'] },
 };
@@ -52,7 +52,7 @@ export function getPolicy() {
         ruleId: 'rule:goal-interpret',
         eventType: 'GOAL_INTERPRET_REQUESTED',
         payloadFromInput: {
-          request: 'request',
+          llmRequest: 'llmRequest',
           approvalRef: 'approvalRef',
           currentnessRef: 'currentnessRef',
         },
@@ -77,7 +77,7 @@ export function getPolicy() {
           // References are not approvals. The trusted Host adapter MUST
           // resolve them against durable consent/ActionController policy.
           return resources.call('llm', 'interpretGoal', {
-            request: input.request,
+            llmRequest: input.llmRequest,
             currentnessRef: input.currentnessRef,
             approvalRef: input.approvalRef,
           });
