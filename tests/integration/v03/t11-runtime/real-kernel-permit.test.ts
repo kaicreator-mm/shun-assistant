@@ -78,7 +78,12 @@ const CAPABILITY_PACKAGE_ID = 'capability-windows-effect@v030.1.0.0';
 /** Controlled clock: real Date-shaped monotonic ticks, no sleeps. */
 function controlledClock(): { now: () => number } {
   let tick = 0;
-  return { now: (): number => BASE_MS + (tick += 1) * 1000 };
+  return {
+    now: (): number => {
+      tick += 1;
+      return BASE_MS + tick * 1000;
+    },
+  };
 }
 
 /** Plain in-process CAS V10DocStore (the K docs port over a physical owner). */
