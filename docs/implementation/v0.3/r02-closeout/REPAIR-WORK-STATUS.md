@@ -8,11 +8,11 @@ Current implementation branch: `wip/v0.3.0-r02-owner-repairs`. Read GitHub curre
 
 | Finding | Bounded implementation now present | Not yet proven / remaining |
 |---|---|---|
-| F01 production route | Trusted manifest/real public SDK K/Host composition and shipping startup option; Guided routes and SQLite K docs | Full domain Business/Capability signed binaries, verified trusted Host data, first run on physical Windows, all J01–J09 |
+| F01 production route | Trusted manifest/real public SDK K/Host composition and shipping startup option; Guided routes and SQLite K docs | Full domain Business/Capability signed binaries, verified trusted Host data, first run on physical Windows, all J01–J09; trusted operator Case now has separately pinned SHA256 startup file |
 | F02 Guided | Host SQLite single-use Step, replay/409, real HTTP State/Decision, UI relay and host-pinned trusted Case startup | Live selected root creation and complete preview/R2/Kernel journeys |
-| F03 BUILD | SHA-256-verified real selected K/S/B/C source admission, public SDK BUILD/activation against same bytes, fake facade rejection | Actual v0.10.3 package closure and production K/S/B/C binary/exports binding positive |
-| F04 Gateway | K admitted != terminal, COMPLETED/UNKNOWN/refused typed mapping, 202/409/422, no blind retry, tests | Exact-sha real K/Host execution, adversarial runtime tests not yet run |
-| F05 provenance | Public barrel issuer removed, package exports locked, Host internal issuance + tests | Stronger process boundary, durable cross-process replay/currentness store and full currentness authority |
+| F03 BUILD | SHA-256-verified real selected K/S/B/C source admission, public SDK BUILD/activation against same bytes, fake facade rejection, offline trusted manifest assembler | Actual v0.10.3 package closure and production K/S/B/C binary/exports binding positive |
+| F04 Gateway | K admitted != terminal, COMPLETED/UNKNOWN/refused typed mapping, redacted unknown/refused results, 202/409/422, no blind retry, tests | Exact-sha real K/Host execution, adversarial runtime tests not yet run |
+| F05 provenance | Public barrel issuer removed, package exports locked, Host internal issuance, durable SQLite issue/replay fence + restart tests | Trusted Host composition must actually wire the new durable fence/observation adapter, and end-to-end currentness must be validated |
 | F06 release J01–J09 | New evidence matrix, unchanged real-host acceptance requirement | Actual Windows Node>=24 and Woodpecker evidence; paid/physical steps Owner deferred |
 | Q01 historical task labels | Already normalized #229–#241 CLOSED + state:done | Independent final sign-off deferred |
 | Q02/Q05 documentation | ZH/EN operator and Provider trust/offline key custody guides + README | Installer/packaging/rollback physical validation |
