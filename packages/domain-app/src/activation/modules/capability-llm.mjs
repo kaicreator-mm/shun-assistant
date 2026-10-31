@@ -22,11 +22,31 @@ export const HANDLERS = [{ operationId: 'interpretGoal', handler: 'interpretGoal
 export async function interpretGoal(input) {
   if (!input || typeof input !== 'object' || Array.isArray(input) ||
       Object.keys(input).sort().join('|') !==
-        ['request','currentnessRef','approvalRef'].sort().join('|') ||
+        ['llmRequest','currentnessRef','approvalRef'].sort().join('|') ||
       typeof input.approvalRef !== 'string' ||
-      typeof input.currentnessRef !== 'string' ||
-      !input.request || typeof input.request !== 'object') {
+      typeof input.currentnessRef !== 'string') {
     throw new Error('SHUN_LLM_EFFECT_INPUT_REFUSED');
   }
-  return generate(input);
+  const request = input.llmRequest;
+  if (!request || typeof request !== 'object' || Array.isArray(request) ||
+      Object.keys(request).sort().join('|') !==
+        ['contractVersion','deadlineUnixMs','maxOutputTokens','messages',
+         'modelId','outputFormat','requestId'].sort().join('|') ||
+      request.contractVersion !== 'dh.llm.generate/1' ||
+      request.modelId !== 'deepseek-flash' || request.outputFormat !== 'text' ||
+      typeof request.requestId !== 'string' ||
+      !/^[A-Za-z0-9_-]{1,128}$/.test(request.requestId) ||
+      !Number.isSafeInteger(request.deadlineUnixMs) ||
+      !Number.isSafeInteger(request.maxOutputTokens) ||
+      request.maxOutputTokens < 1 || request.maxOutputTokens > 8192 ||
+      !Array.isArray(request.messages) || request.messages.length !== 1 ||
+      request.messages[0]?.role !== 'user' ||
+      typeof request.messages[0].content !== 'string' ||
+      request.messages[0].content.length < 1 ||
+      request.messages[0].content.length > 8192) {
+    throw new Error('SHUN_LLM_REQUEST_CONTRACT_REFUSED');
+  }
+  // The existing trusted T04 host rechecks actual deadline, consent, Journal,
+  // immutable bytes and cost. This C has no credential or network handle.
+  return generate(request);
 }
