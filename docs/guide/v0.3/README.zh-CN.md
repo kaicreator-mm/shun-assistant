@@ -32,3 +32,15 @@
 DomainHarness v0.10.3 来源是 Git Tag `v0.10.3`，并不意味着 npm 存在同名包。只允许验证过的**公共 SDK** 构建/安装源；禁止私有 deep import。详情参见 [Provider 信任根与离线恢复](../../provider/v0.3/TRUST.zh-CN.md)。
 
 最终需在 Windows Node>=24 对 J01–J09 逐项保留运行日志、精确 SHA、真实退出码、使用的 BUILD/K/Host 身份；付费 DeepSeek 请求与会产生物理副作用的操作必须分别取得明确批准。未运行者记为 UNKNOWN。
+
+## v0.3 可信 BUILD 启用（待真实环境验证）
+
+运营方先用 DomainHarness v0.10.3 Git Tag 构建并验证四个公共 SDK 包，并获取真实的 K/S 源码与经审核的 Shun B/C Domain Package 源码。准备一个**位于可信本地目录**的构建规格 JSON，其中包括 `appId`、`audience`、`buildId`、`targetProfile=node24-esm/1`、`routes`、`hardBudget`，以及四个 `modules`。每项包含 `module`（packageId/role/abiVersion/endpoint/provides/requires 等公开 BUILD 元数据）、绝对路径 `sourceFile`、经独立确认的 `sourceSha256` 与 `provenance`（K/S：`PUBLIC_DOMAIN_PACKAGE_V0103`；B/C：`SHUN_TRUSTED_DOMAIN_PACKAGE`）。
+
+在 Windows Node>=24 上执行：
+
+```text
+node scripts/v03-ci/assemble-trusted-build.mjs C:\\ShunHost\\build-spec.json C:\\ShunHost\\shun-v03.build.json
+```
+
+记录命令输出的整体 SHA256，并由可信启动环境分别提供 `SHUN_V03_BUILD_FILE`、`SHUN_V03_BUILD_SHA256`、`SHUN_V03_SDK_CONSUMER_DIR`、`SHUN_V03_KERNEL_DOC_DATABASE`、`SHUN_V03_DEPLOYMENT_ROOT`、`SHUN_V03_TENANT_ID`、`SHUN_V03_DEPLOYED_APP_ID`，以及真实存储模式的安全配置。Guided 需要可信 SQLite 路径 `SHUN_V03_GUIDED_DATABASE`，可选的已签核 Host 选中 Case 文件由 `SHUN_V03_GUIDED_CASE_FILE` 及 `SHUN_V03_GUIDED_CASE_SHA256` 精确绑定。**这些配置不表示自动批准或自动允许物理效果**；未有真实权限与当前性证明时运行仍应拒绝。
