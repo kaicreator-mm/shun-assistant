@@ -109,6 +109,14 @@ export async function createProductionV03Gateway(config: ProductionV03Config): P
             const candidate = raw as {
               caseId: string; request: unknown; currentnessRef: string; approvalRef: string;
             };
+            // Production Case scope must be issued by the trusted Host, not
+            // inferred from a correctly formatted browser-controlled string.
+            // Absent/stale/foreign selections cannot even reach Kernel send.
+            const liveStep = config.selectedCase.state().currentStep;
+            if (!liveStep || liveStep.taskId !== candidate.caseId ||
+                liveStep.validUntilUnixMs <= Date.now()) {
+              return Promise.resolve({ status: 'refused', code: 'HOST_CASE_NOT_CURRENT' });
+            }
             const messageId = 'msg-' + hash(JSON.stringify(candidate)).slice(0, 32);
             return activated.facade.send({
               intentType: 'goal-interpret',
