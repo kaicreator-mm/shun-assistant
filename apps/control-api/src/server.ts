@@ -9,7 +9,6 @@
 import { createReadStream, existsSync, statSync } from 'node:fs';
 import { createServer, type IncomingMessage, type Server, type ServerResponse } from 'node:http';
 import { extname, normalize, resolve, sep } from 'node:path';
-import type { GoalRequest } from '@shun/contracts';
 import { GoalRequestSchema } from '@shun/contracts';
 import { buildDeepSeekGoalDisclosure } from '@shun/llm-remote';
 import type { RecipeRegistrationResult } from '@shun/resolver';
@@ -19,6 +18,8 @@ import {
   suggestReadonlyOptimizations,
 } from '@shun/vertical-system';
 import { z } from 'zod';
+import type { ControlApiGateway } from '../../../packages/domain-app/src/api/gateway.ts';
+import { MINIMUM_SENDER_DEADLINE_BUDGET_MS } from '../../../packages/domain-host/src/cloud/openai-host.ts';
 import type { CloudInterpretPort } from './cloud-interpret.ts';
 import {
   CONTROL_ERROR_CODES,
@@ -28,6 +29,7 @@ import {
 } from './errors.ts';
 import type { ControlBackend } from './ports.ts';
 import type { AuthorizedInventoryRecipeResult } from './recipe-inventory-run.ts';
+import { createV03GatewayRoute, type V03GatewayRoute } from './v03/gateway-route.ts';
 
 export const CONTROL_API_REVISION = 'shun.control-api/0.1';
 
@@ -77,6 +79,14 @@ export interface ControlServerOptions {
     | { ok: false; code: 'RECIPE_READ_UNAVAILABLE' };
   /** Trusted process composition; never configured by an HTTP request. */
   cloud?: CloudInterpretPort;
+  /**
+   * T11 — the trusted v0.3 single-domain gateway over the selected K-gated
+   * DomainApp facade. The composition root injects either the built gateway
+   * or a lazy factory (so importing this server module never pays for a
+   * DomainHarness activation); never an HTTP request. The server exposes ONLY
+   * the T09 `ControlApiGateway.submit` admission surface — never a raw send.
+   */
+  v03Gateway?: ControlApiGateway | (() => ControlApiGateway);
   /** Directory with the static control-ui app; omitted = API only. */
   uiDir?: string;
   /** Loopback host only; anything else is a construction-time refusal. */
@@ -107,6 +117,26 @@ export function createControlServer(options: ControlServerOptions): ControlServe
   const maxBodyBytes = options.maxBodyBytes ?? 1024 * 1024;
   const uiRoot = options.uiDir ? resolve(options.uiDir) : undefined;
 
+  // The v0.3 gateway route is resolved lazily and at most once: a lazy
+  // factory is invoked on the first v0.3 submission, so importing or starting
+  // the server never performs a DomainHarness activation. A factory that
+  // refuses configuration stays a typed 503 on the route (fail closed),
+  // never a crash of the whole surface.
+  let v03Route: V03GatewayRoute | undefined;
+  let v03RouteRefused = false;
+  const v03RouteFor = (): V03GatewayRoute | undefined => {
+    if (v03Route !== undefined || v03RouteRefused) return v03Route;
+    if (options.v03Gateway === undefined) return undefined;
+    try {
+      const gateway =
+        typeof options.v03Gateway === 'function' ? options.v03Gateway() : options.v03Gateway;
+      v03Route = createV03GatewayRoute({ gateway });
+    } catch {
+      v03RouteRefused = true;
+    }
+    return v03Route;
+  };
+
   const server = createServer((req, res) => {
     handle(options.backend, req, res, {
       host,
@@ -116,6 +146,7 @@ export function createControlServer(options: ControlServerOptions): ControlServe
       executeBuiltinInventoryRecipe: options.executeBuiltinInventoryRecipe,
       readBuiltinInventoryCandidate: options.readBuiltinInventoryCandidate,
       cloud: options.cloud,
+      v03RouteFor,
     }).catch((error: unknown) => {
       respondError(res, error);
     });
@@ -157,6 +188,7 @@ interface RouteContext {
   saveBuiltinInventoryCandidate?: ControlServerOptions['saveBuiltinInventoryCandidate'];
   executeBuiltinInventoryRecipe?: ControlServerOptions['executeBuiltinInventoryRecipe'];
   readBuiltinInventoryCandidate?: ControlServerOptions['readBuiltinInventoryCandidate'];
+  v03RouteFor: () => V03GatewayRoute | undefined;
 }
 
 /**
@@ -400,13 +432,36 @@ async function handle(
     if (!ctx.cloud?.status().enabled) {
       return respondJson(res, 503, { error: { code: 'CLOUD_UNAVAILABLE' } });
     }
-    const result = await ctx.cloud.interpretGoal(parsed.data.goalText);
+    // T11 (Amendment R1): the absolute request deadline is computed on the
+    // trusted side — never from HTTP input — using the same window the T04
+    // Host binding requires for a fresh request (consent window + pre-send
+    // floor). The interpreter rechecks it at the final pre-send boundary.
+    const result = await ctx.cloud.interpretGoal({
+      goalText: parsed.data.goalText,
+      deadlineUnixMs: Date.now() + MINIMUM_SENDER_DEADLINE_BUDGET_MS,
+    });
     if (!result.ok) {
       return respondJson(res, result.code === 'CONSENT_DECLINED' ? 409 : 503, {
         error: { code: result.code },
       });
     }
     return respondJson(res, 200, result);
+  }
+
+  // T11 — the single v0.3 submission surface. Bounded JSON in, one T09
+  // ControlApiGateway admission out: the gateway fully validates the
+  // submission BEFORE the selected DomainApp facade is ever touched, so a
+  // refused submission performs zero `send` calls and can never reserve a K
+  // journal entry. The route never exposes a raw send and never accepts
+  // approval or grant object content (references only, enforced in-gateway).
+  if (method === 'POST' && url.pathname === '/api/v03/gateway/submit') {
+    const route = ctx.v03RouteFor();
+    if (route === undefined) {
+      return respondJson(res, 503, { ok: false, code: 'V03_GATEWAY_UNAVAILABLE' });
+    }
+    const body = await readJsonBody(req, ctx.maxBodyBytes);
+    const receipt = await route.submit(body);
+    return respondJson(res, route.httpStatus(receipt), receipt);
   }
 
   if (resource === 'tasks') {

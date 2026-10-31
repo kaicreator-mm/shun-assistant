@@ -788,11 +788,29 @@ function wireTrustedCloudInterpretation() {
   return onDisplayed;
 }
 
+// T11: the bounded v0.3 control surface is one same-origin hop away. The
+// entry is injected here (the v0.2 index.html is not T11's to edit): a plain
+// relative link served by the same loopback control-api, carrying no
+// authority and never linking anywhere off-origin.
+function wireV03Entry() {
+  const header = document.querySelector('header');
+  if (!header || header.querySelector('nav.v03-entry')) return;
+  const nav = document.createElement('nav');
+  nav.className = 'v03-entry';
+  const link = document.createElement('a');
+  link.href = './v03/index.html';
+  link.rel = 'next';
+  link.textContent = 'Open the bounded v0.3 control surface';
+  nav.append(link);
+  header.append(nav);
+}
+
 wireForm();
 wireLiveSystem();
 wireReadonlyDiagnosis();
 wireBuiltinRecipeSave();
 const onCloudDisplayed = wireTrustedCloudInterpretation();
 wireCloudDisclosurePreview(onCloudDisplayed);
+wireV03Entry();
 refresh();
 setInterval(refresh, 2500);
