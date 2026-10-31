@@ -81,6 +81,20 @@ const productionBuild = process.env.SHUN_V03_BUILD_FILE;
 if (productionBuild && (!guided || mode !== 'real-storage')) {
   throw new Error('V03_PRODUCTION_REQUIRES_GUIDED_TRUSTED_REAL_STORAGE');
 }
+// The T04 trusted cloud host binding is installed by the production
+// composition through the consumer's domain-harness-openai-host package.
+// Without a configured real interpreter the port stays disabled and every
+// LLM effect fails closed (CLOUD_UNAVAILABLE), never silently succeeds.
+const cloud = cloudInterpreterFromEnvironment();
+const disabledCloudInterpreter = {
+  status: () => ({
+    enabled: false,
+    provider: 'deepseek' as const,
+    model: 'deepseek-flash' as const,
+    osConsentRequired: true as const,
+  }),
+  interpretGoal: async () => ({ ok: false, code: 'CLOUD_UNAVAILABLE' }),
+};
 const production =
   productionBuild && guided
     ? await createProductionV03Gateway({
@@ -92,10 +106,16 @@ const production =
         tenantId: requiredEnv('SHUN_V03_TENANT_ID'),
         deployedAppId: requiredEnv('SHUN_V03_DEPLOYED_APP_ID'),
         selectedCase: guided,
+        llm: {
+          interpreter: cloud ?? disabledCloudInterpreter,
+          journalFile: requiredEnv('SHUN_V03_CLOUD_JOURNAL'),
+          configuredMaxOutputTokens: Number.parseInt(
+            process.env.SHUN_V03_LLM_MAX_OUTPUT_TOKENS ?? '256',
+            10,
+          ),
+        },
       })
     : undefined;
-
-const cloud = cloudInterpreterFromEnvironment();
 const handle = createControlServer({
   backend,
   uiDir,

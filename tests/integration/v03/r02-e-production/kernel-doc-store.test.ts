@@ -11,14 +11,18 @@ describe('R02-E public selected K durable doc CAS', () => {
     try {
       let store = new SqliteKernelDocStore(file);
       expect(await store.get('K/turn-1')).toBeNull();
-      expect(await store.put('K/turn-1', { phase: 'started' }, { kind: 'create' }))
-        .toEqual({ revision: 0 });
-      await expect(store.put('K/turn-1', { phase: 'duplicate' }, { kind: 'create' }))
-        .rejects.toThrow('K_DOC_CAS');
-      expect(await store.put('K/turn-1', { phase: 'terminal' }, { kind: 'cas', revision: 0 }))
-        .toEqual({ revision: 1 });
-      await expect(store.put('K/turn-1', {}, { kind: 'cas', revision: 0 }))
-        .rejects.toThrow('K_DOC_CAS');
+      expect(await store.put('K/turn-1', { phase: 'started' }, { kind: 'create' })).toEqual({
+        revision: 0,
+      });
+      await expect(
+        store.put('K/turn-1', { phase: 'duplicate' }, { kind: 'create' }),
+      ).rejects.toThrow('K_DOC_CAS');
+      expect(
+        await store.put('K/turn-1', { phase: 'terminal' }, { kind: 'cas', revision: 0 }),
+      ).toEqual({ revision: 1 });
+      await expect(store.put('K/turn-1', {}, { kind: 'cas', revision: 0 })).rejects.toThrow(
+        'K_DOC_CAS',
+      );
       store.close();
       store = new SqliteKernelDocStore(file);
       expect(await store.get('K/turn-1')).toEqual({ value: { phase: 'terminal' }, revision: 1 });

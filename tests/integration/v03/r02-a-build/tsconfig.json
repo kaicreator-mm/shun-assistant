@@ -2,26 +2,15 @@
   "extends": "../../../../tsconfig.base.json",
   "compilerOptions": {
     "baseUrl": ".",
-    "types": [
-      "node"
-    ],
-    "typeRoots": [
-      "../../../../packages/vertical-support/node_modules/@types"
-    ],
+    "types": ["node"],
+    "typeRoots": ["../../../../packages/vertical-support/node_modules/@types"],
     "paths": {
-      "vitest": [
-        "../../../../packages/vertical-support/node_modules/vitest/dist/index.d.ts"
-      ],
-      "domain-harness-openai-host": [
-        "./domain-harness-openai-host.d.mts"
-      ]
+      "vitest": ["../../../../packages/vertical-support/node_modules/vitest/dist/index.d.ts"],
+      "domain-harness-openai-host": ["./domain-harness-openai-host.d.mts"]
     },
     "resolveJsonModule": true,
     "allowJs": true,
     "checkJs": false
   },
-  "include": [
-    "./**/*.ts",
-    "./**/*.d.mts"
-  ]
+  "include": ["./**/*.ts", "./**/*.d.mts"]
 }

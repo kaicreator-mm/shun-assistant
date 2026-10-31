@@ -7,8 +7,7 @@ const root = dirname(fileURLToPath(import.meta.url));
 // The REAL installed public SDK consumer (v0.10.3 tag tarballs) plus the
 // trusted domain-harness-openai-host binding to the T04 static entry.
 ensureV03SdkConsumer();
-const sdk = (name: string, sub: string) =>
-  join(consumerDir, 'node_modules/@kaicreator', name, sub);
+const sdk = (name: string, sub: string) => join(consumerDir, 'node_modules/@kaicreator', name, sub);
 
 export default {
   root,

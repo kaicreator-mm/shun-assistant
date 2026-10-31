@@ -24,10 +24,10 @@ import { tmpdir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
-import { buildNeutralGoalRequest } from '../../../../packages/domain-computer/src/cloud/goal-request.ts';
-import type { ShunLlmGenerateRequestV1 } from '../../../../packages/domain-computer/src/contracts/llm-generate-v1.ts';
 import { activatePublicShunDomainApp } from '../../../../packages/domain-app/src/activation/public-sdk.ts';
 import { composeTrustedRuntimeBuild } from '../../../../packages/domain-app/src/activation/trusted-build.ts';
+import { buildNeutralGoalRequest } from '../../../../packages/domain-computer/src/cloud/goal-request.ts';
+import type { ShunLlmGenerateRequestV1 } from '../../../../packages/domain-computer/src/contracts/llm-generate-v1.ts';
 import { SqliteKernelDocStore } from '../../../../packages/domain-host/src/state/kernel-doc-store.ts';
 import { consumerDir } from './ensure-consumer.mjs';
 
@@ -93,13 +93,21 @@ function interpreterDouble(): InterpreterDouble {
  * domain-harness-openai-host import resolves to, or the module-global
  * installed binding would stay empty in that instance. */
 async function installTrustedBinding(state: InterpreterDouble, now: () => number): Promise<void> {
-  const rows = new Map<string, { requestSha256: string; result?: ShunLlmGenerateRequestV1 | unknown }>();
+  const rows = new Map<
+    string,
+    { requestSha256: string; result?: ShunLlmGenerateRequestV1 | unknown }
+  >();
   const binding = (await import('domain-harness-openai-host')) as {
     installTrustedCloudHostBinding: (config: unknown) => void;
   };
   binding.installTrustedCloudHostBinding({
     interpreter: {
-      status: () => ({ enabled: true, provider: 'deepseek', model: 'deepseek-flash', osConsentRequired: true }),
+      status: () => ({
+        enabled: true,
+        provider: 'deepseek',
+        model: 'deepseek-flash',
+        osConsentRequired: true,
+      }),
       interpretGoal: async (input: { goalText: string; deadlineUnixMs: number }) => {
         state.calls.push({ goalText: input.goalText, deadlineUnixMs: input.deadlineUnixMs });
         if (state.nextResult === 'consent-declined') {
@@ -185,9 +193,13 @@ function assembleTrustedBuild(dir: string): { buildFile: string; buildFileSha256
         sourceFile: kernelFile,
         sourceSha256: kernelSha,
         module: {
-          packageId: KERNEL_PACKAGE_ID, role: 'kernel-primary',
-          abiVersion: 'v08-kernel-abi/1', endpoint: 'occurrence-runtime',
-          dependencies: [], provides: ['kernel:occurrence-runtime/1'], requires: [],
+          packageId: KERNEL_PACKAGE_ID,
+          role: 'kernel-primary',
+          abiVersion: 'v08-kernel-abi/1',
+          endpoint: 'occurrence-runtime',
+          dependencies: [],
+          provides: ['kernel:occurrence-runtime/1'],
+          requires: [],
         },
       },
       {
@@ -195,9 +207,13 @@ function assembleTrustedBuild(dir: string): { buildFile: string; buildFileSha256
         sourceFile: standardFile,
         sourceSha256: standardSha,
         module: {
-          packageId: STANDARD_PACKAGE_ID, role: 'standard-primary',
-          abiVersion: 'v08-standard-sdk-abi/1', endpoint: 'rule-interpreter',
-          dependencies: [], provides: ['standard:interpret/1', 'standard:route/1'], requires: [],
+          packageId: STANDARD_PACKAGE_ID,
+          role: 'standard-primary',
+          abiVersion: 'v08-standard-sdk-abi/1',
+          endpoint: 'rule-interpreter',
+          dependencies: [],
+          provides: ['standard:interpret/1', 'standard:route/1'],
+          requires: [],
         },
       },
       {
@@ -205,9 +221,13 @@ function assembleTrustedBuild(dir: string): { buildFile: string; buildFileSha256
         sourceFile: businessFile,
         sourceSha256: businessSha,
         module: {
-          packageId: BUSINESS_PACKAGE_ID, role: 'business',
-          abiVersion: 'v08-business-abi/1', endpoint: 'business-policy',
-          dependencies: [], provides: ['intent:goal-interpret'], requires: [],
+          packageId: BUSINESS_PACKAGE_ID,
+          role: 'business',
+          abiVersion: 'v08-business-abi/1',
+          endpoint: 'business-policy',
+          dependencies: [],
+          provides: ['intent:goal-interpret'],
+          requires: [],
         },
       },
       {
@@ -215,12 +235,16 @@ function assembleTrustedBuild(dir: string): { buildFile: string; buildFileSha256
         sourceFile: capabilityFile,
         sourceSha256: capabilitySha,
         module: {
-          packageId: CAPABILITY_PACKAGE_ID, role: 'capability',
-          abiVersion: 'v08-capability-abi/1', endpoint: 'capability-endpoint',
+          packageId: CAPABILITY_PACKAGE_ID,
+          role: 'capability',
+          abiVersion: 'v08-capability-abi/1',
+          endpoint: 'capability-endpoint',
           dependencies: [],
           externalImports: { node: [], npm: ['domain-harness-openai-host'], native: [] },
-          provides: ['capability:llm/1'], requires: [],
-          capabilityId: 'llm', externalEffect: true,
+          provides: ['capability:llm/1'],
+          requires: [],
+          capabilityId: 'llm',
+          externalEffect: true,
           handlers: [{ operationId: 'interpretGoal', handler: 'interpretGoal' }],
         },
       },
@@ -239,7 +263,10 @@ function assembleTrustedBuild(dir: string): { buildFile: string; buildFileSha256
   return { buildFile, buildFileSha256: receipt.sha256 };
 }
 
-function goalInput(requestId: string, overrides: Partial<Record<string, unknown>> = {}): Record<string, unknown> {
+function goalInput(
+  requestId: string,
+  overrides: Partial<Record<string, unknown>> = {},
+): Record<string, unknown> {
   const llmRequest = buildNeutralGoalRequest({
     requestId,
     goalText: 'Please summarize the selected folder contents.',
@@ -294,7 +321,9 @@ describe('R02-A real v0.10.3 SDK closure activation (production BUILD, no fixtur
     const buildPath = resolveInstalledSdk('@kaicreator/domain-harness-build');
     const kernelPath = resolveInstalledSdk('@kaicreator/domain-harness-microkernel/host-seam');
     type InstalledBuildSdk = { buildV10App: (options: unknown) => unknown };
-    type InstalledKernelSdk = { activateV10App: (build: unknown, options: unknown) => Promise<unknown> };
+    type InstalledKernelSdk = {
+      activateV10App: (build: unknown, options: unknown) => Promise<unknown>;
+    };
     const installedBuild = (await import(pathToFileURL(buildPath).href)) as InstalledBuildSdk;
     const installedKernel = (await import(pathToFileURL(kernelPath).href)) as InstalledKernelSdk;
     expect(typeof installedBuild.buildV10App).toBe('function');
@@ -331,10 +360,17 @@ describe('R02-A real v0.10.3 SDK closure activation (production BUILD, no fixtur
   });
 
   afterAll(() => {
-    try { activated?.dispose(); } catch { /* already disposed */ }
+    try {
+      activated?.dispose();
+    } catch {
+      /* already disposed */
+    }
     // Windows may briefly hold SQLite WAL handles; retry the temp cleanup.
     for (let attempt = 0; attempt < 5; attempt++) {
-      try { rmSync(dir, { recursive: true, force: true }); break; } catch {
+      try {
+        rmSync(dir, { recursive: true, force: true });
+        break;
+      } catch {
         Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, 200);
       }
     }
@@ -358,7 +394,8 @@ describe('R02-A real v0.10.3 SDK closure activation (production BUILD, no fixtur
       phase: 'terminal',
       outcome: { ok: true },
     });
-    const llm = (effect?.output as { outcome: { output: ShunLlmGenerateRequestV1 } }).outcome.output;
+    const llm = (effect?.output as { outcome: { output: ShunLlmGenerateRequestV1 } }).outcome
+      .output;
     expect(llm).toMatchObject({
       status: 'completed',
       requestId: 'r02a-req-1',
@@ -380,7 +417,9 @@ describe('R02-A real v0.10.3 SDK closure activation (production BUILD, no fixtur
     });
     expect(receipt.status).toBe('admitted');
     const effect = (receipt.admitted as { effects: Array<Record<string, unknown>> }).effects[0];
-    const outcome = (effect?.output as { outcome: { ok: unknown; output: ShunLlmGenerateRequestV1 } })?.outcome;
+    const outcome = (
+      effect?.output as { outcome: { ok: unknown; output: ShunLlmGenerateRequestV1 } }
+    )?.outcome;
     const llm = outcome?.output;
     expect(llm).toMatchObject({
       status: 'refused',

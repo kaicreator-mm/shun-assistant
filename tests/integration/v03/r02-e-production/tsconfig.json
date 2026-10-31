@@ -2,20 +2,14 @@
   "extends": "../../../../tsconfig.base.json",
   "compilerOptions": {
     "baseUrl": ".",
-    "types": [
-      "node"
-    ],
-    "typeRoots": [
-      "../../../../packages/vertical-support/node_modules/@types"
-    ],
+    "types": ["node"],
+    "typeRoots": ["../../../../packages/vertical-support/node_modules/@types"],
     "paths": {
-      "vitest": [
-        "../../../../packages/vertical-support/node_modules/vitest/dist/index.d.ts"
-      ]
+      "vitest": ["../../../../packages/vertical-support/node_modules/vitest/dist/index.d.ts"]
     },
-    "resolveJsonModule": true
+    "resolveJsonModule": true,
+    "allowJs": true,
+    "checkJs": false
   },
-  "include": [
-    "./**/*.ts"
-  ]
+  "include": ["./**/*.ts", "./**/*.d.mts", "../r02-a-build/ensure-consumer.mjs"]
 }
