@@ -1,0 +1,38 @@
+{
+  "extends": "../../../../tsconfig.base.json",
+  "compilerOptions": {
+    "baseUrl": ".",
+    "types": ["node"],
+    "typeRoots": ["../../../../packages/vertical-support/node_modules/@types"],
+    "paths": {
+      "@kaicreator/domain-harness-microkernel/host-seam": [
+        "../../../../node_modules/.t11-dh-consumer/node_modules/@kaicreator/domain-harness-microkernel/dist/host-seam.d.ts"
+      ],
+      "@kaicreator/domain-harness-microkernel": [
+        "../../../../node_modules/.t11-dh-consumer/node_modules/@kaicreator/domain-harness-microkernel/dist/index.d.ts"
+      ],
+      "@kaicreator/domain-harness-build": [
+        "../../../../node_modules/.t11-dh-consumer/node_modules/@kaicreator/domain-harness-build/dist/index.d.ts"
+      ],
+      "@kaicreator/domain-harness-host-node": [
+        "../../../../node_modules/.t11-dh-consumer/node_modules/@kaicreator/domain-harness-host-node/dist/index.d.ts"
+      ],
+      "@kaicreator/domain-harness-contracts": [
+        "../../../../node_modules/.t11-dh-consumer/node_modules/@kaicreator/domain-harness-contracts/dist/index.d.ts"
+      ],
+      "@shun/vertical-support": ["../../../../packages/vertical-support/src/index.ts"],
+      "vitest": ["../../../../packages/vertical-support/node_modules/vitest/dist/index.d.ts"]
+    }
+  },
+  "include": [
+    "../../../../packages/contracts/src/**/*.ts",
+    "../../../../packages/llm-remote/src/**/*.ts",
+    "../../../../packages/domain-app/src/**/*.ts",
+    "../../../../packages/domain-computer/src/**/*.ts",
+    "../../../../packages/domain-host/src/**/*.ts",
+    "../../../../packages/store/src/**/*.ts",
+    "../../../../packages/vertical-support/src/**/*.ts",
+    "../../../../apps/control-api/src/**/*.ts",
+    "./**/*.ts"
+  ]
+}
