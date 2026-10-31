@@ -168,9 +168,10 @@ describe('T11 package public entries are side-effect-free controlled exits', () 
 
   it('domain-computer exports every merged task adapter factory', async () => {
     const computer = await import('../../../../packages/domain-computer/src/index.ts');
+    // External package users must not mint the private Host observation mark.
+    expect('issueHostObjectObservation' in computer).toBe(false);
     for (const name of [
       'selectGoalSemantic',
-      'issueHostObjectObservation',
       'createNextGuidedStep',
       'validateGuidedStepOutcome',
       'validateGuidedAdvisory',
