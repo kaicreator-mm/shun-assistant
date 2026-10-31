@@ -8,7 +8,7 @@ const sha=(s:string)=>createHash('sha256').update(s).digest('hex');
 const roles=['kernel-primary','standard-primary','business','capability'];
 function modules() {
   return roles.map((role,i)=>{
-    const src='export const MODULE_ID="package:'+i+'";\\n'.repeat(4);
+    const src=('export const MODULE_ID="package:'+i+'";\\n').repeat(4);
     return {module: {
       packageId:'package:'+i, role, abiVersion:'v08-'+role+'-abi/1',
       moduleSource:src, moduleSha256:sha(src), endpoint:'./index.js',

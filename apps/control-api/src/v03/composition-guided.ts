@@ -5,8 +5,7 @@
 import { createHash } from 'node:crypto';
 import { lstatSync, readFileSync, realpathSync } from 'node:fs';
 import { isAbsolute, resolve } from 'node:path';
-import type { HostGuidedService } from
-  '../../../../packages/domain-host/src/guided/host-guided-service.ts';
+import type { HostGuidedService } from '../../../../packages/domain-host/src/guided/host-guided-service.ts';
 
 const HEX = /^[0-9a-f]{64}$/;
 
@@ -20,8 +19,8 @@ export function provisionGuidedCaseFromHostFile(input: {
   }
   const file = resolve(input.file);
   const stat = lstatSync(file);
-  if (!stat.isFile() || stat.isSymbolicLink() || realpathSync(file) !== file ||
-      stat.size > 262_144) throw new Error('GUIDED_HOST_CASE_UNTRUSTED_FILE');
+  if (!stat.isFile() || stat.isSymbolicLink() || realpathSync(file) !== file || stat.size > 262_144)
+    throw new Error('GUIDED_HOST_CASE_UNTRUSTED_FILE');
   const bytes = readFileSync(file);
   if (createHash('sha256').update(bytes).digest('hex') !== input.sha256) {
     throw new Error('GUIDED_HOST_CASE_DIGEST_REFUSED');
@@ -31,16 +30,22 @@ export function provisionGuidedCaseFromHostFile(input: {
     semanticSelection: unknown;
     scope: unknown;
   };
-  if (!value || typeof value !== 'object' || Array.isArray(value) ||
-      Object.keys(value).sort().join('|') !==
-        ['observation', 'scope', 'semanticSelection'].sort().join('|')) {
+  if (
+    !value ||
+    typeof value !== 'object' ||
+    Array.isArray(value) ||
+    Object.keys(value).sort().join('|') !==
+      ['observation', 'scope', 'semanticSelection'].sort().join('|')
+  ) {
     throw new Error('GUIDED_HOST_CASE_SCHEMA_REFUSED');
   }
   const current = input.service.state().currentStep;
   if (current) {
     const observation = value.observation as { taskId?: unknown; caseRef?: unknown };
-    if (observation?.taskId !== current.taskId ||
-        JSON.stringify(observation.caseRef) !== JSON.stringify(current.caseRef)) {
+    if (
+      observation?.taskId !== current.taskId ||
+      JSON.stringify(observation.caseRef) !== JSON.stringify(current.caseRef)
+    ) {
       throw new Error('GUIDED_HOST_CASE_RESTART_IDENTITY_MISMATCH');
     }
     return { status: 'RESTORED', stepId: current.stepId };

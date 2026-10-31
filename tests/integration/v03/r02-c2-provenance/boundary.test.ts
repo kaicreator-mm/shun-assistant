@@ -50,7 +50,6 @@ describe('R02-C2 Host issuer public capability boundary', () => {
     const reopened = new SqliteHostObservationFence(fenceFile);
     expect(reopened.accept({
       sourceRef: 'host-observation:r02', revision: 'revision-1', taskId: 'safe-task',
-      observedObjectRefs: ['FOLDER:workspace'],
       issuedAtUnixMs: 100, expiresAtUnixMs: 200,
     }, 120)).toBe(false);
     reopened.close();

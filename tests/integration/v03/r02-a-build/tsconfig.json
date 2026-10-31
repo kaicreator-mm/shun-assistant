@@ -13,7 +13,9 @@
         "../../../../packages/vertical-support/node_modules/vitest/dist/index.d.ts"
       ]
     },
-    "resolveJsonModule": true
+    "resolveJsonModule": true,
+    "allowJs": true,
+    "checkJs": false
   },
   "include": [
     "./**/*.ts"

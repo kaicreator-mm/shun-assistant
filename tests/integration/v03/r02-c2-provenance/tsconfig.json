@@ -11,6 +11,9 @@
     "paths": {
       "vitest": [
         "../../../../packages/vertical-support/node_modules/vitest/dist/index.d.ts"
+      ],
+      "@shun/vertical-support": [
+        "../../../../packages/vertical-support/src/index.ts"
       ]
     },
     "resolveJsonModule": true

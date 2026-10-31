@@ -205,23 +205,20 @@ describe('real Windows collector boundary', () => {
 
   it('preserves Chinese OS caption as genuine UTF-8 local-only output', async () => {
     const caption = '微软 Windows 11 专业版';
-    const result = await collectWindowsSupportContextWithTrustedRunner(
-      async (_file, args) => {
-        const script = args.join(' ');
-        expect(script.indexOf('[Console]::OutputEncoding=$utf8')).toBeLessThan(
-          script.indexOf('ConvertTo-Json'),
-        );
-        return {
-          stdout: JSON.stringify({
-            os: { name: caption, build: '26100' },
-            device: { model: '中文设备' },
-            updates: { last_check: '2026-11-01' },
-          }),
-          stderr: '',
-        };
-      },
-      'win32',
-    );
+    const result = await collectWindowsSupportContextWithTrustedRunner(async (_file, args) => {
+      const script = args.join(' ');
+      expect(script.indexOf('[Console]::OutputEncoding=$utf8')).toBeLessThan(
+        script.indexOf('ConvertTo-Json'),
+      );
+      return {
+        stdout: JSON.stringify({
+          os: { name: caption, build: '26100' },
+          device: { model: '中文设备' },
+          updates: { last_check: '2026-11-01' },
+        }),
+        stderr: '',
+      };
+    }, 'win32');
     expect(result.localOnly).toBe(true);
     expect(result.externalDisclosures).toEqual([]);
     expect(result.report.os.name).toBe(caption);

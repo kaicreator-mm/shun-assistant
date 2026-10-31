@@ -3,8 +3,10 @@
  * creates the port; untrusted HTTP can only read state or relay an answer.
  * No route can mint a grant, consent, Kernel Permit or effect command.
  */
-import type { GuidedDecisionReceipt, HostGuidedService } from
-  '../../../../packages/domain-host/src/guided/host-guided-service.ts';
+import type {
+  GuidedDecisionReceipt,
+  HostGuidedService,
+} from '../../../../packages/domain-host/src/guided/host-guided-service.ts';
 
 export type V03GuidedPort = Pick<HostGuidedService, 'state' | 'decide'>;
 
@@ -25,10 +27,14 @@ export function createV03GuidedRoute(port: V03GuidedPort): V03GuidedRoute {
     decide,
     httpStatus(result: GuidedDecisionReceipt) {
       switch (result.status) {
-        case 'RECORDED': return 200;
-        case 'STALE': return 409;
-        case 'REFUSED': return 422;
-        case 'UNKNOWN': return 503;
+        case 'RECORDED':
+          return 200;
+        case 'STALE':
+          return 409;
+        case 'REFUSED':
+          return 422;
+        case 'UNKNOWN':
+          return 503;
       }
     },
   });

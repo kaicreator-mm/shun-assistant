@@ -4,14 +4,14 @@
 //   SHUN_CONTROL_PORT           — port (default 7788)
 //   SHUN_CONTROL_UI_DIR         — static UI directory (default ../control-ui/public)
 import { dirname, resolve } from 'node:path';
-import { HostGuidedService } from '../../../packages/domain-host/src/guided/host-guided-service.ts';
 import { fileURLToPath } from 'node:url';
+import { HostGuidedService } from '../../../packages/domain-host/src/guided/host-guided-service.ts';
 import { cloudInterpreterFromEnvironment } from './cloud-interpret.ts';
 import { DemoShunBackend } from './demo/backend.ts';
 import { RealStorageControlBackend } from './real-storage/backend.ts';
 import { createControlServer } from './server.ts';
-import { createProductionV03Gateway } from './v03/composition-production.ts';
 import { provisionGuidedCaseFromHostFile } from './v03/composition-guided.ts';
+import { createProductionV03Gateway } from './v03/composition-production.ts';
 
 const here = dirname(fileURLToPath(import.meta.url));
 const port = Number.parseInt(process.env.SHUN_CONTROL_PORT ?? '7788', 10);
@@ -61,9 +61,8 @@ const guidedDb = process.env.SHUN_V03_GUIDED_DATABASE;
 if (guidedDb && mode !== 'real-storage') {
   throw new Error('V03_GUIDED_REQUIRES_REAL_STORAGE_MODE');
 }
-const guided = guidedDb && mode === 'real-storage'
-  ? new HostGuidedService(resolve(guidedDb))
-  : undefined;
+const guided =
+  guidedDb && mode === 'real-storage' ? new HostGuidedService(resolve(guidedDb)) : undefined;
 
 // Restore or stage only operator-pinned Host observations. A browser cannot
 // supply an authority-bearing semantic selection or a selected root.
@@ -82,18 +81,19 @@ const productionBuild = process.env.SHUN_V03_BUILD_FILE;
 if (productionBuild && (!guided || mode !== 'real-storage')) {
   throw new Error('V03_PRODUCTION_REQUIRES_GUIDED_TRUSTED_REAL_STORAGE');
 }
-const production = productionBuild && guided
-  ? await createProductionV03Gateway({
-      buildFile: productionBuild,
-      buildFileSha256: requiredEnv('SHUN_V03_BUILD_SHA256'),
-      sdkConsumerDir: requiredEnv('SHUN_V03_SDK_CONSUMER_DIR'),
-      kDocDatabaseFile: requiredEnv('SHUN_V03_KERNEL_DOC_DATABASE'),
-      deploymentRoot: requiredEnv('SHUN_V03_DEPLOYMENT_ROOT'),
-      tenantId: requiredEnv('SHUN_V03_TENANT_ID'),
-      deployedAppId: requiredEnv('SHUN_V03_DEPLOYED_APP_ID'),
-      selectedCase: guided,
-    })
-  : undefined;
+const production =
+  productionBuild && guided
+    ? await createProductionV03Gateway({
+        buildFile: productionBuild,
+        buildFileSha256: requiredEnv('SHUN_V03_BUILD_SHA256'),
+        sdkConsumerDir: requiredEnv('SHUN_V03_SDK_CONSUMER_DIR'),
+        kDocDatabaseFile: requiredEnv('SHUN_V03_KERNEL_DOC_DATABASE'),
+        deploymentRoot: requiredEnv('SHUN_V03_DEPLOYMENT_ROOT'),
+        tenantId: requiredEnv('SHUN_V03_TENANT_ID'),
+        deployedAppId: requiredEnv('SHUN_V03_DEPLOYED_APP_ID'),
+        selectedCase: guided,
+      })
+    : undefined;
 
 const cloud = cloudInterpreterFromEnvironment();
 const handle = createControlServer({
@@ -125,11 +125,14 @@ for (const signal of ['SIGINT', 'SIGTERM'] as const) {
     if (closing) return;
     closing = true;
     void handle.close().finally(() => {
-      try { production?.dispose(); } finally { guided?.close(); }
+      try {
+        production?.dispose();
+      } finally {
+        guided?.close();
+      }
     });
   });
 }
-
 
 function requiredEnv(key: string): string {
   const value = process.env[key];
