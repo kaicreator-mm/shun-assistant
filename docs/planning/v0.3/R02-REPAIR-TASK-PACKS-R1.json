@@ -147,7 +147,7 @@
       "concern": "Truthful Gateway/HTTP status separation for forwarded/admitted/refused/unknown/terminal effect.",
       "stage": "OWNER_APPROVED_PLANNED_NOT_YET_DISPATCHABLE",
       "blocked_by_planned": [],
-      "role": "WEB_BUILDER",
+      "role": "LOCAL_BUILDER",
       "execution_environment": "WEB_PLUS_CI_OR_LOCAL",
       "review_policy": "required",
       "allowed_write_set": [
@@ -203,7 +203,7 @@
       "concern": "Remove Host Observation issuer from public domain-computer capability surface and bind issuer to trusted Host-only authority.",
       "stage": "OWNER_APPROVED_PLANNED_NOT_YET_DISPATCHABLE",
       "blocked_by_planned": [],
-      "role": "WEB_BUILDER",
+      "role": "LOCAL_BUILDER",
       "execution_environment": "WEB_PLUS_CI_OR_LOCAL",
       "review_policy": "required",
       "allowed_write_set": [
@@ -259,7 +259,7 @@
       "concern": "Bilingual v0.3 product guide, Windows modes and release limits, provider licensing/custody/rotation and rollback without claiming readiness.",
       "stage": "OWNER_APPROVED_PLANNED_NOT_YET_DISPATCHABLE",
       "blocked_by_planned": [],
-      "role": "WEB_BUILDER",
+      "role": "LOCAL_BUILDER",
       "execution_environment": "WEB_PLUS_CI_OR_LOCAL",
       "review_policy": "required",
       "allowed_write_set": [
@@ -584,8 +584,8 @@
       "blocked_by_planned": [
         "R02-V"
       ],
-      "role": "CLOSURE_COORDINATOR",
-      "execution_environment": "GITHUB_PLUS_INDEPENDENT_REVIEW",
+      "role": "LOCAL_BUILDER",
+      "execution_environment": "WEB_PLUS_CI_OR_LOCAL",
       "review_policy": "required",
       "allowed_write_set": [
         "docs/implementation/v0.3/r02-closeout/**"
