@@ -9,7 +9,7 @@ import { DatabaseSync } from 'node:sqlite';
 
 export type V10WriteCondition =
   | Readonly<{ kind: 'create' }>
-  | Readonly<{ kind: 'revision'; revision: number }>;
+  | Readonly<{ kind: 'cas'; revision: number }>;
 
 type Row = { readonly value_json: string; readonly revision: number };
 
@@ -49,7 +49,7 @@ export class SqliteKernelDocStore {
         this.#db.exec('COMMIT');
         return { revision: 0 };
       }
-      if (condition.kind !== 'revision' || !Number.isSafeInteger(condition.revision) ||
+      if (condition.kind !== 'cas' || !Number.isSafeInteger(condition.revision) ||
           !old || old.revision !== condition.revision) {
         throw new TypeError('K_DOC_CAS_CONFLICT');
       }
@@ -74,7 +74,7 @@ export class SqliteKernelDocStore {
       if (condition.kind === 'create') {
         if (old) throw new TypeError('K_DOC_CAS_CONFLICT');
       } else {
-        if (condition.kind !== 'revision' || !old ||
+        if (condition.kind !== 'cas' || !old ||
             !Number.isSafeInteger(condition.revision) ||
             old.revision !== condition.revision) throw new TypeError('K_DOC_CAS_CONFLICT');
         const changed = this.#db.prepare('DELETE FROM k_v10_docs WHERE doc_key=? AND revision=?')
