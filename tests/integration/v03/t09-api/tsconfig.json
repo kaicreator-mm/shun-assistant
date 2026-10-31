@@ -1,0 +1,16 @@
+{
+  "extends": "../../../../tsconfig.base.json",
+  "compilerOptions": {
+    "baseUrl": ".",
+    "types": ["node"],
+    "typeRoots": ["../../../../packages/vertical-support/node_modules/@types"],
+    "paths": {
+      "vitest": ["../../../../packages/vertical-support/node_modules/vitest/dist/index.d.ts"]
+    }
+  },
+  "include": [
+    "../../../../packages/domain-app/src/**/*.ts",
+    "../../../../apps/control-api/src/v03/**/*.ts",
+    "./**/*.ts"
+  ]
+}
