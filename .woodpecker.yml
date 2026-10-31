@@ -1,17 +1,26 @@
 # Shun v0.3 R02 — real CI gate; do not use GitHub Actions.
 # This runs repository tests including every nested v0.3 suite and exposes
 # the actual failing command/exit code. A red build is never a release gate PASS.
+#
+# The self-hosted agent uses Woodpecker's LOCAL backend: steps run directly
+# on the Node 24 worker (the 'bash' image is the conventional no-op shell),
+# with the workspace npm registry pinned to the local Verdaccio cache.
 when:
   - event: push
   - event: pull_request
+  - event: manual
+
+labels:
+  backend: local
 
 steps:
   - name: node24-full-qualification
-    image: node:24-bookworm
+    image: bash
     commands:
+      - git --version && node --version
+      - test "$(git rev-parse HEAD)" = "$CI_COMMIT_SHA"
       - corepack enable
       - corepack prepare pnpm@10.34.5 --activate
-      - node --version
       - pnpm --version
       - pnpm install --frozen-lockfile
       - pnpm -r --if-present run lint
