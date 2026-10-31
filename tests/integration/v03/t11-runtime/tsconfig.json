@@ -5,16 +5,38 @@
     "types": ["node"],
     "typeRoots": ["../../../../packages/vertical-support/node_modules/@types"],
     "paths": {
+      "@kaicreator/domain-harness-microkernel/host-seam": [
+        "../../../../node_modules/.t11-dh-consumer/node_modules/@kaicreator/domain-harness-microkernel/dist/host-seam.d.ts"
+      ],
+      "@kaicreator/domain-harness-microkernel": [
+        "../../../../node_modules/.t11-dh-consumer/node_modules/@kaicreator/domain-harness-microkernel/dist/index.d.ts"
+      ],
+      "@kaicreator/domain-harness-build": [
+        "../../../../node_modules/.t11-dh-consumer/node_modules/@kaicreator/domain-harness-build/dist/index.d.ts"
+      ],
+      "@kaicreator/domain-harness-host-node": [
+        "../../../../node_modules/.t11-dh-consumer/node_modules/@kaicreator/domain-harness-host-node/dist/index.d.ts"
+      ],
+      "@kaicreator/domain-harness-contracts": [
+        "../../../../node_modules/.t11-dh-consumer/node_modules/@kaicreator/domain-harness-contracts/dist/index.d.ts"
+      ],
+      "shun-windows-effect-host": ["./staged-windows-host.d.ts"],
       "@shun/vertical-support": ["../../../../packages/vertical-support/src/index.ts"],
       "vitest": ["../../../../packages/vertical-support/node_modules/vitest/dist/index.d.ts"]
-    }
+    },
+    "allowJs": true,
+    "checkJs": false
   },
   "include": [
     "../../../../packages/domain-app/src/**/*.ts",
     "../../../../packages/domain-computer/src/**/*.ts",
     "../../../../packages/domain-host/src/**/*.ts",
+    "../../../../packages/store/src/**/*.ts",
+    "../../../../packages/workflow/src/journal.ts",
     "../../../../apps/control-api/src/**/*.ts",
     "../../../../apps/control-api/native/**/*.ts",
+    "../../../../apps/control-ui/public/v03/strings.js",
+    "../../../../apps/control-ui/public/v03/view-model.js",
     "./**/*.ts"
   ]
 }
