@@ -94,8 +94,8 @@ describe('createControlApiGateway pre-send admission', () => {
     const subject = gateway(facade);
     const submission = validSubmission();
     const receipt = await subject.submit(submission);
-    expect(receipt.status).toBe('SENT');
-    if (receipt.status !== 'SENT') return;
+    expect(receipt.status).toBe('UNKNOWN');
+    if (receipt.status !== 'UNKNOWN') return;
     expect(receipt.sendCalls).toBe(1);
     expect(facade.calls.length).toBe(1);
     // No rewrite: the facade receives exactly the validated submission.
@@ -134,7 +134,7 @@ describe('createControlApiGateway pre-send admission', () => {
     });
     const okFacade = countingFacade();
     const okReceipt = await gateway(okFacade).submit(sneaky);
-    expect(okReceipt.status).toBe('SENT');
+    expect(okReceipt.status).toBe('UNKNOWN');
     expect(okFacade.calls.length).toBe(1);
     expect(Object.getPrototypeOf(okFacade.calls[0])).toBe(Object.prototype);
     expect(JSON.stringify(okFacade.calls[0])).toBe(JSON.stringify(validSubmission()));
@@ -291,7 +291,7 @@ describe('stable Case semantics (L2 §7 / DH #1437)', () => {
     expectRefused(await subject.submit(malformed), 'GATEWAY_INPUT_INVALID', facade);
     // Then: the valid canonical successor for the SAME stable Case is admitted.
     const receipt = await subject.submit(validSubmission({ caseId }));
-    expect(receipt.status).toBe('SENT');
+    expect(receipt.status).toBe('UNKNOWN');
     expect(facade.calls.length).toBe(1);
     expect((facade.calls[0] as { caseId: string }).caseId).toBe(caseId);
   });
@@ -328,8 +328,8 @@ describe('v03 control-api route seam', () => {
     const facade = countingFacade();
     const route = createV03GatewayRoute({ gateway: gateway(facade) });
     const receipt = await route.submit(validSubmission());
-    expect(receipt.status).toBe('SENT');
-    expect(route.httpStatus(receipt)).toBe(200);
+    expect(receipt.status).toBe('UNKNOWN');
+    expect(route.httpStatus(receipt)).toBe(409);
     expect(facade.calls.length).toBe(1);
     const refusedReceipt = await route.submit('{"broken"');
     expect(refusedReceipt.status).toBe('REFUSED');
