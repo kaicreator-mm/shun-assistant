@@ -78,6 +78,12 @@ export class HostGuidedService {
     try {
       this.#db.exec('BEGIN IMMEDIATE');
       const current = this.#read();
+      // A consumed step may never be reissued under the same identity after
+      // a restart: the next Host observation must advance the real revision.
+      if (current && current.step.stepId === next.step.stepId) {
+        this.#db.exec('ROLLBACK');
+        return { status: 'REFUSED', code: 'GUIDED_SEED_REPLAY' };
+      }
       if (current?.state === 'CURRENT') {
         this.#db.exec('ROLLBACK');
         return { status: 'REFUSED', code: 'CURRENT_STEP_ALREADY_EXISTS' };
