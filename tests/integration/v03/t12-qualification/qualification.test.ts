@@ -177,6 +177,12 @@ describe('V01 candidate identity', () => {
   // reachable from this clone (full clones), and is explicitly skipped when
   // the shallow/partial clone cannot answer it.
   const candidateReachable = (() => {
+    // A shallow/grafted clone cannot answer ancestry truthfully; the
+    // invariant stays mandatory only where full history exists.
+    const shallow = spawnSync('git', ['rev-parse', '--is-shallow-repository'], {
+      cwd: repoRoot, encoding: 'utf8',
+    });
+    if ((shallow.stdout ?? '').trim() === 'true') return false;
     const cat = spawnSync('git', ['cat-file', '-e', CANDIDATE_SHA], {
       cwd: repoRoot, encoding: 'utf8',
     });
