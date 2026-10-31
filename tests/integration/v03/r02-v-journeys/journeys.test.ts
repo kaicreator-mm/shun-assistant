@@ -318,7 +318,6 @@ describe('R02-V real-product journeys (zero paid, zero physical effects)', () =>
       platform: process.platform,
       node: process.version,
       osCaption: collected.report.os?.name ?? null,
-      osLocale: collected.report.os?.locale ?? null,
       collectedAt: new Date().toISOString(),
     };
     console.log('[J01] real read-only host record:', JSON.stringify(record));
