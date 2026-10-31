@@ -1,8 +1,12 @@
 import { describe, expect, it } from 'vitest';
+import { mkdtempSync, rmSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import * as publicComputer from '../../../../packages/domain-computer/src/index.ts';
 import * as publicHost from '../../../../packages/domain-host/src/index.ts';
 import computerManifest from '../../../../packages/domain-computer/package.json' with { type: 'json' };
 import hostManifest from '../../../../packages/domain-host/package.json' with { type: 'json' };
+import { SqliteHostObservationFence } from '../../../../packages/domain-host/src/observation/durable-observation.ts';
 import { createPrivateHostObservationIssuer } from
   '../../../../packages/domain-host/src/observation/private-host-observation.ts';
 
@@ -15,6 +19,9 @@ describe('R02-C2 Host issuer public capability boundary', () => {
   });
 
   it('issues only a scoped, current result from the trusted Host observer', async () => {
+    const dir = mkdtempSync(join(tmpdir(), 'shun-host-observation-'));
+    const fenceFile = join(dir, 'fence.sqlite');
+    const fence = new SqliteHostObservationFence(fenceFile);
     let calls = 0;
     const issuer = createPrivateHostObservationIssuer({
       async observe(taskId) {
@@ -28,14 +35,25 @@ describe('R02-C2 Host issuer public capability boundary', () => {
           expiresAtUnixMs: 200,
         };
       },
-    });
+    }, fence);
     expect(await issuer.issue('safe-task', 120)).toMatchObject({
       taskId: 'safe-task',
       sourceRef: 'host-observation:r02',
       observedObjectRefs: ['FOLDER:workspace'],
     });
+    // The exact observation revision is consumed by the durable fence.
+    expect(await issuer.issue('safe-task', 120)).toBeNull();
     expect(await issuer.issue('safe-task', 200)).toBeNull();
     expect(await issuer.issue('../malicious', 120)).toBeNull();
-    expect(calls).toBe(2);
+    expect(calls).toBe(3);
+    fence.close();
+    const reopened = new SqliteHostObservationFence(fenceFile);
+    expect(reopened.accept({
+      sourceRef: 'host-observation:r02', revision: 'revision-1', taskId: 'safe-task',
+      observedObjectRefs: ['FOLDER:workspace'],
+      observedAtUnixMs: 100, expiresAtUnixMs: 200,
+    }, 120)).toBe(false);
+    reopened.close();
+    rmSync(dir, { recursive: true, force: true });
   });
 });
