@@ -12,6 +12,7 @@ describe('R04 source contract: the shipped desktop surface replaces technical op
     expect(html).toContain('src="./desktop.js"');
     expect(html).toContain('href="./desktop.css"');
     expect(html).toContain('id="dynamic-form"');
+    expect(html).toContain('id="step-progress"');
     expect(html).toContain('aria-label="Main navigation"');
     expect(html).not.toContain('src="./app.js"');
     expect(html).not.toContain('id="v03-j-grant"');
@@ -67,6 +68,11 @@ describe('R04 source contract: the shipped desktop surface replaces technical op
     expect(app).toContain('projectTaskSnapshots');
     expect(app).toContain('projectHostTaskDetail');
     expect(app).toContain('projectGuidedHistory(lastState?.history)');
+    expect(app).toContain('let guidedRefreshGeneration = 0;');
+    expect(app).toContain('if(generation!==guidedRefreshGeneration)return');
+    expect(app).toContain('progressModel(lastState?.journey,locale)');
+    expect(app).toContain("model.kind!=='ASK'||!progressReady");
+    expect(app).toContain('unresolvedStepId=submittedStepId');
     expect(app).toContain('let hostTaskListGeneration = 0;');
     expect(app).toContain("labeledRow(target,'taskStatus',tr('taskState'+view.state))");
     expect(app).toContain("taskStateSUCCEEDED:'Host marked succeeded'");
