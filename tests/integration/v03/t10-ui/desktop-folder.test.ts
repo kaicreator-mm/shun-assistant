@@ -20,7 +20,7 @@ describe('R04 browser-only folder selection',()=>{
   expect(summarizeBrowserFolder([{size:1,webkitRelativePath:'safe\\secret'}]).status).toBe('REFUSED');
   expect(summarizeBrowserFolder([...folder,{size:1,webkitRelativePath:'Elsewhere/x'}]).status).toBe('REFUSED');
   expect(summarizeBrowserFolder([{size:-1,webkitRelativePath:'safe/a'}]).status).toBe('REFUSED');
-  expect(summarizeBrowserFolder({length:4097}).status).toBe('REFUSED');
+  expect(summarizeBrowserFolder(Array(4097).fill({size:0,webkitRelativePath:'safe/a'})).status).toBe('REFUSED');
  });
 });
 describe('R04 truthful Guided HTTP receipt classification',()=>{
