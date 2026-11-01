@@ -27,6 +27,8 @@ describe('R04 source contract: the shipped desktop surface replaces technical op
     const taskPage=html.slice(html.indexOf('id="page-tasks"'),html.indexOf('id="page-approvals"'));
     const historyPage=html.slice(html.indexOf('id="page-history"'),html.indexOf('id="page-settings"'));
     expect(taskPage).toContain('id="host-task-detail"');
+    expect(taskPage.indexOf('id="host-task-detail"')).toBeLessThan(taskPage.indexOf('id="host-task-list"'));
+    expect(taskPage).toContain('tabindex="-1"');
     expect(taskPage).toContain('id="host-task-refresh"');
     expect(taskPage).toContain('id="host-task-filter"');
     expect(taskPage).toContain('id="host-task-count"');
@@ -78,7 +80,7 @@ describe('R04 source contract: the shipped desktop surface replaces technical op
     expect(app).toContain('projectApprovalDecision');
     expect(app).toContain('projectTaskSnapshots');
     expect(app).toContain('filterTaskSnapshots(hostTaskRows');
-    expect(app).toContain("$('host-task-filter').addEventListener('change',renderHostTaskRows)");
+    expect(app).toContain("$('host-task-filter').addEventListener('change',()=>{");
     expect(app).toContain('projectHostTaskDetail');
     expect(app).toContain('projectClarificationReceipt');
     expect(app).toContain('async function submitHostClarification(id,key,value)');
@@ -106,6 +108,14 @@ describe('R04 source contract: the shipped desktop surface replaces technical op
     expect(app).not.toContain('error instanceof Error ? error.message');
     expect(app).toContain('/api/tasks/');
     expect(app).toContain('hostTaskDetailRequest');
+    expect(app).toContain('let hostTaskSelectedId = null;');
+    expect(app).toContain("hostTaskDetail={status:'LOADING',id};");
+    expect(app).toContain("if(focusDetail)$('host-task-detail').focus({preventScroll:false})");
+    expect(app).toContain("button.setAttribute('aria-controls','host-task-detail')");
+    expect(app).toContain("button.setAttribute('aria-expanded',String(selected))");
+    expect(app).toContain("loadHostTaskDetail(item.id,true)");
+    expect(app).toContain("hostTaskSelectedId=null;hostTaskDetail=null;renderHostTaskDetail();");
+    expect(app).toContain("taskDetailLoading:'正在打开所选任务……'");
     expect(app).toContain('function guidedIdentity(model)');
     expect(app).toContain('const previousAnswers=previousModel?formAnswers():[]');
     expect(app).toContain('guidedIdentity(previousModel)===guidedIdentity(model)');
@@ -136,6 +146,7 @@ describe('R04 source contract: the shipped desktop surface replaces technical op
     expect(app).toContain("event.key.toLowerCase()==='k'");
     expect(css).toContain(':focus-visible');
     expect(css).toContain('prefers-reduced-motion');
+    expect(css).toContain('.history-entry.host-task-selected');
     expect(css).toContain('[hidden]');
   });
 

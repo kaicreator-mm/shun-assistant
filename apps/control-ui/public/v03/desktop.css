@@ -16,3 +16,7 @@
 .search input[type=search]::-webkit-search-cancel-button{cursor:pointer}
 
 .host-task-controls{display:flex;flex-wrap:wrap;align-items:center;gap:12px;margin-top:24px}.host-task-controls h2{margin:0 auto 0 0}.host-task-controls label{font-size:13px;color:var(--muted)}.host-task-controls select{max-width:210px;min-width:145px;border:1px solid var(--border);border-radius:8px;padding:9px;background:var(--surface);color:var(--text)}#host-task-count{margin:12px 0}
+
+#host-task-detail{margin:12px 0 18px;scroll-margin-top:95px}
+#host-task-detail:focus-visible{outline:3px solid var(--accent);outline-offset:4px}
+.history-entry.host-task-selected{border-left:3px solid var(--accent);padding-left:12px;background:var(--accent-light);border-radius:6px}
