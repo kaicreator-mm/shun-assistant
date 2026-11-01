@@ -119,3 +119,39 @@ export function projectTaskSnapshots(value){
  }
  return {status:'READY',items:items.slice(-100).reverse()};
 }
+
+/**
+ * Read-only bounded projection of GET /api/tasks/:id. A Host task state is
+ * reported as recorded metadata, never translated into an effect grant.
+ * @param {unknown} value
+ * @param {string} expectedId
+ */
+export function projectHostTaskDetail(value,expectedId){
+ if(!ID.test(expectedId)||!object(value)||value.taskId!==expectedId||
+    !shortText(value.title,2048)||!shortText(value.state,96)||
+    !shortText(value.updatedAt,64)||!Number.isFinite(Date.parse(value.updatedAt)))
+   return refused('TASK_DETAIL_UNVERIFIED');
+ let plan=null,verification=null,recovery=null;
+ if(value.planSummary!==undefined){
+  const p=value.planSummary;
+  if(!object(p)||!SHA.test(p.planHash)||!['R0','R1','R2','R3'].includes(p.riskClass)||
+     !shortText(p.riskStatement)||!Number.isSafeInteger(p.actionCount)||p.actionCount<0)
+    return refused('TASK_PLAN_UNVERIFIED');
+  plan={risk:p.riskClass,riskStatement:p.riskStatement,actionCount:p.actionCount,planHash:p.planHash};
+ }
+ if(value.verification!==undefined){
+  const v=value.verification;
+  if(!object(v)||!shortText(v.status,96)||!Array.isArray(v.checks)||v.checks.length>128||
+     v.checks.some(x=>!object(x)||!shortText(x.checkId,128)||!shortText(x.status,96)))
+    return refused('TASK_VERIFICATION_UNVERIFIED');
+  verification={status:v.status,checks:v.checks.map(x=>({id:x.checkId,status:x.status}))};
+ }
+ if(value.recovery!==undefined){
+  const r=value.recovery;
+  if(!object(r)||!shortText(r.classification,128)||!shortText(r.detail)||typeof r.reconciled!=='boolean')
+    return refused('TASK_RECOVERY_UNVERIFIED');
+  recovery={classification:r.classification,detail:r.detail,reconciled:r.reconciled};
+ }
+ return {status:'READY',id:expectedId,title:value.title,state:value.state,
+  updatedAt:value.updatedAt,plan,verification,recovery};
+}
