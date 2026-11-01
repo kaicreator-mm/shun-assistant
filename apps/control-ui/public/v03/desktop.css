@@ -14,3 +14,5 @@
 
 .search-empty{margin:18px 0 0;padding:14px 18px;background:var(--surface);border:1px dashed var(--border);border-radius:10px;color:var(--muted);font-size:13px;line-height:1.6}
 .search input[type=search]::-webkit-search-cancel-button{cursor:pointer}
+
+.host-task-controls{display:flex;flex-wrap:wrap;align-items:center;gap:12px;margin-top:24px}.host-task-controls h2{margin:0 auto 0 0}.host-task-controls label{font-size:13px;color:var(--muted)}.host-task-controls select{max-width:210px;min-width:145px;border:1px solid var(--border);border-radius:8px;padding:9px;background:var(--surface);color:var(--text)}#host-task-count{margin:12px 0}

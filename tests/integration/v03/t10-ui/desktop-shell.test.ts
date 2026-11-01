@@ -28,6 +28,8 @@ describe('R04 source contract: the shipped desktop surface replaces technical op
     const historyPage=html.slice(html.indexOf('id="page-history"'),html.indexOf('id="page-settings"'));
     expect(taskPage).toContain('id="host-task-detail"');
     expect(taskPage).toContain('id="host-task-refresh"');
+    expect(taskPage).toContain('id="host-task-filter"');
+    expect(taskPage).toContain('id="host-task-count"');
     expect(historyPage).not.toContain('id="host-task-detail"');
     expect(html).toContain('id="search-empty"');
     expect(html).toContain('id="search-clear"');
@@ -75,6 +77,8 @@ describe('R04 source contract: the shipped desktop surface replaces technical op
     expect(app).not.toContain("desc.textContent=item.riskClass+' · '+item.taskId");
     expect(app).toContain('projectApprovalDecision');
     expect(app).toContain('projectTaskSnapshots');
+    expect(app).toContain('filterTaskSnapshots(hostTaskRows');
+    expect(app).toContain("$('host-task-filter').addEventListener('change',renderHostTaskRows)");
     expect(app).toContain('projectHostTaskDetail');
     expect(app).toContain('projectClarificationReceipt');
     expect(app).toContain('async function submitHostClarification(id,key,value)');

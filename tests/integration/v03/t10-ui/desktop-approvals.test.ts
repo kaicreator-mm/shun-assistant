@@ -1,7 +1,7 @@
 import {describe,it,expect} from 'vitest';
 import {
  realApprovalPosture,projectPendingApprovals,projectExactApproval,
- projectApprovalDecision,projectTaskSnapshots,projectHostTaskDetail,projectClarificationReceipt
+ projectApprovalDecision,projectTaskSnapshots,filterTaskSnapshots,projectHostTaskDetail,projectClarificationReceipt
 } from '../../../../apps/control-ui/public/v03/desktop-approvals.js';
 
 const now=Date.parse('2026-11-01T12:00:00Z');
@@ -52,6 +52,22 @@ describe('R04 real ActionController approval UI',()=>{
   expect(projectApprovalDecision(decision,selected,true)).toEqual({status:'RECORDED',approved:true});
   expect(projectApprovalDecision({...decision,decision:{...decision.decision,planHash:'b'.repeat(64)}},selected,true).status).toBe('REFUSED');
   expect(projectApprovalDecision(decision,selected,false).status).toBe('REFUSED');
+ });
+ it('sorts task snapshots newest first and filters exact Host states',()=>{
+  const task=(taskId,state,updatedAt)=>({taskId,title:'Task '+taskId,state,updatedAt});
+  const list=projectTaskSnapshots({tasks:[
+   task('done','SUCCEEDED','2026-11-01T09:00:00Z'),
+   task('active','EXECUTING','2026-11-01T10:00:00Z'),
+   task('ask','CLARIFICATION','2026-11-01T11:00:00Z'),
+   task('review','AWAITING_AUTHORIZATION','2026-11-01T08:00:00Z')
+  ]});
+  expect(list.status).toBe('READY');
+  expect(list.items.map(x=>x.id)).toEqual(['ask','active','done','review']);
+  expect(filterTaskSnapshots(list.items,'attention').items.map(x=>x.id)).toEqual(['ask','review']);
+  expect(filterTaskSnapshots(list.items,'active').items.map(x=>x.id)).toEqual(['ask','active','review']);
+  expect(filterTaskSnapshots(list.items,'finished').items.map(x=>x.id)).toEqual(['done']);
+  expect(filterTaskSnapshots(list.items,'all').items).toEqual(list.items);
+  expect(filterTaskSnapshots(list.items,'invented').status).toBe('REFUSED');
  });
  it('opens a task detail only for the exact Host task identity and supported evidence',()=>{
   const recorded={taskId:'task-a',title:'Local check',state:'SUCCEEDED',revision:2,

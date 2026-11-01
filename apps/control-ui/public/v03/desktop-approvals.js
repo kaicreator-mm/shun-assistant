@@ -7,6 +7,9 @@ const ID = /^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$/;
 const RISKS = ['R2', 'R3'];
 // Exact Host contract TaskState whitelist, display-only, not an authority.
 const STATES = ['RECEIVED','INTERPRETING','CLARIFICATION','RESOLVING','PLANNED','AWAITING_AUTHORIZATION','EXECUTING','VERIFYING','LIFECYCLE_RECONCILIATION','SUCCEEDED','FAILED','CANCELLED','NEEDS_INTERVENTION'];
+const TERMINAL_STATES=['SUCCEEDED','FAILED','CANCELLED'];
+const ATTENTION_STATES=['CLARIFICATION','AWAITING_AUTHORIZATION','NEEDS_INTERVENTION'];
+const TASK_FILTERS=['all','attention','active','finished'];
 const TEXT_MAX = 4096;
 
 /** @param {unknown} value @returns {value is Record<string, any>} */
@@ -119,7 +122,16 @@ export function projectTaskSnapshots(value){
   items.push({id:task.taskId,title:task.title,state:task.state,
    updatedAt:task.updatedAt});
  }
- return {status:'READY',items:items.slice(-100).reverse()};
+ return {status:'READY',items:items.sort((a,b)=>
+   Date.parse(b.updatedAt)-Date.parse(a.updatedAt)||a.id.localeCompare(b.id)).slice(0,100)};
+}
+/** Filter already verified Host task projections; never infer permission. */
+export function filterTaskSnapshots(items,filter){
+ if(!Array.isArray(items)||!TASK_FILTERS.includes(filter))return refused('TASK_FILTER_UNVERIFIED');
+ return {status:'READY',items:items.filter(item=>
+  filter==='all'||(filter==='attention'&&ATTENTION_STATES.includes(item.state))||
+  (filter==='active'&&!TERMINAL_STATES.includes(item.state))||
+  (filter==='finished'&&TERMINAL_STATES.includes(item.state)))};
 }
 
 /**
