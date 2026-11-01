@@ -1,0 +1,42 @@
+pack_id: shun-v030-r02-a-cedf9ce-execution-pack-g1
+task_id: R02-A
+issue: "#262"
+repository: kaicreator-mm/shun-assistant
+version: v0.3.0
+base_sha: cedf9ce30c5bd9640a325e2fa0a5981aa7bd73f1
+task_pack_ref: docs/planning/v0.3/R02-REPAIR-TASK-PACKS-R1.json@blob:93247874e37d492b49f241d294017fd2fa6cb431
+branch: wip/v0.3.0-r02-owner-repairs
+parent_issue: "#259"
+owner_authorization_ref: "#260 OWNER_SHUN_V030_R02_AMENDMENT_R1_APPROVE"
+pinned_standard_revision: 2c395c55569fe2edf3f4135f12d3d069e526d0b7
+generated_by: zcode:shun-v030-r02-repairs-zc
+generated_at: 2026-11-01
+admission_mode: SINGLE_WRITER_ADMISSION
+protected_claim_key: "kaicreator-mm/shun-assistant#262:builder:__default__"
+allowed_write_set:
+  - packages/domain-app/src/build/**
+  - packages/domain-app/src/activation/**
+  - tests/integration/v03/r02-a-build/**
+plan:
+  - step: A1-install-real-v0103-sdk-closure
+    deliverable: "Real installed public DomainHarness v0.10.3 (git tag 061376f4) SDK package closure consumed by production BUILD/activation, not test-fixture-only consumers"
+    capability: LOCAL (Windows Node>=24, pnpm workspace, domain-harness mirror)
+    state: PLANNED
+  - step: A2-production-KSBC-activation
+    deliverable: "Same composeDomainBuild artifact flows through public buildV10App and activateV10App with real K/S/B/C module bytes; positive journey + mismatch/tamper/private-import negatives"
+    capability: LOCAL + CI
+    state: PLANNED
+  - step: A3-exact-sha-nested-tests
+    deliverable: "tests/integration/v03/r02-a-build/** green under Vitest + tsc + Biome at exact HEAD; Woodpecker run"
+    capability: CI (Woodpecker local docker agent)
+    state: PLANNED
+forbidden:
+  - second Kernel or second sender
+  - SDK private source imports
+  - main or version/v0.2.0 mutation
+  - paid DeepSeek calls or physical Windows effects
+  - paths outside allowed_write_set
+notes: >-
+  Historical WIP commits on wip/v0.3.0-r02-owner-repairs before this pack predate
+  accepted Claims and remain UNQUALIFIED WIP; this pack + the accepted CAS Claim on
+  #262 govern source writes from cedf9ce forward.

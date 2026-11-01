@@ -1,0 +1,26 @@
+pack_id: shun-v030-r02-d3-cedf9ce-execution-pack-g1
+task_id: R02-D3
+issue: "#268"
+repository: kaicreator-mm/shun-assistant
+version: v0.3.0
+base_sha: cedf9ce30c5bd9640a325e2fa0a5981aa7bd73f1
+task_pack_ref: docs/planning/v0.3/R02-REPAIR-TASK-PACKS-R1.json@blob:93247874e37d492b49f241d294017fd2fa6cb431
+branch: wip/v0.3.0-r02-owner-repairs
+parent_issue: "#259"
+owner_authorization_ref: "#260 OWNER_SHUN_V030_R02_AMENDMENT_R1_APPROVE"
+pinned_standard_revision: 2c395c55569fe2edf3f4135f12d3d069e526d0b7
+generated_by: zcode:shun-v030-r02-repairs-zc
+generated_at: 2026-11-01
+admission_mode: SINGLE_WRITER_ADMISSION
+protected_claim_key: "kaicreator-mm/shun-assistant#268:builder:__default__"
+allowed_write_set:
+  - packages/vertical-support/src/internal/windows-runner.ts
+  - packages/vertical-support/test/support-context.test.ts
+plan:
+  - step: D3-1-verify-utf8-collector
+    deliverable: "Confirm PowerShell stdout UTF-8 fix and CN caption regression on real zh-CN Windows if environment permits; else keep unit regression evidence only"
+    capability: LOCAL (Windows Node>=24)
+    state: PLANNED
+forbidden:
+  - edits outside the two scoped files; physical system mutation
+notes: Existing WIP commits (8760c5e, 640dc2f) predate the accepted Claim and stay UNQUALIFIED; Claim on #268 governs forward writes.

@@ -1,38 +1,70 @@
-import { readdirSync } from 'node:fs';
-import { basename, dirname, join } from 'node:path';
+// All nested v0.3 task qualification suites are mandatory; the old runner
+// only enumerated top-level .test.mjs and silently skipped every Vitest suite.
+import { existsSync, readdirSync } from 'node:fs';
+import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { spawnSync } from 'node:child_process';
 
 const here = dirname(fileURLToPath(import.meta.url));
-const tests = readdirSync(here)
-  .filter((name) => name.endsWith('.test.mjs'))
-  .sort();
+const workspaceRoot = resolve(here, '../..');
+const v03 = join(here, 'v03');
+const vitest = join(workspaceRoot, 'packages/vertical-support/node_modules/vitest/vitest.mjs');
+const suites = [];
 
-if (tests.length === 0) {
-  console.log('[t10-integration] NO_TESTS_PRESENT');
-  process.exit(0);
+function addNative(file) {
+  suites.push({
+    name: file,
+    args: ['--experimental-transform-types', '--test', file],
+  });
 }
 
-for (const name of tests) {
-  const file = join(here, name);
-  console.log(`[t10-integration] RUN ${basename(file)}`);
-  const result = spawnSync(
-    process.execPath,
-    ['--experimental-transform-types', '--test', file],
-    {
-    cwd: process.cwd(),
+for (const name of readdirSync(here).filter((x) => x.endsWith('.test.mjs')).sort()) {
+  addNative(join(here, name));
+}
+
+for (const dirName of readdirSync(v03, { withFileTypes: true })
+  .filter((entry) => entry.isDirectory())
+  .map((entry) => entry.name)
+  .sort()) {
+  const dir = join(v03, dirName);
+  const files = readdirSync(dir).sort();
+  for (const file of files.filter((name) => name.endsWith('.test.mjs'))) {
+    addNative(join(dir, file));
+  }
+  if (files.some((name) => name.endsWith('.test.ts'))) {
+    const config = join(dir, 'vitest.config.ts');
+    if (!existsSync(config)) {
+      throw new Error(`V03_TEST_GATE_MISSING_CONFIG: ${dirName}`);
+    }
+    suites.push({
+      name: `${dirName}/vitest`,
+      args: [vitest, 'run', '--config', config],
+      requiresVitest: true,
+    });
+  }
+}
+
+if (suites.length === 0) {
+  console.error('[integration] MANDATORY_SUITES_MISSING');
+  process.exit(1);
+}
+if (suites.some((s) => s.requiresVitest) && !existsSync(vitest)) {
+  console.error('[integration] VITEST_NOT_INSTALLED; fail closed');
+  process.exit(1);
+}
+
+let passed = 0;
+for (const suite of suites) {
+  console.log(`[integration] RUN ${suite.name}`);
+  const result = spawnSync(process.execPath, suite.args, {
+    cwd: workspaceRoot,
     stdio: 'inherit',
-      env: process.env,
-    },
-  );
-  if (result.error) {
-    console.error(`[t10-integration] SPAWN_FAILED ${name}: ${result.error.message}`);
-    process.exit(1);
+    env: process.env,
+  });
+  if (result.error || result.status !== 0) {
+    console.error(`[integration] FAIL ${suite.name}: ${result.error?.message ?? result.status ?? 'no exit'}`);
+    process.exit(result.status && result.status > 0 ? result.status : 1);
   }
-  if (result.status !== 0) {
-    console.error(`[t10-integration] FAIL ${name} status=${String(result.status)}`);
-    process.exit(result.status ?? 1);
-  }
+  passed++;
 }
-
-console.log(`[t10-integration] PASS ${tests.length} file(s)`);
+console.log(`[integration] PASS ${passed}/${suites.length} suites`);

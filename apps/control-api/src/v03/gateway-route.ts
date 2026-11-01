@@ -21,11 +21,13 @@ export interface V03GatewayRouteDeps {
 
 export interface V03GatewayRoute {
   submit(rawInput: unknown): Promise<SendReceipt>;
-  /** HTTP status mapping for a settled receipt (200 sent / 422 refused). */
+  /** HTTP status: 200 verified completed, 202 admitted, 409 unknown, 422 refused. */
   httpStatus(receipt: SendReceipt): number;
 }
 
-const SENT_HTTP_STATUS = 200;
+const COMPLETED_HTTP_STATUS = 200;
+const ADMITTED_HTTP_STATUS = 202;
+const UNKNOWN_HTTP_STATUS = 409;
 const REFUSED_HTTP_STATUS = 422;
 const ROUTE_CONFIG_REFUSED = 'V03_GATEWAY_ROUTE_CONFIGURATION_REFUSED';
 
@@ -45,7 +47,17 @@ export function createV03GatewayRoute(deps: V03GatewayRouteDeps): V03GatewayRout
         return submit(rawInput);
       },
       httpStatus(receipt: SendReceipt): number {
-        return receipt.status === 'SENT' ? SENT_HTTP_STATUS : REFUSED_HTTP_STATUS;
+        switch (receipt.status) {
+          case 'COMPLETED':
+            return COMPLETED_HTTP_STATUS;
+          case 'ADMITTED':
+            return ADMITTED_HTTP_STATUS;
+          case 'UNKNOWN':
+            return UNKNOWN_HTTP_STATUS;
+          case 'KERNEL_REFUSED':
+          case 'REFUSED':
+            return REFUSED_HTTP_STATUS;
+        }
       },
     }) satisfies V03GatewayRoute;
   } catch {

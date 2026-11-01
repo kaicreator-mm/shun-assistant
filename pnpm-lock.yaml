@@ -107,6 +107,12 @@ importers:
         specifier: ^3.2.4
         version: 3.2.7(@types/node@24.19.2)
 
+  packages/domain-app: {}
+
+  packages/domain-computer: {}
+
+  packages/domain-host: {}
+
   packages/executor-windows:
     dependencies:
       '@shun/contracts':
@@ -262,7 +268,6 @@ importers:
       vitest:
         specifier: ^3.2.4
         version: 3.2.7(@types/node@24.19.2)
-
 
   packages/vertical-image:
     dependencies:

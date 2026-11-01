@@ -47,6 +47,12 @@ export async function collectWindowsSupportContextWithTrustedRunner(
 
   const script = [
     "$ErrorActionPreference='Stop'",
+    // Windows PowerShell 5.1 inherits a legacy console code page on zh-CN
+    // systems; Node's UTF-8 decoder cannot recover GBK-mangled stdout.
+    // Force actual child stdout encoding before JSON serialization.
+    '$utf8=New-Object System.Text.UTF8Encoding($false)',
+    '[Console]::OutputEncoding=$utf8',
+    '$OutputEncoding=$utf8',
     '$os=CimCmdlets\\Get-CimInstance Win32_OperatingSystem',
     '$cs=CimCmdlets\\Get-CimInstance Win32_ComputerSystem',
     '$u=Microsoft.PowerShell.Management\\Get-HotFix | Microsoft.PowerShell.Utility\\Sort-Object InstalledOn -Descending | Microsoft.PowerShell.Utility\\Select-Object -First 1',

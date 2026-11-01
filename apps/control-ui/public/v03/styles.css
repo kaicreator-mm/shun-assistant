@@ -98,3 +98,26 @@ li.refused {
 li.unknown {
   color: var(--unknown);
 }
+
+.journey-panel {
+  border-top: 1px solid var(--border);
+  margin-top: 0.75rem;
+  padding-top: 0.5rem;
+}
+
+.journey-panel h3 {
+  font-size: 1rem;
+  margin: 0 0 0.25rem;
+}
+
+.journey-panel label {
+  display: block;
+  margin-top: 0.5rem;
+}
+
+.journey-panel input,
+.journey-panel select {
+  margin: 0.25rem 0 0.75rem;
+  max-width: 32rem;
+  width: 100%;
+}

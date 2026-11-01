@@ -785,7 +785,7 @@ describe('T11 real selected-K Permit journey (public SDK, real kernel bytes)', (
       currentnessRef: 'shun.currentness.v1/registry-t11',
       approvalRef: 'shun.approval.v1/operator-local-01',
     });
-    expect(sent.status).toBe('SENT');
+    expect(sent.status).toBe('COMPLETED');
     const kernelReceipt = (sent as { result: Record<string, unknown> }).result;
     expect(kernelReceipt.status).toBe('admitted');
     const effect = firstEffect(kernelReceipt);
