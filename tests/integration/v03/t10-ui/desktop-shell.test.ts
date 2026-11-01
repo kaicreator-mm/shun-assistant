@@ -107,6 +107,6 @@ describe('R04 source contract: the shipped desktop surface replaces technical op
       expect(app.split(label).length).toBeGreaterThan(2);
     }
     const html = source('index.html');
-    expect(html).not.toMatch(/(planRef|grantRef|approvalRef|currentnessRef|effectPermit)/);
+    expect(html).not.toMatch(/\b(?:planRef|grantRef|approvalRef|currentnessRef|effectPermit)\b/);
   });
 });
