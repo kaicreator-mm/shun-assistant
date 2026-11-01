@@ -60,6 +60,8 @@ let connected = false;
 let cloudOptIn = false;
 let busy = false;
 let routineBusy = false;
+let computerCheckGeneration = 0;
+let aiPreviewGeneration = 0;
 let verifiedRoutine = false;
 let healthStatus = null;
 let approvalSelected = null;
@@ -302,14 +304,17 @@ function showLocalReport(target, projected) {
   return true;
 }
 async function runCheck(kind) {
+  const token=++computerCheckGeneration;
   page('computer');
   const result=$('computer-result');result.replaceChildren();
   const status=document.createElement('p');status.textContent=tr('loading');result.append(status);
   try {
     const data=await request(kind==='inventory'?'/api/system/inventory':'/api/system/diagnosis');
+    if(token!==computerCheckGeneration)return;
     const projected=projectLocalObservation(kind,data);
     if(!showLocalReport(result,projected)) throw Error(projected.code);
   }catch(error){
+    if(token!==computerCheckGeneration)return;
     result.replaceChildren();
     const p=document.createElement('p');
     p.textContent=tr('offlineCheck')+' '+(error instanceof Error?error.message:'');
@@ -549,7 +554,8 @@ async function loadHostTasks(){
 /** Exact privacy preview is a read-only local API call, never an LLM send. */
 async function previewAiGoal() {
   const goal=$('ai-goal').value;
-  if (!goal.trim()) return;
+  if (!goal.trim()||$('ai-preview').disabled)return;
+  const generation=++aiPreviewGeneration;
   const target=$('ai-preview-result');
   target.replaceChildren();
   const loading=document.createElement('p');loading.textContent=tr('assistantLoading');target.append(loading);
@@ -558,6 +564,7 @@ async function previewAiGoal() {
     const raw=await request('/api/cloud/disclosure-preview',{
       method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({goalText:goal})
     });
+    if(generation!==aiPreviewGeneration||goal!==$('ai-goal').value)return;
     const preview=projectDisclosurePreview(raw);
     if(preview.status!=='OBSERVED')throw Error(preview.code);
     target.replaceChildren();
@@ -567,10 +574,11 @@ async function previewAiGoal() {
     const info=document.createElement('p');info.textContent=tr('assistantPrivacy');
     target.append(title,exact,info);
   }catch{
+    if(generation!==aiPreviewGeneration)return;
     target.replaceChildren();
     const notice=document.createElement('p');notice.textContent=tr('assistantPreviewFail');
     target.append(notice);
-  }finally{$('ai-preview').disabled=false;}
+  }finally{if(generation===aiPreviewGeneration)$('ai-preview').disabled=false;}
 }
 document.querySelectorAll('[data-page]').forEach(button=>button.addEventListener('click',()=>page(button.dataset.page)));
 document.querySelectorAll('[data-action]').forEach(button=>button.addEventListener('click',()=>{
@@ -589,7 +597,7 @@ $('approval-confirm').addEventListener('change',checked=>{$('approval-accept').d
 $('approval-accept').addEventListener('click',()=>decideApproval(true).catch(showError));
 $('approval-decline').addEventListener('click',()=>decideApproval(false).catch(showError));
 $('ai-preview-form').addEventListener('submit',event=>{event.preventDefault();previewAiGoal().catch(showError);});
-$('ai-goal').addEventListener('input',()=>{const box=$('ai-preview-result');box.replaceChildren();const p=document.createElement('p');p.textContent=tr('assistantNoPreview');box.append(p);});
+$('ai-goal').addEventListener('input',()=>{++aiPreviewGeneration;$('ai-preview').disabled=false;const box=$('ai-preview-result');box.replaceChildren();const p=document.createElement('p');p.textContent=tr('assistantNoPreview');box.append(p);});
 $('refresh').addEventListener('click',()=>refresh().catch(showError));
 $('language').addEventListener('change',event=>{locale=event.target.value==='zh'?'zh':'en';storage.write('shun-ui-language',locale);translate();});
 $('appearance').addEventListener('change',event=>{const v=['light','dark'].includes(event.target.value)?event.target.value:'system';document.documentElement.dataset.theme=v;storage.write('shun-ui-theme',v);});

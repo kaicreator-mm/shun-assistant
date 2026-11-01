@@ -101,6 +101,17 @@ describe('R04 source contract: the shipped desktop surface replaces technical op
     expect(css).toContain('[hidden]');
   });
 
+  it('fences stale disclosures and local checks, with visible keyboard textarea focus', () => {
+    const app = source('desktop.js');
+    const css = source('desktop.css');
+    expect(app).toContain('let aiPreviewGeneration = 0;');
+    expect(app).toContain('let computerCheckGeneration = 0;');
+    expect(app).toContain("if(generation!==aiPreviewGeneration||goal!==$('ai-goal').value)return");
+    expect(app).toContain('if(token!==computerCheckGeneration)return');
+    expect(app).toContain("++aiPreviewGeneration;$('ai-preview').disabled=false");
+    expect(css).toContain('textarea:focus-visible');
+  });
+
   it('keeps user-facing copy in both languages, not internal authorization identifiers', () => {
     const app = source('desktop.js');
     for (const label of ["heroTitle:", "actionInventory:", "actionDiagnosis:", "scopeTitle:", "notAnApproval:"]) {
