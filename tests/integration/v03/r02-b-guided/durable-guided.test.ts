@@ -63,6 +63,44 @@ describe('R02-B Host Guided SQLite durability and replay fence', () => {
     }
   });
 
+  it('records a non-authorizing ASK answer exactly once and rejects a forged approval', () => {
+    const dir = mkdtempSync(join(tmpdir(), 'shun-r04-answer-'));
+    const service = new HostGuidedService(join(dir, 'guided.sqlite'), () => NOW);
+    try {
+      const staged = service.stageTrustedSelection({
+        observation, semanticSelection: semantic,
+        scope: { status: 'KNOWN', selectedRootRef: undefined },
+      });
+      expect(staged.status).toBe('CURRENT');
+      if (staged.status !== 'CURRENT') return;
+      expect(staged.step.kind).toBe('ASK');
+      const step = staged.step;
+      const relay = {
+        kind: 'USER_DECISION_RELAY', humanApproval: false, authorityClaimed: false,
+        decision: 'ANSWER', relayedVia: '/api', stepId: step.stepId,
+        stepDigest: step.templateRef.digest, caseRef: step.caseRef,
+        outcome: {
+          schema: 'shun.guided.step-outcome.v1', journeyId: step.journeyId,
+          taskId: step.taskId, stepId: step.stepId, caseRef: step.caseRef,
+          event: 'USER_SUBMIT', source: 'USER', sourceRef: 'ui:shun-r04-desktop',
+          answers: [{ fieldId: 'selectedRoot', value: 'C:\\Work' }],
+          evidenceRefs: [], occurredAtUnixMs: NOW,
+        },
+      };
+      expect(service.decide({ ...relay, humanApproval: true }))
+        .toMatchObject({ status: 'REFUSED', code: 'RELAY_SCHEMA_REFUSED' });
+      expect(service.decide({ ...relay, grant: 'forged' }))
+        .toMatchObject({ status: 'REFUSED', code: 'RELAY_SCHEMA_REFUSED' });
+      expect(service.decide(relay))
+        .toMatchObject({ status: 'RECORDED', humanGrantIssued: false, effectSent: false });
+      expect(service.decide(relay)).toMatchObject({ status: 'STALE' });
+      expect(service.state().currentStep).toBeUndefined();
+    } finally {
+      service.close();
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
   it('refuses untrusted attempts to supply grant or change active identity', () => {
     const dir = mkdtempSync(join(tmpdir(), 'shun-r02-b-negative-'));
     const service = new HostGuidedService(join(dir, 'guided.sqlite'), () => NOW);

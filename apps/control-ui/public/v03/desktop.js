@@ -161,11 +161,11 @@ function renderGuided() {
  }
  form.hidden=false;
  const isReview=model.kind==='REVIEW_EFFECT';
- $('step-submit').disabled=!isReview;
- $('step-submit').textContent=isReview?tr('consentNext'):tr('continue');
+ $('step-submit').disabled=model.kind!=='ASK';
+ $('step-submit').textContent=tr('continue');
  $('step-refuse').disabled=!model.allowedEvents?.includes('USER_SUBMIT');
  set('approval-hint',isReview?tr('previewMissing'):tr('formUnavailable'));
- if (!isReview) { alert.textContent=tr('formUnavailable');alert.hidden=false; }
+ if (isReview) { alert.textContent=tr('previewMissing');alert.hidden=false; }
 }
 let currentModel=null;
 function formAnswers() {
@@ -177,12 +177,17 @@ function formAnswers() {
 }
 async function submitDecision(decision) {
  if (busy || !current || !currentModel) return;
- if (decision==='APPROVE' && currentModel.kind!=='REVIEW_EFFECT') {notify(tr('formUnavailable'));return;}
+ if (decision==='ANSWER' && currentModel.kind!=='ASK') {notify(tr('formUnavailable'));return;}
+ if (decision==='APPROVE') {notify(tr('previewMissing'));return;}
  const form=$('dynamic-form');
- if (decision==='APPROVE' && !form.reportValidity())return;
+ if (decision==='ANSWER' && !form.reportValidity())return;
  const built=buildStepOutcome({step:current,answers:formAnswers(),sourceRef:'ui:shun-r04-desktop',occurredAtUnixMs:Date.now()});
  if (!built.ok) {notify(tr('refused')+' '+built.reason);return;}
- const relay=userDecisionRelay({step:current,outcome:built.outcome,decision,confirmed:true,nowUnixMs:Date.now()});
+ const relay=decision==='ANSWER' ? {ok:true,relay:{
+  kind:'USER_DECISION_RELAY',humanApproval:false,authorityClaimed:false,
+  decision:'ANSWER',relayedVia:'/api',stepId:current.stepId,
+  stepDigest:current.templateRef.digest,caseRef:current.caseRef,outcome:built.outcome
+ }} : userDecisionRelay({step:current,outcome:built.outcome,decision,confirmed:true,nowUnixMs:Date.now()});
  if (!relay.ok) {notify(tr('refused')+' '+relay.reason);return;}
  const replay=replayGuard(submitted,built.outcome);
  if (!replay.allowed) {notify(tr('refused'));return;}
@@ -249,7 +254,7 @@ $('menu-toggle').addEventListener('click',()=>{
  const shell=document.querySelector('.shell');shell.classList.toggle('menu-open');
  $('menu-toggle').setAttribute('aria-expanded',String(shell.classList.contains('menu-open')));
 });
-$('dynamic-form').addEventListener('submit',event=>{event.preventDefault();submitDecision('APPROVE').catch(showError);});
+$('dynamic-form').addEventListener('submit',event=>{event.preventDefault();submitDecision('ANSWER').catch(showError);});
 $('step-refuse').addEventListener('click',()=>submitDecision('REFUSE').catch(showError));
 $('task-search').addEventListener('input',event=>{
  const q=event.target.value.trim().toLocaleLowerCase(locale==='zh'?'zh-CN':'en');

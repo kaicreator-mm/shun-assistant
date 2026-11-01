@@ -124,9 +124,10 @@ export class HostGuidedService {
   decide(raw: unknown): GuidedDecisionReceipt {
     if (!isRecord(raw) || Object.keys(raw).sort().join('|') !==
       ['authorityClaimed','caseRef','decision','humanApproval','kind','outcome','relayedVia','stepDigest','stepId'].sort().join('|') ||
-      raw.kind !== 'USER_DECISION_RELAY' || raw.humanApproval !== true ||
+      raw.kind !== 'USER_DECISION_RELAY' ||
       raw.authorityClaimed !== false || raw.relayedVia !== '/api' ||
-      (raw.decision !== 'APPROVE' && raw.decision !== 'REFUSE')) {
+      !((raw.decision === 'ANSWER' && raw.humanApproval === false) ||
+        ((raw.decision === 'APPROVE' || raw.decision === 'REFUSE') && raw.humanApproval === true))) {
       return { status: 'REFUSED', code: 'RELAY_SCHEMA_REFUSED' };
     }
     const now = this.#clock();
@@ -141,7 +142,8 @@ export class HostGuidedService {
       if (raw.stepId !== stored.step.stepId ||
           raw.stepDigest !== stored.step.templateRef.digest ||
           JSON.stringify(raw.caseRef) !== JSON.stringify(stored.step.caseRef) ||
-          (raw.decision === 'APPROVE' && stored.step.kind !== 'REVIEW_EFFECT')) {
+          ((raw.decision === 'ANSWER' && stored.step.kind !== 'ASK') ||
+           (raw.decision === 'APPROVE' && stored.step.kind !== 'REVIEW_EFFECT')))  {
         this.#db.exec('ROLLBACK');
         return { status: 'STALE', code: 'GUIDED_STEP_IDENTITY_MISMATCH' };
       }
