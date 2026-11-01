@@ -133,7 +133,12 @@ export function projectHostTaskDetail(value,expectedId){
     !shortText(value.title,2048)||!STATES.includes(value.state)||
     !shortText(value.updatedAt,64)||!Number.isFinite(Date.parse(value.updatedAt)))
    return refused('TASK_DETAIL_UNVERIFIED');
- let plan=null,verification=null,recovery=null;
+ let plan=null,verification=null,recovery=null,clarification=null;
+ if(value.state==='CLARIFICATION'){
+  if(!object(value.clarification)||!shortText(value.clarification.question,2048))
+   return refused('TASK_CLARIFICATION_UNVERIFIED');
+  clarification={question:value.clarification.question};
+ }
  if(value.planSummary!==undefined){
   const p=value.planSummary;
   if(!object(p)||!SHA.test(p.planHash)||!['R0','R1','R2','R3'].includes(p.riskClass)||
@@ -155,5 +160,11 @@ export function projectHostTaskDetail(value,expectedId){
   recovery={classification:r.classification,detail:r.detail,reconciled:r.reconciled};
  }
  return {status:'READY',id:expectedId,title:value.title,state:value.state,
-  updatedAt:value.updatedAt,plan,verification,recovery};
+  updatedAt:value.updatedAt,plan,verification,recovery,clarification};
+}
+
+/** Host acknowledgment is only a recorded clarification, never a permission or effect. */
+export function projectClarificationReceipt(value){
+ if(!object(value)||!STATES.includes(value.state))return refused('CLARIFICATION_RECEIPT_UNVERIFIED');
+ return {status:'RECORDED',state:value.state};
 }

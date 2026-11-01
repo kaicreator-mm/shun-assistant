@@ -71,6 +71,12 @@ describe('R04 source contract: the shipped desktop surface replaces technical op
     expect(app).toContain('projectApprovalDecision');
     expect(app).toContain('projectTaskSnapshots');
     expect(app).toContain('projectHostTaskDetail');
+    expect(app).toContain('projectClarificationReceipt');
+    expect(app).toContain('async function submitHostClarification(id,key,value)');
+    expect(app).toContain('if(!persistUncertainClarification(id))');
+    expect(app).toContain("sessionStorage.setItem('shun-r04-clarification-uncertain',id)");
+    expect(app).toContain("'/clarification'");
+    expect(app).not.toContain("'/api/tasks/'+encodeURIComponent(id)+'/retry'");
     expect(app).toContain('projectGuidedHistory(lastState?.history)');
     expect(app).toContain('let guidedRefreshGeneration = 0;');
     expect(app).toContain('if(generation!==guidedRefreshGeneration)return');

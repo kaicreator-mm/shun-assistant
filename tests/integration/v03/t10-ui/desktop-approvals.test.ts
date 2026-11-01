@@ -1,7 +1,7 @@
 import {describe,it,expect} from 'vitest';
 import {
  realApprovalPosture,projectPendingApprovals,projectExactApproval,
- projectApprovalDecision,projectTaskSnapshots,projectHostTaskDetail
+ projectApprovalDecision,projectTaskSnapshots,projectHostTaskDetail,projectClarificationReceipt
 } from '../../../../apps/control-ui/public/v03/desktop-approvals.js';
 
 const now=Date.parse('2026-11-01T12:00:00Z');
@@ -67,6 +67,21 @@ describe('R04 real ActionController approval UI',()=>{
   expect(projectHostTaskDetail({...recorded,updatedAt:'unknown'},'task-a').status).toBe('REFUSED');
   expect(projectHostTaskDetail({...recorded,verification:{status:'PASSED',checks:[{status:'PASSED'}]}},'task-a').status).toBe('REFUSED');
   expect(projectHostTaskDetail({...recorded,planSummary:{...recorded.planSummary,planHash:'forged'}},'task-a').status).toBe('REFUSED');
+ });
+ it('shows a bounded Host clarification only in its exact task state',()=>{
+  const base={taskId:'task-c',title:'Organize files',state:'CLARIFICATION',
+   updatedAt:'2026-11-01T12:00:00Z',clarification:{question:'Which folder?'}};
+  expect(projectHostTaskDetail(base,'task-c')).toMatchObject({
+   status:'READY',clarification:{question:'Which folder?'}});
+  expect(projectHostTaskDetail({...base,clarification:{question:''}},'task-c').status).toBe('REFUSED');
+  expect(projectHostTaskDetail({...base,clarification:{question:'x'.repeat(2049)}},'task-c').status).toBe('REFUSED');
+  expect(projectHostTaskDetail({...base,clarification:undefined},'task-c').status).toBe('REFUSED');
+  expect(projectHostTaskDetail({...base,state:'SUCCEEDED'},'task-c').clarification).toBe(null);
+ });
+ it('accepts only a Host-returned workflow state as a clarification receipt',()=>{
+  expect(projectClarificationReceipt({state:'RESOLVING'})).toEqual({status:'RECORDED',state:'RESOLVING'});
+  expect(projectClarificationReceipt({state:'UNKNOWN'}).status).toBe('REFUSED');
+  expect(projectClarificationReceipt({ok:true}).status).toBe('REFUSED');
  });
  it('renders only bounded verified task metadata from the Host list',()=>{
   expect(projectTaskSnapshots({tasks:[{taskId:'task-a',title:'PC health check',
