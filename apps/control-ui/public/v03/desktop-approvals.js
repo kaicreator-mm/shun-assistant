@@ -131,6 +131,7 @@ export function projectTaskSnapshots(value){
 export function projectHostTaskDetail(value,expectedId){
  if(!ID.test(expectedId)||!object(value)||value.taskId!==expectedId||
     !shortText(value.title,2048)||!STATES.includes(value.state)||
+    !Number.isSafeInteger(value.revision)||value.revision<0||
     !shortText(value.updatedAt,64)||!Number.isFinite(Date.parse(value.updatedAt)))
    return refused('TASK_DETAIL_UNVERIFIED');
  let plan=null,verification=null,recovery=null,clarification=null;
@@ -160,7 +161,7 @@ export function projectHostTaskDetail(value,expectedId){
   recovery={classification:r.classification,detail:r.detail,reconciled:r.reconciled};
  }
  return {status:'READY',id:expectedId,title:value.title,state:value.state,
-  updatedAt:value.updatedAt,plan,verification,recovery,clarification};
+  revision:value.revision,updatedAt:value.updatedAt,plan,verification,recovery,clarification};
 }
 
 /** Host acknowledgment is only a recorded clarification, never a permission or effect. */

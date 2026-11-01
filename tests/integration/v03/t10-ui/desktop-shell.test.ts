@@ -24,6 +24,11 @@ describe('R04 source contract: the shipped desktop surface replaces technical op
     expect(html).toContain('id="approval-confirm"');
     expect(html).toContain('id="host-task-list"');
     expect(html).toContain('id="host-task-detail"');
+    const taskPage=html.slice(html.indexOf('id="page-tasks"'),html.indexOf('id="page-approvals"'));
+    const historyPage=html.slice(html.indexOf('id="page-history"'),html.indexOf('id="page-settings"'));
+    expect(taskPage).toContain('id="host-task-detail"');
+    expect(taskPage).toContain('id="host-task-refresh"');
+    expect(historyPage).not.toContain('id="host-task-detail"');
     expect(html).toContain('id="search-empty"');
     expect(html).toContain('id="search-clear"');
     expect(html).toContain('aria-keyshortcuts="Control+K"');
@@ -73,6 +78,11 @@ describe('R04 source contract: the shipped desktop surface replaces technical op
     expect(app).toContain('projectHostTaskDetail');
     expect(app).toContain('projectClarificationReceipt');
     expect(app).toContain('async function submitHostClarification(id,key,value)');
+    expect(app).toContain('selected.revision,selected.updatedAt');
+    expect(app).toContain('latest.revision,latest.updatedAt');
+    expect(app).toContain('if(confirmed&&requestToken===hostTaskDetailRequest');
+    expect(app).not.toContain('await loadHostTaskDetail(id);');
+    expect(app).toContain("$('host-task-refresh').addEventListener");
     expect(app).toContain('if(!persistUncertainClarification(id))');
     expect(app).toContain("sessionStorage.setItem('shun-r04-clarification-uncertain',id)");
     expect(app).toContain("'/clarification'");

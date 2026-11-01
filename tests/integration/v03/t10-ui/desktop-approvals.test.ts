@@ -54,7 +54,7 @@ describe('R04 real ActionController approval UI',()=>{
   expect(projectApprovalDecision(decision,selected,false).status).toBe('REFUSED');
  });
  it('opens a task detail only for the exact Host task identity and supported evidence',()=>{
-  const recorded={taskId:'task-a',title:'Local check',state:'SUCCEEDED',
+  const recorded={taskId:'task-a',title:'Local check',state:'SUCCEEDED',revision:2,
    updatedAt:'2026-11-01T12:00:00Z',
    planSummary:{planHash:'a'.repeat(64),riskClass:'R0',riskStatement:'Read-only check.',
     actionCount:1},verification:{status:'PASSED',
@@ -63,16 +63,18 @@ describe('R04 real ActionController approval UI',()=>{
   expect(projectHostTaskDetail(recorded,'task-a')).toMatchObject({status:'READY',
    verification:{status:'PASSED'},plan:{risk:'R0'},recovery:{reconciled:true}});
   expect(projectHostTaskDetail(recorded,'task-b').status).toBe('REFUSED');
+  expect(projectHostTaskDetail({...recorded,revision:undefined},'task-a').status).toBe('REFUSED');
+  expect(projectHostTaskDetail({...recorded,revision:-1},'task-a').status).toBe('REFUSED');
   expect(projectHostTaskDetail({...recorded,state:'UNKNOWN'},'task-a').status).toBe('REFUSED');
   expect(projectHostTaskDetail({...recorded,updatedAt:'unknown'},'task-a').status).toBe('REFUSED');
   expect(projectHostTaskDetail({...recorded,verification:{status:'PASSED',checks:[{status:'PASSED'}]}},'task-a').status).toBe('REFUSED');
   expect(projectHostTaskDetail({...recorded,planSummary:{...recorded.planSummary,planHash:'forged'}},'task-a').status).toBe('REFUSED');
  });
  it('shows a bounded Host clarification only in its exact task state',()=>{
-  const base={taskId:'task-c',title:'Organize files',state:'CLARIFICATION',
+  const base={taskId:'task-c',title:'Organize files',state:'CLARIFICATION',revision:3,
    updatedAt:'2026-11-01T12:00:00Z',clarification:{question:'Which folder?'}};
   expect(projectHostTaskDetail(base,'task-c')).toMatchObject({
-   status:'READY',clarification:{question:'Which folder?'}});
+   status:'READY',revision:3,clarification:{question:'Which folder?'}});
   expect(projectHostTaskDetail({...base,clarification:{question:''}},'task-c').status).toBe('REFUSED');
   expect(projectHostTaskDetail({...base,clarification:{question:'x'.repeat(2049)}},'task-c').status).toBe('REFUSED');
   expect(projectHostTaskDetail({...base,clarification:undefined},'task-c').status).toBe('REFUSED');
