@@ -25,6 +25,9 @@ describe('R04 source contract: the shipped desktop surface replaces technical op
     expect(app).toContain("decision:'ANSWER'");
     expect(app).toContain("humanApproval:false");
     expect(app).toContain("model.kind!=='ASK'");
+    expect(app).toContain("currentModel.fields.flatMap");
+    expect(app).toContain("!f.required && (value==='' || value===false)");
+    expect(app).toContain("addEventListener('click',()=>page('home'))");
     expect(app).not.toContain('/api/v03/effect/submit');
     expect(app).not.toContain('/api/v03/provider/first-use');
     expect(app).not.toContain('/api/v03/meta/feedback');

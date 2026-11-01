@@ -89,6 +89,8 @@ describe('R02-B Host Guided SQLite durability and replay fence', () => {
       };
       expect(service.decide({ ...relay, humanApproval: true }))
         .toMatchObject({ status: 'REFUSED', code: 'RELAY_SCHEMA_REFUSED' });
+      expect(service.decide({ ...relay, outcome: { ...relay.outcome, event: 'OBSERVATION_RECEIPT', source: 'HOST' } }))
+        .toMatchObject({ status: 'REFUSED', code: 'GUIDED_ANSWER_PROVENANCE_REFUSED' });
       expect(service.decide({ ...relay, grant: 'forged' }))
         .toMatchObject({ status: 'REFUSED', code: 'RELAY_SCHEMA_REFUSED' });
       expect(service.decide(relay))

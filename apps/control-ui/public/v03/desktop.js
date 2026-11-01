@@ -13,7 +13,7 @@ const words = {
   actionInventory:'Computer overview',actionInventoryDesc:'See system information without changing anything.',actionDiagnosis:'Check my computer',actionDiagnosisDesc:'Run a safe, read-only health check.',actionFolder:'Work with files',actionFolderDesc:'Choose a folder, review a plan and decide what happens.',openAction:'Open →',
   privacyTitle:'You stay in control',privacyDesc:'Local checks stay on this computer. Changes and cloud requests need separate approval.',recentTitle:'Continue a task',noCurrent:'No active task right now.',seeTasks:'View tasks →',
   guidedEyebrow:'GUIDED WORKFLOW',tasksTitle:'Your current task',tasksDesc:'One decision at a time. You can stop whenever you want.',stepTag:'NEXT STEP',noTaskTitle:'No task selected',noTaskDesc:'Choose an action from Home, or wait for a trusted task to be selected.',
-  waiting:'Waiting',decline:'Decline',continue:'Continue',scopeTitle:'Selected location',scopeUnknown:'No trusted folder selection yet.',safetyTitle:'Before anything changes',
+  waiting:'Waiting',decline:'Back to home',continue:'Continue',scopeTitle:'Selected location',scopeUnknown:'No trusted folder selection yet.',safetyTitle:'Before anything changes',
   safetyPreview:'Review which files would change.',safetyConfirm:'Approve the exact plan separately.',safetyVerify:'Check the actual result afterward.',notAnApproval:'Answering a form does not authorize changes to your computer.',
   readOnly:'READ-ONLY',computerTitle:'My computer',computerDesc:'See real local information. No files are changed or sent to the cloud.',runOverview:'Show overview',runCheck:'Run health check',noReport:'Choose a check to see its results.',
   activity:'ACTIVITY',historyTitle:'Task history',historyDesc:'Only actual recorded outcomes appear here.',historyEmpty:'No completed steps yet.',preferences:'PREFERENCES',settingsTitle:'Settings',settingsDesc:'Choose how this app looks. Security decisions stay with Windows.',
@@ -31,7 +31,7 @@ const words = {
   actionInventory:'查看电脑概况',actionInventoryDesc:'查看系统信息，不会修改任何内容。',actionDiagnosis:'检查电脑状态',actionDiagnosisDesc:'安全地检查电脑健康状况，只读操作。',actionFolder:'整理与管理文件',actionFolderDesc:'选择文件夹，检查计划并决定下一步。',openAction:'打开 →',
   privacyTitle:'电脑始终由你掌控',privacyDesc:'本地检查不会上传数据。修改电脑或连接云端前需单独授权。',recentTitle:'继续未完成的任务',noCurrent:'目前没有正在进行的任务。',seeTasks:'查看任务 →',
   guidedEyebrow:'分步引导',tasksTitle:'当前任务',tasksDesc:'每次只处理一步，随时可以停止。',stepTag:'下一步',noTaskTitle:'暂时没有任务',noTaskDesc:'从首页选择一个操作，或等待可信 Host 选中任务。',
-  waiting:'等待中',decline:'拒绝',continue:'继续',scopeTitle:'已选择的位置',scopeUnknown:'尚未通过可信 Host 选择文件夹。',safetyTitle:'执行前的保护',
+  waiting:'等待中',decline:'返回首页',continue:'继续',scopeTitle:'已选择的位置',scopeUnknown:'尚未通过可信 Host 选择文件夹。',safetyTitle:'执行前的保护',
   safetyPreview:'确认将修改哪些文件。',safetyConfirm:'对具体计划单独授权。',safetyVerify:'执行后核对真实结果。',notAnApproval:'填写表单不代表授权修改电脑。',
   readOnly:'只读操作',computerTitle:'我的电脑',computerDesc:'查看真实的本机信息，不会改动文件或上传数据。',runOverview:'查看概况',runCheck:'检查健康状态',noReport:'选择一项检查来查看结果。',
   activity:'操作记录',historyTitle:'任务历史',historyDesc:'这里只显示真正已记录的结果。',historyEmpty:'还没有已完成的步骤。',preferences:'个性化',settingsTitle:'设置',settingsDesc:'调整显示方式。安全授权由 Windows 和可信 Host 处理。',
@@ -163,16 +163,20 @@ function renderGuided() {
  const isReview=model.kind==='REVIEW_EFFECT';
  $('step-submit').disabled=model.kind!=='ASK';
  $('step-submit').textContent=tr('continue');
- $('step-refuse').disabled=!model.allowedEvents?.includes('USER_SUBMIT');
+ $('step-refuse').disabled=false;
  set('approval-hint',isReview?tr('previewMissing'):tr('formUnavailable'));
  if (isReview) { alert.textContent=tr('previewMissing');alert.hidden=false; }
 }
 let currentModel=null;
 function formAnswers() {
  if (!currentModel)return [];
- return currentModel.fields.map(f=>{
+ return currentModel.fields.flatMap(f=>{
   const input=$('field-'+f.id);
-  return {fieldId:f.id,value:f.type==='CONFIRM'?!!input.checked:input.value};
+  if (!input) return [];
+  const value=f.type==='CONFIRM'?!!input.checked:input.value;
+  // Blank optional fields are absent, not invalid empty answers.
+  if (!f.required && (value==='' || value===false)) return [];
+  return [{fieldId:f.id,value}];
  });
 }
 async function submitDecision(decision) {
@@ -255,7 +259,8 @@ $('menu-toggle').addEventListener('click',()=>{
  $('menu-toggle').setAttribute('aria-expanded',String(shell.classList.contains('menu-open')));
 });
 $('dynamic-form').addEventListener('submit',event=>{event.preventDefault();submitDecision('ANSWER').catch(showError);});
-$('step-refuse').addEventListener('click',()=>submitDecision('REFUSE').catch(showError));
+// Back is local navigation; it neither refuses a Host case nor grants execution.
+$('step-refuse').addEventListener('click',()=>page('home'));
 $('task-search').addEventListener('input',event=>{
  const q=event.target.value.trim().toLocaleLowerCase(locale==='zh'?'zh-CN':'en');
  for(const card of document.querySelectorAll('[data-action]'))card.hidden=!!q&&!card.textContent.toLocaleLowerCase().includes(q);

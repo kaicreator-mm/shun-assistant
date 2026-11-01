@@ -139,6 +139,13 @@ export class HostGuidedService {
         this.#db.exec('ROLLBACK');
         return { status: 'STALE', code: 'GUIDED_STEP_NOT_CURRENT' };
       }
+      // Untrusted ASK answers must not impersonate trusted Host receipts.
+      if (raw.decision === 'ANSWER' &&
+          (!isRecord(raw.outcome) || raw.outcome.event !== 'USER_SUBMIT' ||
+           raw.outcome.source !== 'USER')) {
+        this.#db.exec('ROLLBACK');
+        return { status: 'REFUSED', code: 'GUIDED_ANSWER_PROVENANCE_REFUSED' };
+      }
       if (raw.stepId !== stored.step.stepId ||
           raw.stepDigest !== stored.step.templateRef.digest ||
           JSON.stringify(raw.caseRef) !== JSON.stringify(stored.step.caseRef) ||
