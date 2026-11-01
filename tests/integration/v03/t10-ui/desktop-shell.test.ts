@@ -58,6 +58,10 @@ describe('R04 source contract: the shipped desktop surface replaces technical op
     expect(app).toContain('projectExactApproval');
     expect(app).toContain('approvalDetailGeneration');
     expect(app).toContain('approvalInboxGeneration');
+    expect(app).toContain('if(approvalUnresolvedId)return;');
+    expect(app).toContain('if(approvalUnresolvedId){');
+    expect(app).toContain('approvalBusy||!!approvalUnresolvedId;');
+    expect(app).not.toContain('if(approvalUnresolvedId===approvalSelected.id)return;');
     expect(app).toContain('if(generation!==approvalDetailGeneration)return');
     expect(app).toContain("sessionStorage.setItem('shun-r04-approval-uncertain',id)");
     expect(app).toContain('if(!persistUncertainApproval(selected.id))');
