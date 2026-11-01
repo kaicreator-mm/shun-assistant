@@ -22,6 +22,10 @@ describe('R04 source contract: the shipped desktop surface replaces technical op
     expect(html).toContain('id="simulation-banner"');
     expect(html).toContain('id="approval-confirm"');
     expect(html).toContain('id="host-task-list"');
+    expect(html).toContain('id="search-empty"');
+    expect(html).toContain('id="search-clear"');
+    expect(html).toContain('aria-keyshortcuts="Control+K"');
+    expect(html).toContain('data-i18n="skipContent"');
     expect(html).toContain('id="folder-input"');
     expect(html).toContain('webkitdirectory');
     expect(html).toContain('data-aria-label="navigationLabel"');
@@ -44,6 +48,11 @@ describe('R04 source contract: the shipped desktop surface replaces technical op
     expect(app).toContain('projectDisclosurePreview');
     expect(app).toContain('summarizeBrowserFolder');
     expect(app).toContain('guidedReceiptStatus');
+    expect(app).toContain("function filterActions()");
+    expect(app).toContain("'search-empty').hidden=visible!==0");
+    expect(app).toContain("'search-clear').hidden=!q");
+    expect(app).toContain("skipContent:'Skip to main content'");
+    expect(app).toContain("skipContent:'跳转至主要内容'");
     expect(app).toContain('projectExactApproval');
     expect(app).toContain('projectApprovalDecision');
     expect(app).toContain('projectTaskSnapshots');
