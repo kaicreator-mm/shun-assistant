@@ -64,7 +64,7 @@ export function projectExactApproval(health,value,expectedId,now){
     !object(p.verification)||!shortText(p.verification.summary)||
     !Array.isArray(p.verification.checks)||p.verification.checks.length>64||
     p.verification.checks.some(x=>!shortText(x,256))||
-    (p.expiresAt!==undefined&&p.expiresAt!==a.expiresAt)||
+    p.expiresAt!==a.expiresAt||
     !Array.isArray(p.actions)||p.actions.length===0||p.actions.length>64){
    return refused('PLAN_IDENTITY_UNVERIFIED');
  }
@@ -112,7 +112,8 @@ export function projectTaskSnapshots(value){
  const items=[];
  for(const task of value.tasks){
   if(!object(task)||!shortText(task.taskId,128)||!shortText(task.title,2048)||
-   !shortText(task.state,96)||!shortText(task.updatedAt,64))return refused('TASK_HISTORY_UNVERIFIED');
+   !shortText(task.state,96)||!shortText(task.updatedAt,64)||
+   !Number.isFinite(Date.parse(task.updatedAt)))return refused('TASK_HISTORY_UNVERIFIED');
   items.push({id:task.taskId,title:task.title,state:task.state,
    updatedAt:task.updatedAt});
  }
