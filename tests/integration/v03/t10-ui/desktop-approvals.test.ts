@@ -1,7 +1,7 @@
 import {describe,it,expect} from 'vitest';
 import {
  realApprovalPosture,projectPendingApprovals,projectExactApproval,
- projectApprovalDecision,projectTaskSnapshots
+ projectApprovalDecision,projectTaskSnapshots,projectHostTaskDetail
 } from '../../../../apps/control-ui/public/v03/desktop-approvals.js';
 
 const now=Date.parse('2026-11-01T12:00:00Z');
@@ -52,6 +52,20 @@ describe('R04 real ActionController approval UI',()=>{
   expect(projectApprovalDecision(decision,selected,true)).toEqual({status:'RECORDED',approved:true});
   expect(projectApprovalDecision({...decision,decision:{...decision.decision,planHash:'b'.repeat(64)}},selected,true).status).toBe('REFUSED');
   expect(projectApprovalDecision(decision,selected,false).status).toBe('REFUSED');
+ });
+ it('opens a task detail only for the exact Host task identity and supported evidence',()=>{
+  const recorded={taskId:'task-a',title:'Local check',state:'COMPLETED',
+   updatedAt:'2026-11-01T12:00:00Z',
+   planSummary:{planHash:'a'.repeat(64),riskClass:'R0',riskStatement:'Read-only check.',
+    actionCount:1},verification:{status:'PASSED',
+    checks:[{checkId:'disk-observed',status:'PASSED'}]},
+   recovery:{classification:'NOT_REQUIRED',detail:'No recovery was needed.',reconciled:true}};
+  expect(projectHostTaskDetail(recorded,'task-a')).toMatchObject({status:'READY',
+   verification:{status:'PASSED'},plan:{risk:'R0'},recovery:{reconciled:true}});
+  expect(projectHostTaskDetail(recorded,'task-b').status).toBe('REFUSED');
+  expect(projectHostTaskDetail({...recorded,updatedAt:'unknown'},'task-a').status).toBe('REFUSED');
+  expect(projectHostTaskDetail({...recorded,verification:{status:'PASSED',checks:[{status:'PASSED'}]}},'task-a').status).toBe('REFUSED');
+  expect(projectHostTaskDetail({...recorded,planSummary:{...recorded.planSummary,planHash:'forged'}},'task-a').status).toBe('REFUSED');
  });
  it('renders only bounded verified task metadata from the Host list',()=>{
   expect(projectTaskSnapshots({tasks:[{taskId:'task-a',title:'PC health check',
