@@ -33,7 +33,8 @@ export function composeTrustedRuntimeBuild(input: {
   readonly hardBudget: BuildV10AppOptions['hardBudget'];
 }): TrustedBuildResult {
   try {
-    if (!input || !Array.isArray(input.modules) || input.modules.length !== 4 ||
+    if (!input || !Array.isArray(input.modules) || input.modules.length < 4 ||
+        input.modules.length > 10 ||
         !Array.isArray(input.routes) || input.routes.length < 1 ||
         input.targetProfile !== 'node24-esm/1' ||
         !/^[A-Za-z][A-Za-z0-9._:-]{0,127}$/.test(input.appId) ||
@@ -41,7 +42,11 @@ export function composeTrustedRuntimeBuild(input: {
         !/^[A-Za-z][A-Za-z0-9._:-]{0,127}$/.test(input.buildId)) {
       return { status: 'REFUSED', code: 'TRUSTED_MODULE_INVALID' };
     }
-    const roles = new Set<string>();
+    // R03-INT (OWNER_SHUN_V030_R03_INT_WRITESET_ADDENDUM_R1): one kernel and
+    // one standard stay mandatory singletons; ONE OR MORE business and
+    // capability Domain Packages may compose (the public SDK collects them as
+    // arrays). Every other admission rule is unchanged.
+    const cardinality: Record<string, number> = {};
     const ids = new Set<string>();
     const modules: V10ModuleInput[] = [];
     for (const entry of input.modules) {
@@ -55,12 +60,13 @@ export function composeTrustedRuntimeBuild(input: {
           module.moduleSha256 !== entry.approvedSha256 ||
           createHash('sha256').update(module.moduleSource, 'utf8').digest('hex') !== entry.approvedSha256 ||
           !ROLES.includes(module.role as typeof ROLES[number]) ||
-          roles.has(module.role) ||
+          (module.role !== 'business' && module.role !== 'capability' &&
+            cardinality[module.role] !== undefined) ||
           ids.has(module.packageId) ||
           !/^[A-Za-z0-9][A-Za-z0-9._:@/-]{0,127}$/.test(module.packageId)) {
         return { status: 'REFUSED', code: 'TRUSTED_MODULE_INVALID' };
       }
-      roles.add(module.role);
+      cardinality[module.role] = (cardinality[module.role] ?? 0) + 1;
       ids.add(module.packageId);
       modules.push(Object.freeze({
         ...module,
@@ -69,7 +75,7 @@ export function composeTrustedRuntimeBuild(input: {
         requires: Object.freeze([...(module.requires ?? [])]),
       }));
     }
-    if (ROLES.some((role) => !roles.has(role))) {
+    if (ROLES.some((role) => (cardinality[role] ?? 0) < 1)) {
       return { status: 'REFUSED', code: 'TRUSTED_MODULE_INVALID' };
     }
     if (!Number.isSafeInteger(input.hardBudget?.maxStepsPerTurn) ||

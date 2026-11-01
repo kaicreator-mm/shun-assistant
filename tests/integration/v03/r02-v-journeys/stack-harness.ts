@@ -44,7 +44,138 @@ export const routeWorkflowIntent = __dhv10RouterBundle.routeWorkflowIntent;
 `;
 }
 
-export function assembleBuild(dir: string): { buildFile: string; buildFileSha256: string } {
+function trustedModule(
+  provenance: string,
+  sourceFile: string,
+  bytes: string,
+  module: Record<string, unknown>,
+): { provenance: string; sourceFile: string; sourceSha256: string; module: Record<string, unknown> } {
+  return { provenance, sourceFile, sourceSha256: sha256Hex(bytes), module };
+}
+
+/**
+ * R03-INT journey modules: the windows effect, provider first-use and meta
+ * feedback Business/Capability Domain Packages, wired exactly like the goal
+ * pair over the same pinned public SDK bytes.
+ */
+function journeyModules(wanted: {
+  windows?: boolean;
+  provider?: boolean;
+  meta?: boolean;
+}): {
+  modules: ReturnType<typeof trustedModule>[];
+  routes: Record<string, string>[];
+} {
+  const read = (name: string): string => readFileSync(join(shunModules, name), 'utf8');
+  const windowsBusiness = read('business-windows.mjs');
+  const windowsCapability = read('capability-windows-effect.mjs');
+  const providerBusiness = read('business-provider.mjs');
+  const providerCapability = read('capability-provider.mjs');
+  const metaBusiness = read('business-meta.mjs');
+  const metaCapability = read('capability-meta.mjs');
+  const modules: ReturnType<typeof trustedModule>[] = [];
+  const routes: Record<string, string>[] = [];
+  if (wanted.windows) {
+    modules.push(
+      trustedModule('SHUN_TRUSTED_DOMAIN_PACKAGE', join(shunModules, 'business-windows.mjs'), windowsBusiness, {
+        packageId: 'shun.business.windows@v0.3.0',
+        role: 'business',
+        abiVersion: 'v08-business-abi/1',
+        endpoint: 'business-policy',
+        dependencies: [],
+        provides: ['intent:submitWindowsAction', 'intent:submitUnpermittedWindowsProbe'],
+        requires: [],
+      }),
+    );
+    modules.push(
+      trustedModule('SHUN_TRUSTED_DOMAIN_PACKAGE', join(shunModules, 'capability-windows-effect.mjs'), windowsCapability, {
+        packageId: 'shun.capability.windows-executor@v0.3.0',
+        role: 'capability',
+        abiVersion: 'v08-capability-abi/1',
+        endpoint: 'capability-endpoint',
+        dependencies: [],
+        externalImports: { node: [], npm: ['shun-windows-effect-host'], native: [] },
+        provides: ['capability:windows/1'],
+        requires: [],
+        capabilityId: 'windows',
+        externalEffect: true,
+        handlers: [{ operationId: 'windows.execute', handler: 'windowsExecute' }],
+      }),
+    );
+    routes.push(
+      { intentId: 'submitWindowsAction', operationId: 'windows.execute', capabilityId: 'windows', handlerId: 'windowsExecute' },
+      { intentId: 'submitUnpermittedWindowsProbe', operationId: 'windows.execute', capabilityId: 'windows', handlerId: 'windowsExecute' },
+    );
+  }
+  if (wanted.provider) {
+    modules.push(
+      trustedModule('SHUN_TRUSTED_DOMAIN_PACKAGE', join(shunModules, 'business-provider.mjs'), providerBusiness, {
+        packageId: 'shun.business.provider@v0.3.0',
+        role: 'business',
+        abiVersion: 'v08-business-abi/1',
+        endpoint: 'business-policy',
+        dependencies: [],
+        provides: ['intent:submitProviderFirstUse'],
+        requires: [],
+      }),
+    );
+    modules.push(
+      trustedModule('SHUN_TRUSTED_DOMAIN_PACKAGE', join(shunModules, 'capability-provider.mjs'), providerCapability, {
+        packageId: 'shun.capability.provider-first-use@v0.3.0',
+        role: 'capability',
+        abiVersion: 'v08-capability-abi/1',
+        endpoint: 'capability-endpoint',
+        dependencies: [],
+        externalImports: { node: [], npm: ['shun-provider-host'], native: [] },
+        provides: ['capability:provider/1'],
+        requires: [],
+        capabilityId: 'provider',
+        externalEffect: true,
+        handlers: [{ operationId: 'provider.firstUse', handler: 'providerFirstUse' }],
+      }),
+    );
+    routes.push(
+      { intentId: 'submitProviderFirstUse', operationId: 'provider.firstUse', capabilityId: 'provider', handlerId: 'providerFirstUse' },
+    );
+  }
+  if (wanted.meta) {
+    modules.push(
+      trustedModule('SHUN_TRUSTED_DOMAIN_PACKAGE', join(shunModules, 'business-meta.mjs'), metaBusiness, {
+        packageId: 'shun.business.meta@v0.3.0',
+        role: 'business',
+        abiVersion: 'v08-business-abi/1',
+        endpoint: 'business-policy',
+        dependencies: [],
+        provides: ['intent:submitMetaFeedback'],
+        requires: [],
+      }),
+    );
+    modules.push(
+      trustedModule('SHUN_TRUSTED_DOMAIN_PACKAGE', join(shunModules, 'capability-meta.mjs'), metaCapability, {
+        packageId: 'shun.capability.meta-feedback@v0.3.0',
+        role: 'capability',
+        abiVersion: 'v08-capability-abi/1',
+        endpoint: 'capability-endpoint',
+        dependencies: [],
+        externalImports: { node: [], npm: ['shun-meta-host'], native: [] },
+        provides: ['capability:meta/1'],
+        requires: [],
+        capabilityId: 'meta',
+        externalEffect: true,
+        handlers: [{ operationId: 'meta.submitFeedback', handler: 'submitMetaFeedback' }],
+      }),
+    );
+    routes.push(
+      { intentId: 'submitMetaFeedback', operationId: 'meta.submitFeedback', capabilityId: 'meta', handlerId: 'submitMetaFeedback' },
+    );
+  }
+  return { modules, routes };
+}
+
+export function assembleBuild(
+  dir: string,
+  options?: { readonly journeys?: { windows?: boolean; provider?: boolean; meta?: boolean } },
+): { buildFile: string; buildFileSha256: string } {
   const kernel = readPinned('kernel-mechanism-v1.mjs');
   const standard = standardBundle();
   const business = readFileSync(join(shunModules, 'business-goal.mjs'), 'utf8');
@@ -130,6 +261,11 @@ export function assembleBuild(dir: string): { buildFile: string; buildFileSha256
       },
     ],
   };
+  if (options?.journeys) {
+    const journey = journeyModules(options.journeys);
+    (spec.modules as unknown[]).push(...journey.modules);
+    (spec.routes as unknown[]).push(...journey.routes);
+  }
   const specFile = join(dir, 'spec.json');
   const buildFile = join(dir, 'build.json');
   writeFileSync(specFile, JSON.stringify(spec, null, 2));
@@ -162,6 +298,10 @@ export interface LiveStack {
 export async function bootLiveStack(options: {
   interpreter: TrustedLlmInterpreterPort;
   prefix: string;
+  journeys?: {
+    manifest?: { windows?: boolean; provider?: boolean; meta?: boolean };
+    bindings?: import('../../../../apps/control-api/src/v03/composition-journeys.ts').JourneyBindingsConfig;
+  };
 }): Promise<LiveStack> {
   const dir = mkdtempSync(join(tmpdir(), options.prefix));
   const guided = new HostGuidedService(join(dir, 'guided.sqlite'));
@@ -193,7 +333,7 @@ export async function bootLiveStack(options: {
   });
   if (staged.status !== 'CURRENT') throw new Error('live stack staging failed');
   const caseId = staged.step.taskId;
-  const { buildFile, buildFileSha256 } = assembleBuild(dir);
+  const { buildFile, buildFileSha256 } = assembleBuild(dir, { journeys: options.journeys?.manifest });
   const production = await createProductionV03Gateway({
     buildFile,
     buildFileSha256,
@@ -209,6 +349,7 @@ export async function bootLiveStack(options: {
       configuredMaxOutputTokens: 1024,
     },
     approvalLedgerFile: join(dir, 'submit-references.sqlite'),
+    journeys: options.journeys?.bindings,
   });
   const server = createControlServer({
     backend: new DemoShunBackend(),
@@ -216,6 +357,7 @@ export async function bootLiveStack(options: {
     port: 0,
     v03Guided: guided,
     v03Gateway: production.gateway,
+    v03Journeys: production.journeys,
   });
   const port = await server.start();
   return {

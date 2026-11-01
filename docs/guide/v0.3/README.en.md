@@ -1,6 +1,6 @@
 # Shun Assistant v0.3.0 Operator Guide (English)
 
-> **Status: R02 repair work-in-progress. Not release-qualified on real Windows/Woodpecker.**
+> **Status: R02+R03-INT repairs, exact-SHA CI-verified. Verified on real Windows Node 24 + Woodpecker at each recorded HEAD; NOT yet release-approved (independent R03 reassessment and Owner release authority pending). The verified subset is enumerated below — nothing beyond it is claimed.**
 
 ## Prerequisites and startup
 
@@ -8,7 +8,7 @@
 - Check out the exact approved monorepo SHA. Use `corepack enable` and `pnpm install --frozen-lockfile`.
 - Loopback UI: `http://127.0.0.1:7788`. `pnpm --filter @shun/control-api dev` starts the current development surface. Demo is simulated and proves no real v0.3 Kernel/Host production journey.
 - Real-storage mode (`SHUN_CONTROL_MODE=real-storage`) requires trusted workspace, SQLite, registry revision/public key and Host authorization secret configuration. Missing authoritative configuration must fail closed. Never promote test credentials.
-- The BUILD/Guided/HTTP UI journey is **not operationally qualified** until the same production startup artifact is wired and tested end to end.
+- Verified at the recorded exact HEADs (see `docs/implementation/v0.3/r02-validation/`): real B-040 read-only collection; loopback HTTP truth (200/202/409/422/503) over the selected public v0.10.3 DomainApp; real paid DeepSeek CN/EN (J03, budget-exhausted, do not re-run); real scoped Windows effects, signed Provider first use and durable Shadow feedback through the SAME selected K (R03-INT journey routes). Physical/paid legs are env-gated test journeys, not a production-operation approval.
 
 ## Authority boundaries
 
@@ -33,7 +33,7 @@ DomainHarness v0.10.3 is selected from immutable Git Tag `v0.10.3`, not an assum
 
 Real Windows Node>=24 and Woodpecker exact-SHA evidence is required for J01–J09. Mark unexecuted real-model/physical OS steps UNKNOWN or OWNER_DEFERRED, not PASS.
 
-## Trusted v0.3 production BUILD setup (not yet runtime-qualified)
+## Trusted v0.3 production BUILD setup (runtime-qualified subset in the recorded receipts)
 
 Build/verify the four **public** DomainHarness v0.10.3 Git-tag SDK packages; source real K/S Domain Package artifacts from the installed immutable public packages and reviewed Shun-specific B/C source artifacts. In a trusted local directory prepare a JSON spec with `appId`, `audience`, `buildId`, `targetProfile: node24-esm/1`, `routes`, `hardBudget`, and exactly four `modules`. Each entry contains public BUILD module metadata (`packageId`, `role`, `abiVersion`, `endpoint`, `provides`, `requires` etc), an absolute `sourceFile`, verified `sourceSha256`, and `provenance` (`PUBLIC_DOMAIN_PACKAGE_V0103` for K/S; `SHUN_TRUSTED_DOMAIN_PACKAGE` for B/C).
 

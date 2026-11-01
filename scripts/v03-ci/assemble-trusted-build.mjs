@@ -35,7 +35,8 @@ if (!specArg || !outArg || extra.length !== 0 ||
 // never copied from UI/Planner bytes. Every module also has a pinned hash.
 const spec = JSON.parse(readFileSync(resolve(specArg), 'utf8'));
 if (!spec || typeof spec !== 'object' || !Array.isArray(spec.modules) ||
-    spec.modules.length !== 4 || spec.targetProfile !== 'node24-esm/1' ||
+    spec.modules.length < 4 || spec.modules.length > 10 ||
+    spec.targetProfile !== 'node24-esm/1' ||
     !Array.isArray(spec.routes) || spec.routes.length < 1 ||
     !spec.hardBudget || !spec.appId || !spec.audience || !spec.buildId) {
   throw new Error('V03_ASSEMBLE_SPEC_INVALID');
@@ -44,7 +45,9 @@ const actualRoles = new Set();
 const actualIds = new Set();
 const modules = spec.modules.map((entry) => {
   if (!entry || !entry.module || typeof entry.module !== 'object' ||
-      !roles.includes(entry.module.role) || actualRoles.has(entry.module.role) ||
+      !roles.includes(entry.module.role) ||
+      (entry.module.role !== 'business' && entry.module.role !== 'capability' &&
+        actualRoles.has(entry.module.role)) ||
       !entry.module.packageId || actualIds.has(entry.module.packageId) ||
       typeof entry.sourceFile !== 'string' || !SHA.test(entry.sourceSha256) ||
       !['PUBLIC_DOMAIN_PACKAGE_V0103','SHUN_TRUSTED_DOMAIN_PACKAGE'].includes(entry.provenance) ||

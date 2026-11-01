@@ -1,6 +1,6 @@
 # Shun Assistant v0.3.0 使用与部署指南（中文）
 
-> **状态：R02 修复工作分支；尚未通过最终 Windows 与 Woodpecker 验证，不是发布版本。**
+> **状态：R02+R03-INT 修复，各记录 HEAD 均有 exact-SHA Woodpecker 绿与真实 Windows Node 24 验证；尚未获得发布批准(独立 R03 复审与 Owner 发布授权待完成)。已验证子集如下列举,不作超出范围的宣称。**
 
 ## 运行准备
 

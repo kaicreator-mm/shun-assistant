@@ -3,14 +3,18 @@
 // Env:
 //   SHUN_CONTROL_PORT           — port (default 7788)
 //   SHUN_CONTROL_UI_DIR         — static UI directory (default ../control-ui/public)
+import { createHash } from 'node:crypto';
+import { readFileSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { HostGuidedService } from '../../../packages/domain-host/src/guided/host-guided-service.ts';
+import { HostMetaShadowStore } from '../../../packages/domain-host/src/meta/host-meta-shadow-store.ts';
 import { cloudInterpreterFromEnvironment } from './cloud-interpret.ts';
 import { DemoShunBackend } from './demo/backend.ts';
 import { RealStorageControlBackend } from './real-storage/backend.ts';
 import { createControlServer } from './server.ts';
 import { provisionGuidedCaseFromHostFile } from './v03/composition-guided.ts';
+import type { JourneyBindingsConfig } from './v03/composition-journeys.ts';
 import { createProductionV03Gateway } from './v03/composition-production.ts';
 
 const here = dirname(fileURLToPath(import.meta.url));
@@ -74,6 +78,38 @@ if (guided && process.env.SHUN_V03_GUIDED_CASE_FILE) {
   });
 }
 
+// R03-INT journey bindings (all optional; a manifest declaring the matching
+// routes makes them mandatory — the composition refuses to boot otherwise).
+// Every value is trusted operator-local configuration, never HTTP input.
+const windowsJourney =
+  process.env.SHUN_V03_WINDOWS_EFFECT_AUTHORITY_DIR && process.env.SHUN_V03_WINDOWS_EFFECT_WORKSPACE
+    ? {
+        authorityDir: requiredEnv('SHUN_V03_WINDOWS_EFFECT_AUTHORITY_DIR'),
+        workspaceRoot: requiredEnv('SHUN_V03_WINDOWS_EFFECT_WORKSPACE'),
+      }
+    : undefined;
+const providerJourney = process.env.SHUN_V03_PROVIDER_CONFIG
+  ? loadProviderJourneyConfig(requiredEnv('SHUN_V03_PROVIDER_CONFIG'))
+  : undefined;
+const metaStore = process.env.SHUN_V03_META_DATABASE
+  ? new HostMetaShadowStore(resolve(requiredEnv('SHUN_V03_META_DATABASE')))
+  : undefined;
+if (metaStore && process.env.SHUN_V03_META_CASE_FILE) {
+  provisionMetaFromHostFile({
+    store: metaStore,
+    file: process.env.SHUN_V03_META_CASE_FILE,
+    sha256: requiredEnv('SHUN_V03_META_CASE_SHA256'),
+  });
+}
+const journeys: JourneyBindingsConfig | undefined =
+  windowsJourney || providerJourney || metaStore
+    ? {
+        windows: windowsJourney,
+        provider: providerJourney,
+        meta: metaStore ? { store: metaStore } : undefined,
+      }
+    : undefined;
+
 // Production v0.3 is an explicit, operator-pinned mode. Missing genuine
 // SDK/BUILD/Host state fails before an HTTP listener is opened; no demo
 // fallback is ever mislabeled as a real v0.3 DomainApp.
@@ -118,6 +154,7 @@ const production =
         // Host-issued record every gateway submit reference would be an
         // unauthenticated browser-controlled string. Boot fails closed.
         approvalLedgerFile: requiredEnv('SHUN_V03_APPROVAL_LEDGER'),
+        journeys,
       })
     : undefined;
 // Issuance is trusted-process-only (never an HTTP route). The operator reads
@@ -148,6 +185,7 @@ const handle = createControlServer({
   cloud,
   v03Guided: guided,
   v03Gateway: production?.gateway,
+  v03Journeys: production?.journeys,
 });
 const bound = await handle.start();
 console.log(
@@ -170,7 +208,11 @@ for (const signal of ['SIGINT', 'SIGTERM'] as const) {
       try {
         production?.dispose();
       } finally {
-        guided?.close();
+        try {
+          metaStore?.close();
+        } finally {
+          guided?.close();
+        }
       }
     });
   });
@@ -180,4 +222,62 @@ function requiredEnv(key: string): string {
   const value = process.env[key];
   if (!value) throw new Error(`Missing trusted local configuration ${key}; refusing real mode`);
   return value;
+}
+
+/** Operator-pinned CuratedProvider journey config (trusted local file). */
+function loadProviderJourneyConfig(file: string): JourneyBindingsConfig['provider'] {
+  const raw = JSON.parse(readFileSync(resolve(file), 'utf8')) as Record<string, unknown>;
+  if (
+    typeof raw.cacheRoot !== 'string' ||
+    !Array.isArray(raw.roots) ||
+    !Array.isArray(raw.scopes) ||
+    typeof raw.descriptor !== 'object' ||
+    raw.descriptor === null ||
+    typeof raw.taskId !== 'string' ||
+    !Number.isSafeInteger(raw.revocationEpoch)
+  ) {
+    throw new Error('V03_PROVIDER_JOURNEY_CONFIG_INVALID');
+  }
+  return {
+    cacheRoot: raw.cacheRoot,
+    roots: raw.roots as { keyId: string; publicKeyPem: string }[],
+    scopes: raw.scopes as unknown[],
+    descriptor: raw.descriptor,
+    taskId: raw.taskId,
+    revocationEpoch: raw.revocationEpoch as number,
+  };
+}
+
+/**
+ * Operator-pinned meta provisioning: record the genuine outcome receipt and
+ * the explicit opt-in consent for ONE Case at boot (trusted process only).
+ */
+function provisionMetaFromHostFile(input: {
+  store: HostMetaShadowStore;
+  file: string;
+  sha256: string;
+}): void {
+  const bytes = readFileSync(resolve(input.file));
+  if (createHash('sha256').update(bytes).digest('hex') !== input.sha256) {
+    throw new Error('V03_META_CASE_DIGEST_REFUSED');
+  }
+  const raw = JSON.parse(bytes.toString('utf8')) as Record<string, unknown>;
+  const receipt = raw.receipt as Record<string, unknown> | undefined;
+  const consent = raw.consent as Record<string, unknown> | undefined;
+  if (
+    !receipt ||
+    !consent ||
+    typeof receipt.caseRef !== 'string' ||
+    typeof receipt.revision !== 'string' ||
+    typeof receipt.sha256 !== 'string' ||
+    typeof consent.consentRef !== 'string'
+  ) {
+    throw new Error('V03_META_CASE_INVALID');
+  }
+  input.store.recordOutcomeReceipt({
+    caseRef: receipt.caseRef,
+    revision: receipt.revision,
+    sha256: receipt.sha256,
+  });
+  input.store.recordOptInConsent(consent as never);
 }

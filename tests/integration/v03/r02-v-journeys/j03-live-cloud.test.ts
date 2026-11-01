@@ -6,7 +6,9 @@
  * MUST NOT run in ordinary CI: requires SHUN_R02V_LIVE_CLOUD=1 on a real
  * Windows desktop with DEEPSEEK_API_KEY in the operator environment and
  * SHUN_CONSENT_TEST_INSTRUMENTS=1. Target: exactly TWO paid completions
- * (one CN goal, one EN goal), each ≤256 output tokens; hard ceiling 4.
+ * (one CN goal, one EN goal), each up to 1024 output tokens; hard ceiling 8
+ * per OWNER_SHUN_V030_R02_J03_PAID_CEILING_AMEND_R1 (7/8 consumed by the
+ * recorded runs; do NOT re-run — the budget is exhausted).
  *
  * What is REAL here (no doubles on the paid path):
  *   - the production v0.3 gateway over real loopback HTTP with the REAL

@@ -20,6 +20,12 @@ import {
   type HostSubmitReferenceIssueReceipt,
   SqliteHostSubmitReferenceLedger,
 } from './composition-approval.ts';
+import {
+  createJourneySubmits,
+  installJourneyBindings,
+  type JourneyBindingsConfig,
+  type JourneySubmits,
+} from './composition-journeys.ts';
 
 /** The frozen T04 interpreter port the trusted binding consumes. */
 export interface TrustedLlmInterpreterPort {
@@ -53,6 +59,12 @@ export interface ProductionV03Config {
    * Host-issued record.
    */
   readonly approvalLedgerFile: string;
+  /**
+   * R03-INT: trusted Host bindings for the windows/provider/meta journey
+   * intents. A manifest that declares those routes REQUIRES the matching
+   * real binding configuration here — the boot fails closed otherwise.
+   */
+  readonly journeys?: JourneyBindingsConfig;
   /** Trusted clock override (tests); admission decisions never use HTTP time. */
   readonly now?: () => number;
 }
@@ -254,6 +266,7 @@ function resolveOpenAiHostBinding(consumerRoot: string): string {
 
 export async function createProductionV03Gateway(config: ProductionV03Config): Promise<{
   gateway: ControlApiGateway;
+  journeys?: JourneySubmits;
   subjectDigest: string;
   /**
    * Trusted process-side issuance of the submit-reference pair for the one
@@ -271,10 +284,36 @@ export async function createProductionV03Gateway(config: ProductionV03Config): P
   }
   const now = config.now ?? Date.now;
   const prepared = composeTrustedRuntimeBuild(trustedManifest(config));
+  // R03-INT: goal-interpret stays mandatory; the windows/provider/meta
+  // journey intents may compose alongside it, each fail-closed on its real
+  // trusted Host binding configuration.
+  const JOURNEY_INTENTS = new Set([
+    'submitWindowsAction',
+    'submitUnpermittedWindowsProbe',
+    'submitProviderFirstUse',
+    'submitMetaFeedback',
+  ]);
+  const declaredRoutes =
+    prepared.status === 'READY_FOR_PUBLIC_SDK_BUILD' ? prepared.options.routes : [];
+  const unknownIntent = declaredRoutes.some(
+    (route) => route.intentId !== 'goal-interpret' && !JOURNEY_INTENTS.has(route.intentId),
+  );
+  const needsWindows = declaredRoutes.some(
+    (route) =>
+      route.intentId === 'submitWindowsAction' ||
+      route.intentId === 'submitUnpermittedWindowsProbe',
+  );
+  const needsProvider = declaredRoutes.some((route) => route.intentId === 'submitProviderFirstUse');
+  const needsMeta = declaredRoutes.some((route) => route.intentId === 'submitMetaFeedback');
+  const journeyRoutesUnbacked =
+    (needsWindows && !config.journeys?.windows) ||
+    (needsProvider && !config.journeys?.provider) ||
+    (needsMeta && !config.journeys?.meta);
   if (
     prepared.status !== 'READY_FOR_PUBLIC_SDK_BUILD' ||
-    prepared.options.routes.length !== 1 ||
-    prepared.options.routes[0]?.intentId !== 'goal-interpret' ||
+    unknownIntent ||
+    journeyRoutesUnbacked ||
+    !declaredRoutes.some((route) => route.intentId === 'goal-interpret') ||
     !isAbsolute(config.kDocDatabaseFile) ||
     !isAbsolute(config.deploymentRoot) ||
     !config.selectedCase ||
@@ -290,6 +329,9 @@ export async function createProductionV03Gateway(config: ProductionV03Config): P
   ) {
     throw new Error('V03_PRODUCTION_COMPOSITION_REFUSED');
   }
+  // R03-INT: install the REAL Host bindings before activation so every
+  // declared journey route has its trusted authority chain in place.
+  if (config.journeys) await installJourneyBindings(config.journeys, config.sdkConsumerDir);
   // Public package export resolution from an isolated, installed SDK consumer.
   const consumerRoot = realpathSync(config.sdkConsumerDir);
   if (consumerRoot !== resolve(config.sdkConsumerDir))
@@ -401,6 +443,12 @@ export async function createProductionV03Gateway(config: ProductionV03Config): P
     });
     return {
       subjectDigest: activated.subjectDigest,
+      journeys: createJourneySubmits({
+        facade: activated.facade,
+        selectedCase: config.selectedCase,
+        references,
+        now,
+      }),
       issueSubmitReferences(): HostSubmitReferenceIssueReceipt {
         // Issuance reads only the trusted Host-staged live step; references
         // never outlive the Case selection (validity capped at both the step

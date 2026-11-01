@@ -105,6 +105,63 @@ export { generate, installTrustedCloudHostBinding, createTrustedCloudHostBinding
   writeFileSync(marker, expectedMarker);
 }
 
+
+/**
+ * R03-INT: stage the three additional trusted production Host bindings.
+ * Same pattern as the openai-host binding: the consumer package re-exports
+ * the REAL repo source entry, so the composing process and the sealed
+ * capability import THE SAME module instance.
+ */
+function stageR03IntBindings() {
+  const bindings = [
+    {
+      name: 'shun-windows-effect-host',
+      source: 'packages/domain-host/src/windows/effect-host-binding.ts',
+      exports:
+        'installTrustedWindowsEffectBinding, windowsExecute, trustedWindowsEffectBindingStatus',
+      note: 'R03-INT trusted Windows effect Host binding (real authority chain)',
+    },
+    {
+      name: 'shun-provider-host',
+      source: 'packages/domain-host/src/provider/provider-host-binding.ts',
+      exports: 'installTrustedProviderBinding, providerFirstUse, trustedProviderBindingStatus',
+      note: 'R03-INT trusted CuratedProvider Host binding (real first-use chain)',
+    },
+    {
+      name: 'shun-meta-host',
+      source: 'packages/domain-host/src/meta/meta-host-binding.ts',
+      exports: 'installTrustedMetaBinding, submitMetaFeedback, trustedMetaBindingStatus',
+      note: 'R03-INT trusted Meta Shadow Host binding (real durable store)',
+    },
+  ];
+  for (const binding of bindings) {
+    const hostDir = join(consumerDir, 'node_modules', binding.name);
+    const adapterUrl = pathToFileURL(join(repoRoot, binding.source)).href;
+    const indexFile = join(hostDir, 'index.mjs');
+    const marker = join(hostDir, 'PROVENANCE.txt');
+    const expectedMarker = `v03-sdk-consumer ${binding.name} binding v1 -> ${adapterUrl}
+`;
+    if (existsSync(marker) && readFileSync(marker, 'utf8') === expectedMarker) continue;
+    mkdirSync(hostDir, { recursive: true });
+    writeFileSync(
+      join(hostDir, 'package.json'),
+      JSON.stringify(
+        { name: binding.name, version: '0.3.0', private: true, type: 'module', main: './index.mjs' },
+        null,
+        2,
+      ),
+    );
+    writeFileSync(
+      indexFile,
+      `// ${binding.note}. Re-exports the REAL trusted install seam so the
+// composing process and the capability import the same module instance.
+export { ${binding.exports} } from '${adapterUrl}';
+`,
+    );
+    writeFileSync(marker, expectedMarker);
+  }
+}
+
 export function ensureV03SdkConsumer() {
   const installedMarker = join(
     consumerDir,
@@ -112,11 +169,13 @@ export function ensureV03SdkConsumer() {
   );
   if (existsSync(installedMarker)) {
     stageOpenAiHostBinding();
+    stageR03IntBindings();
     return;
   }
   verifyTarballReceipts();
   installTarballs();
   stageOpenAiHostBinding();
+  stageR03IntBindings();
 }
 
 // Direct execution (operator/test setup): node ensure-consumer.mjs
