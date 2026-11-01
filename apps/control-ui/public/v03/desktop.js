@@ -144,7 +144,16 @@ async function refresh() {
   translate();
  } catch (error) { connected=false; current=null; lastState=null; showError(error);translate(); }
 }
+function guidedIdentity(model){
+ return JSON.stringify([model.journeyId,model.taskId,model.stepId,
+  model.templateId,model.templateDigest,model.caseRef.snapshotId,model.caseRef.digest,
+  model.issuedAtUnixMs,model.validUntilUnixMs]);
+}
 function renderGuided() {
+ // Preserve unsent answers only when the trusted StepSpec identity remains exact.
+ // Never persist form content, and never carry it across a different Case.
+ const previousModel=currentModel;
+ const previousAnswers=previousModel?formAnswers():[];
  const form=$('dynamic-form'), fields=$('form-fields'), container=$('step-container'), alert=$('step-alert');
  form.hidden=true; fields.replaceChildren(); container.replaceChildren();alert.hidden=true;currentModel=null;
  if (!current) {
@@ -192,6 +201,16 @@ function renderGuided() {
   fields.append(block);
  }
  form.hidden=false;
+ if(previousModel && guidedIdentity(previousModel)===guidedIdentity(model)){
+  for(const answer of previousAnswers){
+   const field=model.fields.find(f=>f.id===answer.fieldId);
+   const control=field?$('field-'+field.id):null;
+   if(!control)continue;
+   if(field.type==='CONFIRM'&&typeof answer.value==='boolean')control.checked=answer.value;
+   else if((field.type==='TEXT'||field.type==='CHOICE')&&typeof answer.value==='string')
+    control.value=answer.value;
+  }
+ }
  const isReview=model.kind==='REVIEW_EFFECT';
  $('step-submit').disabled=model.kind!=='ASK'||unresolvedStepId===model.stepId;
  $('step-submit').textContent=tr('continue');
@@ -603,6 +622,12 @@ function filterActions(){
  $('search-clear').hidden=!q;
 }
 $('task-search').addEventListener('input',filterActions);
+$('task-search').addEventListener('keydown',event=>{
+ if(event.key!=='Enter'||event.isComposing)return;
+ const visible=[...document.querySelectorAll('[data-action]')].filter(card=>!card.hidden);
+ if(visible.length!==1)return; // ambiguous search is never auto-selected
+ event.preventDefault();visible[0].click();
+});
 $('search-clear').addEventListener('click',()=>{
  $('task-search').value='';filterActions();$('task-search').focus();
 });
