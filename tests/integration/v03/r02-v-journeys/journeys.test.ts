@@ -347,7 +347,14 @@ describe('R02-V real-product journeys (zero paid, zero physical effects)', () =>
   it('J07: the real HTTP surface serves the UI and guided state truthfully', async () => {
     const ui = await fetch(`http://127.0.0.1:${port}/v03/index.html`);
     expect(ui.status).toBe(200);
-    expect((await ui.text()).includes('v03')).toBe(true);
+    // The redesigned desktop surface supersedes the old technical-ID panels.
+    // Verify the real shipped entry and its dynamic-form landmarks instead of
+    // an incidental version substring that the new interface no longer has.
+    const html = await ui.text();
+    expect(html).toContain('src="./desktop.js"');
+    expect(html).toContain('id="navigation"');
+    expect(html).toContain('id="dynamic-form"');
+    expect(html).not.toContain('id="v03-j-grant"');
     const state = await json(port, 'GET', '/api/v03/guided/state');
     expect(state.status).toBe(200);
     const body = state.body as { currentStep?: { taskId: string }; journey: { paused: boolean } };
