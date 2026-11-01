@@ -6,6 +6,7 @@
 import { t as approvedText } from './strings.js';
 import { realApprovalPosture, projectPendingApprovals, projectExactApproval, projectApprovalDecision, projectTaskSnapshots, projectHostTaskDetail } from './desktop-approvals.js';
 import { summarizeBrowserFolder, guidedReceiptStatus } from './desktop-folder.js';
+import { projectGuidedHistory } from './desktop-history.js';
 import { projectLocalObservation, projectRoutineState, projectRoutineExecution, projectDisclosurePreview } from './desktop-observations.js';
 import { currentStepModel, buildStepOutcome, userDecisionRelay, replayGuard } from './view-model.js';
 
@@ -19,7 +20,7 @@ const words = {
   waiting:'Waiting',decline:'Back to home',continue:'Continue',scopeTitle:'Selected location',scopeUnknown:'No trusted folder selection yet.',safetyTitle:'Before anything changes',
   safetyPreview:'Review which files would change.',safetyConfirm:'Approve the exact plan separately.',safetyVerify:'Check the actual result afterward.',notAnApproval:'Answering a form does not authorize changes to your computer.',
   readOnly:'READ-ONLY',computerTitle:'My computer',computerDesc:'See real local information. No files are changed or sent to the cloud.',runOverview:'Show overview',runCheck:'Run health check',noReport:'Choose a check to see its results.',
-  activity:'ACTIVITY',historyTitle:'Task history',historyDesc:'Only actual recorded outcomes appear here.',historyEmpty:'No completed steps yet.',preferences:'PREFERENCES',settingsTitle:'Settings',settingsDesc:'Choose how this app looks. Security decisions stay with Windows.',
+  activity:'ACTIVITY',historyTitle:'Task history',historyDesc:'Only actual recorded outcomes appear here.',historyEmpty:'No recorded guided steps yet.',historyUnavailable:'Cannot verify the guided history. No operation is assumed complete.',preferences:'PREFERENCES',settingsTitle:'Settings',settingsDesc:'Choose how this app looks. Security decisions stay with Windows.',
   languageTitle:'Language',languageDesc:'Use Chinese or English in the interface.',appearanceTitle:'Appearance',appearanceDesc:'Follow your Windows theme or choose light/dark.',connectionTitle:'Connection',connectionDesc:'Shun listens on your computer only. Remote model calls require separate consent.',
   connected:'Connected locally',unavailable:'Local service unavailable',localMode:'Local checks',cloudMode:'Cloud opt-in',searchEmpty:'No matching actions. Try a different phrase.',
   ready:'Ready',needsAttention:'Needs attention',formUnavailable:'This step needs a trusted Host workflow. Nothing has been submitted.',previewMissing:'The actual action plan and independent authorization are not available in this view. No change can be made.',
@@ -37,7 +38,7 @@ const words = {
   waiting:'等待中',decline:'返回首页',continue:'继续',scopeTitle:'已选择的位置',scopeUnknown:'尚未通过可信 Host 选择文件夹。',safetyTitle:'执行前的保护',
   safetyPreview:'确认将修改哪些文件。',safetyConfirm:'对具体计划单独授权。',safetyVerify:'执行后核对真实结果。',notAnApproval:'填写表单不代表授权修改电脑。',
   readOnly:'只读操作',computerTitle:'我的电脑',computerDesc:'查看真实的本机信息，不会改动文件或上传数据。',runOverview:'查看概况',runCheck:'检查健康状态',noReport:'选择一项检查来查看结果。',
-  activity:'操作记录',historyTitle:'任务历史',historyDesc:'这里只显示真正已记录的结果。',historyEmpty:'还没有已完成的步骤。',preferences:'个性化',settingsTitle:'设置',settingsDesc:'调整显示方式。安全授权由 Windows 和可信 Host 处理。',
+  activity:'操作记录',historyTitle:'任务历史',historyDesc:'这里只显示真正已记录的结果。',historyEmpty:'尚无已记录的引导步骤。',historyUnavailable:'无法核实引导记录，不会推断任何操作已完成。',preferences:'个性化',settingsTitle:'设置',settingsDesc:'调整显示方式。安全授权由 Windows 和可信 Host 处理。',
   languageTitle:'界面语言',languageDesc:'选择简体中文或英语。',appearanceTitle:'外观',appearanceDesc:'跟随系统主题或选择明暗外观。',connectionTitle:'连接状态',connectionDesc:'只在本机提供服务。调用云端模型必须另行确认。',
   connected:'已连接本机',unavailable:'本机服务不可用',localMode:'本地检查',cloudMode:'云端需授权',searchEmpty:'没有找到匹配的操作，请换个关键词。',
   ready:'可继续',needsAttention:'需要检查',formUnavailable:'此步骤尚需可信 Host 的业务支持，未提交任何内容。',previewMissing:'此处尚无法展示真实操作计划与独立授权信息，因此不会修改电脑。',
@@ -71,6 +72,7 @@ let approvalDetailGeneration = 0;
 let approvalInboxGeneration = 0;
 let hostTaskDetail = null;
 let hostTaskDetailRequest = 0;
+let hostTaskListGeneration = 0;
 let unresolvedStepId = null;
 const submitted = [];
 const $ = id => document.getElementById(id);
@@ -119,7 +121,7 @@ function page(name) {
 function notify(message, kind='info') {
  const toast=$('toast'); toast.hidden=false; toast.textContent=message; toast.dataset.kind=kind;
 }
-function showError(error) { notify(tr('unknown') + ' ' + (error instanceof Error ? error.message : String(error))); }
+function showError() { notify(tr('unknown')); }
 async function request(url, options) {
  const reply=await fetch(url, {credentials:'same-origin',...options});
  const json=await reply.json().catch(()=>null);
@@ -264,12 +266,19 @@ async function submitDecision(decision) {
 }
 function renderHistory() {
  const box=$('history-list');box.replaceChildren();
- const history=Array.isArray(lastState?.history)?lastState.history:[];
- if (!history.length){const p=document.createElement('p');p.textContent=tr('historyEmpty');box.append(p);return;}
- for (const row of history.slice().reverse().slice(0,40)) {
+ const history=projectGuidedHistory(lastState?.history);
+ if(history.status!=='READY'){
+  const p=document.createElement('p');p.textContent=tr('historyUnavailable');box.append(p);return;
+ }
+ if(!history.items.length){
+  const p=document.createElement('p');p.textContent=tr('historyEmpty');box.append(p);return;
+ }
+ for(const row of history.items){
   const item=document.createElement('div');item.className='history-entry';
-  const title=document.createElement('strong');title.textContent=row.status==='ACCEPTED'?tr('recorded'):row.status==='REFUSED'?tr('refused'):tr('unknown');
-  const when=document.createElement('time');when.textContent=typeof row.at==='string'?new Date(row.at).toLocaleString(locale==='zh'?'zh-CN':'en-US'):'';
+  const title=document.createElement('strong');
+  title.textContent=tr(row.status==='ACCEPTED'?'recorded':'refused');
+  const when=document.createElement('time');when.dateTime=row.at;
+  when.textContent=new Date(row.at).toLocaleString(locale==='zh'?'zh-CN':'en-US');
   item.append(title,document.createElement('br'),when);box.append(item);
  }
 }
@@ -531,11 +540,13 @@ async function loadHostTaskDetail(id){
 }
 /** Read-only Host task progress; no UI retry, reconcile or automatic action. */
 async function loadHostTasks(){
+ const generation=++hostTaskListGeneration;
  const target=$('host-task-list');target.replaceChildren();
  hostTaskDetailRequest++;
  hostTaskDetail=null;renderHostTaskDetail();
  try{
   const result=projectTaskSnapshots(await request('/api/tasks'));
+  if(generation!==hostTaskListGeneration)return;
   if(result.status!=='READY')throw Error(result.code);
   if(!result.items.length){const p=document.createElement('p');p.textContent=tr('hostTasksEmpty');target.append(p);return;}
   for(const item of result.items){
@@ -548,6 +559,7 @@ async function loadHostTasks(){
    line.append(name,meta,button);target.append(line);
   }
  }catch{
+  if(generation!==hostTaskListGeneration)return;
   const p=document.createElement('p');p.textContent=tr('hostTasksUnknown');target.append(p);
  }
 }
