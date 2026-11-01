@@ -93,6 +93,7 @@ function translate() {
  renderGuided();
  renderHistory();
  renderHostTaskDetail();
+ if(approvalSelected)renderApprovalPreview(approvalSelected);
  filterActions();
 }
 function page(name) {
@@ -370,7 +371,7 @@ async function loadApprovals(){
    const h=document.createElement('h3');h.textContent=item.summary;
    const desc=document.createElement('p');desc.textContent=item.riskClass+' · '+item.taskId;
    const button=document.createElement('button');button.type='button';
-   button.className='text-button';button.textContent=tr('approvalSelect');
+   button.className='text-button';button.dataset.i18n='approvalSelect';button.textContent=tr('approvalSelect');
    button.addEventListener('click',()=>loadApprovalDetail(item.id).catch(showError));
    card.append(h,desc,button);$('approval-list').append(card);
   }
@@ -487,7 +488,7 @@ async function loadHostTasks(){
    const name=document.createElement('strong');name.textContent=item.title;
    const meta=document.createElement('p');meta.textContent=item.state+' · '+new Date(item.updatedAt).toLocaleString(locale==='zh'?'zh-CN':'en-US');
    const button=document.createElement('button');button.type='button';button.className='text-button';
-   button.textContent=tr('taskView');
+   button.dataset.i18n='taskView';button.textContent=tr('taskView');
    button.addEventListener('click',()=>loadHostTaskDetail(item.id).catch(showError));
    line.append(name,meta,button);target.append(line);
   }
