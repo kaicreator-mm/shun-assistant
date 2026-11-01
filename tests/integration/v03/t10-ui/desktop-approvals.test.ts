@@ -41,6 +41,8 @@ describe('R04 real ActionController approval UI',()=>{
   expect(projectExactApproval(health,{approval:pending,preview:{...preview,planHash:'b'.repeat(64)}},pending.approvalId,now).status).toBe('REFUSED');
   expect(projectExactApproval(health,{approval:pending,preview:{...preview,policySnapshotRevision:'old'}},pending.approvalId,now).status).toBe('REFUSED');
   expect(projectExactApproval(health,{approval:pending,preview:{...preview,actions:[]}},pending.approvalId,now).status).toBe('REFUSED');
+  expect(projectExactApproval(health,{approval:pending,preview:{...preview,expiresAt:undefined}},pending.approvalId,now).status).toBe('REFUSED');
+  expect(projectExactApproval(health,{approval:pending,preview:{...preview,expiresAt:'2026-11-01T12:11:00Z'}},pending.approvalId,now).status).toBe('REFUSED');
   expect(projectExactApproval(health,{approval:pending,preview:{...preview,actions:[{...preview.actions[0],network:{allowed:true,domains:['untrusted.example']}}]}},pending.approvalId,now).status).toBe('READY');
  });
  it('considers Host decision recorded only on exact echoed identity, never success of an effect',()=>{
@@ -56,5 +58,7 @@ describe('R04 real ActionController approval UI',()=>{
     state:'COMPLETED',updatedAt:'2026-11-01T12:00:00Z'}]}).status).toBe('READY');
   expect(projectTaskSnapshots({tasks:[{taskId:'task-a',title:'',state:'COMPLETED',
     updatedAt:'2026-11-01T12:00:00Z'}]}).status).toBe('REFUSED');
+  expect(projectTaskSnapshots({tasks:[{taskId:'task-a',title:'Local check',
+    state:'COMPLETED',updatedAt:'invalid-timestamp'}]}).status).toBe('REFUSED');
  });
 });
