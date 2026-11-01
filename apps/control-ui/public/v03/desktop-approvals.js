@@ -125,7 +125,11 @@ export function projectTaskSnapshots(value){
  return {status:'READY',items:items.sort((a,b)=>
    Date.parse(b.updatedAt)-Date.parse(a.updatedAt)||a.id.localeCompare(b.id)).slice(0,100)};
 }
-/** Filter already verified Host task projections; never infer permission. */
+/**
+ * Filter already verified Host task projections; never infer permission.
+ * @param {readonly {state: string}[]} items
+ * @param {string} filter
+ */
 export function filterTaskSnapshots(items,filter){
  if(!Array.isArray(items)||!TASK_FILTERS.includes(filter))return refused('TASK_FILTER_UNVERIFIED');
  return {status:'READY',items:items.filter(item=>

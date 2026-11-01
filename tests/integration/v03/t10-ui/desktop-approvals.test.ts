@@ -54,7 +54,7 @@ describe('R04 real ActionController approval UI',()=>{
   expect(projectApprovalDecision(decision,selected,false).status).toBe('REFUSED');
  });
  it('sorts task snapshots newest first and filters exact Host states',()=>{
-  const task=(taskId,state,updatedAt)=>({taskId,title:'Task '+taskId,state,updatedAt});
+  const task=(taskId: string,state: string,updatedAt: string)=>({taskId,title:'Task '+taskId,state,updatedAt});
   const list=projectTaskSnapshots({tasks:[
    task('done','SUCCEEDED','2026-11-01T09:00:00Z'),
    task('active','EXECUTING','2026-11-01T10:00:00Z'),
