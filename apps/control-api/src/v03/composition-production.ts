@@ -16,6 +16,10 @@ import {
 import { buildNeutralGoalRequest } from '../../../../packages/domain-computer/src/cloud/goal-request.ts';
 import type { HostGuidedService } from '../../../../packages/domain-host/src/guided/host-guided-service.ts';
 import { SqliteKernelDocStore } from '../../../../packages/domain-host/src/state/kernel-doc-store.ts';
+import {
+  type HostSubmitReferenceIssueReceipt,
+  SqliteHostSubmitReferenceLedger,
+} from './composition-approval.ts';
 
 /** The frozen T04 interpreter port the trusted binding consumes. */
 export interface TrustedLlmInterpreterPort {
@@ -42,6 +46,15 @@ export interface ProductionV03Config {
   readonly deployedAppId: string;
   readonly selectedCase: Pick<HostGuidedService, 'state'>;
   readonly llm: ProductionLlmConfig;
+  /**
+   * Durable SQLite file of the Host-issued submit-reference ledger. The
+   * production composition refuses to boot without it: caller-supplied
+   * approval/currentness references are never trusted without a matching
+   * Host-issued record.
+   */
+  readonly approvalLedgerFile: string;
+  /** Trusted clock override (tests); admission decisions never use HTTP time. */
+  readonly now?: () => number;
 }
 
 /**
@@ -152,6 +165,13 @@ export class SqliteCloudRequestJournal {
   }
 }
 
+/**
+ * Submit references live strictly inside the Guided step window (steps cap
+ * at 5 minutes): references never outlive the Case selection, and an
+ * expired pair is re-issued as a fresh pair by the trusted Host.
+ */
+const SUBMIT_REFERENCE_MAX_TTL_MS = 270_000;
+
 function hash(value: string | Uint8Array): string {
   return createHash('sha256').update(value).digest('hex');
 }
@@ -235,8 +255,21 @@ function resolveOpenAiHostBinding(consumerRoot: string): string {
 export async function createProductionV03Gateway(config: ProductionV03Config): Promise<{
   gateway: ControlApiGateway;
   subjectDigest: string;
+  /**
+   * Trusted process-side issuance of the submit-reference pair for the one
+   * live Guided Case step. Never exposed through HTTP: an API client can
+   * submit WITH issued references but can never mint one.
+   */
+  issueSubmitReferences(): HostSubmitReferenceIssueReceipt;
   dispose(): void;
 }> {
+  if (
+    !isAbsolute(config.approvalLedgerFile) ||
+    (config.now !== undefined && typeof config.now !== 'function')
+  ) {
+    throw new Error('V03_PRODUCTION_COMPOSITION_REFUSED');
+  }
+  const now = config.now ?? Date.now;
   const prepared = composeTrustedRuntimeBuild(trustedManifest(config));
   if (
     prepared.status !== 'READY_FOR_PUBLIC_SDK_BUILD' ||
@@ -320,6 +353,9 @@ export async function createProductionV03Gateway(config: ProductionV03Config): P
     }
     throw new Error('V03_CLOUD_HOST_CONFIGURATION_REFUSED');
   }
+  // The ledger shares the composition clock so issuance validity and every
+  // per-submit verification observe the same trusted time.
+  const references = new SqliteHostSubmitReferenceLedger(config.approvalLedgerFile, now);
   const store = new SqliteKernelDocStore(config.kDocDatabaseFile);
   let attemptCounter = 0;
   try {
@@ -365,6 +401,26 @@ export async function createProductionV03Gateway(config: ProductionV03Config): P
     });
     return {
       subjectDigest: activated.subjectDigest,
+      issueSubmitReferences(): HostSubmitReferenceIssueReceipt {
+        // Issuance reads only the trusted Host-staged live step; references
+        // never outlive the Case selection (validity capped at both the step
+        // window and a bounded reference TTL).
+        const liveStep = config.selectedCase.state().currentStep;
+        if (!liveStep) return { status: 'REFUSED', code: 'HOST_CASE_NOT_CURRENT' };
+        const issuedAt = now();
+        const validUntil = Math.min(
+          liveStep.validUntilUnixMs,
+          issuedAt + SUBMIT_REFERENCE_MAX_TTL_MS,
+        );
+        if (validUntil <= issuedAt) {
+          return { status: 'REFUSED', code: 'HOST_CASE_NOT_CURRENT' };
+        }
+        return references.issue({
+          caseId: liveStep.taskId,
+          stepId: liveStep.stepId,
+          validUntilUnixMs: validUntil,
+        });
+      },
       gateway: createControlApiGateway({
         domainApp: {
           send: async (raw) => {
@@ -381,9 +437,24 @@ export async function createProductionV03Gateway(config: ProductionV03Config): P
             if (
               !liveStep ||
               liveStep.taskId !== candidate.caseId ||
-              liveStep.validUntilUnixMs <= Date.now()
+              liveStep.validUntilUnixMs <= now()
             ) {
               return { status: 'refused', code: 'HOST_CASE_NOT_CURRENT' };
+            }
+            // The submitted reference pair must authenticate against the
+            // durable Host-issued record for THIS live Case step. Valid-shaped
+            // but forged, pair-spliced, cross-Case, superseded-step, revoked
+            // or expired references refuse here — before the LLM request is
+            // minted and before the Kernel facade is entered: zero K sends,
+            // zero T04 calls, zero egress for unauthenticated submissions.
+            const verified = references.verify({
+              caseId: candidate.caseId,
+              stepId: liveStep.stepId,
+              currentnessRef: candidate.currentnessRef,
+              approvalRef: candidate.approvalRef,
+            });
+            if (verified.status !== 'VALID') {
+              return { status: 'refused', code: verified.code };
             }
             // The exact dh.llm.generate/1 request is minted HERE by the
             // trusted Host from the gateway-validated GoalRequest — the
@@ -392,7 +463,7 @@ export async function createProductionV03Gateway(config: ProductionV03Config): P
             const llmRequest = buildNeutralGoalRequest({
               requestId,
               goalText: typeof candidate.request?.goal === 'string' ? candidate.request.goal : '',
-              deadlineUnixMs: Date.now() + 600_000,
+              deadlineUnixMs: now() + 600_000,
               maxOutputTokens: config.llm.configuredMaxOutputTokens,
             });
             if (!llmRequest) return { status: 'refused', code: 'HOST_LLM_REQUEST_REFUSED' };
@@ -418,10 +489,12 @@ export async function createProductionV03Gateway(config: ProductionV03Config): P
       dispose() {
         activated.dispose();
         store.close();
+        references.close();
       },
     };
   } catch {
     store.close();
+    references.close();
     throw new Error('V03_PRODUCTION_ACTIVATION_REFUSED');
   }
 }

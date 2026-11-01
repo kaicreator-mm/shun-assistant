@@ -153,6 +153,14 @@ function assembleBuild(dir: string): { buildFile: string; buildFileSha256: strin
   };
 }
 
+// Host-issued reference pair (R02-E reference binding), acquired from the
+// trusted production composition in beforeAll: the gateway accepts only
+// references minted by the trusted Host, never caller constants.
+let submitRefs: { currentnessRef: string; approvalRef: string } = {
+  currentnessRef: '',
+  approvalRef: '',
+};
+
 function submission(caseId: string, goal: string): Record<string, unknown> {
   return {
     caseId,
@@ -166,8 +174,8 @@ function submission(caseId: string, goal: string): Record<string, unknown> {
         environmentPolicy: { allowedBackendKinds: ['LOCAL_WINDOWS'], allowElevation: false },
       },
     },
-    currentnessRef: 'shun.currentness.v1/goal-r02v',
-    approvalRef: 'shun.approval.v1/goal-r02v',
+    currentnessRef: submitRefs.currentnessRef,
+    approvalRef: submitRefs.approvalRef,
   };
 }
 
@@ -268,7 +276,13 @@ describe('R02-V real-product journeys (zero paid, zero physical effects)', () =>
         journalFile: join(dir, 'cloud-journal.sqlite'),
         configuredMaxOutputTokens: 256,
       },
+      approvalLedgerFile: join(dir, 'submit-references.sqlite'),
     });
+    // Trusted process-side issuance — the only source of submit references.
+    const issued = production.issueSubmitReferences();
+    expect(issued.status).toBe('ISSUED');
+    if (issued.status !== 'ISSUED') throw new Error('reference issuance failed');
+    submitRefs = { currentnessRef: issued.currentnessRef, approvalRef: issued.approvalRef };
     server = createControlServer({
       backend: new DemoShunBackend(),
       uiDir: resolve(repoRoot, 'apps/control-ui/public'),

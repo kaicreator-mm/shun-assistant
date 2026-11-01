@@ -2,17 +2,24 @@
  * R02-E production shipping composition journey — the REAL production entry
  * (`createProductionV03Gateway`) over the installed public v0.10.3 SDK
  * consumer, the real operator manifest, the durable Guided Case, the SQLite
- * K doc store and the durable cloud request journal.
+ * K doc store, the durable cloud request journal and the durable
+ * Host-issued submit-reference ledger.
  *
  * Zero paid calls / zero physical effects: the trusted T04 binding is
  * installed with a controlled interpreter double whose status/interpretGoal
  * follow the real frozen port; the single-sender/replay/no-retry invariants
  * are asserted against the REAL Kernel gate.
+ *
+ * Reference-binding negatives (preflight repair): valid-shaped FORGED,
+ * EXPIRED and CROSS-CASE reference submissions must be refused BEFORE the
+ * Kernel facade is entered — zero K doc writes, zero cloud-journal writes
+ * and zero T04 interpreter calls for every unauthenticated submission.
  */
 import { spawnSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
 import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
+import { DatabaseSync } from 'node:sqlite';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
@@ -164,22 +171,17 @@ interface InterpreterState {
   nextResult: 'proposal' | 'consent-declined';
 }
 
-function submission(caseId: string, goal: string): Record<string, unknown> {
-  return {
-    caseId,
-    request: {
-      taskId: caseId,
-      goal,
-      objects: [],
-      constraints: {},
-      policyContext: {
-        privacyPolicy: { localOnly: true, externalDisclosure: 'FORBIDDEN' },
-        environmentPolicy: { allowedBackendKinds: ['LOCAL_WINDOWS'], allowElevation: false },
-      },
-    },
-    currentnessRef: 'shun.currentness.v1/goal-r02e',
-    approvalRef: 'shun.approval.v1/goal-r02e',
-  };
+/** Durable-effect evidence counters (K doc store / cloud request journal). */
+function sqliteRowCount(file: string, table: string): number {
+  const db = new DatabaseSync(file);
+  try {
+    const row = db.prepare(`SELECT COUNT(*) AS count FROM ${table}`).get() as
+      | { count: number }
+      | undefined;
+    return row?.count ?? -1;
+  } finally {
+    db.close();
+  }
 }
 
 describe('R02-E shipping production gateway over the real SDK consumer', () => {
@@ -188,6 +190,12 @@ describe('R02-E shipping production gateway over the real SDK consumer', () => {
   let interpreter: InterpreterState;
   let gateway: Awaited<ReturnType<typeof createProductionV03Gateway>>;
   let caseId: string;
+  let issuedRefs: { currentnessRef: string; approvalRef: string };
+  let kDocsFile: string;
+  let cloudJournalFile: string;
+  /** Real advancing clock plus a controllable offset (reference-expiry test). */
+  let clockOffsetMs = 0;
+  let issuedAtRealMs = 0;
 
   beforeAll(async () => {
     dir = mkdtempSync(join(tmpdir(), 'shun-r02e-'));
@@ -227,11 +235,13 @@ describe('R02-E shipping production gateway over the real SDK consumer', () => {
 
     interpreter = { calls: [], nextResult: 'proposal' };
     const { buildFile, buildFileSha256 } = assembleBuild(dir);
+    kDocsFile = join(dir, 'k-docs.sqlite');
+    cloudJournalFile = join(dir, 'cloud-journal.sqlite');
     gateway = await createProductionV03Gateway({
       buildFile,
       buildFileSha256,
       sdkConsumerDir: consumerDir,
-      kDocDatabaseFile: join(dir, 'k-docs.sqlite'),
+      kDocDatabaseFile: kDocsFile,
       deploymentRoot: consumerDir,
       tenantId: 'tenant:shun-v03',
       deployedAppId: 'deployment:shun-v03-r02e',
@@ -263,10 +273,19 @@ describe('R02-E shipping production gateway over the real SDK consumer', () => {
             };
           },
         },
-        journalFile: join(dir, 'cloud-journal.sqlite'),
+        journalFile: cloudJournalFile,
         configuredMaxOutputTokens: 256,
       },
+      approvalLedgerFile: join(dir, 'submit-references.sqlite'),
+      now: () => Date.now() + clockOffsetMs,
     });
+    // Trusted process-side issuance: the ONLY way submit references exist.
+    const issued = gateway.issueSubmitReferences();
+    expect(issued.status).toBe('ISSUED');
+    if (issued.status !== 'ISSUED') throw new Error('reference issuance failed');
+    expect(issued.caseId).toBe(caseId);
+    issuedRefs = { currentnessRef: issued.currentnessRef, approvalRef: issued.approvalRef };
+    issuedAtRealMs = Date.now();
   });
 
   afterAll(() => {
@@ -286,11 +305,34 @@ describe('R02-E shipping production gateway over the real SDK consumer', () => {
     }
   });
 
+  function submission(
+    submitCaseId: string,
+    goal: string,
+    refs: { currentnessRef: string; approvalRef: string } = issuedRefs,
+  ): Record<string, unknown> {
+    return {
+      caseId: submitCaseId,
+      request: {
+        taskId: submitCaseId,
+        goal,
+        objects: [],
+        constraints: {},
+        policyContext: {
+          privacyPolicy: { localOnly: true, externalDisclosure: 'FORBIDDEN' },
+          environmentPolicy: { allowedBackendKinds: ['LOCAL_WINDOWS'], allowElevation: false },
+        },
+      },
+      currentnessRef: refs.currentnessRef,
+      approvalRef: refs.approvalRef,
+    };
+  }
+
   it('boots the production composition with the real SDK closure', () => {
     expect(gateway.subjectDigest).toMatch(/^[0-9a-f]{64}$/);
   });
 
-  it('positive: live Case submit reaches COMPLETED with the trusted proposal', async () => {
+  it('positive: live Case submit with Host-issued references reaches COMPLETED', async () => {
+    const kDocsBefore = sqliteRowCount(kDocsFile, 'k_v10_docs');
     const receipt = await gateway.gateway.submit(
       submission(caseId, 'Summarize the selected folder.'),
     );
@@ -305,6 +347,9 @@ describe('R02-E shipping production gateway over the real SDK consumer', () => {
     expect(interpreter.calls).toHaveLength(1);
     // The exact Host-minted disclosure reached the only sender entry.
     expect(interpreter.calls[0]?.goalText).toBe('Summarize the selected folder.');
+    // A real K send leaves durable K doc writes — the counter the negatives
+    // below rely on to prove ZERO Kernel sends.
+    expect(sqliteRowCount(kDocsFile, 'k_v10_docs')).toBeGreaterThan(kDocsBefore);
   });
 
   it('re-submitting identical content is refused by the K non-idempotency fence, never re-sent', async () => {
@@ -340,5 +385,135 @@ describe('R02-E shipping production gateway over the real SDK consumer', () => {
     const receipt = await gateway.gateway.submit({ ...submission(caseId, 'x'), extra: true });
     expect(receipt).toMatchObject({ status: 'REFUSED', sendCalls: 0, journalEntries: 0 });
     expect(interpreter.calls).toHaveLength(2);
+  });
+
+  it('FORGED valid-shaped references are refused pre-Kernel: zero sends, zero journals, zero T04', async () => {
+    const kDocs = sqliteRowCount(kDocsFile, 'k_v10_docs');
+    const journal = sqliteRowCount(cloudJournalFile, 'cloud_request_journal');
+    const t04 = interpreter.calls.length;
+    const receipt = await gateway.gateway.submit(
+      submission(caseId, 'Summarize with forged references.', {
+        currentnessRef: `shun.currentness.v1/${'a'.repeat(48)}`,
+        approvalRef: `shun.approval.v1/${'b'.repeat(48)}`,
+      }),
+    );
+    // Grammar-valid but never issued by the trusted Host: the composition
+    // refuses before the Kernel facade — no K doc write, no cloud-journal
+    // reservation, no interpreter call, no egress.
+    expect(receipt).toMatchObject({ status: 'KERNEL_REFUSED', sendCalls: 1 });
+    expect(interpreter.calls).toHaveLength(t04);
+    expect(sqliteRowCount(kDocsFile, 'k_v10_docs')).toBe(kDocs);
+    expect(sqliteRowCount(cloudJournalFile, 'cloud_request_journal')).toBe(journal);
+  });
+
+  it('EXPIRED Host-issued references are refused pre-Kernel while the Case step is still live', async () => {
+    const kDocs = sqliteRowCount(kDocsFile, 'k_v10_docs');
+    const journal = sqliteRowCount(cloudJournalFile, 'cloud_request_journal');
+    const t04 = interpreter.calls.length;
+    // References live strictly inside the Guided step window (composition
+    // caps the TTL at 270s while the step lives 300s): advance the trusted
+    // clock to exactly past the reference validity but NOT past the step
+    // validity (the offset is anchored at the real issuance instant, so real
+    // test elapsed time cannot break either bound).
+    try {
+      clockOffsetMs += issuedAtRealMs + 270_001 - Date.now();
+      const receipt = await gateway.gateway.submit(
+        submission(caseId, 'Summarize with expired references.'),
+      );
+      expect(receipt).toMatchObject({ status: 'KERNEL_REFUSED', sendCalls: 1 });
+      expect(interpreter.calls).toHaveLength(t04);
+      expect(sqliteRowCount(kDocsFile, 'k_v10_docs')).toBe(kDocs);
+      expect(sqliteRowCount(cloudJournalFile, 'cloud_request_journal')).toBe(journal);
+    } finally {
+      clockOffsetMs = 0;
+    }
+  });
+
+  it('CROSS-CASE references (issued for another Case) are refused pre-Kernel', async () => {
+    const kDocs = sqliteRowCount(kDocsFile, 'k_v10_docs');
+    const journal = sqliteRowCount(cloudJournalFile, 'cloud_request_journal');
+    const t04 = interpreter.calls.length;
+    // The control positive at the end must reach the trusted proposal path.
+    interpreter.nextResult = 'proposal';
+    // Consume the live step (trusted Host observation receipt, REFUSE), then
+    // stage a genuinely NEW Case B — the attacker presents Case A's still
+    // CURRENT issued references under Case B's live submit.
+    const step = guided.state().currentStep;
+    expect(step).toBeTruthy();
+    if (!step) return;
+    const consumed = guided.decide({
+      kind: 'USER_DECISION_RELAY',
+      humanApproval: true,
+      authorityClaimed: false,
+      decision: 'REFUSE',
+      relayedVia: '/api',
+      stepId: step.stepId,
+      stepDigest: step.templateRef.digest,
+      caseRef: step.caseRef,
+      outcome: {
+        schema: 'shun.guided.step-outcome.v1',
+        journeyId: step.journeyId,
+        taskId: step.taskId,
+        stepId: step.stepId,
+        caseRef: step.caseRef,
+        event: 'OBSERVATION_RECEIPT',
+        source: 'HOST',
+        sourceRef: 'host:obs:r02e',
+        answers: [],
+        evidenceRefs: ['host:scope:r02e'],
+        occurredAtUnixMs: Date.now(),
+      },
+    });
+    expect(consumed.status).toBe('RECORDED');
+    const stagedB = guided.stageTrustedSelection({
+      observation: {
+        schema: 'shun.guided.host-observation.v1',
+        taskId: 'task-r02e-goal-b',
+        journeyId: 'journey-r02e',
+        sourceRef: 'host:obs:r02e-b',
+        revision: 'r02e-b',
+        caseRef: { snapshotId: 'snap-r02e-b', digest: 'd'.repeat(64) },
+        observedAtUnixMs: Date.now() - 1_000,
+        validUntilUnixMs: Date.now() + 3_600_000,
+        evidenceRefs: ['host:scope:r02e-b'],
+        selectedRootRef: 'host:root:r02e-b',
+      },
+      semanticSelection: {
+        status: 'SELECTED',
+        semantic: {
+          schema: 'shun.goal-semantic.v1',
+          taskId: 'task-r02e-goal-b',
+          goalContract: { taskId: 'task-r02e-goal-b', objective: 'summarize second folder' },
+          capabilityId: 'system.storage.diagnose_bounded_action',
+          capabilityRevision: 'r1',
+          provenance: { resolverRevision: 'resolver-v03' },
+        },
+      },
+      scope: { status: 'KNOWN', selectedRootRef: 'host:root:r02e-b' },
+    });
+    expect(stagedB.status).toBe('CURRENT');
+    if (stagedB.status !== 'CURRENT') return;
+    const crossCase = await gateway.gateway.submit(
+      submission('task-r02e-goal-b', 'Summarize the second folder.', issuedRefs),
+    );
+    expect(crossCase).toMatchObject({ status: 'KERNEL_REFUSED', sendCalls: 1 });
+    expect(interpreter.calls).toHaveLength(t04);
+    expect(sqliteRowCount(kDocsFile, 'k_v10_docs')).toBe(kDocs);
+    expect(sqliteRowCount(cloudJournalFile, 'cloud_request_journal')).toBe(journal);
+    // Control: Case B's OWN freshly issued references complete normally —
+    // the refusal above was reference authentication, not a broken seam.
+    const refsB = gateway.issueSubmitReferences();
+    expect(refsB.status).toBe('ISSUED');
+    if (refsB.status !== 'ISSUED') return;
+    expect(refsB.caseId).toBe('task-r02e-goal-b');
+    const genuineB = await gateway.gateway.submit(
+      submission(
+        'task-r02e-goal-b',
+        'Summarize the second folder.',
+        { currentnessRef: refsB.currentnessRef, approvalRef: refsB.approvalRef },
+      ),
+    );
+    expect(genuineB.status).toBe('COMPLETED');
+    expect(interpreter.calls).toHaveLength(t04 + 1);
   });
 });

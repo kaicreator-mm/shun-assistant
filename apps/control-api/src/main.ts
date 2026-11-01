@@ -114,8 +114,30 @@ const production =
             10,
           ),
         },
+        // The durable Host submit-reference ledger is mandatory: without a
+        // Host-issued record every gateway submit reference would be an
+        // unauthenticated browser-controlled string. Boot fails closed.
+        approvalLedgerFile: requiredEnv('SHUN_V03_APPROVAL_LEDGER'),
       })
     : undefined;
+// Issuance is trusted-process-only (never an HTTP route). The operator reads
+// the issued pair from this local console to submit; without a live staged
+// Case no references exist and every gateway submit refuses pre-Kernel.
+if (production) {
+  const issued = production.issueSubmitReferences();
+  if (issued.status === 'ISSUED') {
+    console.log(
+      `v0.3 submit references issued (case ${issued.caseId}, step ${issued.stepId}, ` +
+        `valid until ${new Date(issued.validUntilUnixMs).toISOString()}): ` +
+        `currentnessRef=${issued.currentnessRef} approvalRef=${issued.approvalRef}`,
+    );
+  } else {
+    console.log(
+      `v0.3 submit references NOT issued (${issued.code}); ` +
+        '/api/v03/gateway/submit will refuse every send until a Guided Case is staged.',
+    );
+  }
+}
 const handle = createControlServer({
   backend,
   uiDir,
