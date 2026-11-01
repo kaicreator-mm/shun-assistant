@@ -8,15 +8,15 @@ const html = source('index.html');
 
 describe('R04 shipped desktop bootstrap wiring', () => {
   it('every literal DOM lookup has exactly one matching HTML element', () => {
-    const ids = [...html.matchAll(/\\bid="([^"]+)"/g)].map((match) => match[1]);
+    const ids = [...html.matchAll(/\bid="([^"]+)"/g)].map((match) => match[1]);
     expect(new Set(ids).size).toBe(ids.length);
-    const lookups = [...js.matchAll(/\\$\\('([^']+)'\\)/g)].map((match) => match[1]);
+    const lookups = [...js.matchAll(/\$\('([^']+)'\)/g)].map((match) => match[1]);
     expect(lookups.length).toBeGreaterThan(30);
     for (const id of lookups) expect(ids).toContain(id);
   });
 
   it('the boot module imports only modules that actually ship with the UI', () => {
-    const relative = [...js.matchAll(/from '\\.\\/([^']+)'/g)].map((match) => match[1]);
+    const relative = [...js.matchAll(/from '\.\/([^']+)'/g)].map((match) => match[1]);
     expect(relative.length).toBeGreaterThan(3);
     for (const path of relative) {
       expect(path).not.toContain('..');
@@ -26,10 +26,10 @@ describe('R04 shipped desktop bootstrap wiring', () => {
   });
 
   it('all shipped labels and accessibility attributes exist in BOTH UI locales', () => {
-    const en = js.slice(js.indexOf('\\n en: {'), js.indexOf('\\n },\\n zh: {'));
-    const zh = js.slice(js.indexOf('\\n zh: {'), js.indexOf('\\n }\\n};\\nconst storage'));
+    const en = js.slice(js.indexOf('\n en: {'), js.indexOf('\n },\n zh: {'));
+    const zh = js.slice(js.indexOf('\n zh: {'), js.indexOf('\n }\n};\nconst storage'));
     const keys = (value: string): Set<string> =>
-      new Set([...value.matchAll(/(?:^|[,\\n{]\\s*)([a-zA-Z][a-zA-Z0-9]*):'/g)]
+      new Set([...value.matchAll(/(?:^|[,\n{]\s*)([a-zA-Z][a-zA-Z0-9]*):'/g)]
         .map((match) => match[1] as string));
     const english = keys(en);
     const chinese = keys(zh);
