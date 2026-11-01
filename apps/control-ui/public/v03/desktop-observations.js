@@ -48,7 +48,7 @@ function metrics(evidence) {
 function invalid(code) { return { status: 'REFUSED', code }; }
 
 /**
- * @param {'inventory'|'diagnosis'} kind
+ * @param {string} kind
  * @param {any} value Raw actual loopback API body (validated before projection).
  * @returns {{status: 'OBSERVED', metrics: {key:string,value:string}[],
  *   signals: string[], counts: {key:string,value:string}[] } |
