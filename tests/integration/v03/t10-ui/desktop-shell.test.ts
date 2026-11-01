@@ -16,6 +16,8 @@ describe('R04 source contract: the shipped desktop surface replaces technical op
     expect(html).not.toContain('src="./app.js"');
     expect(html).not.toContain('id="v03-j-grant"');
     expect(html).not.toContain('id="v03-j-approval"');
+    expect(html).toContain('id="page-routine"');
+    expect(html).toContain('id="page-assistant"');
   });
 
   it('renders approved Host StepSpec fields without offering a raw effect/permit route', () => {
@@ -28,6 +30,12 @@ describe('R04 source contract: the shipped desktop surface replaces technical op
     expect(app).toContain("currentModel.fields.flatMap");
     expect(app).toContain("!f.required && (value==='' || value===false)");
     expect(app).toContain("addEventListener('click',()=>page('home'))");
+    expect(app).toContain('/api/recipes/builtin/system-inventory');
+    expect(app).toContain('/api/cloud/disclosure-preview');
+    expect(app).toContain('projectRoutineExecution');
+    expect(app).toContain('projectDisclosurePreview');
+    expect(app).not.toContain('/api/cloud/interpret');
+    expect(app).not.toContain('/api/v03/gateway/submit');
     expect(app).not.toContain('/api/v03/effect/submit');
     expect(app).not.toContain('/api/v03/provider/first-use');
     expect(app).not.toContain('/api/v03/meta/feedback');
