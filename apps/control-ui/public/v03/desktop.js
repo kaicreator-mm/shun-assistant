@@ -4,13 +4,14 @@
  * Fields are rendered ONLY from the trusted, allowlisted StepSpec projection.
  */
 import { t as approvedText } from './strings.js';
+import { realApprovalPosture, projectPendingApprovals, projectExactApproval, projectApprovalDecision, projectTaskSnapshots } from './desktop-approvals.js';
 import { summarizeBrowserFolder, guidedReceiptStatus } from './desktop-folder.js';
 import { projectLocalObservation, projectRoutineState, projectRoutineExecution, projectDisclosurePreview } from './desktop-observations.js';
 import { currentStepModel, buildStepOutcome, userDecisionRelay, replayGuard } from './view-model.js';
 
 const words = {
  en: {
-  brandSub:'Your Windows companion',navHome:'Home',navTasks:'My tasks',navAssistant:'AI request preview',navComputer:'My computer',navRoutine:'Saved routines',navHistory:'History',navSettings:'Settings',
+  brandSub:'Your Windows companion',navHome:'Home',navTasks:'My tasks',navApprovals:'Approvals',navAssistant:'AI request preview',navComputer:'My computer',navRoutine:'Saved routines',navHistory:'History',navSettings:'Settings',
   localOnly:'Runs on your computer',welcome:'WELCOME BACK',heroTitle:'What would you like to do?',heroDesc:'Choose a familiar task. Shun will guide you through the details.',searchLabel:'Find a task',searchPlaceholder:'Find an action…',quickTitle:'Quick actions',quickDesc:'Start safely; nothing changes without your approval.',
   actionAssistant:'Plan with AI',actionAssistantDesc:'Preview what might be shared before any model request.',actionInventory:'Computer overview',actionInventoryDesc:'See system information without changing anything.',actionDiagnosis:'Check my computer',actionDiagnosisDesc:'Run a safe, read-only health check.',actionRoutine:'Saved system check',actionRoutineDesc:'Reuse a verified read-only check without AI.',actionFolder:'Work with files',actionFolderDesc:'Choose a folder, review a plan and decide what happens.',openAction:'Open →',
   privacyTitle:'You stay in control',privacyDesc:'Local checks stay on this computer. Changes and cloud requests need separate approval.',recentTitle:'Continue a task',noCurrent:'No active task right now.',seeTasks:'View tasks →',
@@ -25,10 +26,10 @@ const words = {
   scopeReady:'A location has been selected by the trusted Host.',stepExpired:'This step is no longer current. Refresh before continuing.',recorded:'Your decision was recorded. No Windows permission was granted.',refused:'The request was refused.',unknown:'The result is unknown. Do not repeat the operation without checking its actual state.',
   offlineCheck:'This check is only available on a real Windows host.',loading:'Checking your computer…',completed:'Check completed',noData:'No safe summary is available.',technicalDetails:'Technical details',
   consentNext:'Continue to separate authorization',cancelDecision:'Decline this step',unsafeUnavailable:'This form is not an approval or an execution request.',reportMemory:'Memory',reportCpu:'Processor',reportDisk:'Storage',reportDevice:'Device',safeAction:'Read-only check',
-  emptyNotice:'Choose a task on the home page to begin.',filterReset:'Clear search',navigationLabel:'Main navigation',sectionLabel:'Sections',menuLabel:'Toggle menu',refreshLabel:'Refresh',folderInputLabel:'Folder preview picker',folderChoose:'Browse a folder',folderHint:'Browser preview only. No file content or path is sent to Shun.',folderPreview:'Browser preview: {folder} · {count} files · {size} MiB. This is NOT a Host-approved work scope.',folderRefused:'Folder preview unavailable. No files were sent.',stale:'The step expired or changed. Refresh before continuing.',unknownHold:'Result unknown. This step is locked until the trusted Host reconciles it.',assistantTag:'PRIVACY FIRST',assistantTitle:'Plan with AI',assistantDesc:'Describe a goal and inspect the exact data before consenting to anything.',assistantGoalLabel:'What would you like to do?',assistantPlaceholder:'Example: Explain why my computer feels slow…',assistantPreview:'Preview disclosure',assistantPrivacy:'Local preview only. No cloud send, consent or budget reservation occurs here.',assistantNoPreview:'No disclosure prepared yet.',assistantPreviewOk:'Exact proposed disclosure (not sent)',assistantPreviewFail:'Preview unavailable; nothing was sent.',assistantLoading:'Preparing local preview…',routineTag:'REUSABLE TASK',routineTitle:'Saved system check',routineIntro:'Save one verified, read-only system check and reuse it without AI requests. Shun checks local permissions every time.',routineName:'Computer overview',routineSafe:'Reads only aggregate CPU, memory and storage information. No files are modified.',routineSave:'Save routine',routineRun:'Run saved check',routineAuth:'Saving is not approval. The trusted Host checks permission on every run.',routineNoRun:'No verified run yet.',routineNotSaved:'Not saved',routineSaved:'Saved, not authorized',routineDenied:'Host refused the routine. Nothing was changed.',routineProgress:'Checking trusted Host…',routineSuccess:'Host-verified read-only result',routineError:'Unable to verify the routine status.',observedOnly:'Single observation; not a diagnosis or speed-up guarantee.',metricCpu:'CPU logical cores',metricMemory:'Available / total memory',metricStorage:'Free / total storage',metricProcesses:'Observed processes',metricStartup:'Startup entries',signalDisk:'Low storage space detected',signalMemory:'Low available memory detected',signalNone:'No low-memory or low-storage signal in this snapshot.'
+  emptyNotice:'Choose a task on the home page to begin.',filterReset:'Clear search',approvalTag:'INDEPENDENT APPROVAL',approvalTitle:'Plans awaiting your decision',approvalIntro:'Review the actual plan, scope and risk. An approval is not proof of execution.',approvalRefresh:'Refresh pending plans',approvalPending:'Pending approvals',approvalSafetyTitle:'Your protection',approvalSafetyDesc:'The trusted Host checks the exact plan and current policy. The browser never issues a grant.',approvalDetail:'Review exact plan',approvalCheckbox:'I reviewed this exact plan, scope, risk and recovery.',approvalDecline:'Decline',approvalAccept:'Approve this plan',approvalDemo:'Demonstration mode. Real approvals are disabled.',approvalUnready:'No verified approval service or current policy. Actions disabled.',approvalLoading:'Loading real Host approvals…',approvalEmpty:'There are no pending approvals.',approvalExpired:'The plan expired or changed. Refresh before deciding.',approvalUnknown:'Decision result unknown. Do not repeat it until Host state is checked.',approvalRecorded:'Your decision was recorded. Execution is not confirmed.',approvalRefused:'The Host refused this decision. Nothing was authorized.',approvalPlanHash:'Plan identity',approvalRisk:'Risk',approvalActions:'Affected actions',approvalRead:'Read scope',approvalWrite:'Write scope',approvalNetwork:'Network access',approvalVerification:'Verification',approvalRecovery:'Recovery',approvalExpiry:'Approval expires',approvalNoNetwork:'Disabled',approvalYesNetwork:'Allowed',approvalSelect:'Review →',hostTasksTitle:'Host task history',hostTasksLoading:'Loading locally recorded tasks…',hostTasksEmpty:'No locally recorded tasks.',hostTasksUnknown:'Task history unavailable; no success is inferred.',navigationLabel:'Main navigation',sectionLabel:'Sections',menuLabel:'Toggle menu',refreshLabel:'Refresh',folderInputLabel:'Folder preview picker',folderChoose:'Browse a folder',folderHint:'Browser preview only. No file content or path is sent to Shun.',folderPreview:'Browser preview: {folder} · {count} files · {size} MiB. This is NOT a Host-approved work scope.',folderRefused:'Folder preview unavailable. No files were sent.',stale:'The step expired or changed. Refresh before continuing.',unknownHold:'Result unknown. This step is locked until the trusted Host reconciles it.',assistantTag:'PRIVACY FIRST',assistantTitle:'Plan with AI',assistantDesc:'Describe a goal and inspect the exact data before consenting to anything.',assistantGoalLabel:'What would you like to do?',assistantPlaceholder:'Example: Explain why my computer feels slow…',assistantPreview:'Preview disclosure',assistantPrivacy:'Local preview only. No cloud send, consent or budget reservation occurs here.',assistantNoPreview:'No disclosure prepared yet.',assistantPreviewOk:'Exact proposed disclosure (not sent)',assistantPreviewFail:'Preview unavailable; nothing was sent.',assistantLoading:'Preparing local preview…',routineTag:'REUSABLE TASK',routineTitle:'Saved system check',routineIntro:'Save one verified, read-only system check and reuse it without AI requests. Shun checks local permissions every time.',routineName:'Computer overview',routineSafe:'Reads only aggregate CPU, memory and storage information. No files are modified.',routineSave:'Save routine',routineRun:'Run saved check',routineAuth:'Saving is not approval. The trusted Host checks permission on every run.',routineNoRun:'No verified run yet.',routineNotSaved:'Not saved',routineSaved:'Saved, not authorized',routineDenied:'Host refused the routine. Nothing was changed.',routineProgress:'Checking trusted Host…',routineSuccess:'Host-verified read-only result',routineError:'Unable to verify the routine status.',observedOnly:'Single observation; not a diagnosis or speed-up guarantee.',metricCpu:'CPU logical cores',metricMemory:'Available / total memory',metricStorage:'Free / total storage',metricProcesses:'Observed processes',metricStartup:'Startup entries',signalDisk:'Low storage space detected',signalMemory:'Low available memory detected',signalNone:'No low-memory or low-storage signal in this snapshot.'
  },
  zh: {
-  brandSub:'你的 Windows 电脑助手',navHome:'首页',navTasks:'我的任务',navAssistant:'AI 请求预览',navComputer:'我的电脑',navRoutine:'保存的任务',navHistory:'历史记录',navSettings:'设置',
+  brandSub:'你的 Windows 电脑助手',navHome:'首页',navTasks:'我的任务',navApprovals:'待审批',navAssistant:'AI 请求预览',navComputer:'我的电脑',navRoutine:'保存的任务',navHistory:'历史记录',navSettings:'设置',
   localOnly:'仅在本机运行',welcome:'欢迎回来',heroTitle:'今天想让电脑做点什么？',heroDesc:'选择常用任务，顺助手会逐步引导你完成。',searchLabel:'查找任务',searchPlaceholder:'查找任务或操作…',quickTitle:'常用操作',quickDesc:'从安全的检查开始。任何改动都需要你的独立确认。',
   actionAssistant:'用 AI 规划',actionAssistantDesc:'先查看可能披露的信息，不会发送模型请求。',actionInventory:'查看电脑概况',actionInventoryDesc:'查看系统信息，不会修改任何内容。',actionDiagnosis:'检查电脑状态',actionDiagnosisDesc:'安全地检查电脑健康状况，只读操作。',actionRoutine:'保存的系统检查',actionRoutineDesc:'复用已验证的只读任务，不需要 AI。',actionFolder:'整理与管理文件',actionFolderDesc:'选择文件夹，检查计划并决定下一步。',openAction:'打开 →',
   privacyTitle:'电脑始终由你掌控',privacyDesc:'本地检查不会上传数据。修改电脑或连接云端前需单独授权。',recentTitle:'继续未完成的任务',noCurrent:'目前没有正在进行的任务。',seeTasks:'查看任务 →',
@@ -43,7 +44,7 @@ const words = {
   scopeReady:'可信 Host 已选择一个位置。',stepExpired:'该步骤已过期，请刷新后再继续。',recorded:'已记录你的选择，没有签发 Windows 执行权限。',refused:'请求已拒绝。',unknown:'操作结果未知。核实真实状态前请勿重复操作。',
   offlineCheck:'此项检查仅在真实 Windows 主机上可用。',loading:'正在检查电脑…',completed:'检查完成',noData:'没有可安全展示的摘要。',technicalDetails:'技术细节',
   consentNext:'继续到独立授权',cancelDecision:'拒绝此步骤',unsafeUnavailable:'此表单不产生执行授权。',reportMemory:'内存',reportCpu:'处理器',reportDisk:'存储空间',reportDevice:'设备',safeAction:'只读检查',
-  emptyNotice:'请先从首页选择一个任务。',filterReset:'清除搜索',navigationLabel:'主导航',sectionLabel:'导航分区',menuLabel:'展开或收起菜单',refreshLabel:'刷新',folderInputLabel:'文件夹本地预览选择器',folderChoose:'浏览文件夹',folderHint:'仅在浏览器中预览，不向顺助手发送文件内容或路径。',folderPreview:'浏览器预览：{folder} · {count} 个文件 · {size} MiB。这不是可信 Host 批准的操作范围。',folderRefused:'无法预览文件夹，未发送任何文件。',stale:'步骤已过期或改变，请刷新后再继续。',unknownHold:'操作结果未知，该步骤已锁定，须由可信 Host 核对状态。',assistantTag:'隐私优先',assistantTitle:'用 AI 规划',assistantDesc:'描述目标，在同意任何请求前先查看拟披露的精确内容。',assistantGoalLabel:'你想完成什么？',assistantPlaceholder:'例如：帮我解释电脑为什么变慢了……',assistantPreview:'查看披露内容',assistantPrivacy:'仅在本机生成预览，不会调用模型、签发同意或预留预算。',assistantNoPreview:'尚无披露预览。',assistantPreviewOk:'拟披露的原始内容（尚未发送）',assistantPreviewFail:'预览失败，未发送任何内容。',assistantLoading:'正在本机准备预览……',routineTag:'可复用的任务',routineTitle:'保存的系统检查',routineIntro:'保存一个已验证的只读系统检查，以后不用调用 AI 也能执行。每次都由本机核对权限。',routineName:'电脑概况',routineSafe:'只读取 CPU、内存和存储空间的汇总信息，不会修改文件。',routineSave:'保存任务',routineRun:'运行保存的检查',routineAuth:'保存任务不代表授权执行，每次运行都由可信 Host 检查权限。',routineNoRun:'还没有已验证的运行结果。',routineNotSaved:'尚未保存',routineSaved:'已保存，未授权执行',routineDenied:'可信 Host 拒绝运行，未修改任何内容。',routineProgress:'正在核对本机可信 Host…',routineSuccess:'本机已验证的只读结果',routineError:'无法核对任务状态。',observedOnly:'仅代表一次观察，不保证定位原因或提升速度。',metricCpu:'CPU 逻辑核心',metricMemory:'可用 / 总内存',metricStorage:'剩余 / 总存储空间',metricProcesses:'已观察的进程数',metricStartup:'启动项数量',signalDisk:'检测到剩余存储空间偏低',signalMemory:'检测到可用内存偏低',signalNone:'本次快照未检测到内存或存储空间不足的信号。'
+  emptyNotice:'请先从首页选择一个任务。',filterReset:'清除搜索',approvalTag:'独立审批',approvalTitle:'等待你确认的操作计划',approvalIntro:'查看真实计划、范围及风险。审批通过并不代表操作已执行。',approvalRefresh:'刷新待审批计划',approvalPending:'待审批计划',approvalSafetyTitle:'权限保护',approvalSafetyDesc:'可信 Host 会检查精确计划及现行策略。浏览器不能自行签发授权。',approvalDetail:'核对具体计划',approvalCheckbox:'我已核对该计划、操作范围、风险与恢复条件。',approvalDecline:'拒绝',approvalAccept:'批准此计划',approvalDemo:'当前是演示模式，真实审批不可用。',approvalUnready:'没有已核验的审批服务或有效策略，已禁用操作。',approvalLoading:'正在读取真实 Host 审批状态……',approvalEmpty:'目前没有待审批计划。',approvalExpired:'计划已过期或变化，请刷新后重新检查。',approvalUnknown:'决策结果未知，核对 Host 状态前请勿重复。',approvalRecorded:'已记录你的决策，但不代表执行成功。',approvalRefused:'Host 拒绝本次决策，未授予权限。',approvalPlanHash:'计划标识',approvalRisk:'风险',approvalActions:'影响的操作',approvalRead:'读取范围',approvalWrite:'写入范围',approvalNetwork:'网络访问',approvalVerification:'执行后验证',approvalRecovery:'失败恢复',approvalExpiry:'审批有效期至',approvalNoNetwork:'禁用',approvalYesNetwork:'允许',approvalSelect:'查看计划 →',hostTasksTitle:'Host 任务记录',hostTasksLoading:'正在加载本机任务记录……',hostTasksEmpty:'尚无本机任务记录。',hostTasksUnknown:'无法读取任务记录，不能据此推断成功。',navigationLabel:'主导航',sectionLabel:'导航分区',menuLabel:'展开或收起菜单',refreshLabel:'刷新',folderInputLabel:'文件夹本地预览选择器',folderChoose:'浏览文件夹',folderHint:'仅在浏览器中预览，不向顺助手发送文件内容或路径。',folderPreview:'浏览器预览：{folder} · {count} 个文件 · {size} MiB。这不是可信 Host 批准的操作范围。',folderRefused:'无法预览文件夹，未发送任何文件。',stale:'步骤已过期或改变，请刷新后再继续。',unknownHold:'操作结果未知，该步骤已锁定，须由可信 Host 核对状态。',assistantTag:'隐私优先',assistantTitle:'用 AI 规划',assistantDesc:'描述目标，在同意任何请求前先查看拟披露的精确内容。',assistantGoalLabel:'你想完成什么？',assistantPlaceholder:'例如：帮我解释电脑为什么变慢了……',assistantPreview:'查看披露内容',assistantPrivacy:'仅在本机生成预览，不会调用模型、签发同意或预留预算。',assistantNoPreview:'尚无披露预览。',assistantPreviewOk:'拟披露的原始内容（尚未发送）',assistantPreviewFail:'预览失败，未发送任何内容。',assistantLoading:'正在本机准备预览……',routineTag:'可复用的任务',routineTitle:'保存的系统检查',routineIntro:'保存一个已验证的只读系统检查，以后不用调用 AI 也能执行。每次都由本机核对权限。',routineName:'电脑概况',routineSafe:'只读取 CPU、内存和存储空间的汇总信息，不会修改文件。',routineSave:'保存任务',routineRun:'运行保存的检查',routineAuth:'保存任务不代表授权执行，每次运行都由可信 Host 检查权限。',routineNoRun:'还没有已验证的运行结果。',routineNotSaved:'尚未保存',routineSaved:'已保存，未授权执行',routineDenied:'可信 Host 拒绝运行，未修改任何内容。',routineProgress:'正在核对本机可信 Host…',routineSuccess:'本机已验证的只读结果',routineError:'无法核对任务状态。',observedOnly:'仅代表一次观察，不保证定位原因或提升速度。',metricCpu:'CPU 逻辑核心',metricMemory:'可用 / 总内存',metricStorage:'剩余 / 总存储空间',metricProcesses:'已观察的进程数',metricStartup:'启动项数量',signalDisk:'检测到剩余存储空间偏低',signalMemory:'检测到可用内存偏低',signalNone:'本次快照未检测到内存或存储空间不足的信号。'
  }
 };
 const storage = (() => {
@@ -60,6 +61,10 @@ let cloudOptIn = false;
 let busy = false;
 let routineBusy = false;
 let verifiedRoutine = false;
+let healthStatus = null;
+let approvalSelected = null;
+let approvalBusy = false;
+let approvalUnresolvedId = null;
 let unresolvedStepId = null;
 const submitted = [];
 const $ = id => document.getElementById(id);
@@ -97,6 +102,8 @@ function page(name) {
  $('menu-toggle').setAttribute('aria-expanded','false');
  if (name === 'tasks') refresh().catch(showError);
  if (name === 'routine') refreshRoutine().catch(showError);
+ if (name === 'approvals') loadApprovals().catch(showError);
+ if (name === 'history') loadHostTasks().catch(showError);
  $('main').focus({preventScroll:true});
 }
 function notify(message, kind='info') {
@@ -119,6 +126,7 @@ async function refresh() {
    request('/api/v03/guided/state').catch(()=>null)
   ]);
   connected=health?.ok===true;
+  healthStatus=health;
   cloudOptIn=connected && health.cloudMode==='REMOTE_OPT_IN';
   $('connection').previousElementSibling?.classList.toggle('online',connected);
   lastState=state;
@@ -331,6 +339,118 @@ async function runRoutine() {
     set('routine-status',tr('routineDenied'));
   }finally{routineBusy=false;await refreshRoutine();}
 }
+/** One recognized Host ApprovalPort, never a v0.3 reference token. */
+function approvalMessage(key){const node=$('approval-status');node.hidden=false;node.textContent=tr(key);}
+function labeledRow(parent,title,value){
+ const row=document.createElement('p');
+ const strong=document.createElement('strong');strong.textContent=tr(title)+': ';
+ const span=document.createElement('span');span.textContent=value;
+ row.append(strong,span);parent.append(row);
+}
+async function loadApprovals(){
+ approvalSelected=null;$('approval-detail').hidden=true;$('approval-confirm').checked=false;
+ $('approval-accept').disabled=true;$('approval-list').replaceChildren();
+ approvalMessage('approvalLoading');
+ if(realApprovalPosture(healthStatus)!=='REAL'){
+   approvalMessage(realApprovalPosture(healthStatus)==='DEMO'?'approvalDemo':'approvalUnready');
+   return;
+ }
+ try{
+  const result=projectPendingApprovals(healthStatus,await request('/api/approvals'),Date.now());
+  if(result.status!=='READY')throw Error(result.code||result.status);
+  $('approval-status').hidden=true;
+  if(result.items.length===0){approvalMessage('approvalEmpty');return;}
+  for(const item of result.items){
+   const card=document.createElement('div');card.className='history-entry';
+   const h=document.createElement('h3');h.textContent=item.summary;
+   const desc=document.createElement('p');desc.textContent=item.riskClass+' · '+item.taskId;
+   const button=document.createElement('button');button.type='button';
+   button.className='text-button';button.textContent=tr('approvalSelect');
+   button.addEventListener('click',()=>loadApprovalDetail(item.id).catch(showError));
+   card.append(h,desc,button);$('approval-list').append(card);
+  }
+ }catch{approvalMessage('approvalUnready');}
+}
+function renderApprovalPreview(value){
+ const target=$('approval-preview');target.replaceChildren();
+ labeledRow(target,'approvalRisk',value.risk+' · '+value.riskStatement);
+ labeledRow(target,'approvalPlanHash',value.planHash);
+ labeledRow(target,'approvalExpiry',new Date(value.expiresAt).toLocaleString(locale==='zh'?'zh-CN':'en-US'));
+ const section=document.createElement('h3');section.textContent=tr('approvalActions');target.append(section);
+ for(const action of value.actions){
+  const box=document.createElement('div');box.className='history-entry';
+  const h=document.createElement('strong');h.textContent=action.title;box.append(h);
+  const p=document.createElement('p');p.textContent=action.description;box.append(p);
+  if(action.read.length)labeledRow(box,'approvalRead',action.read.join(', '));
+  if(action.write.length)labeledRow(box,'approvalWrite',action.write.join(', '));
+  labeledRow(box,'approvalNetwork',tr(action.networkAllowed?'approvalYesNetwork':'approvalNoNetwork')+
+   (action.networkDomains.length?' · '+action.networkDomains.join(', '):''));
+  target.append(box);
+ }
+ labeledRow(target,'approvalVerification',value.verification);
+ labeledRow(target,'approvalRecovery',value.recovery);
+}
+async function loadApprovalDetail(id){
+ if(approvalBusy)return;
+ approvalSelected=null;$('approval-detail').hidden=true;
+ $('approval-confirm').checked=false;$('approval-accept').disabled=true;
+ if(realApprovalPosture(healthStatus)!=='REAL'){approvalMessage('approvalUnready');return;}
+ try{
+  const value=projectExactApproval(healthStatus,await request('/api/approvals/'+encodeURIComponent(id)),id,Date.now());
+  if(value.status!=='READY')throw Error(value.code);
+  approvalSelected=value;renderApprovalPreview(value);
+  $('approval-detail').hidden=false;$('approval-status').hidden=true;
+  if(approvalUnresolvedId===id){
+   $('approval-accept').disabled=true;$('approval-decline').disabled=true;
+   approvalMessage('approvalUnknown');return;
+  }
+  $('approval-decline').disabled=false;
+ }catch{approvalMessage('approvalExpired');}
+}
+async function decideApproval(approved){
+ if(approvalBusy||!approvalSelected||realApprovalPosture(healthStatus)!=='REAL')return;
+ if(approvalUnresolvedId===approvalSelected.id)return;
+ if(approved&&!$('approval-confirm').checked)return;
+ const selected=approvalSelected;
+ approvalBusy=true;$('approval-accept').disabled=true;$('approval-decline').disabled=true;
+ try{
+  // Re-read Host-authored preview just before mutation. Identity/policy must
+  // match the whole exact plan that was displayed, not merely a typed SHA.
+  const refreshed=projectExactApproval(healthStatus,
+   await request('/api/approvals/'+encodeURIComponent(selected.id)),selected.id,Date.now());
+  if(refreshed.status!=='READY'||
+   JSON.stringify(refreshed)!==JSON.stringify(selected))throw Error('PREVIEW_CHANGED');
+  const response=await request('/api/approvals/'+encodeURIComponent(selected.id)+'/decision',{
+   method:'POST',headers:{'content-type':'application/json'},
+   body:JSON.stringify({approved,planHash:selected.planHash})
+  });
+  const result=projectApprovalDecision(response,selected,approved);
+  if(result.status!=='RECORDED')throw Error(result.code);
+  approvalUnresolvedId=null;approvalMessage('approvalRecorded');
+  approvalSelected=null;$('approval-detail').hidden=true;
+  // No effect is claimed to have completed. Do not repeat mutation.
+ }catch(error){
+  if(error?.message==='PREVIEW_CHANGED'){approvalMessage('approvalExpired');approvalSelected=null;}
+  else {approvalUnresolvedId=selected.id;approvalMessage('approvalUnknown');}
+ }finally{approvalBusy=false;$('approval-accept').disabled=true;$('approval-decline').disabled=true;}
+}
+/** Read-only Host task progress; no UI retry, reconcile or automatic action. */
+async function loadHostTasks(){
+ const target=$('host-task-list');target.replaceChildren();
+ try{
+  const result=projectTaskSnapshots(await request('/api/tasks'));
+  if(result.status!=='READY')throw Error(result.code);
+  if(!result.items.length){const p=document.createElement('p');p.textContent=tr('hostTasksEmpty');target.append(p);return;}
+  for(const item of result.items){
+   const line=document.createElement('div');line.className='history-entry';
+   const name=document.createElement('strong');name.textContent=item.title;
+   const meta=document.createElement('p');meta.textContent=item.state+' · '+new Date(item.updatedAt).toLocaleString(locale==='zh'?'zh-CN':'en-US');
+   line.append(name,meta);target.append(line);
+  }
+ }catch{
+  const p=document.createElement('p');p.textContent=tr('hostTasksUnknown');target.append(p);
+ }
+}
 /** Exact privacy preview is a read-only local API call, never an LLM send. */
 async function previewAiGoal() {
   const goal=$('ai-goal').value;
@@ -369,6 +489,10 @@ $('run-inventory').addEventListener('click',()=>runCheck('inventory').catch(show
 $('run-diagnosis').addEventListener('click',()=>runCheck('diagnosis').catch(showError));
 $('routine-save').addEventListener('click',()=>saveRoutine().catch(showError));
 $('routine-run').addEventListener('click',()=>runRoutine().catch(showError));
+$('approval-refresh').addEventListener('click',()=>loadApprovals().catch(showError));
+$('approval-confirm').addEventListener('change',checked=>{$('approval-accept').disabled=!checked.target.checked||!approvalSelected||approvalBusy||approvalUnresolvedId===approvalSelected.id;});
+$('approval-accept').addEventListener('click',()=>decideApproval(true).catch(showError));
+$('approval-decline').addEventListener('click',()=>decideApproval(false).catch(showError));
 $('ai-preview-form').addEventListener('submit',event=>{event.preventDefault();previewAiGoal().catch(showError);});
 $('ai-goal').addEventListener('input',()=>{const box=$('ai-preview-result');box.replaceChildren();const p=document.createElement('p');p.textContent=tr('assistantNoPreview');box.append(p);});
 $('refresh').addEventListener('click',()=>refresh().catch(showError));

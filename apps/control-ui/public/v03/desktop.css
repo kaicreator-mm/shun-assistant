@@ -7,3 +7,5 @@
 .field textarea{display:block;width:100%;min-height:130px;padding:12px;resize:vertical;border:1px solid var(--border);border-radius:9px;font:inherit;color:var(--text);background:var(--surface)}.field textarea:focus-visible{outline:3px solid #579fdb;outline-offset:2px}.disclosure{max-height:380px;overflow:auto;white-space:pre-wrap;overflow-wrap:anywhere;padding:16px;border-radius:8px;border:1px solid var(--border);background:var(--bg);font-size:12px;line-height:1.6}
 
 .folder-preview{border-top:1px solid var(--border);padding-top:18px;margin-top:18px}.folder-preview .button{width:100%;font-size:12px}.folder-preview p{font-size:12px;line-height:1.6;margin:12px 0 0;overflow-wrap:anywhere}
+
+.approval-detail{margin-top:20px}.approval-detail .history-entry{padding:12px 0}.approval-detail p{overflow-wrap:anywhere}.approval-ack{display:flex;align-items:flex-start;gap:12px;padding:18px 0;font-size:13px;font-weight:600}.approval-ack input{width:19px;height:19px;flex:none;accent-color:var(--accent)}.approval-detail [hidden]{display:none!important}

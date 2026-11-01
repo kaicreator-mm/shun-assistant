@@ -18,6 +18,9 @@ describe('R04 source contract: the shipped desktop surface replaces technical op
     expect(html).not.toContain('id="v03-j-approval"');
     expect(html).toContain('id="page-routine"');
     expect(html).toContain('id="page-assistant"');
+    expect(html).toContain('id="page-approvals"');
+    expect(html).toContain('id="approval-confirm"');
+    expect(html).toContain('id="host-task-list"');
     expect(html).toContain('id="folder-input"');
     expect(html).toContain('webkitdirectory');
     expect(html).toContain('data-aria-label="navigationLabel"');
@@ -40,6 +43,10 @@ describe('R04 source contract: the shipped desktop surface replaces technical op
     expect(app).toContain('projectDisclosurePreview');
     expect(app).toContain('summarizeBrowserFolder');
     expect(app).toContain('guidedReceiptStatus');
+    expect(app).toContain('projectExactApproval');
+    expect(app).toContain('projectApprovalDecision');
+    expect(app).toContain('projectTaskSnapshots');
+    expect(app).toContain("realApprovalPosture(healthStatus)!=='REAL'");
     expect(app).toContain('const trustedTitle=stepText(model.titleKey)');
     expect(app).toContain('const trustedLabel=stepText(field.labelKey)');
     expect(app).toContain('unresolvedStepId===model.stepId');
