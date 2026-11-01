@@ -51,7 +51,8 @@ export function projectPendingApprovals(health,value,now){
  * @param {number} now
  */
 export function projectExactApproval(health,value,expectedId,now){
- if(realApprovalPosture(health)!=='REAL')return refused('AUTHORITY_UNAVAILABLE');
+ if(realApprovalPosture(health)!=='REAL'||!object(health)||!object(health.policy))
+   return refused('AUTHORITY_UNAVAILABLE');
  if(!ID.test(expectedId)||!object(value)||!object(value.approval)||!object(value.preview))return refused('PREVIEW_UNVERIFIED');
  const a=value.approval,p=value.preview;
  if(!pending(a,now)||a.approvalId!==expectedId||p.taskId!==a.taskId||
