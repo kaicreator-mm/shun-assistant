@@ -22,6 +22,9 @@ import {
 
 const STATE_ENDPOINT = '/api/v03/guided/state';
 const DECISION_ENDPOINT = '/api/v03/guided/decision';
+const EFFECT_ENDPOINT = '/api/v03/effect/submit';
+const PROVIDER_ENDPOINT = '/api/v03/provider/first-use';
+const META_ENDPOINT = '/api/v03/meta/feedback';
 
 /** Replay ledger for this page session: keys of outcomes already relayed. */
 /** @type {string[]} */
@@ -204,6 +207,247 @@ function renderUnknownState(reason) {
   renderHistory([]);
 }
 
+// --- R03B production journeys panel -----------------------------------------
+//
+// Three production journeys (effect / provider first-use / meta feedback)
+// driven by references the operator pastes from the local launch console.
+// Boundary: the UI only RELAYS what the operator typed — it never mints or
+// infers a reference, grant or approval, and the caseId always comes from the
+// current guided step, never from a free-text field.
+
+/** Rating options for the meta journey: value = API literal, label = catalog key. */
+const JOURNEY_RATING_OPTIONS = Object.freeze([
+  ['HELPFUL', 'journeys.rating.helpful'],
+  ['NOT_HELPFUL', 'journeys.rating.notHelpful'],
+]);
+
+/** Category options for the meta journey (closed taxonomy, API literals). */
+const JOURNEY_CATEGORY_OPTIONS = Object.freeze([
+  ['INCORRECT_RESULT', 'journeys.category.incorrectResult'],
+  ['MISSING_STEP', 'journeys.category.missingStep'],
+  ['WRONG_TARGET', 'journeys.category.wrongTarget'],
+  ['UNSAFE_SUGGESTION', 'journeys.category.unsafeSuggestion'],
+  ['TOO_COMPLEX', 'journeys.category.tooComplex'],
+  ['OTHER', 'journeys.category.other'],
+]);
+
+/** Correction options for the meta journey (closed taxonomy, API literals). */
+const JOURNEY_CORRECTION_OPTIONS = Object.freeze([
+  ['WRONG_OBJECT', 'journeys.correction.wrongObject'],
+  ['MISSING_CONSTRAINT', 'journeys.correction.missingConstraint'],
+  ['STALE_CONTEXT', 'journeys.correction.staleContext'],
+  ['POLICY_MISMATCH', 'journeys.correction.policyMismatch'],
+  ['NO_CORRECTION', 'journeys.correction.noCorrection'],
+]);
+
+/**
+ * Fill a journey select from the catalog. Option labels are localized; values
+ * stay the API literals. The first option becomes the selected default (the
+ * semantics a browser gives a freshly filled select).
+ * @param {string} selectId
+ * @param {readonly (readonly [string, string])[]} options
+ */
+function populateJourneySelect(selectId, options) {
+  const select = el(selectId);
+  if (!select) return;
+  for (const [value, labelKey] of options) {
+    const option = document.createElement('option');
+    option.value = value;
+    option.textContent = text(labelKey);
+    select.append(option);
+  }
+  select.value = options[0]?.[0] ?? '';
+}
+
+/**
+ * Same-origin journey submission. Unlike api(), the receipt body is read even
+ * on non-2xx responses: the server truthfully maps ADMITTED→202, UNKNOWN→409
+ * and REFUSED/KERNEL_REFUSED→422 while still returning the full receipt, and
+ * the status line must render that receipt instead of a bare HTTP code.
+ * @param {string} path
+ * @param {unknown} body
+ */
+async function journeyReceipt(path, body) {
+  const response = await fetch(path, {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify(body),
+  });
+  return response.json().catch(() => undefined);
+}
+
+/**
+ * The per-effect output envelope of a journey receipt, when present.
+ * @param {any} receipt
+ */
+function receiptOutput(receipt) {
+  return receipt?.result?.admitted?.effects?.[0]?.output?.outcome?.output;
+}
+
+/**
+ * Shared panel preconditions: a non-empty reference pair (the operator's
+ * pasted refs) and a caseId taken ONLY from the current guided step. When a
+ * precondition fails the status line explains it and no request is sent.
+ * @param {HTMLElement} statusNode
+ * @returns {{ caseId: string, currentnessRef: string, approvalRef: string } | undefined}
+ */
+function journeyRefsAndCase(statusNode) {
+  const currentnessRef = el('v03-j-currentness')?.value ?? '';
+  const approvalRef = el('v03-j-approval')?.value ?? '';
+  if (currentnessRef.length === 0 || approvalRef.length === 0) {
+    statusNode.className = 'refused';
+    statusNode.textContent = text('journeys.refsNeeded');
+    return undefined;
+  }
+  const caseId = currentStep?.taskId;
+  if (typeof caseId !== 'string' || caseId.length === 0) {
+    statusNode.className = 'unknown';
+    statusNode.textContent = text('journeys.noCase');
+    return undefined;
+  }
+  return { caseId, currentnessRef, approvalRef };
+}
+
+/**
+ * Truthful receipt → status line. Only the exact 'COMPLETED' status renders
+ * as success (with the panel's relayed evidence); REFUSED and KERNEL_REFUSED
+ * render the refusal with its code; everything else — ADMITTED, UNKNOWN, a
+ * missing or malformed receipt — renders as an explicit UNKNOWN and never as
+ * success.
+ * @param {HTMLElement} node
+ * @param {any} receipt
+ * @param {readonly string[]} evidence
+ */
+function renderJourneyStatus(node, receipt, evidence) {
+  const receiptStatus = receipt?.status;
+  if (receiptStatus === 'COMPLETED') {
+    node.className = 'ok';
+    let line = text('journeys.status.completed');
+    for (const item of evidence) {
+      if (item.length > 0) line += ` — ${item}`;
+    }
+    node.textContent = line;
+    return;
+  }
+  const code =
+    typeof receipt?.code === 'string' && receipt.code.length > 0
+      ? receipt.code
+      : typeof receiptStatus === 'string' && receiptStatus.length > 0
+        ? receiptStatus
+        : 'UNKNOWN';
+  if (receiptStatus === 'REFUSED' || receiptStatus === 'KERNEL_REFUSED') {
+    node.className = 'refused';
+    node.textContent = `${text('journeys.status.refused')} — ${code}`;
+    return;
+  }
+  node.className = 'unknown';
+  node.textContent = `${text('journeys.status.unknown')} — ${code}`;
+}
+
+/**
+ * Transport failure: an explicit UNKNOWN with the raw error message, the same
+ * catch contract as decide() — the UI never invents a completion.
+ * @param {HTMLElement} node
+ * @param {unknown} error
+ */
+function journeyUnknown(node, error) {
+  const unknown = t(locale, 'journeys.status.unknown');
+  node.className = 'unknown';
+  node.textContent = `${unknown.ok ? unknown.text : 'UNKNOWN'} — ${
+    error instanceof Error ? error.message : String(error)
+  }`;
+}
+
+/** Effect journey: relay the operator's action/plan/grant refs as-is. */
+async function runEffectJourney() {
+  const statusNode = el('v03-j-effect-status');
+  if (!statusNode) return;
+  try {
+    const refs = journeyRefsAndCase(statusNode);
+    if (!refs) return;
+    const actionRef = el('v03-j-action')?.value ?? '';
+    const planRef = el('v03-j-plan')?.value ?? '';
+    const grantRef = el('v03-j-grant')?.value ?? '';
+    const receipt = await journeyReceipt(EFFECT_ENDPOINT, {
+      caseId: refs.caseId,
+      actionRef,
+      planRef,
+      grantRef,
+      currentnessRef: refs.currentnessRef,
+      approvalRef: refs.approvalRef,
+    });
+    renderJourneyStatus(statusNode, receipt, [actionRef]);
+  } catch (error) {
+    journeyUnknown(statusNode, error);
+  }
+}
+
+/** Provider journey: relay the operator's taskId as-is; show the stdout head. */
+async function runProviderJourney() {
+  const statusNode = el('v03-j-provider-status');
+  if (!statusNode) return;
+  try {
+    const refs = journeyRefsAndCase(statusNode);
+    if (!refs) return;
+    const taskId = el('v03-j-provider-task')?.value ?? '';
+    const receipt = await journeyReceipt(PROVIDER_ENDPOINT, {
+      caseId: refs.caseId,
+      taskId,
+      currentnessRef: refs.currentnessRef,
+      approvalRef: refs.approvalRef,
+    });
+    const stdout = receiptOutput(receipt)?.stdout;
+    renderJourneyStatus(statusNode, receipt, [
+      typeof stdout === 'string' ? stdout.split('\n')[0].trim() : '',
+    ]);
+  } catch (error) {
+    journeyUnknown(statusNode, error);
+  }
+}
+
+/** Meta journey: relay the operator's feedback taxonomy as-is. */
+async function runMetaJourney() {
+  const statusNode = el('v03-j-meta-status');
+  if (!statusNode) return;
+  try {
+    const refs = journeyRefsAndCase(statusNode);
+    if (!refs) return;
+    const receipt = await journeyReceipt(META_ENDPOINT, {
+      caseId: refs.caseId,
+      caseRef: el('v03-j-meta-case')?.value ?? '',
+      sourceRevision: el('v03-j-meta-revision')?.value ?? '',
+      rating: el('v03-j-meta-rating')?.value ?? '',
+      category: el('v03-j-meta-category')?.value ?? '',
+      correction: el('v03-j-meta-correction')?.value ?? '',
+      currentnessRef: refs.currentnessRef,
+      approvalRef: refs.approvalRef,
+    });
+    const candidateRef = receiptOutput(receipt)?.candidateRef;
+    renderJourneyStatus(statusNode, receipt, [
+      typeof candidateRef === 'string' ? candidateRef : '',
+    ]);
+  } catch (error) {
+    journeyUnknown(statusNode, error);
+  }
+}
+
+/**
+ * Wire one journey run button: localized label + the click→relay binding.
+ * Like decide(), the listener is the only caller; nothing sends without a
+ * human click.
+ * @param {string} buttonId
+ * @param {string} labelKey
+ * @param {() => Promise<void>} run
+ */
+function wireJourneyRun(buttonId, labelKey, run) {
+  const button = el(buttonId);
+  if (!button) return;
+  button.textContent = text(labelKey);
+  button.addEventListener('click', () => {
+    void run();
+  });
+}
+
 /**
  * Relay an explicit decision. `confirmed` is true only when this call comes
  * directly from a click on the approve/refuse button — there is no other
@@ -367,6 +611,35 @@ try {
   setText('v03-scope-title', text('state.selectedScope'));
   setText('v03-progress-title', text('state.progress'));
   setText('v03-history-title', text('state.history'));
+} catch (error) {
+  renderUnknownState(error instanceof Error ? error.message : String(error));
+}
+
+// Journeys panel: labels, selects and run buttons. Same loud-fail contract as
+// the titles above — a catalog gap shows the unknown banner, never machine text.
+try {
+  setText('v03-journeys-title', text('journeys.title'));
+  setText('v03-journeys-note', text('journeys.note'));
+  setText('v03-j-label-currentness', text('journeys.refs.currentness'));
+  setText('v03-j-label-approval', text('journeys.refs.approval'));
+  setText('v03-j-effect-title', text('journeys.effect.title'));
+  setText('v03-j-label-action', text('journeys.effect.action'));
+  setText('v03-j-label-plan', text('journeys.effect.plan'));
+  setText('v03-j-label-grant', text('journeys.effect.grant'));
+  setText('v03-j-provider-title', text('journeys.provider.title'));
+  setText('v03-j-label-provider-task', text('journeys.provider.task'));
+  setText('v03-j-meta-title', text('journeys.meta.title'));
+  setText('v03-j-label-meta-case', text('journeys.meta.case'));
+  setText('v03-j-label-meta-revision', text('journeys.meta.revision'));
+  setText('v03-j-label-meta-rating', text('journeys.meta.rating'));
+  setText('v03-j-label-meta-category', text('journeys.meta.category'));
+  setText('v03-j-label-meta-correction', text('journeys.meta.correction'));
+  populateJourneySelect('v03-j-meta-rating', JOURNEY_RATING_OPTIONS);
+  populateJourneySelect('v03-j-meta-category', JOURNEY_CATEGORY_OPTIONS);
+  populateJourneySelect('v03-j-meta-correction', JOURNEY_CORRECTION_OPTIONS);
+  wireJourneyRun('v03-j-effect-run', 'journeys.effect.run', runEffectJourney);
+  wireJourneyRun('v03-j-provider-run', 'journeys.provider.run', runProviderJourney);
+  wireJourneyRun('v03-j-meta-run', 'journeys.meta.run', runMetaJourney);
 } catch (error) {
   renderUnknownState(error instanceof Error ? error.message : String(error));
 }

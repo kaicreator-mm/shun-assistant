@@ -46,6 +46,53 @@
         <h2 id="v03-advisory-title">Suggestion (advisory only)</h2>
         <div id="v03-advisory"></div>
       </section>
+
+      <section id="v03-journeys-section" aria-labelledby="v03-journeys-title">
+        <h2 id="v03-journeys-title">Production journeys</h2>
+        <p id="v03-journeys-note" class="muted"></p>
+        <div id="v03-journeys">
+          <div class="journey-panel" id="v03-j-refs-panel">
+            <!-- Shared reference pair, pasted from the local launch console. -->
+            <label for="v03-j-currentness" id="v03-j-label-currentness">Currentness reference</label>
+            <input id="v03-j-currentness" type="text" />
+            <label for="v03-j-approval" id="v03-j-label-approval">Approval reference</label>
+            <input id="v03-j-approval" type="text" />
+          </div>
+          <div class="journey-panel" id="v03-j-effect-panel">
+            <h3 id="v03-j-effect-title">Effect journey</h3>
+            <label for="v03-j-action" id="v03-j-label-action">Action reference</label>
+            <input id="v03-j-action" type="text" />
+            <label for="v03-j-plan" id="v03-j-label-plan">Plan reference</label>
+            <input id="v03-j-plan" type="text" />
+            <label for="v03-j-grant" id="v03-j-label-grant">Grant reference</label>
+            <input id="v03-j-grant" type="text" />
+            <button id="v03-j-effect-run" type="button">Send effect request</button>
+            <p id="v03-j-effect-status" role="status"></p>
+          </div>
+          <div class="journey-panel" id="v03-j-provider-panel">
+            <h3 id="v03-j-provider-title">Provider first-use journey</h3>
+            <label for="v03-j-provider-task" id="v03-j-label-provider-task">Provider task id</label>
+            <input id="v03-j-provider-task" type="text" />
+            <button id="v03-j-provider-run" type="button">Send provider request</button>
+            <p id="v03-j-provider-status" role="status"></p>
+          </div>
+          <div class="journey-panel" id="v03-j-meta-panel">
+            <h3 id="v03-j-meta-title">Meta feedback journey</h3>
+            <label for="v03-j-meta-case" id="v03-j-label-meta-case">Source case reference</label>
+            <input id="v03-j-meta-case" type="text" />
+            <label for="v03-j-meta-revision" id="v03-j-label-meta-revision">Source revision</label>
+            <input id="v03-j-meta-revision" type="text" />
+            <label for="v03-j-meta-rating" id="v03-j-label-meta-rating">Rating</label>
+            <select id="v03-j-meta-rating"></select>
+            <label for="v03-j-meta-category" id="v03-j-label-meta-category">Category</label>
+            <select id="v03-j-meta-category"></select>
+            <label for="v03-j-meta-correction" id="v03-j-label-meta-correction">Correction</label>
+            <select id="v03-j-meta-correction"></select>
+            <button id="v03-j-meta-run" type="button">Send feedback</button>
+            <p id="v03-j-meta-status" role="status"></p>
+          </div>
+        </div>
+      </section>
     </main>
 
     <footer>

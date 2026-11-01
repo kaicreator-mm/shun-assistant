@@ -94,6 +94,7 @@ describe.skipIf(!RUN_PHYSICAL)(
         sideEffectClass: 'R1',
         filesystemScope: { read: [], write: [workspace] },
         expectedState: { path: canaryFile, exists: true, content: canaryText },
+        taskId: stack.caseId,
       });
       const refs = stack.submitRefs();
       const result = await json(stack.port, 'POST', '/api/v03/effect/submit', {
@@ -139,6 +140,7 @@ describe.skipIf(!RUN_PHYSICAL)(
         requiredPrivilege: 'USER',
         sideEffectClass: 'R1',
         filesystemScope: { read: [], write: [workspace] },
+        taskId: stack.caseId,
       });
       const refs = stack.submitRefs();
       const result = await json(stack.port, 'POST', '/api/v03/effect/probe', {
@@ -191,6 +193,7 @@ describe.skipIf(!RUN_PHYSICAL)(
           requiredPrivilege: 'USER',
           sideEffectClass: 'R1',
           filesystemScope: { read: [], write: [workspace] },
+          taskId: stack.caseId,
         },
         { expiresAt: new Date(Date.now() - 60_000).toISOString() },
       );
@@ -208,6 +211,32 @@ describe.skipIf(!RUN_PHYSICAL)(
       expect(existsSync(expiredTarget)).toBe(false);
     });
 
+    it('NEGATIVE (R03B cross-Case): a plan minted for ANOTHER task refuses with zero effect', async () => {
+      const crossTarget = join(workspace, 'cross-case-never.txt');
+      const { action, plan, grant } = buildAuthorizedAction(authority, {
+        op: 'windows.fs.write',
+        // Valid plan+grant — but bound to a DIFFERENT task identity than the
+        // live Guided Case that authorized this K turn.
+        parameters: { path: crossTarget, content: 'never' },
+        requiredPrivilege: 'USER',
+        sideEffectClass: 'R1',
+        filesystemScope: { read: [], write: [workspace] },
+        taskId: 'task-a-different-case',
+      });
+      const refs = stack.submitRefs();
+      const result = await json(stack.port, 'POST', '/api/v03/effect/submit', {
+        caseId: stack.caseId,
+        actionRef: action.actionId,
+        planRef: plan.planHash,
+        grantRef: grant.grantId,
+        currentnessRef: refs.currentnessRef,
+        approvalRef: refs.approvalRef,
+      });
+      expect(result.status).toBe(422);
+      expect(['KERNEL_REFUSED', 'REFUSED']).toContain((result.body as { status: string }).status);
+      expect(existsSync(crossTarget)).toBe(false);
+    });
+
     it('NEGATIVE: a forged reference pair refuses pre-send', async () => {
       const forgedTarget = join(workspace, 'forged-refs-never.txt');
       const { action, plan, grant } = buildAuthorizedAction(authority, {
@@ -216,6 +245,7 @@ describe.skipIf(!RUN_PHYSICAL)(
         requiredPrivilege: 'USER',
         sideEffectClass: 'R1',
         filesystemScope: { read: [], write: [workspace] },
+        taskId: stack.caseId,
       });
       const result = await json(stack.port, 'POST', '/api/v03/effect/submit', {
         caseId: stack.caseId,

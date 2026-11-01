@@ -45,3 +45,16 @@ plan:
 forbidden:
   - paid DeepSeek calls; merge; tag/release; main or version/v0.2.0 mutation; second kernel/dispatcher/sender; SDK private imports
 notes: "R03-F01/F02/Q01 repair under Owner authorization; J03 evidence untouched."
+
+# R03B extension (OWNER_SHUN_V030_R03B_CROSSCASE_UI_COMPOSITE_APPROVE)
+r03b_base_sha: 6e9f880231d37032a2e351b0505daf67c8037605
+r03b_added_write_set:
+  - apps/control-ui/public/v03/**
+  - packages/domain-host/src/windows/effect-host-binding.ts (cross-Case binding only)
+r03b_lanes:
+  - lane: A-crosscase-binding
+    deliverable: "Bind effect authority (plan/grant taskId) to the K turn instance parsed from the permit durableControlTurnId; j02 test updates + cross-Case zero-effect negative"
+  - lane: B-ui-journeys
+    deliverable: "v03 UI journey panels (CN/EN) relaying effect/provider/meta endpoints; operator pastes Host-issued references; caseId from live guided state"
+  - lane: C-composite-ui-loop
+    deliverable: "Composite App all-families real submits + per-family K-permit evidence + real UI code loop test in both locales"
