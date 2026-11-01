@@ -22,6 +22,7 @@ describe('R04 source contract: the shipped desktop surface replaces technical op
     expect(html).toContain('id="simulation-banner"');
     expect(html).toContain('id="approval-confirm"');
     expect(html).toContain('id="host-task-list"');
+    expect(html).toContain('id="host-task-detail"');
     expect(html).toContain('id="search-empty"');
     expect(html).toContain('id="search-clear"');
     expect(html).toContain('aria-keyshortcuts="Control+K"');
@@ -56,6 +57,10 @@ describe('R04 source contract: the shipped desktop surface replaces technical op
     expect(app).toContain('projectExactApproval');
     expect(app).toContain('projectApprovalDecision');
     expect(app).toContain('projectTaskSnapshots');
+    expect(app).toContain('projectHostTaskDetail');
+    expect(app).toContain('/api/tasks/');
+    expect(app).toContain('hostTaskDetailRequest');
+    expect(app).toContain("taskReconciled:'已核对'");
     expect(app).toContain("healthStatus?.simulated===true");
     expect(app).toContain("realApprovalPosture(healthStatus)!=='REAL'");
     expect(app).toContain('const trustedTitle=stepText(model.titleKey)');
