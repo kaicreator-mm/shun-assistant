@@ -25,7 +25,7 @@ const words = {
   scopeReady:'A location has been selected by the trusted Host.',stepExpired:'This step is no longer current. Refresh before continuing.',recorded:'Your decision was recorded. No Windows permission was granted.',refused:'The request was refused.',unknown:'The result is unknown. Do not repeat the operation without checking its actual state.',
   offlineCheck:'This check is only available on a real Windows host.',loading:'Checking your computer…',completed:'Check completed',noData:'No safe summary is available.',technicalDetails:'Technical details',
   consentNext:'Continue to separate authorization',cancelDecision:'Decline this step',unsafeUnavailable:'This form is not an approval or an execution request.',reportMemory:'Memory',reportCpu:'Processor',reportDisk:'Storage',reportDevice:'Device',safeAction:'Read-only check',
-  emptyNotice:'Choose a task on the home page to begin.',filterReset:'Clear search',folderChoose:'Browse a folder',folderHint:'Browser preview only. No file content or path is sent to Shun.',folderPreview:'Browser preview: {folder} · {count} files · {size} MiB. This is NOT a Host-approved work scope.',folderRefused:'Folder preview unavailable. No files were sent.',stale:'The step expired or changed. Refresh before continuing.',unknownHold:'Result unknown. This step is locked until the trusted Host reconciles it.',assistantTag:'PRIVACY FIRST',assistantTitle:'Plan with AI',assistantDesc:'Describe a goal and inspect the exact data before consenting to anything.',assistantGoalLabel:'What would you like to do?',assistantPlaceholder:'Example: Explain why my computer feels slow…',assistantPreview:'Preview disclosure',assistantPrivacy:'Local preview only. No cloud send, consent or budget reservation occurs here.',assistantNoPreview:'No disclosure prepared yet.',assistantPreviewOk:'Exact proposed disclosure (not sent)',assistantPreviewFail:'Preview unavailable; nothing was sent.',assistantLoading:'Preparing local preview…',routineTag:'REUSABLE TASK',routineTitle:'Saved system check',routineIntro:'Save one verified, read-only system check and reuse it without AI requests. Shun checks local permissions every time.',routineName:'Computer overview',routineSafe:'Reads only aggregate CPU, memory and storage information. No files are modified.',routineSave:'Save routine',routineRun:'Run saved check',routineAuth:'Saving is not approval. The trusted Host checks permission on every run.',routineNoRun:'No verified run yet.',routineNotSaved:'Not saved',routineSaved:'Saved, not authorized',routineDenied:'Host refused the routine. Nothing was changed.',routineProgress:'Checking trusted Host…',routineSuccess:'Host-verified read-only result',routineError:'Unable to verify the routine status.',observedOnly:'Single observation; not a diagnosis or speed-up guarantee.',metricCpu:'CPU logical cores',metricMemory:'Available / total memory',metricStorage:'Free / total storage',metricProcesses:'Observed processes',metricStartup:'Startup entries',signalDisk:'Low storage space detected',signalMemory:'Low available memory detected',signalNone:'No low-memory or low-storage signal in this snapshot.'
+  emptyNotice:'Choose a task on the home page to begin.',filterReset:'Clear search',navigationLabel:'Main navigation',sectionLabel:'Sections',menuLabel:'Toggle menu',refreshLabel:'Refresh',folderInputLabel:'Folder preview picker',folderChoose:'Browse a folder',folderHint:'Browser preview only. No file content or path is sent to Shun.',folderPreview:'Browser preview: {folder} · {count} files · {size} MiB. This is NOT a Host-approved work scope.',folderRefused:'Folder preview unavailable. No files were sent.',stale:'The step expired or changed. Refresh before continuing.',unknownHold:'Result unknown. This step is locked until the trusted Host reconciles it.',assistantTag:'PRIVACY FIRST',assistantTitle:'Plan with AI',assistantDesc:'Describe a goal and inspect the exact data before consenting to anything.',assistantGoalLabel:'What would you like to do?',assistantPlaceholder:'Example: Explain why my computer feels slow…',assistantPreview:'Preview disclosure',assistantPrivacy:'Local preview only. No cloud send, consent or budget reservation occurs here.',assistantNoPreview:'No disclosure prepared yet.',assistantPreviewOk:'Exact proposed disclosure (not sent)',assistantPreviewFail:'Preview unavailable; nothing was sent.',assistantLoading:'Preparing local preview…',routineTag:'REUSABLE TASK',routineTitle:'Saved system check',routineIntro:'Save one verified, read-only system check and reuse it without AI requests. Shun checks local permissions every time.',routineName:'Computer overview',routineSafe:'Reads only aggregate CPU, memory and storage information. No files are modified.',routineSave:'Save routine',routineRun:'Run saved check',routineAuth:'Saving is not approval. The trusted Host checks permission on every run.',routineNoRun:'No verified run yet.',routineNotSaved:'Not saved',routineSaved:'Saved, not authorized',routineDenied:'Host refused the routine. Nothing was changed.',routineProgress:'Checking trusted Host…',routineSuccess:'Host-verified read-only result',routineError:'Unable to verify the routine status.',observedOnly:'Single observation; not a diagnosis or speed-up guarantee.',metricCpu:'CPU logical cores',metricMemory:'Available / total memory',metricStorage:'Free / total storage',metricProcesses:'Observed processes',metricStartup:'Startup entries',signalDisk:'Low storage space detected',signalMemory:'Low available memory detected',signalNone:'No low-memory or low-storage signal in this snapshot.'
  },
  zh: {
   brandSub:'你的 Windows 电脑助手',navHome:'首页',navTasks:'我的任务',navAssistant:'AI 请求预览',navComputer:'我的电脑',navRoutine:'保存的任务',navHistory:'历史记录',navSettings:'设置',
@@ -43,7 +43,7 @@ const words = {
   scopeReady:'可信 Host 已选择一个位置。',stepExpired:'该步骤已过期，请刷新后再继续。',recorded:'已记录你的选择，没有签发 Windows 执行权限。',refused:'请求已拒绝。',unknown:'操作结果未知。核实真实状态前请勿重复操作。',
   offlineCheck:'此项检查仅在真实 Windows 主机上可用。',loading:'正在检查电脑…',completed:'检查完成',noData:'没有可安全展示的摘要。',technicalDetails:'技术细节',
   consentNext:'继续到独立授权',cancelDecision:'拒绝此步骤',unsafeUnavailable:'此表单不产生执行授权。',reportMemory:'内存',reportCpu:'处理器',reportDisk:'存储空间',reportDevice:'设备',safeAction:'只读检查',
-  emptyNotice:'请先从首页选择一个任务。',filterReset:'清除搜索',folderChoose:'浏览文件夹',folderHint:'仅在浏览器中预览，不向顺助手发送文件内容或路径。',folderPreview:'浏览器预览：{folder} · {count} 个文件 · {size} MiB。这不是可信 Host 批准的操作范围。',folderRefused:'无法预览文件夹，未发送任何文件。',stale:'步骤已过期或改变，请刷新后再继续。',unknownHold:'操作结果未知，该步骤已锁定，须由可信 Host 核对状态。',assistantTag:'隐私优先',assistantTitle:'用 AI 规划',assistantDesc:'描述目标，在同意任何请求前先查看拟披露的精确内容。',assistantGoalLabel:'你想完成什么？',assistantPlaceholder:'例如：帮我解释电脑为什么变慢了……',assistantPreview:'查看披露内容',assistantPrivacy:'仅在本机生成预览，不会调用模型、签发同意或预留预算。',assistantNoPreview:'尚无披露预览。',assistantPreviewOk:'拟披露的原始内容（尚未发送）',assistantPreviewFail:'预览失败，未发送任何内容。',assistantLoading:'正在本机准备预览……',routineTag:'可复用的任务',routineTitle:'保存的系统检查',routineIntro:'保存一个已验证的只读系统检查，以后不用调用 AI 也能执行。每次都由本机核对权限。',routineName:'电脑概况',routineSafe:'只读取 CPU、内存和存储空间的汇总信息，不会修改文件。',routineSave:'保存任务',routineRun:'运行保存的检查',routineAuth:'保存任务不代表授权执行，每次运行都由可信 Host 检查权限。',routineNoRun:'还没有已验证的运行结果。',routineNotSaved:'尚未保存',routineSaved:'已保存，未授权执行',routineDenied:'可信 Host 拒绝运行，未修改任何内容。',routineProgress:'正在核对本机可信 Host…',routineSuccess:'本机已验证的只读结果',routineError:'无法核对任务状态。',observedOnly:'仅代表一次观察，不保证定位原因或提升速度。',metricCpu:'CPU 逻辑核心',metricMemory:'可用 / 总内存',metricStorage:'剩余 / 总存储空间',metricProcesses:'已观察的进程数',metricStartup:'启动项数量',signalDisk:'检测到剩余存储空间偏低',signalMemory:'检测到可用内存偏低',signalNone:'本次快照未检测到内存或存储空间不足的信号。'
+  emptyNotice:'请先从首页选择一个任务。',filterReset:'清除搜索',navigationLabel:'主导航',sectionLabel:'导航分区',menuLabel:'展开或收起菜单',refreshLabel:'刷新',folderInputLabel:'文件夹本地预览选择器',folderChoose:'浏览文件夹',folderHint:'仅在浏览器中预览，不向顺助手发送文件内容或路径。',folderPreview:'浏览器预览：{folder} · {count} 个文件 · {size} MiB。这不是可信 Host 批准的操作范围。',folderRefused:'无法预览文件夹，未发送任何文件。',stale:'步骤已过期或改变，请刷新后再继续。',unknownHold:'操作结果未知，该步骤已锁定，须由可信 Host 核对状态。',assistantTag:'隐私优先',assistantTitle:'用 AI 规划',assistantDesc:'描述目标，在同意任何请求前先查看拟披露的精确内容。',assistantGoalLabel:'你想完成什么？',assistantPlaceholder:'例如：帮我解释电脑为什么变慢了……',assistantPreview:'查看披露内容',assistantPrivacy:'仅在本机生成预览，不会调用模型、签发同意或预留预算。',assistantNoPreview:'尚无披露预览。',assistantPreviewOk:'拟披露的原始内容（尚未发送）',assistantPreviewFail:'预览失败，未发送任何内容。',assistantLoading:'正在本机准备预览……',routineTag:'可复用的任务',routineTitle:'保存的系统检查',routineIntro:'保存一个已验证的只读系统检查，以后不用调用 AI 也能执行。每次都由本机核对权限。',routineName:'电脑概况',routineSafe:'只读取 CPU、内存和存储空间的汇总信息，不会修改文件。',routineSave:'保存任务',routineRun:'运行保存的检查',routineAuth:'保存任务不代表授权执行，每次运行都由可信 Host 检查权限。',routineNoRun:'还没有已验证的运行结果。',routineNotSaved:'尚未保存',routineSaved:'已保存，未授权执行',routineDenied:'可信 Host 拒绝运行，未修改任何内容。',routineProgress:'正在核对本机可信 Host…',routineSuccess:'本机已验证的只读结果',routineError:'无法核对任务状态。',observedOnly:'仅代表一次观察，不保证定位原因或提升速度。',metricCpu:'CPU 逻辑核心',metricMemory:'可用 / 总内存',metricStorage:'剩余 / 总存储空间',metricProcesses:'已观察的进程数',metricStartup:'启动项数量',signalDisk:'检测到剩余存储空间偏低',signalMemory:'检测到可用内存偏低',signalNone:'本次快照未检测到内存或存储空间不足的信号。'
  }
 };
 const storage = (() => {
@@ -73,6 +73,7 @@ function translate() {
  document.documentElement.lang = locale === 'zh' ? 'zh-CN' : 'en';
  for (const node of document.querySelectorAll('[data-i18n]')) node.textContent = tr(node.dataset.i18n);
  for (const node of document.querySelectorAll('[data-placeholder]')) node.placeholder = tr(node.dataset.placeholder);
+ for (const node of document.querySelectorAll('[data-aria-label]')) node.setAttribute('aria-label',tr(node.dataset.ariaLabel));
  $('language').value = locale;
  $('appearance').value = document.documentElement.dataset.theme || 'system';
  for (const label of document.querySelectorAll('[data-page]')) {
@@ -140,17 +141,21 @@ function renderGuided() {
   set('step-title',tr('needsAttention'));set('step-description',tr('stepExpired'));
   set('step-status',model.status);alert.textContent=model.reason||tr('stepExpired');alert.hidden=false;return;
  }
+ const trustedTitle=stepText(model.titleKey);
+ if(!trustedTitle){set('step-title',tr('needsAttention'));alert.textContent=tr('formUnavailable');alert.hidden=false;return;}
  currentModel=model;
- set('home-task-summary',stepText(model.titleKey)||tr('ready'));
- set('step-title',stepText(model.titleKey)||tr('needsAttention'));
+ set('home-task-summary',trustedTitle);
+ set('step-title',trustedTitle);
  set('step-description',model.requiresExplicitApproval?tr('previewMissing'):tr('notAnApproval'));
  set('step-status',tr('ready'));
  set('scope-summary',lastState?.scope?.status==='KNOWN'?tr('scopeReady'):tr('scopeUnknown'));
  for (const field of model.fields) {
   const block=document.createElement('div');block.className='field';
   const label=document.createElement('label');label.htmlFor='field-'+field.id;
-  label.textContent=stepText(field.labelKey)||tr('needsAttention');
-  const makeOption=o=>stepText(o.labelKey)||tr('needsAttention');
+  const trustedLabel=stepText(field.labelKey);
+  if(!trustedLabel){currentModel=null;fields.replaceChildren();alert.textContent=tr('formUnavailable');alert.hidden=false;return;}
+  label.textContent=trustedLabel;
+  const makeOption=o=>stepText(o.labelKey);
   if (field.type==='TEXT') {
    const input=document.createElement('input');input.type='text';input.id=label.htmlFor;input.name=field.id;
    input.required=field.required;input.maxLength=Math.min(field.maxLength||256,1024);input.autocomplete='off';
@@ -158,7 +163,11 @@ function renderGuided() {
   } else if (field.type==='CHOICE') {
    const select=document.createElement('select');select.id=label.htmlFor;select.name=field.id;select.required=field.required;
    const blank=document.createElement('option');blank.value='';blank.textContent='—';select.append(blank);
-   for (const option of field.options||[]) {const el=document.createElement('option');el.value=option.id;el.textContent=makeOption(option);select.append(el);}
+   for (const option of field.options||[]) {
+    const display=makeOption(option);
+    if(!display){currentModel=null;fields.replaceChildren();alert.textContent=tr('formUnavailable');alert.hidden=false;return;}
+    const el=document.createElement('option');el.value=option.id;el.textContent=display;select.append(el);
+   }
    block.append(label,select);
   } else if (field.type==='CONFIRM') {
    const input=document.createElement('input');input.type='checkbox';input.id=label.htmlFor;input.name=field.id;
