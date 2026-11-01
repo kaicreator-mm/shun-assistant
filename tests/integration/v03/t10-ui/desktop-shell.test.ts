@@ -61,6 +61,9 @@ describe('R04 source contract: the shipped desktop surface replaces technical op
     expect(app).toContain('/api/tasks/');
     expect(app).toContain('hostTaskDetailRequest');
     expect(app).toContain("taskReconciled:'已核对'");
+    expect(app).toContain("button.dataset.i18n='taskView'");
+    expect(app).toContain("button.dataset.i18n='approvalSelect'");
+    expect(app).toContain('if(approvalSelected)renderApprovalPreview(approvalSelected)');
     expect(app).toContain("healthStatus?.simulated===true");
     expect(app).toContain("realApprovalPosture(healthStatus)!=='REAL'");
     expect(app).toContain('const trustedTitle=stepText(model.titleKey)');
