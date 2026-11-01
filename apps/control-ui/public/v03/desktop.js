@@ -20,7 +20,7 @@ const words = {
   waiting:'Waiting',decline:'Back to home',continue:'Continue',scopeTitle:'Selected location',scopeUnknown:'No trusted folder selection yet.',safetyTitle:'Before anything changes',
   safetyPreview:'Review which files would change.',safetyConfirm:'Approve the exact plan separately.',safetyVerify:'Check the actual result afterward.',notAnApproval:'Answering a form does not authorize changes to your computer.',
   readOnly:'READ-ONLY',computerTitle:'My computer',computerDesc:'See real local information. No files are changed or sent to the cloud.',runOverview:'Show overview',runCheck:'Run health check',noReport:'Choose a check to see its results.',
-  activity:'ACTIVITY',historyTitle:'Task history',historyDesc:'Only actual recorded outcomes appear here.',historyEmpty:'No recorded guided steps yet.',historyUnavailable:'Cannot verify the guided history. No operation is assumed complete.',preferences:'PREFERENCES',settingsTitle:'Settings',settingsDesc:'Choose how this app looks. Security decisions stay with Windows.',
+  activity:'ACTIVITY',historyTitle:'Task history',historyDesc:'Only actual recorded outcomes appear here.',historyEmpty:'No recorded guided steps yet.',historyUnavailable:'Cannot verify the guided history. No operation is assumed complete.',taskStateRECEIVED:'Received',taskStateINTERPRETING:'Understanding request',taskStateCLARIFICATION:'Needs more information',taskStateRESOLVING:'Finding a safe option',taskStatePLANNED:'Plan ready',taskStateAWAITING_AUTHORIZATION:'Awaiting approval',taskStateEXECUTING:'Running under Host control',taskStateVERIFYING:'Checking result',taskStateLIFECYCLE_RECONCILIATION:'Reconciliation required',taskStateSUCCEEDED:'Host marked succeeded',taskStateFAILED:'Host marked failed',taskStateCANCELLED:'Cancelled',taskStateNEEDS_INTERVENTION:'Needs attention',preferences:'PREFERENCES',settingsTitle:'Settings',settingsDesc:'Choose how this app looks. Security decisions stay with Windows.',
   languageTitle:'Language',languageDesc:'Use Chinese or English in the interface.',appearanceTitle:'Appearance',appearanceDesc:'Follow your Windows theme or choose light/dark.',connectionTitle:'Connection',connectionDesc:'Shun listens on your computer only. Remote model calls require separate consent.',
   connected:'Connected locally',unavailable:'Local service unavailable',localMode:'Local checks',cloudMode:'Cloud opt-in',searchEmpty:'No matching actions. Try a different phrase.',
   ready:'Ready',needsAttention:'Needs attention',formUnavailable:'This step needs a trusted Host workflow. Nothing has been submitted.',previewMissing:'The actual action plan and independent authorization are not available in this view. No change can be made.',
@@ -38,7 +38,7 @@ const words = {
   waiting:'等待中',decline:'返回首页',continue:'继续',scopeTitle:'已选择的位置',scopeUnknown:'尚未通过可信 Host 选择文件夹。',safetyTitle:'执行前的保护',
   safetyPreview:'确认将修改哪些文件。',safetyConfirm:'对具体计划单独授权。',safetyVerify:'执行后核对真实结果。',notAnApproval:'填写表单不代表授权修改电脑。',
   readOnly:'只读操作',computerTitle:'我的电脑',computerDesc:'查看真实的本机信息，不会改动文件或上传数据。',runOverview:'查看概况',runCheck:'检查健康状态',noReport:'选择一项检查来查看结果。',
-  activity:'操作记录',historyTitle:'任务历史',historyDesc:'这里只显示真正已记录的结果。',historyEmpty:'尚无已记录的引导步骤。',historyUnavailable:'无法核实引导记录，不会推断任何操作已完成。',preferences:'个性化',settingsTitle:'设置',settingsDesc:'调整显示方式。安全授权由 Windows 和可信 Host 处理。',
+  activity:'操作记录',historyTitle:'任务历史',historyDesc:'这里只显示真正已记录的结果。',historyEmpty:'尚无已记录的引导步骤。',historyUnavailable:'无法核实引导记录，不会推断任何操作已完成。',taskStateRECEIVED:'已接收',taskStateINTERPRETING:'正在理解请求',taskStateCLARIFICATION:'需要补充信息',taskStateRESOLVING:'正在选择安全方案',taskStatePLANNED:'计划已就绪',taskStateAWAITING_AUTHORIZATION:'等待授权',taskStateEXECUTING:'Host 正在执行',taskStateVERIFYING:'正在核对结果',taskStateLIFECYCLE_RECONCILIATION:'需要核对执行状态',taskStateSUCCEEDED:'Host 标记为成功',taskStateFAILED:'Host 标记为失败',taskStateCANCELLED:'已取消',taskStateNEEDS_INTERVENTION:'需要人工处理',preferences:'个性化',settingsTitle:'设置',settingsDesc:'调整显示方式。安全授权由 Windows 和可信 Host 处理。',
   languageTitle:'界面语言',languageDesc:'选择简体中文或英语。',appearanceTitle:'外观',appearanceDesc:'跟随系统主题或选择明暗外观。',connectionTitle:'连接状态',connectionDesc:'只在本机提供服务。调用云端模型必须另行确认。',
   connected:'已连接本机',unavailable:'本机服务不可用',localMode:'本地检查',cloudMode:'云端需授权',searchEmpty:'没有找到匹配的操作，请换个关键词。',
   ready:'可继续',needsAttention:'需要检查',formUnavailable:'此步骤尚需可信 Host 的业务支持，未提交任何内容。',previewMissing:'此处尚无法展示真实操作计划与独立授权信息，因此不会修改电脑。',
@@ -515,7 +515,7 @@ function renderHostTaskDetail(){
  }
  const view=hostTaskDetail;
  const heading=document.createElement('h3');heading.textContent=view.title;target.append(heading);
- labeledRow(target,'taskStatus',view.state);
+ labeledRow(target,'taskStatus',tr('taskState'+view.state));
  labeledRow(target,'taskUpdated',new Date(view.updatedAt).toLocaleString(locale==='zh'?'zh-CN':'en-US'));
  if(view.plan)labeledRow(target,'taskPlan',view.plan.risk+' · '+view.plan.actionCount);
  if(view.verification)labeledRow(target,'taskVerification',view.verification.status);
@@ -552,7 +552,7 @@ async function loadHostTasks(){
   for(const item of result.items){
    const line=document.createElement('div');line.className='history-entry';
    const name=document.createElement('strong');name.textContent=item.title;
-   const meta=document.createElement('p');meta.textContent=item.state+' · '+new Date(item.updatedAt).toLocaleString(locale==='zh'?'zh-CN':'en-US');
+   const meta=document.createElement('p');meta.textContent=tr('taskState'+item.state)+' · '+new Date(item.updatedAt).toLocaleString(locale==='zh'?'zh-CN':'en-US');
    const button=document.createElement('button');button.type='button';button.className='text-button';
    button.dataset.i18n='taskView';button.textContent=tr('taskView');
    button.addEventListener('click',()=>loadHostTaskDetail(item.id).catch(showError));

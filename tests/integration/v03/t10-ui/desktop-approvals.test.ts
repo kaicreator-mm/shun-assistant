@@ -54,7 +54,7 @@ describe('R04 real ActionController approval UI',()=>{
   expect(projectApprovalDecision(decision,selected,false).status).toBe('REFUSED');
  });
  it('opens a task detail only for the exact Host task identity and supported evidence',()=>{
-  const recorded={taskId:'task-a',title:'Local check',state:'COMPLETED',
+  const recorded={taskId:'task-a',title:'Local check',state:'SUCCEEDED',
    updatedAt:'2026-11-01T12:00:00Z',
    planSummary:{planHash:'a'.repeat(64),riskClass:'R0',riskStatement:'Read-only check.',
     actionCount:1},verification:{status:'PASSED',
@@ -63,16 +63,19 @@ describe('R04 real ActionController approval UI',()=>{
   expect(projectHostTaskDetail(recorded,'task-a')).toMatchObject({status:'READY',
    verification:{status:'PASSED'},plan:{risk:'R0'},recovery:{reconciled:true}});
   expect(projectHostTaskDetail(recorded,'task-b').status).toBe('REFUSED');
+  expect(projectHostTaskDetail({...recorded,state:'UNKNOWN'},'task-a').status).toBe('REFUSED');
   expect(projectHostTaskDetail({...recorded,updatedAt:'unknown'},'task-a').status).toBe('REFUSED');
   expect(projectHostTaskDetail({...recorded,verification:{status:'PASSED',checks:[{status:'PASSED'}]}},'task-a').status).toBe('REFUSED');
   expect(projectHostTaskDetail({...recorded,planSummary:{...recorded.planSummary,planHash:'forged'}},'task-a').status).toBe('REFUSED');
  });
  it('renders only bounded verified task metadata from the Host list',()=>{
   expect(projectTaskSnapshots({tasks:[{taskId:'task-a',title:'PC health check',
-    state:'COMPLETED',updatedAt:'2026-11-01T12:00:00Z'}]}).status).toBe('READY');
-  expect(projectTaskSnapshots({tasks:[{taskId:'task-a',title:'',state:'COMPLETED',
+    state:'SUCCEEDED',updatedAt:'2026-11-01T12:00:00Z'}]}).status).toBe('READY');
+  expect(projectTaskSnapshots({tasks:[{taskId:'task-a',title:'Local check',
+    state:'COMPLETED',updatedAt:'2026-11-01T12:00:00Z'}]}).status).toBe('REFUSED');
+  expect(projectTaskSnapshots({tasks:[{taskId:'task-a',title:'',state:'SUCCEEDED',
     updatedAt:'2026-11-01T12:00:00Z'}]}).status).toBe('REFUSED');
   expect(projectTaskSnapshots({tasks:[{taskId:'task-a',title:'Local check',
-    state:'COMPLETED',updatedAt:'invalid-timestamp'}]}).status).toBe('REFUSED');
+    state:'SUCCEEDED',updatedAt:'invalid-timestamp'}]}).status).toBe('REFUSED');
  });
 });

@@ -5,6 +5,8 @@
 const SHA = /^[a-f0-9]{64}$/;
 const ID = /^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$/;
 const RISKS = ['R2', 'R3'];
+// Exact Host contract TaskState whitelist, display-only, not an authority.
+const STATES = ['RECEIVED','INTERPRETING','CLARIFICATION','RESOLVING','PLANNED','AWAITING_AUTHORIZATION','EXECUTING','VERIFYING','LIFECYCLE_RECONCILIATION','SUCCEEDED','FAILED','CANCELLED','NEEDS_INTERVENTION'];
 const TEXT_MAX = 4096;
 
 /** @param {unknown} value @returns {value is Record<string, any>} */
@@ -112,7 +114,7 @@ export function projectTaskSnapshots(value){
  const items=[];
  for(const task of value.tasks){
   if(!object(task)||!shortText(task.taskId,128)||!shortText(task.title,2048)||
-   !shortText(task.state,96)||!shortText(task.updatedAt,64)||
+   !STATES.includes(task.state)||!shortText(task.updatedAt,64)||
    !Number.isFinite(Date.parse(task.updatedAt)))return refused('TASK_HISTORY_UNVERIFIED');
   items.push({id:task.taskId,title:task.title,state:task.state,
    updatedAt:task.updatedAt});
@@ -128,7 +130,7 @@ export function projectTaskSnapshots(value){
  */
 export function projectHostTaskDetail(value,expectedId){
  if(!ID.test(expectedId)||!object(value)||value.taskId!==expectedId||
-    !shortText(value.title,2048)||!shortText(value.state,96)||
+    !shortText(value.title,2048)||!STATES.includes(value.state)||
     !shortText(value.updatedAt,64)||!Number.isFinite(Date.parse(value.updatedAt)))
    return refused('TASK_DETAIL_UNVERIFIED');
  let plan=null,verification=null,recovery=null;

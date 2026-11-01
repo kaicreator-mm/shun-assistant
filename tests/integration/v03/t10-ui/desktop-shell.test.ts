@@ -68,6 +68,9 @@ describe('R04 source contract: the shipped desktop surface replaces technical op
     expect(app).toContain('projectHostTaskDetail');
     expect(app).toContain('projectGuidedHistory(lastState?.history)');
     expect(app).toContain('let hostTaskListGeneration = 0;');
+    expect(app).toContain("labeledRow(target,'taskStatus',tr('taskState'+view.state))");
+    expect(app).toContain("taskStateSUCCEEDED:'Host marked succeeded'");
+    expect(app).toContain("taskStateSUCCEEDED:'Host 标记为成功'");
     expect(app).toContain('if(generation!==hostTaskListGeneration)return');
     expect(app).toContain("function showError() { notify(tr('unknown')); }");
     expect(app).not.toContain('error instanceof Error ? error.message');
