@@ -137,3 +137,21 @@ export function projectRoutineExecution(value) {
   return { status: 'OBSERVED', metrics: metrics(value.snapshot),
     signals: [], counts: [] };
 }
+
+/**
+ * Exact disclosure preview is local-only: no consent, grant or cloud send.
+ * Keep the original projectionJson bytes unchanged in the UI.
+ * @param {any} value
+ */
+export function projectDisclosurePreview(value) {
+  if (!value || typeof value !== 'object' || value.ok !== true ||
+      value.status !== 'LOCAL_PREVIEW_ONLY' ||
+      value.consentIssued !== false || value.cloudSendAllowed !== false ||
+      value.privateBrokerReady !== false ||
+      typeof value.sha256 !== 'string' || !/^[a-f0-9]{64}$/.test(value.sha256) ||
+      typeof value.projectionJson !== 'string' ||
+      value.projectionJson.length === 0 || value.projectionJson.length > 16384) {
+    return invalid('DISCLOSURE_PREVIEW_UNVERIFIED');
+  }
+  return {status:'OBSERVED', projectionJson:value.projectionJson};
+}

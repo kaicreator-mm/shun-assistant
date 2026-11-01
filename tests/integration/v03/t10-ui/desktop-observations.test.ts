@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import {
-  formatGib, projectLocalObservation, projectRoutineState, projectRoutineExecution,
+  formatGib, projectLocalObservation, projectRoutineState, projectRoutineExecution, projectDisclosurePreview,
 } from '../../../../apps/control-ui/public/v03/desktop-observations.js';
 
 const base = {
@@ -73,6 +73,14 @@ describe('R04 real local-only observation projection', () => {
     expect(projectRoutineExecution({...valid,recipeExecuted:false}).status).toBe('REFUSED');
     expect(projectRoutineExecution({...valid,externalDisclosures:['somewhere']}).status).toBe('REFUSED');
     expect(projectRoutineExecution({...valid,snapshot:{...base,platform:'linux'}}).status).toBe('REFUSED');
+  });
+  it('shows exact local disclosure only, refuses any claimed cloud authorization',()=>{
+    const good={ok:true,status:'LOCAL_PREVIEW_ONLY',projectionJson:'{"goal":"inspect"}',
+      sha256:'a'.repeat(64),consentIssued:false,cloudSendAllowed:false,privateBrokerReady:false};
+    expect(projectDisclosurePreview(good)).toEqual({status:'OBSERVED',projectionJson:'{"goal":"inspect"}'});
+    expect(projectDisclosurePreview({...good,cloudSendAllowed:true}).status).toBe('REFUSED');
+    expect(projectDisclosurePreview({...good,privateBrokerReady:true}).status).toBe('REFUSED');
+    expect(projectDisclosurePreview({...good,sha256:'invalid'}).status).toBe('REFUSED');
   });
   it('requires verifiable immutable built-in recipe metadata before offering to run',()=>{
     const good={ok:true,saved:true,state:'PERSISTED_CANDIDATE_ONLY',

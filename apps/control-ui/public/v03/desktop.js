@@ -4,14 +4,14 @@
  * Fields are rendered ONLY from the trusted, allowlisted StepSpec projection.
  */
 import { t as approvedText } from './strings.js';
-import { projectLocalObservation, projectRoutineState, projectRoutineExecution } from './desktop-observations.js';
+import { projectLocalObservation, projectRoutineState, projectRoutineExecution, projectDisclosurePreview } from './desktop-observations.js';
 import { currentStepModel, buildStepOutcome, userDecisionRelay, replayGuard } from './view-model.js';
 
 const words = {
  en: {
-  brandSub:'Your Windows companion',navHome:'Home',navTasks:'My tasks',navComputer:'My computer',navRoutine:'Saved routines',navHistory:'History',navSettings:'Settings',
+  brandSub:'Your Windows companion',navHome:'Home',navTasks:'My tasks',navAssistant:'AI request preview',navComputer:'My computer',navRoutine:'Saved routines',navHistory:'History',navSettings:'Settings',
   localOnly:'Runs on your computer',welcome:'WELCOME BACK',heroTitle:'What would you like to do?',heroDesc:'Choose a familiar task. Shun will guide you through the details.',searchLabel:'Find a task',searchPlaceholder:'Find an action…',quickTitle:'Quick actions',quickDesc:'Start safely; nothing changes without your approval.',
-  actionInventory:'Computer overview',actionInventoryDesc:'See system information without changing anything.',actionDiagnosis:'Check my computer',actionDiagnosisDesc:'Run a safe, read-only health check.',actionRoutine:'Saved system check',actionRoutineDesc:'Reuse a verified read-only check without AI.',actionFolder:'Work with files',actionFolderDesc:'Choose a folder, review a plan and decide what happens.',openAction:'Open →',
+  actionAssistant:'Plan with AI',actionAssistantDesc:'Preview what might be shared before any model request.',actionInventory:'Computer overview',actionInventoryDesc:'See system information without changing anything.',actionDiagnosis:'Check my computer',actionDiagnosisDesc:'Run a safe, read-only health check.',actionRoutine:'Saved system check',actionRoutineDesc:'Reuse a verified read-only check without AI.',actionFolder:'Work with files',actionFolderDesc:'Choose a folder, review a plan and decide what happens.',openAction:'Open →',
   privacyTitle:'You stay in control',privacyDesc:'Local checks stay on this computer. Changes and cloud requests need separate approval.',recentTitle:'Continue a task',noCurrent:'No active task right now.',seeTasks:'View tasks →',
   guidedEyebrow:'GUIDED WORKFLOW',tasksTitle:'Your current task',tasksDesc:'One decision at a time. You can stop whenever you want.',stepTag:'NEXT STEP',noTaskTitle:'No task selected',noTaskDesc:'Choose an action from Home, or wait for a trusted task to be selected.',
   waiting:'Waiting',decline:'Back to home',continue:'Continue',scopeTitle:'Selected location',scopeUnknown:'No trusted folder selection yet.',safetyTitle:'Before anything changes',
@@ -24,12 +24,12 @@ const words = {
   scopeReady:'A location has been selected by the trusted Host.',stepExpired:'This step is no longer current. Refresh before continuing.',recorded:'Your decision was recorded. No Windows permission was granted.',refused:'The request was refused.',unknown:'The result is unknown. Do not repeat the operation without checking its actual state.',
   offlineCheck:'This check is only available on a real Windows host.',loading:'Checking your computer…',completed:'Check completed',noData:'No safe summary is available.',technicalDetails:'Technical details',
   consentNext:'Continue to separate authorization',cancelDecision:'Decline this step',unsafeUnavailable:'This form is not an approval or an execution request.',reportMemory:'Memory',reportCpu:'Processor',reportDisk:'Storage',reportDevice:'Device',safeAction:'Read-only check',
-  emptyNotice:'Choose a task on the home page to begin.',filterReset:'Clear search',routineTag:'REUSABLE TASK',routineTitle:'Saved system check',routineIntro:'Save one verified, read-only system check and reuse it without AI requests. Shun checks local permissions every time.',routineName:'Computer overview',routineSafe:'Reads only aggregate CPU, memory and storage information. No files are modified.',routineSave:'Save routine',routineRun:'Run saved check',routineAuth:'Saving is not approval. The trusted Host checks permission on every run.',routineNoRun:'No verified run yet.',routineNotSaved:'Not saved',routineSaved:'Saved, not authorized',routineDenied:'Host refused the routine. Nothing was changed.',routineProgress:'Checking trusted Host…',routineSuccess:'Host-verified read-only result',routineError:'Unable to verify the routine status.',observedOnly:'Single observation; not a diagnosis or speed-up guarantee.',metricCpu:'CPU logical cores',metricMemory:'Available / total memory',metricStorage:'Free / total storage',metricProcesses:'Observed processes',metricStartup:'Startup entries',signalDisk:'Low storage space detected',signalMemory:'Low available memory detected',signalNone:'No low-memory or low-storage signal in this snapshot.'
+  emptyNotice:'Choose a task on the home page to begin.',filterReset:'Clear search',assistantTag:'PRIVACY FIRST',assistantTitle:'Plan with AI',assistantDesc:'Describe a goal and inspect the exact data before consenting to anything.',assistantGoalLabel:'What would you like to do?',assistantPlaceholder:'Example: Explain why my computer feels slow…',assistantPreview:'Preview disclosure',assistantPrivacy:'Local preview only. No cloud send, consent or budget reservation occurs here.',assistantNoPreview:'No disclosure prepared yet.',assistantPreviewOk:'Exact proposed disclosure (not sent)',assistantPreviewFail:'Preview unavailable; nothing was sent.',assistantLoading:'Preparing local preview…',routineTag:'REUSABLE TASK',routineTitle:'Saved system check',routineIntro:'Save one verified, read-only system check and reuse it without AI requests. Shun checks local permissions every time.',routineName:'Computer overview',routineSafe:'Reads only aggregate CPU, memory and storage information. No files are modified.',routineSave:'Save routine',routineRun:'Run saved check',routineAuth:'Saving is not approval. The trusted Host checks permission on every run.',routineNoRun:'No verified run yet.',routineNotSaved:'Not saved',routineSaved:'Saved, not authorized',routineDenied:'Host refused the routine. Nothing was changed.',routineProgress:'Checking trusted Host…',routineSuccess:'Host-verified read-only result',routineError:'Unable to verify the routine status.',observedOnly:'Single observation; not a diagnosis or speed-up guarantee.',metricCpu:'CPU logical cores',metricMemory:'Available / total memory',metricStorage:'Free / total storage',metricProcesses:'Observed processes',metricStartup:'Startup entries',signalDisk:'Low storage space detected',signalMemory:'Low available memory detected',signalNone:'No low-memory or low-storage signal in this snapshot.'
  },
  zh: {
-  brandSub:'你的 Windows 电脑助手',navHome:'首页',navTasks:'我的任务',navComputer:'我的电脑',navRoutine:'保存的任务',navHistory:'历史记录',navSettings:'设置',
+  brandSub:'你的 Windows 电脑助手',navHome:'首页',navTasks:'我的任务',navAssistant:'AI 请求预览',navComputer:'我的电脑',navRoutine:'保存的任务',navHistory:'历史记录',navSettings:'设置',
   localOnly:'仅在本机运行',welcome:'欢迎回来',heroTitle:'今天想让电脑做点什么？',heroDesc:'选择常用任务，顺助手会逐步引导你完成。',searchLabel:'查找任务',searchPlaceholder:'查找任务或操作…',quickTitle:'常用操作',quickDesc:'从安全的检查开始。任何改动都需要你的独立确认。',
-  actionInventory:'查看电脑概况',actionInventoryDesc:'查看系统信息，不会修改任何内容。',actionDiagnosis:'检查电脑状态',actionDiagnosisDesc:'安全地检查电脑健康状况，只读操作。',actionRoutine:'保存的系统检查',actionRoutineDesc:'复用已验证的只读任务，不需要 AI。',actionFolder:'整理与管理文件',actionFolderDesc:'选择文件夹，检查计划并决定下一步。',openAction:'打开 →',
+  actionAssistant:'用 AI 规划',actionAssistantDesc:'先查看可能披露的信息，不会发送模型请求。',actionInventory:'查看电脑概况',actionInventoryDesc:'查看系统信息，不会修改任何内容。',actionDiagnosis:'检查电脑状态',actionDiagnosisDesc:'安全地检查电脑健康状况，只读操作。',actionRoutine:'保存的系统检查',actionRoutineDesc:'复用已验证的只读任务，不需要 AI。',actionFolder:'整理与管理文件',actionFolderDesc:'选择文件夹，检查计划并决定下一步。',openAction:'打开 →',
   privacyTitle:'电脑始终由你掌控',privacyDesc:'本地检查不会上传数据。修改电脑或连接云端前需单独授权。',recentTitle:'继续未完成的任务',noCurrent:'目前没有正在进行的任务。',seeTasks:'查看任务 →',
   guidedEyebrow:'分步引导',tasksTitle:'当前任务',tasksDesc:'每次只处理一步，随时可以停止。',stepTag:'下一步',noTaskTitle:'暂时没有任务',noTaskDesc:'从首页选择一个操作，或等待可信 Host 选中任务。',
   waiting:'等待中',decline:'返回首页',continue:'继续',scopeTitle:'已选择的位置',scopeUnknown:'尚未通过可信 Host 选择文件夹。',safetyTitle:'执行前的保护',
@@ -42,7 +42,7 @@ const words = {
   scopeReady:'可信 Host 已选择一个位置。',stepExpired:'该步骤已过期，请刷新后再继续。',recorded:'已记录你的选择，没有签发 Windows 执行权限。',refused:'请求已拒绝。',unknown:'操作结果未知。核实真实状态前请勿重复操作。',
   offlineCheck:'此项检查仅在真实 Windows 主机上可用。',loading:'正在检查电脑…',completed:'检查完成',noData:'没有可安全展示的摘要。',technicalDetails:'技术细节',
   consentNext:'继续到独立授权',cancelDecision:'拒绝此步骤',unsafeUnavailable:'此表单不产生执行授权。',reportMemory:'内存',reportCpu:'处理器',reportDisk:'存储空间',reportDevice:'设备',safeAction:'只读检查',
-  emptyNotice:'请先从首页选择一个任务。',filterReset:'清除搜索',routineTag:'可复用的任务',routineTitle:'保存的系统检查',routineIntro:'保存一个已验证的只读系统检查，以后不用调用 AI 也能执行。每次都由本机核对权限。',routineName:'电脑概况',routineSafe:'只读取 CPU、内存和存储空间的汇总信息，不会修改文件。',routineSave:'保存任务',routineRun:'运行保存的检查',routineAuth:'保存任务不代表授权执行，每次运行都由可信 Host 检查权限。',routineNoRun:'还没有已验证的运行结果。',routineNotSaved:'尚未保存',routineSaved:'已保存，未授权执行',routineDenied:'可信 Host 拒绝运行，未修改任何内容。',routineProgress:'正在核对本机可信 Host…',routineSuccess:'本机已验证的只读结果',routineError:'无法核对任务状态。',observedOnly:'仅代表一次观察，不保证定位原因或提升速度。',metricCpu:'CPU 逻辑核心',metricMemory:'可用 / 总内存',metricStorage:'剩余 / 总存储空间',metricProcesses:'已观察的进程数',metricStartup:'启动项数量',signalDisk:'检测到剩余存储空间偏低',signalMemory:'检测到可用内存偏低',signalNone:'本次快照未检测到内存或存储空间不足的信号。'
+  emptyNotice:'请先从首页选择一个任务。',filterReset:'清除搜索',assistantTag:'隐私优先',assistantTitle:'用 AI 规划',assistantDesc:'描述目标，在同意任何请求前先查看拟披露的精确内容。',assistantGoalLabel:'你想完成什么？',assistantPlaceholder:'例如：帮我解释电脑为什么变慢了……',assistantPreview:'查看披露内容',assistantPrivacy:'仅在本机生成预览，不会调用模型、签发同意或预留预算。',assistantNoPreview:'尚无披露预览。',assistantPreviewOk:'拟披露的原始内容（尚未发送）',assistantPreviewFail:'预览失败，未发送任何内容。',assistantLoading:'正在本机准备预览……',routineTag:'可复用的任务',routineTitle:'保存的系统检查',routineIntro:'保存一个已验证的只读系统检查，以后不用调用 AI 也能执行。每次都由本机核对权限。',routineName:'电脑概况',routineSafe:'只读取 CPU、内存和存储空间的汇总信息，不会修改文件。',routineSave:'保存任务',routineRun:'运行保存的检查',routineAuth:'保存任务不代表授权执行，每次运行都由可信 Host 检查权限。',routineNoRun:'还没有已验证的运行结果。',routineNotSaved:'尚未保存',routineSaved:'已保存，未授权执行',routineDenied:'可信 Host 拒绝运行，未修改任何内容。',routineProgress:'正在核对本机可信 Host…',routineSuccess:'本机已验证的只读结果',routineError:'无法核对任务状态。',observedOnly:'仅代表一次观察，不保证定位原因或提升速度。',metricCpu:'CPU 逻辑核心',metricMemory:'可用 / 总内存',metricStorage:'剩余 / 总存储空间',metricProcesses:'已观察的进程数',metricStartup:'启动项数量',signalDisk:'检测到剩余存储空间偏低',signalMemory:'检测到可用内存偏低',signalNone:'本次快照未检测到内存或存储空间不足的信号。'
  }
 };
 const storage = (() => {
@@ -313,10 +313,37 @@ async function runRoutine() {
     set('routine-status',tr('routineDenied'));
   }finally{routineBusy=false;await refreshRoutine();}
 }
+/** Exact privacy preview is a read-only local API call, never an LLM send. */
+async function previewAiGoal() {
+  const goal=$('ai-goal').value;
+  if (!goal.trim()) return;
+  const target=$('ai-preview-result');
+  target.replaceChildren();
+  const loading=document.createElement('p');loading.textContent=tr('assistantLoading');target.append(loading);
+  $('ai-preview').disabled=true;
+  try {
+    const raw=await request('/api/cloud/disclosure-preview',{
+      method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({goalText:goal})
+    });
+    const preview=projectDisclosurePreview(raw);
+    if(preview.status!=='OBSERVED')throw Error(preview.code);
+    target.replaceChildren();
+    const title=document.createElement('h3');title.textContent=tr('assistantPreviewOk');
+    const exact=document.createElement('pre');exact.className='disclosure';
+    exact.textContent=preview.projectionJson; // never innerHTML, never reconstruct the bytes
+    const info=document.createElement('p');info.textContent=tr('assistantPrivacy');
+    target.append(title,exact,info);
+  }catch{
+    target.replaceChildren();
+    const notice=document.createElement('p');notice.textContent=tr('assistantPreviewFail');
+    target.append(notice);
+  }finally{$('ai-preview').disabled=false;}
+}
 document.querySelectorAll('[data-page]').forEach(button=>button.addEventListener('click',()=>page(button.dataset.page)));
 document.querySelectorAll('[data-action]').forEach(button=>button.addEventListener('click',()=>{
  const kind=button.dataset.action;
- if(kind==='guided')page('tasks');
+ if(kind==='assistant')page('assistant');
+ else if(kind==='guided')page('tasks');
  else if(kind==='routine')page('routine');
  else runCheck(kind).catch(showError);
 }));
@@ -324,6 +351,8 @@ $('run-inventory').addEventListener('click',()=>runCheck('inventory').catch(show
 $('run-diagnosis').addEventListener('click',()=>runCheck('diagnosis').catch(showError));
 $('routine-save').addEventListener('click',()=>saveRoutine().catch(showError));
 $('routine-run').addEventListener('click',()=>runRoutine().catch(showError));
+$('ai-preview-form').addEventListener('submit',event=>{event.preventDefault();previewAiGoal().catch(showError);});
+$('ai-goal').addEventListener('input',()=>{const box=$('ai-preview-result');box.replaceChildren();const p=document.createElement('p');p.textContent=tr('assistantNoPreview');box.append(p);});
 $('refresh').addEventListener('click',()=>refresh().catch(showError));
 $('language').addEventListener('change',event=>{locale=event.target.value==='zh'?'zh':'en';storage.write('shun-ui-language',locale);translate();});
 $('appearance').addEventListener('change',event=>{const v=['light','dark'].includes(event.target.value)?event.target.value:'system';document.documentElement.dataset.theme=v;storage.write('shun-ui-theme',v);});
