@@ -19,6 +19,7 @@ describe('R04 source contract: the shipped desktop surface replaces technical op
     expect(html).toContain('id="page-routine"');
     expect(html).toContain('id="page-assistant"');
     expect(html).toContain('id="page-approvals"');
+    expect(html).toContain('id="simulation-banner"');
     expect(html).toContain('id="approval-confirm"');
     expect(html).toContain('id="host-task-list"');
     expect(html).toContain('id="folder-input"');
@@ -46,6 +47,7 @@ describe('R04 source contract: the shipped desktop surface replaces technical op
     expect(app).toContain('projectExactApproval');
     expect(app).toContain('projectApprovalDecision');
     expect(app).toContain('projectTaskSnapshots');
+    expect(app).toContain("healthStatus?.simulated===true");
     expect(app).toContain("realApprovalPosture(healthStatus)!=='REAL'");
     expect(app).toContain('const trustedTitle=stepText(model.titleKey)');
     expect(app).toContain('const trustedLabel=stepText(field.labelKey)');
