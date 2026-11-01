@@ -1,4 +1,4 @@
-# R02 validation receipt — executed zero-paid / zero-physical subset
+# R02 validation receipt — executed zero-paid / zero-physical subset + authorized real journeys
 
 **This is a factual execution record, not a release certificate.** All
 rows marked PASS carry a real command, exit code and evidence pointer
@@ -19,14 +19,14 @@ below; OWNER_DEFERRED rows were never executed and are never claimed PASS.
 | Journey | Disposition | Evidence |
 |---|---|---|
 | J01 read-only B-040 | **PASS (read-only, real host)** | `tests/integration/v03/r02-v-journeys` J01: real collector, `localOnly=true`, `externalDisclosures=[]`, genuine caption `Microsoft Windows 11 专业版`; skipped on the Linux CI agent (Windows-only journey) |
-| J02 authorized Windows effect | OWNER_DEFERRED (physical effect not authorized) | Module-seam evidence unchanged (T11 real-K fixture journey); no physical execution claimed |
-| J03 paid DeepSeek CN/EN | OWNER_DEFERRED (paid calls not authorized) | Request/consent/deadline shapes verified end-to-end with the controlled double incl. CONSENT_DECLINED truth; zero paid sends |
+| J02 authorized Windows effect | **PASS (real physical effect, Owner-authorized)** | `AUTHORIZED-REAL-JOURNEYS-RECEIPT.md` J02: real R2 grant + scoped `windows.fs.write` + independent poststate + journal, expired/revoked/out-of-scope falsifiers zero-effect |
+| J03 paid DeepSeek CN/EN | **PASS (real paid CN+EN, Owner-authorized)** | `AUTHORIZED-REAL-JOURNEYS-RECEIPT.md` J03: 2 real completions through the production gateway (journal `completed`×2), real C02 dialogs (2 allow + 1 deny, instrument click disclosed), denied consent zero-send, 7/8 amended paid ceiling |
 | J04 replay determinism | **PASS** | V suite: identical resubmission fenced by the real K non-idempotency gate (HTTP 422, single sender entry) |
-| J05 Provider JIT install | OWNER_DEFERRED (physical install not authorized) | Signed-material verification fixtures (T08) unchanged |
+| J05 Provider JIT install | **PASS (real signed first-use, Owner-authorized)** | `AUTHORIZED-REAL-JOURNEYS-RECEIPT.md` J05: real signed rg 14.1.1 staged + executed (`--version`, FILE_SEARCH canary), offline restart reuse, zero-residue removal, tamper falsifier |
 | J06 K unknown/restart recovery | **PASS** | V suite restart journey (SQLite reopen, replay fence, new-revision staging) + `r02-e-production/kernel-doc-store` CAS/reopen + `r02-a-build` UNKNOWN-throw semantics |
 | J07 real UI/Control API | **PASS (loopback HTTP)** | V suite: real `createControlServer`: UI 200, guided state 200, submit 200 COMPLETED, replay 422, hostile 422 pre-send, gateway-less boot 503; 202 ADMITTED mapping covered by `r02-c1-gateway` |
 | J08 Guided Step/Outcome | **PASS** | V suite: atomic decision 200 RECORDED (no auto-grant, no effect), 409 replay, consumed Case gates submits, restart fence |
-| J09 Feedback/Shadow | UNKNOWN (module logic only; not re-executed here) | Pre-existing opt-in Shadow tests unchanged |
+| J09 Feedback/Shadow | **PASS (real durable Host store)** | `AUTHORIZED-REAL-JOURNEYS-RECEIPT.md` J09: genuine guided outcome receipt → opt-in candidate persisted on the real SQLite Shadow store (new `domain-host/src/meta`), restart-durable, promotion/stale falsifiers refuse |
 
 ## Command / exit-code record (local Windows Node v24.21.0)
 
@@ -52,6 +52,8 @@ records and the deliberately-failing nested-test proof.
 
 ## Non-waivers
 
-No paid DeepSeek request, no physical Windows effect, no main/v0.2.0
-mutation, no tag/release, no independent R03 self-approval. J02/J03/J05
-stay OWNER_DEFERRED until separately authorized.
+No main/v0.2.0 mutation, no tag/release, no independent R03 self-approval.
+J02/J03/J05/J09 were executed ONLY after the Owner authorization
+`OWNER_SHUN_V030_R02_J02030509_DISPOSITION_APPROVE` (#259) plus the J03
+paid-ceiling amendment `OWNER_SHUN_V030_R02_J03_PAID_CEILING_AMEND_R1`;
+their evidence and disclosures live in `AUTHORIZED-REAL-JOURNEYS-RECEIPT.md`.

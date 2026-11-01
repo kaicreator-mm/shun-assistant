@@ -10,8 +10,11 @@
  *   - restart/replay fences on real SQLite files.
  *
  * The ONLY controlled double is the trusted T04 cloud interpreter port
- * (zero paid calls). J02 physical effects and J03 paid DeepSeek stay
- * OWNER_DEFERRED and are never claimed PASS here.
+ * (zero paid calls). J02 physical effects, J03 paid DeepSeek, J05 physical
+ * Provider install and J09 durable Shadow are executed under the Owner
+ * authorization OWNER_SHUN_V030_R02_J02030509_DISPOSITION_APPROVE in the
+ * sibling files j02-windows-effect / j03-live-cloud / j05-provider-install /
+ * j09-shadow-meta (env-gated); this zero-paid suite claims nothing for them.
  */
 import { spawnSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
