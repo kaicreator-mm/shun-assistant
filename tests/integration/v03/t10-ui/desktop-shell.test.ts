@@ -107,8 +107,8 @@ describe('R04 source contract: the shipped desktop surface replaces technical op
     expect(app).toContain('unresolvedStepId=submittedStepId');
     expect(app).toContain('let hostTaskListGeneration = 0;');
     expect(app).toContain("labeledRow(target,'taskStatus',tr('taskState'+view.state))");
-    expect(app).toContain("taskStateSUCCEEDED:'Marked complete'");
-    expect(app).toContain("taskStateSUCCEEDED:'已标记完成'");
+    expect(app).toContain("taskStateSUCCEEDED:'Marked complete (recorded)'");
+    expect(app).toContain("taskStateSUCCEEDED:'已记录为完成'");
     expect(app).toContain('if(generation!==hostTaskListGeneration)return');
     expect(app).toContain("function showError() { notify(tr('unknown')); }");
     expect(app).not.toContain('error instanceof Error ? error.message');
@@ -193,6 +193,18 @@ describe('R04 source contract: the shipped desktop surface replaces technical op
     expect(html).toContain('What is available in this version');
     expect(html).toContain('This preview does not read or change any files.');
     expect(html).not.toContain('review a plan and decide what happens');
+  });
+
+
+  it('distinguishes a typed folder-path request from an actual selected scope', () => {
+    const app = source('desktop.js');
+    expect(app).toContain("model.templateId==='shun.guided.select-root'");
+    expect(app).toContain("folderPathCandidate:'This only records the folder path you entered.");
+    expect(app).toContain("folderPathCandidate:'这里只记录你输入的文件夹路径");
+    expect(app).toContain("actionAssistant:'Preview an AI request'");
+    expect(app).toContain("assistantTitle:'AI request preview'");
+    expect(app).toContain("actionAssistant:'查看 AI 请求预览'");
+    expect(app).toContain("assistantTitle:'AI 请求预览'");
   });
 
 });
