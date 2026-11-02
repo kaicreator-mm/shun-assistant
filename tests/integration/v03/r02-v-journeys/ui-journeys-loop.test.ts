@@ -132,6 +132,12 @@ describe('R03B UI Meta candidate correlation assertion (CI-runnable)', () => {
     } as unknown as MetaCandidateReader;
     expect(() => assertSingleNewMetaCandidate(multiple, new Set(['candidate-old']))).toThrow();
 
+    const missingPayload = {
+      listShadowCandidates: () => [{ candidateId: 'candidate-new' }],
+      readShadowCandidate: () => undefined,
+    } as unknown as MetaCandidateReader;
+    expect(() => assertSingleNewMetaCandidate(missingPayload, new Set())).toThrow();
+
     const mismatch = {
       candidateId: 'candidate-new',
       payloadJson: JSON.stringify({
