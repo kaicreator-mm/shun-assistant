@@ -13,7 +13,7 @@ import { progressModel } from './view-model.js';
 
 const words = {
  en: {
-  brandSub:'Your Windows companion',navHome:'Home',navTasks:'My tasks',navApprovals:'Approvals',navAssistant:'AI request preview',navComputer:'My computer',navRoutine:'Saved routines',navHistory:'History',navSettings:'Settings',
+  brandSub:'Your Windows companion',recentTasksTitle:'Recent tasks',recentTasksEmpty:'No recent tasks yet.',recentTasksUnknown:'Recent tasks could not be verified.',recentTasksOpen:'Open task',navHome:'Home',navTasks:'My tasks',navApprovals:'Approvals',navAssistant:'AI request preview',navComputer:'My computer',navRoutine:'Saved routines',navHistory:'History',navSettings:'Settings',
   localOnly:'Runs on your computer',welcome:'WELCOME BACK',heroTitle:'What would you like to do?',heroDesc:'Choose a familiar task. Shun will guide you through the details.',searchLabel:'Find a task',searchPlaceholder:'Find an action…',quickTitle:'Quick actions',quickDesc:'Start safely; nothing changes without your approval.',
   actionAssistant:'Preview an AI request',actionAssistantDesc:'Preview what might be shared before any model request.',actionInventory:'Computer overview',actionInventoryDesc:'See system information without changing anything.',actionDiagnosis:'Check my computer',actionDiagnosisDesc:'Run a safe, read-only health check.',actionRoutine:'Saved system check',actionRoutineDesc:'Reuse a verified read-only check without AI.',actionFolder:'Preview a folder',actionFolderDesc:'See a folder’s name, item count and size locally. No files are read or changed.',openAction:'Open →',
   privacyTitle:'You stay in control',privacyDesc:'Local checks stay on this computer. Changes and cloud requests need separate approval.',recentTitle:'Continue a task',noCurrent:'No active task right now.',seeTasks:'View tasks →',
@@ -31,7 +31,7 @@ const words = {
   emptyNotice:'Choose a task on the home page to begin.',filterReset:'Clear search',demoWarning:'DEMONSTRATION — tasks and approvals are simulated. No real Windows effects are authorized.',demoMode:'Demo',approvalTag:'INDEPENDENT APPROVAL',approvalTitle:'Plans awaiting your decision',approvalIntro:'Review the actual plan, scope and risk. An approval is not proof of execution.',approvalRefresh:'Refresh pending plans',approvalPending:'Pending approvals',approvalSafetyTitle:'Your protection',approvalSafetyDesc:'The local service checks the exact plan and current safety rules. This page cannot grant permission by itself.',approvalDetail:'Review exact plan',approvalCheckbox:'I reviewed this exact plan, scope, risk and recovery.',approvalDecline:'Decline',approvalAccept:'Approve this plan',approvalDemo:'Demonstration mode. Real approvals are disabled.',approvalUnready:'No verified approval service or current policy. Actions disabled.',approvalRiskR2:'High risk — confirmation required',approvalRiskR3:'Critical risk — stronger protection required',approvalPrivilege:'Required access',privilegeNONE:'Standard read-only access',privilegeUSER:'Your Windows account',privilegeELEVATED:'Administrator access required',approvalLoading:'Loading pending approvals…',approvalEmpty:'There are no pending approvals.',approvalExpired:'The plan expired or changed. Refresh before deciding.',approvalUnknown:'A previous decision could not be verified. New decisions are paused until its status is checked.',approvalRecorded:'Your decision was recorded. Execution is not confirmed.',approvalRefused:'This decision was declined. No permission was granted.',approvalPlanHash:'Plan identity',approvalRisk:'Risk',approvalActions:'Affected actions',approvalRead:'Read scope',approvalWrite:'Write scope',approvalNetwork:'Network access',approvalVerification:'Verification',approvalRecovery:'Recovery',approvalExpiry:'Approval expires',approvalNoNetwork:'Disabled',approvalYesNetwork:'Allowed',approvalSelect:'Review →',hostTasksTitle:'Your local tasks',hostTasksRefresh:'Refresh tasks',hostTasksFilter:'Show',hostTasksAll:'All tasks',hostTasksAttention:'Needs attention',hostTasksActive:'In progress',hostTasksFinished:'Finished',hostTasksShowing:'Showing {count} tasks',hostTasksNoMatches:'No tasks match this filter.',hostTasksLoading:'Loading locally recorded tasks…',hostTasksEmpty:'No locally recorded tasks.',hostTasksUnknown:'Task history unavailable; no success is inferred.',navigationLabel:'Main navigation',sectionLabel:'Sections',menuLabel:'Toggle menu',refreshLabel:'Refresh',folderInputLabel:'Choose a folder for local preview',folderChoose:'Browse a folder',folderHint:'Local preview only: folder name, item count and total size. No file contents or folder path are sent.',folderPreview:'Local preview: {folder} · {count} files · {size} MiB. This does not attach the folder to a task.',folderRefused:'Folder preview unavailable. No files were sent.',stale:'The step expired or changed. Refresh before continuing.',unknownHold:'The result is unknown. This step is locked until the task status is checked.',assistantTag:'PRIVACY FIRST',assistantTitle:'AI request preview',assistantDesc:'Describe a goal and inspect the exact data before consenting to anything.',assistantGoalLabel:'What would you like to do?',assistantPlaceholder:'Example: Explain why my computer feels slow…',assistantPreview:'Preview disclosure',assistantPrivacy:'Local preview only. No cloud send, consent or budget reservation occurs here.',assistantNoPreview:'No disclosure prepared yet.',assistantPreviewOk:'Exact proposed disclosure (not sent)',assistantPreviewFail:'Preview unavailable; nothing was sent.',assistantLoading:'Preparing local preview…',routineTag:'REUSABLE TASK',routineTitle:'Saved system check',routineIntro:'Save one verified, read-only system check and reuse it without AI requests. Shun checks local permissions every time.',routineName:'Computer overview',routineSafe:'Reads only aggregate CPU, memory and storage information. No files are modified.',routineSave:'Save routine',routineRun:'Run saved check',routineAuth:'Saving a routine does not approve future runs. This PC checks permission each time.',routineNoRun:'No verified run yet.',routineNotSaved:'Not saved',routineSaved:'Saved, not authorized',routineDenied:'This PC declined the saved check. Nothing was changed.',routineProgress:'Checking this PC…',routineSuccess:'Verified read-only result',routineError:'Unable to verify the routine status.',observedOnly:'Single observation; not a diagnosis or speed-up guarantee.',metricCpu:'CPU logical cores',metricMemory:'Available / total memory',metricStorage:'Free / total storage',metricProcesses:'Observed processes',metricStartup:'Startup entries',signalDisk:'Low storage space detected',signalMemory:'Low available memory detected',signalNone:'No low-memory or low-storage signal in this snapshot.',skipContent:'Skip to main content',taskDetailsTitle:'Task details',taskView:'View details',taskOpenApprovals:'Review required approval',taskStatus:'Recorded state',taskUpdated:'Last updated',taskPlan:'Plan risk',taskVerification:'Verification result',taskRecovery:'Recovery state',taskProgressTitle:'Recorded progress',taskEvidenceNote:'These details come from this PC’s task records. Viewing them does not grant permission or prove an action ran.',taskDetailUnknown:'Unable to verify the selected task. No completion is assumed.',taskDetailLoading:'Opening the selected task…',taskClarificationLabel:'A question from your computer',taskClarificationHelp:'Your answer is sent only to this PC. It does not approve changes to Windows.',taskClarificationSubmit:'Send answer',taskClarificationUnavailable:'This question has changed or the local service is unavailable. Refresh the task.',taskClarificationUnknown:'We could not verify whether your answer was saved. Check the task before sending it again.',taskClarificationRecorded:'Your answer was saved. This does not mean the task was carried out.',taskReconciled:'reconciled',taskNotReconciled:'not reconciled'
  },
  zh: {
-  brandSub:'你的 Windows 电脑助手',navHome:'首页',navTasks:'我的任务',navApprovals:'待审批',navAssistant:'AI 请求预览',navComputer:'我的电脑',navRoutine:'保存的任务',navHistory:'历史记录',navSettings:'设置',
+  brandSub:'你的 Windows 电脑助手',recentTasksTitle:'最近任务',recentTasksEmpty:'暂无最近任务。',recentTasksUnknown:'无法核实最近任务。',recentTasksOpen:'打开任务',navHome:'首页',navTasks:'我的任务',navApprovals:'待审批',navAssistant:'AI 请求预览',navComputer:'我的电脑',navRoutine:'保存的任务',navHistory:'历史记录',navSettings:'设置',
   localOnly:'仅在本机运行',welcome:'欢迎回来',heroTitle:'今天想让电脑做点什么？',heroDesc:'选择常用任务，顺助手会逐步引导你完成。',searchLabel:'查找任务',searchPlaceholder:'查找任务或操作…',quickTitle:'常用操作',quickDesc:'从安全的检查开始。任何改动都需要你的独立确认。',
   actionAssistant:'查看 AI 请求预览',actionAssistantDesc:'先查看可能披露的信息，不会发送模型请求。',actionInventory:'查看电脑概况',actionInventoryDesc:'查看系统信息，不会修改任何内容。',actionDiagnosis:'检查电脑状态',actionDiagnosisDesc:'安全地检查电脑健康状况，只读操作。',actionRoutine:'保存的系统检查',actionRoutineDesc:'复用已验证的只读任务，不需要 AI。',actionFolder:'预览文件夹',actionFolderDesc:'在本机查看文件夹名称、项目数量和总大小，不读取或修改文件。',openAction:'打开 →',
   privacyTitle:'电脑始终由你掌控',privacyDesc:'本地检查不会上传数据。修改电脑或连接云端前需单独授权。',recentTitle:'继续未完成的任务',noCurrent:'目前没有正在进行的任务。',seeTasks:'查看任务 →',
@@ -111,6 +111,7 @@ function translate() {
  filterActions();
 }
 function page(name) {
+ if(name==='home')loadHomeRecentTasks().catch(showError);
  for (const p of document.querySelectorAll('main .page')) p.hidden = p.id !== 'page-' + name;
  for (const button of document.querySelectorAll('.nav-item')) {
   const isActive = button.dataset.page === name;
@@ -653,6 +654,41 @@ async function submitHostClarification(id,key,value){
    loadHostTaskDetail(id).catch(showError);
  }
 }
+
+let homeRecentGeneration = 0;
+/** Read-only recent task summary for the Home landing page. */
+async function loadHomeRecentTasks(){
+ const generation=++homeRecentGeneration;
+ const target=$('home-recent-tasks');target.replaceChildren();
+ const loading=document.createElement('p');loading.textContent=tr('hostTasksLoading');target.append(loading);
+ try{
+  const result=projectTaskSnapshots(await request('/api/tasks'));
+  if(generation!==homeRecentGeneration)return;
+  if(result.status!=='READY')throw Error(result.code);
+  target.replaceChildren();
+  if(!result.items.length){
+   const empty=document.createElement('p');empty.textContent=tr('recentTasksEmpty');target.append(empty);return;
+  }
+  for(const task of result.items.slice(0,3)){
+   const row=document.createElement('div');row.className='history-entry home-task-entry';
+   const title=document.createElement('strong');title.textContent=task.title;
+   const meta=document.createElement('p');meta.textContent=tr('taskState'+task.state)+' · '+
+    new Date(task.updatedAt).toLocaleString(locale==='zh'?'zh-CN':'en-US');
+   const open=document.createElement('button');open.type='button';open.className='text-button';
+   open.textContent=tr('recentTasksOpen');
+   open.addEventListener('click',()=>{
+    page('tasks');
+    loadHostTaskDetail(task.id,true).catch(showError);
+   });
+   row.append(title,meta,open);target.append(row);
+  }
+ }catch{
+  if(generation!==homeRecentGeneration)return;
+  target.replaceChildren();
+  const unknown=document.createElement('p');unknown.textContent=tr('recentTasksUnknown');target.append(unknown);
+ }
+}
+
 /** Read-only exact Host task details; clarification is separately user-initiated. */
 async function loadHostTaskDetail(id,focusDetail=false){
  const requestToken=++hostTaskDetailRequest;

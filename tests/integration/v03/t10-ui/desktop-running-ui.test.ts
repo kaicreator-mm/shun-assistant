@@ -98,7 +98,7 @@ function setup(locale, options = {}) {
     progressModel: () => options.currentStep ? ({ ok: true, status: 'RUNNING', position: { text: '1 of 1' } }) : ({ ok: true, status: 'UNKNOWN', position: { text: 'unknown' } }),
     ...approvals,
   };
-  runInNewContext(script + '\nglobalThis.__ui = { loadHostTasks, loadHostTaskDetail, refresh };',
+  runInNewContext(script + '\nglobalThis.__ui = { loadHostTasks, loadHostTaskDetail, loadHomeRecentTasks, refresh };',
     context, { timeout: 2000 });
   return { ui: context.__ui, node: (id) => document.getElementById(id), requests,
     releaseTaskA: () => releaseTaskA?.(tasks[0]) };
@@ -107,6 +107,17 @@ function setup(locale, options = {}) {
 describe('R04 real desktop.js task-list interactions (controlled DOM)', () => {
   for (const locale of ['en-US', 'zh-CN']) {
 
+
+    it('shows the newest local tasks on Home with plain status labels: ' + locale, async () => {
+      const { ui, node, requests } = setup(locale);
+      await ui.loadHomeRecentTasks();
+      const rows=node('home-recent-tasks').children;
+      expect(rows).toHaveLength(2);
+      expect(rows[0].children[0].textContent).toBe('Folder question');
+      expect(rows[0].children[1].textContent).toContain(locale.startsWith('zh') ? '需要你补充信息' : 'Needs your input');
+      expect(rows[0].children[2].textContent).toBe(locale.startsWith('zh') ? '打开任务' : 'Open task');
+      expect(requests.every(item=>item.method==='GET')).toBe(true);
+    });
     it('warns that a typed folder path is only a request, not a selected scope: ' + locale, async () => {
       const currentStep = { stepId: 'step-1', taskId: 'task-a' };
       const { ui, node, requests } = setup(locale, { currentStep });
