@@ -109,6 +109,13 @@ describe('R04 real desktop.js task-list interactions (controlled DOM)', () => {
 
 
 
+
+    it('requests the Home recent-task list at first boot, without navigation: ' + locale, async () => {
+      const { node, requests } = setup(locale);
+      expect(requests.map((item) => item.url)).toContain('/api/tasks');
+      expect(node('home-recent-tasks').children.length).toBeGreaterThan(0);
+      expect(requests.every((item) => item.method === 'GET')).toBe(true);
+    });
     it('routes an unmatched natural-language query to local disclosure preview only: ' + locale, async () => {
       const { ui, node, requests } = setup(locale);
       node('task-search').value=locale.startsWith('zh')?'我的电脑最近很慢':'my computer has been slow lately';

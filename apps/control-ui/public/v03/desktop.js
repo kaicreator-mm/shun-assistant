@@ -874,4 +874,4 @@ document.addEventListener('keydown',event=>{
   if(document.activeElement===$('task-search'))$('task-search').blur();
  }
 });
-translate();refresh().catch(showError);
+translate();loadHomeRecentTasks().catch(showError);refresh().catch(showError);

@@ -64,6 +64,7 @@ describe('R04 source contract: the shipped desktop surface replaces technical op
     expect(app).toContain('summarizeBrowserFolder');
     expect(app).toContain('guidedReceiptStatus');
     expect(app).toContain("async function loadHomeRecentTasks()");
+    expect(app).toContain('translate();loadHomeRecentTasks().catch(showError);refresh().catch(showError);');
     expect(app).toContain("result.items.slice(0,3)");
     expect(app).toContain("function filterActions()");
     expect(app).toContain("'search-empty').hidden=visible!==0");
