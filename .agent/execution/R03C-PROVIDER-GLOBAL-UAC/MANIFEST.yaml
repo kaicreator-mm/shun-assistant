@@ -1,0 +1,45 @@
+pack_id: shun-v030-r03c-provider-global-uac-local-builder-r1
+task_id: R03C-PROVIDER-GLOBAL-UAC
+issue: "#287"
+repository: kaicreator-mm/shun-assistant
+version: v0.3.0
+base_sha: be2e81722a70ee3d0bd5634bc83d97d733c20b78
+branch: JIT_only_task/v0.3.0-r03c-provider-global-uac-local-builder-r1
+parent_issue: "#280"
+owner_authorization_ref: "#280 comment 6584396368"
+owner_execution_amendment_ref: "#280 comment 6585799747"
+generated_by: local-agent:shun-v030-r03c
+generated_at: 2026-11-03
+standard_revision: 2c395c55569fe2edf3f4135f12d3d069e526d0b7
+execution_profile: LOCAL_BUILDER
+execution_environment: LOCAL
+admission_mode: SINGLE_WRITER_ADMISSION
+protected_claim_key: "kaicreator-mm/shun-assistant#287:builder:__default__"
+allowed_write_set:
+  - packages/domain-host/src/provider/provider-host-binding.ts
+  - packages/domain-host/src/provider/provider-first-use-ledger.ts
+  - packages/domain-host/src/windows/effect-host-binding.ts
+  - tests/integration/v03/r03c-provider-global/provider-host-global.test.ts
+  - tests/integration/v03/r03c-provider-global/vitest.config.ts
+  - docs/implementation/v0.3/r03c-provider-global/PROVIDER_HOST_GLOBAL.md
+plan:
+  - "Add a durable Host-global Provider first-use request ledger under the existing operator-owned provider cache root: Host-issued random requestRef, exact provider identity/version/digest/publisher, privilege scope, exact action preview, expiry, one-way transitions."
+  - "Two-step flow: prepare returns a bounded preview; explicit confirmation consumes PREPARED->APPROVED; the K capability consumes APPROVED->RUNNING exactly once with requestRef-only input; terminal COMPLETED/REFUSED; uncertain/interrupted becomes UNKNOWN; restart turns abandoned RUNNING into UNKNOWN with no auto-replay."
+  - "Resolve the privilege scope from the verified signed descriptor's requiredPrivilege (USER default); USER first use stays on the unprivileged activation path."
+  - "ELEVATED requires an operator-provisioned exact windows.proc.exec installer action bound to provider-global with exact actionRef/planRef/grantRef, current authority, pre-existing ProgramPin and a bounded preview; execute through the existing PrivilegedWindowsExecutionBackend and pinned one-shot UAC relay only."
+  - "Fail closed and record on UAC denial, missing/expired grant, plan drift, missing ProgramPin, digest mismatch, cancellation or uncertain completion; no runtime ProgramPin creation/rotation; never elevate the assistant or the CuratedProvider CLI."
+  - "Tests: prepare/confirm without a Guided Case, wrong/expired/replayed requestRef, restart UNKNOWN, USER unprivileged, ELEVATED grant/pin path, denial/drift fail-closed, cross-Case selection independence, durable secret-free receipts."
+forbidden:
+  - "current Guided Case as Provider authority"
+  - "whole-assistant elevation"
+  - "arbitrary model-generated elevated command"
+  - "second RunAs helper, installer, dispatcher, sender, or Kernel"
+  - "runtime creation/rotation of ProgramPin"
+  - "real installer execution or persistent system change"
+  - "main"
+  - "version/v0.2.0"
+  - "tag/release"
+  - "paid LLM"
+  - "physical Windows effects beyond the pre-pinned read-only probe boundary"
+predecessor: "The prior WEB_BUILDER pack at 0760c1c and the pre-authorization WIP branch wip/v0.3.0-r03c-provider-global-uac are historical read-only references only; the invalidated generation-1 Claim must not be reused."
+notes: "Admitted after #289 (R03C-PROVIDER-SIGNED-PRIVILEGE-CONTRACT) completed and qualified: PR #301, Woodpecker #201/#203 SUCCESS at 593140928caf5a797abb89d799799fc54796a3aa, evidence in #289 comment 6587217618. The prose write set lists five paths; the #280 owner YAML and this pack authorize six (adds the vitest.config.ts required by the v03 nested-suite gate), matching the reconciled #285 precedent."
