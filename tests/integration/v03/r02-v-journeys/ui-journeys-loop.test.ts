@@ -275,7 +275,9 @@ describe.skipIf(!RUN_PHYSICAL)(
             .listShadowCandidates()
             .filter((candidate) => !candidateIdsBeforeSubmit.has(candidate.candidateId));
           expect(newCandidates).toHaveLength(1);
-          const persisted = store.readShadowCandidate(newCandidates[0].candidateId);
+          const newCandidate = newCandidates[0];
+          if (!newCandidate) throw new Error('expected one new Meta Shadow candidate');
+          const persisted = store.readShadowCandidate(newCandidate.candidateId);
           expect(persisted).toBeDefined();
           const payload = JSON.parse(persisted!.payloadJson) as {
             kind: string;
