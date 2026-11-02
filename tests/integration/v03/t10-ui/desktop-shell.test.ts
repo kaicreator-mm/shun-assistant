@@ -174,4 +174,22 @@ describe('R04 source contract: the shipped desktop surface replaces technical op
     const html = source('index.html');
     expect(html).not.toMatch(/\b(?:planRef|grantRef|approvalRef|currentnessRef|effectPermit)\b/);
   });
+
+  it('uses plain Windows-user language and states the real folder-preview boundary', () => {
+    const app = source('desktop.js');
+    const html = source('index.html');
+    expect(app).toContain("actionFolder:'Preview a folder'");
+    expect(app).toContain("actionFolder:'预览文件夹'");
+    expect(app).toContain("taskStateEXECUTING:'In progress'");
+    expect(app).toContain("taskStateEXECUTING:'进行中'");
+    expect(app).toContain("safetyConfirm:'A verified, file-by-file change plan is not available yet.'");
+    expect(app).toContain("safetyConfirm:'当前版本尚不支持经过核验的逐文件修改计划。'");
+    expect(app).toContain("folderHint:'Local preview only: folder name, item count and total size.");
+    expect(app).toContain("folderHint:'仅在本机预览文件夹名称、项目数量和总大小");
+    expect(app).not.toMatch(/:\s*'[^']*\bHost\b[^']*'/i);
+    expect(html).toContain('What is available in this version');
+    expect(html).toContain('This preview does not read or change any files.');
+    expect(html).not.toContain('review a plan and decide what happens');
+  });
+
 });
