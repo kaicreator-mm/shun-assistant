@@ -37,6 +37,7 @@ describe('R04 source contract: the shipped desktop surface replaces technical op
     expect(html).toContain('id="home-recent-tasks"');
     expect(html).toContain('data-i18n="recentTasksTitle"');
     expect(html).toContain('id="search-empty"');
+    expect(html).toContain('id="search-describe"');
     expect(html).toContain('id="search-clear"');
     expect(html).toContain('aria-keyshortcuts="Control+K"');
     expect(html).toContain('data-i18n="skipContent"');
@@ -66,6 +67,8 @@ describe('R04 source contract: the shipped desktop surface replaces technical op
     expect(app).toContain("result.items.slice(0,3)");
     expect(app).toContain("function filterActions()");
     expect(app).toContain("'search-empty').hidden=visible!==0");
+    expect(app).toContain("$('search-describe').addEventListener('click'");
+    expect(app).toContain("$('ai-goal').value=goal");
     expect(app).toContain("'search-clear').hidden=!q");
     expect(app).toContain("skipContent:'Skip to main content'");
     expect(app).toContain("skipContent:'跳转至主要内容'");

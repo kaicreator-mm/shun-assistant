@@ -108,6 +108,16 @@ describe('R04 real desktop.js task-list interactions (controlled DOM)', () => {
   for (const locale of ['en-US', 'zh-CN']) {
 
 
+
+    it('routes an unmatched natural-language query to local disclosure preview only: ' + locale, async () => {
+      const { ui, node, requests } = setup(locale);
+      node('task-search').value=locale.startsWith('zh')?'我的电脑最近很慢':'my computer has been slow lately';
+      node('task-search').events.input();
+      node('search-describe').events.click();
+      expect(node('ai-goal').value).toBe(node('task-search').value);
+      expect(node('ai-preview-result').children).toHaveLength(0);
+      expect(requests.every(item=>item.method==='GET')).toBe(true);
+    });
     it('shows the newest local tasks on Home with plain status labels: ' + locale, async () => {
       const { ui, node, requests } = setup(locale);
       await ui.loadHomeRecentTasks();

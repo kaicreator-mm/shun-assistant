@@ -24,3 +24,5 @@
 .task-progress-timeline{padding-left:22px;margin:8px 0 16px;color:var(--text);line-height:1.75;font-size:13px}.task-progress-timeline li{padding:2px 0}.task-progress-timeline li::marker{color:var(--accent)}
 
 .home-recent{margin-top:28px}.home-recent .section-heading{margin-bottom:14px}.home-task-entry{display:flex;align-items:center;gap:12px;flex-wrap:wrap}.home-task-entry strong{flex:1 1 220px}.home-task-entry p{margin:0;color:var(--muted);font-size:12px;flex:1 1 200px}.home-task-entry button{margin-left:auto}
+
+.search-empty p{margin:0 0 10px}.search-empty button{min-height:36px}

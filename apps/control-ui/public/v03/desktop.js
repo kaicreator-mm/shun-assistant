@@ -14,7 +14,7 @@ import { progressModel } from './view-model.js';
 const words = {
  en: {
   brandSub:'Your Windows companion',recentTasksTitle:'Recent tasks',recentTasksEmpty:'No recent tasks yet.',recentTasksUnknown:'Recent tasks could not be verified.',recentTasksOpen:'Open task',navHome:'Home',navTasks:'My tasks',navApprovals:'Approvals',navAssistant:'AI request preview',navComputer:'My computer',navRoutine:'Saved routines',navHistory:'History',navSettings:'Settings',
-  localOnly:'Runs on your computer',welcome:'WELCOME BACK',heroTitle:'What would you like to do?',heroDesc:'Choose a familiar task. Shun will guide you through the details.',searchLabel:'Find a task',searchPlaceholder:'Find an action…',quickTitle:'Quick actions',quickDesc:'Start safely; nothing changes without your approval.',
+  localOnly:'Runs on your computer',welcome:'WELCOME BACK',heroTitle:'What would you like to do?',heroDesc:'Choose a familiar task. Shun will guide you through the details.',searchLabel:'Find an action or describe a goal',searchPlaceholder:'Search quick actions or describe a goal…',quickTitle:'Quick actions',quickDesc:'Start safely; nothing changes without your approval.',
   actionAssistant:'Preview an AI request',actionAssistantDesc:'Preview what might be shared before any model request.',actionInventory:'Computer overview',actionInventoryDesc:'See system information without changing anything.',actionDiagnosis:'Check my computer',actionDiagnosisDesc:'Run a safe, read-only health check.',actionRoutine:'Saved system check',actionRoutineDesc:'Reuse a verified read-only check without AI.',actionFolder:'Preview a folder',actionFolderDesc:'See a folder’s name, item count and size locally. No files are read or changed.',openAction:'Open →',
   privacyTitle:'You stay in control',privacyDesc:'Local checks stay on this computer. Changes and cloud requests need separate approval.',recentTitle:'Continue a task',noCurrent:'No active task right now.',seeTasks:'View tasks →',
   guidedEyebrow:'TASK WORKSPACE',tasksTitle:'Your tasks',tasksDesc:'Answer the next question or review a task update. You can stop at any time.',stepTag:'NEXT STEP',noTaskTitle:'No task selected',noTaskDesc:'Choose an action on Home, or wait for a task to appear.',
@@ -23,7 +23,7 @@ const words = {
   readOnly:'READ-ONLY',computerTitle:'My computer',computerDesc:'See real local information. No files are changed or sent to the cloud.',runOverview:'Show overview',runCheck:'Run health check',noReport:'Choose a check to see its results.',
   activity:'ACTIVITY',historyTitle:'Task history',historyDesc:'Only actual recorded outcomes appear here.',historyEmpty:'No recorded guided steps yet.',historyUnavailable:'Cannot verify the guided history. No operation is assumed complete.',taskStateRECEIVED:'Received',taskStateINTERPRETING:'Understanding request',taskStateCLARIFICATION:'Needs your input',taskStateRESOLVING:'Preparing a safe option',taskStatePLANNED:'Plan prepared',taskStateAWAITING_AUTHORIZATION:'Waiting for approval',taskStateEXECUTING:'In progress',taskStateVERIFYING:'Checking the result',taskStateLIFECYCLE_RECONCILIATION:'Checking task status',taskStateSUCCEEDED:'Marked complete (recorded)',taskStateFAILED:'Could not complete',taskStateCANCELLED:'Cancelled',taskStateNEEDS_INTERVENTION:'Needs attention',preferences:'PREFERENCES',settingsTitle:'Settings',settingsDesc:'Choose how this app looks. Security decisions stay with Windows.',
   languageTitle:'Language',languageDesc:'Use Chinese or English in the interface.',appearanceTitle:'Appearance',appearanceDesc:'Follow your Windows theme or choose light/dark.',connectionTitle:'Connection',connectionDesc:'Shun listens on your computer only. Remote model calls require separate consent.',
-  connected:'Connected locally',unavailable:'Local service unavailable',localMode:'Local checks',cloudMode:'Cloud opt-in',searchEmpty:'No matching actions. Try a different phrase.',
+  connected:'Connected locally',unavailable:'Local service unavailable',localMode:'Local checks',cloudMode:'Cloud opt-in',searchEmpty:'No matching quick action. You can preview this goal locally instead.',searchDescribe:'Preview this goal',
   ready:'Ready',needsAttention:'Needs attention',formUnavailable:'This step is not available yet. Nothing was submitted.',previewMissing:'The actual action plan and independent authorization are not available in this view. No change can be made.',
   progressUnavailable:'Task progress cannot be verified.',progressNotActionable:'This task is paused or its status cannot be verified. Check its status before answering.',scopeReady:'A folder is selected for this task.',stepExpired:'This step is no longer current. Refresh before continuing.',recorded:'Your decision was recorded. No Windows permission was granted.',refused:'The request was refused.',unknown:'The result is unknown. Do not repeat the operation without checking its actual state.',
   offlineCheck:'This check is only available on Windows.',loading:'Checking your computer…',completed:'Check completed',noData:'No safe summary is available.',technicalDetails:'Technical details',
@@ -32,7 +32,7 @@ const words = {
  },
  zh: {
   brandSub:'你的 Windows 电脑助手',recentTasksTitle:'最近任务',recentTasksEmpty:'暂无最近任务。',recentTasksUnknown:'无法核实最近任务。',recentTasksOpen:'打开任务',navHome:'首页',navTasks:'我的任务',navApprovals:'待审批',navAssistant:'AI 请求预览',navComputer:'我的电脑',navRoutine:'保存的任务',navHistory:'历史记录',navSettings:'设置',
-  localOnly:'仅在本机运行',welcome:'欢迎回来',heroTitle:'今天想让电脑做点什么？',heroDesc:'选择常用任务，顺助手会逐步引导你完成。',searchLabel:'查找任务',searchPlaceholder:'查找任务或操作…',quickTitle:'常用操作',quickDesc:'从安全的检查开始。任何改动都需要你的独立确认。',
+  localOnly:'仅在本机运行',welcome:'欢迎回来',heroTitle:'今天想让电脑做点什么？',heroDesc:'选择常用任务，顺助手会逐步引导你完成。',searchLabel:'查找操作或描述目标',searchPlaceholder:'搜索快捷操作，或描述你的目标…',quickTitle:'常用操作',quickDesc:'从安全的检查开始。任何改动都需要你的独立确认。',
   actionAssistant:'查看 AI 请求预览',actionAssistantDesc:'先查看可能披露的信息，不会发送模型请求。',actionInventory:'查看电脑概况',actionInventoryDesc:'查看系统信息，不会修改任何内容。',actionDiagnosis:'检查电脑状态',actionDiagnosisDesc:'安全地检查电脑健康状况，只读操作。',actionRoutine:'保存的系统检查',actionRoutineDesc:'复用已验证的只读任务，不需要 AI。',actionFolder:'预览文件夹',actionFolderDesc:'在本机查看文件夹名称、项目数量和总大小，不读取或修改文件。',openAction:'打开 →',
   privacyTitle:'电脑始终由你掌控',privacyDesc:'本地检查不会上传数据。修改电脑或连接云端前需单独授权。',recentTitle:'继续未完成的任务',noCurrent:'目前没有正在进行的任务。',seeTasks:'查看任务 →',
   guidedEyebrow:'任务工作区',tasksTitle:'我的任务',tasksDesc:'补充下一步所需信息，或查看任务进展。你可以随时停止。',stepTag:'下一步',noTaskTitle:'暂时没有任务',noTaskDesc:'从首页选择一项操作，或等待任务出现。',
@@ -41,7 +41,7 @@ const words = {
   readOnly:'只读操作',computerTitle:'我的电脑',computerDesc:'查看真实的本机信息，不会改动文件或上传数据。',runOverview:'查看概况',runCheck:'检查健康状态',noReport:'选择一项检查来查看结果。',
   activity:'操作记录',historyTitle:'任务历史',historyDesc:'这里只显示真正已记录的结果。',historyEmpty:'尚无已记录的引导步骤。',historyUnavailable:'无法核实引导记录，不会推断任何操作已完成。',taskStateRECEIVED:'已接收',taskStateINTERPRETING:'正在理解请求',taskStateCLARIFICATION:'需要你补充信息',taskStateRESOLVING:'正在准备安全方案',taskStatePLANNED:'计划已准备',taskStateAWAITING_AUTHORIZATION:'等待审批',taskStateEXECUTING:'进行中',taskStateVERIFYING:'正在核对结果',taskStateLIFECYCLE_RECONCILIATION:'正在核对任务状态',taskStateSUCCEEDED:'已记录为完成',taskStateFAILED:'未能完成',taskStateCANCELLED:'已取消',taskStateNEEDS_INTERVENTION:'需要人工处理',preferences:'个性化',settingsTitle:'设置',settingsDesc:'调整显示方式。涉及系统修改时，Windows 会进行独立的安全确认。',
   languageTitle:'界面语言',languageDesc:'选择简体中文或英语。',appearanceTitle:'外观',appearanceDesc:'跟随系统主题或选择明暗外观。',connectionTitle:'连接状态',connectionDesc:'只在本机提供服务。调用云端模型必须另行确认。',
-  connected:'已连接本机',unavailable:'本机服务不可用',localMode:'本地检查',cloudMode:'云端需授权',searchEmpty:'没有找到匹配的操作，请换个关键词。',
+  connected:'已连接本机',unavailable:'本机服务不可用',localMode:'本地检查',cloudMode:'云端需授权',searchEmpty:'没有匹配的快捷操作。你也可以先在本机预览这个目标。',searchDescribe:'预览此目标',
   ready:'可继续',needsAttention:'需要检查',formUnavailable:'当前版本尚不支持此步骤，未提交任何内容。',previewMissing:'此处尚无法展示真实操作计划与独立授权信息，因此不会修改电脑。',
   progressUnavailable:'无法核实当前任务进度。',progressNotActionable:'任务已暂停或状态无法核实，请先刷新并核对任务状态。',scopeReady:'当前任务已关联文件夹。',stepExpired:'该步骤已过期，请刷新后再继续。',recorded:'已记录你的选择，没有签发 Windows 执行权限。',refused:'请求已拒绝。',unknown:'操作结果未知。核实真实状态前请勿重复操作。',
   offlineCheck:'此项检查仅在 Windows 上可用。',loading:'正在检查电脑…',completed:'检查完成',noData:'没有可安全展示的摘要。',technicalDetails:'技术细节',
@@ -843,6 +843,12 @@ function filterActions(){
  $('search-clear').hidden=!q;
 }
 $('task-search').addEventListener('input',filterActions);
+$('search-describe').addEventListener('click',()=>{
+ const goal=$('task-search').value.trim();
+ if(!goal)return;
+ $('ai-goal').value=goal;
+ page('assistant');$('ai-goal').focus();
+});
 $('task-search').addEventListener('keydown',event=>{
  if(event.key!=='Enter'||event.isComposing)return;
  const visible=[...document.querySelectorAll('[data-action]')].filter(card=>!card.hidden);
