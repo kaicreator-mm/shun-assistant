@@ -265,13 +265,40 @@ describe.skipIf(!RUN_PHYSICAL)(
           dom.byId('v03-j-meta-rating')!.value = 'HELPFUL';
           dom.byId('v03-j-meta-category')!.value = 'OTHER';
           dom.byId('v03-j-meta-correction')!.value = 'NO_CORRECTION';
+          const candidateIdsBeforeSubmit = new Set(
+            store.listShadowCandidates().map((candidate) => candidate.candidateId),
+          );
           dom.byId('v03-j-meta-run')!.click();
           await until(() => (dom.byId('v03-j-meta-status')?.textContent ?? '').length > 0);
           expect(dom.byId('v03-j-meta-status')?.textContent).toContain(completed.text ?? '');
-          const candidates = store.listShadowCandidates().filter(
-            (candidate) => !candidate.candidateId.includes(locale) || true,
-          );
-          expect(candidates.length).toBeGreaterThanOrEqual(1);
+          const newCandidates = store
+            .listShadowCandidates()
+            .filter((candidate) => !candidateIdsBeforeSubmit.has(candidate.candidateId));
+          expect(newCandidates).toHaveLength(1);
+          const newCandidate = newCandidates[0];
+          if (!newCandidate) throw new Error('expected one new Meta Shadow candidate');
+          const persisted = store.readShadowCandidate(newCandidate.candidateId);
+          expect(persisted).toBeDefined();
+          const payload = JSON.parse(persisted!.payloadJson) as {
+            kind: string;
+            lifecycle: string;
+            active: boolean;
+            source: { caseRef: string; revision: string };
+            feedback: { rating: string; category: string; correction?: string };
+          };
+          expect(payload).toMatchObject({
+            kind: 'META_FEEDBACK',
+            lifecycle: 'FUTURE_BUILD_SHADOW',
+            active: false,
+            source: { caseRef: 'task-r03b-ui-src', revision: 'outcome-r1' },
+            feedback: {
+              rating: 'HELPFUL',
+              category: 'OTHER',
+              correction: 'NO_CORRECTION',
+            },
+          });
+          expect(persisted!.lifecycle).toBe('FUTURE_BUILD_SHADOW');
+          expect(persisted!.active).toBe(false);
         } finally {
           dom.restore();
         }
