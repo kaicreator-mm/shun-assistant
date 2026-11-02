@@ -20,3 +20,5 @@
 #host-task-detail{margin:12px 0 18px;scroll-margin-top:95px}
 #host-task-detail:focus-visible{outline:3px solid var(--accent);outline-offset:4px}
 .history-entry.host-task-selected{border-left:3px solid var(--accent);padding-left:12px;background:var(--accent-light);border-radius:6px}
+
+.task-progress-timeline{padding-left:22px;margin:8px 0 16px;color:var(--text);line-height:1.75;font-size:13px}.task-progress-timeline li{padding:2px 0}.task-progress-timeline li::marker{color:var(--accent)}

@@ -51,7 +51,9 @@ function setup(locale, options = {}) {
     { taskId: 'task-a', title: 'Folder question', revision: 1, state: 'CLARIFICATION',
       updatedAt: '2026-11-02T02:00:00Z', clarification: { question: 'Which folder?' } },
     { taskId: 'task-b', title: 'Finished check', revision: 2, state: 'SUCCEEDED',
-      updatedAt: '2026-11-01T23:00:00Z' },
+      updatedAt: '2026-11-01T23:00:00Z',progress:[
+       {at:'2026-11-01T22:00:00Z',state:'RECEIVED',note:'private-file'},
+       {at:'2026-11-01T23:00:00Z',state:'SUCCEEDED',note:'private-token'}] },
     ...(options.includeApprovalTask ? [{ taskId: 'task-c', title: 'Needs approval', revision: 3,
       state: 'AWAITING_AUTHORIZATION', updatedAt: '2026-11-01T22:00:00Z' }] : []),
   ];
@@ -133,6 +135,17 @@ describe('R04 real desktop.js task-list interactions (controlled DOM)', () => {
       expect(detail.children[0].textContent).toBe('Finished check');
       expect(node('host-task-list').children[1].className).toContain('host-task-selected');
       expect(requests.every((item) => item.method === 'GET')).toBe(true);
+    });
+    it('renders verified progress while hiding Host note text: ' + locale, async () => {
+      const {ui,node,requests}=setup(locale);
+      node('host-task-filter').value='all';await ui.loadHostTasks();
+      await ui.loadHostTaskDetail('task-b',true);
+      const list=node('host-task-detail').children.find(entry=>entry.tagName==='OL');
+      expect(list).toBeDefined();
+      expect(list.children).toHaveLength(2);
+      expect(list.children[0].textContent).not.toContain('private');
+      expect(list.children[1].textContent).not.toContain('private');
+      expect(requests.every(entry=>entry.method==='GET')).toBe(true);
     });
     it('does not re-open a task when a filter changes during a pending read: ' + locale, async () => {
       const { ui, node, requests, releaseTaskA } = setup(locale, { deferTaskA: true });

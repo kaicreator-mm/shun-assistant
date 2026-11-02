@@ -86,6 +86,21 @@ describe('R04 real ActionController approval UI',()=>{
   expect(projectHostTaskDetail({...recorded,verification:{status:'PASSED',checks:[{status:'PASSED'}]}},'task-a').status).toBe('REFUSED');
   expect(projectHostTaskDetail({...recorded,planSummary:{...recorded.planSummary,planHash:'forged'}},'task-a').status).toBe('REFUSED');
  });
+ it('bounds and sanitizes recorded Host task progress',()=>{
+  const base={taskId:'task-x',title:'Read files',revision:3,state:'EXECUTING',
+   updatedAt:'2026-11-02T09:00:00Z',progress:[
+    {at:'2026-11-02T08:00:00Z',state:'RECEIVED',note:'private-folder'},
+    {at:'2026-11-02T09:00:00Z',state:'EXECUTING',note:'private-secret'}]};
+  const value=projectHostTaskDetail(base,'task-x');
+  expect(value.status).toBe('READY');
+  expect(value.progress).toEqual([{at:'2026-11-02T08:00:00Z',state:'RECEIVED'},
+   {at:'2026-11-02T09:00:00Z',state:'EXECUTING'}]);
+  expect(JSON.stringify(value)).not.toContain('private');
+  expect(projectHostTaskDetail({...base,progress:[{at:'invalid',state:'RECEIVED'}]},'task-x').status).toBe('REFUSED');
+  expect(projectHostTaskDetail({...base,progress:[{at:'2026-11-02T08:00:00Z',state:'INVENTED'}]},'task-x').status).toBe('REFUSED');
+  expect(projectHostTaskDetail({...base,progress:Array.from({length:129},()=>base.progress[0])},'task-x').status).toBe('REFUSED');
+  expect(projectHostTaskDetail({...base,progress:undefined},'task-x').progress).toBe(null);
+ });
  it('shows a bounded Host clarification only in its exact task state',()=>{
   const base={taskId:'task-c',title:'Organize files',state:'CLARIFICATION',revision:3,
    updatedAt:'2026-11-01T12:00:00Z',clarification:{question:'Which folder?'}};

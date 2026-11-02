@@ -150,7 +150,19 @@ export function projectHostTaskDetail(value,expectedId){
     !Number.isSafeInteger(value.revision)||value.revision<0||
     !shortText(value.updatedAt,64)||!Number.isFinite(Date.parse(value.updatedAt)))
    return refused('TASK_DETAIL_UNVERIFIED');
- let plan=null,verification=null,recovery=null,clarification=null;
+ let plan=null,verification=null,recovery=null,clarification=null,progress=null;
+ if(value.progress!==undefined){
+  if(!Array.isArray(value.progress)||value.progress.length>128)return refused('TASK_PROGRESS_UNVERIFIED');
+  const rows=[];
+  for(const entry of value.progress){
+   if(!object(entry)||!STATES.includes(entry.state)||
+      !shortText(entry.at,64)||!Number.isFinite(Date.parse(entry.at)))
+    return refused('TASK_PROGRESS_UNVERIFIED');
+   // Explicitly discard note: it may contain private Host paths or secrets.
+   rows.push({at:entry.at,state:entry.state});
+  }
+  progress=rows.slice(-12);
+ }
  if(value.state==='CLARIFICATION'){
   if(!object(value.clarification)||!shortText(value.clarification.question,2048))
    return refused('TASK_CLARIFICATION_UNVERIFIED');
@@ -177,7 +189,7 @@ export function projectHostTaskDetail(value,expectedId){
   recovery={classification:r.classification,detail:r.detail,reconciled:r.reconciled};
  }
  return {status:'READY',id:expectedId,title:value.title,state:value.state,
-  revision:value.revision,updatedAt:value.updatedAt,plan,verification,recovery,clarification};
+  revision:value.revision,updatedAt:value.updatedAt,plan,verification,recovery,clarification,progress};
 }
 
 /** Host acknowledgment is only a recorded clarification, never a permission or effect. */
