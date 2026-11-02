@@ -64,7 +64,7 @@ function setup(locale, options = {}) {
       ok: true, loopbackOnly: true, simulated: false,
       policy: { kind: 'ACTIVE', revision: 'fixture' }, cloudMode: 'DISABLED',
     };
-    else if (url === '/api/v03/guided/state') data = { currentStep: null, history: [] };
+    else if (url === '/api/v03/guided/state') data = options.currentStep ? { currentStep: options.currentStep, history: [], journey: { position: 1, total: 1, paused: false }, scope: { status: 'NONE' } } : { currentStep: null, history: [] };
     else if (url === '/api/tasks') data = { tasks };
     else if (url === '/api/tasks/task-a') data = blockedTaskA ? await blockedTaskA : tasks[0];
     else if (url === '/api/tasks/task-b') data = tasks[1];
@@ -76,7 +76,7 @@ function setup(locale, options = {}) {
   const context = {
     document, fetch, navigator: { language: locale },
     sessionStorage: { getItem: () => null, setItem() {} },
-    approvedText: () => ({ ok: false }),
+    approvedText: (_locale, key) => options.currentStep ? ({ ok: true, text: key === 'guided.selectRoot.title' ? 'Choose the folder to work in' : 'Folder path' }) : ({ ok: false }),
     summarizeBrowserFolder: () => ({ status: 'REFUSED' }),
     guidedReceiptStatus: () => 'UNKNOWN',
     projectGuidedHistory: () => ({ status: 'READY', items: [] }),
@@ -84,14 +84,21 @@ function setup(locale, options = {}) {
     projectRoutineState: () => ({ status: 'REFUSED' }),
     projectRoutineExecution: () => ({ status: 'REFUSED' }),
     projectDisclosurePreview: () => ({ status: 'REFUSED' }),
-    currentStepModel: () => ({ status: 'REFUSED' }),
+    currentStepModel: () => options.currentStep ? ({
+      status: 'CURRENT', journeyId: 'journey-a', taskId: 'task-a', stepId: 'step-1',
+      caseRef: { snapshotId: 'case-a', digest: 'a'.repeat(64) },
+      templateId: 'shun.guided.select-root', templateDigest: 'b'.repeat(64),
+      issuedAtUnixMs: 1, validUntilUnixMs: Number.MAX_SAFE_INTEGER,
+      kind: 'ASK', titleKey: 'guided.selectRoot.title', requiresExplicitApproval: false,
+      fields: [{ id: 'selectedRoot', type: 'TEXT', labelKey: 'guided.selectRoot.path', required: true, maxLength: 1024 }],
+    }) : ({ status: 'REFUSED' }),
     buildStepOutcome: () => ({ ok: false }),
     userDecisionRelay: () => ({ ok: false }),
     replayGuard: () => ({ allowed: false }),
-    progressModel: () => ({ ok: true, status: 'UNKNOWN', position: { text: 'unknown' } }),
+    progressModel: () => options.currentStep ? ({ ok: true, status: 'RUNNING', position: { text: '1 of 1' } }) : ({ ok: true, status: 'UNKNOWN', position: { text: 'unknown' } }),
     ...approvals,
   };
-  runInNewContext(script + '\nglobalThis.__ui = { loadHostTasks, loadHostTaskDetail };',
+  runInNewContext(script + '\nglobalThis.__ui = { loadHostTasks, loadHostTaskDetail, refresh };',
     context, { timeout: 2000 });
   return { ui: context.__ui, node: (id) => document.getElementById(id), requests,
     releaseTaskA: () => releaseTaskA?.(tasks[0]) };
@@ -99,6 +106,18 @@ function setup(locale, options = {}) {
 
 describe('R04 real desktop.js task-list interactions (controlled DOM)', () => {
   for (const locale of ['en-US', 'zh-CN']) {
+
+    it('warns that a typed folder path is only a request, not a selected scope: ' + locale, async () => {
+      const currentStep = { stepId: 'step-1', taskId: 'task-a' };
+      const { ui, node, requests } = setup(locale, { currentStep });
+      await ui.refresh();
+      const notice = node('step-container').children[0];
+      expect(notice.textContent).toBe(locale.startsWith('zh')
+        ? '这里只记录你输入的文件夹路径，不代表已选中该文件夹，也不会因此访问其中的文件。'
+        : 'This only records the folder path you entered. It does not select the folder or allow file access.');
+      expect(node('dynamic-form').hidden).toBe(false);
+      expect(requests.every((item) => item.method === 'GET')).toBe(true);
+    });
     it('focuses selected details, fences old selection and never sends mutations: ' + locale, async () => {
       const { ui, node, requests } = setup(locale);
       node('host-task-filter').value = 'all';
