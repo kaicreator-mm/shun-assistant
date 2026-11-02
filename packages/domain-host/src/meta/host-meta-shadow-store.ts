@@ -604,13 +604,16 @@ export class HostMetaShadowStore implements MetaFeedbackHostPort {
       throw new TypeError('META_EXPERIENCE_QUERY_INVALID');
     }
     const limit = input.limit ?? 10;
+    // node:sqlite intentionally exposes generic SQL output rows. This
+    // exact SELECT is schema-bound by the table definition above; keep the
+    // narrow conversion explicit rather than weakening the row interface.
     const rows = (input.taskClass
       ? this.#db.prepare(`SELECT * FROM meta_verified_experiences
           WHERE capability_id=? AND task_class=? AND revoked=0
           ORDER BY recorded_at DESC LIMIT 256`).all(input.capabilityId, input.taskClass)
       : this.#db.prepare(`SELECT * FROM meta_verified_experiences
           WHERE capability_id=? AND revoked=0
-          ORDER BY recorded_at DESC LIMIT 256`).all(input.capabilityId)) as MetaExperienceRow[];
+          ORDER BY recorded_at DESC LIMIT 256`).all(input.capabilityId)) as unknown as MetaExperienceRow[];
     const results: MetaSharedExperienceResult[] = [];
     for (const row of rows) {
       if (
