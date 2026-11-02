@@ -19,4 +19,4 @@ steps:
   - name: node24-full-qualification
     image: bash
     commands:
-      - sh -c 'exec >> /var/lib/woodpecker/shun-ci-last.log 2>&1; echo "=== pipeline $CI_BUILD_LINK sha $CI_COMMIT_SHA $(date -u +%FT%TZ) ==="; set -eo pipefail; set -x; git --version; node --version; test "$(git rev-parse HEAD)" = "$CI_COMMIT_SHA"; corepack enable; corepack prepare pnpm@10.34.5 --activate; pnpm --version; pnpm install --frozen-lockfile; pnpm -r --if-present run lint; pnpm -r --if-present run typecheck; pnpm -r --if-present run test; node scripts/v03-ci/verify-fail-closed.mjs'
+      - sh -c 'exec >> /var/lib/woodpecker/shun-ci-last.log 2>&1; echo "=== pipeline $CI_BUILD_LINK sha $CI_COMMIT_SHA $(date -u +%FT%TZ) ==="; set -eo pipefail; set -x; git --version; node --version; test "$(git rev-parse HEAD)" = "$CI_COMMIT_SHA"; corepack enable; corepack prepare pnpm@10.34.5 --activate; pnpm --version; pnpm install --frozen-lockfile; node scripts/v03-ci/preflight-ui-syntax.mjs; pnpm -r --if-present run lint; pnpm -r --if-present run typecheck; pnpm -r --if-present run test; node scripts/v03-ci/verify-fail-closed.mjs'

@@ -9,7 +9,8 @@
   "scripts": {
     "lint": "pnpm -r --if-present run lint",
     "typecheck": "pnpm -r --if-present run typecheck",
-    "test": "pnpm -r --if-present run test"
+    "test": "pnpm -r --if-present run test",
+    "preflight:syntax": "node scripts/v03-ci/preflight-ui-syntax.mjs"
   },
   "pnpm": {
     "onlyBuiltDependencies": [

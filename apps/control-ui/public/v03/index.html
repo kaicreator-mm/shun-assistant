@@ -1,107 +1,90 @@
 <!doctype html>
 <html lang="en">
-  <head>
-    <meta charset="utf-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>Shun Bounded Control (v0.3)</title>
-    <link rel="stylesheet" href="./styles.css" />
-  </head>
-  <body>
-    <header>
-      <h1 id="v03-title">Shun Bounded Control (v0.3)</h1>
-      <p id="v03-subtitle" class="muted">
-        One guided step at a time. Nothing takes effect without your explicit approval.
-      </p>
-      <p id="v03-banner" class="unknown" role="status">
-        Connecting to the local Shun surface…
-      </p>
-    </header>
-
-    <main>
-      <section id="v03-scope-section" aria-labelledby="v03-scope-title">
-        <h2 id="v03-scope-title">Selected scope</h2>
-        <div id="v03-scope"></div>
-      </section>
-
-      <section id="v03-progress-section" aria-labelledby="v03-progress-title">
-        <h2 id="v03-progress-title">Progress</h2>
-        <div id="v03-progress"></div>
-      </section>
-
-      <section id="v03-step-section" aria-labelledby="v03-step-title">
-        <h2 id="v03-step-title">Current guided step</h2>
-        <div id="v03-step"></div>
-        <form id="v03-step-form"></form>
-        <button id="v03-approve" type="button" class="approve">Approve this step</button>
-        <button id="v03-refuse" type="button" class="refuse">Refuse this step</button>
-        <p id="v03-decision-feedback" role="status"></p>
-      </section>
-
-      <section id="v03-history-section" aria-labelledby="v03-history-title">
-        <h2 id="v03-history-title">History</h2>
-        <ul id="v03-history"></ul>
-      </section>
-
-      <section id="v03-advisory-section" aria-labelledby="v03-advisory-title">
-        <h2 id="v03-advisory-title">Suggestion (advisory only)</h2>
-        <div id="v03-advisory"></div>
-      </section>
-
-      <section id="v03-journeys-section" aria-labelledby="v03-journeys-title">
-        <h2 id="v03-journeys-title">Production journeys</h2>
-        <p id="v03-journeys-note" class="muted"></p>
-        <div id="v03-journeys">
-          <div class="journey-panel" id="v03-j-refs-panel">
-            <!-- Shared reference pair, pasted from the local launch console. -->
-            <label for="v03-j-currentness" id="v03-j-label-currentness">Currentness reference</label>
-            <input id="v03-j-currentness" type="text" />
-            <label for="v03-j-approval" id="v03-j-label-approval">Approval reference</label>
-            <input id="v03-j-approval" type="text" />
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="color-scheme" content="light dark">
+  <title>Shun Assistant</title>
+  <link rel="stylesheet" href="./desktop.css">
+  <script type="module" src="./desktop.js"></script>
+</head>
+<body>
+  <a class="skip" href="#main" data-i18n="skipContent">Skip to main content</a>
+  <div class="shell">
+    <aside class="sidebar" aria-label="Main navigation" data-aria-label="navigationLabel">
+      <div class="identity"><div class="mark" aria-hidden="true">S</div><div><strong>Shun Assistant</strong><small data-i18n="brandSub">Your Windows companion</small></div></div>
+      <nav id="navigation" aria-label="Sections" data-aria-label="sectionLabel">
+        <button class="nav-item active" data-page="home" aria-current="page"><span aria-hidden="true">⌂</span><span data-i18n="navHome">Home</span></button>
+        <button class="nav-item" data-page="assistant"><span aria-hidden="true">✦</span><span data-i18n="navAssistant">AI request preview</span></button>
+        <button class="nav-item" data-page="approvals"><span aria-hidden="true">✓</span><span data-i18n="navApprovals">Approvals</span></button>
+        <button class="nav-item" data-page="tasks"><span aria-hidden="true">▤</span><span data-i18n="navTasks">My tasks</span></button>
+        <button class="nav-item" data-page="routine"><span aria-hidden="true">▷</span><span data-i18n="navRoutine">Saved routines</span></button>
+        <button class="nav-item" data-page="computer"><span aria-hidden="true">▧</span><span data-i18n="navComputer">My computer</span></button>
+        <button class="nav-item" data-page="history"><span aria-hidden="true">◷</span><span data-i18n="navHistory">History</span></button>
+        <button class="nav-item" data-page="settings"><span aria-hidden="true">⚙</span><span data-i18n="navSettings">Settings</span></button>
+      </nav>
+      <div class="side-footer"><span class="status-dot" aria-hidden="true"></span><span id="connection" role="status">Connecting…</span><small data-i18n="localOnly">Runs on your computer</small></div>
+    </aside>
+    <div class="workspace">
+      <header class="topbar"><button id="menu-toggle" class="icon-button menu-toggle" aria-label="Toggle menu" data-aria-label="menuLabel" aria-controls="navigation" aria-expanded="false">☰</button><div class="crumb" id="breadcrumb">Home</div><div class="top-actions"><span id="mode-label" class="mode-chip">Local</span><button id="refresh" class="icon-button" aria-label="Refresh" data-aria-label="refreshLabel" title="Refresh">↻</button></div></header>
+      <main id="main" tabindex="-1"><div id="simulation-banner" class="simulation-banner" role="status" data-i18n="demoWarning" hidden>Demonstration only — actions are not real.</div>
+        <section id="page-home" class="page" aria-labelledby="home-title">
+          <div class="hero"><p class="eyebrow" data-i18n="welcome">WELCOME BACK</p><h1 id="home-title" data-i18n="heroTitle">What would you like to do?</h1><p class="subtle" data-i18n="heroDesc">Choose a familiar task. Shun will guide you through the details.</p><label for="task-search" class="sr-only" data-i18n="searchLabel">Find an action or describe a goal</label><div class="search"><span aria-hidden="true">⌕</span><input id="task-search" type="search" autocomplete="off" data-placeholder="searchPlaceholder" placeholder="Search quick actions or describe a goal…" aria-controls="quick-actions search-empty" aria-keyshortcuts="Control+K"><kbd>Ctrl K</kbd></div><button id="search-clear" type="button" class="text-button" data-i18n="filterReset" hidden>Clear search</button></div>
+          <div class="section-heading"><h2 data-i18n="quickTitle">Quick actions</h2><p data-i18n="quickDesc">Start safely; nothing changes without your approval.</p></div>
+          <div class="action-grid" id="quick-actions">
+            <button class="action-card" data-action="assistant"><span class="action-icon" aria-hidden="true">✦</span><strong data-i18n="actionAssistant">Preview an AI request</strong><span data-i18n="actionAssistantDesc">Inspect what could be shared before any model request.</span><span class="action-link" data-i18n="openAction">Open →</span></button>
+            <button class="action-card" data-action="inventory"><span class="action-icon" aria-hidden="true">▦</span><strong data-i18n="actionInventory">Computer overview</strong><span data-i18n="actionInventoryDesc">See system information without changing anything.</span><span class="action-link" data-i18n="openAction">Open →</span></button>
+            <button class="action-card" data-action="diagnosis"><span class="action-icon" aria-hidden="true">⌁</span><strong data-i18n="actionDiagnosis">Check my computer</strong><span data-i18n="actionDiagnosisDesc">Run a safe, read-only health check.</span><span class="action-link" data-i18n="openAction">Open →</span></button>
+            <button class="action-card" data-action="routine"><span class="action-icon" aria-hidden="true">▷</span><strong data-i18n="actionRoutine">Saved system check</strong><span data-i18n="actionRoutineDesc">Reuse the same verified, read-only task without using AI.</span><span class="action-link" data-i18n="openAction">Open →</span></button>
+            <button class="action-card" data-action="guided"><span class="action-icon" aria-hidden="true">▤</span><strong data-i18n="actionFolder">Preview a folder</strong><span data-i18n="actionFolderDesc">See a folder’s name, item count and size locally. No files are read or changed.</span><span class="action-link" data-i18n="openAction">Open →</span></button>
           </div>
-          <div class="journey-panel" id="v03-j-effect-panel">
-            <h3 id="v03-j-effect-title">Effect journey</h3>
-            <label for="v03-j-action" id="v03-j-label-action">Action reference</label>
-            <input id="v03-j-action" type="text" />
-            <label for="v03-j-plan" id="v03-j-label-plan">Plan reference</label>
-            <input id="v03-j-plan" type="text" />
-            <label for="v03-j-grant" id="v03-j-label-grant">Grant reference</label>
-            <input id="v03-j-grant" type="text" />
-            <button id="v03-j-effect-run" type="button">Send effect request</button>
-            <p id="v03-j-effect-status" role="status"></p>
+          <div id="search-empty" class="search-empty" role="status" aria-live="polite" hidden><p data-i18n="searchEmpty">No matching quick action. You can preview this goal locally instead.</p><button id="search-describe" type="button" class="button secondary" data-i18n="searchDescribe">Preview this goal</button></div>
+          <div class="home-footer"><div class="mini-card"><h3 data-i18n="privacyTitle">You stay in control</h3><p data-i18n="privacyDesc">Local checks stay on this computer. Changes and cloud requests need separate approval.</p></div><div class="mini-card"><h3 data-i18n="recentTitle">Continue a task</h3><p id="home-task-summary" data-i18n="noCurrent">No active task right now.</p><button class="text-button" data-page="tasks" data-i18n="seeTasks">View tasks →</button></div></div>
+          <div class="home-recent"><div class="section-heading"><h2 data-i18n="recentTasksTitle">Recent tasks</h2><button type="button" class="text-button" data-page="tasks" data-i18n="seeTasks">View tasks →</button></div><div id="home-recent-tasks" class="panel history-panel" aria-live="polite"><p data-i18n="hostTasksLoading">Loading locally recorded tasks…</p></div></div>
+        </section>
+        <section id="page-assistant" class="page" hidden aria-labelledby="assistant-title">
+          <div class="page-heading"><p class="eyebrow" data-i18n="assistantTag">PRIVACY FIRST</p><h1 id="assistant-title" data-i18n="assistantTitle">AI request preview</h1><p data-i18n="assistantDesc">Describe a goal and review exactly what might be shared. No cloud request is sent.</p></div>
+          <div class="panel">
+            <form id="ai-preview-form"><div class="field"><label for="ai-goal" data-i18n="assistantGoalLabel">Your goal</label><textarea id="ai-goal" rows="4" maxlength="8192" required data-placeholder="assistantPlaceholder" placeholder="Describe what you want to do…"></textarea></div>
+            <div class="form-footer"><button type="submit" id="ai-preview" class="button primary" data-i18n="assistantPreview">Preview disclosure</button></div></form>
+            <p class="small-help" data-i18n="assistantPrivacy">Local preview only. Consent and cloud send are unavailable here.</p>
           </div>
-          <div class="journey-panel" id="v03-j-provider-panel">
-            <h3 id="v03-j-provider-title">Provider first-use journey</h3>
-            <label for="v03-j-provider-task" id="v03-j-label-provider-task">Provider task id</label>
-            <input id="v03-j-provider-task" type="text" />
-            <button id="v03-j-provider-run" type="button">Send provider request</button>
-            <p id="v03-j-provider-status" role="status"></p>
+          <div id="ai-preview-result" class="panel report" role="status" aria-live="polite"><p data-i18n="assistantNoPreview">No disclosure prepared yet.</p></div>
+        </section>
+        <section id="page-tasks" class="page" hidden aria-labelledby="tasks-title"><div class="page-heading"><p class="eyebrow" data-i18n="guidedEyebrow">TASK WORKSPACE</p><h1 id="tasks-title" data-i18n="tasksTitle">Your tasks</h1><p data-i18n="tasksDesc">Answer the next question or review a task update. You can stop at any time.</p></div><div id="step-alert" class="notice" role="status" hidden></div><div class="flow-layout"><article class="panel step-panel"><div class="panel-heading"><div><span class="tag" data-i18n="stepTag">NEXT STEP</span><h2 id="step-title" data-i18n="noTaskTitle">No task selected</h2></div><span id="step-status" class="soft-chip" data-i18n="waiting">Waiting</span></div><p id="step-progress" class="small-help" role="status" aria-live="polite">Task progress cannot be verified.</p><p id="step-description" class="subtle" data-i18n="noTaskDesc">Choose an action on Home, or wait for a task to appear.</p><div id="step-container"></div><form id="dynamic-form" novalidate hidden><div id="form-fields"></div><div class="form-footer"><button id="step-refuse" class="button secondary" type="button" data-i18n="decline">Decline</button><button id="step-submit" class="button primary" type="submit" data-i18n="continue">Continue</button></div></form><p class="small-help" id="approval-hint" data-i18n="notAnApproval">Continuing a form is not permission to change your computer.</p></article><aside class="context"><article class="panel"><h3 data-i18n="scopeTitle">Selected location</h3><p id="scope-summary" data-i18n="scopeUnknown">No folder is attached to the current task.</p><div class="folder-preview"><button class="button secondary" id="folder-select" type="button" data-i18n="folderChoose">Browse a folder</button><input id="folder-input" type="file" webkitdirectory multiple hidden aria-label="Folder preview picker" data-aria-label="folderInputLabel"><p id="folder-summary" role="status" aria-live="polite" data-i18n="folderHint">Local preview only: folder name, item count and total size. No file contents or folder path are sent.</p></div></article><article class="panel"><h3 data-i18n="safetyTitle">What is available in this version</h3><ul class="safety-list"><li data-i18n="safetyPreview">Folder preview shows its name, item count and total size only.</li><li data-i18n="safetyConfirm">A verified, file-by-file change plan is not available yet.</li><li data-i18n="safetyVerify">This preview does not read or change any files.</li></ul></article></aside></div><div class="toolbar host-task-controls"><h2 data-i18n="hostTasksTitle">Your local tasks</h2><label for="host-task-filter" data-i18n="hostTasksFilter">Show</label><select id="host-task-filter"><option value="all" data-i18n="hostTasksAll">All tasks</option><option value="attention" data-i18n="hostTasksAttention">Needs attention</option><option value="active" data-i18n="hostTasksActive">In progress</option><option value="finished" data-i18n="hostTasksFinished">Finished</option></select><button class="button secondary" type="button" id="host-task-refresh" data-i18n="hostTasksRefresh">Refresh tasks</button></div><p id="host-task-count" class="small-help" role="status" aria-live="polite"></p><div id="host-task-detail" class="panel history-panel" role="region" aria-label="Task details" data-aria-label="taskDetailsTitle" aria-live="polite" tabindex="-1" hidden></div><div id="host-task-list" class="panel history-panel" aria-live="polite"><p data-i18n="hostTasksLoading">Loading locally recorded tasks…</p></div></section>
+        <section id="page-approvals" class="page" hidden aria-labelledby="approvals-title">
+          <div class="page-heading"><p class="eyebrow" data-i18n="approvalTag">INDEPENDENT APPROVAL</p><h1 id="approvals-title" data-i18n="approvalTitle">Plans awaiting your decision</h1><p data-i18n="approvalIntro">Review the exact action, scope and risk before approving. A decision is not proof that the operation completed.</p></div>
+          <div class="toolbar"><button type="button" class="button secondary" id="approval-refresh" data-i18n="approvalRefresh">Refresh pending plans</button></div>
+          <div id="approval-status" class="notice" role="status" aria-live="polite" hidden></div>
+          <div class="flow-layout">
+            <article class="panel"><h2 data-i18n="approvalPending">Pending approvals</h2><div id="approval-list" aria-live="polite"></div></article>
+            <aside class="context"><article class="panel"><h3 data-i18n="approvalSafetyTitle">Your protection</h3><p data-i18n="approvalSafetyDesc">Approval always checks the original Host-authored plan and current policy. It cannot issue a grant by itself.</p></article></aside>
           </div>
-          <div class="journey-panel" id="v03-j-meta-panel">
-            <h3 id="v03-j-meta-title">Meta feedback journey</h3>
-            <label for="v03-j-meta-case" id="v03-j-label-meta-case">Source case reference</label>
-            <input id="v03-j-meta-case" type="text" />
-            <label for="v03-j-meta-revision" id="v03-j-label-meta-revision">Source revision</label>
-            <input id="v03-j-meta-revision" type="text" />
-            <label for="v03-j-meta-rating" id="v03-j-label-meta-rating">Rating</label>
-            <select id="v03-j-meta-rating"></select>
-            <label for="v03-j-meta-category" id="v03-j-label-meta-category">Category</label>
-            <select id="v03-j-meta-category"></select>
-            <label for="v03-j-meta-correction" id="v03-j-label-meta-correction">Correction</label>
-            <select id="v03-j-meta-correction"></select>
-            <button id="v03-j-meta-run" type="button">Send feedback</button>
-            <p id="v03-j-meta-status" role="status"></p>
+          <article id="approval-detail" class="panel approval-detail" hidden aria-labelledby="approval-detail-title">
+            <h2 id="approval-detail-title" data-i18n="approvalDetail">Review exact plan</h2>
+            <div id="approval-preview"></div>
+            <label class="approval-ack"><input type="checkbox" id="approval-confirm"><span data-i18n="approvalCheckbox">I reviewed the exact plan, scope, risks and recovery conditions.</span></label>
+            <div class="form-footer">
+              <button type="button" id="approval-decline" class="button secondary" data-i18n="approvalDecline">Decline</button>
+              <button type="button" id="approval-accept" class="button primary" disabled data-i18n="approvalAccept">Approve this plan</button>
+            </div>
+          </article>
+        </section>
+        <section id="page-computer" class="page" hidden aria-labelledby="computer-title"><div class="page-heading"><p class="eyebrow" data-i18n="readOnly">READ-ONLY</p><h1 id="computer-title" data-i18n="computerTitle">My computer</h1><p data-i18n="computerDesc">See real local information. No files are changed or sent to the cloud.</p></div><div class="toolbar"><button class="button primary" id="run-inventory" data-i18n="runOverview">Show overview</button><button class="button secondary" id="run-diagnosis" data-i18n="runCheck">Run health check</button></div><div id="computer-result" class="panel report" aria-live="polite"><p data-i18n="noReport">Choose a check to see its results.</p></div></section>
+        <section id="page-routine" class="page" hidden aria-labelledby="routine-title">
+          <div class="page-heading"><p class="eyebrow" data-i18n="routineTag">REUSABLE TASK</p><h1 id="routine-title" data-i18n="routineTitle">Saved system check</h1><p data-i18n="routineIntro">Save one verified, read-only system check and reuse it without AI requests. Shun checks your local permissions every time.</p></div>
+          <div class="panel">
+            <div class="panel-heading"><div><h2 data-i18n="routineName">Computer overview</h2><p data-i18n="routineSafe">Reads only aggregate CPU, memory and storage information. No files are modified.</p></div><span id="routine-status" class="soft-chip" role="status">—</span></div>
+            <div class="toolbar"><button class="button secondary" id="routine-save" type="button" data-i18n="routineSave">Save routine</button><button class="button primary" id="routine-run" type="button" disabled data-i18n="routineRun">Run saved check</button></div>
+            <p class="small-help" data-i18n="routineAuth">A saved routine is not execution authorization. The trusted Windows Host verifies the policy and action on every run.</p>
           </div>
-        </div>
-      </section>
-    </main>
-
-    <footer>
-      <p class="muted">
-        This surface relays your decisions only. It cannot create authorization and never approves
-        anything by itself.
-      </p>
-    </footer>
-
-    <script type="module" src="./app.js"></script>
-  </body>
+          <div id="routine-result" class="panel report" aria-live="polite"><p data-i18n="routineNoRun">No verified run yet.</p></div>
+        </section>
+        <section id="page-history" class="page" hidden aria-labelledby="history-title"><div class="page-heading"><p class="eyebrow" data-i18n="activity">ACTIVITY</p><h1 id="history-title" data-i18n="historyTitle">Task history</h1><p data-i18n="historyDesc">Only actual recorded outcomes appear here.</p></div><div id="history-list" class="panel history-panel" aria-live="polite"><p data-i18n="historyEmpty">No completed steps yet.</p></div></section>
+        <section id="page-settings" class="page" hidden aria-labelledby="settings-title"><div class="page-heading"><p class="eyebrow" data-i18n="preferences">PREFERENCES</p><h1 id="settings-title" data-i18n="settingsTitle">Settings</h1><p data-i18n="settingsDesc">Choose how this app looks. Security decisions stay with Windows.</p></div><div class="panel setting-row"><div><h3 data-i18n="languageTitle">Language</h3><p data-i18n="languageDesc">Use Chinese or English in the interface.</p></div><select id="language" aria-label="Language" data-aria-label="languageTitle"><option value="en">English</option><option value="zh">简体中文</option></select></div><div class="panel setting-row"><div><h3 data-i18n="appearanceTitle">Appearance</h3><p data-i18n="appearanceDesc">Follow your Windows theme or choose light/dark.</p></div><select id="appearance" aria-label="Appearance" data-aria-label="appearanceTitle"><option value="system">System</option><option value="light">Light</option><option value="dark">Dark</option></select></div><div class="panel setting-row"><div><h3 data-i18n="connectionTitle">Connection</h3><p data-i18n="connectionDesc">Shun listens on your computer only. Remote model calls require separate consent.</p></div><span id="settings-connection" class="soft-chip">—</span></div></section>
+      </main>
+    </div>
+  </div>
+  <div id="toast" class="toast" role="status" aria-live="polite" hidden></div>
+</body>
 </html>
