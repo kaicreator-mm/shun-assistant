@@ -14,6 +14,7 @@ describe('R04 source contract: the shipped desktop surface replaces technical op
     expect(html).toContain('id="dynamic-form"');
     expect(html).toContain('id="step-progress"');
     expect(html).toContain('aria-label="Main navigation"');
+    expect(html).toContain('aria-controls="navigation"');
     expect(html).not.toContain('src="./app.js"');
     expect(html).not.toContain('id="v03-j-grant"');
     expect(html).not.toContain('id="v03-j-approval"');
@@ -149,6 +150,8 @@ describe('R04 source contract: the shipped desktop surface replaces technical op
     expect(app).toContain('/api/system/inventory');
     expect(app).toContain('/api/system/diagnosis');
     expect(app).toContain("event.key.toLowerCase()==='k'");
+    expect(app).toContain("if(shell.classList.contains('menu-open'))");
+    expect(app).toContain("$('menu-toggle').focus()");
     expect(css).toContain(':focus-visible');
     expect(css).toContain('prefers-reduced-motion');
     expect(css).toContain('.history-entry.host-task-selected');

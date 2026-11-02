@@ -816,10 +816,16 @@ document.addEventListener('keydown',event=>{
  if((event.ctrlKey||event.metaKey)&&event.key.toLowerCase()==='k'){event.preventDefault();page('home');$('task-search').focus();}
  if(event.key==='Escape'){
   if(document.activeElement===$('task-search')&&$('task-search').value){
-   $('task-search').value='';filterActions();event.preventDefault();
-  }else $('task-search').blur();
-  document.querySelector('.shell').classList.remove('menu-open');
-  $('menu-toggle').setAttribute('aria-expanded','false');
+   $('task-search').value='';filterActions();event.preventDefault();return;
+  }
+  const shell=document.querySelector('.shell');
+  if(shell.classList.contains('menu-open')){
+   shell.classList.remove('menu-open');
+   $('menu-toggle').setAttribute('aria-expanded','false');
+   $('menu-toggle').focus();
+   event.preventDefault();return;
+  }
+  if(document.activeElement===$('task-search'))$('task-search').blur();
  }
 });
 translate();refresh().catch(showError);
