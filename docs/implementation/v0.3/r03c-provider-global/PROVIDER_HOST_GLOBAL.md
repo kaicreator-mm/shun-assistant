@@ -24,7 +24,7 @@ Issue #287 · Execution Pack `.agent/execution/R03C-PROVIDER-GLOBAL-UAC/MANIFEST
 
 ## Test seams
 
-`installTrustedProviderBinding` accepts optional `fetchArtifact` and `process` overrides (production defaults remain the real fetch and `BoundedSpawnProcess`) so the qualification suite exercises the real verifier→stager→activator chain with in-memory fixture bytes and a capturing spawn port — zero network, zero real child processes.
+`installTrustedProviderBinding` accepts optional `fetchArtifact`, `process` and `hostFacts` overrides (production defaults remain the real fetch, `BoundedSpawnProcess` and real host facts) so the qualification suite exercises the real verifier→stager→activator chain with in-memory fixture bytes, a capturing spawn port and the pinned `windows-x64` host facts — zero network, zero real child processes, on any CI host.
 
 ## Explicitly out of scope / not done here
 

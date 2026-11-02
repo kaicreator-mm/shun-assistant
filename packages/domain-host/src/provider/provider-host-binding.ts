@@ -73,6 +73,17 @@ export interface TrustedProviderBindingConfig {
   readonly fetchArtifact?: typeof fetch;
   /** Trusted-process seam override (tests); defaults to the real bounded spawn. */
   readonly process?: unknown;
+  /**
+   * Trusted-process seam override (tests); defaults to the real host facts.
+   * The activation chain enforces the catalog's `windows-x64` platform pin,
+   * so non-Windows qualification environments inject the pinned facts instead
+   * of weakening the pin itself.
+   */
+  readonly hostFacts?: {
+    readonly platform?: string;
+    readonly architecture?: string;
+    readonly nodeAbi?: string;
+  };
 }
 
 /** Capability envelope returned to the K (terminal receipts only). */
@@ -160,9 +171,9 @@ export function installTrustedProviderBinding(config: TrustedProviderBindingConf
     }),
     authorizeRunEffect,
     requiredRevocationEpoch: () => config.revocationEpoch,
-    hostPlatform: () => process.platform,
-    hostArchitecture: () => process.arch,
-    hostNodeAbi: () => process.versions.modules,
+    hostPlatform: () => config.hostFacts?.platform ?? process.platform,
+    hostArchitecture: () => config.hostFacts?.architecture ?? process.arch,
+    hostNodeAbi: () => config.hostFacts?.nodeAbi ?? process.versions.modules,
     hostNativeChildRuntime: () => process.execPath,
     hostSpawnEnvironment: minimalWindowsSpawnEnvironment,
     process:

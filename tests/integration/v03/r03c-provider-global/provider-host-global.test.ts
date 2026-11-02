@@ -192,6 +192,7 @@ async function installUserBinding(): Promise<InstalledUserHost> {
     scopes: [trust],
     descriptor: makeDescriptor(trust),
     revocationEpoch: 1,
+    hostFacts: { platform: 'win32', architecture: 'x64', nodeAbi: '137' },
     fetchArtifact: (async () => new Response(ARTIFACT_BYTES, { status: 200 })) as typeof fetch,
     process: port,
   });
@@ -517,6 +518,7 @@ describe('R03C Host-global Provider first-use (requestRef-only, Case-free)', () 
       scopes: [trust],
       descriptor: makeDescriptor(trust),
       revocationEpoch: 1,
+      hostFacts: { platform: 'win32', architecture: 'x64', nodeAbi: '137' },
       fetchArtifact: (async () => new Response(ARTIFACT_BYTES, { status: 200 })) as typeof fetch,
       process: capturePort('').port,
       elevatedAction: {
@@ -591,6 +593,7 @@ describe('R03C Host-global Provider first-use (requestRef-only, Case-free)', () 
       scopes: [trust],
       descriptor: makeDescriptor(trust),
       revocationEpoch: 1,
+      hostFacts: { platform: 'win32', architecture: 'x64', nodeAbi: '137' },
       fetchArtifact: (async () => new Response(ARTIFACT_BYTES, { status: 200 })) as typeof fetch,
       process: capturePort('').port,
       // Drifted plan reference: the preview must refuse before anything runs.
@@ -624,6 +627,7 @@ describe('R03C Host-global Provider first-use (requestRef-only, Case-free)', () 
         scopes: [nativeTrust],
         descriptor: makeDescriptor(nativeTrust, { abiRevision: '137', entrypoint: 'addon.node' }),
         revocationEpoch: 1,
+        hostFacts: { platform: 'win32', architecture: 'x64', nodeAbi: '137' },
         fetchArtifact: (async () => new Response(ARTIFACT_BYTES, { status: 200 })) as typeof fetch,
         elevatedAction: {
           actionRef: provisioned.actionId,
