@@ -57,8 +57,8 @@ function setup(locale, options = {}) {
     ...(options.includeApprovalTask ? [{ taskId: 'task-c', title: 'Needs approval', revision: 3,
       state: 'AWAITING_AUTHORIZATION', updatedAt: '2026-11-01T22:00:00Z' }] : []),
   ];
-  const fetch = async (url, options) => {
-    requests.push({ url, method: options?.method || 'GET' });
+  const fetch = async (url, requestOptions) => {
+    requests.push({ url, method: requestOptions?.method || 'GET' });
     let data;
     if (url === '/api/health') data = {
       ok: true, loopbackOnly: true, simulated: false,
