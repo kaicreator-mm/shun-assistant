@@ -1,0 +1,41 @@
+pack_id: shun-v030-r03c-provider-signed-privilege-contract-local-builder-r1
+task_id: R03C-PROVIDER-SIGNED-PRIVILEGE-CONTRACT
+issue: "#289"
+repository: kaicreator-mm/shun-assistant
+version: v0.3.0
+base_sha: be2e81722a70ee3d0bd5634bc83d97d733c20b78
+branch: JIT_only_task/v0.3.0-r03c-provider-privilege-contract-local-builder-r1
+parent_issue: "#280"
+owner_authorization_ref: "#280 comment 6584396368"
+owner_execution_amendment_ref: "#280 comment 6585799747"
+generated_by: local-agent:shun-v030-r03c
+generated_at: 2026-11-03
+standard_revision: 2c395c55569fe2edf3f4135f12d3d069e526d0b7
+execution_profile: LOCAL_BUILDER
+execution_environment: LOCAL
+admission_mode: SINGLE_WRITER_ADMISSION
+protected_claim_key: "kaicreator-mm/shun-assistant#289:builder:__default__"
+allowed_write_set:
+  - packages/contracts/src/v02.ts
+  - packages/contracts/src/schema/v02-provider-catalog-artifact.schema.json
+  - packages/contracts/test/v02.test.ts
+  - packages/vertical-jit/test/curated-provider.test.ts
+plan:
+  - "Add optional requiredPrivilege USER|ELEVATED to the strict ProviderCatalogArtifact contract and matching JSON Schema."
+  - "Treat omitted requiredPrivilege as USER for backward compatibility."
+  - "Allow ELEVATED only for artifactKind CLI; reject NATIVE_ADDON+ELEVATED in Zod and JSON Schema."
+  - "Ensure canonical signed descriptor includes the field so changing USER/ELEVATED without curator re-signing fails verification."
+  - "Add schema/Zod parity, legacy omission, signed elevated CLI, signature tamper and native-addon rejection tests."
+forbidden:
+  - "Host/UAC runtime binding"
+  - "Provider first-use ledger"
+  - "production fixture signature"
+  - "private signing keys"
+  - "operator config as substitute for signed field"
+  - "new installer/RunAs path"
+  - "main"
+  - "version/v0.2.0"
+  - "tag/release"
+  - "paid LLM"
+  - "physical Windows effects"
+notes: "Fresh exact-base claim required. Prior invalidated pre-authorization Claims and WIP branches are not admitted delivery. No merge/release authority."
