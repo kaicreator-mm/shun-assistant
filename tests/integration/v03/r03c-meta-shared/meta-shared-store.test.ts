@@ -15,7 +15,7 @@ const EXPERIENCE = {
   patternId: 'bounded-folder-repair',
   outcome: 'COMPLETED_VERIFIED' as const,
   tags: ['folder-selection', 'manifest-preview'],
-  constraints: ['selected-root-only', 'poststate-verified'],
+  constraints: ['poststate-verified', 'selected-root-only'],
 };
 
 function consent(input: {
