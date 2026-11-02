@@ -95,8 +95,25 @@ describe('R02-B Host Guided SQLite durability and replay fence', () => {
         .toMatchObject({ status: 'REFUSED', code: 'RELAY_SCHEMA_REFUSED' });
       expect(service.decide(relay))
         .toMatchObject({ status: 'RECORDED', humanGrantIssued: false, effectSent: false });
+      const savedAnswer = service.readRecordedAnswer(step.stepId) as {
+        event: string;
+        source: string;
+        answers: readonly { fieldId: string; value: unknown }[];
+      } | undefined;
+      expect(savedAnswer).toMatchObject({
+        event: 'USER_SUBMIT',
+        source: 'USER',
+        answers: [{ fieldId: 'selectedRoot', value: 'C:\\Work' }],
+      });
       expect(service.decide(relay)).toMatchObject({ status: 'STALE' });
       expect(service.state().currentStep).toBeUndefined();
+      service.close();
+      const restarted = new HostGuidedService(join(dir, 'guided.sqlite'), () => NOW);
+      try {
+        expect(restarted.readRecordedAnswer(step.stepId)).toEqual(savedAnswer);
+      } finally {
+        restarted.close();
+      }
     } finally {
       service.close();
       rmSync(dir, { recursive: true, force: true });
