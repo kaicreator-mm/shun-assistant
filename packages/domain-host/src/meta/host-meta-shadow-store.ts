@@ -129,6 +129,12 @@ interface MetaExperienceRow {
 
 const EXPERIENCE_CODE = /^[a-z][a-z0-9._-]{0,63}$/;
 const EXPERIENCE_OUTCOMES = new Set(['COMPLETED_VERIFIED', 'REFUSED_VERIFIED']);
+const META_FEEDBACK_CATEGORIES = new Set([
+  'INCORRECT_RESULT', 'MISSING_STEP', 'WRONG_TARGET', 'UNSAFE_SUGGESTION', 'TOO_COMPLEX', 'OTHER',
+]);
+const META_FEEDBACK_CORRECTIONS = new Set([
+  'WRONG_OBJECT', 'MISSING_CONSTRAINT', 'STALE_CONTEXT', 'POLICY_MISMATCH', 'NO_CORRECTION',
+]);
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
@@ -238,6 +244,12 @@ export class HostMetaShadowStore implements MetaFeedbackHostPort {
       opt_in INTEGER NOT NULL,
       expires_at TEXT NOT NULL
     )`);
+    this.#db.exec(`CREATE TABLE IF NOT EXISTS meta_outcome_currentness (
+      case_ref TEXT PRIMARY KEY,
+      revision TEXT NOT NULL,
+      sha256 TEXT NOT NULL,
+      updated_at TEXT NOT NULL
+    )`);
     this.#db.exec(`CREATE TABLE IF NOT EXISTS meta_opt_in_currentness (
       case_ref TEXT NOT NULL,
       source_revision TEXT NOT NULL,
@@ -290,6 +302,10 @@ export class HostMetaShadowStore implements MetaFeedbackHostPort {
       this.#db.prepare(
         'INSERT OR REPLACE INTO meta_outcome_receipts(case_ref,revision,sha256,recorded_at) VALUES(?,?,?,?)',
       ).run(input.caseRef, input.revision, input.sha256, recordedAt);
+      this.#db.prepare(`INSERT INTO meta_outcome_currentness(case_ref,revision,sha256,updated_at)
+        VALUES(?,?,?,?) ON CONFLICT(case_ref) DO UPDATE SET
+        revision=excluded.revision,sha256=excluded.sha256,updated_at=excluded.updated_at`)
+        .run(input.caseRef, input.revision, input.sha256, recordedAt);
       if (experience) {
         this.#db.prepare(`INSERT OR REPLACE INTO meta_verified_experiences(
           case_ref,revision,source_digest,capability_id,task_class,pattern_id,outcome,
@@ -408,11 +424,9 @@ export class HostMetaShadowStore implements MetaFeedbackHostPort {
     }
     // The receipt this consent points at must be the CURRENT recorded
     // revision for the case — a stale receipt cannot authorize feedback.
-    const receipt = this.#db
-      .prepare(
-        'SELECT revision, sha256 FROM meta_outcome_receipts WHERE case_ref=? ORDER BY recorded_at DESC, revision DESC LIMIT 1',
-      )
-      .get(input.caseRef) as { revision: string; sha256: string } | undefined;
+    const receipt = this.#db.prepare(
+      'SELECT revision,sha256 FROM meta_outcome_currentness WHERE case_ref=?',
+    ).get(input.caseRef) as { revision: string; sha256: string } | undefined;
     if (
       receipt === undefined ||
       receipt.revision !== input.sourceRevision ||
@@ -468,14 +482,21 @@ export class HostMetaShadowStore implements MetaFeedbackHostPort {
       const currentness = this.#db.prepare(
         'SELECT consent_ref,opt_in FROM meta_opt_in_currentness WHERE case_ref=? AND source_revision=?',
       ).get(authorization.caseRef, authorization.sourceRevision) as ConsentCurrentnessRow | undefined;
+      const outcomeCurrentness = this.#db.prepare(
+        'SELECT revision,sha256 FROM meta_outcome_currentness WHERE case_ref=?',
+      ).get(authorization.caseRef) as { revision: string; sha256: string } | undefined;
       const nowIso = new Date().toISOString();
       if (
         consent === undefined ||
         currentness === undefined ||
         currentness.opt_in !== 1 ||
         currentness.consent_ref !== authorization.consentRef ||
+        !outcomeCurrentness ||
+        outcomeCurrentness.revision !== authorization.sourceRevision ||
+        outcomeCurrentness.sha256 !== authorization.sourceDigest ||
         consent.case_ref !== authorization.caseRef ||
         consent.source_revision !== authorization.sourceRevision ||
+        consent.source_digest !== authorization.sourceDigest ||
         consent.opt_in !== 1 ||
         !isIsoUtc(consent.expires_at) ||
         Date.parse(consent.expires_at) <= Date.parse(nowIso) ||
@@ -614,7 +635,7 @@ export class HostMetaShadowStore implements MetaFeedbackHostPort {
         (input.tags !== undefined && !input.tags.every((tag) => experience.tags.includes(tag)))
       ) continue;
       const latestReceipt = this.#db.prepare(
-        'SELECT revision,sha256 FROM meta_outcome_receipts WHERE case_ref=? ORDER BY recorded_at DESC,revision DESC LIMIT 1',
+        'SELECT revision,sha256 FROM meta_outcome_currentness WHERE case_ref=?',
       ).get(row.case_ref) as { revision: string; sha256: string } | undefined;
       if (
         !latestReceipt ||
@@ -695,8 +716,11 @@ export class HostMetaShadowStore implements MetaFeedbackHostPort {
           provenance?.consentRef !== consentRef ||
           !feedback ||
           (feedback.rating !== 'HELPFUL' && feedback.rating !== 'NOT_HELPFUL') ||
-          !isExperienceCode(feedback.category) ||
-          (feedback.correction !== undefined && !isExperienceCode(feedback.correction))
+          typeof feedback.category !== 'string' ||
+          !META_FEEDBACK_CATEGORIES.has(feedback.category) ||
+          (feedback.correction !== undefined &&
+            (typeof feedback.correction !== 'string' ||
+              !META_FEEDBACK_CORRECTIONS.has(feedback.correction)))
         ) continue;
         return Object.freeze({
           rating: feedback.rating,
