@@ -1,0 +1,47 @@
+schema: ads/execution-pack/v1
+task_id: R03C-META-SHARED-SQLITE
+issue: 285
+owner_authorization:
+  - "shun-assistant#280 OWNER_SHUN_V030_R03C_PROVIDER_GLOBAL_META_SHARED_APPROVE"
+  - "shun-assistant#259 OWNER_SHUN_V030_R03_F01F02Q01_REPAIR_APPROVE"
+baseline:
+  branch: wip/v0.3.0-r02-owner-repairs
+  sha: be2e81722a70ee3d0bd5634bc83d97d733c20b78
+  tree: 8d6d6ee5fc4277e6b0b64b2d22e6f66575fe2889
+execution_branch: wip/v0.3.0-r03c-meta-shared-sqlite
+role: WEB_BUILDER
+validation_role: LOCAL_VALIDATION
+integration_target: wip/v0.3.0-r02-owner-repairs
+allowed_write_set:
+  - packages/domain-host/src/meta/host-meta-shadow-store.ts
+  - tests/integration/v03/r03c-meta-shared/meta-shared-store.test.ts
+acceptance:
+  - trusted Host stores normalized verified experience in existing SQLite DB
+  - Case B retrieves relevant eligible experience from Case A
+  - source Case remains provenance and is not an equality gate
+  - query revalidates latest receipt and opt-in currentness
+  - stale and revoked records are excluded
+  - SQLite restart durability
+  - malformed/private/oversized records rejected
+  - feedback stays FUTURE_BUILD_SHADOW inactive
+  - query result advisory-only, no authority/effect surface
+pre_ci:
+  required: node scripts/v03-ci/preflight-ui-syntax.mjs
+  then: scoped lint/typecheck/tests
+  ci: self-hosted Woodpecker push and pull_request at exact SHA
+forbidden:
+  - new database, Kernel, dispatcher, sender
+  - raw prompt, file, credential, secret or unrestricted path storage
+  - cloud sync
+  - Permit/grant/approval issuance, policy mutation, auto-execution, Shadow promotion
+  - main
+  - version/v0.2.0
+  - tag
+  - release
+claim:
+  status: pending
+  required_event: DISPATCH_CLAIMED
+  claim_generation: 1
+review:
+  policy: self_adversarial_exact_sha_then_owner_final_review
+  merge: not_authorized
