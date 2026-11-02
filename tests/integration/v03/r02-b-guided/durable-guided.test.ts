@@ -66,6 +66,7 @@ describe('R02-B Host Guided SQLite durability and replay fence', () => {
   it('records a non-authorizing ASK answer exactly once and rejects a forged approval', () => {
     const dir = mkdtempSync(join(tmpdir(), 'shun-r04-answer-'));
     const service = new HostGuidedService(join(dir, 'guided.sqlite'), () => NOW);
+    let serviceClosed = false;
     try {
       const staged = service.stageTrustedSelection({
         observation, semanticSelection: semantic,
@@ -108,6 +109,7 @@ describe('R02-B Host Guided SQLite durability and replay fence', () => {
       expect(service.decide(relay)).toMatchObject({ status: 'STALE' });
       expect(service.state().currentStep).toBeUndefined();
       service.close();
+      serviceClosed = true;
       const restarted = new HostGuidedService(join(dir, 'guided.sqlite'), () => NOW);
       try {
         expect(restarted.readRecordedAnswer(step.stepId)).toEqual(savedAnswer);
@@ -115,7 +117,7 @@ describe('R02-B Host Guided SQLite durability and replay fence', () => {
         restarted.close();
       }
     } finally {
-      service.close();
+      if (!serviceClosed) service.close();
       rmSync(dir, { recursive: true, force: true });
     }
   });
