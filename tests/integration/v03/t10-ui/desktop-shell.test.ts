@@ -82,6 +82,9 @@ describe('R04 source contract: the shipped desktop surface replaces technical op
     expect(app).toContain('filterTaskSnapshots(hostTaskRows');
     expect(app).toContain("$('host-task-filter').addEventListener('change',()=>{");
     expect(app).toContain('projectHostTaskDetail');
+    expect(app).toContain("if(view.state==='AWAITING_AUTHORIZATION')");
+    expect(app).toContain("link.addEventListener('click',()=>page('approvals'))");
+    expect(app).toContain("taskOpenApprovals:'查看待审批事项'");
     expect(app).toContain('projectClarificationReceipt');
     expect(app).toContain('async function submitHostClarification(id,key,value)');
     expect(app).toContain('selected.revision,selected.updatedAt');

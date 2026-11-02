@@ -52,6 +52,8 @@ function setup(locale, options = {}) {
       updatedAt: '2026-11-02T02:00:00Z', clarification: { question: 'Which folder?' } },
     { taskId: 'task-b', title: 'Finished check', revision: 2, state: 'SUCCEEDED',
       updatedAt: '2026-11-01T23:00:00Z' },
+    ...(options.includeApprovalTask ? [{ taskId: 'task-c', title: 'Needs approval', revision: 3,
+      state: 'AWAITING_AUTHORIZATION', updatedAt: '2026-11-01T22:00:00Z' }] : []),
   ];
   const fetch = async (url, options) => {
     requests.push({ url, method: options?.method || 'GET' });
@@ -64,6 +66,8 @@ function setup(locale, options = {}) {
     else if (url === '/api/tasks') data = { tasks };
     else if (url === '/api/tasks/task-a') data = blockedTaskA ? await blockedTaskA : tasks[0];
     else if (url === '/api/tasks/task-b') data = tasks[1];
+    else if (url === '/api/tasks/task-c') data = tasks[2];
+    else if (url === '/api/approvals') data = { approvals: [] };
     else throw new Error('Unexpected URL: ' + url);
     return { ok: true, status: 200, json: async () => data };
   };
@@ -144,6 +148,23 @@ describe('R04 real desktop.js task-list interactions (controlled DOM)', () => {
       expect(node('host-task-list').children).toHaveLength(1);
       expect(node('host-task-list').children[0].className).not.toContain('host-task-selected');
       expect(requests.every((item) => item.method === 'GET')).toBe(true);
+    });
+
+    it('offers approval navigation for Host-authorized waiting tasks, without submitting approval: ' + locale, async () => {
+      const { ui, node, requests } = setup(locale, { includeApprovalTask: true });
+      node('host-task-filter').value = 'all';
+      await ui.loadHostTasks();
+      expect(node('host-task-list').children).toHaveLength(3);
+      await ui.loadHostTaskDetail('task-c', true);
+      const inspector = node('host-task-detail');
+      const openApproval = inspector.children.find((element) => element.tagName === 'BUTTON');
+      expect(openApproval).toBeDefined();
+      expect(openApproval.textContent).toBe(locale.startsWith('zh') ? '查看待审批事项' : 'Review required approval');
+      openApproval.events.click();
+      await Promise.resolve();
+      await Promise.resolve();
+      expect(requests.every((item) => item.method === 'GET')).toBe(true);
+      expect(requests.map((item) => item.url)).toContain('/api/approvals');
     });
   }
 });
