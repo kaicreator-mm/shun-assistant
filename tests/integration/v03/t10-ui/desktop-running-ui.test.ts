@@ -98,7 +98,7 @@ function setup(locale, options = {}) {
     progressModel: () => options.currentStep ? ({ ok: true, status: 'RUNNING', position: { text: '1 of 1' } }) : ({ ok: true, status: 'UNKNOWN', position: { text: 'unknown' } }),
     ...approvals,
   };
-  runInNewContext(script + '\nglobalThis.__ui = { loadHostTasks, loadHostTaskDetail, loadHomeRecentTasks, refresh };',
+  runInNewContext(script + '\nglobalThis.__ui = { loadHostTasks, loadHostTaskDetail, loadHomeRecentTasks, refresh, searchKeyAction };',
     context, { timeout: 2000 });
   return { ui: context.__ui, node: (id) => document.getElementById(id), requests,
     releaseTaskA: () => releaseTaskA?.(tasks[0]) };
@@ -109,6 +109,22 @@ describe('R04 real desktop.js task-list interactions (controlled DOM)', () => {
 
 
 
+
+    it('clears a non-empty search on Escape without treating it as navigation: ' + locale, () => {
+      const {ui}=setup(locale);
+      expect(ui.searchKeyAction('Escape',false,'folder',1)).toBe('CLEAR');
+      expect(ui.searchKeyAction('Escape',false,'',1)).toBe('NONE');
+    });
+    it('activates exactly one quick action on Enter, never an ambiguous result: ' + locale, () => {
+      const {ui}=setup(locale);
+      expect(ui.searchKeyAction('Enter',false,'folder',1)).toBe('ACTIVATE');
+      expect(ui.searchKeyAction('Enter',false,'',5)).toBe('NONE');
+      expect(ui.searchKeyAction('Enter',false,'folder',2)).toBe('NONE');
+    });
+    it('does not activate a quick action while IME composition is active: ' + locale, () => {
+      const {ui}=setup(locale);
+      expect(ui.searchKeyAction('Enter',true,'文件夹',1)).toBe('NONE');
+    });
 
     it('requests the Home recent-task list at first boot, without navigation: ' + locale, async () => {
       const { node, requests } = setup(locale);

@@ -66,6 +66,8 @@ describe('R04 source contract: the shipped desktop surface replaces technical op
     expect(app).toContain("async function loadHomeRecentTasks()");
     expect(app).toContain('translate();loadHomeRecentTasks().catch(showError);refresh().catch(showError);');
     expect(app).toContain("result.items.slice(0,3)");
+    expect(app).toContain("function activateAction(kind)");
+    expect(app).toContain("function searchKeyAction(key,isComposing,query,visibleCount)");
     expect(app).toContain("function filterActions()");
     expect(app).toContain("'search-empty').hidden=visible!==0");
     expect(app).toContain("$('search-describe').addEventListener('click'");
@@ -133,8 +135,11 @@ describe('R04 source contract: the shipped desktop surface replaces technical op
     expect(app).toContain('function guidedIdentity(model)');
     expect(app).toContain('const previousAnswers=previousModel?formAnswers():[]');
     expect(app).toContain('guidedIdentity(previousModel)===guidedIdentity(model)');
-    expect(app).toContain("if(visible.length!==1)return");
-    expect(app).toContain("if(event.key!=='Enter'||event.isComposing)return");
+    expect(app).toContain("if(key==='Enter')return visibleCount===1?'ACTIVATE':'NONE'");
+    expect(app).toContain("if(key==='Escape')return query?'CLEAR':'NONE'");
+    expect(app).toContain("if(isComposing)return 'NONE'");
+    expect(app).toContain("event.stopPropagation()");
+    expect(app).toContain("activateAction(visible[0].dataset.action)");
     expect(app).toContain("taskReconciled:'已核对'");
     expect(app).toContain("button.dataset.i18n='taskView'");
     expect(app).toContain("button.dataset.i18n='approvalSelect'");

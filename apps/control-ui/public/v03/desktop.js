@@ -787,14 +787,20 @@ async function previewAiGoal() {
     target.append(notice);
   }finally{if(generation===aiPreviewGeneration)$('ai-preview').disabled=false;}
 }
-document.querySelectorAll('[data-page]').forEach(button=>button.addEventListener('click',()=>page(button.dataset.page)));
-document.querySelectorAll('[data-action]').forEach(button=>button.addEventListener('click',()=>{
- const kind=button.dataset.action;
+function activateAction(kind){
  if(kind==='assistant')page('assistant');
  else if(kind==='guided')page('tasks');
  else if(kind==='routine')page('routine');
  else runCheck(kind).catch(showError);
-}));
+}
+function searchKeyAction(key,isComposing,query,visibleCount){
+ if(isComposing)return 'NONE';
+ if(key==='Escape')return query?'CLEAR':'NONE';
+ if(key==='Enter')return visibleCount===1?'ACTIVATE':'NONE';
+ return 'NONE';
+}
+document.querySelectorAll('[data-page]').forEach(button=>button.addEventListener('click',()=>page(button.dataset.page)));
+document.querySelectorAll('[data-action]').forEach(button=>button.addEventListener('click',()=>activateAction(button.dataset.action)));
 $('run-inventory').addEventListener('click',()=>runCheck('inventory').catch(showError));
 $('run-diagnosis').addEventListener('click',()=>runCheck('diagnosis').catch(showError));
 $('routine-save').addEventListener('click',()=>saveRoutine().catch(showError));
@@ -850,10 +856,16 @@ $('search-describe').addEventListener('click',()=>{
  page('assistant');$('ai-goal').focus();
 });
 $('task-search').addEventListener('keydown',event=>{
- if(event.key!=='Enter'||event.isComposing)return;
+ const input=$('task-search');
  const visible=[...document.querySelectorAll('[data-action]')].filter(card=>!card.hidden);
- if(visible.length!==1)return; // ambiguous search is never auto-selected
- event.preventDefault();visible[0].click();
+ const action=searchKeyAction(event.key,event.isComposing,input.value,visible.length);
+ if(action==='CLEAR'){
+  event.preventDefault();event.stopPropagation();
+  input.value='';filterActions();input.focus();return;
+ }
+ if(action==='ACTIVATE'){
+  event.preventDefault();activateAction(visible[0].dataset.action);
+ }
 });
 $('search-clear').addEventListener('click',()=>{
  $('task-search').value='';filterActions();$('task-search').focus();
@@ -861,9 +873,6 @@ $('search-clear').addEventListener('click',()=>{
 document.addEventListener('keydown',event=>{
  if((event.ctrlKey||event.metaKey)&&event.key.toLowerCase()==='k'){event.preventDefault();page('home');$('task-search').focus();}
  if(event.key==='Escape'){
-  if(document.activeElement===$('task-search')&&$('task-search').value){
-   $('task-search').value='';filterActions();event.preventDefault();return;
-  }
   const shell=document.querySelector('.shell');
   if(shell.classList.contains('menu-open')){
    shell.classList.remove('menu-open');
@@ -871,7 +880,6 @@ document.addEventListener('keydown',event=>{
    $('menu-toggle').focus();
    event.preventDefault();return;
   }
-  if(document.activeElement===$('task-search'))$('task-search').blur();
  }
 });
 translate();loadHomeRecentTasks().catch(showError);refresh().catch(showError);
