@@ -27,7 +27,8 @@ export type GuidedDecisionReceipt =
 
 type Row = { readonly state_json: string; readonly revision: number };
 const CASE_KEY = 'selected-case';
-const ID = /^[A-Za-z][A-Za-z0-9._-]{0,127}$/;
+const TASK_ID = /^[A-Za-z][A-Za-z0-9._-]{0,127}$/;
+const STEP_ID = /^[A-Za-z0-9][A-Za-z0-9_.:-]{0,159}$/;
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return value !== null && typeof value === 'object' && !Array.isArray(value) &&
@@ -77,7 +78,7 @@ export class HostGuidedService {
       nowUnixMs: now,
     });
     if (next.status !== 'STEP') return { status: 'REFUSED', code: next.code };
-    if (!ID.test(next.step.taskId)) return { status: 'REFUSED', code: 'TASK_ID_INVALID' };
+    if (!TASK_ID.test(next.step.taskId)) return { status: 'REFUSED', code: 'TASK_ID_INVALID' };
     const state: StoredCase = {
       step: next.step, observation: input.observation,
       semanticSelection: input.semanticSelection, scope: input.scope,
@@ -227,7 +228,7 @@ export class HostGuidedService {
    * corruption before an answer is reused by a later Host step.
    */
   readRecordedAnswer(stepId: string): unknown | undefined {
-    if (typeof stepId !== 'string' || !ID.test(stepId)) return undefined;
+    if (typeof stepId !== 'string' || !STEP_ID.test(stepId)) return undefined;
     const row = this.#db.prepare(`SELECT outcome_json,outcome_sha256
       FROM guided_step_answers WHERE step_id=?`).get(stepId) as
       | { outcome_json: string; outcome_sha256: string }
