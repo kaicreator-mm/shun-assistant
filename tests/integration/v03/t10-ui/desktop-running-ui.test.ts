@@ -31,7 +31,7 @@ class StubElement {
   click() { this.events.click?.(); }
 }
 
-function setup(locale) {
+function setup(locale, options = {}) {
   const registry = new Map();
   const document = {
     documentElement: new StubElement('html'), body: new StubElement('body'),
@@ -45,6 +45,8 @@ function setup(locale) {
   };
   document.documentElement.dataset.theme = 'system';
   const requests = [];
+  let releaseTaskA;
+  const blockedTaskA = options.deferTaskA ? new Promise((resolve) => { releaseTaskA = resolve; }) : null;
   const tasks = [
     { taskId: 'task-a', title: 'Folder question', revision: 1, state: 'CLARIFICATION',
       updatedAt: '2026-11-02T02:00:00Z', clarification: { question: 'Which folder?' } },
@@ -60,7 +62,7 @@ function setup(locale) {
     };
     else if (url === '/api/v03/guided/state') data = { currentStep: null, history: [] };
     else if (url === '/api/tasks') data = { tasks };
-    else if (url === '/api/tasks/task-a') data = tasks[0];
+    else if (url === '/api/tasks/task-a') data = blockedTaskA ? await blockedTaskA : tasks[0];
     else if (url === '/api/tasks/task-b') data = tasks[1];
     else throw new Error('Unexpected URL: ' + url);
     return { ok: true, status: 200, json: async () => data };
@@ -85,7 +87,8 @@ function setup(locale) {
   };
   runInNewContext(script + '\nglobalThis.__ui = { loadHostTasks, loadHostTaskDetail };',
     context, { timeout: 2000 });
-  return { ui: context.__ui, node: (id) => document.getElementById(id), requests };
+  return { ui: context.__ui, node: (id) => document.getElementById(id), requests,
+    releaseTaskA: () => releaseTaskA?.(tasks[0]) };
 }
 
 describe('R04 real desktop.js task-list interactions (controlled DOM)', () => {
@@ -110,6 +113,37 @@ describe('R04 real desktop.js task-list interactions (controlled DOM)', () => {
       expect(node('host-task-count').textContent).toContain('1');
       expect(requests.every((item) => item.method === 'GET')).toBe(true);
       expect(requests.map((item) => item.url)).toContain('/api/tasks/task-a');
+    });
+
+    it('does not let a late older Host read replace a more recently selected task: ' + locale, async () => {
+      const { ui, node, requests, releaseTaskA } = setup(locale, { deferTaskA: true });
+      node('host-task-filter').value = 'all';
+      await ui.loadHostTasks();
+      const older = ui.loadHostTaskDetail('task-a', true);
+      const newer = ui.loadHostTaskDetail('task-b', true);
+      await newer;
+      releaseTaskA();
+      await older;
+      const detail = node('host-task-detail');
+      expect(detail.hidden).toBe(false);
+      expect(detail.children[0].textContent).toBe('Finished check');
+      expect(node('host-task-list').children[1].className).toContain('host-task-selected');
+      expect(requests.every((item) => item.method === 'GET')).toBe(true);
+    });
+    it('does not re-open a task when a filter changes during a pending read: ' + locale, async () => {
+      const { ui, node, requests, releaseTaskA } = setup(locale, { deferTaskA: true });
+      node('host-task-filter').value = 'all';
+      await ui.loadHostTasks();
+      const pending = ui.loadHostTaskDetail('task-a', true);
+      expect(node('host-task-detail').hidden).toBe(false);
+      node('host-task-filter').value = 'finished';
+      node('host-task-filter').events.change();
+      releaseTaskA();
+      await pending;
+      expect(node('host-task-detail').hidden).toBe(true);
+      expect(node('host-task-list').children).toHaveLength(1);
+      expect(node('host-task-list').children[0].className).not.toContain('host-task-selected');
+      expect(requests.every((item) => item.method === 'GET')).toBe(true);
     });
   }
 });
