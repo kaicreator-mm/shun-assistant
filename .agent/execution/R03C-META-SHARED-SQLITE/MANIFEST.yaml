@@ -1,0 +1,44 @@
+pack_id: shun-v030-r03c-meta-shared-sqlite-local-builder-r1
+task_id: R03C-META-SHARED-SQLITE
+issue: "#285"
+repository: kaicreator-mm/shun-assistant
+version: v0.3.0
+base_sha: be2e81722a70ee3d0bd5634bc83d97d733c20b78
+branch: JIT_only_task/v0.3.0-r03c-meta-shared-sqlite-local-builder-r2
+parent_issue: "#280"
+owner_authorization_ref: "#280 comment 6584396368"
+owner_execution_amendment_ref: "#280 comment 6585799747"
+generated_by: local-agent:shun-v030-r03c
+generated_at: 2026-11-03
+standard_revision: 2c395c55569fe2edf3f4135f12d3d069e526d0b7
+execution_profile: LOCAL_BUILDER
+execution_environment: LOCAL
+admission_mode: SINGLE_WRITER_ADMISSION
+protected_claim_key: "kaicreator-mm/shun-assistant#285:builder:__default__"
+allowed_write_set:
+  - packages/domain-host/src/meta/host-meta-shadow-store.ts
+  - tests/integration/v03/r03c-meta-shared/meta-shared-store.test.ts
+  - tests/integration/v03/r03c-meta-shared/vitest.config.ts
+plan:
+  - "Inspect existing HostMetaShadowStore, schema, receipt and consent currentness APIs; reuse existing SQLite database only."
+  - "Implement privacy-minimized closed-world MetaVerifiedExperience normalization and bounded indexed cross-Case query; source Case is provenance, never an equality gate."
+  - "Make query currentness checks snapshot-consistent; stale receipt, expired/revoked consent and explicit revocation exclude records."
+  - "Preserve advisory-only output; no Permit, grant, approval, policy mutation, auto-execution or Shadow promotion."
+  - "Add cross-Case positive, same-Case, restart durability, stale receipt, revocation, malformed/PII/arbitrary token, oversized input and concurrent read/write tests."
+forbidden:
+  - "new database"
+  - "new Kernel/dispatcher"
+  - "cloud sync"
+  - "raw prompt/file/credential storage"
+  - "absolute paths or secrets"
+  - "policy mutation"
+  - "Permit/grant creation"
+  - "auto-execution"
+  - "Shadow promotion"
+  - "Control API or DomainApp wiring"
+  - "main"
+  - "version/v0.2.0"
+  - "tag/release"
+  - "paid LLM"
+  - "physical Windows effects"
+notes: "Fresh exact-base claim required. Prior invalidated pre-authorization Claims and WIP branches are not admitted delivery. No merge/release authority."
