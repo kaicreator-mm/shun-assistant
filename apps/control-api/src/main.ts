@@ -3,7 +3,6 @@
 // Env:
 //   SHUN_CONTROL_PORT           — port (default 7788)
 //   SHUN_CONTROL_UI_DIR         — static UI directory (default ../control-ui/public)
-import { createHash } from 'node:crypto';
 import { readFileSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -14,7 +13,10 @@ import { DemoShunBackend } from './demo/backend.ts';
 import { RealStorageControlBackend } from './real-storage/backend.ts';
 import { createControlServer } from './server.ts';
 import { provisionGuidedCaseFromHostFile } from './v03/composition-guided.ts';
-import type { JourneyBindingsConfig } from './v03/composition-journeys.ts';
+import {
+  type JourneyBindingsConfig,
+  provisionMetaFromHostFile,
+} from './v03/composition-journeys.ts';
 import { createProductionV03Gateway } from './v03/composition-production.ts';
 
 const here = dirname(fileURLToPath(import.meta.url));
@@ -95,6 +97,8 @@ const metaStore = process.env.SHUN_V03_META_DATABASE
   ? new HostMetaShadowStore(resolve(requiredEnv('SHUN_V03_META_DATABASE')))
   : undefined;
 if (metaStore && process.env.SHUN_V03_META_CASE_FILE) {
+  // Operator-pinned provisioning: one legacy single-record file or one
+  // bounded multi-Case batch file (R03C), hash-pinned, fail-closed.
   provisionMetaFromHostFile({
     store: metaStore,
     file: process.env.SHUN_V03_META_CASE_FILE,
@@ -186,6 +190,7 @@ const handle = createControlServer({
   v03Guided: guided,
   v03Gateway: production?.gateway,
   v03Journeys: production?.journeys,
+  v03ProviderGlobal: production?.providerGlobal,
 });
 const bound = await handle.start();
 console.log(
@@ -246,38 +251,4 @@ function loadProviderJourneyConfig(file: string): JourneyBindingsConfig['provide
     taskId: raw.taskId,
     revocationEpoch: raw.revocationEpoch as number,
   };
-}
-
-/**
- * Operator-pinned meta provisioning: record the genuine outcome receipt and
- * the explicit opt-in consent for ONE Case at boot (trusted process only).
- */
-function provisionMetaFromHostFile(input: {
-  store: HostMetaShadowStore;
-  file: string;
-  sha256: string;
-}): void {
-  const bytes = readFileSync(resolve(input.file));
-  if (createHash('sha256').update(bytes).digest('hex') !== input.sha256) {
-    throw new Error('V03_META_CASE_DIGEST_REFUSED');
-  }
-  const raw = JSON.parse(bytes.toString('utf8')) as Record<string, unknown>;
-  const receipt = raw.receipt as Record<string, unknown> | undefined;
-  const consent = raw.consent as Record<string, unknown> | undefined;
-  if (
-    !receipt ||
-    !consent ||
-    typeof receipt.caseRef !== 'string' ||
-    typeof receipt.revision !== 'string' ||
-    typeof receipt.sha256 !== 'string' ||
-    typeof consent.consentRef !== 'string'
-  ) {
-    throw new Error('V03_META_CASE_INVALID');
-  }
-  input.store.recordOutcomeReceipt({
-    caseRef: receipt.caseRef,
-    revision: receipt.revision,
-    sha256: receipt.sha256,
-  });
-  input.store.recordOptInConsent(consent as never);
 }
