@@ -156,9 +156,13 @@ describe('T11 v0.3 gateway route is wired into the Control API server', () => {
 });
 
 describe('T11 package public entries are side-effect-free controlled exits', () => {
-  it('domain-app exports the T09 composition and gateway adapters', async () => {
+  it('domain-app exports the gateway adapter and keeps the legacy composer internal', async () => {
     const app = await import('../../../../packages/domain-app/src/index.ts');
-    expect(typeof app.composeDomainBuild).toBe('function');
+    // Generation-2 (#303): the legacy T09 structural BUILD preview composer is
+    // @internal test-preview-only and must NOT leak through the public
+    // @shun/domain-app package root; production uses composeTrustedRuntimeBuild
+    // plus the real DomainHarness v0.10.3 buildV10App/activateV10App chain.
+    expect('composeDomainBuild' in app).toBe(false);
     expect(typeof app.createControlApiGateway).toBe('function');
     expect(app.V03_TRUSTED_CLOUD_INTERPRETER_PORT).toBe('shun.trusted-cloud-interpreter.v03');
     expect(app.V03_EXTERNAL_IMPORT_BINDINGS).toEqual({

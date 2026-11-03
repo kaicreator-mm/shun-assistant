@@ -415,7 +415,11 @@ describe('V01 production build surface', () => {
 describe('V01 public interface anchoring and real consumer composition', () => {
   it('anchors the three controlled Shun package entries plus the B-040 public surface', async () => {
     const app = await import('../../../../packages/domain-app/src/index.ts');
-    expect(typeof app.composeDomainBuild).toBe('function');
+    // Generation-2 (#303): the legacy T09 structural BUILD preview composer is
+    // @internal test-preview-only and must NOT leak through the public
+    // @shun/domain-app package root; production uses composeTrustedRuntimeBuild
+    // plus the real DomainHarness v0.10.3 buildV10App/activateV10App chain.
+    expect('composeDomainBuild' in app).toBe(false);
     expect(typeof app.createControlApiGateway).toBe('function');
     expect(app.V03_TRUSTED_CLOUD_INTERPRETER_PORT).toBe('shun.trusted-cloud-interpreter.v03');
     expect(app.V03_EXTERNAL_IMPORT_BINDINGS).toEqual({
@@ -464,7 +468,7 @@ describe('V01 public interface anchoring and real consumer composition', () => {
     expect(typeof support.SupportContextResultSchema.safeParse).toBe('function');
 
     results.publicInterface.anchoredPackages = [
-      { package: '@shun/domain-app', anchored: ['composeDomainBuild', 'createControlApiGateway'] },
+      { package: '@shun/domain-app', anchored: ['createControlApiGateway'] },
       { package: '@shun/domain-computer', anchored: ['13 merged task adapter factories'] },
       { package: '@shun/domain-host', anchored: ['T01/T04/T08 Host seams'] },
       { package: '@shun/vertical-support', anchored: ['B-040 minimize/collect/schema'] },
