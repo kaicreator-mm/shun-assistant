@@ -1,0 +1,50 @@
+pack_id: shun-v030-r03c-provider-signed-privilege-host-enforcement-local-builder-r1
+task_id: R03C-PROVIDER-SIGNED-PRIVILEGE-HOST-ENFORCEMENT
+issue: "#287"
+repository: kaicreator-mm/shun-assistant
+version: v0.3.0
+parent_issue: "#280"
+owner_authorization_ref: "#280 comment 6584396368"
+owner_execution_amendment_ref: "#280 comment 6585799747"
+architecture_plan_ref: "#305"
+standard_revision: 2c395c55569fe2edf3f4135f12d3d069e526d0b7
+execution_profile: LOCAL_BUILDER
+execution_environment: LOCAL
+source_base_sha: 2f4ca411e21f62e1cb9df0659cb8d4c137256825
+source_base_tree: 6735a7365d21ab9bb1396db298fb504ff5b39323
+branch: JIT_only_task/v0.3.0-r03c-provider-signed-privilege-host-enforcement-r1
+execution_pack_path: .agent/execution/R03C-PROVIDER-SIGNED-PRIVILEGE-HOST-ENFORCEMENT/MANIFEST.yaml
+protected_claim_key: "kaicreator-mm/shun-assistant#287:builder:__default__"
+admission_mode: SINGLE_WRITER_ADMISSION
+admission_generation: 4
+repair_findings:
+  - "#287 comment 6600862035 R03C-PROVIDER-P1-HOST-PRIVILEGE-OVERRIDE"
+allowed_write_set:
+  - packages/domain-host/src/provider/provider-host-binding.ts
+  - packages/domain-host/src/provider/provider-first-use-ledger.ts
+  - packages/domain-host/src/windows/effect-host-binding.ts
+  - tests/integration/v03/r03c-provider-global/provider-host-global.test.ts
+  - tests/integration/v03/r03c-provider-global/vitest.config.ts
+  - docs/implementation/v0.3/r03c-provider-global/PROVIDER_HOST_GLOBAL.md
+plan:
+  - "Enforce the verified curator-signed artifact.requiredPrivilege at the Host binding boundary; omitted means USER."
+  - "Reject config.elevatedAction when the verified descriptor requires USER, including legacy descriptors where requiredPrivilege is omitted."
+  - "For a signed ELEVATED descriptor, require artifactKind CLI and the exact pre-provisioned provider-global installer action with current grant, plan, authority and pre-existing ProgramPin; do not let Host config upgrade or downgrade the signed requirement."
+  - "Preserve the existing privileged Windows backend and one-shot UAC relay. Do not create another RunAs helper, installer, dispatcher, Kernel or authority store."
+  - "Add regression coverage for USER/no elevated action, USER+elevated action refusal, omitted privilege+elevated action refusal, signed ELEVATED CLI without exact authority refusal, signed ELEVATED CLI with exact authority acceptance, signature tampering and NATIVE_ADDON+ELEVATED refusal."
+  - "Preserve requestRef-only K input, one-shot request state machine, closed-world preview/receipt schemas, sanitized Provider output and all generation-3 privacy repairs."
+  - "No real UAC prompt, Provider installer execution or persistent Windows effect; tests use injected fakes and existing read-only validation boundaries."
+pre_ci:
+  - "Run node scripts/v03-ci/preflight-ui-syntax.mjs on the exact changed tree using Node 24 before any source-changing CI."
+  - "Run scoped strict TypeScript, lint, typecheck and the r03c-provider-global integration suite."
+  - "Run existing r02-v-journeys and r02-e-production regressions."
+  - "Record Node/pnpm versions, exact commands, exit codes, changed-file/write-set comparison, exact HEAD/tree and Woodpecker Build IDs/results."
+forbidden:
+  - "any path outside the six-path allowed_write_set"
+  - "changes to #289 signed artifact contract or DomainHarness SDK"
+  - "Host configuration overriding artifact.requiredPrivilege"
+  - "second Kernel, dispatcher, database, RunAs helper or installer"
+  - "real UAC prompt, actual Provider installation or persistent Windows effect"
+  - "main, version/v0.2.0, merge, tag or release"
+  - "paid LLM, cloud sync or external data disclosure"
+notes: "Generation 4 repairs the confirmed Host enforcement gap discovered after generation-3 delivery 2f4ca411e21f62e1cb9df0659cb8d4c137256825. Generation-3 CI remains valid for its own exact SHA but does not qualify this finding. Fresh generation-4 CAS Claim must bind this exact pack-only commit after pack CI and dependency/currentness checks. #287 remains blocked by #289; no source edits before accepted Claim."
