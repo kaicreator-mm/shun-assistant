@@ -752,6 +752,8 @@ describe('R03C Host-global Provider first-use (requestRef-only, Case-free)', () 
     const artifactSha256 = sha256(ARTIFACT_BYTES);
     const trust = providerScope(artifactSha256);
     const { specs } = capturePort('');
+    // Generation 4: the descriptor itself is curator-signed ELEVATED (#289
+    // contract); the Host config only pins the exact pre-provisioned action.
     binding.installTrustedProviderBinding({
       cacheRoot,
       roots: [
@@ -761,7 +763,7 @@ describe('R03C Host-global Provider first-use (requestRef-only, Case-free)', () 
         },
       ],
       scopes: [trust],
-      descriptor: makeDescriptor(trust),
+      descriptor: makeDescriptor(trust, { requiredPrivilege: 'ELEVATED' }),
       revocationEpoch: 1,
       hostFacts: { platform: 'win32', architecture: 'x64', nodeAbi: '137' },
       fetchArtifact: (async () => new Response(ARTIFACT_BYTES, { status: 200 })) as typeof fetch,
@@ -843,12 +845,13 @@ describe('R03C Host-global Provider first-use (requestRef-only, Case-free)', () 
         },
       ],
       scopes: [trust],
-      descriptor: makeDescriptor(trust),
+      // Signed ELEVATED descriptor; the pinned plan reference is drifted, so
+      // the preview must refuse before anything runs.
+      descriptor: makeDescriptor(trust, { requiredPrivilege: 'ELEVATED' }),
       revocationEpoch: 1,
       hostFacts: { platform: 'win32', architecture: 'x64', nodeAbi: '137' },
       fetchArtifact: (async () => new Response(ARTIFACT_BYTES, { status: 200 })) as typeof fetch,
       process: capturePort('').port,
-      // Drifted plan reference: the preview must refuse before anything runs.
       elevatedAction: {
         actionRef: provisioned.actionId,
         planRef: 'f'.repeat(64),
@@ -860,8 +863,9 @@ describe('R03C Host-global Provider first-use (requestRef-only, Case-free)', () 
     expect(drifted).toMatchObject({ ok: false, code: 'PROVIDER_ELEVATION_PREVIEW_UNAVAILABLE' });
     expect(specs.length).toBe(0);
 
-    // A native addon is never elevated: the operator configuration is
-    // refused outright for non-CLI artifacts.
+    // Generation 4: a native addon descriptor signed USER (omitted privilege)
+    // is refused outright when Host config tries to pin an elevated action —
+    // the signed descriptor wins over Host configuration.
     vi.resetModules();
     const native = await freshHost();
     const nativeTrust = providerScope(sha256(ARTIFACT_BYTES));
@@ -888,7 +892,148 @@ describe('R03C Host-global Provider first-use (requestRef-only, Case-free)', () 
           taskId: 'provider-global',
         },
       }),
-    ).toThrow('PROVIDER_HOST_ELEVATION_CLI_ONLY');
+    ).toThrow('PROVIDER_HOST_ELEVATION_SIGNED_USER');
+  });
+
+  it('generation-4 signed-privilege enforcement: Host config cannot override the signed descriptor', async () => {
+    // Each install needs a fresh module (the binding is a per-module
+    // singleton). The elevatedAction reference itself is only stored at
+    // install time — grant/plan/ProgramPin resolution happens at prepare —
+    // so install-time refusals can use a structurally valid dummy reference.
+    const dummyAction = {
+      actionRef: 'act-install-rg',
+      planRef: A64,
+      grantRef: 'grant-dummy',
+      taskId: 'provider-global',
+    };
+    const installExpectingThrow = async (
+      name: string,
+      descriptorOverrides: Record<string, unknown>,
+      elevatedAction?: typeof dummyAction,
+    ): Promise<string> => {
+      const { binding } = await freshHost();
+      const trust = providerScope(sha256(ARTIFACT_BYTES));
+      try {
+        binding.installTrustedProviderBinding({
+          cacheRoot: newDir(`${name}-cache`),
+          roots: [
+            {
+              keyId: 'key-1',
+              publicKeyPem: keyPair.publicKey.export({ type: 'spki', format: 'pem' }).toString(),
+            },
+          ],
+          scopes: [trust],
+          descriptor: makeDescriptor(trust, descriptorOverrides),
+          revocationEpoch: 1,
+          hostFacts: { platform: 'win32', architecture: 'x64', nodeAbi: '137' },
+          fetchArtifact: (async () =>
+            new Response(ARTIFACT_BYTES, { status: 200 })) as typeof fetch,
+          ...(elevatedAction !== undefined ? { elevatedAction } : {}),
+        });
+        throw new Error('EXPECTED_INSTALL_REFUSAL_BUT_INSTALLED');
+      } catch (error) {
+        return error instanceof Error ? error.message : 'unknown';
+      }
+    };
+
+    // USER-signed descriptor + Host elevated action: refused (signed wins).
+    expect(await installExpectingThrow('g4-user-literal', { requiredPrivilege: 'USER' }, dummyAction)).toMatch(
+      /PROVIDER_HOST_ELEVATION_SIGNED_USER/,
+    );
+    // Omitted privilege (legacy descriptor) + Host elevated action: refused.
+    expect(await installExpectingThrow('g4-omitted', {}, dummyAction)).toMatch(
+      /PROVIDER_HOST_ELEVATION_SIGNED_USER/,
+    );
+    // Signed ELEVATED CLI descriptor without the pinned Host action: refused.
+    expect(
+      await installExpectingThrow('g4-elevated-no-action', { requiredPrivilege: 'ELEVATED' }),
+    ).toMatch(/PROVIDER_HOST_ELEVATION_ACTION_REQUIRED/);
+    // USER↔ELEVATED tampering after signing fails curator verification, so
+    // the binding refuses the descriptor outright (never installs).
+    const trust = providerScope(sha256(ARTIFACT_BYTES));
+    const signedUser = makeDescriptor(trust);
+    const { binding: tamperedUp } = await freshHost();
+    expect(() =>
+      tamperedUp.installTrustedProviderBinding({
+        cacheRoot: newDir('g4-tamper-up-cache'),
+        roots: [
+          {
+            keyId: 'key-1',
+            publicKeyPem: keyPair.publicKey.export({ type: 'spki', format: 'pem' }).toString(),
+          },
+        ],
+        scopes: [trust],
+        descriptor: { ...signedUser, requiredPrivilege: 'ELEVATED' },
+        revocationEpoch: 1,
+        hostFacts: { platform: 'win32', architecture: 'x64', nodeAbi: '137' },
+        fetchArtifact: (async () => new Response(ARTIFACT_BYTES, { status: 200 })) as typeof fetch,
+        elevatedAction: dummyAction,
+      }),
+    ).toThrow(/PROVIDER_HOST_DESCRIPTOR_UNTRUSTED:CATALOG_SIGNATURE_INVALID/);
+    const signedElevated = makeDescriptor(trust, { requiredPrivilege: 'ELEVATED' });
+    const { binding: tamperedDown } = await freshHost();
+    expect(() =>
+      tamperedDown.installTrustedProviderBinding({
+        cacheRoot: newDir('g4-tamper-down-cache'),
+        roots: [
+          {
+            keyId: 'key-1',
+            publicKeyPem: keyPair.publicKey.export({ type: 'spki', format: 'pem' }).toString(),
+          },
+        ],
+        scopes: [trust],
+        descriptor: { ...signedElevated, requiredPrivilege: 'USER' },
+        revocationEpoch: 1,
+        hostFacts: { platform: 'win32', architecture: 'x64', nodeAbi: '137' },
+        fetchArtifact: (async () => new Response(ARTIFACT_BYTES, { status: 200 })) as typeof fetch,
+      }),
+    ).toThrow(/PROVIDER_HOST_DESCRIPTOR_UNTRUSTED:CATALOG_SIGNATURE_INVALID/);
+    // NATIVE_ADDON + ELEVATED: the #289 strict signed schema refuses the
+    // descriptor before any signature work (ELEVATED is CLI-only there).
+    const nativeTrust = providerScope(sha256(ARTIFACT_BYTES));
+    nativeTrust.artifactKind = 'NATIVE_ADDON';
+    nativeTrust.abiRevision = '137';
+    const { binding: nativeElevated } = await freshHost();
+    expect(() =>
+      nativeElevated.installTrustedProviderBinding({
+        cacheRoot: newDir('g4-native-elevated-cache'),
+        roots: [
+          {
+            keyId: 'key-1',
+            publicKeyPem: keyPair.publicKey.export({ type: 'spki', format: 'pem' }).toString(),
+          },
+        ],
+        scopes: [nativeTrust],
+        descriptor: makeDescriptor(nativeTrust, {
+          artifactKind: 'NATIVE_ADDON',
+          abiRevision: '137',
+          entrypoint: 'addon.node',
+          requiredPrivilege: 'ELEVATED',
+        }),
+        revocationEpoch: 1,
+        hostFacts: { platform: 'win32', architecture: 'x64', nodeAbi: '137' },
+        fetchArtifact: (async () => new Response(ARTIFACT_BYTES, { status: 200 })) as typeof fetch,
+        elevatedAction: dummyAction,
+      }),
+    ).toThrow(/PROVIDER_HOST_DESCRIPTOR_UNTRUSTED:CATALOG_UNTRUSTED/);
+    // Positive control: signed ELEVATED CLI + pinned action installs ELEVATED.
+    const { binding: accepted } = await freshHost();
+    accepted.installTrustedProviderBinding({
+      cacheRoot: newDir('g4-accepted-cache'),
+      roots: [
+        {
+          keyId: 'key-1',
+          publicKeyPem: keyPair.publicKey.export({ type: 'spki', format: 'pem' }).toString(),
+        },
+      ],
+      scopes: [trust],
+      descriptor: makeDescriptor(trust, { requiredPrivilege: 'ELEVATED' }),
+      revocationEpoch: 1,
+      hostFacts: { platform: 'win32', architecture: 'x64', nodeAbi: '137' },
+      fetchArtifact: (async () => new Response(ARTIFACT_BYTES, { status: 200 })) as typeof fetch,
+      elevatedAction: dummyAction,
+    });
+    expect(accepted.trustedProviderBindingStatus()).toMatchObject({ privilegeScope: 'ELEVATED' });
   });
 });
 

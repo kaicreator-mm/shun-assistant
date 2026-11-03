@@ -8,8 +8,10 @@
  * a currently selected Guided Case. The K capability input carries ONLY a
  * Host-issued requestRef; the durable two-step request ledger
  * (provider-first-use-ledger.ts) owns PREPARED → APPROVED → RUNNING →
- * terminal/UNKNOWN transitions. USER-privilege providers run the unprivileged
- * activation path; an operator-pinned ELEVATED configuration is served only
+ * terminal/UNKNOWN transitions. Privilege is derived from the VERIFIED
+ * curator-signed `artifact.requiredPrivilege` (#289 contract), never from
+ * Host configuration: omitted means USER, and Host config can never upgrade
+ * a USER/omitted descriptor. A signed ELEVATED descriptor is served only
  * through the existing privileged one-shot UAC backend
  * (effect-host-binding.ts) with the ONE pre-provisioned exact installer
  * action in the authority store — never a model-selected or caller-supplied
@@ -63,13 +65,15 @@ export interface TrustedProviderBindingConfig {
   /** Pinned revocation epoch the chain requires. */
   readonly revocationEpoch: number;
   /**
-   * Operator-pinned declaration that this provider's installer requires
-   * elevation: a reference to the ONE pre-provisioned `provider-global`
+   * Operator-pinned reference to the ONE pre-provisioned `provider-global`
    * `windows.proc.exec` installer action in the existing authority store.
-   * Present = ELEVATED (CLI artifacts only); absent = USER. Prepare refuses
-   * every request unless the referenced action resolves with current
-   * grant/plan/authority and a pre-existing ProgramPin check inside the
-   * existing privileged backend.
+   * It is consulted ONLY when the verified curator-signed descriptor
+   * requires ELEVATED (#289 `artifact.requiredPrivilege`); it MUST be absent
+   * for USER/omitted descriptors — Host configuration can never upgrade a
+   * signed USER requirement (generation-4 repair, #287 comment 6600862035).
+   * For a signed ELEVATED descriptor, prepare() refuses every request unless
+   * the referenced action resolves with current grant/plan/authority and a
+   * pre-existing ProgramPin check inside the existing privileged backend.
    */
   readonly elevatedAction?: TrustedElevatedActionRef;
   /** Trusted-process seam override (tests); defaults to the real artifact fetch. */
@@ -125,20 +129,31 @@ export function installTrustedProviderBinding(config: TrustedProviderBindingConf
   const proof = verifier.verify(config.descriptor);
   if (!proof.ok) throw new Error(`PROVIDER_HOST_DESCRIPTOR_UNTRUSTED:${proof.code}`);
   const artifact = proof.artifact;
-  // The privilege scope is operator-pinned host configuration, gated on the
-  // ONE pre-provisioned `provider-global` installer action in the existing
-  // authority store: prepare() refuses every request unless that exact
-  // action resolves with current grant/plan/authority. No model- or
-  // caller-selected privilege exists; a native addon is never elevated.
-  const privilegeScope: ProviderPrivilegeScope =
-    config.elevatedAction !== undefined ? 'ELEVATED' : 'USER';
+  // Generation-4 repair (R03C-PROVIDER-P1-HOST-PRIVILEGE-OVERRIDE, #287
+  // comment 6600862035): the privilege scope is derived from the VERIFIED
+  // curator-signed artifact.requiredPrivilege (#289 contract), never from
+  // the presence of Host config. Omitted means USER. Host configuration may
+  // pin the exact pre-provisioned installer action but can never upgrade a
+  // USER/omitted descriptor to ELEVATED, nor downgrade a signed ELEVATED
+  // descriptor to USER. No model- or caller-selected privilege exists; a
+  // native addon is never elevated (the #289 schema already refuses
+  // NATIVE_ADDON+ELEVATED descriptors; the CLI-only check below stays as
+  // defense in depth).
+  const signedRequiredPrivilege: ProviderPrivilegeScope =
+    artifact.requiredPrivilege === 'ELEVATED' ? 'ELEVATED' : 'USER';
   let elevatedActionRef: TrustedElevatedActionRef | undefined;
-  if (privilegeScope === 'ELEVATED') {
+  if (signedRequiredPrivilege === 'ELEVATED') {
     if (artifact.artifactKind !== 'CLI') {
       throw new Error('PROVIDER_HOST_ELEVATION_CLI_ONLY');
     }
+    if (config.elevatedAction === undefined) {
+      throw new Error('PROVIDER_HOST_ELEVATION_ACTION_REQUIRED');
+    }
     elevatedActionRef = config.elevatedAction;
+  } else if (config.elevatedAction !== undefined) {
+    throw new Error('PROVIDER_HOST_ELEVATION_SIGNED_USER');
   }
+  const privilegeScope: ProviderPrivilegeScope = signedRequiredPrivilege;
   const stager = new CuratedProviderStager({
     cacheRoot: config.cacheRoot,
     verifier,
