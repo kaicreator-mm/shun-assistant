@@ -1,5 +1,16 @@
 /**
- * T09 — v0.3 single-domain BUILD composition adapter.
+ * T09 — v0.3 legacy structural BUILD preview composer.
+ *
+ * @internal
+ * @deprecated Test-preview-only. NOT part of the public @shun/domain-app
+ * package ABI and never a production BUILD entry. Do not route production
+ * activation through this composer: its sealed types below are structural
+ * mirrors of the old v0.10.2-rc.0 BUILD input contract and its module bytes
+ * are placeholders that mint no authority. Production uses
+ * composeTrustedRuntimeBuild plus the real public DomainHarness v0.10.3
+ * buildV10App/activateV10App chain (R03C, Owner decision #280 comment
+ * 6596114371; see #303). This file stays only as direct internal test
+ * coverage for the deterministic composition helper.
  *
  * Maps the controlled Shun module whitelist (selected K/S/B/C) onto plain-data
  * BUILD inputs for the real public DomainHarness `buildV10App` SDK (consumed
