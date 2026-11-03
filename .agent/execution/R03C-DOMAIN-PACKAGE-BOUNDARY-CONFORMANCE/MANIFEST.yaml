@@ -1,4 +1,4 @@
-pack_id: shun-v030-r03c-domain-package-boundary-conformance-local-builder-r2
+pack_id: shun-v030-r03c-domain-package-boundary-conformance-r3
 task_id: R03C-DOMAIN-PACKAGE-BOUNDARY-CONFORMANCE
 issue: "#303"
 parent_issue: "#280"
@@ -7,19 +7,21 @@ target_version: v0.3.0
 owner_authorization_ref: "#280 comment 6596114371"
 owner_write_set_amendment_ref: "#303 comment 6603290369"
 owner_scope_clarification_ref: "#303 comment 6603971265"
-execution_profile: LOCAL_BUILDER
-execution_environment: LOCAL
+architecture_plan_ref: "#305"
 standard_revision: 2c395c55569fe2edf3f4135f12d3d069e526d0b7
-source_base_sha: be2e81722a70ee3d0bd5634bc83d97d733c20b78
-source_base_tree: 8d6d6ee5fc4277e6b0b64b2d22e6f66575fe2889
+execution_profile: WEB_BUILDER_WITH_LOCAL_VALIDATION
+execution_environment: WEB_SOURCE_LOCAL_PREFLIGHT
+source_base_sha: 835d7fd0f30c6a4593712d34aea7fb4b555e9ea3
+source_base_tree: da6eed2fd8b636298c9fcaa644f3da7d2ba3b8bc
 prior_generation_pack_sha: ad327e8dc64e12a4627e8affc79359ccfe3eac24
-prior_generation_pack_tree: a74e22327655f2959ec60650564276a9be7d9845
-prior_local_implementation_head: 7d978f6
-branch: JIT_only_task/v0.3.0-r03c-domain-package-boundary-conformance-r2
+superseded_generation_2_claim_sha: 1ab7bb4d915386fed64921e6051364ee46a35a2b
+branch: JIT_only_task/v0.3.0-r03c-domain-package-boundary-conformance-r3
 execution_pack_path: .agent/execution/R03C-DOMAIN-PACKAGE-BOUNDARY-CONFORMANCE/MANIFEST.yaml
 protected_claim_key: "kaicreator-mm/shun-assistant#303:builder:__default__"
 admission_mode: SINGLE_WRITER_ADMISSION
-admission_generation: 2
+admission_generation: 3
+repair_findings:
+  - "#303 comment 6605196896 generation-2 Claim ancestry mismatch and t12 metadata omission"
 allowed_write_set:
   - packages/domain-app/src/index.ts
   - packages/domain-app/src/build/composition.ts
@@ -27,28 +29,25 @@ allowed_write_set:
   - tests/integration/v03/t11-runtime/server-v03-gateway.test.ts
   - tests/integration/v03/t12-qualification/qualification.test.ts
 plan:
-  - "Remove the legacy build/composition.ts preview composer from the public @shun/domain-app root export."
-  - "Mark composeDomainBuild and its structural v0.10.2-rc.0 mirrors as internal/test-preview-only; explicitly prohibit production activation from consuming placeholder K/S module bytes."
-  - "Keep direct-source tests as legacy preview coverage and prove the public package root does not export composeDomainBuild."
-  - "Verify production still uses composeTrustedRuntimeBuild and the real public DomainHarness v0.10.3 buildV10App/activateV10App consumer path."
-  - "Re-anchor only the stale V01 public-root assertions in t11-runtime/server-v03-gateway.test.ts and t12-qualification/qualification.test.ts: assert composeDomainBuild is absent from @shun/domain-app; preserve all gateway/port pins, SDK consumer checks, runtime coverage and all other V01 assertions."
-  - "In t12-qualification/qualification.test.ts, remove only composeDomainBuild from results.publicInterface.anchoredPackages because it is no longer a public-root export; preserve createControlApiGateway and every other report field."
-  - "Do not change production route/activation, Host bindings, Kernel, SDK, ABI, or any of #288's 12 integration paths."
+  - "Reapply the five verified generation-2 source files from PR #311 onto this exact generation-3 pack parent; do not preserve the old generation-2 source ancestry."
+  - "Keep the legacy structural preview composer removed from the public @shun/domain-app root; retain selective public exports for the trusted Control API port pins."
+  - "Keep composeDomainBuild marked internal/test-preview-only; production remains composeTrustedRuntimeBuild plus DomainHarness v0.10.3 buildV10App/activateV10App."
+  - "Keep t09 public-root regression and the t11/t12 V01 assertion re-anchors: composeDomainBuild must be absent; preserve gateway/port pins, SDK consumer checks and all other V01 coverage."
+  - "In tests/integration/v03/t12-qualification/qualification.test.ts, remove only composeDomainBuild from results.publicInterface.anchoredPackages; preserve createControlApiGateway and every other report field."
+  - "No production route/activation, Host, Kernel, SDK, ABI or #288 integration write-set changes."
 pre_ci:
-  - "Run exact-tree Windows Node 24 syntax preflight before every source-changing CI."
-  - "Run scoped lint and typecheck."
-  - "Run T09 composition and R02-A production activation suites."
-  - "Run focused t11-runtime and t12-qualification suites."
-  - "Run the full tests/integration/run-tests.mjs task-check; require all 24 suites green."
-  - "Record Node/pnpm versions, exact commands, exit codes, changed-file/write-set comparison, exact HEAD/tree and Woodpecker Build IDs/results."
+  - "Run Node 24.21.0 node scripts/v03-ci/preflight-ui-syntax.mjs against the exact changed tree before any source CI."
+  - "Run scoped lint/typecheck, T09 composition and R02-A production activation tests."
+  - "Run focused t11-runtime and t12-qualification suites, then full tools/task-check.sh and require all 24 integration suites green."
+  - "Record Node/pnpm versions, exact commands, exit codes, changed-file/write-set comparison, exact HEAD/tree and Woodpecker Push/PR Build IDs/results."
 forbidden:
   - "any path outside the exact five-path allowed_write_set"
   - "any additional production source path"
   - "DomainHarness SDK, Runtime, Kernel, ABI, package tarball or v0.10.3 tag changes"
   - "production BUILD route/activation/Host implementation changes"
-  - "any #288 integration write-set change"
+  - "any #288 12-path Integrator write-set change"
   - "main or version/v0.2.0"
   - "merge, tag or release"
   - "real Provider installation, UAC prompt or persistent Windows effect"
   - "paid LLM calls"
-notes: "Generation 2 is the Owner-approved two-test-only expansion of generation 1. Reuse local gen1 implementation only after the local agent verifies exact parent ad327e8 and the original three-path diff. The two added files may change only the stale composeDomainBuild public-root expectation, plus the separately Owner-approved removal of composeDomainBuild from t12 results.publicInterface.anchoredPackages (same file, no new path). Preserve createControlApiGateway and all other V01 evidence. This manifest was amended before generation-2 Claim acceptance to include the Owner scope clarification. Pack-only CI and a fresh generation-2 CAS Claim bound to the final exact pack commit are mandatory before further source writes. #303 remains a native blocker of #288; #288 write set is unchanged."
+notes: "Generation-2 Claim #303 comment 6604328035 was bound to 1ab7bb4d915386fed64921e6051364ee46a35a2b and is superseded because the Owner-approved scope clarification was committed in pack 835d7fd0f30c6a4593712d34aea7fb4b555e9ea3. The prior delivery PR #311 is useful source reference only: its implementation parent is 1ab7bb4d, it diverges from 835d7fd, and it left the Owner-approved t12 anchoredPackages evidence stale. Generation 3 must be claimed against this exact pack commit and source commits must descend from it. Pack-only CI Push+PR must pass before fresh CAS Claim. The t12 same-file metadata correction is explicitly approved by Owner comment 6603971265; no new path or production expansion."
