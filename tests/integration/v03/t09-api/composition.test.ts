@@ -386,6 +386,29 @@ describe('real public SDK buildV10App over the composed selection', () => {
   });
 });
 
+// ---- Public package-root boundary (R03C #303): the legacy preview composer
+// must NOT leak through the public @shun/domain-app ABI. Direct internal
+// coverage above is the only supported way to reach composeDomainBuild.
+
+describe('public package-root boundary (#303)', () => {
+  it('the public @shun/domain-app root does not export the legacy preview composer', async () => {
+    const app = (await import('../../../../packages/domain-app/src/index.ts')) as Record<
+      string,
+      unknown
+    >;
+    expect('composeDomainBuild' in app).toBe(false);
+    expect(app.composeDomainBuild).toBeUndefined();
+    // The trusted Control API gateway remains the intended public surface.
+    expect(typeof app.createControlApiGateway).toBe('function');
+  });
+
+  it('the preview composer stays reachable only as direct internal-source coverage', async () => {
+    // Direct import keeps the deterministic helper tested without making it a
+    // public Package ABI entry; production never routes through it.
+    expect(typeof composeDomainBuild).toBe('function');
+  });
+});
+
 // ---- Source identity: the adapter never imports the SDK privately ----
 
 /** Import positions only: static/dynamic import specifiers in a TS source. */
