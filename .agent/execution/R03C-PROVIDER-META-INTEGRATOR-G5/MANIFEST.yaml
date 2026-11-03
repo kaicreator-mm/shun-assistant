@@ -1,0 +1,123 @@
+pack_id: shun-v030-r03c-provider-meta-integrator-g5
+task_id: R03C-PROVIDER-META-PRODUCTION-INTEGRATOR
+issue: "#288"
+repository: kaicreator-mm/shun-assistant
+version: v0.3.0
+parent_issue: "#280"
+standard_revision: 2c395c55569fe2edf3f4135f12d3d069e526d0b7
+admission_generation: 5
+admission_mode: SINGLE_WRITER_ADMISSION
+protected_claim_key: "kaicreator-mm/shun-assistant#288:builder:__default__"
+execution_profile: LOCAL_BUILDER
+execution_environment: LOCAL
+owner_authorization_refs:
+  - "#280 comment 6584396368 OWNER_SHUN_V030_R03C_SOURCE_IMPLEMENTATION_APPROVE"
+  - "#280 comment 6585799747 OWNER_SHUN_V030_R03C_LOCAL_BUILDER_EXECUTION_AMENDMENT"
+  - "#280 comment 6596114371 OWNER_DOMAIN_PACKAGE_BOUNDARY_CONFORMANCE"
+  - "#288 comment 6612240741 OWNER_SHUN_V030_R03C_G3_HOST_ATOMIC_BATCH_APPROVE"
+  - "#288 comment 6613663173 R1_BLOCK_CONSENT_REPLAY_REPAIR_WITHIN_SAME_13_PATH_SCOPE"
+  - "#288 comment 6615667417 OWNER_SHUN_V030_R03C_G4_INTEGRATION_ADMISSION"
+  - "#288 comment 6616096625 OWNER_ADMISSION_READBACK_AND_BASELINE_VERIFICATION"
+source_base:
+  sha: 85150b55a05986203d2600324684fe6e2158af97
+  tree: 8b34b166d0508802386ddf7889e1977f8b5ade5a
+  branch: JIT_only_task/v0.3.0-r03c-provider-meta-combined-baseline-r1
+pack_branch: JIT_only_task/v0.3.0-r03c-provider-meta-integrator-pack-g5
+jit_branch: JIT_only_task/v0.3.0-r03c-provider-meta-integrator-local-g5
+execution_pack_path: .agent/execution/R03C-PROVIDER-META-INTEGRATOR-G5/MANIFEST.yaml
+source_input:
+  pr: "#322"
+  exact_head: c16028da83e2930f60470b1b68a376a609e8e99c
+  exact_tree: ed9c6e02ad0ec3525161b6c9359314dcf89f256c
+  exact_parent: de2747830f6ac3820b22d111857e11665673c141
+  compare_from_source_base:
+    ahead_by: 4
+    behind_by: 0
+    changed_paths: 12
+  purpose: "Owner-approved Generation-4 R03C integration source input; re-deliver its source diff against the exact combined predecessor baseline without merging PR #322 or any predecessor PR."
+predecessor_inputs:
+  - issue: "#285"
+    pr: "#300"
+    exact_head: 542066dbe3330f716f2fa466b21cadf3c8dc0808
+    exact_tree: 648cd5fa8d37e17369eb9982e15d3d4ceadc9a32
+    owner_disposition: "#285 comment 6606582584"
+    woodpecker: ["#219 SUCCESS", "#220 SUCCESS"]
+    github_actions: "executor-windows/contracts SUCCESS"
+  - issue: "#287"
+    pr: "#310"
+    exact_head: 01e70c4637bf8d88440c51e386ff10e1ff27f480
+    exact_tree: 029214f65d765ca329a7ad84ffab7a45c469214b
+    owner_disposition: "#287 comment 6606585120"
+    woodpecker: ["#242 SUCCESS", "#239 SUCCESS"]
+    github_actions: "executor-windows/contracts SUCCESS"
+  - issue: "#289"
+    pr: "#301"
+    exact_head: 593140928caf5a797abb89d799799fc54796a3aa
+    exact_tree: e3a01664dbffced6a9e7f55035672912a29e1259
+    owner_disposition: "#289 comment 6606587898"
+    woodpecker: ["#201 SUCCESS", "#203 SUCCESS"]
+    github_actions: "contracts SUCCESS; executor-windows unrelated 60s timeout explicitly accepted as residual at #289 comment 6606130965"
+  - issue: "#303"
+    pr: "#314"
+    exact_head: e3db43afdf6987faec9d5f1f52e22ac2415c2c9c
+    exact_tree: ff0ef4b16824313cb213e37d71a8d5c855e94e1c
+    owner_disposition: "#303 comment 6606590469"
+    woodpecker: ["#250 SUCCESS", "#251 SUCCESS"]
+    github_actions: "contracts/executor-windows SUCCESS"
+native_dependencies:
+  issue_288_blocked_by: ["#285", "#287", "#289", "#303"]
+  issue_287_blocked_by: ["#289"]
+  verified_by: "GitHub REST GET /issues/288/dependencies/blocked_by and /issues/287/dependencies/blocked_by on 2026-11-04"
+combined_baseline:
+  sha: 85150b55a05986203d2600324684fe6e2158af97
+  tree: 8b34b166d0508802386ddf7889e1977f8b5ade5a
+  parents:
+    - be2e81722a70ee3d0bd5634bc83d97d733c20b78
+    - 542066dbe3330f716f2fa466b21cadf3c8dc0808
+    - 01e70c4637bf8d88440c51e386ff10e1ff27f480
+    - e3db43afdf6987faec9d5f1f52e22ac2415c2c9c
+  signed_privilege_ancestor:
+    sha: 593140928caf5a797abb89d799799fc54796a3aa
+    included_through: 01e70c4637bf8d88440c51e386ff10e1ff27f480
+allowed_write_set:
+  - apps/control-api/src/main.ts
+  - apps/control-api/src/server.ts
+  - apps/control-api/src/v03/composition-journeys.ts
+  - apps/control-api/src/v03/composition-production.ts
+  - packages/domain-app/src/activation/modules/business-provider.mjs
+  - packages/domain-app/src/activation/modules/capability-provider.mjs
+  - packages/domain-app/src/activation/modules/business-meta-memory.mjs
+  - packages/domain-app/src/activation/modules/capability-meta-memory.mjs
+  - tests/integration/v03/r03c-provider-global/provider-global-route.test.ts
+  - tests/integration/v03/r03c-meta-shared/meta-shared-production.test.ts
+  - tests/integration/v03/r02-a-build/ensure-consumer.mjs
+  - docs/implementation/v0.3/r03c-production/PRODUCTION_WIRING.md
+  - packages/domain-host/src/meta/host-meta-shadow-store.ts
+source_delivery_contract:
+  - "Create a fresh LOCAL_BUILDER CAS Claim generation 5 against this pack before any source edit."
+  - "Create the source JIT branch from source_base.sha (85150b55...), not from the pack branch."
+  - "Re-read PR #322 exact HEAD/tree and compute the full diff source_base.sha..c16028da; it must be exactly the 12 paths returned by the pack-time compare, all within the 13-path allowed_write_set."
+  - "Re-deliver only that approved source diff onto the fresh source branch, without merging/cherry-picking predecessor PRs or merging PR #322. A single bounded source commit is preferred; no .agent execution-pack manifests may enter the source diff."
+  - "Expected resulting source tree is ed9c6e02ad0ec3525161b6c9359314dcf89f256c if the source input is reproduced byte-for-byte. A different tree requires explicit explanation and fresh review."
+  - "Do not alter product behavior or expand the 13-path write set. Do not modify PR #322 or predecessor PRs."
+  - "The re-delivered commit SHA will differ from PR #322 and is NOT covered by the previous Owner approval; it requires a fresh independent Exact-SHA R1 and a fresh exact-SHA Owner disposition before any subsequent integration action."
+test_contract:
+  - "Use Node 24.21.0; exact-tree syntax preflight over all tracked JS/TS plus three browser modules must pass before source CI."
+  - "Run focused R03C Provider-global and Meta shared-production integration suites."
+  - "Run lint, typecheck and the full tools/task-check.sh suite."
+  - "Record exact commands, tool versions, exit codes and test counts."
+  - "Run Woodpecker Push and PR CI on the exact re-delivery SHA; record Build IDs and URLs."
+  - "Verify exact HEAD, tree, parent, 12-path diff, no out-of-scope path, and that the final tree matches expected source input unless explained."
+forbidden:
+  - "merging PR #322 or any predecessor PR"
+  - "mutating main or version/v0.2.0"
+  - "tag, release or deployment"
+  - "any source path outside the exact 13-path allowed_write_set"
+  - "Control API direct SQLite/SQL access"
+  - "new Kernel, dispatcher, Host database, HTTP/model-facing writer or authority channel"
+  - "bypass or relaxation of Host receipt, consent, revocation, digest, currentness or signed Provider privilege checks"
+  - "real Provider installation, UAC prompt, persistent Windows effect, paid LLM or cloud sync"
+source_write_authorized: true
+merge_authorized: false
+release_authorized: false
+notes: "Generation-5 is a fresh bounded re-delivery pack for the Owner-approved Generation-4 R03C source input against the already-existing exact combined predecessor baseline. It does not authorize any PR merge. The new re-delivery SHA/tree must receive independent R1 and fresh Owner disposition; the previous Owner admission binds only c16028da83e2930f60470b1b68a376a609e8e99c / ed9c6e02ad0ec3525161b6c9359314dcf89f256c."
