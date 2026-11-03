@@ -34,6 +34,7 @@ import {
   type PrivilegedReceiptSummary,
   previewTrustedElevatedAction,
   type TrustedElevatedActionRef,
+  type TrustedElevatedActionResult,
 } from '../windows/effect-host-binding.ts';
 import {
   ProviderFirstUseLedger,
@@ -411,6 +412,68 @@ export function readProviderFirstUseRequest(
 }
 
 /**
+ * Generation-5 repair (R03C-PROVIDER-P1-PREMATURE-ELEVATED-TERMINAL-RECEIPT,
+ * #287 comment 6602534717): the elevated installer execution is an
+ * INTERMEDIATE stage of the one end-to-end first-use request, not a terminal
+ * result. A successful elevation therefore only yields the bounded in-memory
+ * summary; definitive REFUSED/UNKNOWN elevations persist exactly one receipt
+ * and terminate the request immediately, before any Provider CLI starts.
+ */
+let pendingElevatedTerminalEnvelope: ProviderCapabilityEnvelope | undefined;
+
+async function runElevatedStage(
+  requestRef: string,
+  refuse: (externalRef: string, code: string) => ProviderCapabilityEnvelope,
+): Promise<PrivilegedReceiptSummary | undefined | 'TERMINAL'> {
+  if (installed === undefined) throw new Error('PROVIDER_HOST_NOT_INSTALLED');
+  if (installed.privilegeScope !== 'ELEVATED') return undefined;
+  if (installed.elevatedActionRef === undefined) {
+    installed.ledger.finish(requestRef, 'REFUSED', {
+      outcome: 'REFUSED',
+      code: 'PROVIDER_HOST_ELEVATION_ACTION_REQUIRED',
+    });
+    pendingElevatedTerminalEnvelope = refuse(
+      requestRef,
+      'PROVIDER_HOST_ELEVATION_ACTION_REQUIRED',
+    );
+    return 'TERMINAL';
+  }
+  const elevated: TrustedElevatedActionResult = await executeTrustedElevatedAction(
+    installed.elevatedActionRef,
+  );
+  if (elevated.status === 'COMPLETED') {
+    // No ledger.finish here: the request stays RUNNING until the Provider
+    // first-use stage below terminates it exactly once.
+    return elevated.receipt;
+  }
+  if (elevated.status === 'REFUSED') {
+    installed.ledger.finish(
+      requestRef,
+      'REFUSED',
+      elevatedReceipt('REFUSED', elevated.code, elevated.receipt),
+    );
+    pendingElevatedTerminalEnvelope = refuse(requestRef, elevated.code);
+    return 'TERMINAL';
+  }
+  installed.ledger.finish(
+    requestRef,
+    'UNKNOWN',
+    elevatedReceipt('UNKNOWN', elevated.code, elevated.receipt),
+  );
+  pendingElevatedTerminalEnvelope = { phase: 'running', externalRef: requestRef };
+  return 'TERMINAL';
+}
+
+function elevatedTerminalEnvelope(requestRef: string): ProviderCapabilityEnvelope {
+  const envelope = pendingElevatedTerminalEnvelope ?? {
+    phase: 'running' as const,
+    externalRef: requestRef,
+  };
+  pendingElevatedTerminalEnvelope = undefined;
+  return envelope;
+}
+
+/**
  * K→C callback: the pinned provider's genuine first use. The payload carries
  * ONLY the Host-issued requestRef — no caller-supplied taskId, provider path,
  * executable, args, grant, privilege or Case reference is accepted. The
@@ -437,40 +500,8 @@ export async function providerFirstUse(
     // activation or UAC path is touched.
     return refusalEnvelope(requestRef, begun.code);
   }
-  if (installed.privilegeScope === 'ELEVATED') {
-    if (installed.elevatedActionRef === undefined) {
-      installed.ledger.finish(requestRef, 'REFUSED', {
-        outcome: 'REFUSED',
-        code: 'PROVIDER_HOST_ELEVATION_ACTION_REQUIRED',
-      });
-      return refusalEnvelope(requestRef, 'PROVIDER_HOST_ELEVATION_ACTION_REQUIRED');
-    }
-    const elevated = await executeTrustedElevatedAction(installed.elevatedActionRef);
-    if (elevated.status === 'COMPLETED') {
-      installed.ledger.finish(
-        requestRef,
-        'COMPLETED',
-        elevatedReceipt('EXECUTED', 'PROVIDER_ELEVATION_COMPLETED', elevated.receipt),
-      );
-    } else if (elevated.status === 'REFUSED') {
-      installed.ledger.finish(
-        requestRef,
-        'REFUSED',
-        elevatedReceipt('REFUSED', elevated.code, elevated.receipt),
-      );
-      return refusalEnvelope(requestRef, elevated.code);
-    } else {
-      installed.ledger.finish(
-        requestRef,
-        'UNKNOWN',
-        elevatedReceipt('UNKNOWN', elevated.code, elevated.receipt),
-      );
-      return {
-        phase: 'running',
-        externalRef: requestRef,
-      };
-    }
-  }
+  const elevatedSummary = await runElevatedStage(requestRef, refusalEnvelope);
+  if (elevatedSummary === 'TERMINAL') return elevatedTerminalEnvelope(requestRef);
   const probe = await installed.activator.runCli({
     taskId: PROVIDER_GLOBAL_TASK_ID,
     descriptor: installed.descriptor,
@@ -478,7 +509,7 @@ export async function providerFirstUse(
   });
   if (!probe.ok) {
     const probeEnvelope = envelopeFrom(probe, requestRef);
-    recordActivationOutcome(requestRef, probeEnvelope);
+    recordActivationOutcome(requestRef, probeEnvelope, elevatedSummary);
     return probeEnvelope;
   }
   const canary = await installed.activator.runCli({
@@ -494,12 +525,13 @@ export async function providerFirstUse(
   });
   if (!canary.ok) {
     const canaryEnvelope = envelopeFrom(canary, requestRef);
-    recordActivationOutcome(requestRef, canaryEnvelope);
+    recordActivationOutcome(requestRef, canaryEnvelope, elevatedSummary);
     return canaryEnvelope;
   }
   // One terminal receipt carrying BOTH real executions as closed facts: the
-  // strictly parsed version token (or parsed=false with no text retained)
-  // and the enum canary result. Raw provider stdout/stderr are neither
+  // strictly parsed version token (or parsed=false with no text retained),
+  // the enum canary result and — when the installer already ran — the bounded
+  // elevated terminal classification. Raw provider stdout/stderr are neither
   // returned to the K nor persisted.
   const version = parseVersionToken(probe.stdout);
   const receipt: ProviderFirstUseReceipt = {
@@ -512,7 +544,9 @@ export async function providerFirstUse(
     canaryResult: canaryResultFrom(canary),
     exitCode: canary.exitCode,
     timedOut: canary.timedOut,
-    durationMs: probe.durationMs + canary.durationMs,
+    durationMs:
+      probe.durationMs + canary.durationMs + (elevatedSummary?.durationMs ?? 0),
+    ...(elevatedSummary !== undefined ? { elevatedTerminal: elevatedSummary.terminal } : {}),
   };
   installed.ledger.finish(requestRef, 'COMPLETED', receipt);
   return {
@@ -522,21 +556,33 @@ export async function providerFirstUse(
   };
 }
 
-function recordActivationOutcome(requestRef: string, envelope: ProviderCapabilityEnvelope): void {
+function recordActivationOutcome(
+  requestRef: string,
+  envelope: ProviderCapabilityEnvelope,
+  elevated: PrivilegedReceiptSummary | undefined,
+): void {
   if (installed === undefined) return;
   if (envelope.phase === 'running') {
     // Interrupted execution: an uncertain boundary — never retried blindly.
-    installed.ledger.finish(requestRef, 'UNKNOWN', {
-      outcome: 'UNKNOWN',
-      code: 'ACTIVATION_INTERRUPTED',
-    });
+    // Generation-5 repair: after a successful elevation the receipt still
+    // carries the bounded elevated summary; exactly one UNKNOWN is written.
+    installed.ledger.finish(
+      requestRef,
+      'UNKNOWN',
+      elevated !== undefined
+        ? elevatedReceipt('UNKNOWN', 'ACTIVATION_INTERRUPTED', elevated)
+        : { outcome: 'UNKNOWN', code: 'ACTIVATION_INTERRUPTED' },
+    );
     return;
   }
   if (!envelope.outcome.ok) {
-    installed.ledger.finish(requestRef, 'REFUSED', {
-      outcome: 'REFUSED',
-      code: envelope.outcome.error.code,
-    });
+    installed.ledger.finish(
+      requestRef,
+      'REFUSED',
+      elevated !== undefined
+        ? elevatedReceipt('REFUSED', envelope.outcome.error.code, elevated)
+        : { outcome: 'REFUSED', code: envelope.outcome.error.code },
+    );
   }
 }
 

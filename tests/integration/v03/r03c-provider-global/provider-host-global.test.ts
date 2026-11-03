@@ -18,11 +18,19 @@
  * schemas shared by finish() and decodeRow(); privileged ExecutionReceipts
  * are reduced to an allowlist summary before persistence.
  *
+ * Generation-5 terminal-receipt repair (#287 comment 6602534717, pack PR
+ * #308): a successful elevated installer execution is an INTERMEDIATE stage
+ * — the request stays RUNNING until the Provider first-use stage terminates,
+ * and exactly one closed receipt (combining the bounded elevated summary
+ * with the Provider outcome) is persisted. Injected-fake tests below prove
+ * success/refusal/interruption after elevation with zero real UAC/installer
+ * execution.
+ *
  * The trusted Host bindings are process singletons, so each scenario imports
  * them fresh (vi.resetModules + dynamic import) over its own fixture store.
  */
 import { createHash, generateKeyPairSync, randomUUID, sign } from 'node:crypto';
-import { mkdtempSync, rmSync } from 'node:fs';
+import { existsSync, mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { DatabaseSync } from 'node:sqlite';
@@ -71,6 +79,10 @@ afterEach(() => {
       /* already closed */
     }
   }
+  // Generation-5 injected-fake coverage registers vi.doMock registrations;
+  // drop them so no mock leaks into another scenario.
+  vi.doUnmock(EFFECT_HOST_BINDING_MODULE);
+  vi.doUnmock(ACTIVATION_MODULE);
   while (createdDirs.length > 0) {
     const dir = createdDirs.pop();
     if (dir === undefined) break;
@@ -298,6 +310,124 @@ function provisionElevatedAuthority(authorityDir: string): {
   };
   writeGrantRecord(join(authorityDir, 'grants'), grant as never);
   return { planHash: plan.planHash, grantId: grant.grantId, actionId };
+}
+
+// ---------------------------------------------------------------------------
+// Generation-5 repair (#287 comment 6602534717, pack PR #308): the elevated
+// installer execution is an INTERMEDIATE stage of the one end-to-end
+// first-use request. The injected-fake coverage below replaces the privileged
+// backend (and, for the refusal path, the Provider activator's runCli) with
+// deterministic fakes: no real UAC prompt, helper, installer or persistent
+// Windows effect is ever exercised, and every assertion is offline.
+// ---------------------------------------------------------------------------
+
+const EFFECT_HOST_BINDING_MODULE =
+  '../../../../packages/domain-host/src/windows/effect-host-binding.ts';
+const ACTIVATION_MODULE = '../../../../packages/provider-loader/src/activation.ts';
+
+interface InjectedRunOutcome {
+  exitCode: number;
+  stdout: string;
+  stderr: string;
+  timedOut: boolean;
+  stdoutTruncated: boolean;
+  stderrTruncated: boolean;
+}
+
+interface InjectedHost {
+  readonly binding: Awaited<ReturnType<typeof freshHost>>['binding'];
+  readonly effect: Awaited<ReturnType<typeof freshHost>>['effect'];
+  readonly elevatedCalls: () => number;
+}
+
+/**
+ * Fresh Host modules whose privileged backend is replaced by a deterministic
+ * fake returning the fixed closed-world summary (what the real allowlist
+ * projection would produce). `providerRefusal` additionally replaces
+ * CuratedProviderActivator.runCli with an activator-level refusal, modelling
+ * the Provider stage refusing after a successful elevation.
+ */
+async function freshInjectedHost(options: {
+  readonly providerRefusal?: 'ARTIFACT_NOT_VERIFIED';
+}): Promise<InjectedHost> {
+  vi.resetModules();
+  let elevatedCalls = 0;
+  const effectActual = await vi.importActual<
+    typeof import('../../../../packages/domain-host/src/windows/effect-host-binding.ts')
+  >(EFFECT_HOST_BINDING_MODULE);
+  vi.doMock(EFFECT_HOST_BINDING_MODULE, async () => ({
+    ...effectActual,
+    executeTrustedElevatedAction: async () => {
+      elevatedCalls += 1;
+      return {
+        status: 'COMPLETED' as const,
+        // The exact closed-world summary the real projection mints.
+        receipt: effectActual.projectPrivilegedReceipt({
+          terminal: 'SUCCEEDED',
+          exitCode: 0,
+          timedOut: false,
+          durationMs: 42,
+        }),
+      };
+    },
+  }));
+  if (options.providerRefusal !== undefined) {
+    const refusal = options.providerRefusal;
+    const activationActual = await vi.importActual<
+      typeof import('../../../../packages/provider-loader/src/activation.ts')
+    >(ACTIVATION_MODULE);
+    vi.doMock(ACTIVATION_MODULE, async () => ({
+      ...activationActual,
+      CuratedProviderActivator: class extends activationActual.CuratedProviderActivator {
+        override async runCli(): Promise<never> {
+          return { ok: false, code: refusal } as never;
+        }
+      },
+    }));
+  }
+  const binding = trackBinding(
+    await import('../../../../packages/domain-host/src/provider/provider-host-binding.ts'),
+  );
+  const effect = await import(EFFECT_HOST_BINDING_MODULE);
+  return { binding, effect, elevatedCalls: () => elevatedCalls };
+}
+
+/** Install the operator-provisioned ELEVATED binding over the injected Host. */
+function installInjectedElevatedBinding(
+  host: InjectedHost,
+  rootName: string,
+  processPort: unknown,
+): { readonly workspaceRoot: string; readonly cacheRoot: string } {
+  const root = newDir(rootName);
+  const authorityDir = join(root, 'authority');
+  const workspaceRoot = join(root, 'workspace');
+  const provisioned = provisionElevatedAuthority(authorityDir);
+  host.effect.installTrustedWindowsEffectBinding({ authorityDir, workspaceRoot });
+
+  const cacheRoot = newDir(`${rootName}-cache`);
+  const trust = providerScope(sha256(ARTIFACT_BYTES));
+  host.binding.installTrustedProviderBinding({
+    cacheRoot,
+    roots: [
+      {
+        keyId: 'key-1',
+        publicKeyPem: keyPair.publicKey.export({ type: 'spki', format: 'pem' }).toString(),
+      },
+    ],
+    scopes: [trust],
+    descriptor: makeDescriptor(trust, { requiredPrivilege: 'ELEVATED' }),
+    revocationEpoch: 1,
+    hostFacts: { platform: 'win32', architecture: 'x64', nodeAbi: '137' },
+    fetchArtifact: (async () => new Response(ARTIFACT_BYTES, { status: 200 })) as typeof fetch,
+    process: processPort,
+    elevatedAction: {
+      actionRef: provisioned.actionId,
+      planRef: provisioned.planHash,
+      grantRef: provisioned.grantId,
+      taskId: 'provider-global',
+    },
+  });
+  return { workspaceRoot, cacheRoot };
 }
 
 describe('R03C Host-global Provider first-use (requestRef-only, Case-free)', () => {
@@ -1034,6 +1164,196 @@ describe('R03C Host-global Provider first-use (requestRef-only, Case-free)', () 
       elevatedAction: dummyAction,
     });
     expect(accepted.trustedProviderBindingStatus()).toMatchObject({ privilegeScope: 'ELEVATED' });
+  });
+
+  it('generation-5: elevated SUCCEEDED keeps the request RUNNING until the Provider canary terminates it COMPLETED exactly once', async () => {
+    const host = await freshInjectedHost({});
+    // The canary FILE_SEARCH run blocks on a test-controlled gate so the
+    // durable request state is observable while the Provider stage is in
+    // flight. No real child process ever spawns.
+    const specs: ActivationRunSpec[] = [];
+    let markCanaryEntered: () => void = () => undefined;
+    const canaryEntered = new Promise<void>((resolve) => {
+      markCanaryEntered = resolve;
+    });
+    let releaseCanary: (outcome: InjectedRunOutcome) => void = () => undefined;
+    const canaryGate = new Promise<InjectedRunOutcome>((resolve) => {
+      releaseCanary = resolve;
+    });
+    const port = {
+      async run(spec: ActivationRunSpec): Promise<InjectedRunOutcome> {
+        specs.push(spec);
+        if (spec.args.includes('SHUN-PROVIDER-FIRST-USE')) {
+          markCanaryEntered();
+          return canaryGate;
+        }
+        return {
+          exitCode: 0,
+          stdout: 'ripgrep 14.1.1',
+          stderr: '',
+          timedOut: false,
+          stdoutTruncated: false,
+          stderrTruncated: false,
+        };
+      },
+    };
+    const { workspaceRoot } = installInjectedElevatedBinding(host, 'g5-success', port);
+
+    const prepared = await host.binding.prepareProviderFirstUse();
+    expect(prepared.ok).toBe(true);
+    if (!prepared.ok) return;
+    expect(host.binding.confirmProviderFirstUse(prepared.requestRef).ok).toBe(true);
+
+    const pending = host.binding.providerFirstUse({ requestRef: prepared.requestRef }, undefined);
+    await canaryEntered;
+    // The installer stage already succeeded (injected), yet the request MUST
+    // still be RUNNING with no receipt: elevation is intermediate.
+    const midFlight = host.binding.readProviderFirstUseRequest(prepared.requestRef);
+    expect(midFlight?.status).toBe('RUNNING');
+    expect(midFlight?.receipt).toBeUndefined();
+
+    releaseCanary({
+      exitCode: 0,
+      stdout: 'noise\nSHUN-PROVIDER-FIRST-USE matched\n',
+      stderr: '',
+      timedOut: false,
+      stdoutTruncated: false,
+      stderrTruncated: false,
+    });
+    const envelope = await pending;
+    expect(envelope.phase).toBe('terminal');
+    if (envelope.phase !== 'terminal') throw new Error('expected terminal envelope');
+    expect(envelope.outcome.ok).toBe(true);
+    // Exactly one elevated stage ran; both unprivileged runs used the port.
+    expect(host.elevatedCalls()).toBe(1);
+    expect(specs.length).toBe(2);
+
+    // One terminal receipt, identical in the envelope and the durable ledger,
+    // combining the bounded elevated summary with the Provider outcome.
+    const record = host.binding.readProviderFirstUseRequest(prepared.requestRef);
+    expect(record?.status).toBe('COMPLETED');
+    expect(record?.receipt).toMatchObject({
+      outcome: 'EXECUTED',
+      code: 'PROVIDER_FIRST_USE_EXECUTED',
+      elevatedTerminal: 'SUCCEEDED',
+      canaryResult: 'MATCHED',
+      probeVersion: '14.1.1',
+      exitCode: 0,
+    });
+    expect(record?.receipt?.durationMs).toBeGreaterThanOrEqual(42);
+    if (envelope.outcome.ok) expect(envelope.outcome.output).toEqual(record?.receipt);
+    // COMPLETED is terminal: a replay refuses before any further execution.
+    const replay = await host.binding.providerFirstUse(
+      { requestRef: prepared.requestRef },
+      undefined,
+    );
+    expect(replay).toMatchObject({
+      phase: 'terminal',
+      outcome: { ok: false, error: { code: 'PROVIDER_REQUEST_NOT_APPROVED' } },
+    });
+    // No real UAC/installer execution: the privileged workspace has no run
+    // artifacts at all.
+    expect(existsSync(join(workspaceRoot, 'executions'))).toBe(false);
+  });
+
+  it('generation-5: after elevated SUCCEEDED a Provider-stage refusal finishes exactly once as REFUSED with the bounded elevated summary', async () => {
+    const host = await freshInjectedHost({ providerRefusal: 'ARTIFACT_NOT_VERIFIED' });
+    // The real activator is replaced by the refusal fake, so the spawn port is
+    // never consulted; capture anyway to prove zero Provider CLI runs.
+    const captured = capturePort('');
+    const { workspaceRoot } = installInjectedElevatedBinding(host, 'g5-refused', captured.port);
+
+    const prepared = await host.binding.prepareProviderFirstUse();
+    expect(prepared.ok).toBe(true);
+    if (!prepared.ok) return;
+    expect(host.binding.confirmProviderFirstUse(prepared.requestRef).ok).toBe(true);
+    const envelope = await host.binding.providerFirstUse(
+      { requestRef: prepared.requestRef },
+      undefined,
+    );
+    expect(envelope).toMatchObject({
+      phase: 'terminal',
+      outcome: { ok: false, error: { code: 'ARTIFACT_NOT_VERIFIED' } },
+    });
+    // The elevated stage ran exactly once; the refused Provider stage never
+    // reached the spawn port.
+    expect(host.elevatedCalls()).toBe(1);
+    expect(captured.specs.length).toBe(0);
+
+    const record = host.binding.readProviderFirstUseRequest(prepared.requestRef);
+    expect(record?.status).toBe('REFUSED');
+    // Exactly one terminal receipt, carrying ONLY bounded elevated summary
+    // fields — the allowlist projection, never raw privileged output.
+    expect(record?.receipt).toEqual({
+      outcome: 'REFUSED',
+      code: 'ARTIFACT_NOT_VERIFIED',
+      elevatedTerminal: 'SUCCEEDED',
+      exitCode: 0,
+      timedOut: false,
+      durationMs: 42,
+    });
+    expect(JSON.stringify(record?.receipt)).not.toMatch(
+      /outputRefs|stdoutRef|stderrRef|environmentId/,
+    );
+    // The refusal is terminal: a replay refuses before any further execution.
+    const replay = await host.binding.providerFirstUse(
+      { requestRef: prepared.requestRef },
+      undefined,
+    );
+    expect(replay).toMatchObject({
+      phase: 'terminal',
+      outcome: { ok: false, error: { code: 'PROVIDER_REQUEST_NOT_APPROVED' } },
+    });
+    expect(existsSync(join(workspaceRoot, 'executions'))).toBe(false);
+  });
+
+  it('generation-5: after elevated SUCCEEDED a Provider-stage interruption finishes exactly once as UNKNOWN with the bounded elevated summary', async () => {
+    const host = await freshInjectedHost({});
+    // Real activator; the injected spawn port throws on the VERSION_PROBE, an
+    // ambiguous execution boundary the chain maps to ACTIVATION_INTERRUPTED.
+    const specs: ActivationRunSpec[] = [];
+    const port = {
+      async run(spec: ActivationRunSpec): Promise<InjectedRunOutcome> {
+        specs.push(spec);
+        throw new Error('INJECTED_SPAWN_FAILURE');
+      },
+    };
+    installInjectedElevatedBinding(host, 'g5-interrupted', port);
+
+    const prepared = await host.binding.prepareProviderFirstUse();
+    expect(prepared.ok).toBe(true);
+    if (!prepared.ok) return;
+    expect(host.binding.confirmProviderFirstUse(prepared.requestRef).ok).toBe(true);
+    const envelope = await host.binding.providerFirstUse(
+      { requestRef: prepared.requestRef },
+      undefined,
+    );
+    // Interrupted boundary: the K turn is not closed optimistically.
+    expect(envelope.phase).toBe('running');
+    expect(host.elevatedCalls()).toBe(1);
+    expect(specs.length).toBe(1);
+
+    const record = host.binding.readProviderFirstUseRequest(prepared.requestRef);
+    expect(record?.status).toBe('UNKNOWN');
+    // Exactly one terminal(uncertain) receipt with the bounded elevated
+    // summary — never a false COMPLETED left by the intermediate stage.
+    expect(record?.receipt).toEqual({
+      outcome: 'UNKNOWN',
+      code: 'ACTIVATION_INTERRUPTED',
+      elevatedTerminal: 'SUCCEEDED',
+      exitCode: 0,
+      timedOut: false,
+      durationMs: 42,
+    });
+    // UNKNOWN is terminal: a replay refuses before any further execution.
+    const replay = await host.binding.providerFirstUse(
+      { requestRef: prepared.requestRef },
+      undefined,
+    );
+    expect(replay).toMatchObject({
+      phase: 'terminal',
+      outcome: { ok: false, error: { code: 'PROVIDER_REQUEST_NOT_APPROVED' } },
+    });
   });
 });
 
