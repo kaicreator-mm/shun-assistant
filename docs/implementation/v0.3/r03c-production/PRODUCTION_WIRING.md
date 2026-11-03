@@ -112,21 +112,49 @@ Selected V10 DomainApp facade.send()  ── SAME selected K, ONE writer ──
    (`declaration_seq` ordering; opt-out immediately revokes and never
    resurrects).
 
-## Multi-Case Host provisioning (boot)
+## Multi-Case Host provisioning (boot, generation 2)
 
 `provisionMetaFromHostFile` (in `composition-journeys.ts`, used by
-`main.ts`) keeps the operator-pinned hash-pinning discipline and accepts
-exactly one of two file forms:
+`main.ts`) keeps the operator-pinned hash-pinning discipline and is the ONLY
+trusted ingestion path for outcome receipts, opt-in consents, closed-world
+vocabulary and normalized verified experiences. No HTTP/API/model-facing
+writer exists; verified outcomes are never caller- or model-supplied. Exactly
+one file form per document:
 
 - legacy: `{ "receipt": {...}, "consent": {...} }` (unchanged behavior);
-- batch (R03C): `{ "cases": [ { "receipt": {...}, "consent": {...} }, ... ] }`
-  with a bound of **16** cases — enough to seed more than one source Case
-  into the SAME local DB at boot.
+- batch (R03C gen 1): `{ "cases": [ { "receipt": {...}, "consent": {...} }, ... ] }`
+  with a bound of **16** cases;
+- batch + experiences (R03C gen 2):
+  `{ "vocabulary": { "capabilityIds": [...], "taskClasses": [...],
+  "patternIds": [...], "tags": [...], "constraintCodes": [...] },
+  "cases": [ { "receipt": {...}, "consent": {...}, "experiences": [...] }, ... ] }`.
 
-The whole file is sha256-pinned (`SHUN_V03_META_CASE_SHA256`); every record
-must carry the minimal receipt/consent shape and the durable store
-re-validates strictly on write. Digest mismatch, malformed entries, a file
-mixing both forms, and over-bound batches all refuse closed at boot.
+Generation-2 rules (strict, atomic):
+
+- `vocabulary` has exactly five arrays of unique lowercase closed-world codes
+  (≤64 per kind); only these operator-pinned codes are registered with the
+  store, BEFORE any experience is recorded.
+- Each `cases[]` entry has exactly `receipt`, `consent`, `experiences`; each
+  experience has exactly `capabilityId`, `taskClass`, `patternId`,
+  `verifiedOutcome` (`VERIFIED_PASS|VERIFIED_FAIL`), `tags`,
+  `constraintCodes`. Source identity (`caseRef`/`sourceRevision`/
+  `sourceDigest`) is DERIVED from the enclosing receipt — the file can never
+  attach an experience to another Case or revision.
+- The consent must bind the same caseRef/revision/digest as its receipt and
+  be opt-in for any attached experience. Bounds: 16 Cases, ≤64 experiences
+  per document, #285 store bounds for tag/constraint arrays (≤8/≤16).
+- **The complete document validates before the first durable write.**
+  Unknown keys, unknown vocabulary, duplicate Case/revision entries,
+  consent/receipt mismatch, invalid experience payloads, malformed later
+  entries, over-limit batches and digest mismatches all refuse closed — a
+  refused document leaves ZERO durable writes, so the shared query can never
+  expose partially seeded experiences. Recording goes through the #285
+  store's own `recordSharedExperience`, which re-checks vocabulary,
+  current receipt, current opt-in consent and revocation authoritatively.
+- Later consent declarations (e.g. an operator opt-out) provision through a
+  second pinned file: the identical receipt re-record is a no-op and the new
+  consent row supersedes by `declaration_seq`, immediately revoking derived
+  experiences.
 
 ## Build/manifest admission
 
@@ -166,7 +194,12 @@ the sealed capability share ONE module instance:
   prepare, closed preview, one-pending rule, fixed-intent confirm, replay/
   malformed refusal with zero executions, no raw stdout.
 - `tests/integration/v03/r03c-meta-shared/meta-shared-production.test.ts`
-  — real HTTP cross-Case/same-Case retrieval through the K to the Host
-  store, exact input contract (tags refused), advisory-only results, zero
-  LLM calls, revocation exclusion, and the multi-Case provisioning matrix
-  (legacy/batch/tamper/malformed/both-forms/over-bound).
+  — (generation 2) ALL store seeding goes through the real operator
+  SHA-256-pinned provisioning path on a clean store: real HTTP
+  cross-Case/same-Case retrieval through the K to the Host store, exact
+  input contract (tags refused), advisory-only results, zero LLM calls,
+  opt-out via a second pinned file, and the pinned-schema matrix (legacy /
+  gen-1 batch preserved / gen-2 happy path / unknown vocabulary /
+  consent-receipt mismatch / invalid payloads / malformed later entry /
+  extra keys / duplicates / opt-out-with-experiences / over-limit / digest
+  tamper) — every refusal proven to leave ZERO queryable experiences.

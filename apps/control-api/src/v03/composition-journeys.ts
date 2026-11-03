@@ -476,20 +476,210 @@ export function createJourneySubmits(deps: {
 }
 
 /**
- * R03C (#288): operator-pinned Meta case provisioning, extended from the
- * legacy single-record Host file to a BOUNDED multi-Case batch while
- * preserving the exact hash-pinning and fail-closed validation.
+ * R03C (#288, generation 2): operator-pinned Meta case provisioning. The
+ * file remains SHA-256 pinned (`SHUN_V03_META_CASE_SHA256`) and is the ONLY
+ * trusted ingestion path for outcome receipts, opt-in consents, closed-world
+ * vocabulary and normalized verified experiences. No HTTP/API/model-facing
+ * writer exists; verified outcomes are never caller- or model-supplied.
  *
  * File forms (exactly one, never both):
- *   legacy:   { "receipt": {...}, "consent": {...} }
- *   batch:    { "cases": [ { "receipt": {...}, "consent": {...} }, ... ] }
+ *   legacy:  { "receipt": {...}, "consent": {...} }
+ *            (accepted exactly as generation 1: receipt + consent only)
+ *   batch:   { "cases": [ { "receipt": {...}, "consent": {...} }, ... ] }
+ *            (generation-1 bounded multi-Case format, unchanged)
+ *   batch+experiences (generation 2):
+ *            { "vocabulary": { "capabilityIds": [...], "taskClasses": [...],
+ *              "patternIds": [...], "tags": [...], "constraintCodes": [...] },
+ *              "cases": [ { "receipt": {...}, "consent": {...},
+ *                           "experiences": [ {...} ] }, ... ] }
  *
- * The whole file stays sha256-pinned; every record must carry the minimal
- * receipt/consent shape and the durable store re-validates strictly on
- * write (fail-closed). The batch is bounded so a pinned file can seed more
- * than one source Case into the SAME local DB without an unbounded boot cost.
+ * The batch+experiences form is STRICT: unknown keys, unknown vocabulary,
+ * duplicate Case/revision entries, consent/receipt mismatch, malformed later
+ * entries and over-limit batches all refuse. THE COMPLETE DOCUMENT IS
+ * VALIDATED BEFORE THE FIRST DURABLE WRITE — a refused document leaves the
+ * store untouched, so the shared query can never expose partially seeded
+ * experiences. Each experience derives caseRef/sourceRevision/sourceDigest
+ * from its enclosing receipt (never accepted from the file) and is recorded
+ * through the #285 store's own `recordSharedExperience`, which re-checks
+ * registered vocabulary, current receipt, current opt-in consent and
+ * revocation authoritatively.
  */
 export const META_CASE_PROVISION_MAX_CASES = 16;
+export const META_CASE_PROVISION_MAX_EXPERIENCES_TOTAL = 64;
+export const META_CASE_PROVISION_MAX_VOCABULARY_PER_KIND = 64;
+
+// Mirrored #285 store bounds: pre-validation must be complete so that the
+// store's own write-time checks can never trip after the first durable write.
+const META_EXPERIENCE_CODE = /^[a-z0-9][a-z0-9._-]{0,63}$/;
+const META_EXPERIENCE_MAX_TAGS = 8;
+const META_EXPERIENCE_MAX_CONSTRAINT_CODES = 16;
+const META_PROVISION_SAFE_REF = /^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$/;
+const META_PROVISION_SHA256 = /^[0-9a-f]{64}$/;
+const META_PROVISION_ISO_UTC = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}.\d{3}Z$/;
+
+interface ParsedProvisionReceipt {
+  readonly caseRef: string;
+  readonly revision: string;
+  readonly sha256: string;
+}
+
+interface ParsedProvisionEntry {
+  readonly receipt: ParsedProvisionReceipt;
+  readonly consent: Record<string, unknown>;
+  readonly experiences: readonly Record<string, unknown>[];
+}
+
+function isIsoUtcString(value: unknown): value is string {
+  return (
+    typeof value === 'string' &&
+    META_PROVISION_ISO_UTC.test(value) &&
+    Number.isFinite(Date.parse(value)) &&
+    new Date(Date.parse(value)).toISOString() === value
+  );
+}
+
+function parseProvisionCodeArray(value: unknown, kind: string): string[] {
+  if (!Array.isArray(value)) throw new Error('V03_META_VOCABULARY_INVALID');
+  if (value.length > META_CASE_PROVISION_MAX_VOCABULARY_PER_KIND) {
+    throw new Error('V03_META_VOCABULARY_BOUND_REFUSED');
+  }
+  const codes: string[] = [];
+  for (const code of value) {
+    if (typeof code !== 'string' || !META_EXPERIENCE_CODE.test(code)) {
+      throw new Error('V03_META_VOCABULARY_INVALID');
+    }
+    if (codes.includes(code)) throw new Error('V03_META_VOCABULARY_DUPLICATE');
+    codes.push(code);
+  }
+  return codes;
+}
+
+function parseProvisionReceipt(value: unknown): ParsedProvisionReceipt {
+  if (!isRecord(value)) throw new Error('V03_META_CASE_INVALID');
+  const { caseRef, revision, sha256 } = value;
+  if (
+    typeof caseRef !== 'string' ||
+    !META_PROVISION_SAFE_REF.test(caseRef) ||
+    typeof revision !== 'string' ||
+    !META_PROVISION_SAFE_REF.test(revision) ||
+    typeof sha256 !== 'string' ||
+    !META_PROVISION_SHA256.test(sha256)
+  ) {
+    throw new Error('V03_META_CASE_INVALID');
+  }
+  return { caseRef, revision, sha256 };
+}
+
+function parseProvisionConsent(
+  value: unknown,
+  receipt: ParsedProvisionReceipt,
+  requiresOptIn: boolean,
+): Record<string, unknown> {
+  if (!isRecord(value)) throw new Error('V03_META_CASE_INVALID');
+  const consent = value;
+  const stringFields = [
+    'consentRef',
+    'revision',
+    'caseRef',
+    'sourceRevision',
+    'operatorId',
+    'operatorSubjectRef',
+    'authorizationRevision',
+    'currentnessRef',
+  ] as const;
+  for (const field of stringFields) {
+    if (
+      typeof consent[field] !== 'string' ||
+      !META_PROVISION_SAFE_REF.test(consent[field] as string)
+    ) {
+      throw new Error('V03_META_CASE_INVALID');
+    }
+  }
+  if (
+    typeof consent.sourceDigest !== 'string' ||
+    !META_PROVISION_SHA256.test(consent.sourceDigest)
+  ) {
+    throw new Error('V03_META_CASE_INVALID');
+  }
+  if (typeof consent.optIn !== 'boolean') throw new Error('V03_META_CASE_INVALID');
+  if (!isIsoUtcString(consent.expiresAt)) throw new Error('V03_META_CASE_INVALID');
+  // The consent must bind the SAME source identity as its receipt, and a
+  // Case carrying verified experiences must be opted in.
+  if (
+    consent.caseRef !== receipt.caseRef ||
+    consent.sourceRevision !== receipt.revision ||
+    consent.sourceDigest !== receipt.sha256
+  ) {
+    throw new Error('V03_META_CASE_SOURCE_MISMATCH');
+  }
+  if (requiresOptIn && consent.optIn !== true) {
+    throw new Error('V03_META_CASE_OPT_IN_REQUIRED');
+  }
+  return consent;
+}
+
+function parseProvisionExperience(
+  value: unknown,
+  vocabulary: Readonly<{
+    capabilityIds: ReadonlySet<string>;
+    taskClasses: ReadonlySet<string>;
+    patternIds: ReadonlySet<string>;
+    tags: ReadonlySet<string>;
+    constraintCodes: ReadonlySet<string>;
+  }>,
+): Record<string, unknown> {
+  if (!isRecord(value)) throw new Error('V03_META_EXPERIENCE_INVALID');
+  const keys = Object.keys(value).sort();
+  if (
+    keys.length !== 6 ||
+    !keys.every((key) =>
+      [
+        'capabilityId',
+        'constraintCodes',
+        'patternId',
+        'tags',
+        'taskClass',
+        'verifiedOutcome',
+      ].includes(key),
+    )
+  ) {
+    throw new Error('V03_META_EXPERIENCE_INVALID');
+  }
+  const { capabilityId, taskClass, patternId, verifiedOutcome, tags, constraintCodes } = value;
+  if (
+    typeof capabilityId !== 'string' ||
+    !vocabulary.capabilityIds.has(capabilityId) ||
+    typeof taskClass !== 'string' ||
+    !vocabulary.taskClasses.has(taskClass) ||
+    typeof patternId !== 'string' ||
+    !vocabulary.patternIds.has(patternId)
+  ) {
+    throw new Error('V03_META_EXPERIENCE_VOCABULARY_UNKNOWN');
+  }
+  if (verifiedOutcome !== 'VERIFIED_PASS' && verifiedOutcome !== 'VERIFIED_FAIL') {
+    throw new Error('V03_META_EXPERIENCE_INVALID');
+  }
+  if (!Array.isArray(tags) || tags.length > META_EXPERIENCE_MAX_TAGS) {
+    throw new Error('V03_META_EXPERIENCE_INVALID');
+  }
+  for (const tag of tags) {
+    if (typeof tag !== 'string' || !vocabulary.tags.has(tag)) {
+      throw new Error('V03_META_EXPERIENCE_VOCABULARY_UNKNOWN');
+    }
+  }
+  if (
+    !Array.isArray(constraintCodes) ||
+    constraintCodes.length > META_EXPERIENCE_MAX_CONSTRAINT_CODES
+  ) {
+    throw new Error('V03_META_EXPERIENCE_INVALID');
+  }
+  for (const code of constraintCodes) {
+    if (typeof code !== 'string' || !vocabulary.constraintCodes.has(code)) {
+      throw new Error('V03_META_EXPERIENCE_VOCABULARY_UNKNOWN');
+    }
+  }
+  return value;
+}
 
 export function provisionMetaFromHostFile(input: {
   store: HostMetaShadowStore;
@@ -507,6 +697,33 @@ export function provisionMetaFromHostFile(input: {
     // Neither form, or a file trying to be both: refuse closed.
     throw new Error('V03_META_CASE_INVALID');
   }
+  const withExperiences = !legacy && raw.vocabulary !== undefined;
+  if (withExperiences) {
+    // Strict generation-2 document: exactly { vocabulary, cases }.
+    const documentKeys = Object.keys(raw).sort();
+    if (
+      documentKeys.length !== 2 ||
+      documentKeys[0] !== 'cases' ||
+      documentKeys[1] !== 'vocabulary'
+    ) {
+      throw new Error('V03_META_CASE_INVALID');
+    }
+  }
+  const vocabularyRaw = withExperiences ? (raw.vocabulary as Record<string, unknown>) : undefined;
+  const vocabularySets = vocabularyRaw
+    ? {
+        capabilityIds: new Set(
+          parseProvisionCodeArray(vocabularyRaw.capabilityIds, 'capabilityIds'),
+        ),
+        taskClasses: new Set(parseProvisionCodeArray(vocabularyRaw.taskClasses, 'taskClasses')),
+        patternIds: new Set(parseProvisionCodeArray(vocabularyRaw.patternIds, 'patternIds')),
+        tags: new Set(parseProvisionCodeArray(vocabularyRaw.tags, 'tags')),
+        constraintCodes: new Set(
+          parseProvisionCodeArray(vocabularyRaw.constraintCodes, 'constraintCodes'),
+        ),
+      }
+    : undefined;
+
   const entries: unknown[] = batch
     ? (raw.cases as unknown[])
     : [{ receipt: raw.receipt, consent: raw.consent }];
@@ -517,25 +734,103 @@ export function provisionMetaFromHostFile(input: {
   ) {
     throw new Error('V03_META_CASE_BATCH_BOUND_REFUSED');
   }
+
+  // ── Phase 1: validate the COMPLETE document. No durable writes yet, so a
+  // refused document can never leave partially seeded experiences behind.
+  const parsed: ParsedProvisionEntry[] = [];
+  const seenCaseRevisions = new Set<string>();
+  let totalExperiences = 0;
   for (const entry of entries) {
     if (!isRecord(entry)) throw new Error('V03_META_CASE_INVALID');
-    const receipt = entry.receipt as Record<string, unknown> | undefined;
-    const consent = entry.consent as Record<string, unknown> | undefined;
-    if (
-      !receipt ||
-      !consent ||
-      typeof receipt.caseRef !== 'string' ||
-      typeof receipt.revision !== 'string' ||
-      typeof receipt.sha256 !== 'string' ||
-      typeof consent.consentRef !== 'string'
-    ) {
-      throw new Error('V03_META_CASE_INVALID');
+    if (withExperiences) {
+      const keys = Object.keys(entry).sort();
+      if (
+        keys.length !== 3 ||
+        !keys.every((key) => ['consent', 'experiences', 'receipt'].includes(key))
+      ) {
+        throw new Error('V03_META_CASE_INVALID');
+      }
     }
+    const receipt = parseProvisionReceipt(entry.receipt);
+    const caseRevisionKey = `${receipt.caseRef}@${receipt.revision}`;
+    if (seenCaseRevisions.has(caseRevisionKey)) {
+      throw new Error('V03_META_CASE_DUPLICATE');
+    }
+    seenCaseRevisions.add(caseRevisionKey);
+    const experiencesRaw: unknown[] | undefined = withExperiences
+      ? Array.isArray(entry.experiences)
+        ? (entry.experiences as unknown[])
+        : undefined
+      : undefined;
+    if (withExperiences && experiencesRaw === undefined) {
+      throw new Error('V03_META_EXPERIENCE_INVALID');
+    }
+    const consent = parseProvisionConsent(
+      entry.consent,
+      receipt,
+      (experiencesRaw?.length ?? 0) > 0,
+    );
+    const experiences: Record<string, unknown>[] = [];
+    const seenExperiences = new Set<string>();
+    for (const experience of experiencesRaw ?? []) {
+      const parsedExperience = parseProvisionExperience(experience, vocabularySets as never);
+      const normalized = JSON.stringify([
+        receipt.caseRef,
+        receipt.revision,
+        receipt.sha256,
+        parsedExperience.capabilityId,
+        parsedExperience.taskClass,
+        parsedExperience.patternId,
+        parsedExperience.verifiedOutcome,
+        [...(parsedExperience.tags as string[])].sort(),
+        [...(parsedExperience.constraintCodes as string[])].sort(),
+      ]);
+      if (seenExperiences.has(normalized)) throw new Error('V03_META_EXPERIENCE_DUPLICATE');
+      seenExperiences.add(normalized);
+      experiences.push(parsedExperience);
+    }
+    totalExperiences += experiences.length;
+    if (totalExperiences > META_CASE_PROVISION_MAX_EXPERIENCES_TOTAL) {
+      throw new Error('V03_META_EXPERIENCE_BATCH_BOUND_REFUSED');
+    }
+    parsed.push({ receipt, consent, experiences });
+  }
+
+  // ── Phase 2: durable writes. receipt/consent shapes were fully validated
+  // above, so the store's write-time checks re-confirm rather than discover.
+  if (vocabularySets) {
+    for (const code of vocabularySets.capabilityIds) input.store.registerMetaCapabilityId(code);
+    for (const code of vocabularySets.taskClasses) input.store.registerMetaTaskClass(code);
+    for (const code of vocabularySets.patternIds) input.store.registerMetaPatternId(code);
+    for (const code of vocabularySets.tags) input.store.registerMetaExperienceTag(code);
+    for (const code of vocabularySets.constraintCodes) {
+      input.store.registerMetaConstraintCode(code);
+    }
+  }
+  for (const entry of parsed) {
     input.store.recordOutcomeReceipt({
-      caseRef: receipt.caseRef,
-      revision: receipt.revision,
-      sha256: receipt.sha256,
+      caseRef: entry.receipt.caseRef,
+      revision: entry.receipt.revision,
+      sha256: entry.receipt.sha256,
     });
-    input.store.recordOptInConsent(consent as never);
+    input.store.recordOptInConsent(entry.consent as never);
+    for (const experience of entry.experiences) {
+      // Source identity is derived from the enclosing genuine receipt —
+      // the file can never attach an experience to another Case/revision.
+      const recorded = input.store.recordSharedExperience({
+        caseRef: entry.receipt.caseRef,
+        sourceRevision: entry.receipt.revision,
+        sourceDigest: entry.receipt.sha256,
+        capabilityId: experience.capabilityId as string,
+        taskClass: experience.taskClass as string,
+        patternId: experience.patternId as string,
+        verifiedOutcome: experience.verifiedOutcome as 'VERIFIED_PASS' | 'VERIFIED_FAIL',
+        tags: experience.tags as string[],
+        constraintCodes: experience.constraintCodes as string[],
+      });
+      if (recorded.status !== 'STORED' && recorded.status !== 'ALREADY_STORED') {
+        throw new Error('V03_META_EXPERIENCE_REFUSED');
+      }
+    }
   }
 }

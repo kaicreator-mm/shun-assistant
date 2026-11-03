@@ -1,24 +1,31 @@
 /**
  * R03C-META-SHARED-PRODUCTION — read-only cross-Case Meta shared-experience
  * query over the REAL production composition and the REAL loopback HTTP
- * control surface (Issue #288, LOCAL_BUILDER generation 1).
+ * control surface (Issue #288, LOCAL_BUILDER generation 2).
  *
- * Proves, through real HTTP → reference-authenticated journey admission →
- * selected public v0.10.3 K → a BUILD-selected externalEffect:false C module
- * → the existing Host SQLite read port (#285 store):
+ * Generation-2 repair (PR #316 comment 6610635105, pack PR #317): every
+ * durable record below — vocabulary, receipts, consents AND the verified
+ * experiences themselves — enters the store ONLY through the real operator
+ * SHA-256-pinned provisioning path (`provisionMetaFromHostFile`). No direct
+ * store register/record calls remain as fixture seeding. The tests
+ * prove, on a CLEAN store, that:
  *   - current Case B retrieves Case A's privacy-minimized verified experience
- *     (source Case is provenance only, never an equality gate); same-Case
- *     retrieval also works;
- *   - query inputs match the #285 contract exactly (targetCaseRef injected
- *     by the trusted composition, capabilityId, optional taskClass, bounded
- *     limit) — an unsupported `tags` field is refused at the gateway;
+ *     through real HTTP → reference-authenticated admission → selected K →
+ *     externalEffect:false C → existing Host SQLite (source Case is
+ *     provenance only, never an equality gate); same-Case retrieval works;
+ *   - query inputs match the #285 contract exactly (optional taskClass,
+ *     bounded limit) — an unsupported `tags` field refuses at the gateway;
  *   - results are advisoryOnly data: no Permit/grant/approval is minted, no
  *     policy mutates, no Shadow candidate is promoted, and no cloud LLM is
  *     called (the disabled interpreter journals nothing);
- *   - stale/revoked experience is excluded after the source Case opts out;
- *   - the R03C multi-Case Host provisioning file (hash-pinned, bounded batch)
- *     seeds more than one source Case into the same local DB, preserving
- *     legacy single-record compatibility and fail-closed validation.
+ *   - stale/revoked experience is excluded after the source Case's opt-out
+ *     declaration arrives through a second pinned provisioning file;
+ *   - the generation-2 pinned schema is strict and ATOMIC: unknown vocabulary,
+ *     consent/receipt mismatch, invalid experience payloads, duplicate
+ *     Case/revision entries, opt-out Cases carrying experiences, over-limit
+ *     batches, extra document keys and malformed LATER entries all refuse
+ *     with ZERO durable writes — the shared query can never expose partially
+ *     seeded experiences.
  */
 import { spawnSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
@@ -30,17 +37,17 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { DemoShunBackend } from '../../../../apps/control-api/src/demo/backend.ts';
 import { createControlServer } from '../../../../apps/control-api/src/server.ts';
 import {
+  META_CASE_PROVISION_MAX_CASES,
+  META_CASE_PROVISION_MAX_EXPERIENCES_TOTAL,
+  provisionMetaFromHostFile,
+} from '../../../../apps/control-api/src/v03/composition-journeys.ts';
+import {
   createProductionV03Gateway,
   type TrustedLlmInterpreterPort,
 } from '../../../../apps/control-api/src/v03/composition-production.ts';
-import {
-  META_CASE_PROVISION_MAX_CASES,
-  provisionMetaFromHostFile,
-} from '../../../../apps/control-api/src/v03/composition-journeys.ts';
 import { HostGuidedService } from '../../../../packages/domain-host/src/guided/host-guided-service.ts';
 import {
   HostMetaShadowStore,
-  type MetaVerifiedExperienceInput,
   type MetaVerifiedExperienceRecord,
 } from '../../../../packages/domain-host/src/meta/host-meta-shadow-store.ts';
 import { consumerDir, ensureV03SdkConsumer } from '../r02-a-build/ensure-consumer.mjs';
@@ -82,7 +89,12 @@ export const routeWorkflowIntent = __dhv10RouterBundle.routeWorkflowIntent;
 
 function trustedModule(sourceFile: string, module: Record<string, unknown>) {
   const bytes = readFileSync(sourceFile, 'utf8');
-  return { provenance: 'SHUN_TRUSTED_DOMAIN_PACKAGE', sourceFile, sourceSha256: sha256(bytes), module };
+  return {
+    provenance: 'SHUN_TRUSTED_DOMAIN_PACKAGE',
+    sourceFile,
+    sourceSha256: sha256(bytes),
+    module,
+  };
 }
 
 function assembleBuild(dir: string): { buildFile: string; buildFileSha256: string } {
@@ -95,7 +107,7 @@ function assembleBuild(dir: string): { buildFile: string; buildFileSha256: strin
   const spec = {
     appId: 'shun-v03-goal',
     audience: 'operator-local',
-    buildId: 'shun-v0.3-r03c-meta-shared-production',
+    buildId: 'shun-v0.3-r03c-meta-shared-production-g2',
     targetProfile: 'node24-esm/1',
     routes: [
       { intentId: 'goal-interpret', operationId: 'interpretGoal', capabilityId: 'llm', handlerId: 'interpretGoal' },
@@ -229,7 +241,13 @@ function metaResults(body: Record<string, unknown>): MetaVerifiedExperienceRecor
   return (result?.admitted?.effects?.[0]?.output?.outcome?.output ?? []) as MetaVerifiedExperienceRecord[];
 }
 
-function consentRecord(caseRef: string, revision: string, digest: string): Record<string, unknown> {
+/** Operator-pinned consent record (the exact shape the pinned file carries). */
+function consentRecord(
+  caseRef: string,
+  revision: string,
+  digest: string,
+  overrides: Record<string, unknown> = {},
+): Record<string, unknown> {
   return {
     consentRef: `consent-${caseRef}-${revision}`,
     revision: 'consent-rev-1',
@@ -242,22 +260,17 @@ function consentRecord(caseRef: string, revision: string, digest: string): Recor
     currentnessRef: `currentness:${caseRef}:${revision}`,
     optIn: true,
     expiresAt: hoursFromNow(2),
+    ...overrides,
   };
 }
 
-function seedCase(store: HostMetaShadowStore, caseRef: string): string {
-  const revision = 'outcome-r1';
-  const digest = sha256(`evidence:${caseRef}:${revision}`);
-  store.recordOutcomeReceipt({ caseRef, revision, sha256: digest });
-  store.recordOptInConsent(consentRecord(caseRef, revision, digest) as never);
-  return digest;
+function receiptRecord(caseRef: string, revision = 'outcome-r1'): Record<string, unknown> {
+  return { caseRef, revision, sha256: sha256(`evidence:${caseRef}:${revision}`) };
 }
 
-function experienceFor(caseRef: string, digest: string, overrides: Partial<MetaVerifiedExperienceInput> = {}): MetaVerifiedExperienceInput {
+/** The single pinned experience shape (source identity derived from receipt). */
+function experienceRecord(overrides: Record<string, unknown> = {}): Record<string, unknown> {
   return {
-    caseRef,
-    sourceRevision: 'outcome-r1',
-    sourceDigest: digest,
     capabilityId: CAPABILITY,
     taskClass: TASK_CLASS,
     patternId: PATTERN,
@@ -268,7 +281,31 @@ function experienceFor(caseRef: string, digest: string, overrides: Partial<MetaV
   };
 }
 
-describe('R03C: Meta shared-experience query route (production composition + HTTP)', () => {
+function provisionDocument(): Record<string, unknown> {
+  return {
+    vocabulary: {
+      capabilityIds: [CAPABILITY, CAPABILITY_ALT],
+      taskClasses: [TASK_CLASS],
+      patternIds: [PATTERN],
+      tags: [TAG_HIGH_SUCCESS],
+      constraintCodes: [CONSTRAINT_NO_ELEVATION],
+    },
+    cases: [
+      {
+        receipt: receiptRecord('case-alpha'),
+        consent: consentRecord('case-alpha', 'outcome-r1', sha256('evidence:case-alpha:outcome-r1')),
+        experiences: [experienceRecord()],
+      },
+      {
+        receipt: receiptRecord('case-beta'),
+        consent: consentRecord('case-beta', 'outcome-r1', sha256('evidence:case-beta:outcome-r1')),
+        experiences: [experienceRecord()],
+      },
+    ],
+  };
+}
+
+describe('R03C: Meta shared-experience query route (pinned-provisioned clean store + HTTP)', () => {
   let dir: string;
   let guided: HostGuidedService;
   let store: HostMetaShadowStore;
@@ -276,34 +313,24 @@ describe('R03C: Meta shared-experience query route (production composition + HTT
   let server: ReturnType<typeof createControlServer>;
   let port: number;
   let caseId = '';
-  let caseAlphaExperienceId = '';
-  let caseBetaExperienceId = '';
 
   const submit = async (body: unknown) =>
     json(port, 'POST', '/api/v03/meta/shared-query', body);
 
   beforeAll(async () => {
     ensureV03SdkConsumer();
-    dir = mkdtempSync(join(tmpdir(), 'shun-r03c-meta-shared-prod-'));
+    dir = mkdtempSync(join(tmpdir(), 'shun-r03c-meta-shared-g2-'));
     store = new HostMetaShadowStore(join(dir, 'meta.sqlite'));
-    store.registerMetaCapabilityId(CAPABILITY);
-    store.registerMetaCapabilityId(CAPABILITY_ALT);
-    store.registerMetaTaskClass(TASK_CLASS);
-    store.registerMetaPatternId(PATTERN);
-    store.registerMetaExperienceTag(TAG_HIGH_SUCCESS);
-    store.registerMetaConstraintCode(CONSTRAINT_NO_ELEVATION);
-    // Two source Cases in the SAME local DB: case-alpha (cross-Case source)
-    // and the current Case itself (same-Case retrieval).
-    const alphaDigest = seedCase(store, 'case-alpha');
-    const alpha = store.recordSharedExperience(experienceFor('case-alpha', alphaDigest));
-    if (alpha.status !== 'STORED') throw new Error(`alpha seed refused: ${alpha.status}`);
-    caseAlphaExperienceId = alpha.experienceId ?? '';
-    const betaDigest = seedCase(store, 'case-beta');
-    const beta = store.recordSharedExperience(
-      experienceFor('case-beta', betaDigest, { patternId: PATTERN }),
-    );
-    if (beta.status !== 'STORED') throw new Error(`beta seed refused: ${beta.status}`);
-    caseBetaExperienceId = beta.experienceId ?? '';
+    // The ONLY ingestion path: the real operator SHA-256-pinned provisioning
+    // file (vocabulary + receipts + consents + verified experiences).
+    const provisionFile = join(dir, 'pinned-provision.json');
+    const bytes = JSON.stringify(provisionDocument(), null, 2) + '\n';
+    writeFileSync(provisionFile, bytes);
+    provisionMetaFromHostFile({
+      store,
+      file: provisionFile,
+      sha256: sha256(bytes),
+    });
 
     guided = new HostGuidedService(join(dir, 'guided.sqlite'));
     const now = Date.now();
@@ -344,7 +371,7 @@ describe('R03C: Meta shared-experience query route (production composition + HTT
       kDocDatabaseFile: join(dir, 'k-docs.sqlite'),
       deploymentRoot: consumerDir,
       tenantId: 'tenant:shun-v03',
-      deployedAppId: 'deployment:shun-v03-r03c-meta-shared',
+      deployedAppId: 'deployment:shun-v03-r03c-meta-shared-g2',
       selectedCase: guided,
       llm: {
         interpreter: disabledInterpreter,
@@ -404,14 +431,16 @@ describe('R03C: Meta shared-experience query route (production composition + HTT
     expect(status).toBe(200);
     expect(body.status).toBe('COMPLETED');
     const results = metaResults(body);
-    const alpha = results.find((record) => record.experienceId === caseAlphaExperienceId);
+    const alpha = results.find((record) => record.provenance.sourceCaseRef === 'case-alpha');
     expect(alpha).toBeTruthy();
     expect(alpha?.advisoryOnly).toBe(true);
-    expect(alpha?.provenance.sourceCaseRef).toBe('case-alpha');
+    expect(alpha?.provenance.sourceRevision).toBe('outcome-r1');
+    expect(alpha?.provenance.sourceDigest).toBe(sha256('evidence:case-alpha:outcome-r1'));
     expect(alpha?.feedbackCandidateRef).toBeUndefined();
-    // Same-Case record of the current Case is visible too.
-    expect(results.some((record) => record.experienceId === caseBetaExperienceId)).toBe(true);
-    // Closed-world vocabulary tokens ride with the record; no raw prompt data.
+    // Same-Case record of the current Case is visible too (pinned seed).
+    expect(
+      results.some((record) => record.provenance.sourceCaseRef === 'case-beta'),
+    ).toBe(true);
     expect(alpha?.tags).toEqual([TAG_HIGH_SUCCESS]);
   });
 
@@ -447,8 +476,6 @@ describe('R03C: Meta shared-experience query route (production composition + HTT
   });
 
   it('query mints no authority and never calls the cloud LLM', async () => {
-    // The disabled interpreter must have journaled nothing; a query is a
-    // read-only internal effect with zero external dispatch.
     const { DatabaseSync } = await import('node:sqlite');
     const journal = new DatabaseSync(join(dir, 'cloud-journal.sqlite'));
     const row = journal
@@ -458,21 +485,33 @@ describe('R03C: Meta shared-experience query route (production composition + HTT
     expect(row.count).toBe(0);
   });
 
-  it('stale/revoked experience is excluded after the source Case opts out (same-Case stays)', async () => {
+  it('stale/revoked experience is excluded after the source Case opts out via a second pinned file', async () => {
+    // The opt-out declaration is itself operator-pinned provisioning
+    // (generation-1 batch form; the identical receipt re-record is a no-op).
+    const revocationFile = join(dir, 'pinned-revocation.json');
     const alphaDigest = sha256('evidence:case-alpha:outcome-r1');
-    store.recordOptInConsent({
-      consentRef: 'consent-case-alpha-rev-2',
-      revision: 'consent-rev-2',
-      caseRef: 'case-alpha',
-      sourceRevision: 'outcome-r1',
-      sourceDigest: alphaDigest,
-      operatorId: 'operator:shun-owner',
-      operatorSubjectRef: 'operator:shun-owner',
-      authorizationRevision: 'authz-rev-2',
-      currentnessRef: 'currentness:case-alpha:outcome-r1:rev-2',
-      optIn: false,
-      expiresAt: hoursFromNow(2),
-    });
+    const bytes =
+      JSON.stringify(
+        {
+          cases: [
+            {
+              receipt: receiptRecord('case-alpha'),
+              consent: consentRecord('case-alpha', 'outcome-r1', alphaDigest, {
+                consentRef: 'consent-case-alpha-rev-2',
+                revision: 'consent-rev-2',
+                authorizationRevision: 'authz-rev-2',
+                currentnessRef: 'currentness:case-alpha:outcome-r1:rev-2',
+                optIn: false,
+              }),
+            },
+          ],
+        },
+        null,
+        2,
+      ) + '\n';
+    writeFileSync(revocationFile, bytes);
+    provisionMetaFromHostFile({ store, file: revocationFile, sha256: sha256(bytes) });
+
     const refs = production.issueSubmitReferences();
     if (refs.status !== 'ISSUED') throw new Error(`refs refused: ${refs.status}`);
     const { status, body } = await submit({
@@ -483,12 +522,12 @@ describe('R03C: Meta shared-experience query route (production composition + HTT
     });
     expect(status).toBe(200);
     const results = metaResults(body);
-    expect(results.some((record) => record.experienceId === caseAlphaExperienceId)).toBe(false);
-    expect(results.some((record) => record.experienceId === caseBetaExperienceId)).toBe(true);
+    expect(results.some((record) => record.provenance.sourceCaseRef === 'case-alpha')).toBe(false);
+    expect(results.some((record) => record.provenance.sourceCaseRef === 'case-beta')).toBe(true);
   });
 });
 
-describe('R03C: multi-Case hash-pinned Host meta provisioning (composition-journeys)', () => {
+describe('R03C: pinned provisioning schema (generation-2 contract)', () => {
   const createdDirs: string[] = [];
   const openStores: HostMetaShadowStore[] = [];
 
@@ -500,11 +539,51 @@ describe('R03C: multi-Case hash-pinned Host meta provisioning (composition-journ
     return { store, dir: tempDir };
   }
 
-  function pinnedFile(dir: string, name: string, value: unknown): { file: string; sha256: string } {
+  function provisionViaPinnedFile(
+    store: HostMetaShadowStore,
+    dir: string,
+    name: string,
+    document: unknown,
+  ): string {
     const file = join(dir, name);
-    const bytes = JSON.stringify(value, null, 2) + '\n';
+    const bytes = JSON.stringify(document, null, 2) + '\n';
     writeFileSync(file, bytes);
-    return { file, sha256: sha256(bytes) };
+    return file;
+  }
+
+  function pinnedSha(document: unknown): string {
+    return sha256(JSON.stringify(document, null, 2) + '\n');
+  }
+
+  /** A refused document must leave ZERO experiences queryable. */
+  function expectAtomicRefusal(
+    store: HostMetaShadowStore,
+    dir: string,
+    name: string,
+    document: unknown,
+    code: string,
+  ): void {
+    const file = provisionViaPinnedFile(store, dir, name, document);
+    expect(() =>
+      provisionMetaFromHostFile({ store, file, sha256: pinnedSha(document) }),
+    ).toThrow(code);
+    // Zero visible experiences. A refused document never registers its
+    // vocabulary, so the store may itself refuse the query capability as
+    // unknown — which is equally a proof that nothing was seeded.
+    let visible: readonly unknown[] | undefined;
+    try {
+      visible = store.querySharedExperiences({
+        targetCaseRef: 'case-any',
+        capabilityId: CAPABILITY,
+      });
+    } catch (error) {
+      if (error instanceof TypeError && error.message === 'META_EXPERIENCE_QUERY_INVALID') {
+        visible = [];
+      } else {
+        throw error;
+      }
+    }
+    expect(visible).toHaveLength(0);
   }
 
   afterAll(() => {
@@ -529,85 +608,185 @@ describe('R03C: multi-Case hash-pinned Host meta provisioning (composition-journ
     }
   });
 
-  it('legacy single-record file keeps working (strict compatibility)', () => {
+  it('legacy single-record file keeps working exactly as before (receipt + consent only)', () => {
     const { store, dir } = makeStore('legacy');
-    store.registerMetaCapabilityId(CAPABILITY);
-    store.registerMetaTaskClass(TASK_CLASS);
-    store.registerMetaPatternId(PATTERN);
-    const digest = sha256('evidence:case-legacy:outcome-r1');
-    const pinned = pinnedFile(dir, 'case.json', {
-      receipt: { caseRef: 'case-legacy', revision: 'outcome-r1', sha256: digest },
-      consent: consentRecord('case-legacy', 'outcome-r1', digest),
-    });
-    provisionMetaFromHostFile({ store, file: pinned.file, sha256: pinned.sha256 });
-    const recorded = store.recordSharedExperience(
-      experienceFor('case-legacy', digest, { tags: [], constraintCodes: [] }),
-    );
-    expect(recorded.status).toBe('STORED');
+    const document = {
+      receipt: receiptRecord('case-legacy'),
+      consent: consentRecord('case-legacy', 'outcome-r1', sha256('evidence:case-legacy:outcome-r1')),
+    };
+    const file = provisionViaPinnedFile(store, dir, 'case.json', document);
+    provisionMetaFromHostFile({ store, file, sha256: pinnedSha(document) });
+    // Legacy form registers no vocabulary and no experiences: the store's
+    // own writer stays sealed for this Case (proves no implicit widening).
+    expect(() =>
+      store.recordSharedExperience({
+        caseRef: 'case-legacy',
+        sourceRevision: 'outcome-r1',
+        sourceDigest: sha256('evidence:case-legacy:outcome-r1'),
+        capabilityId: CAPABILITY,
+        taskClass: TASK_CLASS,
+        patternId: PATTERN,
+        verifiedOutcome: 'VERIFIED_PASS',
+        tags: [],
+        constraintCodes: [],
+      }),
+    ).toThrow('META_EXPERIENCE_VOCABULARY_UNKNOWN');
   });
 
-  it('bounded batch file seeds MORE THAN ONE source Case into the same local DB', () => {
-    const { store, dir } = makeStore('batch');
-    store.registerMetaCapabilityId(CAPABILITY);
-    store.registerMetaTaskClass(TASK_CLASS);
-    store.registerMetaPatternId(PATTERN);
+  it('generation-1 bounded batch format (receipt + consent only) is preserved', () => {
+    const { store, dir } = makeStore('batch-g1');
     const digestA = sha256('evidence:case-a:outcome-r1');
     const digestB = sha256('evidence:case-b:outcome-r1');
-    const pinned = pinnedFile(dir, 'cases.json', {
+    const document = {
       cases: [
-        {
-          receipt: { caseRef: 'case-a', revision: 'outcome-r1', sha256: digestA },
-          consent: consentRecord('case-a', 'outcome-r1', digestA),
-        },
-        {
-          receipt: { caseRef: 'case-b', revision: 'outcome-r1', sha256: digestB },
-          consent: consentRecord('case-b', 'outcome-r1', digestB),
-        },
+        { receipt: receiptRecord('case-a'), consent: consentRecord('case-a', 'outcome-r1', digestA) },
+        { receipt: receiptRecord('case-b'), consent: consentRecord('case-b', 'outcome-r1', digestB) },
       ],
-    });
-    provisionMetaFromHostFile({ store, file: pinned.file, sha256: pinned.sha256 });
-    for (const [caseRef, digest] of [['case-a', digestA], ['case-b', digestB]] as const) {
-      const recorded = store.recordSharedExperience(
-        experienceFor(caseRef, digest, { tags: [], constraintCodes: [] }),
-      );
-      expect(recorded.status).toBe('STORED');
-    }
+    };
+    const file = provisionViaPinnedFile(store, dir, 'cases.json', document);
+    provisionMetaFromHostFile({ store, file, sha256: pinnedSha(document) });
+    // Gen-1 batch registers no vocabulary: the store's query refuses the
+    // capability as unknown (nothing seeded, exactly as before generation 2).
+    expect(() =>
+      store.querySharedExperiences({ targetCaseRef: 'case-x', capabilityId: CAPABILITY }),
+    ).toThrow('META_EXPERIENCE_QUERY_INVALID');
   });
 
-  it('fail-closed: digest mismatch, malformed entries, both-forms, and over-bound batches refuse', () => {
-    const { store, dir } = makeStore('refused');
-    store.registerMetaCapabilityId(CAPABILITY);
-    const digest = sha256('evidence:case-x:outcome-r1');
-    const valid = {
-      receipt: { caseRef: 'case-x', revision: 'outcome-r1', sha256: digest },
-      consent: consentRecord('case-x', 'outcome-r1', digest),
+  it('generation-2 file provisions closed vocabulary + bounded experiences for MULTIPLE Cases', () => {
+    const { store, dir } = makeStore('batch-g2');
+    const document = provisionDocument();
+    const file = provisionViaPinnedFile(store, dir, 'full.json', document);
+    provisionMetaFromHostFile({ store, file, sha256: pinnedSha(document) });
+    const all = store.querySharedExperiences({
+      targetCaseRef: 'case-beta',
+      capabilityId: CAPABILITY,
+    });
+    expect(all).toHaveLength(2);
+    expect(
+      all.every((record) => record.advisoryOnly === true && record.provenance.sourceCaseRef.length > 0),
+    ).toBe(true);
+    const filtered = store.querySharedExperiences({
+      targetCaseRef: 'case-beta',
+      capabilityId: CAPABILITY,
+      taskClass: TASK_CLASS,
+    });
+    expect(filtered).toHaveLength(2);
+  });
+
+  it('fail-closed: unknown vocabulary refuses atomically', () => {
+    const { store, dir } = makeStore('unknown-vocab');
+    const broken = {
+      ...provisionDocument(),
+      cases: [
+        {
+          receipt: receiptRecord('case-alpha'),
+          consent: consentRecord('case-alpha', 'outcome-r1', sha256('evidence:case-alpha:outcome-r1')),
+          experiences: [experienceRecord({ capabilityId: 'cap.undeclared' })],
+        },
+      ],
     };
-    const pinned = pinnedFile(dir, 'valid.json', valid);
+    expectAtomicRefusal(store, dir, 'unknown.json', broken, 'V03_META_EXPERIENCE_VOCABULARY_UNKNOWN');
+  });
 
-    expect(() =>
-      provisionMetaFromHostFile({ store, file: pinned.file, sha256: '0'.repeat(64) }),
-    ).toThrow('V03_META_CASE_DIGEST_REFUSED');
+  it('fail-closed: consent/receipt source mismatch refuses atomically', () => {
+    const { store, dir } = makeStore('mismatch');
+    const broken = {
+      ...provisionDocument(),
+      cases: [
+        {
+          receipt: receiptRecord('case-alpha'),
+          consent: consentRecord('case-alpha', 'outcome-r1', sha256('evidence:case-alpha:outcome-r1'), {
+            sourceDigest: sha256('evidence:OTHER'),
+          }),
+          experiences: [experienceRecord()],
+        },
+      ],
+    };
+    expectAtomicRefusal(store, dir, 'mismatch.json', broken, 'V03_META_CASE_SOURCE_MISMATCH');
+  });
 
-    const malformed = pinnedFile(dir, 'malformed.json', {
-      cases: [{ receipt: { caseRef: 'case-x' }, consent: valid.consent }],
-    });
-    expect(() =>
-      provisionMetaFromHostFile({ store, file: malformed.file, sha256: malformed.sha256 }),
-    ).toThrow('V03_META_CASE_INVALID');
+  it('fail-closed: invalid experience payloads (extra keys / bad outcome / undeclared tag) refuse atomically', () => {
+    const { store, dir } = makeStore('invalid-exp');
+    const alphaConsent = consentRecord('case-alpha', 'outcome-r1', sha256('evidence:case-alpha:outcome-r1'));
+    const brokenExtra = {
+      ...provisionDocument(),
+      cases: [
+        { receipt: receiptRecord('case-alpha'), consent: alphaConsent, experiences: [experienceRecord({ note: 'operator remark' })] },
+      ],
+    };
+    expectAtomicRefusal(store, dir, 'extra.json', brokenExtra, 'V03_META_EXPERIENCE_INVALID');
+    const brokenOutcome = {
+      ...provisionDocument(),
+      cases: [
+        { receipt: receiptRecord('case-alpha'), consent: alphaConsent, experiences: [experienceRecord({ verifiedOutcome: 'PARTIAL' })] },
+      ],
+    };
+    expectAtomicRefusal(store, dir, 'outcome.json', brokenOutcome, 'V03_META_EXPERIENCE_INVALID');
+    const brokenTag = {
+      ...provisionDocument(),
+      cases: [
+        { receipt: receiptRecord('case-alpha'), consent: alphaConsent, experiences: [experienceRecord({ tags: ['tag.undeclared'] })] },
+      ],
+    };
+    expectAtomicRefusal(store, dir, 'tag.json', brokenTag, 'V03_META_EXPERIENCE_VOCABULARY_UNKNOWN');
+  });
 
-    const bothForms = pinnedFile(dir, 'both.json', { ...valid, cases: [valid] });
-    expect(() =>
-      provisionMetaFromHostFile({ store, file: bothForms.file, sha256: bothForms.sha256 }),
-    ).toThrow('V03_META_CASE_INVALID');
+  it('fail-closed: a malformed LATER Case entry refuses the WHOLE document (no partial seed)', () => {
+    const { store, dir } = makeStore('later-entry');
+    const document = provisionDocument();
+    const broken = {
+      ...document,
+      cases: [
+        ...(document.cases as unknown[]),
+        { receipt: receiptRecord('case-gamma'), consent: 'not-a-consent', experiences: [] },
+      ],
+    };
+    expectAtomicRefusal(store, dir, 'later.json', broken, 'V03_META_CASE_INVALID');
+  });
 
-    const overBound = pinnedFile(dir, 'over.json', {
+  it('fail-closed: extra document keys, duplicate Case/revision, opt-out with experiences, over-limit totals', () => {
+    const { store, dir } = makeStore('strict');
+
+    const withExtraKey = { ...provisionDocument(), operatorNote: 'x' };
+    expectAtomicRefusal(store, dir, 'extra-key.json', withExtraKey, 'V03_META_CASE_INVALID');
+
+    const duplicate = provisionDocument();
+    (duplicate.cases as unknown[]).push((duplicate.cases as unknown[])[0] as never);
+    expectAtomicRefusal(store, dir, 'dup.json', duplicate, 'V03_META_CASE_DUPLICATE');
+
+    const optOutWithExperiences = provisionDocument();
+    (optOutWithExperiences.cases as Record<string, unknown>[])[0] = {
+      receipt: receiptRecord('case-alpha'),
+      consent: consentRecord('case-alpha', 'outcome-r1', sha256('evidence:case-alpha:outcome-r1'), { optIn: false }),
+      experiences: [experienceRecord()],
+    };
+    expectAtomicRefusal(store, dir, 'optout.json', optOutWithExperiences, 'V03_META_CASE_OPT_IN_REQUIRED');
+
+    // 65 identical experiences in one Case trip the in-case duplicate rule
+    // before the total bound; a same-shape over-limit document still refuses.
+    const overLimit = provisionDocument();
+    const alphaEntry = (overLimit.cases as Record<string, unknown>[])[0] as Record<string, unknown>;
+    alphaEntry.experiences = Array.from(
+      { length: META_CASE_PROVISION_MAX_EXPERIENCES_TOTAL + 1 },
+      () => experienceRecord(),
+    );
+    expectAtomicRefusal(store, dir, 'over.json', overLimit, 'V03_META_EXPERIENCE_DUPLICATE');
+  });
+
+  it('fail-closed: over-bound Case count and digest tamper still refuse', () => {
+    const { store, dir } = makeStore('bounds');
+    const overCases = {
       cases: Array.from({ length: META_CASE_PROVISION_MAX_CASES + 1 }, (_, index) => ({
-        receipt: { caseRef: `case-${index}`, revision: 'outcome-r1', sha256: digest },
-        consent: consentRecord(`case-${index}`, 'outcome-r1', digest),
+        receipt: receiptRecord(`case-${index}`),
+        consent: consentRecord(`case-${index}`, 'outcome-r1', sha256(`evidence:case-${index}:outcome-r1`)),
       })),
-    });
+    };
+    expectAtomicRefusal(store, dir, 'cases-over.json', overCases, 'V03_META_CASE_BATCH_BOUND_REFUSED');
+
+    const document = provisionDocument();
+    const file = provisionViaPinnedFile(store, dir, 'tamper.json', document);
     expect(() =>
-      provisionMetaFromHostFile({ store, file: overBound.file, sha256: overBound.sha256 }),
-    ).toThrow('V03_META_CASE_BATCH_BOUND_REFUSED');
+      provisionMetaFromHostFile({ store, file, sha256: '0'.repeat(64) }),
+    ).toThrow('V03_META_CASE_DIGEST_REFUSED');
   });
 });
