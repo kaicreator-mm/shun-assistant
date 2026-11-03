@@ -18,6 +18,8 @@
  */
 import { join } from 'node:path';
 import { validateGrantPresentation } from '../../../contracts/src/authorization.ts';
+import { LocalWindowsBackend } from '../../../executor-windows/src/backend.ts';
+import { PrivilegedWindowsExecutionBackend } from '../../../executor-windows/src/privileged-backend.ts';
 import {
   FileCurrentnessSource,
   FileGrantSource,
@@ -25,7 +27,6 @@ import {
   hmacGrantIntegrityVerifier,
   resolveGrantHmacKeyFile,
 } from '../../../executor-windows/src/trusted-store.ts';
-import { LocalWindowsBackend } from '../../../executor-windows/src/backend.ts';
 import {
   createWindowsEffectHost,
   readKernelEffectPermit,
@@ -42,7 +43,100 @@ export interface TrustedWindowsEffectBindingConfig {
 interface InstalledBinding {
   readonly host: ReturnType<typeof createWindowsEffectHost>;
   readonly backend: LocalWindowsBackend;
+  readonly privilegedBackend: PrivilegedWindowsExecutionBackend;
   readonly planSource: FilePlanSource;
+  readonly grantSource: FileGrantSource;
+  readonly currentness: FileCurrentnessSource;
+  readonly verifyIntegrity: ReturnType<typeof hmacGrantIntegrityVerifier>;
+}
+
+/** Operator-provisioned reference to the ONE pinned provider-global installer action. */
+export interface TrustedElevatedActionRef {
+  readonly actionRef: string;
+  readonly planRef: string;
+  readonly grantRef: string;
+  readonly taskId: 'provider-global';
+}
+
+/** Bounded UAC preview: program identity, exact arguments, side-effect class. */
+export interface TrustedElevatedActionPreview {
+  readonly actionRef: string;
+  readonly planRef: string;
+  readonly taskId: 'provider-global';
+  readonly requiredPrivilege: 'ELEVATED';
+  readonly sideEffectClass: string;
+  readonly program: string;
+  readonly args: readonly string[];
+}
+
+export type TrustedElevatedActionResult =
+  | {
+      readonly status: 'COMPLETED';
+      readonly code?: undefined;
+      readonly receipt: PrivilegedReceiptSummary;
+    }
+  | {
+      readonly status: 'REFUSED';
+      readonly code: string;
+      readonly receipt: PrivilegedReceiptSummary;
+    }
+  | {
+      readonly status: 'UNKNOWN';
+      readonly code: string;
+      readonly receipt: PrivilegedReceiptSummary;
+    };
+
+/**
+ * Closed-world allowlist projection of a privileged backend
+ * `ExecutionReceipt`: only the terminal classification and bounded
+ * numeric/boolean execution facts survive. Output references
+ * (`outputRefs`/`stdoutRef`/`stderrRef`), `environmentId`, absolute paths,
+ * raw output, free text and arbitrary nested properties are structurally
+ * dropped — callers cannot persist or return them even by mistake.
+ */
+export interface PrivilegedReceiptSummary {
+  readonly terminal:
+    | 'SUCCEEDED'
+    | 'REFUSED'
+    | 'UAC_DECLINED'
+    | 'CANCELLED'
+    | 'FAILED'
+    | 'TIMED_OUT'
+    | 'UNCLEAR';
+  readonly exitCode?: number;
+  readonly timedOut?: boolean;
+  readonly durationMs?: number;
+}
+
+const PRIVILEGED_TERMINALS = [
+  'SUCCEEDED',
+  'REFUSED',
+  'UAC_DECLINED',
+  'CANCELLED',
+  'FAILED',
+  'TIMED_OUT',
+] as const;
+
+export function projectPrivilegedReceipt(receipt: unknown): PrivilegedReceiptSummary {
+  const source =
+    typeof receipt === 'object' && receipt !== null ? (receipt as Record<string, unknown>) : {};
+  const terminal =
+    typeof source.terminal === 'string' &&
+    (PRIVILEGED_TERMINALS as readonly string[]).includes(source.terminal)
+      ? (source.terminal as PrivilegedReceiptSummary['terminal'])
+      : 'UNCLEAR';
+  const exitCode = Number.isInteger(source.exitCode) ? (source.exitCode as number) : undefined;
+  const timedOut = typeof source.timedOut === 'boolean' ? source.timedOut : undefined;
+  const durationMs =
+    Number.isInteger(source.durationMs) && (source.durationMs as number) >= 0
+      ? (source.durationMs as number)
+      : undefined;
+  return Object.freeze({
+    terminal,
+    ...(exitCode !== undefined ? { exitCode } : {}),
+    ...(timedOut !== undefined ? { timedOut } : {}),
+    ...(durationMs !== undefined ? { durationMs } : {}),
+  });
 }
 
 /**
@@ -154,7 +248,19 @@ export function installTrustedWindowsEffectBinding(
       },
     },
   });
-  installed = { host, backend, planSource };
+  const privilegedBackend = new PrivilegedWindowsExecutionBackend({
+    authorityDir: config.authorityDir,
+    workspaceRoot: config.workspaceRoot,
+  });
+  installed = {
+    host,
+    backend,
+    privilegedBackend,
+    planSource,
+    grantSource,
+    currentness,
+    verifyIntegrity,
+  };
 }
 
 function crossCaseRefusal(effectId: string): WindowsHostEnvelope {
@@ -199,6 +305,156 @@ export async function windowsExecute(
     }
   }
   return installed.host.dispatch(payload, dispatchContext);
+}
+
+// ---------------------------------------------------------------------------
+// R03C — Host-global Provider elevation (existing privileged backend only)
+// ---------------------------------------------------------------------------
+
+/**
+ * Resolve the ONE operator-provisioned `provider-global` ELEVATED installer
+ * action from the durable authority store: plan, grant and current authority
+ * must all be current, the action must be unique and declare ELEVATED, and
+ * its step must be the allowlisted exact installer shape. Any drift refuses
+ * before the privileged backend is ever constructed around a payload.
+ */
+function resolveTrustedElevatedAction(input: TrustedElevatedActionRef):
+  | {
+      readonly ok: true;
+      readonly action: Record<string, unknown>;
+      readonly grant: unknown;
+      readonly step: Record<string, unknown>;
+    }
+  | { readonly ok: false; readonly code: string } {
+  if (installed === undefined) return { ok: false, code: 'WINDOWS_HOST_NOT_INSTALLED' };
+  if (
+    input.taskId !== 'provider-global' ||
+    !/^[A-Za-z][A-Za-z0-9._-]{0,127}$/.test(input.actionRef) ||
+    !/^[a-f0-9]{64}$/.test(input.planRef) ||
+    !/^[A-Za-z][A-Za-z0-9._:-]{0,127}$/.test(input.grantRef)
+  ) {
+    return { ok: false, code: 'PROVIDER_ELEVATION_REFERENCE_INVALID' };
+  }
+  const plan = installed.planSource.byPlanHash(input.planRef);
+  if (plan?.taskId !== 'provider-global' || plan.planHash !== input.planRef) {
+    return { ok: false, code: 'PROVIDER_ELEVATION_PLAN_NOT_CURRENT' };
+  }
+  const grant = installed.grantSource.byGrantId(input.grantRef);
+  if (grant?.taskId !== 'provider-global' || grant.planHash !== plan.planHash) {
+    return { ok: false, code: 'PROVIDER_ELEVATION_GRANT_NOT_CURRENT' };
+  }
+  const planActions = plan.actions.filter((candidate) => candidate.actionId === input.actionRef);
+  const action = planActions[0];
+  if (!action || planActions.length !== 1 || action.requiredPrivilege !== 'ELEVATED') {
+    return { ok: false, code: 'PROVIDER_ELEVATION_ACTION_NOT_UNIQUE_OR_ELEVATED' };
+  }
+  // The plan action is the frozen contracts PlanAction shape (op + typed
+  // parameters). Only the exact installer probe/exec surface is allowlisted;
+  // the privileged backend re-interprets and re-verifies the step itself.
+  if (action.op !== 'windows.proc.contextCheck' && action.op !== 'windows.proc.exec') {
+    return { ok: false, code: 'PROVIDER_ELEVATION_STEP_NOT_ALLOWLISTED' };
+  }
+  const step = { op: action.op, args: action.parameters } as Record<string, unknown>;
+  const authorizedAction = {
+    taskId: plan.taskId,
+    actionId: action.actionId,
+    planHash: plan.planHash,
+    policySnapshotRevision: plan.policySnapshotRevision,
+    authorizationKind: 'DURABLE_POLICY' as const,
+    authorizationRef: grant.grantId,
+    expiresAt: grant.expiresAt,
+    action,
+  };
+  const verdict = validateGrantPresentation({
+    grant,
+    plan,
+    action: authorizedAction,
+    currentAuthority: installed.currentness.read(),
+    now: new Date().toISOString(),
+    verifyIntegrity: installed.verifyIntegrity,
+  });
+  if (!verdict.ok) return { ok: false, code: verdict.code };
+  return { ok: true, action: authorizedAction, grant, step };
+}
+
+/** Safe UAC preview for the Provider two-step Host-global request flow. */
+export function previewTrustedElevatedAction(
+  input: TrustedElevatedActionRef,
+): TrustedElevatedActionPreview | undefined {
+  const resolved = resolveTrustedElevatedAction(input);
+  if (!resolved.ok) return undefined;
+  const args = resolved.step.args as { args?: unknown; program?: unknown } | undefined;
+  const program =
+    resolved.step.op === 'windows.proc.contextCheck'
+      ? 'Windows elevation context probe (no child process)'
+      : typeof args?.program === 'string'
+        ? args.program
+        : undefined;
+  const argv = Array.isArray(args?.args) ? args.args : [];
+  if (
+    typeof program !== 'string' ||
+    !argv.every((value) => typeof value === 'string' && value.length <= 512) ||
+    argv.some((value) => /(?:password|token|secret|credential|api[_-]?key)=/i.test(String(value)))
+  ) {
+    return undefined;
+  }
+  return Object.freeze({
+    actionRef: input.actionRef,
+    planRef: input.planRef,
+    taskId: input.taskId,
+    requiredPrivilege: 'ELEVATED' as const,
+    sideEffectClass: String(
+      (resolved.action.action as { sideEffectClass?: unknown }).sideEffectClass ?? 'UNKNOWN',
+    ),
+    program,
+    args: Object.freeze(argv as string[]),
+  });
+}
+
+/**
+ * Execute only the operator-pinned `provider-global` ELEVATED action through
+ * the EXISTING privileged one-shot backend and its pinned UAC relay — the
+ * backend rechecks ProgramPin, grant, plan and authority anchors itself.
+ * Definitive receipts map to COMPLETED/REFUSED; every uncertain boundary
+ * maps to UNKNOWN. No second RunAs path, no silent fallback.
+ */
+export async function executeTrustedElevatedAction(
+  input: TrustedElevatedActionRef,
+): Promise<TrustedElevatedActionResult> {
+  if (installed === undefined)
+    return {
+      status: 'REFUSED',
+      code: 'WINDOWS_HOST_NOT_INSTALLED',
+      receipt: projectPrivilegedReceipt(undefined),
+    };
+  const resolved = resolveTrustedElevatedAction(input);
+  if (!resolved.ok)
+    return { status: 'REFUSED', code: resolved.code, receipt: projectPrivilegedReceipt(undefined) };
+  let receipt: unknown;
+  try {
+    receipt = await installed.privilegedBackend.execute(
+      resolved.action as never,
+      resolved.grant as never,
+    );
+  } catch {
+    return {
+      status: 'UNKNOWN',
+      code: 'PROVIDER_ELEVATION_EXECUTION_UNKNOWN',
+      receipt: projectPrivilegedReceipt(undefined),
+    };
+  }
+  // The raw privileged receipt (output references, absolute paths, raw
+  // output) never leaves this module — only the closed allowlist summary.
+  const summary = projectPrivilegedReceipt(receipt);
+  const terminal = (receipt as { terminal?: unknown }).terminal;
+  if (terminal === 'SUCCEEDED') return { status: 'COMPLETED', receipt: summary };
+  if (terminal === 'REFUSED' || terminal === 'UAC_DECLINED' || terminal === 'CANCELLED') {
+    return { status: 'REFUSED', code: 'PROVIDER_ELEVATION_REFUSED', receipt: summary };
+  }
+  if (terminal === 'FAILED' || terminal === 'TIMED_OUT') {
+    return { status: 'REFUSED', code: 'PROVIDER_ELEVATION_FAILED', receipt: summary };
+  }
+  return { status: 'UNKNOWN', code: 'PROVIDER_ELEVATION_OUTCOME_UNKNOWN', receipt: summary };
 }
 
 /** Trusted-process evidence accessor (receipts/verification only). */
