@@ -1,7 +1,7 @@
 /**
  * R03C-META-SHARED-PRODUCTION — read-only cross-Case Meta shared-experience
  * query over the REAL production composition and the REAL loopback HTTP
- * control surface (Issue #288, LOCAL_BUILDER generation 3).
+ * control surface (Issue #288, LOCAL_BUILDER generation 4).
  *
  * Generation-2 repair (PR #316 comment 6610635105, pack PR #317): every
  * durable record below — vocabulary, receipts, consents AND the verified
@@ -43,6 +43,22 @@
  *     refuses before any write;
  *   - the full pinned-file production path rolls back atomically when a
  *     later Case hits a Store-level conflict.
+ *
+ * Generation-4 consent identity (PR #320 review comment 6613661823, pack
+ * PR #321, Owner repair record R1_BLOCK_CONSENT_REPLAY_REPAIR_WITHIN_SAME_13_PATH_SCOPE):
+ * in the batch path a consentRef is an IMMUTABLE consent-declaration identity.
+ * The generation-4 suite proves, again through the independent READ-ONLY
+ * SQLite handle (row counts AND declaration_seq), that:
+ *   - replaying the byte-identical pinned batch after a later opt-out never
+ *     resurrects the old opt-in (opt-out stays current, the old consent keeps
+ *     its original declaration_seq, the attached experience fails the #285
+ *     current-consent check and the whole replay rolls back);
+ *   - replaying an identical batch with no intervening opt-out is a true
+ *     no-op — declaration_seq values are byte-identical, not just row counts;
+ *   - duplicate consentRefs across Case entries are rejected in phase 1;
+ *   - a batch reusing an existing consentRef of another Case — or the same
+ *     consentRef with any different field — conflicts and leaves every
+ *     pre-existing row unchanged.
  */
 import { spawnSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
@@ -932,8 +948,9 @@ describe('R03C: Host Store atomic batch transaction (generation 3)', () => {
 
   it('provisions the complete batch in ONE store call; cross-Case query works; re-apply is idempotent', () => {
     const { store, dir } = makeStore('batch-ok');
+    const document = batchDocument();
     const before = durableCounts(dir);
-    const result = store.provisionVerifiedExperienceBatch(batchDocument());
+    const result = store.provisionVerifiedExperienceBatch(document);
     expect(result).toEqual({
       status: 'PROVISIONED',
       vocabularyCodes: 6,
@@ -957,9 +974,10 @@ describe('R03C: Host Store atomic batch transaction (generation 3)', () => {
       'case-alpha',
       'case-beta',
     ]);
-    // Identical batch re-applied: receipts no-op, consents replace with the
-    // identical content, experiences are ALREADY_STORED — zero delta.
-    store.provisionVerifiedExperienceBatch(batchDocument());
+    // Byte-identical re-apply (same document, same expiresAt strings):
+    // receipts no-op, consents are true no-ops, experiences are
+    // ALREADY_STORED — zero delta.
+    store.provisionVerifiedExperienceBatch(document);
     expect(durableCounts(dir)).toEqual(expected);
   });
 
@@ -1131,6 +1149,276 @@ describe('R03C: Host Store atomic batch transaction (generation 3)', () => {
     expect(() =>
       provisionMetaFromHostFile({ store, file, sha256: pinnedSha(broken) }),
     ).toThrow('META_RECEIPT_CONFLICT');
+    expect(durableCounts(dir)).toEqual(snapshot);
+  });
+});
+
+describe('R03C: immutable consent identity and replay protection (generation 4)', () => {
+  const createdDirs: string[] = [];
+  const openStores: HostMetaShadowStore[] = [];
+
+  function makeStore(name: string): { store: HostMetaShadowStore; dir: string } {
+    const tempDir = mkdtempSync(join(tmpdir(), `r03c-meta-g4-${name}-`));
+    createdDirs.push(tempDir);
+    const store = new HostMetaShadowStore(join(tempDir, 'meta.sqlite'));
+    openStores.push(store);
+    return { store, dir: tempDir };
+  }
+
+  function provisionViaPinnedFile(
+    store: HostMetaShadowStore,
+    dir: string,
+    name: string,
+    document: unknown,
+  ): string {
+    const file = join(dir, name);
+    writeFileSync(file, JSON.stringify(document, null, 2) + '\n');
+    return file;
+  }
+
+  function pinnedSha(document: unknown): string {
+    return sha256(JSON.stringify(document, null, 2) + '\n');
+  }
+
+  function durableCounts(dir: string): {
+    vocabulary: number;
+    receipts: number;
+    consents: number;
+    experiences: number;
+  } {
+    const db = new DatabaseSync(join(dir, 'meta.sqlite'), { readOnly: true });
+    try {
+      const count = (table: string): number =>
+        (db.prepare(`SELECT COUNT(*) AS count FROM ${table}`).get() as { count: number }).count;
+      return {
+        vocabulary: count('meta_experience_vocabulary'),
+        receipts: count('meta_outcome_receipts'),
+        consents: count('meta_opt_in_consents'),
+        experiences: count('meta_verified_experiences'),
+      };
+    } finally {
+      db.close();
+    }
+  }
+
+  /** consentRef -> declaration_seq, via the independent READ-ONLY handle. */
+  function consentSeqs(dir: string): Record<string, number> {
+    const db = new DatabaseSync(join(dir, 'meta.sqlite'), { readOnly: true });
+    try {
+      const rows = db
+        .prepare('SELECT consent_ref, declaration_seq FROM meta_opt_in_consents ORDER BY consent_ref')
+        .all() as { consent_ref: string; declaration_seq: number }[];
+      return Object.fromEntries(rows.map((row) => [row.consent_ref, row.declaration_seq]));
+    } finally {
+      db.close();
+    }
+  }
+
+  function batchExperience(
+    caseRef: string,
+    overrides: Record<string, unknown> = {},
+  ): Record<string, unknown> {
+    const receipt = receiptRecord(caseRef);
+    return {
+      caseRef,
+      sourceRevision: receipt.revision,
+      sourceDigest: receipt.sha256,
+      capabilityId: CAPABILITY,
+      taskClass: TASK_CLASS,
+      patternId: PATTERN,
+      verifiedOutcome: 'VERIFIED_PASS',
+      tags: [TAG_HIGH_SUCCESS],
+      constraintCodes: [CONSTRAINT_NO_ELEVATION],
+      ...overrides,
+    };
+  }
+
+  function batchCase(
+    caseRef: string,
+    overrides: { consent?: Record<string, unknown>; experiences?: unknown[] } = {},
+  ): MetaProvisionCaseInput {
+    const receipt = receiptRecord(caseRef);
+    return {
+      receipt,
+      consent: consentRecord(caseRef, 'outcome-r1', receipt.sha256, overrides.consent) as never,
+      experiences: (overrides.experiences ?? [batchExperience(caseRef)]) as never,
+    };
+  }
+
+  function batchVocabulary(): MetaProvisionBatchInput['vocabulary'] {
+    return {
+      capabilityIds: [CAPABILITY, CAPABILITY_ALT],
+      taskClasses: [TASK_CLASS],
+      patternIds: [PATTERN],
+      tags: [TAG_HIGH_SUCCESS],
+      constraintCodes: [CONSTRAINT_NO_ELEVATION],
+    };
+  }
+
+  function batchDocument(): MetaProvisionBatchInput {
+    return {
+      vocabulary: batchVocabulary(),
+      cases: [batchCase('case-alpha'), batchCase('case-beta')],
+    };
+  }
+
+  afterAll(() => {
+    for (const store of openStores.splice(0)) {
+      try {
+        store.close();
+      } catch {
+        /* already closed */
+      }
+    }
+    while (createdDirs.length > 0) {
+      const tempDir = createdDirs.pop();
+      if (tempDir === undefined) break;
+      for (let attempt = 0; attempt < 3; attempt += 1) {
+        try {
+          rmSync(tempDir, { recursive: true, force: true });
+          break;
+        } catch {
+          Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, 50);
+        }
+      }
+    }
+  });
+
+  it('replaying the byte-identical batch after a later opt-out never resurrects the old opt-in', async () => {
+    const { store, dir } = makeStore('g4-replay');
+    const document = batchDocument();
+    store.provisionVerifiedExperienceBatch(document);
+    expect(
+      store.querySharedExperiences({ targetCaseRef: 'case-beta', capabilityId: CAPABILITY }),
+    ).toHaveLength(2);
+    // Operator opt-out for case-alpha through the pinned generation-1 path.
+    const alphaDigest = sha256('evidence:case-alpha:outcome-r1');
+    const optOut = {
+      cases: [
+        {
+          receipt: receiptRecord('case-alpha'),
+          consent: consentRecord('case-alpha', 'outcome-r1', alphaDigest, {
+            consentRef: 'consent-case-alpha-rev-2',
+            revision: 'consent-rev-2',
+            authorizationRevision: 'authz-rev-2',
+            currentnessRef: 'currentness:case-alpha:outcome-r1:rev-2',
+            optIn: false,
+          }),
+        },
+      ],
+    };
+    const optOutFile = provisionViaPinnedFile(store, dir, 'optout.json', optOut);
+    provisionMetaFromHostFile({ store, file: optOutFile, sha256: pinnedSha(optOut) });
+    const snapshot = durableCounts(dir);
+    const seqsBefore = consentSeqs(dir);
+    // Byte-identical replay of the ORIGINAL batch: the old opt-in consent is
+    // an exact existing declaration and must stay a true no-op (original
+    // declaration_seq preserved); the attached experience must fail the #285
+    // current-consent check because the opt-out is current — and the whole
+    // replay rolls back.
+    expect(() => store.provisionVerifiedExperienceBatch(document)).toThrow(
+      'META_EXPERIENCE_NOT_CURRENT',
+    );
+    expect(durableCounts(dir)).toEqual(snapshot);
+    expect(consentSeqs(dir)).toEqual(seqsBefore);
+    // The opt-out remains current: alpha's experience stays invisible…
+    const visible = store.querySharedExperiences({
+      targetCaseRef: 'case-beta',
+      capabilityId: CAPABILITY,
+    });
+    expect(visible.some((record) => record.provenance.sourceCaseRef === 'case-alpha')).toBe(false);
+    // …a new experience write is refused…
+    expect(() =>
+      store.recordSharedExperience({
+        caseRef: 'case-alpha',
+        sourceRevision: 'outcome-r1',
+        sourceDigest: alphaDigest,
+        capabilityId: CAPABILITY_ALT,
+        taskClass: TASK_CLASS,
+        patternId: PATTERN,
+        verifiedOutcome: 'VERIFIED_PASS',
+        tags: [],
+        constraintCodes: [],
+      }),
+    ).toThrow('META_EXPERIENCE_NOT_CURRENT');
+    // …and feedback authorization is refused.
+    await expect(
+      store.authorizeCurrentFeedback({
+        scope: 'META_FEEDBACK_SHADOW',
+        caseRef: 'case-alpha',
+        sourceRevision: 'outcome-r1',
+        selection: {
+          selected: true,
+          caseRef: 'case-alpha',
+          sourceRevision: 'outcome-r1',
+          rating: 'HELPFUL',
+          category: 'OTHER',
+        },
+      }),
+    ).rejects.toThrow('META_OPT_IN_MISSING');
+  });
+
+  it('replaying an identical batch without an intervening opt-out is a true no-op (declaration_seq preserved)', () => {
+    const { store, dir } = makeStore('g4-noop');
+    const document = batchDocument();
+    store.provisionVerifiedExperienceBatch(document);
+    const seqsBefore = consentSeqs(dir);
+    const countsBefore = durableCounts(dir);
+    const second = store.provisionVerifiedExperienceBatch(document);
+    expect(second.status).toBe('PROVISIONED');
+    // Stronger than row counts: every declaration_seq must be identical. The
+    // pre-generation-4 REPLACE upsert would have advanced them on replay.
+    expect(consentSeqs(dir)).toEqual(seqsBefore);
+    expect(durableCounts(dir)).toEqual(countsBefore);
+  });
+
+  it('rejects duplicate consentRefs across Case entries during phase 1, before any write', () => {
+    const { store, dir } = makeStore('g4-dup-ref');
+    const document = batchDocument();
+    document.cases[1] = batchCase('case-beta', {
+      consent: { consentRef: 'consent-case-alpha-outcome-r1' },
+    });
+    const before = durableCounts(dir);
+    expect(() => store.provisionVerifiedExperienceBatch(document)).toThrow(
+      'META_PROVISION_BATCH_INVALID',
+    );
+    expect(durableCounts(dir)).toEqual(before);
+  });
+
+  it('a batch reusing an existing consentRef owned by another Case conflicts and leaves pre-existing rows unchanged', () => {
+    const { store, dir } = makeStore('g4-cross-ref');
+    store.provisionVerifiedExperienceBatch({
+      vocabulary: batchVocabulary(),
+      cases: [batchCase('case-gamma')],
+    });
+    const snapshot = durableCounts(dir);
+    const seqsBefore = consentSeqs(dir);
+    const hijack = {
+      vocabulary: batchVocabulary(),
+      cases: [batchCase('case-delta', { consent: { consentRef: 'consent-case-gamma-outcome-r1' } })],
+    };
+    // The global consentRef belongs to case-gamma: rebinding it to
+    // case-delta's declaration is an identity conflict; the batch — including
+    // the just-inserted case-delta receipt — rolls back.
+    expect(() => store.provisionVerifiedExperienceBatch(hijack)).toThrow('META_CONSENT_CONFLICT');
+    expect(durableCounts(dir)).toEqual(snapshot);
+    expect(consentSeqs(dir)).toEqual(seqsBefore);
+  });
+
+  it('the same consentRef with any different field is a declaration-identity conflict (no silent REPLACE)', () => {
+    const { store, dir } = makeStore('g4-drift');
+    store.provisionVerifiedExperienceBatch(batchDocument());
+    const snapshot = durableCounts(dir);
+    const drifted = batchDocument() as never as {
+      cases: { consent: Record<string, unknown> }[];
+    };
+    drifted.cases[0].consent = {
+      ...drifted.cases[0].consent,
+      expiresAt: hoursFromNow(4),
+    };
+    expect(() => store.provisionVerifiedExperienceBatch(drifted as never)).toThrow(
+      'META_CONSENT_CONFLICT',
+    );
     expect(durableCounts(dir)).toEqual(snapshot);
   });
 });
