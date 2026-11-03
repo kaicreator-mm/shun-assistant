@@ -1,7 +1,7 @@
 # R03C Provider-global / Meta shared production wiring (v0.3.0)
 
 Owner-approved single-integrator wiring for the two Host-global lanes
-(Issue #288, write set frozen at 12 paths; this document is one of them).
+(Issue #288, write set frozen at 13 paths; this document is one of them).
 Baseline: combined exact source `85150b55a05986203d2600324684fe6e2158af97`
 (#285 + #287 + #289 ancestry + #303). Predecessor contracts are authoritative:
 #285 (Meta store), #287 (Provider Host-global ledger/UAC), #289 (signed
