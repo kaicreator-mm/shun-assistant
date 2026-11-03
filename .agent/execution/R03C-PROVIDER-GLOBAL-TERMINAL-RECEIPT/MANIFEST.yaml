@@ -44,3 +44,5 @@ forbidden:
   - "main, version/v0.2.0, merge, tag or release"
   - "paid LLM, cloud sync or external data disclosure"
 notes: "Generation 5 exact delivery 01e70c4637bf8d88440c51e386ff10e1ff27f480 passed Node 24 syntax preflight, full task-check and Woodpecker Push #238 / PR #239. Subsequent self-adversarial review found a cross-request race caused by module-global pendingElevatedTerminalEnvelope (#287 comment 6605186994). Generation 6 supersedes generation 5 for final acceptance. This pack is a single manifest-only commit parented to the exact generation-5 source delivery; obtain pack Push+PR SUCCESS, then a fresh generation-6 CAS Claim bound to this exact pack commit/tree/blob before source writes. No merge/release or physical Windows effects."
+
+pack_ci_retrigger: "PR #312 did not publish a Woodpecker PR status on the first manifest-only commit; this manifest-only successor exists solely to trigger both Push and PR pack qualification before the fresh generation-6 Claim. No source scope changes."
