@@ -8,6 +8,11 @@
  *   - `authorizeCurrentFeedback` resolves CURRENT opt-in consent bound to a
  *     genuine recorded outcome receipt (trusted Host composition records both
  *     artifacts; neither is ever HTTP input).
+ *   - Consent is single-current per (caseRef, sourceRevision): only the newest
+ *     declared consent revision authorizes. A newer opt-out supersedes every
+ *     historical opt-in row and immediately revokes the experiences derived
+ *     from that source; a later opt-in authorizes new records but never
+ *     resurrects revoked ones.
  *   - `runMetaFeedbackWorkflow` persists ONLY a `FUTURE_BUILD_SHADOW`,
  *     `active:false` candidate and atomically rechecks consentRef/
  *     currentnessRef at commit. Any promotion/activation shape is refused
@@ -266,7 +271,15 @@ export class HostMetaShadowStore implements MetaFeedbackHostPort {
     }
   }
 
-  /** Trusted operator opt-in (a separate, explicit human action). */
+  /**
+   * Trusted operator consent action (a separate, explicit human action).
+   * Serialized current-consent update for the exact (caseRef, sourceRevision):
+   * the newest declared revision supersedes every earlier consent row. An
+   * opt-out also immediately revokes every still-eligible experience derived
+   * from that source, so withdrawn consent excludes existing records at once
+   * and across restarts; a later opt-in authorizes new records only and never
+   * resurrects the revoked ones.
+   */
   recordOptInConsent(input: MetaOptInConsentInput): void {
     if (
       !isSafeRef(input.consentRef) ||
@@ -282,26 +295,41 @@ export class HostMetaShadowStore implements MetaFeedbackHostPort {
     ) {
       throw new TypeError('META_CONSENT_INVALID');
     }
-    this.#db
-      .prepare(
-        `INSERT OR REPLACE INTO meta_opt_in_consents(
-           consent_ref,revision,case_ref,source_revision,source_digest,
-           operator_id,operator_subject_ref,authorization_revision,
-           currentness_ref,opt_in,expires_at) VALUES(?,?,?,?,?,?,?,?,?,?,?)`,
-      )
-      .run(
-        input.consentRef,
-        input.revision,
-        input.caseRef,
-        input.sourceRevision,
-        input.sourceDigest,
-        input.operatorId,
-        input.operatorSubjectRef,
-        input.authorizationRevision,
-        input.currentnessRef,
-        input.optIn ? 1 : 0,
-        input.expiresAt,
-      );
+    this.#db.exec('BEGIN IMMEDIATE');
+    try {
+      this.#db
+        .prepare(
+          `INSERT OR REPLACE INTO meta_opt_in_consents(
+             consent_ref,revision,case_ref,source_revision,source_digest,
+             operator_id,operator_subject_ref,authorization_revision,
+             currentness_ref,opt_in,expires_at) VALUES(?,?,?,?,?,?,?,?,?,?,?)`,
+        )
+        .run(
+          input.consentRef,
+          input.revision,
+          input.caseRef,
+          input.sourceRevision,
+          input.sourceDigest,
+          input.operatorId,
+          input.operatorSubjectRef,
+          input.authorizationRevision,
+          input.currentnessRef,
+          input.optIn ? 1 : 0,
+          input.expiresAt,
+        );
+      if (!input.optIn) {
+        this.#db
+          .prepare(
+            `UPDATE meta_verified_experiences SET revoked_at=?
+             WHERE case_ref=? AND source_revision=? AND revoked_at IS NULL`,
+          )
+          .run(new Date().toISOString(), input.caseRef, input.sourceRevision);
+      }
+      this.#db.exec('COMMIT');
+    } catch (error) {
+      this.#rollback();
+      throw error;
+    }
   }
 
   /**
@@ -318,12 +346,12 @@ export class HostMetaShadowStore implements MetaFeedbackHostPort {
     ) {
       throw new Error('META_AUTHORITY_REFUSED');
     }
-    const consent = this.#db
-      .prepare(
-        'SELECT * FROM meta_opt_in_consents WHERE case_ref=? AND source_revision=? AND opt_in=1',
-      )
-      .get(input.caseRef, input.sourceRevision) as ConsentRow | undefined;
-    if (consent === undefined) throw new Error('META_OPT_IN_MISSING');
+    // Only the CURRENT consent can authorize feedback: a newer opt-out for
+    // the same source supersedes every historical opt_in=1 row.
+    const consent = this.#currentConsent(input.caseRef, input.sourceRevision);
+    if (consent === undefined || consent.opt_in !== 1) {
+      throw new Error('META_OPT_IN_MISSING');
+    }
     const expiresAt: string = consent.expires_at;
     const nowIso = new Date().toISOString();
     if (!isIsoUtc(expiresAt) || Date.parse(expiresAt) <= Date.parse(nowIso)) {
@@ -395,7 +423,8 @@ export class HostMetaShadowStore implements MetaFeedbackHostPort {
         !isIsoUtc(consent.expires_at) ||
         Date.parse(consent.expires_at) <= Date.parse(nowIso) ||
         consent.currentness_ref !== authorization.currentnessRef ||
-        consent.revision !== authorization.consentRevision
+        consent.revision !== authorization.consentRevision ||
+        !this.#isCurrentConsent(consent)
       ) {
         this.#db.exec('ROLLBACK');
         throw new Error('META_CONSENT_NOT_CURRENT');
@@ -746,7 +775,8 @@ export class HostMetaShadowStore implements MetaFeedbackHostPort {
   /**
    * Currentness re-check shared by record and query paths: the referenced
    * receipt must still be the Case's CURRENT revision with the exact digest,
-   * and an unexpired opt-in consent must still exist for the source.
+   * and the CURRENT consent for the source must be an unexpired opt-in —
+   * never merely a historical opt_in=1 row.
    */
   #assertCurrentExperienceEvidence(normalized: NormalizedExperience): void {
     const receipt = this.#latestReceipt(normalized.caseRef);
@@ -757,16 +787,10 @@ export class HostMetaShadowStore implements MetaFeedbackHostPort {
     ) {
       throw new Error('META_EXPERIENCE_NOT_CURRENT');
     }
-    const consent = this.#db
-      .prepare(
-        `SELECT consent_ref, expires_at FROM meta_opt_in_consents
-         WHERE case_ref=? AND source_revision=? AND opt_in=1
-         ORDER BY revision DESC, consent_ref ASC LIMIT 1`,
-      )
-      .get(normalized.caseRef, normalized.sourceRevision) as
-      | { consent_ref: string; expires_at: string }
-      | undefined;
-    if (consent === undefined) throw new Error('META_EXPERIENCE_NOT_CURRENT');
+    const consent = this.#currentConsent(normalized.caseRef, normalized.sourceRevision);
+    if (consent === undefined || consent.opt_in !== 1) {
+      throw new Error('META_EXPERIENCE_NOT_CURRENT');
+    }
     if (!isIsoUtc(consent.expires_at) || Date.parse(consent.expires_at) <= Date.now()) {
       throw new Error('META_CONSENT_EXPIRED');
     }
@@ -782,6 +806,29 @@ export class HostMetaShadowStore implements MetaFeedbackHostPort {
         'SELECT revision, sha256, recorded_at FROM meta_outcome_receipts WHERE case_ref=? ORDER BY recorded_at DESC, revision DESC LIMIT 1',
       )
       .get(caseRef) as { revision: string; sha256: string; recorded_at: string } | undefined;
+  }
+
+  /**
+   * The CURRENT consent for one (caseRef, sourceRevision): the newest declared
+   * consent revision (latest re-declaration breaks ties). Historical rows stay
+   * as provenance, but only this row's opt_in state is authoritative for
+   * write-time authorization and read-time revalidation alike.
+   */
+  #currentConsent(caseRef: string, sourceRevision: string): ConsentRow | undefined {
+    return this.#db
+      .prepare(
+        `SELECT * FROM meta_opt_in_consents
+         WHERE case_ref=? AND source_revision=?
+         ORDER BY revision DESC, rowid DESC, consent_ref ASC
+         LIMIT 1`,
+      )
+      .get(caseRef, sourceRevision) as ConsentRow | undefined;
+  }
+
+  /** True when `consent` is still the newest declared consent for its source. */
+  #isCurrentConsent(consent: ConsentRow): boolean {
+    const current = this.#currentConsent(consent.case_ref, consent.source_revision);
+    return current !== undefined && current.consent_ref === consent.consent_ref;
   }
 
   /** Revalidate one stored row at query time; `undefined` excludes the row. */
@@ -818,9 +865,10 @@ export class HostMetaShadowStore implements MetaFeedbackHostPort {
     ) {
       return undefined;
     }
-    const consent = this.#db
-      .prepare('SELECT opt_in, expires_at FROM meta_opt_in_consents WHERE consent_ref=?')
-      .get(row.consent_ref) as { opt_in: number; expires_at: string } | undefined;
+    // Read-time revalidation uses the CURRENT consent for the source: after a
+    // newer opt-out the bound historical opt-in row no longer authorizes the
+    // record, even before its physical revocation is observed.
+    const consent = this.#currentConsent(row.case_ref, row.source_revision);
     if (
       consent === undefined ||
       consent.opt_in !== 1 ||

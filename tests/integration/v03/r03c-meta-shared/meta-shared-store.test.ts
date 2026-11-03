@@ -5,8 +5,9 @@
  *
  * Proves: closed-world privacy-minimized normalization, advisory-only
  * cross-Case retrieval (no sourceCase==targetCase gate), snapshot-consistent
- * currentness, receipt/consent staleness, explicit revocation, restart
- * durability, malformed/private/oversized rejection, Shadow-feedback
+ * currentness, receipt/consent staleness, explicit revocation, consent opt-out
+ * supersession (no historical-opt-in authorization, no re-opt-in resurrection),
+ * restart durability, malformed/private/oversized rejection, Shadow-feedback
  * metadata attachment without promotion, receipt digest conflict and
  * concurrent submission/query safety.
  */
@@ -85,6 +86,34 @@ function seedCase(
     expiresAt,
   });
   return consentRef;
+}
+
+/** Later consent declaration for one source; supersedes every earlier row. */
+function recordConsent(
+  store: HostMetaShadowStore,
+  options: {
+    caseRef: string;
+    sourceRevision: string;
+    sourceDigest: string;
+    consentRef: string;
+    revision: string;
+    optIn: boolean;
+    expiresAt?: string;
+  },
+): void {
+  store.recordOptInConsent({
+    consentRef: options.consentRef,
+    revision: options.revision,
+    caseRef: options.caseRef,
+    sourceRevision: options.sourceRevision,
+    sourceDigest: options.sourceDigest,
+    operatorId: 'operator:shun-owner',
+    operatorSubjectRef: 'operator:shun-owner',
+    authorizationRevision: `authz-${options.revision}`,
+    currentnessRef: `currentness:${options.caseRef}:${options.sourceRevision}:${options.revision}`,
+    optIn: options.optIn,
+    expiresAt: options.expiresAt ?? hoursFromNow(1),
+  });
 }
 
 function experienceInput(
@@ -304,6 +333,163 @@ describe('R03C shared Meta experience (existing Host SQLite)', () => {
     expect(
       store.querySharedExperiences({ targetCaseRef: 'case-beta', capabilityId: CAPABILITY }),
     ).toHaveLength(0);
+  });
+
+  it('a newer opt-out supersedes the historical opt-in: retrieval empties, recording is refused and feedback authorization fails closed', async () => {
+    const { store } = makeStore('consent-opt-out');
+    seedVocabulary(store);
+    const digest = sha256('evidence:case-alpha:outcome-r1');
+    seedCase(store, 'case-alpha', digest);
+    const selection: MetaFeedbackSelection = {
+      selected: true,
+      caseRef: 'case-alpha',
+      sourceRevision: 'outcome-r1',
+      rating: 'HELPFUL',
+      category: 'OTHER',
+    };
+    // A genuine authorization held by the adapter BEFORE the opt-out.
+    const authorization = (await store.authorizeCurrentFeedback({
+      scope: 'META_FEEDBACK_SHADOW',
+      caseRef: 'case-alpha',
+      sourceRevision: 'outcome-r1',
+      selection,
+    })) as MetaFeedbackAuthorization;
+    expect(authorization.status).toBe('AUTHORIZED');
+    expect(store.recordSharedExperience(experienceInput()).status).toBe('STORED');
+
+    // An unrelated source stays eligible: the opt-out narrows to exactly its
+    // own (caseRef, sourceRevision).
+    seedCase(store, 'case-delta', sha256('evidence:case-delta:outcome-r1'));
+    const delta = store.recordSharedExperience(
+      experienceInput({
+        caseRef: 'case-delta',
+        sourceDigest: sha256('evidence:case-delta:outcome-r1'),
+        patternId: 'pattern.single-pass',
+      }),
+    );
+    expect(delta.status).toBe('STORED');
+
+    // The exact P1 reproduction: a later opt-out with a NEW consentRef for the
+    // same Case/source must supersede the earlier opt-in row immediately.
+    recordConsent(store, {
+      consentRef: 'consent-case-alpha-outcome-r1-revoked',
+      revision: 'consent-rev-2',
+      caseRef: 'case-alpha',
+      sourceRevision: 'outcome-r1',
+      sourceDigest: digest,
+      optIn: false,
+    });
+
+    const after = store.querySharedExperiences({
+      targetCaseRef: 'case-beta',
+      capabilityId: CAPABILITY,
+    });
+    expect(after).toHaveLength(1);
+    expect(first(after).experienceId).toBe(delta.experienceId);
+    // Recording new content derived from the opted-out source is refused...
+    expect(() =>
+      store.recordSharedExperience(experienceInput({ tags: [TAG_WINDOWS] })),
+    ).toThrow('META_EXPERIENCE_NOT_CURRENT');
+    // ...and so is an identical replay of the already-revoked record.
+    expect(() => store.recordSharedExperience(experienceInput())).toThrow(
+      'META_EXPERIENCE_NOT_CURRENT',
+    );
+    // Feedback authorization for the opted-out source fails closed.
+    await expect(
+      store.authorizeCurrentFeedback({
+        scope: 'META_FEEDBACK_SHADOW',
+        caseRef: 'case-alpha',
+        sourceRevision: 'outcome-r1',
+        selection,
+      }),
+    ).rejects.toThrow('META_OPT_IN_MISSING');
+    // The pre-opt-out authorization can no longer store its shadow candidate.
+    const candidate: MetaFeedbackShadowCandidate = Object.freeze({
+      schema: META_FEEDBACK_SCHEMA,
+      candidateId: authorization.candidateId,
+      kind: 'META_FEEDBACK',
+      lifecycle: 'FUTURE_BUILD_SHADOW',
+      active: false as const,
+      source: Object.freeze({
+        caseRef: authorization.caseRef,
+        revision: authorization.sourceRevision,
+        sha256: authorization.sourceDigest,
+      }),
+      feedback: Object.freeze({
+        rating: selection.rating,
+        category: selection.category,
+      }),
+      provenance: Object.freeze({
+        operatorId: authorization.operatorId,
+        operatorSubjectRef: authorization.operatorSubjectRef,
+        consentRef: authorization.consentRef,
+        consentRevision: authorization.consentRevision,
+        consentExpiresAt: authorization.consentExpiresAt,
+        authorizationRevision: authorization.authorizationRevision,
+        currentnessRef: authorization.currentnessRef,
+      }),
+    });
+    await expect(store.runMetaFeedbackWorkflow({ candidate, authorization })).rejects.toThrow(
+      'META_CONSENT_NOT_CURRENT',
+    );
+    // The opt-out physically revoked the derived experiences: the explicit
+    // revocation API stays idempotent and reports no further change.
+    expect(
+      store.revokeSourceExperiences({ caseRef: 'case-alpha', sourceRevision: 'outcome-r1' }),
+    ).toBe(0);
+  });
+
+  it('close/reopen preserves an opt-out revocation and a later re-opt-in never resurrects the old experience', () => {
+    const { store, file } = makeStore('consent-durability');
+    seedVocabulary(store);
+    const digest = sha256('evidence:case-alpha:outcome-r1');
+    seedCase(store, 'case-alpha', digest);
+    expect(store.recordSharedExperience(experienceInput()).status).toBe('STORED');
+    recordConsent(store, {
+      consentRef: 'consent-case-alpha-outcome-r1-revoked',
+      revision: 'consent-rev-2',
+      caseRef: 'case-alpha',
+      sourceRevision: 'outcome-r1',
+      sourceDigest: digest,
+      optIn: false,
+    });
+    store.close();
+
+    const reopened = new HostMetaShadowStore(file);
+    try {
+      // The revocation is durable: nothing from the opted-out source returns.
+      expect(
+        reopened.querySharedExperiences({ targetCaseRef: 'case-beta', capabilityId: CAPABILITY }),
+      ).toHaveLength(0);
+
+      // A later re-opt-in authorizes NEW records for the same source...
+      recordConsent(reopened, {
+        consentRef: 'consent-case-alpha-outcome-r1-reopted',
+        revision: 'consent-rev-3',
+        caseRef: 'case-alpha',
+        sourceRevision: 'outcome-r1',
+        sourceDigest: digest,
+        optIn: true,
+      });
+      const fresh = reopened.recordSharedExperience(
+        experienceInput({ patternId: 'pattern.single-pass' }),
+      );
+      expect(fresh.status).toBe('STORED');
+      // ...but the revoked pre-opt-out experience is NOT resurrected: only the
+      // new record is retrievable, bound to the new current consent.
+      const results = reopened.querySharedExperiences({
+        targetCaseRef: 'case-beta',
+        capabilityId: CAPABILITY,
+      });
+      expect(results.map((record) => record.experienceId)).toEqual([fresh.experienceId]);
+      expect(first(results).provenance.consentRef).toBe('consent-case-alpha-outcome-r1-reopted');
+      // An identical replay of the revoked record conflicts instead of reviving it.
+      expect(() => reopened.recordSharedExperience(experienceInput())).toThrow(
+        'META_EXPERIENCE_CONFLICT',
+      );
+    } finally {
+      reopened.close();
+    }
   });
 
   it('rejects malformed, unregistered, private, path/secret-shaped and oversized records', () => {
