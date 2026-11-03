@@ -1,0 +1,46 @@
+pack_id: shun-v030-r03c-provider-global-terminal-receipt-local-builder-r1
+task_id: R03C-PROVIDER-GLOBAL-TERMINAL-RECEIPT
+issue: "#287"
+repository: kaicreator-mm/shun-assistant
+version: v0.3.0
+parent_issue: "#280"
+owner_authorization_ref: "#280 comment 6584396368"
+owner_execution_amendment_ref: "#280 comment 6585799747"
+architecture_plan_ref: "#305"
+standard_revision: 2c395c55569fe2edf3f4135f12d3d069e526d0b7
+execution_profile: LOCAL_BUILDER
+execution_environment: LOCAL
+source_base_sha: 913421cc5eb1cac900824114ee4f15fc618074a3
+source_base_tree: 70a32216244f3f27a8dfb2d8923350492740f4f5
+branch: JIT_only_task/v0.3.0-r03c-provider-global-terminal-receipt-r1
+execution_pack_path: .agent/execution/R03C-PROVIDER-GLOBAL-TERMINAL-RECEIPT/MANIFEST.yaml
+protected_claim_key: "kaicreator-mm/shun-assistant#287:builder:__default__"
+admission_mode: SINGLE_WRITER_ADMISSION
+admission_generation: 5
+repair_findings:
+  - "#287 comment 6602534717 R03C-PROVIDER-P1-PREMATURE-ELEVATED-TERMINAL-RECEIPT"
+allowed_write_set:
+  - packages/domain-host/src/provider/provider-host-binding.ts
+  - tests/integration/v03/r03c-provider-global/provider-host-global.test.ts
+plan:
+  - "Treat Provider first-use as one end-to-end one-shot request: successful elevated installer execution is an intermediate stage, not a terminal request result."
+  - "Do not call ProviderFirstUseLedger.finish() when the elevated action succeeds. Retain only its bounded PrivilegedReceiptSummary in memory while the request remains RUNNING."
+  - "If elevated action is REFUSED or UNKNOWN, persist exactly one corresponding terminal/uncertain receipt and return without starting Provider CLI."
+  - "After elevated success, run the existing unprivileged Provider VERSION_PROBE and FILE_SEARCH canary. On success, persist exactly one closed receipt combining the Provider facts with the elevated summary, then return."
+  - "If Provider execution refuses or is interrupted after elevated success, persist exactly one REFUSED or UNKNOWN receipt including only bounded elevated summary fields; never leave a false COMPLETED receipt."
+  - "Preserve requestRef-only K input, signed requiredPrivilege enforcement, Host-global scope, generation-3 closed preview/receipt schemas, output sanitization, restart RUNNING-to-UNKNOWN recovery and the existing one-shot state machine."
+  - "Add deterministic injected-fake tests for elevated SUCCEEDED followed by Provider success, Provider refusal and Provider interruption; assert RUNNING until the complete operation terminates, exactly one terminal receipt, and no real UAC/installer execution."
+pre_ci:
+  - "Run node scripts/v03-ci/preflight-ui-syntax.mjs against the exact changed tree using Node 24 before any source-changing CI."
+  - "Run strict TypeScript, scoped lint/typecheck and the r03c-provider-global integration suite."
+  - "Run r02-v-journeys and r02-e-production regressions."
+  - "Record Node/pnpm versions, exact commands, exit codes, changed-file/write-set comparison, exact HEAD/tree and Woodpecker Build IDs/results."
+forbidden:
+  - "any path outside the two-path allowed_write_set"
+  - "changing the signed Provider privilege contract or DomainHarness SDK"
+  - "marking the request COMPLETED before both the elevated stage and Provider first-use stage finish"
+  - "a second ledger, Kernel, dispatcher, RunAs helper or authority store"
+  - "real UAC prompt, Provider installer execution or persistent Windows effects"
+  - "main, version/v0.2.0, merge, tag or release"
+  - "paid LLM, cloud sync or external data disclosure"
+notes: "Generation 5 is a bounded repair of the premature terminal receipt defect discovered after generation-4 exact-SHA delivery 913421cc5eb1cac900824114ee4f15fc618074a3. Generation-4 Push #229 / PR #230 remain valid for their exact SHA only. Require pack-only CI, then a fresh accepted generation-5 CAS Claim against the exact pack commit before source edits."
