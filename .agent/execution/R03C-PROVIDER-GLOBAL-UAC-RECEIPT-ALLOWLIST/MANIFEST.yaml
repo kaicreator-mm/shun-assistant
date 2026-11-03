@@ -16,7 +16,9 @@ execution_pack_path: .agent/execution/R03C-PROVIDER-GLOBAL-UAC-RECEIPT-ALLOWLIST
 protected_claim_key: "kaicreator-mm/shun-assistant#287:builder:__default__"
 admission_mode: SINGLE_WRITER_ADMISSION
 admission_generation: 3
-repair_finding: "PR #302 comment 6595125211 R03C-PROVIDER-P2-UNVALIDATED-DURABLE-RECEIPT"
+repair_findings:
+  - "PR #302 comment 6595125211 R03C-PROVIDER-P2-UNVALIDATED-DURABLE-RECEIPT"
+  - "PR #302 comment 6595168881 R03C-PROVIDER-P1-RAW-PROVIDER-OUTPUT-PERSISTED"
 allowed_write_set:
   - packages/domain-host/src/provider/provider-host-binding.ts
   - packages/domain-host/src/provider/provider-first-use-ledger.ts
