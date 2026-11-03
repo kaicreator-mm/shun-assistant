@@ -1,0 +1,36 @@
+pack_id: shun-v030-r03c-meta-consent-revocation-local-builder-r1
+task_id: R03C-META-CONSENT-REVOCATION
+issue: "#285"
+repository: kaicreator-mm/shun-assistant
+version: v0.3.0
+parent_issue: "#280"
+owner_authorization_ref: "#280 comment 6584396368"
+owner_execution_amendment_ref: "#280 comment 6585799747"
+standard_revision: 2c395c55569fe2edf3f4135f12d3d069e526d0b7
+execution_profile: LOCAL_BUILDER
+execution_environment: LOCAL
+source_base_sha: d906301ffb7a7d4f6b2ba9eac152311cd5c9294d
+source_base_tree: b95cda598fe11201509a62bbdb53a1181020e2ed
+branch: JIT_only_task/v0.3.0-r03c-meta-shared-sqlite-local-builder-r2
+execution_pack_path: .agent/execution/R03C-META-CONSENT-REVOCATION/MANIFEST.yaml
+protected_claim_key: "kaicreator-mm/shun-assistant#285:builder:__default__"
+admission_mode: SINGLE_WRITER_ADMISSION
+admission_generation: 3
+allowed_write_set:
+  - packages/domain-host/src/meta/host-meta-shadow-store.ts
+  - tests/integration/v03/r03c-meta-shared/meta-shared-store.test.ts
+  - tests/integration/v03/r03c-meta-shared/vitest.config.ts
+plan:
+  - "Make recordOptInConsent a transactionally serialized current-consent update for each caseRef/sourceRevision; a new opt-out invalidates every historical opt-in."
+  - "Ensure recording and retrieval require the current consent state, not any historical opt_in=1 row."
+  - "On opt-out, immediately revoke/exclude all experiences derived from that source revision; later opt-in must not resurrect prior experiences."
+  - "Add tests for store experience -> opt-out -> cross-Case query empty, new record refused, restart persistence, re-opt-in non-resurrection, and existing feedback authorization refusal."
+  - "Preserve idempotent revokeSourceExperiences and all existing positive/concurrency behavior."
+forbidden:
+  - "any path outside allowed_write_set"
+  - "new database, Kernel, dispatcher or API"
+  - "cloud sync, raw prompts/files/credentials"
+  - "Permit/grant/policy mutation, auto-execution or Shadow promotion"
+  - "main, version/v0.2.0, merge, tag or release"
+  - "paid LLM, Provider install, UAC or physical Windows effects"
+notes: "Repair of P1 R03C-META-P1-CONSENT-REVOCATION-BYPASS recorded in PR #300 comment 6594095719. Claim must be fresh generation 3 at this exact base; prior generation-2 delivery is not silently amended."
