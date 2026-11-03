@@ -1,0 +1,81 @@
+pack_id: shun-v030-r03c-host-meta-atomic-batch-local-g3
+task_id: R03C-PROVIDER-META-PRODUCTION-INTEGRATOR
+issue: "#288"
+repository: kaicreator-mm/shun-assistant
+version: v0.3.0
+parent_issue: "#280"
+standard_revision: 2c395c55569fe2edf3f4135f12d3d069e526d0b7
+owner_authorization_refs:
+  - "#280 comment 6584396368"
+  - "#280 comment 6585799747"
+  - "#280 comment 6596114371"
+  - "#280 comment 6603602254"
+  - "#280 comment 6606593448"
+  - "#288 comment 6612240741 OWNER_SHUN_V030_R03C_G3_HOST_ATOMIC_BATCH_APPROVE"
+repair_finding: "PR #318 comment 6611769037 — Host Store phase-2 writes are independently committed; later Store-level failure can leave partial batch state; exact vocabulary key set also needs enforcement"
+architecture_plan_ref: "#305 comment 6611854226"
+execution_profile: LOCAL_BUILDER
+execution_environment: LOCAL
+admission_mode: SINGLE_WRITER_ADMISSION
+admission_generation: 3
+protected_claim_key: "kaicreator-mm/shun-assistant#288:builder:__default__"
+source_base_sha: 83c8aa5a9b4151e607e506518d4498929d8dd4a1
+source_base_tree: 1beff197aa07611e06265eac921e832e65621b24
+source_base_branch: JIT_only_task/v0.3.0-r03c-meta-verified-experience-provisioning-local-r2
+pack_branch: JIT_only_task/v0.3.0-r03c-host-meta-atomic-batch-pack-g3
+jit_branch: JIT_only_task/v0.3.0-r03c-host-meta-atomic-batch-local-g3
+execution_pack_path: .agent/execution/R03C-HOST-META-ATOMIC-BATCH/MANIFEST.yaml
+allowed_write_set:
+  - apps/control-api/src/main.ts
+  - apps/control-api/src/server.ts
+  - apps/control-api/src/v03/composition-journeys.ts
+  - apps/control-api/src/v03/composition-production.ts
+  - packages/domain-app/src/activation/modules/business-provider.mjs
+  - packages/domain-app/src/activation/modules/capability-provider.mjs
+  - packages/domain-app/src/activation/modules/business-meta-memory.mjs
+  - packages/domain-app/src/activation/modules/capability-meta-memory.mjs
+  - tests/integration/v03/r03c-provider-global/provider-global-route.test.ts
+  - tests/integration/v03/r03c-meta-shared/meta-shared-production.test.ts
+  - tests/integration/v03/r02-a-build/ensure-consumer.mjs
+  - docs/implementation/v0.3/r03c-production/PRODUCTION_WIRING.md
+  - packages/domain-host/src/meta/host-meta-shadow-store.ts
+plan:
+  - "Add one HostMetaShadowStore-owned batch provisioning API for normalized generation-2 vocabulary, receipts, consents and verified experiences."
+  - "The whole document must use exactly one SQLite BEGIN IMMEDIATE / COMMIT transaction. Any validation, receipt conflict, consent/currentness failure, vocabulary failure or experience insertion error must ROLLBACK every write made by this batch."
+  - "Refactor existing recordOutcomeReceipt, recordOptInConsent and recordSharedExperience public methods into transaction-owning wrappers plus internal transaction-aware helpers. Preserve their public behavior and all #285 invariants; internal helpers must never open nested transactions."
+  - "The Host batch API independently enforces exact object keys, closed-world code grammar, per-kind vocabulary bounds, duplicate vocabulary codes, exact Case/receipt/consent bindings, bounded experience count, duplicate experience rejection, exact experience keys, unique tags/constraintCodes and verifiedOutcome enum."
+  - "Preserve #285 authoritative checks inside the transaction: genuine receipt identity/digest/currentness, current opt-in consent, expiry, declaration-order supersession, revocation, registered vocabulary and idempotent/conflict behavior."
+  - "Control API remains parser/orchestrator only: pass the normalized document to the Host Store API; no direct SQLite or SQL and no bypass of Store validation."
+  - "Keep legacy single-record and generation-1 no-experience batch formats behavior-compatible; route generation-2 vocabulary+experiences through the new atomic Host API."
+  - "No HTTP/model-facing write route, new database, authority/grant/approval channel, automatic promotion or activation."
+  - "Keep Provider behavior unchanged and all original 12 write-set paths unchanged."
+test_contract:
+  - "Tests remain only in tests/integration/v03/r03c-meta-shared/meta-shared-production.test.ts."
+  - "Success: clean DB, one Host batch API call, cross-Case query remains real HTTP -> selected K -> externalEffect:false C -> existing Host SQLite."
+  - "Rollback: valid Case A then Case B with duplicate tags; assert vocabulary, receipts, consents and experiences counts return to the pre-call snapshot."
+  - "Rollback: valid Case A then Case B with duplicate constraintCodes; assert the same zero-delta guarantee."
+  - "Rollback: valid Case A then Case B with expired opt-in consent; assert the same zero-delta guarantee."
+  - "Rollback: valid Case A then Case B with an injected existing receipt digest conflict; assert the same zero-delta guarantee relative to the pre-existing row snapshot."
+  - "Strict schema: extra keys at batch/vocabulary/case/experience levels refuse before any write."
+  - "Retain current consent revocation, current receipt, consent/receipt mismatch, unknown vocabulary and digest tamper regressions."
+  - "Assert durable row counts directly via a read-only test SQLite handle or equally strong Host-owned inspection seam; query result count alone is insufficient."
+pre_ci:
+  - "Verify this pack-only commit is a one-file manifest diff whose sole parent is exactly source_base_sha."
+  - "No source edit until pack Push/PR CI passes and a fresh generation-3 CAS Claim is recorded by the actual LOCAL_BUILDER identity."
+  - "On final source HEAD/tree, run Node 24.21.0 syntax preflight before any source CI; include every tracked JS/TS source and the three browser modules."
+  - "Run focused Meta/Provider integration tests, lint, typecheck and tools/task-check.sh."
+  - "Record exact commands, exit codes, source HEAD/tree, 13-path write-set comparison, Woodpecker Push/PR Build IDs and GitHub Actions checks."
+forbidden:
+  - "any source path outside the exact 13-path allowed_write_set"
+  - "Control API direct SQLite/SQL access"
+  - "nested SQLite transactions"
+  - "bypass or relaxation of #285 receipt, consent, revocation, digest, currentness or vocabulary checks"
+  - "new Host database, Kernel, dispatcher, HTTP/model-facing write route or authority channel"
+  - "caller/model-supplied verified outcomes, raw prompt/file content, secrets or unrestricted free text"
+  - "automatic Shadow promotion, policy mutation, Permit/grant/approval creation or execution"
+  - "real UAC prompt, Provider installation, persistent Windows effect, paid LLM or cloud sync"
+  - "main, version/v0.2.0, merge, tag or release"
+source_write_authorized: true
+merge_authorized: false
+release_authorized: false
+notes: "Generation-3 is the minimum Owner-approved amendment to #288. The original 12 paths remain unchanged and exactly one Host Store implementation path is added. PR #318 generation-2 source remains open and unmerged. No source edit is admitted until this pack is CI-qualified and a fresh generation-3 CAS Claim is recorded by the actual LOCAL_BUILDER identity."
