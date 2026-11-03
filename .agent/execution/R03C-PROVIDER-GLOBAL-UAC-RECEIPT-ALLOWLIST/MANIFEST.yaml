@@ -1,0 +1,47 @@
+pack_id: shun-v030-r03c-provider-global-uac-receipt-allowlist-local-builder-r2
+task_id: R03C-PROVIDER-GLOBAL-UAC-RECEIPT-ALLOWLIST
+issue: "#287"
+repository: kaicreator-mm/shun-assistant
+version: v0.3.0
+parent_issue: "#280"
+owner_authorization_ref: "#280 comment 6584396368"
+owner_execution_amendment_ref: "#280 comment 6585799747"
+standard_revision: 2c395c55569fe2edf3f4135f12d3d069e526d0b7
+execution_profile: LOCAL_BUILDER
+execution_environment: LOCAL
+source_base_sha: fe7a8614521d9a4b4222d89a2b31c6c0b9031e1c
+source_base_tree: e0fe63b7e258d7b3f4cdf31fb208e18de765c89a
+branch: JIT_only_task/v0.3.0-r03c-provider-global-uac-local-builder-r1
+execution_pack_path: .agent/execution/R03C-PROVIDER-GLOBAL-UAC-RECEIPT-ALLOWLIST/MANIFEST.yaml
+protected_claim_key: "kaicreator-mm/shun-assistant#287:builder:__default__"
+admission_mode: SINGLE_WRITER_ADMISSION
+admission_generation: 3
+repair_findings:
+  - "PR #302 comment 6595125211 R03C-PROVIDER-P2-UNVALIDATED-DURABLE-RECEIPT"
+  - "PR #302 comment 6595168881 R03C-PROVIDER-P1-RAW-PROVIDER-OUTPUT-PERSISTED"
+allowed_write_set:
+  - packages/domain-host/src/provider/provider-host-binding.ts
+  - packages/domain-host/src/provider/provider-first-use-ledger.ts
+  - packages/domain-host/src/windows/effect-host-binding.ts
+  - tests/integration/v03/r03c-provider-global/provider-host-global.test.ts
+  - tests/integration/v03/r03c-provider-global/vitest.config.ts
+  - docs/implementation/v0.3/r03c-provider-global/PROVIDER_HOST_GLOBAL.md
+plan:
+  - "Reject unknown keys on ProviderFirstUsePreview and nested elevatedAction; decode must enforce the same exact shape."
+  - "Replace receipt: unknown with a closed discriminated receipt schema and bounded runtime validator. Do not rely on serialized byte length as the only privacy control."
+  - "Project the privileged backend ExecutionReceipt into a minimal allowlisted Provider receipt before persistence. Never persist outputRefs, stdoutRef, stderrRef, environmentId, absolute paths, raw output, free text or arbitrary nested properties."
+  - "Validate persisted receipt_json during decodeRow; malformed, legacy unknown or out-of-schema receipts fail closed."
+  - "Keep restart RUNNING->UNKNOWN reconciliation valid under the new receipt schema; preserve one-shot transitions and all existing provider execution behavior."
+  - "Add tests for extra preview/elevatedAction keys, unknown receipt keys, secret-shaped/free-text values, absolute-path refs, nested payloads, malformed persisted receipts and bounded valid receipt round-trips."
+pre_ci:
+  - "Exact-tree Windows Node 24 syntax preflight before any CI."
+  - "Scoped strict TypeScript, lint, typecheck and tests before Woodpecker."
+  - "Record exact Node/pnpm versions, commands, exit codes, Build IDs and exact SHA."
+forbidden:
+  - "any path outside allowed_write_set"
+  - "signed privilege policy changes; #289 remains the contract authority"
+  - "new installer, RunAs helper, dispatcher, Kernel or database"
+  - "actual Provider installation, UAC prompt or persistent Windows effect"
+  - "main, version/v0.2.0, merge, tag or release"
+  - "paid LLM, cloud sync or external data disclosure"
+notes: "Generation 3 is a bounded privacy hardening repair of the existing #287 delivery. The prior generation-2 delivery at fe7a861 remains qualified by Woodpecker #207/#208; it is not considered Owner-final-review eligible until this P2 finding is closed and the new exact SHA is qualified."
