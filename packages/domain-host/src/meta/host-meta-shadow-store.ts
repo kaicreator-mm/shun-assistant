@@ -8,11 +8,12 @@
  *   - `authorizeCurrentFeedback` resolves CURRENT opt-in consent bound to a
  *     genuine recorded outcome receipt (trusted Host composition records both
  *     artifacts; neither is ever HTTP input).
- *   - Consent is single-current per (caseRef, sourceRevision): only the newest
- *     declared consent revision authorizes. A newer opt-out supersedes every
- *     historical opt-in row and immediately revokes the experiences derived
- *     from that source; a later opt-in authorizes new records but never
- *     resurrects revoked ones.
+ *   - Consent is single-current per (caseRef, sourceRevision): only the most
+ *     recently declared consent row authorizes, where recency is a durable
+ *     transactional declaration-order sequence — never string ordering of the
+ *     opaque revision. A later opt-out supersedes every historical opt-in row
+ *     and immediately revokes the experiences derived from that source; a
+ *     later opt-in authorizes new records but never resurrects revoked ones.
  *   - `runMetaFeedbackWorkflow` persists ONLY a `FUTURE_BUILD_SHADOW`,
  *     `active:false` candidate and atomically rechecks consentRef/
  *     currentnessRef at commit. Any promotion/activation shape is refused
@@ -132,6 +133,7 @@ interface ConsentRow {
   readonly currentness_ref: string;
   readonly opt_in: number;
   readonly expires_at: string;
+  readonly declaration_seq: number;
 }
 
 function isSafeRef(value: unknown): value is string {
@@ -199,7 +201,8 @@ export class HostMetaShadowStore implements MetaFeedbackHostPort {
       authorization_revision TEXT NOT NULL,
       currentness_ref TEXT NOT NULL,
       opt_in INTEGER NOT NULL,
-      expires_at TEXT NOT NULL
+      expires_at TEXT NOT NULL,
+      declaration_seq INTEGER NOT NULL DEFAULT 0
     )`);
     this.#db.exec(`CREATE TABLE IF NOT EXISTS meta_shadow_candidates (
       candidate_id TEXT PRIMARY KEY,
@@ -237,6 +240,7 @@ export class HostMetaShadowStore implements MetaFeedbackHostPort {
       ON meta_verified_experiences(capability_id, task_class, revoked_at)`);
     this.#db.exec(`CREATE INDEX IF NOT EXISTS idx_meta_experiences_source
       ON meta_verified_experiences(case_ref, source_revision)`);
+    this.#migrateConsentDeclarationOrder();
   }
 
   /**
@@ -274,7 +278,8 @@ export class HostMetaShadowStore implements MetaFeedbackHostPort {
   /**
    * Trusted operator consent action (a separate, explicit human action).
    * Serialized current-consent update for the exact (caseRef, sourceRevision):
-   * the newest declared revision supersedes every earlier consent row. An
+   * each write takes the next declaration-order sequence value, so the latest
+   * declaration supersedes every earlier consent row. An
    * opt-out also immediately revokes every still-eligible experience derived
    * from that source, so withdrawn consent excludes existing records at once
    * and across restarts; a later opt-in authorizes new records only and never
@@ -297,12 +302,22 @@ export class HostMetaShadowStore implements MetaFeedbackHostPort {
     }
     this.#db.exec('BEGIN IMMEDIATE');
     try {
+      // The sequence value is assigned under the write lock, so it reflects
+      // real declaration order regardless of how revision strings compare.
+      const nextSeq = (
+        this.#db
+          .prepare(
+            `SELECT COALESCE(MAX(declaration_seq),0)+1 AS next_seq
+             FROM meta_opt_in_consents WHERE case_ref=? AND source_revision=?`,
+          )
+          .get(input.caseRef, input.sourceRevision) as { next_seq: number }
+      ).next_seq;
       this.#db
         .prepare(
           `INSERT OR REPLACE INTO meta_opt_in_consents(
              consent_ref,revision,case_ref,source_revision,source_digest,
              operator_id,operator_subject_ref,authorization_revision,
-             currentness_ref,opt_in,expires_at) VALUES(?,?,?,?,?,?,?,?,?,?,?)`,
+             currentness_ref,opt_in,expires_at,declaration_seq) VALUES(?,?,?,?,?,?,?,?,?,?,?,?)`,
         )
         .run(
           input.consentRef,
@@ -316,6 +331,7 @@ export class HostMetaShadowStore implements MetaFeedbackHostPort {
           input.currentnessRef,
           input.optIn ? 1 : 0,
           input.expiresAt,
+          nextSeq,
         );
       if (!input.optIn) {
         this.#db
@@ -809,9 +825,10 @@ export class HostMetaShadowStore implements MetaFeedbackHostPort {
   }
 
   /**
-   * The CURRENT consent for one (caseRef, sourceRevision): the newest declared
-   * consent revision (latest re-declaration breaks ties). Historical rows stay
-   * as provenance, but only this row's opt_in state is authoritative for
+   * The CURRENT consent for one (caseRef, sourceRevision): the latest entry of
+   * the durable transactional declaration-order sequence (never lexicographic
+   * ordering of the opaque revision string). Historical rows stay as
+   * provenance, but only this row's opt_in state is authoritative for
    * write-time authorization and read-time revalidation alike.
    */
   #currentConsent(caseRef: string, sourceRevision: string): ConsentRow | undefined {
@@ -819,7 +836,7 @@ export class HostMetaShadowStore implements MetaFeedbackHostPort {
       .prepare(
         `SELECT * FROM meta_opt_in_consents
          WHERE case_ref=? AND source_revision=?
-         ORDER BY revision DESC, rowid DESC, consent_ref ASC
+         ORDER BY declaration_seq DESC, rowid DESC
          LIMIT 1`,
       )
       .get(caseRef, sourceRevision) as ConsentRow | undefined;
@@ -829,6 +846,54 @@ export class HostMetaShadowStore implements MetaFeedbackHostPort {
   #isCurrentConsent(consent: ConsentRow): boolean {
     const current = this.#currentConsent(consent.case_ref, consent.source_revision);
     return current !== undefined && current.consent_ref === consent.consent_ref;
+  }
+
+  /**
+   * Safe migration for databases created before `declaration_seq` existed:
+   * add the column, then backfill one sequence per (caseRef, sourceRevision)
+   * in original insertion order so the legacy "latest declaration wins"
+   * semantics carry over and later writes continue the sequence. The write
+   * lock plus the in-transaction recheck keep concurrent constructors from
+   * racing the ALTER.
+   */
+  #migrateConsentDeclarationOrder(): void {
+    if (this.#consentDeclarationSeqColumnExists()) return;
+    this.#db.exec('BEGIN IMMEDIATE');
+    try {
+      if (this.#consentDeclarationSeqColumnExists()) {
+        this.#db.exec('COMMIT');
+        return;
+      }
+      this.#db.exec(
+        'ALTER TABLE meta_opt_in_consents ADD COLUMN declaration_seq INTEGER NOT NULL DEFAULT 0',
+      );
+      const legacyRows = this.#db
+        .prepare(
+          'SELECT rowid AS rid, case_ref, source_revision FROM meta_opt_in_consents ORDER BY rowid ASC',
+        )
+        .all() as unknown as { rid: number; case_ref: string; source_revision: string }[];
+      const nextSeqBySource = new Map<string, number>();
+      const assignSeq = this.#db.prepare(
+        'UPDATE meta_opt_in_consents SET declaration_seq=? WHERE rowid=?',
+      );
+      for (const row of legacyRows) {
+        const key = `${row.case_ref}\u0000${row.source_revision}`;
+        const seq = (nextSeqBySource.get(key) ?? 0) + 1;
+        nextSeqBySource.set(key, seq);
+        assignSeq.run(seq, row.rid);
+      }
+      this.#db.exec('COMMIT');
+    } catch (error) {
+      this.#rollback();
+      throw error;
+    }
+  }
+
+  #consentDeclarationSeqColumnExists(): boolean {
+    const columns = this.#db
+      .prepare('PRAGMA table_info(meta_opt_in_consents)')
+      .all() as unknown as { name?: unknown }[];
+    return columns.some((column) => column.name === 'declaration_seq');
   }
 
   /** Revalidate one stored row at query time; `undefined` excludes the row. */

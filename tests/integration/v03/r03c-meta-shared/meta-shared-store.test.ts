@@ -1,15 +1,17 @@
 /**
  * R03C-META-SHARED-SQLITE — cross-Case verified experience over the EXISTING
- * Host SQLite store (Issue #285, Execution Pack
- * .agent/execution/R03C-META-SHARED-SQLITE/MANIFEST.yaml@636bc865).
+ * Host SQLite store (Issue #285; generation-4 repair pack
+ * .agent/execution/R03C-META-CONSENT-DECLARATION-ORDER/MANIFEST.yaml@c63400c).
  *
  * Proves: closed-world privacy-minimized normalization, advisory-only
  * cross-Case retrieval (no sourceCase==targetCase gate), snapshot-consistent
  * currentness, receipt/consent staleness, explicit revocation, consent opt-out
  * supersession (no historical-opt-in authorization, no re-opt-in resurrection),
- * restart durability, malformed/private/oversized rejection, Shadow-feedback
- * metadata attachment without promotion, receipt digest conflict and
- * concurrent submission/query safety.
+ * declaration-order currentness (consent-rev-2 opt-in vs consent-rev-10 opt-out,
+ * plus legacy pre-sequence schema migration), restart durability,
+ * malformed/private/oversized rejection, Shadow-feedback metadata attachment
+ * without promotion, receipt digest conflict and concurrent submission/query
+ * safety.
  */
 import { createHash } from 'node:crypto';
 import { mkdtempSync, rmSync } from 'node:fs';
@@ -490,6 +492,303 @@ describe('R03C shared Meta experience (existing Host SQLite)', () => {
     } finally {
       reopened.close();
     }
+  });
+
+  it('declaration order, not revision string order, decides current consent (consent-rev-2 opt-in, later consent-rev-10 opt-out)', async () => {
+    const { store } = makeStore('consent-declaration-order');
+    seedVocabulary(store);
+    const digest = sha256('evidence:case-alpha:outcome-r1');
+    store.recordOutcomeReceipt({ caseRef: 'case-alpha', revision: 'outcome-r1', sha256: digest });
+    // Earlier declaration: opt-in whose revision string sorts AFTER the
+    // opt-out below ('consent-rev-2' > 'consent-rev-10' lexicographically).
+    recordConsent(store, {
+      consentRef: 'consent-case-alpha-r2-optin',
+      revision: 'consent-rev-2',
+      caseRef: 'case-alpha',
+      sourceRevision: 'outcome-r1',
+      sourceDigest: digest,
+      optIn: true,
+    });
+    const selection: MetaFeedbackSelection = {
+      selected: true,
+      caseRef: 'case-alpha',
+      sourceRevision: 'outcome-r1',
+      rating: 'HELPFUL',
+      category: 'OTHER',
+    };
+    const authorization = (await store.authorizeCurrentFeedback({
+      scope: 'META_FEEDBACK_SHADOW',
+      caseRef: 'case-alpha',
+      sourceRevision: 'outcome-r1',
+      selection,
+    })) as MetaFeedbackAuthorization;
+    expect(authorization.consentRevision).toBe('consent-rev-2');
+    expect(store.recordSharedExperience(experienceInput()).status).toBe('STORED');
+
+    // Later declaration: an opt-out whose revision string sorts BEFORE the
+    // historical opt-in. Declaration order — not lexicographic order — must
+    // make this opt-out the current consent on every authorization surface.
+    recordConsent(store, {
+      consentRef: 'consent-case-alpha-r10-optout',
+      revision: 'consent-rev-10',
+      caseRef: 'case-alpha',
+      sourceRevision: 'outcome-r1',
+      sourceDigest: digest,
+      optIn: false,
+    });
+
+    expect(
+      store.querySharedExperiences({ targetCaseRef: 'case-beta', capabilityId: CAPABILITY }),
+    ).toHaveLength(0);
+    expect(() =>
+      store.recordSharedExperience(experienceInput({ tags: [TAG_WINDOWS] })),
+    ).toThrow('META_EXPERIENCE_NOT_CURRENT');
+    expect(() => store.recordSharedExperience(experienceInput())).toThrow(
+      'META_EXPERIENCE_NOT_CURRENT',
+    );
+    await expect(
+      store.authorizeCurrentFeedback({
+        scope: 'META_FEEDBACK_SHADOW',
+        caseRef: 'case-alpha',
+        sourceRevision: 'outcome-r1',
+        selection,
+      }),
+    ).rejects.toThrow('META_OPT_IN_MISSING');
+    // The stale pre-opt-out authorization can no longer store its candidate.
+    const candidate: MetaFeedbackShadowCandidate = Object.freeze({
+      schema: META_FEEDBACK_SCHEMA,
+      candidateId: authorization.candidateId,
+      kind: 'META_FEEDBACK',
+      lifecycle: 'FUTURE_BUILD_SHADOW',
+      active: false as const,
+      source: Object.freeze({
+        caseRef: authorization.caseRef,
+        revision: authorization.sourceRevision,
+        sha256: authorization.sourceDigest,
+      }),
+      feedback: Object.freeze({
+        rating: selection.rating,
+        category: selection.category,
+      }),
+      provenance: Object.freeze({
+        operatorId: authorization.operatorId,
+        operatorSubjectRef: authorization.operatorSubjectRef,
+        consentRef: authorization.consentRef,
+        consentRevision: authorization.consentRevision,
+        consentExpiresAt: authorization.consentExpiresAt,
+        authorizationRevision: authorization.authorizationRevision,
+        currentnessRef: authorization.currentnessRef,
+      }),
+    });
+    await expect(store.runMetaFeedbackWorkflow({ candidate, authorization })).rejects.toThrow(
+      'META_CONSENT_NOT_CURRENT',
+    );
+    // The opt-out physically revoked the derived experience: the explicit
+    // revocation API stays idempotent.
+    expect(
+      store.revokeSourceExperiences({ caseRef: 'case-alpha', sourceRevision: 'outcome-r1' }),
+    ).toBe(0);
+  });
+
+  it('a declaration-order opt-out survives close/reopen; a later re-opt-in never resurrects the revoked experience', async () => {
+    const { store, file } = makeStore('consent-declaration-order-durability');
+    seedVocabulary(store);
+    const digest = sha256('evidence:case-alpha:outcome-r1');
+    store.recordOutcomeReceipt({ caseRef: 'case-alpha', revision: 'outcome-r1', sha256: digest });
+    recordConsent(store, {
+      consentRef: 'consent-case-alpha-r2-optin',
+      revision: 'consent-rev-2',
+      caseRef: 'case-alpha',
+      sourceRevision: 'outcome-r1',
+      sourceDigest: digest,
+      optIn: true,
+    });
+    expect(store.recordSharedExperience(experienceInput()).status).toBe('STORED');
+    recordConsent(store, {
+      consentRef: 'consent-case-alpha-r10-optout',
+      revision: 'consent-rev-10',
+      caseRef: 'case-alpha',
+      sourceRevision: 'outcome-r1',
+      sourceDigest: digest,
+      optIn: false,
+    });
+    store.close();
+
+    const reopened = new HostMetaShadowStore(file);
+    try {
+      // Restart keeps the later-declared opt-out current: the historical
+      // lexicographically-larger opt-in stays superseded.
+      expect(
+        reopened.querySharedExperiences({ targetCaseRef: 'case-beta', capabilityId: CAPABILITY }),
+      ).toHaveLength(0);
+      expect(() =>
+        reopened.recordSharedExperience(experienceInput({ tags: [TAG_WINDOWS] })),
+      ).toThrow('META_EXPERIENCE_NOT_CURRENT');
+      await expect(
+        reopened.authorizeCurrentFeedback({
+          scope: 'META_FEEDBACK_SHADOW',
+          caseRef: 'case-alpha',
+          sourceRevision: 'outcome-r1',
+          selection: {
+            selected: true,
+            caseRef: 'case-alpha',
+            sourceRevision: 'outcome-r1',
+            rating: 'HELPFUL',
+            category: 'OTHER',
+          },
+        }),
+      ).rejects.toThrow('META_OPT_IN_MISSING');
+
+      // A later re-opt-in — whose revision string sorts FIRST among all rows —
+      // is still current by declaration order and authorizes NEW records...
+      recordConsent(reopened, {
+        consentRef: 'consent-case-alpha-r1-reopted',
+        revision: 'consent-rev-1',
+        caseRef: 'case-alpha',
+        sourceRevision: 'outcome-r1',
+        sourceDigest: digest,
+        optIn: true,
+      });
+      const reauthorized = (await reopened.authorizeCurrentFeedback({
+        scope: 'META_FEEDBACK_SHADOW',
+        caseRef: 'case-alpha',
+        sourceRevision: 'outcome-r1',
+        selection: {
+          selected: true,
+          caseRef: 'case-alpha',
+          sourceRevision: 'outcome-r1',
+          rating: 'HELPFUL',
+          category: 'OTHER',
+        },
+      })) as MetaFeedbackAuthorization;
+      expect(reauthorized.consentRevision).toBe('consent-rev-1');
+      expect(reauthorized.consentRef).toBe('consent-case-alpha-r1-reopted');
+      const fresh = reopened.recordSharedExperience(
+        experienceInput({ patternId: 'pattern.single-pass' }),
+      );
+      expect(fresh.status).toBe('STORED');
+      // ...but the revoked pre-opt-out experience is NOT resurrected: only the
+      // new record is retrievable, bound to the new current consent.
+      const results = reopened.querySharedExperiences({
+        targetCaseRef: 'case-beta',
+        capabilityId: CAPABILITY,
+      });
+      expect(results.map((record) => record.experienceId)).toEqual([fresh.experienceId]);
+      expect(first(results).provenance.consentRef).toBe('consent-case-alpha-r1-reopted');
+      // An identical replay of the revoked record conflicts instead of reviving it.
+      expect(() => reopened.recordSharedExperience(experienceInput())).toThrow(
+        'META_EXPERIENCE_CONFLICT',
+      );
+    } finally {
+      reopened.close();
+    }
+  });
+
+  it('a pre-declaration_seq consent table migrates in original declaration order and the sequence continues', async () => {
+    const dir = mkdtempSync(join(tmpdir(), 'meta-shared-consent-migration-'));
+    createdDirs.push(dir);
+    const file = join(dir, 'meta.sqlite');
+    const digest = sha256('evidence:case-alpha:outcome-r1');
+    // Legacy schema exactly as created before declaration_seq existed, with
+    // rows declared in an order lexicographic revision sorting would mis-rank:
+    // opt-in 'consent-rev-2' first, then a later opt-out 'consent-rev-10'.
+    const legacy = new DatabaseSync(file);
+    try {
+      legacy.exec(`CREATE TABLE meta_opt_in_consents (
+        consent_ref TEXT PRIMARY KEY,
+        revision TEXT NOT NULL,
+        case_ref TEXT NOT NULL,
+        source_revision TEXT NOT NULL,
+        source_digest TEXT NOT NULL,
+        operator_id TEXT NOT NULL,
+        operator_subject_ref TEXT NOT NULL,
+        authorization_revision TEXT NOT NULL,
+        currentness_ref TEXT NOT NULL,
+        opt_in INTEGER NOT NULL,
+        expires_at TEXT NOT NULL
+      )`);
+      const insert = legacy.prepare(
+        `INSERT INTO meta_opt_in_consents(
+           consent_ref,revision,case_ref,source_revision,source_digest,
+           operator_id,operator_subject_ref,authorization_revision,
+           currentness_ref,opt_in,expires_at) VALUES(?,?,?,?,?,?,?,?,?,?,?)`,
+      );
+      insert.run(
+        'consent-legacy-r2',
+        'consent-rev-2',
+        'case-alpha',
+        'outcome-r1',
+        digest,
+        'operator:shun-owner',
+        'operator:shun-owner',
+        'authz-legacy-2',
+        'currentness:legacy:2',
+        1,
+        hoursFromNow(1),
+      );
+      insert.run(
+        'consent-legacy-r10',
+        'consent-rev-10',
+        'case-alpha',
+        'outcome-r1',
+        digest,
+        'operator:shun-owner',
+        'operator:shun-owner',
+        'authz-legacy-10',
+        'currentness:legacy:10',
+        0,
+        hoursFromNow(1),
+      );
+    } finally {
+      legacy.close();
+    }
+
+    // Opening the store migrates the legacy table (adds + backfills the
+    // declaration-order sequence) before any consent is read.
+    const store = new HostMetaShadowStore(file);
+    openStores.push(store);
+    store.recordOutcomeReceipt({ caseRef: 'case-alpha', revision: 'outcome-r1', sha256: digest });
+    // Backfilled declaration order: the LATER-declared legacy opt-out is
+    // current (lexicographic order would wrongly select 'consent-rev-2').
+    await expect(
+      store.authorizeCurrentFeedback({
+        scope: 'META_FEEDBACK_SHADOW',
+        caseRef: 'case-alpha',
+        sourceRevision: 'outcome-r1',
+        selection: {
+          selected: true,
+          caseRef: 'case-alpha',
+          sourceRevision: 'outcome-r1',
+          rating: 'HELPFUL',
+          category: 'OTHER',
+        },
+      }),
+    ).rejects.toThrow('META_OPT_IN_MISSING');
+
+    // A new declaration continues the migrated sequence and becomes current
+    // even though its revision string sorts before every legacy row.
+    recordConsent(store, {
+      consentRef: 'consent-post-migration',
+      revision: 'consent-rev-1',
+      caseRef: 'case-alpha',
+      sourceRevision: 'outcome-r1',
+      sourceDigest: digest,
+      optIn: true,
+    });
+    const authorization = (await store.authorizeCurrentFeedback({
+      scope: 'META_FEEDBACK_SHADOW',
+      caseRef: 'case-alpha',
+      sourceRevision: 'outcome-r1',
+      selection: {
+        selected: true,
+        caseRef: 'case-alpha',
+        sourceRevision: 'outcome-r1',
+        rating: 'HELPFUL',
+        category: 'OTHER',
+      },
+    })) as MetaFeedbackAuthorization;
+    expect(authorization.consentRef).toBe('consent-post-migration');
+    expect(authorization.consentRevision).toBe('consent-rev-1');
   });
 
   it('rejects malformed, unregistered, private, path/secret-shaped and oversized records', () => {
