@@ -6,6 +6,7 @@ repository: kaicreator-mm/shun-assistant
 target_version: v0.3.0
 owner_authorization_ref: "#280 comment 6596114371"
 owner_write_set_amendment_ref: "#303 comment 6603290369"
+owner_scope_clarification_ref: "#303 comment 6603971265"
 execution_profile: LOCAL_BUILDER
 execution_environment: LOCAL
 standard_revision: 2c395c55569fe2edf3f4135f12d3d069e526d0b7
@@ -31,6 +32,7 @@ plan:
   - "Keep direct-source tests as legacy preview coverage and prove the public package root does not export composeDomainBuild."
   - "Verify production still uses composeTrustedRuntimeBuild and the real public DomainHarness v0.10.3 buildV10App/activateV10App consumer path."
   - "Re-anchor only the stale V01 public-root assertions in t11-runtime/server-v03-gateway.test.ts and t12-qualification/qualification.test.ts: assert composeDomainBuild is absent from @shun/domain-app; preserve all gateway/port pins, SDK consumer checks, runtime coverage and all other V01 assertions."
+  - "In t12-qualification/qualification.test.ts, remove only composeDomainBuild from results.publicInterface.anchoredPackages because it is no longer a public-root export; preserve createControlApiGateway and every other report field."
   - "Do not change production route/activation, Host bindings, Kernel, SDK, ABI, or any of #288's 12 integration paths."
 pre_ci:
   - "Run exact-tree Windows Node 24 syntax preflight before every source-changing CI."
@@ -49,4 +51,4 @@ forbidden:
   - "merge, tag or release"
   - "real Provider installation, UAC prompt or persistent Windows effect"
   - "paid LLM calls"
-notes: "Generation 2 is the Owner-approved two-test-only expansion of generation 1. Reuse local gen1 implementation only after the local agent verifies exact parent ad327e8 and the original three-path diff. The two added files may change only the stale composeDomainBuild public-root expectation. Generation-2 pack-only CI and a fresh generation-2 CAS Claim bound to the exact pack commit are mandatory before further source writes. #303 remains a native blocker of #288; #288 write set is unchanged."
+notes: "Generation 2 is the Owner-approved two-test-only expansion of generation 1. Reuse local gen1 implementation only after the local agent verifies exact parent ad327e8 and the original three-path diff. The two added files may change only the stale composeDomainBuild public-root expectation, plus the separately Owner-approved removal of composeDomainBuild from t12 results.publicInterface.anchoredPackages (same file, no new path). Preserve createControlApiGateway and all other V01 evidence. This manifest was amended before generation-2 Claim acceptance to include the Owner scope clarification. Pack-only CI and a fresh generation-2 CAS Claim bound to the final exact pack commit are mandatory before further source writes. #303 remains a native blocker of #288; #288 write set is unchanged."
