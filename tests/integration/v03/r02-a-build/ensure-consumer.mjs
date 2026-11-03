@@ -111,55 +111,106 @@ export { generate, installTrustedCloudHostBinding, createTrustedCloudHostBinding
  * Same pattern as the openai-host binding: the consumer package re-exports
  * the REAL repo source entry, so the composing process and the sealed
  * capability import THE SAME module instance.
+ *
+ * R03C (#288): the provider shim also stages the Host-only prepare/confirm
+ * surfaces; the meta shim wraps installTrustedMetaBinding to capture the
+ * exact same HostMetaShadowStore instance and re-exports a read-only
+ * querySharedExperiences over it (the #285 store contract).
  */
+function writeStagedBinding(name, note, indexBody, version, adapterUrl) {
+  const hostDir = join(consumerDir, 'node_modules', name);
+  const marker = join(hostDir, 'PROVENANCE.txt');
+  const expectedMarker = `v03-sdk-consumer ${name} binding ${version} -> ${adapterUrl}\n`;
+  if (existsSync(marker) && readFileSync(marker, 'utf8') === expectedMarker) return;
+  mkdirSync(hostDir, { recursive: true });
+  writeFileSync(
+    join(hostDir, 'package.json'),
+    JSON.stringify(
+      { name, version: '0.3.0', private: true, type: 'module', main: './index.mjs' },
+      null,
+      2,
+    ),
+  );
+  writeFileSync(join(hostDir, 'index.mjs'), indexBody);
+  writeFileSync(marker, expectedMarker);
+}
+
 function stageR03IntBindings() {
-  const bindings = [
-    {
-      name: 'shun-windows-effect-host',
-      source: 'packages/domain-host/src/windows/effect-host-binding.ts',
-      exports:
-        'installTrustedWindowsEffectBinding, windowsExecute, trustedWindowsEffectBindingStatus',
-      note: 'R03-INT trusted Windows effect Host binding (real authority chain)',
-    },
-    {
-      name: 'shun-provider-host',
-      source: 'packages/domain-host/src/provider/provider-host-binding.ts',
-      exports: 'installTrustedProviderBinding, providerFirstUse, trustedProviderBindingStatus',
-      note: 'R03-INT trusted CuratedProvider Host binding (real first-use chain)',
-    },
-    {
-      name: 'shun-meta-host',
-      source: 'packages/domain-host/src/meta/meta-host-binding.ts',
-      exports: 'installTrustedMetaBinding, submitMetaFeedback, trustedMetaBindingStatus',
-      note: 'R03-INT trusted Meta Shadow Host binding (real durable store)',
-    },
-  ];
-  for (const binding of bindings) {
-    const hostDir = join(consumerDir, 'node_modules', binding.name);
-    const adapterUrl = pathToFileURL(join(repoRoot, binding.source)).href;
-    const indexFile = join(hostDir, 'index.mjs');
-    const marker = join(hostDir, 'PROVENANCE.txt');
-    const expectedMarker = `v03-sdk-consumer ${binding.name} binding v1 -> ${adapterUrl}
-`;
-    if (existsSync(marker) && readFileSync(marker, 'utf8') === expectedMarker) continue;
-    mkdirSync(hostDir, { recursive: true });
-    writeFileSync(
-      join(hostDir, 'package.json'),
-      JSON.stringify(
-        { name: binding.name, version: '0.3.0', private: true, type: 'module', main: './index.mjs' },
-        null,
-        2,
-      ),
-    );
-    writeFileSync(
-      indexFile,
-      `// ${binding.note}. Re-exports the REAL trusted install seam so the
-// composing process and the capability import the same module instance.
-export { ${binding.exports} } from '${adapterUrl}';
+  const windowsUrl = pathToFileURL(
+    join(repoRoot, 'packages/domain-host/src/windows/effect-host-binding.ts'),
+  ).href;
+  writeStagedBinding(
+    'shun-windows-effect-host',
+    'R03-INT trusted Windows effect Host binding (real authority chain)',
+    `// R03-INT trusted Windows effect Host binding (real authority chain).
+// Re-exports the REAL trusted install seam so the composing process and the
+// capability import the same module instance.
+export { installTrustedWindowsEffectBinding, windowsExecute, trustedWindowsEffectBindingStatus } from '${windowsUrl}';
 `,
-    );
-    writeFileSync(marker, expectedMarker);
+    'v2',
+    windowsUrl,
+  );
+
+  const providerUrl = pathToFileURL(
+    join(repoRoot, 'packages/domain-host/src/provider/provider-host-binding.ts'),
+  ).href;
+  writeStagedBinding(
+    'shun-provider-host',
+    'R03-INT/R03C trusted CuratedProvider Host binding (real first-use chain)',
+    `// R03-INT/R03C trusted CuratedProvider Host binding (real first-use chain).
+// Re-exports the REAL trusted install seam AND the Host-only two-step
+// prepare/confirm surfaces (R03C #288): preview and one-time requestRef
+// authority stay in the Host; the K→C callback consumes only {requestRef}.
+// The composing process and the sealed capability import the same instance.
+export {
+  installTrustedProviderBinding,
+  providerFirstUse,
+  prepareProviderFirstUse,
+  confirmProviderFirstUse,
+  readProviderFirstUseRequest,
+  closeTrustedProviderBinding,
+  trustedProviderBindingStatus,
+} from '${providerUrl}';
+`,
+    'v2',
+    providerUrl,
+  );
+
+  const metaUrl = pathToFileURL(
+    join(repoRoot, 'packages/domain-host/src/meta/meta-host-binding.ts'),
+  ).href;
+  writeStagedBinding(
+    'shun-meta-host',
+    'R03-INT/R03C trusted Meta Shadow Host binding (real durable store)',
+    `// R03-INT/R03C trusted Meta Shadow Host binding (real durable store).
+// installTrustedMetaBinding is wrapped so the EXACT same HostMetaShadowStore
+// instance the feedback binding is installed over also backs the read-only
+// querySharedExperiences surface (R03C #288). The store itself remains the
+// #285 authority: fail-closed validation, currentness and revocation live
+// inside it. A query mints no consent, no Shadow candidate and no authority.
+import {
+  installTrustedMetaBinding as installRealTrustedMetaBinding,
+  submitMetaFeedback,
+  trustedMetaBindingStatus,
+} from '${metaUrl}';
+let installedStore;
+export function installTrustedMetaBinding(config) {
+  if (!config || typeof config.store !== 'object' || config.store === null ||
+      typeof config.store.querySharedExperiences !== 'function') {
+    throw new Error('META_HOST_STORE_REQUIRED');
   }
+  installedStore = config.store;
+  return installRealTrustedMetaBinding(config);
+}
+export function querySharedExperiences(input) {
+  if (installedStore === undefined) throw new Error('META_HOST_NOT_INSTALLED');
+  return installedStore.querySharedExperiences(input);
+}
+export { submitMetaFeedback, trustedMetaBindingStatus };
+`,
+    'v2',
+    metaUrl,
+  );
 }
 
 export function ensureV03SdkConsumer() {

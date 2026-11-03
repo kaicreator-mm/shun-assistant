@@ -1,8 +1,10 @@
 /**
- * Shun v0.3 Business Domain Package — curated Provider first use (R03-INT).
- * One bounded intent triggering the pinned provider's genuine first use
- * through the selected K's external Effect gate; the sealed capability and
- * the trusted Host chain own signature/staging/execution authority.
+ * Shun v0.3 Business Domain Package — curated Provider first use (R03-INT,
+ * R03C #288 Host-global repair). One bounded intent triggering the pinned
+ * provider's genuine first use through the selected K's external Effect gate.
+ * The event payload carries ONLY the Host-issued requestRef: the sealed
+ * capability and the trusted Host chain own signature/staging/one-time
+ * request authority; no caller taskId, path, args or privilege is accepted.
  */
 export const MODULE_ID = 'shun.business.provider@v0.3.0';
 export const PACKAGE_KIND = 'business';
@@ -12,7 +14,7 @@ export const INTENT_TYPES = ['submitProviderFirstUse'];
 export const EFFECT_TYPES = ['effect:provider-first-use'];
 
 const fromEvent = {
-  taskId: { source: 'event', path: ['payload', 'taskId'] },
+  requestRef: { source: 'event', path: ['payload', 'requestRef'] },
 };
 const definition = {
   workflowKey: 'shun-provider', initialState: 'ready', initialContext: {},
@@ -25,7 +27,7 @@ const definition = {
       effectIntents: [{
         effectType: 'effect:provider-first-use',
         inputFrom: fromEvent,
-        idempotencyKeyFrom: { template: 'provider:{taskId}' },
+        idempotencyKeyFrom: { template: 'provider:{requestRef}' },
       }],
     }] },
   ],
@@ -50,7 +52,7 @@ export function getPolicy() {
       'rule:provider-first-use': {
         ruleId: 'rule:provider-first-use',
         eventType: 'PROVIDER_FIRST_USE_REQUESTED',
-        payloadFromInput: { taskId: 'taskId' },
+        payloadFromInput: { requestRef: 'requestRef' },
       },
     },
     intentBindings: {
@@ -69,7 +71,7 @@ export function getPolicy() {
           if (!resources || typeof resources.call !== 'function') {
             throw new Error('K_RESOURCES_REQUIRED');
           }
-          return resources.call('provider', 'provider.firstUse', { taskId: input.taskId });
+          return resources.call('provider', 'provider.firstUse', { requestRef: input.requestRef });
         },
       },
     },

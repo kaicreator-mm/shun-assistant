@@ -9,6 +9,7 @@ import {
   composeTrustedRuntimeBuild,
   type TrustedModuleSource,
 } from '../../../../packages/domain-app/src/activation/trusted-build.ts';
+import type { SendReceipt } from '../../../../packages/domain-app/src/api/gateway.ts';
 import {
   type ControlApiGateway,
   createControlApiGateway,
@@ -21,10 +22,12 @@ import {
   SqliteHostSubmitReferenceLedger,
 } from './composition-approval.ts';
 import {
+  classifyJourneyKernelResult,
   createJourneySubmits,
   installJourneyBindings,
   type JourneyBindingsConfig,
   type JourneySubmits,
+  loadStagedBindingModule,
 } from './composition-journeys.ts';
 
 /** The frozen T04 interpreter port the trusted binding consumes. */
@@ -267,6 +270,26 @@ function resolveOpenAiHostBinding(consumerRoot: string): string {
 export async function createProductionV03Gateway(config: ProductionV03Config): Promise<{
   gateway: ControlApiGateway;
   journeys?: JourneySubmits;
+  /**
+   * R03C (#288): Host-global Provider first-use operations. prepare() needs
+   * no Guided Case and no reference pair; confirm() consumes the one-time
+   * Host-issued requestRef and then submits the fixed Provider Business
+   * Intent through the selected V10 facade (instanceKey provider-global,
+   * payload exactly {requestRef}). Present only when the hash-pinned
+   * manifest declares the provider route with its real binding.
+   */
+  providerGlobal?: {
+    prepare(): Promise<
+      | {
+          readonly ok: true;
+          readonly requestRef: string;
+          readonly preview: unknown;
+          readonly expiresAtUnixMs: number;
+        }
+      | { readonly ok: false; readonly code: string }
+    >;
+    confirm(raw: unknown): Promise<SendReceipt>;
+  };
   subjectDigest: string;
   /**
    * Trusted process-side issuance of the submit-reference pair for the one
@@ -286,12 +309,14 @@ export async function createProductionV03Gateway(config: ProductionV03Config): P
   const prepared = composeTrustedRuntimeBuild(trustedManifest(config));
   // R03-INT: goal-interpret stays mandatory; the windows/provider/meta
   // journey intents may compose alongside it, each fail-closed on its real
-  // trusted Host binding configuration.
+  // trusted Host binding configuration. R03C (#288): the read-only Meta
+  // shared-experience query intent joins the frozen allowlist.
   const JOURNEY_INTENTS = new Set([
     'submitWindowsAction',
     'submitUnpermittedWindowsProbe',
     'submitProviderFirstUse',
     'submitMetaFeedback',
+    'querySharedExperiences',
   ]);
   const declaredRoutes =
     prepared.status === 'READY_FOR_PUBLIC_SDK_BUILD' ? prepared.options.routes : [];
@@ -305,13 +330,37 @@ export async function createProductionV03Gateway(config: ProductionV03Config): P
   );
   const needsProvider = declaredRoutes.some((route) => route.intentId === 'submitProviderFirstUse');
   const needsMeta = declaredRoutes.some((route) => route.intentId === 'submitMetaFeedback');
+  const needsMetaShared = declaredRoutes.some(
+    (route) => route.intentId === 'querySharedExperiences',
+  );
+  // R03C authority pinning: a journey route may only bind its frozen
+  // capability family; a manifest trying to point the provider intent or the
+  // meta-shared read at another capability refuses at boot.
+  const routeCapabilityForged =
+    declaredRoutes.some(
+      (route) => route.intentId === 'submitProviderFirstUse' && route.capabilityId !== 'provider',
+    ) ||
+    declaredRoutes.some(
+      (route) => route.intentId === 'submitMetaFeedback' && route.capabilityId !== 'meta',
+    ) ||
+    declaredRoutes.some(
+      (route) =>
+        route.intentId === 'querySharedExperiences' && route.capabilityId !== 'meta-memory',
+    ) ||
+    declaredRoutes.some(
+      (route) =>
+        (route.intentId === 'submitWindowsAction' ||
+          route.intentId === 'submitUnpermittedWindowsProbe') &&
+        route.capabilityId !== 'windows',
+    );
   const journeyRoutesUnbacked =
     (needsWindows && !config.journeys?.windows) ||
     (needsProvider && !config.journeys?.provider) ||
-    (needsMeta && !config.journeys?.meta);
+    ((needsMeta || needsMetaShared) && !config.journeys?.meta);
   if (
     prepared.status !== 'READY_FOR_PUBLIC_SDK_BUILD' ||
     unknownIntent ||
+    routeCapabilityForged ||
     journeyRoutesUnbacked ||
     !declaredRoutes.some((route) => route.intentId === 'goal-interpret') ||
     !isAbsolute(config.kDocDatabaseFile) ||
@@ -449,6 +498,88 @@ export async function createProductionV03Gateway(config: ProductionV03Config): P
         references,
         now,
       }),
+      providerGlobal: needsProvider
+        ? await (async () => {
+            // The SAME staged consumer module instance the sealed capability
+            // imports: the module-global installed binding is coherent for
+            // the composition-side Host surfaces and the K→C callback.
+            const providerHost = await loadStagedBindingModule(consumerRoot, 'shun-provider-host');
+            const statusOf = (): { installed: boolean } => {
+              const status = providerHost.trustedProviderBindingStatus as
+                | (() => { installed: boolean })
+                | undefined;
+              return typeof status === 'function' ? status() : { installed: false };
+            };
+            let providerAttempt = 0;
+            const providerRefused = (code: string, detail: string): SendReceipt => ({
+              status: 'REFUSED',
+              code: code as never,
+              detail,
+              sendCalls: 0,
+              journalEntries: 0,
+              refusedAtUnixMs: now(),
+            });
+            return {
+              async prepare() {
+                if (!config.journeys?.provider || !statusOf().installed) {
+                  return { ok: false as const, code: 'PROVIDER_HOST_NOT_INSTALLED' };
+                }
+                const prepareFn = providerHost.prepareProviderFirstUse as
+                  | (() => Promise<
+                      | { ok: true; requestRef: string; preview: unknown; expiresAtUnixMs: number }
+                      | { ok: false; code: string }
+                    >)
+                  | undefined;
+                if (typeof prepareFn !== 'function') {
+                  return { ok: false as const, code: 'V03_PROVIDER_SEAM_REFUSED' };
+                }
+                return prepareFn();
+              },
+              async confirm(raw: unknown): Promise<SendReceipt> {
+                if (!config.journeys?.provider || !statusOf().installed) {
+                  return providerRefused(
+                    'PROVIDER_HOST_NOT_INSTALLED',
+                    'trusted provider binding is not installed',
+                  );
+                }
+                // The confirm body is EXACTLY {requestRef}: no intentType,
+                // instanceKey, taskId, path, args or privilege is accepted
+                // from any caller; every value the K send uses is fixed here.
+                if (
+                  !isRecord(raw) ||
+                  Object.keys(raw).sort().join('|') !== 'requestRef' ||
+                  typeof raw.requestRef !== 'string' ||
+                  !/^[A-Za-z][A-Za-z0-9._:-]{0,127}$/.test(raw.requestRef)
+                ) {
+                  return providerRefused(
+                    'GATEWAY_INPUT_INVALID',
+                    'confirm body must be exactly one bounded requestRef',
+                  );
+                }
+                const confirmFn = providerHost.confirmProviderFirstUse as
+                  | ((requestRef: string) => { ok: true } | { ok: false; code: string })
+                  | undefined;
+                if (typeof confirmFn !== 'function') {
+                  return providerRefused('V03_PROVIDER_SEAM_REFUSED', 'confirm seam unavailable');
+                }
+                // PREPARED → APPROVED exactly once in the durable Host ledger;
+                // a wrong/expired/replayed requestRef refuses with zero K
+                // sends and zero provider activation.
+                const confirmed = confirmFn(raw.requestRef);
+                if (!confirmed.ok) {
+                  return providerRefused(confirmed.code, 'Host requestRef refused');
+                }
+                const kernelReceipt = await activated.facade.send({
+                  intentType: 'submitProviderFirstUse',
+                  instanceKey: 'provider-global',
+                  messageId: `msg-pg-${++providerAttempt}`,
+                  input: { requestRef: raw.requestRef },
+                });
+                return classifyJourneyKernelResult(kernelReceipt);
+              },
+            };
+          })()
+        : undefined,
       issueSubmitReferences(): HostSubmitReferenceIssueReceipt {
         // Issuance reads only the trusted Host-staged live step; references
         // never outlive the Case selection (validity capped at both the step
