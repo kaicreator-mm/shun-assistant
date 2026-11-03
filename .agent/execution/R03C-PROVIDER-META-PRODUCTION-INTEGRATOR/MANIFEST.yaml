@@ -1,0 +1,89 @@
+pack_id: shun-v030-r03c-provider-meta-production-integrator-web-r1
+task_id: R03C-PROVIDER-META-PRODUCTION-INTEGRATOR
+issue: "#288"
+repository: kaicreator-mm/shun-assistant
+version: v0.3.0
+parent_issue: "#280"
+owner_authorization_refs:
+  - "#280 comment 6584396368"
+  - "#280 comment 6585799747"
+  - "#280 comment 6596114371"
+  - "#280 comment 6603602254"
+  - "conversation Owner authorization: #285, #287, #289, #303; recorded in #280 comment 6606593448"
+architecture_plan_ref: "#305"
+standard_revision: 2c395c55569fe2edf3f4135f12d3d069e526d0b7
+execution_profile: LOCAL_BUILDER
+execution_environment: LOCAL
+source_base_sha: 85150b55a05986203d2600324684fe6e2158af97
+source_base_tree: 8b34b166d0508802386ddf7889e1977f8b5ade5a
+integration_baseline_branch: JIT_only_task/v0.3.0-r03c-provider-meta-combined-baseline-r1
+branch: JIT_only_task/v0.3.0-r03c-provider-meta-integrator-web-r1
+execution_pack_path: .agent/execution/R03C-PROVIDER-META-PRODUCTION-INTEGRATOR/MANIFEST.yaml
+protected_claim_key: "kaicreator-mm/shun-assistant#288:builder:__default__"
+admission_mode: SINGLE_WRITER_ADMISSION
+admission_generation: 1
+predecessor_deliveries:
+  - issue: "#285"
+    exact_head: 542066dbe3330f716f2fa466b21cadf3c8dc0808
+    exact_tree: 648cd5fa8d37e17369eb9982e15d3d4ceadc9a32
+  - issue: "#287"
+    exact_head: 01e70c4637bf8d88440c51e386ff10e1ff27f480
+    exact_tree: 029214f65d765ca329a7ad84ffab7a45c469214b
+  - issue: "#289"
+    exact_head: 593140928caf5a797abb89d799799fc54796a3aa
+    exact_tree: e3a01664dbffced6a9e7f55035672912a29e1259
+    qualification_residual: "GitHub Actions executor-windows N-R2-1 timed out after 60s; Woodpecker #201/#203 and Actions contracts passed; Owner accepted with residual."
+  - issue: "#303"
+    exact_head: e3db43afdf6987faec9d5f1f52e22ac2415c2c9c
+    exact_tree: ff0ef4b16824313cb213e37d71a8d5c855e94e1c
+    syntax_preflight: "Node 24.21.0 PASS; #303 comment 6605913649"
+combined_baseline:
+  commit: 85150b55a05986203d2600324684fe6e2158af97
+  tree: 8b34b166d0508802386ddf7889e1977f8b5ade5a
+  parent_baseline: be2e81722a70ee3d0bd5634bc83d97d733c20b78
+  source_overlay_paths: 18
+  source_parents:
+    - 542066dbe3330f716f2fa466b21cadf3c8dc0808
+    - 01e70c4637bf8d88440c51e386ff10e1ff27f480
+    - e3db43afdf6987faec9d5f1f52e22ac2415c2c9c
+  note: "#287 ancestry already contains exact #289 delivery 593140928caf5a797abb89d799799fc54796a3 as second parent of 10a0d4c2a466181859fa764f4030d97c6e55f23e."
+allowed_write_set:
+  - apps/control-api/src/main.ts
+  - apps/control-api/src/server.ts
+  - apps/control-api/src/v03/composition-journeys.ts
+  - apps/control-api/src/v03/composition-production.ts
+  - packages/domain-app/src/activation/modules/business-provider.mjs
+  - packages/domain-app/src/activation/modules/capability-provider.mjs
+  - packages/domain-app/src/activation/modules/business-meta-memory.mjs
+  - packages/domain-app/src/activation/modules/capability-meta-memory.mjs
+  - tests/integration/v03/r03c-provider-global/provider-global-route.test.ts
+  - tests/integration/v03/r03c-meta-shared/meta-shared-production.test.ts
+  - tests/integration/v03/r02-a-build/ensure-consumer.mjs
+  - docs/implementation/v0.3/r03c-production/PRODUCTION_WIRING.md
+plan:
+  - "Expose Host-only prepareProviderFirstUse and confirmProviderFirstUse through the existing staged shun-provider-host shim; keep preview and one-time requestRef authority in Host."
+  - "Route the fixed Provider Business Intent through the selected DomainHarness v0.10.3 V10AppFacade.send() path with instanceKey provider-global and payload exactly {requestRef}; do not route this through current-Case admission."
+  - "Keep queryAuthority limited to K query/subscribe. Do not use it as a send authorization gate and do not mix the separate V8 Host gateway into the active V10 activation path."
+  - "Require Host-installed trusted Provider binding and consume the curator-signed requiredPrivilege from #289; omitted/USER remains unprivileged, ELEVATED requires the exact pre-pinned action/grant/plan/ProgramPin and the existing UAC backend."
+  - "Add a read-only Meta shared-experience Business read intent through the same selected V10 facade.send() route, a distinct BUILD-selected externalEffect:false C module, and the existing Host SQLite read port."
+  - "Use exactly the #285 query contract: targetCaseRef, capabilityId, optional taskClass, bounded limit. Do not add tags or direct SQL; source Case is provenance, not a target-Case equality gate."
+  - "Keep feedback writes in the separate existing effectful C module; Meta reads remain advisoryOnly and must not mint Permit/grant/approval, mutate policy or promote Shadow."
+  - "Extend the existing pinned Host meta case file for bounded multi-Case receipts/consents/verified experiences while preserving hash-pinned provisioning and strict fail-closed validation."
+  - "Preserve the exact DomainHarness v0.10.3 V10 buildV10App/activateV10App consumer route and the separately versioned V8 ABI identifiers v08-business-abi/1 and v08-capability-abi/1 where applicable."
+  - "Add Provider prepare/confirm, requestRef replay, no-current-Case, fixed-intent, signed privilege, Meta cross-Case/same-Case, stale/revocation, multi-Case provisioning, and no-authority/no-side-effect integration regressions."
+pre_ci:
+  - "Run Node 24.21.0 exact-tree syntax preflight against the complete combined baseline before any branch creation or CI trigger."
+  - "After Claim, run scoped lint/typecheck and focused Provider/Meta integration tests."
+  - "Run the complete tools/task-check.sh suite and record exact commands, versions, exit codes, changed-file/write-set comparison, exact HEAD/tree, and Woodpecker Push/PR IDs."
+forbidden:
+  - "any path outside the exact 12-path allowed_write_set"
+  - "second Kernel, dispatcher, sender, Host database, gateway or authority channel"
+  - "direct SQLite/SQL access from DomainApp modules"
+  - "Meta read side effects, Permit/grant/approval creation, policy mutation, auto-execution or Shadow promotion"
+  - "Provider caller-controlled intentType, instanceKey, taskId, path, args or privilege"
+  - "Host configuration overriding signed requiredPrivilege"
+  - "V8 facade/gateway substituted for the active V10 build/activation path"
+  - "DomainHarness SDK/runtime/Kernel/ABI or v0.10.3 tag changes"
+  - "main, version/v0.2.0, PR merge, tag or release"
+  - "paid LLM, cloud sync, external data disclosure, real UAC prompt, Provider installation or persistent Windows effects"
+notes: "Owner has approved the four predecessor deliveries for R03C integration. This pack is bound to an isolated combined baseline; source PRs remain unmerged and the shared WIP branch is unchanged. #289's unrelated GitHub Actions executor-windows timeout is explicitly accepted with residual disclosed, not relabelled green. LOCAL_BUILDER is the sole local-agent task type: the local agent owns actual implementation, repairs, tests and CI evidence for the 12-path write set; syntax preflight is a gate inside this builder task, not a standalone LOCAL_VALIDATION assignment. ADS v4.18 role limitations are not bypassed by mislabelling; execution follows the explicit Owner direction recorded in #280 and the current conversation."
