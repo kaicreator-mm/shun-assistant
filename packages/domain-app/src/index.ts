@@ -15,5 +15,13 @@
  * plus the real public DomainHarness v0.10.3 buildV10App/activateV10App
  * chain (R02-A/t12 facade proof); exporting the preview composer from this
  * root would create a second, unsupported apparent production entry path.
+ *
+ * The trusted-cloud-interpreter port pins, by contrast, are part of the
+ * public Control API surface (V01 anchoring) and stay exported — selectively,
+ * so the preview composer itself never becomes a public Package ABI entry.
  */
 export * from './api/gateway.ts';
+export {
+  V03_EXTERNAL_IMPORT_BINDINGS,
+  V03_TRUSTED_CLOUD_INTERPRETER_PORT,
+} from './build/composition.ts';
