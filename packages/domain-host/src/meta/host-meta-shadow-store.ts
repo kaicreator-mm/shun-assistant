@@ -114,11 +114,53 @@ export interface MetaExperienceQueryInput {
   readonly limit?: number;
 }
 
+/**
+ * One normalized provisioning Case: the genuine receipt, the operator consent
+ * bound to it, and the verified experiences whose source identity must match
+ * the receipt exactly (derived by the caller, enforced again here).
+ */
+export interface MetaProvisionCaseInput {
+  readonly receipt: MetaOutcomeReceiptInput;
+  readonly consent: MetaOptInConsentInput;
+  readonly experiences: readonly MetaVerifiedExperienceInput[];
+}
+
+/**
+ * Host-owned atomic provisioning batch (generation 3, Owner
+ * OWNER_SHUN_V030_R03C_G3_HOST_ATOMIC_BATCH_APPROVE). The store validates the
+ * COMPLETE document, then applies vocabulary, receipts, consents and every
+ * experience inside ONE `BEGIN IMMEDIATE` transaction; any failure rolls the
+ * whole batch back, so a refused document has zero durable effect.
+ */
+export interface MetaProvisionBatchInput {
+  readonly vocabulary: Readonly<{
+    readonly capabilityIds: readonly string[];
+    readonly taskClasses: readonly string[];
+    readonly patternIds: readonly string[];
+    readonly tags: readonly string[];
+    readonly constraintCodes: readonly string[];
+  }>;
+  readonly cases: readonly MetaProvisionCaseInput[];
+}
+
+export interface MetaProvisionBatchResult {
+  readonly status: 'PROVISIONED';
+  readonly vocabularyCodes: number;
+  readonly receipts: number;
+  readonly consents: number;
+  readonly experiences: number;
+}
+
 const EXPERIENCE_CODE = /^[a-z0-9][a-z0-9._-]{0,63}$/;
 const MAX_EXPERIENCE_TAGS = 8;
 const MAX_EXPERIENCE_CONSTRAINT_CODES = 16;
 const DEFAULT_EXPERIENCE_QUERY_LIMIT = 10;
 const MAX_EXPERIENCE_QUERY_LIMIT = 20;
+/** Bounds of the atomic provisioning batch (mirror the pinned Control API
+ *  document contract; the store enforces them independently). */
+const MAX_PROVISION_CASES = 16;
+const MAX_PROVISION_EXPERIENCES_TOTAL = 64;
+const MAX_PROVISION_VOCABULARY_PER_KIND = 64;
 
 /** Snake-case SQLite row shape of `meta_opt_in_consents`. */
 interface ConsentRow {
@@ -255,24 +297,33 @@ export class HostMetaShadowStore implements MetaFeedbackHostPort {
     }
     this.#db.exec('BEGIN IMMEDIATE');
     try {
-      const existing = this.#db
-        .prepare('SELECT sha256 FROM meta_outcome_receipts WHERE case_ref=? AND revision=?')
-        .get(input.caseRef, input.revision) as { sha256: string } | undefined;
-      if (existing !== undefined) {
-        this.#db.exec('COMMIT');
-        if (existing.sha256 !== input.sha256) throw new Error('META_RECEIPT_CONFLICT');
-        return;
-      }
-      this.#db
-        .prepare(
-          'INSERT INTO meta_outcome_receipts(case_ref,revision,sha256,recorded_at) VALUES(?,?,?,?)',
-        )
-        .run(input.caseRef, input.revision, input.sha256, new Date().toISOString());
+      this.#recordOutcomeReceiptInTx(input);
       this.#db.exec('COMMIT');
     } catch (error) {
       this.#rollback();
       throw error;
     }
+  }
+
+  /**
+   * Transaction-aware receipt write: MUST run inside an already-open
+   * transaction (the public wrapper or the batch provisioning API owns
+   * BEGIN/COMMIT/ROLLBACK). An identical digest re-record stays an idempotent
+   * no-op; the same revision with a different digest is evidence forgery.
+   */
+  #recordOutcomeReceiptInTx(input: MetaOutcomeReceiptInput): void {
+    const existing = this.#db
+      .prepare('SELECT sha256 FROM meta_outcome_receipts WHERE case_ref=? AND revision=?')
+      .get(input.caseRef, input.revision) as { sha256: string } | undefined;
+    if (existing !== undefined) {
+      if (existing.sha256 !== input.sha256) throw new Error('META_RECEIPT_CONFLICT');
+      return;
+    }
+    this.#db
+      .prepare(
+        'INSERT INTO meta_outcome_receipts(case_ref,revision,sha256,recorded_at) VALUES(?,?,?,?)',
+      )
+      .run(input.caseRef, input.revision, input.sha256, new Date().toISOString());
   }
 
   /**
@@ -302,49 +353,57 @@ export class HostMetaShadowStore implements MetaFeedbackHostPort {
     }
     this.#db.exec('BEGIN IMMEDIATE');
     try {
-      // The sequence value is assigned under the write lock, so it reflects
-      // real declaration order regardless of how revision strings compare.
-      const nextSeq = (
-        this.#db
-          .prepare(
-            `SELECT COALESCE(MAX(declaration_seq),0)+1 AS next_seq
-             FROM meta_opt_in_consents WHERE case_ref=? AND source_revision=?`,
-          )
-          .get(input.caseRef, input.sourceRevision) as { next_seq: number }
-      ).next_seq;
-      this.#db
-        .prepare(
-          `INSERT OR REPLACE INTO meta_opt_in_consents(
-             consent_ref,revision,case_ref,source_revision,source_digest,
-             operator_id,operator_subject_ref,authorization_revision,
-             currentness_ref,opt_in,expires_at,declaration_seq) VALUES(?,?,?,?,?,?,?,?,?,?,?,?)`,
-        )
-        .run(
-          input.consentRef,
-          input.revision,
-          input.caseRef,
-          input.sourceRevision,
-          input.sourceDigest,
-          input.operatorId,
-          input.operatorSubjectRef,
-          input.authorizationRevision,
-          input.currentnessRef,
-          input.optIn ? 1 : 0,
-          input.expiresAt,
-          nextSeq,
-        );
-      if (!input.optIn) {
-        this.#db
-          .prepare(
-            `UPDATE meta_verified_experiences SET revoked_at=?
-             WHERE case_ref=? AND source_revision=? AND revoked_at IS NULL`,
-          )
-          .run(new Date().toISOString(), input.caseRef, input.sourceRevision);
-      }
+      this.#recordOptInConsentInTx(input);
       this.#db.exec('COMMIT');
     } catch (error) {
       this.#rollback();
       throw error;
+    }
+  }
+
+  /**
+   * Transaction-aware consent write: MUST run inside an already-open
+   * transaction. The declaration-order sequence value is assigned under the
+   * write lock, so recency reflects real declaration order; an opt-out also
+   * revokes every still-eligible experience derived from that source.
+   */
+  #recordOptInConsentInTx(input: MetaOptInConsentInput): void {
+    const nextSeq = (
+      this.#db
+        .prepare(
+          `SELECT COALESCE(MAX(declaration_seq),0)+1 AS next_seq
+           FROM meta_opt_in_consents WHERE case_ref=? AND source_revision=?`,
+        )
+        .get(input.caseRef, input.sourceRevision) as { next_seq: number }
+    ).next_seq;
+    this.#db
+      .prepare(
+        `INSERT OR REPLACE INTO meta_opt_in_consents(
+           consent_ref,revision,case_ref,source_revision,source_digest,
+           operator_id,operator_subject_ref,authorization_revision,
+           currentness_ref,opt_in,expires_at,declaration_seq) VALUES(?,?,?,?,?,?,?,?,?,?,?,?)`,
+      )
+      .run(
+        input.consentRef,
+        input.revision,
+        input.caseRef,
+        input.sourceRevision,
+        input.sourceDigest,
+        input.operatorId,
+        input.operatorSubjectRef,
+        input.authorizationRevision,
+        input.currentnessRef,
+        input.optIn ? 1 : 0,
+        input.expiresAt,
+        nextSeq,
+      );
+    if (!input.optIn) {
+      this.#db
+        .prepare(
+          `UPDATE meta_verified_experiences SET revoked_at=?
+           WHERE case_ref=? AND source_revision=? AND revoked_at IS NULL`,
+        )
+        .run(new Date().toISOString(), input.caseRef, input.sourceRevision);
     }
   }
 
@@ -568,17 +627,7 @@ export class HostMetaShadowStore implements MetaFeedbackHostPort {
     experienceDigest: string;
   } {
     const normalized = normalizeExperienceInput(input);
-    const vocabulary: readonly [MetaExperienceVocabularyKind, string][] = [
-      ['capability', normalized.capabilityId],
-      ['task_class', normalized.taskClass],
-      ['pattern', normalized.patternId],
-      ...normalized.tags.map((tag): [MetaExperienceVocabularyKind, string] => ['tag', tag]),
-      ...normalized.constraintCodes.map((code): [MetaExperienceVocabularyKind, string] => [
-        'constraint_code',
-        code,
-      ]),
-    ];
-    for (const [kind, code] of vocabulary) {
+    for (const [kind, code] of experienceVocabularyCodes(normalized)) {
       if (!this.#isVocabularyRegistered(kind, code)) {
         throw new TypeError('META_EXPERIENCE_VOCABULARY_UNKNOWN');
       }
@@ -587,53 +636,266 @@ export class HostMetaShadowStore implements MetaFeedbackHostPort {
     const experienceId = `meta-exp-${digest}`;
     this.#db.exec('BEGIN IMMEDIATE');
     try {
-      this.#assertCurrentExperienceEvidence(normalized);
-      const existing = this.#db
-        .prepare(
-          'SELECT experience_digest, consent_ref FROM meta_verified_experiences WHERE experience_id=?',
-        )
-        .get(experienceId) as { experience_digest: string; consent_ref: string } | undefined;
-      if (existing !== undefined) {
-        this.#db.exec('COMMIT');
-        if (
-          existing.experience_digest !== digest ||
-          existing.consent_ref !== normalized.consentRef
-        ) {
-          throw new Error('META_EXPERIENCE_CONFLICT');
-        }
-        return { status: 'ALREADY_STORED', experienceId, experienceDigest: digest };
-      }
-      this.#db
-        .prepare(
-          `INSERT INTO meta_verified_experiences(
-             experience_id,case_ref,source_revision,source_digest,
-             capability_id,task_class,pattern_id,verified_outcome,
-             tags_json,constraint_codes_json,experience_digest,
-             consent_ref,receipt_recorded_at,feedback_candidate_ref,recorded_at,revoked_at)
-           VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,NULL,?,NULL)`,
-        )
-        .run(
-          experienceId,
-          normalized.caseRef,
-          normalized.sourceRevision,
-          normalized.sourceDigest,
-          normalized.capabilityId,
-          normalized.taskClass,
-          normalized.patternId,
-          normalized.verifiedOutcome,
-          JSON.stringify(normalized.tags),
-          JSON.stringify(normalized.constraintCodes),
-          digest,
-          normalized.consentRef,
-          normalized.receiptRecordedAt,
-          new Date().toISOString(),
-        );
+      const result = this.#recordSharedExperienceInTx(normalized, digest, experienceId);
       this.#db.exec('COMMIT');
-      return { status: 'STORED', experienceId, experienceDigest: digest };
+      return result;
     } catch (error) {
       this.#rollback();
       throw error;
     }
+  }
+
+  /**
+   * Transaction-aware experience write: MUST run inside an already-open
+   * transaction. Re-runs the #285 authoritative evidence checks (current
+   * genuine receipt, current unexpired opt-in consent) at write time and
+   * resolves consentRef/receiptRecordedAt from that CURRENT evidence; the
+   * identical normalized record stays an idempotent no-op, a divergent row
+   * with the same id is a conflict.
+   */
+  #recordSharedExperienceInTx(
+    normalized: NormalizedExperience,
+    digest: string,
+    experienceId: string,
+  ): {
+    status: 'STORED' | 'ALREADY_STORED';
+    experienceId: string;
+    experienceDigest: string;
+  } {
+    this.#assertCurrentExperienceEvidence(normalized);
+    const existing = this.#db
+      .prepare(
+        'SELECT experience_digest, consent_ref FROM meta_verified_experiences WHERE experience_id=?',
+      )
+      .get(experienceId) as { experience_digest: string; consent_ref: string } | undefined;
+    if (existing !== undefined) {
+      if (
+        existing.experience_digest !== digest ||
+        existing.consent_ref !== normalized.consentRef
+      ) {
+        throw new Error('META_EXPERIENCE_CONFLICT');
+      }
+      return { status: 'ALREADY_STORED', experienceId, experienceDigest: digest };
+    }
+    this.#db
+      .prepare(
+        `INSERT INTO meta_verified_experiences(
+           experience_id,case_ref,source_revision,source_digest,
+           capability_id,task_class,pattern_id,verified_outcome,
+           tags_json,constraint_codes_json,experience_digest,
+           consent_ref,receipt_recorded_at,feedback_candidate_ref,recorded_at,revoked_at)
+         VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,NULL,?,NULL)`,
+      )
+      .run(
+        experienceId,
+        normalized.caseRef,
+        normalized.sourceRevision,
+        normalized.sourceDigest,
+        normalized.capabilityId,
+        normalized.taskClass,
+        normalized.patternId,
+        normalized.verifiedOutcome,
+        JSON.stringify(normalized.tags),
+        JSON.stringify(normalized.constraintCodes),
+        digest,
+        normalized.consentRef,
+        normalized.receiptRecordedAt,
+        new Date().toISOString(),
+      );
+    return { status: 'STORED', experienceId, experienceDigest: digest };
+  }
+
+  /**
+   * Generation-3 Host-owned atomic provisioning (Owner
+   * OWNER_SHUN_V030_R03C_G3_HOST_ATOMIC_BATCH_APPROVE).
+   *
+   * Phase 1 validates the COMPLETE document against every Store-level
+   * precondition: exact object keys at batch/vocabulary/case level, exact
+   * experience keys, closed-world code grammar, per-kind vocabulary bounds,
+   * duplicate vocabulary codes, exact receipt/consent/experience source
+   * bindings, opt-in required when experiences attach, bounded Case and
+   * experience totals, within-batch duplicate experience rejection and
+   * closed-world vocabulary membership. Validation reads only — no writes.
+   *
+   * Phase 2 applies EVERYTHING — vocabulary registration, every receipt,
+   * every consent and every experience — inside ONE `BEGIN IMMEDIATE`
+   * transaction through the transaction-aware helpers above. Any validation
+   * remainder, receipt conflict, consent/currentness failure or insertion
+   * error ROLLBACKs the whole batch: a failed document leaves zero durable
+   * vocabulary, receipts, consents or experiences. The #285 authoritative
+   * checks (genuine receipt identity/digest/currentness, current opt-in
+   * consent, expiry, declaration-order supersession, revocation, registered
+   * vocabulary, idempotent/conflict behavior) run inside that transaction.
+   */
+  provisionVerifiedExperienceBatch(input: MetaProvisionBatchInput): MetaProvisionBatchResult {
+    const batch = this.#normalizeProvisionBatch(input);
+    this.#db.exec('BEGIN IMMEDIATE');
+    try {
+      for (const [kind, code] of batch.vocabulary) {
+        this.#registerVocabularyCode(kind, code);
+      }
+      for (const entry of batch.cases) {
+        this.#recordOutcomeReceiptInTx(entry.receipt);
+        this.#recordOptInConsentInTx(entry.consent);
+        for (const experience of entry.experiences) {
+          this.#recordSharedExperienceInTx(
+            experience.normalized,
+            experience.digest,
+            experience.experienceId,
+          );
+        }
+      }
+      this.#db.exec('COMMIT');
+    } catch (error) {
+      this.#rollback();
+      throw error;
+    }
+    return {
+      status: 'PROVISIONED',
+      vocabularyCodes: batch.vocabulary.length,
+      receipts: batch.cases.length,
+      consents: batch.cases.length,
+      experiences: batch.cases.reduce((total, entry) => total + entry.experiences.length, 0),
+    };
+  }
+
+  /**
+   * Phase-1 batch validation: equivalent to every Store-level precondition so
+   * phase 2 can only fail on genuine durability conflicts (still rolled back).
+   */
+  #normalizeProvisionBatch(input: MetaProvisionBatchInput): NormalizedProvisionBatch {
+    if (
+      typeof input !== 'object' ||
+      input === null ||
+      !hasExactKeys(input as unknown as Record<string, unknown>, ['vocabulary', 'cases'])
+    ) {
+      throw new TypeError('META_PROVISION_BATCH_INVALID');
+    }
+    const vocabularyRaw: unknown = input.vocabulary;
+    if (
+      typeof vocabularyRaw !== 'object' ||
+      vocabularyRaw === null ||
+      !hasExactKeys(vocabularyRaw as Record<string, unknown>, [
+        'capabilityIds',
+        'taskClasses',
+        'patternIds',
+        'tags',
+        'constraintCodes',
+      ])
+    ) {
+      throw new TypeError('META_PROVISION_BATCH_INVALID');
+    }
+    const vocabulary: [MetaExperienceVocabularyKind, string][] = [];
+    const declaredCodes = new Map<MetaExperienceVocabularyKind, ReadonlySet<string>>();
+    const kinds: readonly [string, MetaExperienceVocabularyKind][] = [
+      ['capabilityIds', 'capability'],
+      ['taskClasses', 'task_class'],
+      ['patternIds', 'pattern'],
+      ['tags', 'tag'],
+      ['constraintCodes', 'constraint_code'],
+    ];
+    for (const [field, kind] of kinds) {
+      const codes = normalizeProvisionCodeArray(
+        (vocabularyRaw as Record<string, unknown>)[field],
+      );
+      declaredCodes.set(kind, new Set(codes));
+      for (const code of codes) vocabulary.push([kind, code]);
+    }
+    if (
+      !Array.isArray(input.cases) ||
+      input.cases.length < 1 ||
+      input.cases.length > MAX_PROVISION_CASES
+    ) {
+      throw new TypeError('META_PROVISION_BATCH_INVALID');
+    }
+    const seenCaseRevisions = new Set<string>();
+    const seenExperienceIds = new Set<string>();
+    const cases: NormalizedProvisionCase[] = [];
+    let totalExperiences = 0;
+    for (const entry of input.cases) {
+      const normalized = this.#normalizeProvisionCase(
+        entry,
+        declaredCodes,
+        seenCaseRevisions,
+        seenExperienceIds,
+      );
+      cases.push(normalized);
+      totalExperiences += normalized.experiences.length;
+      if (totalExperiences > MAX_PROVISION_EXPERIENCES_TOTAL) {
+        throw new TypeError('META_PROVISION_BATCH_INVALID');
+      }
+    }
+    return { vocabulary, cases };
+  }
+
+  #normalizeProvisionCase(
+    entry: unknown,
+    declaredCodes: ReadonlyMap<MetaExperienceVocabularyKind, ReadonlySet<string>>,
+    seenCaseRevisions: Set<string>,
+    seenExperienceIds: Set<string>,
+  ): NormalizedProvisionCase {
+    if (
+      typeof entry !== 'object' ||
+      entry === null ||
+      !hasExactKeys(entry as Record<string, unknown>, ['receipt', 'consent', 'experiences'])
+    ) {
+      throw new TypeError('META_PROVISION_BATCH_INVALID');
+    }
+    const receiptRaw: unknown = (entry as Record<string, unknown>).receipt;
+    if (
+      typeof receiptRaw !== 'object' ||
+      receiptRaw === null ||
+      !hasExactKeys(receiptRaw as Record<string, unknown>, ['caseRef', 'revision', 'sha256']) ||
+      !isSafeRef((receiptRaw as MetaOutcomeReceiptInput).caseRef) ||
+      !isSafeRef((receiptRaw as MetaOutcomeReceiptInput).revision) ||
+      !SHA256.test((receiptRaw as MetaOutcomeReceiptInput).sha256)
+    ) {
+      throw new TypeError('META_PROVISION_BATCH_INVALID');
+    }
+    const receipt = receiptRaw as MetaOutcomeReceiptInput;
+    const caseRevisionKey = `${receipt.caseRef}@${receipt.revision}`;
+    if (seenCaseRevisions.has(caseRevisionKey)) {
+      throw new TypeError('META_PROVISION_BATCH_INVALID');
+    }
+    seenCaseRevisions.add(caseRevisionKey);
+    const consent = normalizeProvisionConsent(
+      (entry as Record<string, unknown>).consent,
+      receipt,
+    );
+    const experiencesRaw: unknown = (entry as Record<string, unknown>).experiences;
+    if (!Array.isArray(experiencesRaw)) {
+      throw new TypeError('META_PROVISION_BATCH_INVALID');
+    }
+    if (experiencesRaw.length > 0 && consent.optIn !== true) {
+      throw new TypeError('META_PROVISION_BATCH_INVALID');
+    }
+    const experiences: NormalizedProvisionExperience[] = [];
+    for (const raw of experiencesRaw) {
+      const normalized = normalizeExperienceInput(raw as MetaVerifiedExperienceInput);
+      // The experience source identity must be EXACTLY its enclosing receipt;
+      // the file/caller can never attach an experience to another Case,
+      // revision or digest.
+      if (
+        normalized.caseRef !== receipt.caseRef ||
+        normalized.sourceRevision !== receipt.revision ||
+        normalized.sourceDigest !== receipt.sha256
+      ) {
+        throw new TypeError('META_PROVISION_BATCH_INVALID');
+      }
+      for (const [kind, code] of experienceVocabularyCodes(normalized)) {
+        if (!declaredCodes.get(kind)?.has(code) && !this.#isVocabularyRegistered(kind, code)) {
+          throw new TypeError('META_EXPERIENCE_VOCABULARY_UNKNOWN');
+        }
+      }
+      const digest = canonicalExperienceDigest(normalized);
+      const experienceId = `meta-exp-${digest}`;
+      if (seenExperienceIds.has(experienceId)) {
+        throw new TypeError('META_PROVISION_BATCH_INVALID');
+      }
+      seenExperienceIds.add(experienceId);
+      experiences.push({ normalized, digest, experienceId });
+    }
+    return { receipt, consent, experiences };
   }
 
   /**
@@ -1050,6 +1312,108 @@ interface NormalizedExperience {
   readonly constraintCodes: readonly string[];
   consentRef: string;
   receiptRecordedAt: string;
+}
+
+/** Phase-1-normalized experience with its digest/id precomputed. */
+interface NormalizedProvisionExperience {
+  readonly normalized: NormalizedExperience;
+  readonly digest: string;
+  readonly experienceId: string;
+}
+
+interface NormalizedProvisionCase {
+  readonly receipt: MetaOutcomeReceiptInput;
+  readonly consent: MetaOptInConsentInput;
+  readonly experiences: readonly NormalizedProvisionExperience[];
+}
+
+interface NormalizedProvisionBatch {
+  readonly vocabulary: readonly [MetaExperienceVocabularyKind, string][];
+  readonly cases: readonly NormalizedProvisionCase[];
+}
+
+/** Every vocabulary code an experience references, as (kind, code) pairs. */
+function experienceVocabularyCodes(
+  normalized: NormalizedExperience,
+): readonly [MetaExperienceVocabularyKind, string][] {
+  return [
+    ['capability', normalized.capabilityId],
+    ['task_class', normalized.taskClass],
+    ['pattern', normalized.patternId],
+    ...normalized.tags.map((tag): [MetaExperienceVocabularyKind, string] => ['tag', tag]),
+    ...normalized.constraintCodes.map((code): [MetaExperienceVocabularyKind, string] => [
+      'constraint_code',
+      code,
+    ]),
+  ];
+}
+
+/** One vocabulary array: bounded, closed-world grammar, no duplicate codes. */
+function normalizeProvisionCodeArray(value: unknown): string[] {
+  if (!Array.isArray(value) || value.length > MAX_PROVISION_VOCABULARY_PER_KIND) {
+    throw new TypeError('META_PROVISION_BATCH_INVALID');
+  }
+  const codes: string[] = [];
+  for (const code of value) {
+    if (!isExperienceCode(code)) throw new TypeError('META_PROVISION_BATCH_INVALID');
+    if (codes.includes(code)) throw new TypeError('META_PROVISION_BATCH_INVALID');
+    codes.push(code);
+  }
+  return codes;
+}
+
+/**
+ * One provisioning consent: the exact MetaOptInConsentInput key set and field
+ * grammar of `recordOptInConsent`, plus the binding to its enclosing receipt
+ * (same caseRef/sourceRevision/sourceDigest triple).
+ */
+function normalizeProvisionConsent(
+  value: unknown,
+  receipt: MetaOutcomeReceiptInput,
+): MetaOptInConsentInput {
+  if (
+    typeof value !== 'object' ||
+    value === null ||
+    !hasExactKeys(value as Record<string, unknown>, [
+      'consentRef',
+      'revision',
+      'caseRef',
+      'sourceRevision',
+      'sourceDigest',
+      'operatorId',
+      'operatorSubjectRef',
+      'authorizationRevision',
+      'currentnessRef',
+      'optIn',
+      'expiresAt',
+    ])
+  ) {
+    throw new TypeError('META_PROVISION_BATCH_INVALID');
+  }
+  const consent = value as MetaOptInConsentInput;
+  if (
+    !isSafeRef(consent.consentRef) ||
+    !isSafeRef(consent.revision) ||
+    !isSafeRef(consent.caseRef) ||
+    !isSafeRef(consent.sourceRevision) ||
+    !SHA256.test(consent.sourceDigest) ||
+    !isSafeRef(consent.operatorId) ||
+    !isSafeRef(consent.operatorSubjectRef) ||
+    !isSafeRef(consent.authorizationRevision) ||
+    !isSafeRef(consent.currentnessRef) ||
+    typeof consent.optIn !== 'boolean' ||
+    !isIsoUtc(consent.expiresAt)
+  ) {
+    throw new TypeError('META_PROVISION_BATCH_INVALID');
+  }
+  if (
+    consent.caseRef !== receipt.caseRef ||
+    consent.sourceRevision !== receipt.revision ||
+    consent.sourceDigest !== receipt.sha256
+  ) {
+    throw new TypeError('META_PROVISION_BATCH_INVALID');
+  }
+  return consent;
 }
 
 function isExperienceCode(value: unknown): value is string {
