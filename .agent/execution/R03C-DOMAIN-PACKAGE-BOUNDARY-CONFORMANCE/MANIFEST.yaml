@@ -1,41 +1,52 @@
-pack_id: shun-v030-r03c-domain-package-boundary-conformance-local-builder-r1
+pack_id: shun-v030-r03c-domain-package-boundary-conformance-local-builder-r2
 task_id: R03C-DOMAIN-PACKAGE-BOUNDARY-CONFORMANCE
 issue: "#303"
 parent_issue: "#280"
 repository: kaicreator-mm/shun-assistant
 target_version: v0.3.0
 owner_authorization_ref: "#280 comment 6596114371"
+owner_write_set_amendment_ref: "#303 comment 6603290369"
 execution_profile: LOCAL_BUILDER
 execution_environment: LOCAL
 standard_revision: 2c395c55569fe2edf3f4135f12d3d069e526d0b7
 source_base_sha: be2e81722a70ee3d0bd5634bc83d97d733c20b78
 source_base_tree: 8d6d6ee5fc4277e6b0b64b2d22e6f66575fe2889
-branch: JIT_only_task/v0.3.0-r03c-domain-package-boundary-conformance-r1
+prior_generation_pack_sha: ad327e8dc64e12a4627e8affc79359ccfe3eac24
+prior_generation_pack_tree: a74e22327655f2959ec60650564276a9be7d9845
+prior_local_implementation_head: 7d978f6
+branch: JIT_only_task/v0.3.0-r03c-domain-package-boundary-conformance-r2
 execution_pack_path: .agent/execution/R03C-DOMAIN-PACKAGE-BOUNDARY-CONFORMANCE/MANIFEST.yaml
 protected_claim_key: "kaicreator-mm/shun-assistant#303:builder:__default__"
 admission_mode: SINGLE_WRITER_ADMISSION
-admission_generation: 1
+admission_generation: 2
 allowed_write_set:
   - packages/domain-app/src/index.ts
   - packages/domain-app/src/build/composition.ts
   - tests/integration/v03/t09-api/composition.test.ts
+  - tests/integration/v03/t11-runtime/server-v03-gateway.test.ts
+  - tests/integration/v03/t12-qualification/qualification.test.ts
 plan:
   - "Remove the legacy build/composition.ts preview composer from the public @shun/domain-app root export."
   - "Mark composeDomainBuild and its structural v0.10.2-rc.0 mirrors as internal/test-preview-only; explicitly prohibit production activation from consuming placeholder K/S module bytes."
-  - "Keep direct-source tests only as legacy preview coverage and add a regression that the public package root does not export composeDomainBuild."
+  - "Keep direct-source tests as legacy preview coverage and prove the public package root does not export composeDomainBuild."
   - "Verify production still uses composeTrustedRuntimeBuild and the real public DomainHarness v0.10.3 buildV10App/activateV10App consumer path."
-  - "Do not delete or rewrite unrelated K/S/B/C runtime modules, BUILD routes, Host bindings or the #288 integration write set."
+  - "Re-anchor only the stale V01 public-root assertions in t11-runtime/server-v03-gateway.test.ts and t12-qualification/qualification.test.ts: assert composeDomainBuild is absent from @shun/domain-app; preserve all gateway/port pins, SDK consumer checks, runtime coverage and all other V01 assertions."
+  - "Do not change production route/activation, Host bindings, Kernel, SDK, ABI, or any of #288's 12 integration paths."
 pre_ci:
-  - "Exact-tree Windows Node 24 syntax preflight before CI."
-  - "Run scoped T09 composition tests and R02-A production activation test."
+  - "Run exact-tree Windows Node 24 syntax preflight before every source-changing CI."
   - "Run scoped lint and typecheck."
-  - "Record Node/pnpm versions, commands, exit codes, Build IDs, exact HEAD/tree and test counts."
+  - "Run T09 composition and R02-A production activation suites."
+  - "Run focused t11-runtime and t12-qualification suites."
+  - "Run the full tests/integration/run-tests.mjs task-check; require all 24 suites green."
+  - "Record Node/pnpm versions, exact commands, exit codes, changed-file/write-set comparison, exact HEAD/tree and Woodpecker Build IDs/results."
 forbidden:
-  - "any path outside the exact three-path write set"
+  - "any path outside the exact five-path allowed_write_set"
+  - "any additional production source path"
   - "DomainHarness SDK, Runtime, Kernel, ABI, package tarball or v0.10.3 tag changes"
-  - "production route/activation/Host implementation changes"
+  - "production BUILD route/activation/Host implementation changes"
+  - "any #288 integration write-set change"
   - "main or version/v0.2.0"
   - "merge, tag or release"
   - "real Provider installation, UAC prompt or persistent Windows effect"
   - "paid LLM calls"
-notes: "Consumer-side package surface cleanup. #303 is a native prerequisite of the single R03C integrator #288. The exact #288 12-path write set remains unchanged."
+notes: "Generation 2 is the Owner-approved two-test-only expansion of generation 1. Reuse local gen1 implementation only after the local agent verifies exact parent ad327e8 and the original three-path diff. The two added files may change only the stale composeDomainBuild public-root expectation. Generation-2 pack-only CI and a fresh generation-2 CAS Claim bound to the exact pack commit are mandatory before further source writes. #303 remains a native blocker of #288; #288 write set is unchanged."
