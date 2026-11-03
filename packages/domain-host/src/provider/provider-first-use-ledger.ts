@@ -15,8 +15,10 @@
  *
  * Uncertain/interrupted execution becomes UNKNOWN; a restart during RUNNING
  * is ambiguous by definition and is swept to UNKNOWN with no auto-retry.
- * Receipts and previews are bounded, catalogued-token JSON: no free text,
- * credentials, raw prompts or unrestricted paths are ever stored.
+ * Receipts and previews are closed-world JSON validated by one exact schema
+ * on BOTH write and read: no free text, credentials, raw provider output,
+ * output references, unrestricted paths or arbitrary nested objects are ever
+ * stored or returned.
  */
 import { randomUUID } from 'node:crypto';
 import { mkdirSync } from 'node:fs';
@@ -25,9 +27,45 @@ import { DatabaseSync } from 'node:sqlite';
 
 const SAFE_REF = /^[A-Za-z][A-Za-z0-9._:-]{0,127}$/;
 const SHA256 = /^[a-f0-9]{64}$/;
+const VERSION_TOKEN = /^\d{1,4}(?:\.\d{1,4}){0,3}(?:[-+][0-9A-Za-z][0-9A-Za-z._-]{0,31})?$/;
 const MAX_PREVIEW_BYTES = 8_192;
 const MAX_RECEIPT_BYTES = 16_384;
 const REQUEST_TTL_MS = 5 * 60_000;
+
+const PREVIEW_BASE_KEYS = [
+  'providerId',
+  'bindingId',
+  'version',
+  'artifactSha256',
+  'publisherKeyId',
+  'privilegeScope',
+  'reason',
+  'expectedChanges',
+] as const;
+const ELEVATED_ACTION_KEYS = ['program', 'args', 'sideEffectClass', 'requiredPrivilege'] as const;
+const RECEIPT_KEYS = [
+  'outcome',
+  'code',
+  'bindingId',
+  'artifactSha256',
+  'probeVersion',
+  'probeVersionParsed',
+  'canaryResult',
+  'elevatedTerminal',
+  'exitCode',
+  'timedOut',
+  'durationMs',
+] as const;
+const CANARY_RESULTS = ['MATCHED', 'NOT_MATCHED', 'UNCLEAR'] as const;
+const ELEVATED_TERMINALS = [
+  'SUCCEEDED',
+  'REFUSED',
+  'UAC_DECLINED',
+  'CANCELLED',
+  'FAILED',
+  'TIMED_OUT',
+  'UNCLEAR',
+] as const;
 
 export type ProviderFirstUseStatus =
   | 'PREPARED'
@@ -58,6 +96,37 @@ export interface ProviderFirstUsePreview {
   };
 }
 
+/**
+ * Closed-world durable receipt (exact key set, primitive values only).
+ * Raw provider stdout/stderr, output references, absolute paths, free text
+ * and arbitrary nested objects are structurally impossible: every present
+ * field must pass its strict shape check, and `outcome` must match the
+ * terminal status the receipt is written with (and is re-validated with on
+ * every read).
+ */
+export type ProviderFirstUseReceipt = {
+  readonly outcome: 'EXECUTED' | 'REFUSED' | 'UNKNOWN';
+  /** Host-minted bounded refusal/completion code; never provider text. */
+  readonly code: string;
+  readonly bindingId?: string;
+  readonly artifactSha256?: string;
+  /** Strictly parsed provider version token; absent when unparsable. */
+  readonly probeVersion?: string;
+  readonly probeVersionParsed?: boolean;
+  readonly canaryResult?: 'MATCHED' | 'NOT_MATCHED' | 'UNCLEAR';
+  readonly elevatedTerminal?:
+    | 'SUCCEEDED'
+    | 'REFUSED'
+    | 'UAC_DECLINED'
+    | 'CANCELLED'
+    | 'FAILED'
+    | 'TIMED_OUT'
+    | 'UNCLEAR';
+  readonly exitCode?: number;
+  readonly timedOut?: boolean;
+  readonly durationMs?: number;
+};
+
 export interface ProviderFirstUseRequestRecord {
   readonly requestRef: string;
   readonly preview: ProviderFirstUsePreview;
@@ -67,7 +136,7 @@ export interface ProviderFirstUseRequestRecord {
   readonly confirmedAtUnixMs?: number;
   readonly startedAtUnixMs?: number;
   readonly finishedAtUnixMs?: number;
-  readonly receipt?: unknown;
+  readonly receipt?: ProviderFirstUseReceipt;
 }
 
 export type LedgerTransition =
@@ -98,10 +167,46 @@ function isBoundedText(value: unknown, max = 240): value is string {
   );
 }
 
+function hasExactKeySet(value: Record<string, unknown>, keys: readonly string[]): boolean {
+  const actual = Object.keys(value);
+  return actual.length === keys.length && keys.every((key) => key in value);
+}
+
+function optionalString(value: unknown, accept: (candidate: string) => boolean): boolean {
+  return value === undefined || (typeof value === 'string' && accept(value));
+}
+
+function optionalBoolean(value: unknown): boolean {
+  return value === undefined || typeof value === 'boolean';
+}
+
+function optionalEnum(value: unknown, allowed: readonly string[]): boolean {
+  return value === undefined || (typeof value === 'string' && allowed.includes(value));
+}
+
+function optionalInteger(value: unknown, min: number, max: number): boolean {
+  return (
+    value === undefined ||
+    (typeof value === 'number' && Number.isInteger(value) && value >= min && value <= max)
+  );
+}
+
+/**
+ * Closed-world preview gate: exact key set on the preview itself AND on the
+ * nested elevatedAction — caller-supplied extra properties are refused
+ * instead of silently serialized into the durable preview.
+ */
 function validatePreview(value: ProviderFirstUsePreview): boolean {
   if (
     typeof value !== 'object' ||
     value === null ||
+    Array.isArray(value) ||
+    !hasExactKeySet(
+      value as unknown as Record<string, unknown>,
+      value.elevatedAction === undefined
+        ? PREVIEW_BASE_KEYS
+        : [...PREVIEW_BASE_KEYS, 'elevatedAction'],
+    ) ||
     !SAFE_REF.test(value.providerId) ||
     !SAFE_REF.test(value.bindingId) ||
     !isBoundedText(value.version, 64) ||
@@ -119,6 +224,7 @@ function validatePreview(value: ProviderFirstUsePreview): boolean {
     const elevated = value.elevatedAction;
     if (
       !elevated ||
+      !hasExactKeySet(elevated as unknown as Record<string, unknown>, ELEVATED_ACTION_KEYS) ||
       !isBoundedText(elevated.program, 512) ||
       !Array.isArray(elevated.args) ||
       elevated.args.length > 32 ||
@@ -133,6 +239,69 @@ function validatePreview(value: ProviderFirstUsePreview): boolean {
   return value.elevatedAction === undefined;
 }
 
+/**
+ * Closed-world receipt gate — the ONE schema shared by `finish` (write) and
+ * `decodeRow` (read). Exact key set, primitive values only, strict per-field
+ * shapes, and the receipt's `outcome` must agree with the terminal status it
+ * is being validated against (COMPLETED↔EXECUTED, REFUSED↔REFUSED,
+ * UNKNOWN↔UNKNOWN; non-terminal statuses validate shape only, which never
+ * happens for persisted rows because receipts exist only on terminal rows).
+ * Legacy/unknown/malformed shapes fail closed on both sides of the ledger.
+ */
+function validateReceipt(
+  value: unknown,
+  status: ProviderFirstUseStatus,
+): value is ProviderFirstUseReceipt {
+  if (typeof value !== 'object' || value === null || Array.isArray(value)) return false;
+  const record = value as Record<string, unknown>;
+  if (!hasOnlyKnownReceiptKeys(record)) return false;
+  if (
+    record.outcome !== 'EXECUTED' &&
+    record.outcome !== 'REFUSED' &&
+    record.outcome !== 'UNKNOWN'
+  ) {
+    return false;
+  }
+  if (
+    (status === 'COMPLETED' && record.outcome !== 'EXECUTED') ||
+    (status === 'REFUSED' && record.outcome !== 'REFUSED') ||
+    (status === 'UNKNOWN' && record.outcome !== 'UNKNOWN')
+  ) {
+    return false;
+  }
+  if (
+    typeof record.code !== 'string' ||
+    !SAFE_REF.test(record.code) ||
+    isSecretShaped(record.code)
+  ) {
+    return false;
+  }
+  return (
+    optionalString(record.bindingId, (candidate) => SAFE_REF.test(candidate)) &&
+    optionalString(record.artifactSha256, (candidate) => SHA256.test(candidate)) &&
+    optionalString(
+      record.probeVersion,
+      (candidate) => VERSION_TOKEN.test(candidate) && !isSecretShaped(candidate),
+    ) &&
+    optionalBoolean(record.probeVersionParsed) &&
+    optionalEnum(record.canaryResult, CANARY_RESULTS) &&
+    optionalEnum(record.elevatedTerminal, ELEVATED_TERMINALS) &&
+    optionalInteger(record.exitCode, -2_147_483_648, 2_147_483_647) &&
+    optionalBoolean(record.timedOut) &&
+    optionalInteger(record.durationMs, 0, 2_147_483_647)
+  );
+}
+
+/** Closed-world receipt keys: every present key must be a known receipt key. */
+function hasOnlyKnownReceiptKeys(record: Record<string, unknown>): boolean {
+  const keys = Object.keys(record);
+  return keys.length > 0 && keys.every((key) => (RECEIPT_KEYS as readonly string[]).includes(key));
+}
+
+function isSecretShaped(value: string): boolean {
+  return /(?:password|token|secret|credential|api[_-]?key)\s*=/i.test(value);
+}
+
 function decodeRow(row: RequestRow | undefined): ProviderFirstUseRequestRecord | undefined {
   if (!row || !SAFE_REF.test(row.request_ref)) return undefined;
   let preview: unknown;
@@ -144,6 +313,10 @@ function decodeRow(row: RequestRow | undefined): ProviderFirstUseRequestRecord |
     return undefined;
   }
   if (!validatePreview(preview as ProviderFirstUsePreview)) return undefined;
+  // Read side of the closed receipt world: the SAME schema validated at
+  // finish() must hold for the persisted JSON, matched against the row's
+  // terminal status — malformed, legacy or out-of-schema receipts fail closed.
+  if (row.receipt_json !== null && !validateReceipt(receipt, row.status)) return undefined;
   return Object.freeze({
     requestRef: row.request_ref,
     preview: Object.freeze(preview as ProviderFirstUsePreview),
@@ -153,7 +326,7 @@ function decodeRow(row: RequestRow | undefined): ProviderFirstUseRequestRecord |
     ...(row.confirmed_at_unix_ms !== null ? { confirmedAtUnixMs: row.confirmed_at_unix_ms } : {}),
     ...(row.started_at_unix_ms !== null ? { startedAtUnixMs: row.started_at_unix_ms } : {}),
     ...(row.finished_at_unix_ms !== null ? { finishedAtUnixMs: row.finished_at_unix_ms } : {}),
-    ...(row.receipt_json !== null ? { receipt } : {}),
+    ...(row.receipt_json !== null ? { receipt: receipt as ProviderFirstUseReceipt } : {}),
   });
 }
 
@@ -202,7 +375,10 @@ export class ProviderFirstUseLedger {
          SET status='UNKNOWN',finished_at_unix_ms=?,receipt_json=?
          WHERE status='RUNNING'`,
       )
-      .run(nowMs, JSON.stringify({ code: 'PROCESS_RESTARTED_WITH_UNCERTAIN_OUTCOME' }));
+      .run(
+        nowMs,
+        JSON.stringify({ outcome: 'UNKNOWN', code: 'PROCESS_RESTARTED_WITH_UNCERTAIN_OUTCOME' }),
+      );
     this.#db
       .prepare(
         `UPDATE provider_first_use_requests
@@ -335,7 +511,9 @@ export class ProviderFirstUseLedger {
 
   /**
    * Terminal receipt write, only from RUNNING. COMPLETED/REFUSED are
-   * definitive; UNKNOWN records an uncertain execution boundary.
+   * definitive; UNKNOWN records an uncertain execution boundary. The receipt
+   * must satisfy the closed receipt schema (with `outcome` matching this
+   * status) — anything else is refused and the row stays RUNNING.
    */
   finish(
     requestRef: string,
@@ -343,6 +521,7 @@ export class ProviderFirstUseLedger {
     receipt: unknown,
   ): boolean {
     if (!SAFE_REF.test(requestRef)) return false;
+    if (!validateReceipt(receipt, status)) return false;
     let receiptJson: string;
     try {
       receiptJson = JSON.stringify(receipt);

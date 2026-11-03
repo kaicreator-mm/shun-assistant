@@ -1,7 +1,7 @@
 /**
  * R03C-PROVIDER-GLOBAL-UAC — Host-global Provider first-use qualification
- * (Issue #287, Execution Pack
- * .agent/execution/R03C-PROVIDER-GLOBAL-UAC/MANIFEST.yaml@23019ee4).
+ * (Issue #287; generation-3 repair pack
+ * .agent/execution/R03C-PROVIDER-GLOBAL-UAC-RECEIPT-ALLOWLIST/MANIFEST.yaml@ba149aa5).
  *
  * Proves: Case-free prepare/confirm/run with requestRef-only K input,
  * wrong/expired/replayed requestRef refusal before any activation, restart
@@ -12,6 +12,12 @@
  * plan/grant drift refusal, cross-Case independence and bounded secret-free
  * durable receipts.
  *
+ * Generation-3 privacy hardening: raw provider stdout/stderr never reach the
+ * returned envelope or the durable SQLite receipt (strict version token,
+ * enum canary result); previews and receipts are closed-world exact-shape
+ * schemas shared by finish() and decodeRow(); privileged ExecutionReceipts
+ * are reduced to an allowlist summary before persistence.
+ *
  * The trusted Host bindings are process singletons, so each scenario imports
  * them fresh (vi.resetModules + dynamic import) over its own fixture store.
  */
@@ -19,8 +25,10 @@ import { createHash, generateKeyPairSync, randomUUID, sign } from 'node:crypto';
 import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+import { DatabaseSync } from 'node:sqlite';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { canonicalJson, computePlanHash } from '../../../../packages/contracts/src/plan.ts';
+import type { ProviderFirstUseReceipt } from '../../../../packages/domain-host/src/provider/provider-first-use-ledger.ts';
 import { ProviderFirstUseLedger } from '../../../../packages/domain-host/src/provider/provider-first-use-ledger.ts';
 import {
   generateGrantHmacKey,
@@ -141,8 +149,16 @@ interface CapturedRun {
   readonly port: unknown;
 }
 
-/** Capturing spawn port: the real chain runs, no real child process ever starts. */
-function capturePort(stdout = 'ripgrep 14.1.1'): CapturedRun {
+/**
+ * Capturing spawn port: the real chain runs, no real child process ever
+ * starts. The canary FILE_SEARCH run (identified by its `-e PATTERN` argv)
+ * returns its own stdout, mirroring the real provider printing the matched
+ * sandbox line.
+ */
+function capturePort(
+  stdout = 'ripgrep 14.1.1',
+  canaryStdout = 'noise\nSHUN-PROVIDER-FIRST-USE matched\n',
+): CapturedRun {
   const specs: ActivationRunSpec[] = [];
   const port = {
     specs,
@@ -157,7 +173,7 @@ function capturePort(stdout = 'ripgrep 14.1.1'): CapturedRun {
       specs.push(spec);
       return {
         exitCode: 0,
-        stdout,
+        stdout: spec.args.includes('SHUN-PROVIDER-FIRST-USE') ? canaryStdout : stdout,
         stderr: '',
         timedOut: false,
         stdoutTruncated: false,
@@ -175,12 +191,15 @@ interface InstalledUserHost {
 }
 
 /** Install a USER-privilege provider Host binding over disposable fixtures. */
-async function installUserBinding(): Promise<InstalledUserHost> {
+async function installUserBinding(
+  stdout = 'ripgrep 14.1.1',
+  canaryStdout = 'noise\nSHUN-PROVIDER-FIRST-USE matched\n',
+): Promise<InstalledUserHost> {
   const { binding } = await freshHost();
   const cacheRoot = newDir('user-cache');
   const artifactSha256 = sha256(ARTIFACT_BYTES);
   const trust = providerScope(artifactSha256);
-  const { specs, port } = capturePort();
+  const { specs, port } = capturePort(stdout, canaryStdout);
   binding.installTrustedProviderBinding({
     cacheRoot,
     roots: [
@@ -234,14 +253,14 @@ function provisionElevatedAuthority(authorityDir: string): {
   const planAction = {
     actionId,
     bindingRef: 'binding-1',
-    op: 'windows.proc.exec',
+    op: 'windows.proc.exec' as const,
     parameters: {
       program: 'C:\\Windows\\System32\\whoami.exe',
       args: ['/groups', '/fo', 'csv'],
       expectExitCode: 0,
     },
-    sideEffectClass: 'R2',
-    requiredPrivilege: 'ELEVATED',
+    sideEffectClass: 'R2' as const,
+    requiredPrivilege: 'ELEVATED' as const,
   };
   const planNoHash = {
     taskId: 'provider-global',
@@ -314,12 +333,23 @@ describe('R03C Host-global Provider first-use (requestRef-only, Case-free)', () 
     if (envelope.phase !== 'terminal') throw new Error('expected terminal envelope');
     expect(envelope.outcome.ok).toBe(true);
     if (!envelope.outcome.ok) throw new Error('expected first-use success');
-    expect(envelope.outcome.output.state).toBe('EXECUTED');
+    expect(envelope.outcome.output.outcome).toBe('EXECUTED');
+    // Strictly parsed version token + enum canary result; no raw output.
+    expect(envelope.outcome.output).toMatchObject({
+      probeVersion: '14.1.1',
+      probeVersionParsed: true,
+      canaryResult: 'MATCHED',
+    });
+    expect(JSON.stringify(envelope)).not.toContain('stdout');
     // Both real chain executions went through the captured unprivileged port.
     expect(specs.length).toBe(2);
     const record = binding.readProviderFirstUseRequest(prepared.requestRef);
     expect(record?.status).toBe('COMPLETED');
-    expect(record?.receipt).toMatchObject({ state: 'EXECUTED', exitCode: 0 });
+    expect(record?.receipt).toMatchObject({
+      outcome: 'EXECUTED',
+      exitCode: 0,
+      canaryResult: 'MATCHED',
+    });
   });
 
   it('refuses wrong, expired and replayed requestRef before any activation', async () => {
@@ -415,7 +445,10 @@ describe('R03C Host-global Provider first-use (requestRef-only, Case-free)', () 
     const second = new ProviderFirstUseLedger(file, () => nowMs);
     const record = second.read(prepared.record.requestRef);
     expect(record?.status).toBe('UNKNOWN');
-    expect(record?.receipt).toMatchObject({ code: 'PROCESS_RESTARTED_WITH_UNCERTAIN_OUTCOME' });
+    expect(record?.receipt).toMatchObject({
+      outcome: 'UNKNOWN',
+      code: 'PROCESS_RESTARTED_WITH_UNCERTAIN_OUTCOME',
+    });
     // UNKNOWN is terminal: begin/confirm refuse, no auto-replay.
     expect(second.begin(prepared.record.requestRef)).toMatchObject({
       ok: false,
@@ -455,7 +488,7 @@ describe('R03C Host-global Provider first-use (requestRef-only, Case-free)', () 
     if (envelope.phase !== 'terminal') throw new Error('expected terminal envelope');
     expect(envelope.outcome.ok).toBe(true);
     if (!envelope.outcome.ok) throw new Error('expected first-use success');
-    expect(envelope.outcome.output.state).toBe('EXECUTED');
+    expect(envelope.outcome.output.outcome).toBe('EXECUTED');
     expect(specs.length).toBe(2);
     // The durable record carries no Case/task/caller identity at all.
     const raw = JSON.stringify(binding.readProviderFirstUseRequest(prepared.requestRef));
@@ -483,6 +516,20 @@ describe('R03C Host-global Provider first-use (requestRef-only, Case-free)', () 
       'reason',
       'version',
     ]);
+    // The durable receipt carries only closed-world keys; no raw output.
+    expect(Object.keys(record?.receipt ?? {}).sort()).toEqual([
+      'artifactSha256',
+      'bindingId',
+      'canaryResult',
+      'code',
+      'durationMs',
+      'exitCode',
+      'outcome',
+      'probeVersion',
+      'probeVersionParsed',
+      'timedOut',
+    ]);
+    expect(raw).not.toMatch(/stdout|stderr|outputRefs|stdoutRef|stderrRef/);
     // The ledger class refuses secret-shaped text anywhere in the preview.
     const hostile = new ProviderFirstUseLedger(join(newDir('audit-hostile'), 'l.sqlite'));
     expect(
@@ -493,6 +540,204 @@ describe('R03C Host-global Provider first-use (requestRef-only, Case-free)', () 
     ).toBe(false);
     hostile.close();
     expect(cacheRoot.length).toBeGreaterThan(0);
+  });
+
+  it('secret-shaped provider stdout never reaches the returned envelope or the durable SQLite receipt', async () => {
+    const secret = 'sk-live-4f7b1c9e2a8d6055';
+    const hostileStdout = [
+      `Authorization: Bearer ${secret}`,
+      `PATH=C:\\Users\\operator\\credstore api_key=${secret}`,
+      'plain noise without any credential material',
+    ].join('\r\n');
+    const { binding, cacheRoot } = await installUserBinding(hostileStdout, hostileStdout);
+    const prepared = await binding.prepareProviderFirstUse();
+    if (!prepared.ok) throw new Error('prepare failed');
+    expect(binding.confirmProviderFirstUse(prepared.requestRef).ok).toBe(true);
+    const envelope = await binding.providerFirstUse({ requestRef: prepared.requestRef }, undefined);
+    expect(envelope.phase).toBe('terminal');
+    if (envelope.phase !== 'terminal') throw new Error('expected terminal envelope');
+    expect(envelope.outcome.ok).toBe(true);
+    if (!envelope.outcome.ok) throw new Error('expected first-use success');
+    // The returned envelope carries no provider-controlled text at all: the
+    // hostile first line is not version-shaped, so no token is retained.
+    const serialized = JSON.stringify(envelope);
+    expect(serialized).not.toContain(secret);
+    expect(serialized).not.toContain('Bearer');
+    expect(serialized).not.toContain('api_key');
+    expect(serialized).not.toContain('Authorization');
+    expect(envelope.outcome.output).toMatchObject({
+      probeVersionParsed: false,
+      canaryResult: 'NOT_MATCHED',
+    });
+    expect('probeVersion' in envelope.outcome.output).toBe(false);
+
+    // Raw SQLite: the durable receipt_json carries no secret and no raw
+    // output/reference key — proven against the database file itself.
+    const db = new DatabaseSync(join(cacheRoot, 'provider-first-use-requests.sqlite'));
+    try {
+      const row = db
+        .prepare('SELECT receipt_json FROM provider_first_use_requests WHERE request_ref=?')
+        .get(prepared.requestRef) as { receipt_json: string };
+      expect(row.receipt_json).not.toContain(secret);
+      expect(row.receipt_json).not.toContain('Bearer');
+      expect(row.receipt_json).not.toContain('api_key');
+      const persisted = JSON.parse(row.receipt_json) as Record<string, unknown>;
+      expect(Object.keys(persisted).sort()).toEqual([
+        'artifactSha256',
+        'bindingId',
+        'canaryResult',
+        'code',
+        'durationMs',
+        'exitCode',
+        'outcome',
+        'probeVersionParsed',
+        'timedOut',
+      ]);
+    } finally {
+      db.close();
+    }
+  });
+
+  it('previews and receipts are closed-world: unknown keys, nested payloads, secret-shaped values and status mismatch are refused', () => {
+    const ledger = new ProviderFirstUseLedger(join(newDir('closed-world'), 'l.sqlite'));
+    const prepared = ledger.prepare(USER_PREVIEW);
+    expect(prepared.ok).toBe(true);
+    if (!prepared.ok) return;
+    expect(ledger.confirm(prepared.record.requestRef).ok).toBe(true);
+    expect(ledger.begin(prepared.record.requestRef).ok).toBe(true);
+    const ref = prepared.record.requestRef;
+    const valid: ProviderFirstUseReceipt = {
+      outcome: 'EXECUTED',
+      code: 'PROVIDER_FIRST_USE_EXECUTED',
+      bindingId: 'rg-binding',
+      artifactSha256: A64,
+      exitCode: 0,
+      timedOut: false,
+      durationMs: 12,
+    };
+    // Every refused finish leaves the row RUNNING, so each malformed receipt
+    // can be attempted against the same row until the bounded valid one lands.
+    for (const bad of [
+      { ...valid, stdout: 'provider-controlled leak' },
+      { ...valid, stderr: 'provider-controlled leak' },
+      { ...valid, outputRefs: ['C:\\effect-work\\out\\write.bin'] },
+      { ...valid, stdoutRef: 'C:\\effect-work\\out\\stdout.txt' },
+      { ...valid, environmentId: 'env-1' },
+      { ...valid, nested: { secret: 'sk-live-1' } },
+      { ...valid, probeVersion: 'C:\\Windows\\System32\\evil.exe' },
+      { outcome: 'REFUSED', code: 'PROVIDER_ELEVATION_REFUSED' },
+      { ...valid, outcome: 'REFUSED' },
+      { outcome: 'EXECUTED', code: 'api_key=sk-live-1' },
+      { outcome: 'EXECUTED' },
+      'not-an-object',
+      null,
+      ['array'],
+    ]) {
+      expect(ledger.finish(ref, 'COMPLETED', bad as never)).toBe(false);
+      expect(ledger.read(ref)?.status).toBe('RUNNING');
+    }
+    // The bounded valid receipt round-trips exactly through read().
+    expect(ledger.finish(ref, 'COMPLETED', valid)).toBe(true);
+    const record = ledger.read(ref);
+    expect(record?.status).toBe('COMPLETED');
+    expect(record?.receipt).toEqual(valid);
+    ledger.close();
+
+    // Preview closed-world: extra keys on the preview or the nested
+    // elevatedAction, and a missing elevatedAction key, all refuse.
+    const hostilePreview = new ProviderFirstUseLedger(
+      join(newDir('closed-world-preview'), 'l.sqlite'),
+    );
+    expect(hostilePreview.prepare({ ...USER_PREVIEW, extra: 'x' } as never).ok).toBe(false);
+    expect(
+      hostilePreview.prepare({
+        ...USER_PREVIEW,
+        privilegeScope: 'ELEVATED' as const,
+        elevatedAction: {
+          program: 'C:\\Windows\\System32\\whoami.exe',
+          args: [],
+          sideEffectClass: 'R2',
+          requiredPrivilege: 'ELEVATED' as const,
+          hidden: 1,
+        },
+      } as never).ok,
+    ).toBe(false);
+    expect(
+      hostilePreview.prepare({
+        ...USER_PREVIEW,
+        privilegeScope: 'ELEVATED' as const,
+        elevatedAction: {
+          program: 'C:\\Windows\\System32\\whoami.exe',
+          args: [],
+          requiredPrivilege: 'ELEVATED' as const,
+        },
+      } as never).ok,
+    ).toBe(false);
+    hostilePreview.close();
+
+    // decodeRow fails closed on malformed or legacy persisted receipts: the
+    // read side enforces the SAME closed schema as finish().
+    const tamperFile = join(newDir('closed-world-tamper'), 'l.sqlite');
+    const tampered = new ProviderFirstUseLedger(tamperFile);
+    const p2 = tampered.prepare(USER_PREVIEW);
+    if (!p2.ok) throw new Error('prepare failed');
+    expect(tampered.confirm(p2.record.requestRef).ok).toBe(true);
+    expect(tampered.begin(p2.record.requestRef).ok).toBe(true);
+    const raw = new DatabaseSync(tamperFile);
+    try {
+      const update = raw.prepare(
+        'UPDATE provider_first_use_requests SET receipt_json=? WHERE request_ref=?',
+      );
+      // Legacy pre-schema shape: unreadable.
+      update.run(JSON.stringify({ code: 'LEGACY_SHAPE' }), p2.record.requestRef);
+      expect(tampered.read(p2.record.requestRef)).toBeUndefined();
+      // In-schema direct write against the RUNNING row reads back cleanly.
+      update.run(
+        JSON.stringify({ outcome: 'UNKNOWN', code: 'DIRECT_WRITE_PROBE' }),
+        p2.record.requestRef,
+      );
+      expect(tampered.read(p2.record.requestRef)?.receipt).toEqual({
+        outcome: 'UNKNOWN',
+        code: 'DIRECT_WRITE_PROBE',
+      });
+      // Out-of-schema key: unreadable.
+      update.run(
+        JSON.stringify({ outcome: 'UNKNOWN', code: 'DIRECT_WRITE_PROBE', stdoutRef: 'C:\\x' }),
+        p2.record.requestRef,
+      );
+      expect(tampered.read(p2.record.requestRef)).toBeUndefined();
+    } finally {
+      raw.close();
+    }
+    tampered.close();
+  });
+
+  it('privileged ExecutionReceipts are reduced to the closed allowlist summary before persistence', async () => {
+    const { effect } = await freshHost();
+    const summary = effect.projectPrivilegedReceipt({
+      terminal: 'SUCCEEDED',
+      exitCode: 0,
+      timedOut: false,
+      durationMs: 42,
+      stdoutRef: 'C:\\effect-work\\out\\stdout.txt',
+      stderrRef: 'C:\\effect-work\\out\\stderr.txt',
+      outputRefs: ['C:\\effect-work\\out\\write.bin'],
+      environmentId: 'env-1',
+      nested: { bearer: 'sk-live-1' },
+      freeText: 'Authorization: Bearer sk-live-1',
+    });
+    expect(summary).toEqual({
+      terminal: 'SUCCEEDED',
+      exitCode: 0,
+      timedOut: false,
+      durationMs: 42,
+    });
+    // Unknown terminal classification maps to UNCLEAR; absent facts stay absent.
+    expect(effect.projectPrivilegedReceipt({ terminal: 'WEIRD', exitCode: 2 })).toEqual({
+      terminal: 'UNCLEAR',
+      exitCode: 2,
+    });
+    expect(effect.projectPrivilegedReceipt(undefined)).toEqual({ terminal: 'UNCLEAR' });
   });
 
   it('ELEVATED reaches the existing privileged backend only after explicit confirmation and fails closed without a helper pin', async () => {
@@ -566,8 +811,15 @@ describe('R03C Host-global Provider first-use (requestRef-only, Case-free)', () 
     expect(specs.length).toBe(0);
     const record = binding.readProviderFirstUseRequest(prepared.requestRef);
     expect(record?.status).toBe('REFUSED');
-    expect((record?.receipt as { receipt?: { terminal?: string } })?.receipt?.terminal).toBe(
-      'REFUSED',
+    // The durable receipt is the allowlist projection of the privileged
+    // ExecutionReceipt: terminal classification only, no output references.
+    expect(record?.receipt).toMatchObject({
+      outcome: 'REFUSED',
+      code: 'PROVIDER_ELEVATION_REFUSED',
+      elevatedTerminal: 'REFUSED',
+    });
+    expect(JSON.stringify(record?.receipt)).not.toMatch(
+      /outputRefs|stdoutRef|stderrRef|environmentId/,
     );
   });
 

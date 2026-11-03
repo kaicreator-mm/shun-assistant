@@ -70,9 +70,74 @@ export interface TrustedElevatedActionPreview {
 }
 
 export type TrustedElevatedActionResult =
-  | { readonly status: 'COMPLETED'; readonly receipt: unknown }
-  | { readonly status: 'REFUSED'; readonly code: string; readonly receipt?: unknown }
-  | { readonly status: 'UNKNOWN'; readonly code: string; readonly receipt?: unknown };
+  | {
+      readonly status: 'COMPLETED';
+      readonly code?: undefined;
+      readonly receipt: PrivilegedReceiptSummary;
+    }
+  | {
+      readonly status: 'REFUSED';
+      readonly code: string;
+      readonly receipt: PrivilegedReceiptSummary;
+    }
+  | {
+      readonly status: 'UNKNOWN';
+      readonly code: string;
+      readonly receipt: PrivilegedReceiptSummary;
+    };
+
+/**
+ * Closed-world allowlist projection of a privileged backend
+ * `ExecutionReceipt`: only the terminal classification and bounded
+ * numeric/boolean execution facts survive. Output references
+ * (`outputRefs`/`stdoutRef`/`stderrRef`), `environmentId`, absolute paths,
+ * raw output, free text and arbitrary nested properties are structurally
+ * dropped — callers cannot persist or return them even by mistake.
+ */
+export interface PrivilegedReceiptSummary {
+  readonly terminal:
+    | 'SUCCEEDED'
+    | 'REFUSED'
+    | 'UAC_DECLINED'
+    | 'CANCELLED'
+    | 'FAILED'
+    | 'TIMED_OUT'
+    | 'UNCLEAR';
+  readonly exitCode?: number;
+  readonly timedOut?: boolean;
+  readonly durationMs?: number;
+}
+
+const PRIVILEGED_TERMINALS = [
+  'SUCCEEDED',
+  'REFUSED',
+  'UAC_DECLINED',
+  'CANCELLED',
+  'FAILED',
+  'TIMED_OUT',
+] as const;
+
+export function projectPrivilegedReceipt(receipt: unknown): PrivilegedReceiptSummary {
+  const source =
+    typeof receipt === 'object' && receipt !== null ? (receipt as Record<string, unknown>) : {};
+  const terminal =
+    typeof source.terminal === 'string' &&
+    (PRIVILEGED_TERMINALS as readonly string[]).includes(source.terminal)
+      ? (source.terminal as PrivilegedReceiptSummary['terminal'])
+      : 'UNCLEAR';
+  const exitCode = Number.isInteger(source.exitCode) ? (source.exitCode as number) : undefined;
+  const timedOut = typeof source.timedOut === 'boolean' ? source.timedOut : undefined;
+  const durationMs =
+    Number.isInteger(source.durationMs) && (source.durationMs as number) >= 0
+      ? (source.durationMs as number)
+      : undefined;
+  return Object.freeze({
+    terminal,
+    ...(exitCode !== undefined ? { exitCode } : {}),
+    ...(timedOut !== undefined ? { timedOut } : {}),
+    ...(durationMs !== undefined ? { durationMs } : {}),
+  });
+}
 
 /**
  * Cross-Case binding (R03B): the selected Kernel scopes every effect permit
@@ -356,9 +421,15 @@ export function previewTrustedElevatedAction(
 export async function executeTrustedElevatedAction(
   input: TrustedElevatedActionRef,
 ): Promise<TrustedElevatedActionResult> {
-  if (installed === undefined) return { status: 'REFUSED', code: 'WINDOWS_HOST_NOT_INSTALLED' };
+  if (installed === undefined)
+    return {
+      status: 'REFUSED',
+      code: 'WINDOWS_HOST_NOT_INSTALLED',
+      receipt: projectPrivilegedReceipt(undefined),
+    };
   const resolved = resolveTrustedElevatedAction(input);
-  if (!resolved.ok) return { status: 'REFUSED', code: resolved.code };
+  if (!resolved.ok)
+    return { status: 'REFUSED', code: resolved.code, receipt: projectPrivilegedReceipt(undefined) };
   let receipt: unknown;
   try {
     receipt = await installed.privilegedBackend.execute(
@@ -366,17 +437,24 @@ export async function executeTrustedElevatedAction(
       resolved.grant as never,
     );
   } catch {
-    return { status: 'UNKNOWN', code: 'PROVIDER_ELEVATION_EXECUTION_UNKNOWN' };
+    return {
+      status: 'UNKNOWN',
+      code: 'PROVIDER_ELEVATION_EXECUTION_UNKNOWN',
+      receipt: projectPrivilegedReceipt(undefined),
+    };
   }
+  // The raw privileged receipt (output references, absolute paths, raw
+  // output) never leaves this module — only the closed allowlist summary.
+  const summary = projectPrivilegedReceipt(receipt);
   const terminal = (receipt as { terminal?: unknown }).terminal;
-  if (terminal === 'SUCCEEDED') return { status: 'COMPLETED', receipt };
+  if (terminal === 'SUCCEEDED') return { status: 'COMPLETED', receipt: summary };
   if (terminal === 'REFUSED' || terminal === 'UAC_DECLINED' || terminal === 'CANCELLED') {
-    return { status: 'REFUSED', code: 'PROVIDER_ELEVATION_REFUSED', receipt };
+    return { status: 'REFUSED', code: 'PROVIDER_ELEVATION_REFUSED', receipt: summary };
   }
   if (terminal === 'FAILED' || terminal === 'TIMED_OUT') {
-    return { status: 'REFUSED', code: 'PROVIDER_ELEVATION_FAILED', receipt };
+    return { status: 'REFUSED', code: 'PROVIDER_ELEVATION_FAILED', receipt: summary };
   }
-  return { status: 'UNKNOWN', code: 'PROVIDER_ELEVATION_OUTCOME_UNKNOWN', receipt };
+  return { status: 'UNKNOWN', code: 'PROVIDER_ELEVATION_OUTCOME_UNKNOWN', receipt: summary };
 }
 
 /** Trusted-process evidence accessor (receipts/verification only). */

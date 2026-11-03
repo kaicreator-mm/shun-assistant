@@ -18,6 +18,7 @@
 import { join } from 'node:path';
 import {
   type ActivationResult,
+  type ActivationRunOutcome,
   BoundedSpawnProcess,
   CuratedProviderActivator,
   minimalWindowsSpawnEnvironment,
@@ -28,12 +29,14 @@ import { CuratedProviderStager } from '../../../provider-loader/src/staging.ts';
 import { CuratedProviderVerifier } from '../../../vertical-jit/src/curated-provider.ts';
 import {
   executeTrustedElevatedAction,
+  type PrivilegedReceiptSummary,
   previewTrustedElevatedAction,
   type TrustedElevatedActionRef,
 } from '../windows/effect-host-binding.ts';
 import {
   ProviderFirstUseLedger,
   type ProviderFirstUsePreview,
+  type ProviderFirstUseReceipt,
   type ProviderFirstUseRequestRecord,
   type ProviderPrivilegeScope,
 } from './provider-first-use-ledger.ts';
@@ -198,6 +201,11 @@ export function installTrustedProviderBinding(config: TrustedProviderBindingConf
   };
 }
 
+/**
+ * Sanitized terminal envelope: provider-controlled stdout/stderr are NEVER
+ * copied into the returned capability output — only Host-verified identity
+ * and bounded execution facts survive.
+ */
 function envelopeFrom(result: ActivationResult, externalRef: string): ProviderCapabilityEnvelope {
   if (result.ok) {
     return {
@@ -210,8 +218,6 @@ function envelopeFrom(result: ActivationResult, externalRef: string): ProviderCa
           bindingId: result.bindingId,
           digest: result.digest,
           exitCode: result.exitCode,
-          stdout: result.stdout.slice(0, 2048),
-          stderr: result.stderr.slice(0, 512),
           timedOut: result.timedOut,
           durationMs: result.durationMs,
         },
@@ -229,6 +235,52 @@ function envelopeFrom(result: ActivationResult, externalRef: string): ProviderCa
       ok: false,
       error: { code: result.code, message: 'trusted Provider Host refused the first use' },
     },
+  };
+}
+
+const VERSION_TOKEN = /^\d{1,4}(?:\.\d{1,4}){0,3}(?:[-+][0-9A-Za-z][0-9A-Za-z._-]{0,31})?$/;
+const CANARY_MARKER = 'SHUN-PROVIDER-FIRST-USE';
+
+/**
+ * Strict version-token parser over provider stdout: the last whitespace
+ * token of the FIRST line, retained only when it is exactly version-shaped.
+ * Any other stdout (credentials, paths, free text) yields parsed=false and
+ * no text is retained at all.
+ */
+function parseVersionToken(stdout: string): {
+  readonly token: string | undefined;
+  readonly parsed: boolean;
+} {
+  const firstLine = stdout.split(/\r?\n/, 1)[0] ?? '';
+  const candidate = firstLine.trim().split(/\s+/).pop() ?? '';
+  if (VERSION_TOKEN.test(candidate) && candidate.length <= 64) {
+    return { token: candidate, parsed: true };
+  }
+  return { token: undefined, parsed: false };
+}
+
+/** Canary reduction to a closed enum: match semantics of the search exit code. */
+function canaryResultFrom(result: ActivationRunOutcome): 'MATCHED' | 'NOT_MATCHED' | 'UNCLEAR' {
+  if (result.exitCode === 0) {
+    return result.stdout.includes(CANARY_MARKER) ? 'MATCHED' : 'NOT_MATCHED';
+  }
+  if (result.exitCode === 1) return 'NOT_MATCHED';
+  return 'UNCLEAR';
+}
+
+/** Closed durable receipt for the ELEVATED leg from the projected summary. */
+function elevatedReceipt(
+  outcome: 'EXECUTED' | 'REFUSED' | 'UNKNOWN',
+  code: string,
+  summary: PrivilegedReceiptSummary,
+): ProviderFirstUseReceipt {
+  return {
+    outcome,
+    code,
+    elevatedTerminal: summary.terminal,
+    ...(summary.exitCode !== undefined ? { exitCode: summary.exitCode } : {}),
+    ...(summary.timedOut !== undefined ? { timedOut: summary.timedOut } : {}),
+    ...(summary.durationMs !== undefined ? { durationMs: summary.durationMs } : {}),
   };
 }
 
@@ -373,27 +425,31 @@ export async function providerFirstUse(
   if (installed.privilegeScope === 'ELEVATED') {
     if (installed.elevatedActionRef === undefined) {
       installed.ledger.finish(requestRef, 'REFUSED', {
-        code: 'PROVIDER_HOST_ELEVATED_ACTION_REQUIRED',
+        outcome: 'REFUSED',
+        code: 'PROVIDER_HOST_ELEVATION_ACTION_REQUIRED',
       });
-      return refusalEnvelope(requestRef, 'PROVIDER_HOST_ELEVATED_ACTION_REQUIRED');
+      return refusalEnvelope(requestRef, 'PROVIDER_HOST_ELEVATION_ACTION_REQUIRED');
     }
     const elevated = await executeTrustedElevatedAction(installed.elevatedActionRef);
     if (elevated.status === 'COMPLETED') {
-      installed.ledger.finish(requestRef, 'COMPLETED', {
-        code: 'PROVIDER_ELEVATION_COMPLETED',
-        receipt: elevated.receipt,
-      });
+      installed.ledger.finish(
+        requestRef,
+        'COMPLETED',
+        elevatedReceipt('EXECUTED', 'PROVIDER_ELEVATION_COMPLETED', elevated.receipt),
+      );
     } else if (elevated.status === 'REFUSED') {
-      installed.ledger.finish(requestRef, 'REFUSED', {
-        code: elevated.code,
-        receipt: elevated.receipt,
-      });
+      installed.ledger.finish(
+        requestRef,
+        'REFUSED',
+        elevatedReceipt('REFUSED', elevated.code, elevated.receipt),
+      );
       return refusalEnvelope(requestRef, elevated.code);
     } else {
-      installed.ledger.finish(requestRef, 'UNKNOWN', {
-        code: elevated.code,
-        receipt: elevated.receipt,
-      });
+      installed.ledger.finish(
+        requestRef,
+        'UNKNOWN',
+        elevatedReceipt('UNKNOWN', elevated.code, elevated.receipt),
+      );
       return {
         phase: 'running',
         externalRef: requestRef,
@@ -405,8 +461,8 @@ export async function providerFirstUse(
     descriptor: installed.descriptor,
     run: { kind: 'VERSION_PROBE' },
   });
-  const probeEnvelope = envelopeFrom(probe, requestRef);
-  if (probeEnvelope.phase !== 'terminal' || !probeEnvelope.outcome.ok) {
+  if (!probe.ok) {
+    const probeEnvelope = envelopeFrom(probe, requestRef);
     recordActivationOutcome(requestRef, probeEnvelope);
     return probeEnvelope;
   }
@@ -421,28 +477,27 @@ export async function providerFirstUse(
       },
     ],
   });
-  const canaryEnvelope = envelopeFrom(canary, requestRef);
-  if (canaryEnvelope.phase !== 'terminal' || !canaryEnvelope.outcome.ok) {
+  if (!canary.ok) {
+    const canaryEnvelope = envelopeFrom(canary, requestRef);
     recordActivationOutcome(requestRef, canaryEnvelope);
     return canaryEnvelope;
   }
-  // One terminal receipt carrying BOTH real executions: the identity probe
-  // version line and the search-canary match line.
-  const probeOutput = probeEnvelope.outcome.output as Record<string, unknown>;
-  const canaryOutput = canaryEnvelope.outcome.output as Record<string, unknown>;
-  const receipt = {
-    state: 'EXECUTED',
-    bindingId: probeOutput.bindingId,
-    digest: probeOutput.digest,
-    exitCode: canaryOutput.exitCode,
-    stdout:
-      String(probeOutput.stdout ?? '').split(String.fromCharCode(10))[0] +
-      String.fromCharCode(10) +
-      String(canaryOutput.stdout ?? '').split(String.fromCharCode(10))[0],
-    timedOut: canaryOutput.timedOut,
-    durationMs:
-      (typeof probeOutput.durationMs === 'number' ? probeOutput.durationMs : 0) +
-      (typeof canaryOutput.durationMs === 'number' ? canaryOutput.durationMs : 0),
+  // One terminal receipt carrying BOTH real executions as closed facts: the
+  // strictly parsed version token (or parsed=false with no text retained)
+  // and the enum canary result. Raw provider stdout/stderr are neither
+  // returned to the K nor persisted.
+  const version = parseVersionToken(probe.stdout);
+  const receipt: ProviderFirstUseReceipt = {
+    outcome: 'EXECUTED',
+    code: 'PROVIDER_FIRST_USE_EXECUTED',
+    bindingId: probe.bindingId,
+    artifactSha256: installed.artifactSha256,
+    ...(version.token !== undefined ? { probeVersion: version.token } : {}),
+    probeVersionParsed: version.parsed,
+    canaryResult: canaryResultFrom(canary),
+    exitCode: canary.exitCode,
+    timedOut: canary.timedOut,
+    durationMs: probe.durationMs + canary.durationMs,
   };
   installed.ledger.finish(requestRef, 'COMPLETED', receipt);
   return {
@@ -456,11 +511,17 @@ function recordActivationOutcome(requestRef: string, envelope: ProviderCapabilit
   if (installed === undefined) return;
   if (envelope.phase === 'running') {
     // Interrupted execution: an uncertain boundary — never retried blindly.
-    installed.ledger.finish(requestRef, 'UNKNOWN', { code: 'ACTIVATION_INTERRUPTED' });
+    installed.ledger.finish(requestRef, 'UNKNOWN', {
+      outcome: 'UNKNOWN',
+      code: 'ACTIVATION_INTERRUPTED',
+    });
     return;
   }
   if (!envelope.outcome.ok) {
-    installed.ledger.finish(requestRef, 'REFUSED', { code: envelope.outcome.error.code });
+    installed.ledger.finish(requestRef, 'REFUSED', {
+      outcome: 'REFUSED',
+      code: envelope.outcome.error.code,
+    });
   }
 }
 

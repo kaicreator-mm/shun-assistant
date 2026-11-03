@@ -1,6 +1,6 @@
 # R03C-PROVIDER-GLOBAL-UAC — Host-global Provider first-use implementation notes
 
-Issue #287 · Execution Pack `.agent/execution/R03C-PROVIDER-GLOBAL-UAC/MANIFEST.yaml@23019ee4f7afdce7b5051cc4555ea054b97bca5f` · LOCAL_BUILDER r1 · baseline `be2e81722a70ee3d0bd5634bc83d97d733c20b78`.
+Issue #287 · Execution Pack `.agent/execution/R03C-PROVIDER-GLOBAL-UAC-RECEIPT-ALLOWLIST/MANIFEST.yaml@ba149aa594f9507913157f79e14a4c49873815cb` · LOCAL_BUILDER generation 3 · baseline source `fe7a8614521d9a4b4222d89a2b31c6c0b9031e1c`.
 
 ## What this Task delivers
 
@@ -25,6 +25,16 @@ Issue #287 · Execution Pack `.agent/execution/R03C-PROVIDER-GLOBAL-UAC/MANIFEST
 ## Test seams
 
 `installTrustedProviderBinding` accepts optional `fetchArtifact`, `process` and `hostFacts` overrides (production defaults remain the real fetch, `BoundedSpawnProcess` and real host facts) so the qualification suite exercises the real verifier→stager→activator chain with in-memory fixture bytes, a capturing spawn port and the pinned `windows-x64` host facts — zero network, zero real child processes, on any CI host.
+
+## Generation-3 privacy hardening (P1 + P2 repair)
+
+Closing PR #302 findings `R03C-PROVIDER-P1-RAW-PROVIDER-OUTPUT-PERSISTED` (comment 6595168881) and `R03C-PROVIDER-P2-UNVALIDATED-DURABLE-RECEIPT` (comment 6595125211), same six-path write set:
+
+- **Raw provider output eliminated** — `envelopeFrom()` no longer copies `result.stdout`/`result.stderr` into the returned capability envelope, and the terminal receipt never stores provider text. The VERSION_PROBE is reduced to a **strictly parsed version token** (last whitespace token of the first line, kept only when exactly version-shaped; otherwise only `probeVersionParsed:false` is recorded) plus the Host-pinned binding/artifact digest; the FILE_SEARCH canary is reduced to the **enum** `MATCHED | NOT_MATCHED | UNCLEAR`. A secret-shaped stdout regression proves the secret is absent from both the returned envelope and the raw `receipt_json` in SQLite.
+- **Closed-world preview** — `validatePreview` enforces the exact key set of the preview (8 keys; 9 with `elevatedAction`) AND of the nested `elevatedAction` (4 keys); caller-supplied extra properties are refused on `prepare` and again on every `decodeRow` read.
+- **Closed-world receipt schema shared by write and read** — `finish()` refuses any receipt outside the allowlisted flat key set (`outcome`, `code`, `bindingId`, `artifactSha256`, `probeVersion`, `probeVersionParsed`, `canaryResult`, `elevatedTerminal`, `exitCode`, `timedOut`, `durationMs`) or whose `outcome` disagrees with the terminal status; `decodeRow()` re-validates the persisted JSON with the same validator, so legacy/unknown/malformed shapes fail closed on read. Serialized length stays as a bounded additional guard, never the only one.
+- **Privileged receipt allowlist projection** — `effect-host-binding.ts` exports `projectPrivilegedReceipt`, reducing the privileged backend `ExecutionReceipt` to `terminal` classification + bounded exit/timeout/duration facts; `outputRefs`, `stdoutRef`, `stderrRef`, `environmentId`, absolute paths, raw output and arbitrary nesting are structurally dropped before anything is persisted or returned.
+- The PREPARED → APPROVED → RUNNING one-way state machine, restart RUNNING→UNKNOWN sweep (`PROCESS_RESTARTED_WITH_UNCERTAIN_OUTCOME`, now in the new receipt shape) and EXPIRED handling are unchanged.
 
 ## Explicitly out of scope / not done here
 
