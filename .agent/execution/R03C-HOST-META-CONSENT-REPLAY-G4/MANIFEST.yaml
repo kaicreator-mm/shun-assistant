@@ -1,0 +1,83 @@
+pack_id: shun-v030-r03c-host-meta-consent-replay-repair-g4
+task_id: R03C-PROVIDER-META-PRODUCTION-INTEGRATOR
+issue: "#288"
+repository: kaicreator-mm/shun-assistant
+version: v0.3.0
+parent_issue: "#280"
+standard_revision: 2c395c55569fe2edf3f4135f12d3d069e526d0b7
+owner_authorization_refs:
+  - "#280 comment 6584396368"
+  - "#280 comment 6585799747"
+  - "#280 comment 6596114371"
+  - "#280 comment 6603602254"
+  - "#280 comment 6606593448"
+  - "#288 comment 6612240741 OWNER_SHUN_V030_R03C_G3_HOST_ATOMIC_BATCH_APPROVE"
+  - "#288 comment 6613663173 R1_BLOCK_CONSENT_REPLAY_REPAIR_WITHIN_SAME_13_PATH_SCOPE"
+repair_finding: "PR #320 comment 6613661823 — identical pinned batch replay can replace a historical opt-in consent with a newer declaration_seq after a later opt-out; duplicate global consentRef can silently replace another Case's row"
+source_base_sha: de2747830f6ac3820b22d111857e11665673c141
+source_base_tree: 5f554a71ae8d91849d1e9eec489fcec242c809c7
+source_base_branch: JIT_only_task/v0.3.0-r03c-host-meta-atomic-batch-local-g3
+pack_branch: JIT_only_task/v0.3.0-r03c-host-meta-consent-replay-pack-g4
+jit_branch: JIT_only_task/v0.3.0-r03c-host-meta-consent-replay-local-g4
+execution_pack_path: .agent/execution/R03C-HOST-META-CONSENT-REPLAY-G4/MANIFEST.yaml
+execution_profile: LOCAL_BUILDER
+execution_environment: LOCAL
+admission_mode: SINGLE_WRITER_ADMISSION
+admission_generation: 4
+protected_claim_key: "kaicreator-mm/shun-assistant#288:builder:__default__"
+allowed_write_set:
+  - apps/control-api/src/main.ts
+  - apps/control-api/src/server.ts
+  - apps/control-api/src/v03/composition-journeys.ts
+  - apps/control-api/src/v03/composition-production.ts
+  - packages/domain-app/src/activation/modules/business-provider.mjs
+  - packages/domain-app/src/activation/modules/capability-provider.mjs
+  - packages/domain-app/src/activation/modules/business-meta-memory.mjs
+  - packages/domain-app/src/activation/modules/capability-meta-memory.mjs
+  - tests/integration/v03/r03c-provider-global/provider-global-route.test.ts
+  - tests/integration/v03/r03c-meta-shared/meta-shared-production.test.ts
+  - tests/integration/v03/r02-a-build/ensure-consumer.mjs
+  - docs/implementation/v0.3/r03c-production/PRODUCTION_WIRING.md
+  - packages/domain-host/src/meta/host-meta-shadow-store.ts
+plan:
+  - "Repair the R1 P1 in PR #320 without expanding the Owner-approved 13-path write set."
+  - "Make consentRef an immutable consent-declaration identity in the generation-3 batch path. An exact existing declaration is a true no-op and MUST preserve its original declaration_seq; the same consentRef with different fields or a different Case/source binding must conflict."
+  - "Reject duplicate consentRef values across all Case entries during phase-1 batch validation, before BEGIN IMMEDIATE."
+  - "If an existing identical opt-in declaration is no longer current because a later opt-out exists, replaying the old pinned batch must NOT promote it to current. The transaction must retain the opt-out as current; an attached experience must fail the existing #285 current-consent check and roll back the complete batch."
+  - "Use a batch-specific transaction-aware consent helper if required. Preserve the existing public recordOptInConsent API behavior; do not silently change #285's public contract."
+  - "For a new consentRef, keep the existing declaration-order sequence semantics and opt-out revocation behavior."
+  - "Keep the one HostMetaShadowStore-owned BEGIN IMMEDIATE transaction across vocabulary, receipts, consents and experiences. No nested transactions."
+  - "Preserve #285 current receipt/digest/currentness, consent expiry, declaration-order, revocation, vocabulary, idempotent and conflict checks."
+  - "Control API remains parser/orchestrator only; no direct SQLite/SQL."
+  - "No Provider behavior change, new database, HTTP/model-facing writer, authority channel, automatic promotion or activation."
+test_contract:
+  - "Tests remain only in tests/integration/v03/r03c-meta-shared/meta-shared-production.test.ts."
+  - "Regression: provision opt-in batch, apply a later opt-out, replay the byte-identical original pinned batch; assert opt-out remains current, query remains empty, a new experience write and feedback authorization are refused, and durable row snapshots do not change."
+  - "Regression: replaying an identical batch without an intervening opt-out leaves declaration_seq unchanged (not merely row counts)."
+  - "Regression: duplicate consentRef across two Case entries is rejected before any write."
+  - "Regression: a batch Case reusing an existing consentRef owned by a different Case conflicts and leaves pre-existing rows unchanged."
+  - "Retain the existing success, cross-Case HTTP->K->externalEffect:false C->Host SQLite, idempotent experience, duplicate tags/constraints, expired consent, receipt digest conflict, strict schema and full rollback regressions."
+  - "Use the independent read-only SQLite handle to inspect consent identity, declaration_seq and durable row snapshots."
+pre_ci:
+  - "Verify this pack-only commit has exactly one parent equal to source_base_sha and exactly one added manifest path."
+  - "No source edit until Pack Push/PR CI passes and a fresh generation-4 CAS Claim is recorded by the actual LOCAL_BUILDER identity."
+  - "On final source HEAD/tree, run Node 24.21.0 syntax preflight before source CI; include every tracked JS/TS source and the three browser modules."
+  - "Run focused Meta/Provider integration tests, lint, typecheck and tools/task-check.sh."
+  - "Record exact commands, exit codes, source HEAD/tree, 13-path write-set comparison, Woodpecker Push/PR Build IDs and GitHub Actions checks."
+forbidden:
+  - "any source path outside the exact 13-path allowed_write_set"
+  - "reusing an existing consentRef to create a new declaration or advance declaration_seq"
+  - "replaying an older opt-in declaration over a newer opt-out"
+  - "changing public recordOptInConsent behavior without separate Owner approval"
+  - "Control API direct SQLite/SQL access"
+  - "nested SQLite transactions"
+  - "bypass or relaxation of #285 receipt, consent, revocation, digest, currentness or vocabulary checks"
+  - "new Host database, Kernel, dispatcher, HTTP/model-facing write route or authority channel"
+  - "caller/model-supplied verified outcomes, raw prompt/file content, secrets or unrestricted free text"
+  - "automatic Shadow promotion, policy mutation, Permit/grant/approval creation or execution"
+  - "real UAC prompt, Provider installation, persistent Windows effect, paid LLM or cloud sync"
+  - "main, version/v0.2.0, merge, tag or release"
+source_write_authorized: true
+merge_authorized: false
+release_authorized: false
+notes: "Generation 4 is a same-scope repair of the P1 found in the independent Exact-SHA review of PR #320. It retains the exact 13-path Owner-approved scope and changes no Product/L2 contract. PR #320 remains open and unmerged; generation-4 source base is its exact delivered HEAD. The fresh generation-4 CAS Claim must be recorded only after this pack is CI-qualified."
