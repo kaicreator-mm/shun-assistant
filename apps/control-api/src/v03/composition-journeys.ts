@@ -476,7 +476,7 @@ export function createJourneySubmits(deps: {
 }
 
 /**
- * R03C (#288, generation 2): operator-pinned Meta case provisioning. The
+ * R03C (#288, generation 2/3): operator-pinned Meta case provisioning. The
  * file remains SHA-256 pinned (`SHUN_V03_META_CASE_SHA256`) and is the ONLY
  * trusted ingestion path for outcome receipts, opt-in consents, closed-world
  * vocabulary and normalized verified experiences. No HTTP/API/model-facing
@@ -499,10 +499,13 @@ export function createJourneySubmits(deps: {
  * VALIDATED BEFORE THE FIRST DURABLE WRITE — a refused document leaves the
  * store untouched, so the shared query can never expose partially seeded
  * experiences. Each experience derives caseRef/sourceRevision/sourceDigest
- * from its enclosing receipt (never accepted from the file) and is recorded
- * through the #285 store's own `recordSharedExperience`, which re-checks
- * registered vocabulary, current receipt, current opt-in consent and
- * revocation authoritatively.
+ * from its enclosing receipt (never accepted from the file).
+ *
+ * Generation 3: the validated document is handed to the Host Store's
+ * `provisionVerifiedExperienceBatch`, which applies vocabulary, receipts,
+ * consents and all experiences inside ONE `BEGIN IMMEDIATE` transaction and
+ * ROLLBACKs everything on any failure — Control API stays a parser/
+ * orchestrator and never touches SQLite/SQL directly.
  */
 export const META_CASE_PROVISION_MAX_CASES = 16;
 export const META_CASE_PROVISION_MAX_EXPERIENCES_TOTAL = 64;
@@ -604,7 +607,9 @@ function parseProvisionConsent(
   if (typeof consent.optIn !== 'boolean') throw new Error('V03_META_CASE_INVALID');
   if (!isIsoUtcString(consent.expiresAt)) throw new Error('V03_META_CASE_INVALID');
   // The consent must bind the SAME source identity as its receipt, and a
-  // Case carrying verified experiences must be opted in.
+  // Case carrying verified experiences must be opted in — with an unexpired
+  // consent, mirroring the store's write-time expiry check so phase-1 is
+  // equivalent to every Store-level precondition.
   if (
     consent.caseRef !== receipt.caseRef ||
     consent.sourceRevision !== receipt.revision ||
@@ -614,6 +619,9 @@ function parseProvisionConsent(
   }
   if (requiresOptIn && consent.optIn !== true) {
     throw new Error('V03_META_CASE_OPT_IN_REQUIRED');
+  }
+  if (requiresOptIn && Date.parse(consent.expiresAt as string) <= Date.now()) {
+    throw new Error('V03_META_CASE_OPT_IN_EXPIRED');
   }
   return consent;
 }
@@ -667,6 +675,9 @@ function parseProvisionExperience(
       throw new Error('V03_META_EXPERIENCE_VOCABULARY_UNKNOWN');
     }
   }
+  if (new Set(tags).size !== tags.length) {
+    throw new Error('V03_META_EXPERIENCE_INVALID');
+  }
   if (
     !Array.isArray(constraintCodes) ||
     constraintCodes.length > META_EXPERIENCE_MAX_CONSTRAINT_CODES
@@ -677,6 +688,9 @@ function parseProvisionExperience(
     if (typeof code !== 'string' || !vocabulary.constraintCodes.has(code)) {
       throw new Error('V03_META_EXPERIENCE_VOCABULARY_UNKNOWN');
     }
+  }
+  if (new Set(constraintCodes).size !== constraintCodes.length) {
+    throw new Error('V03_META_EXPERIENCE_INVALID');
   }
   return value;
 }
@@ -710,6 +724,18 @@ export function provisionMetaFromHostFile(input: {
     }
   }
   const vocabularyRaw = withExperiences ? (raw.vocabulary as Record<string, unknown>) : undefined;
+  if (vocabularyRaw) {
+    // The vocabulary block is strict too: exactly the five declared kinds.
+    const vocabularyKeys = Object.keys(vocabularyRaw).sort();
+    if (
+      vocabularyKeys.length !== 5 ||
+      !vocabularyKeys.every((key) =>
+        ['capabilityIds', 'constraintCodes', 'patternIds', 'tags', 'taskClasses'].includes(key),
+      )
+    ) {
+      throw new Error('V03_META_VOCABULARY_INVALID');
+    }
+  }
   const vocabularySets = vocabularyRaw
     ? {
         capabilityIds: new Set(
@@ -796,17 +822,42 @@ export function provisionMetaFromHostFile(input: {
     parsed.push({ receipt, consent, experiences });
   }
 
-  // ── Phase 2: durable writes. receipt/consent shapes were fully validated
-  // above, so the store's write-time checks re-confirm rather than discover.
-  if (vocabularySets) {
-    for (const code of vocabularySets.capabilityIds) input.store.registerMetaCapabilityId(code);
-    for (const code of vocabularySets.taskClasses) input.store.registerMetaTaskClass(code);
-    for (const code of vocabularySets.patternIds) input.store.registerMetaPatternId(code);
-    for (const code of vocabularySets.tags) input.store.registerMetaExperienceTag(code);
-    for (const code of vocabularySets.constraintCodes) {
-      input.store.registerMetaConstraintCode(code);
-    }
+  // ── Phase 2: durable writes.
+  const sets = vocabularySets;
+  if (withExperiences && sets) {
+    // Generation 2/3: the Host Store applies the complete normalized batch in
+    // ONE BEGIN IMMEDIATE transaction and rolls everything back on any
+    // failure. Control API stays a parser/orchestrator — no direct SQLite.
+    input.store.provisionVerifiedExperienceBatch({
+      vocabulary: {
+        capabilityIds: [...sets.capabilityIds],
+        taskClasses: [...sets.taskClasses],
+        patternIds: [...sets.patternIds],
+        tags: [...sets.tags],
+        constraintCodes: [...sets.constraintCodes],
+      },
+      cases: parsed.map((entry) => ({
+        receipt: entry.receipt,
+        consent: entry.consent as never,
+        experiences: entry.experiences.map((experience) => ({
+          // Source identity is derived from the enclosing genuine receipt —
+          // the file can never attach an experience to another Case/revision.
+          caseRef: entry.receipt.caseRef,
+          sourceRevision: entry.receipt.revision,
+          sourceDigest: entry.receipt.sha256,
+          capabilityId: experience.capabilityId as string,
+          taskClass: experience.taskClass as string,
+          patternId: experience.patternId as string,
+          verifiedOutcome: experience.verifiedOutcome as 'VERIFIED_PASS' | 'VERIFIED_FAIL',
+          tags: experience.tags as string[],
+          constraintCodes: experience.constraintCodes as string[],
+        })),
+      })),
+    });
+    return;
   }
+  // Legacy single-record and generation-1 batch (receipt + consent only):
+  // unchanged per-record writes, behavior-compatible with generation 1/2.
   for (const entry of parsed) {
     input.store.recordOutcomeReceipt({
       caseRef: entry.receipt.caseRef,
@@ -814,23 +865,5 @@ export function provisionMetaFromHostFile(input: {
       sha256: entry.receipt.sha256,
     });
     input.store.recordOptInConsent(entry.consent as never);
-    for (const experience of entry.experiences) {
-      // Source identity is derived from the enclosing genuine receipt —
-      // the file can never attach an experience to another Case/revision.
-      const recorded = input.store.recordSharedExperience({
-        caseRef: entry.receipt.caseRef,
-        sourceRevision: entry.receipt.revision,
-        sourceDigest: entry.receipt.sha256,
-        capabilityId: experience.capabilityId as string,
-        taskClass: experience.taskClass as string,
-        patternId: experience.patternId as string,
-        verifiedOutcome: experience.verifiedOutcome as 'VERIFIED_PASS' | 'VERIFIED_FAIL',
-        tags: experience.tags as string[],
-        constraintCodes: experience.constraintCodes as string[],
-      });
-      if (recorded.status !== 'STORED' && recorded.status !== 'ALREADY_STORED') {
-        throw new Error('V03_META_EXPERIENCE_REFUSED');
-      }
-    }
   }
 }

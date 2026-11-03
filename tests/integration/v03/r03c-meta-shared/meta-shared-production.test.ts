@@ -1,7 +1,7 @@
 /**
  * R03C-META-SHARED-PRODUCTION — read-only cross-Case Meta shared-experience
  * query over the REAL production composition and the REAL loopback HTTP
- * control surface (Issue #288, LOCAL_BUILDER generation 2).
+ * control surface (Issue #288, LOCAL_BUILDER generation 3).
  *
  * Generation-2 repair (PR #316 comment 6610635105, pack PR #317): every
  * durable record below — vocabulary, receipts, consents AND the verified
@@ -26,12 +26,30 @@
  *     batches, extra document keys and malformed LATER entries all refuse
  *     with ZERO durable writes — the shared query can never expose partially
  *     seeded experiences.
+ *
+ * Generation-3 atomic batch (PR #318 comment 6611769037, pack PR #319,
+ * Owner OWNER_SHUN_V030_R03C_G3_HOST_ATOMIC_BATCH_APPROVE): the Host Store
+ * owns ONE `BEGIN IMMEDIATE` transaction spanning vocabulary, receipts,
+ * consents and all experiences; every failure ROLLBACKs the whole batch.
+ * The generation-3 suite proves, with durable row counts read through an
+ * independent READ-ONLY SQLite handle, that:
+ *   - a valid multi-Case batch provisions everything in one call and stays
+ *     cross-Case queryable; re-applying the identical batch is idempotent;
+ *   - a later Case with duplicate tags / duplicate constraintCodes / an
+ *     expired opt-in consent / an injected pre-existing receipt digest
+ *     conflict rolls back to the exact pre-call row snapshot — vocabulary,
+ *     receipts, consents AND experiences all return to zero delta;
+ *   - strict schema (extra keys at batch/vocabulary/case/experience levels)
+ *     refuses before any write;
+ *   - the full pinned-file production path rolls back atomically when a
+ *     later Case hits a Store-level conflict.
  */
 import { spawnSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
 import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
+import { DatabaseSync } from 'node:sqlite';
 import { fileURLToPath } from 'node:url';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { DemoShunBackend } from '../../../../apps/control-api/src/demo/backend.ts';
@@ -48,6 +66,8 @@ import {
 import { HostGuidedService } from '../../../../packages/domain-host/src/guided/host-guided-service.ts';
 import {
   HostMetaShadowStore,
+  type MetaProvisionBatchInput,
+  type MetaProvisionCaseInput,
   type MetaVerifiedExperienceRecord,
 } from '../../../../packages/domain-host/src/meta/host-meta-shadow-store.ts';
 import { consumerDir, ensureV03SdkConsumer } from '../r02-a-build/ensure-consumer.mjs';
@@ -788,5 +808,329 @@ describe('R03C: pinned provisioning schema (generation-2 contract)', () => {
     expect(() =>
       provisionMetaFromHostFile({ store, file, sha256: '0'.repeat(64) }),
     ).toThrow('V03_META_CASE_DIGEST_REFUSED');
+  });
+});
+
+describe('R03C: Host Store atomic batch transaction (generation 3)', () => {
+  const createdDirs: string[] = [];
+  const openStores: HostMetaShadowStore[] = [];
+
+  function makeStore(name: string): { store: HostMetaShadowStore; dir: string } {
+    const tempDir = mkdtempSync(join(tmpdir(), `r03c-meta-g3-${name}-`));
+    createdDirs.push(tempDir);
+    const store = new HostMetaShadowStore(join(tempDir, 'meta.sqlite'));
+    openStores.push(store);
+    return { store, dir: tempDir };
+  }
+
+  function provisionViaPinnedFile(
+    store: HostMetaShadowStore,
+    dir: string,
+    name: string,
+    document: unknown,
+  ): string {
+    const file = join(dir, name);
+    writeFileSync(file, JSON.stringify(document, null, 2) + '\n');
+    return file;
+  }
+
+  function pinnedSha(document: unknown): string {
+    return sha256(JSON.stringify(document, null, 2) + '\n');
+  }
+
+  /**
+   * Durable row counts through an INDEPENDENT READ-ONLY SQLite handle: the
+   * atomicity assertions must observe real persisted rows, not query results.
+   */
+  function durableCounts(dir: string): {
+    vocabulary: number;
+    receipts: number;
+    consents: number;
+    experiences: number;
+  } {
+    const db = new DatabaseSync(join(dir, 'meta.sqlite'), { readOnly: true });
+    try {
+      const count = (table: string): number =>
+        (db.prepare(`SELECT COUNT(*) AS count FROM ${table}`).get() as { count: number }).count;
+      return {
+        vocabulary: count('meta_experience_vocabulary'),
+        receipts: count('meta_outcome_receipts'),
+        consents: count('meta_opt_in_consents'),
+        experiences: count('meta_verified_experiences'),
+      };
+    } finally {
+      db.close();
+    }
+  }
+
+  /** One batch experience whose source identity matches `caseRef`'s receipt. */
+  function batchExperience(
+    caseRef: string,
+    overrides: Record<string, unknown> = {},
+  ): Record<string, unknown> {
+    const receipt = receiptRecord(caseRef);
+    return {
+      caseRef,
+      sourceRevision: receipt.revision,
+      sourceDigest: receipt.sha256,
+      capabilityId: CAPABILITY,
+      taskClass: TASK_CLASS,
+      patternId: PATTERN,
+      verifiedOutcome: 'VERIFIED_PASS',
+      tags: [TAG_HIGH_SUCCESS],
+      constraintCodes: [CONSTRAINT_NO_ELEVATION],
+      ...overrides,
+    };
+  }
+
+  function batchCase(
+    caseRef: string,
+    overrides: { consent?: Record<string, unknown>; experiences?: unknown[] } = {},
+  ): MetaProvisionCaseInput {
+    const receipt = receiptRecord(caseRef);
+    return {
+      receipt,
+      consent: consentRecord(caseRef, 'outcome-r1', receipt.sha256, overrides.consent) as never,
+      experiences: (overrides.experiences ?? [batchExperience(caseRef)]) as never,
+    };
+  }
+
+  function batchDocument(): MetaProvisionBatchInput {
+    return {
+      vocabulary: {
+        capabilityIds: [CAPABILITY, CAPABILITY_ALT],
+        taskClasses: [TASK_CLASS],
+        patternIds: [PATTERN],
+        tags: [TAG_HIGH_SUCCESS],
+        constraintCodes: [CONSTRAINT_NO_ELEVATION],
+      },
+      cases: [batchCase('case-alpha'), batchCase('case-beta')],
+    };
+  }
+
+  afterAll(() => {
+    for (const store of openStores.splice(0)) {
+      try {
+        store.close();
+      } catch {
+        /* already closed */
+      }
+    }
+    while (createdDirs.length > 0) {
+      const tempDir = createdDirs.pop();
+      if (tempDir === undefined) break;
+      for (let attempt = 0; attempt < 3; attempt += 1) {
+        try {
+          rmSync(tempDir, { recursive: true, force: true });
+          break;
+        } catch {
+          Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, 50);
+        }
+      }
+    }
+  });
+
+  it('provisions the complete batch in ONE store call; cross-Case query works; re-apply is idempotent', () => {
+    const { store, dir } = makeStore('batch-ok');
+    const before = durableCounts(dir);
+    const result = store.provisionVerifiedExperienceBatch(batchDocument());
+    expect(result).toEqual({
+      status: 'PROVISIONED',
+      vocabularyCodes: 6,
+      receipts: 2,
+      consents: 2,
+      experiences: 2,
+    });
+    const expected = {
+      vocabulary: before.vocabulary + 6,
+      receipts: before.receipts + 2,
+      consents: before.consents + 2,
+      experiences: before.experiences + 2,
+    };
+    expect(durableCounts(dir)).toEqual(expected);
+    const found = store.querySharedExperiences({
+      targetCaseRef: 'case-beta',
+      capabilityId: CAPABILITY,
+    });
+    expect(found).toHaveLength(2);
+    expect(found.map((record) => record.provenance.sourceCaseRef).sort()).toEqual([
+      'case-alpha',
+      'case-beta',
+    ]);
+    // Identical batch re-applied: receipts no-op, consents replace with the
+    // identical content, experiences are ALREADY_STORED — zero delta.
+    store.provisionVerifiedExperienceBatch(batchDocument());
+    expect(durableCounts(dir)).toEqual(expected);
+  });
+
+  it('rolls back EVERYTHING when a later Case carries duplicate tags', () => {
+    const { store, dir } = makeStore('rb-dup-tags');
+    const document = batchDocument() as never as {
+      cases: { experiences: Record<string, unknown>[] }[];
+    };
+    document.cases[1].experiences = [
+      {
+        ...document.cases[1].experiences[0],
+        tags: [TAG_HIGH_SUCCESS, TAG_HIGH_SUCCESS],
+      },
+    ];
+    const before = durableCounts(dir);
+    // The #285 normalizer rejects the duplicate codes before any write.
+    expect(() =>
+      store.provisionVerifiedExperienceBatch(document as never),
+    ).toThrow('META_EXPERIENCE_INVALID');
+    expect(durableCounts(dir)).toEqual(before);
+  });
+
+  it('rolls back EVERYTHING when a later Case carries duplicate constraintCodes', () => {
+    const { store, dir } = makeStore('rb-dup-constraints');
+    const document = batchDocument() as never as {
+      cases: { experiences: Record<string, unknown>[] }[];
+    };
+    document.cases[1].experiences = [
+      {
+        ...document.cases[1].experiences[0],
+        constraintCodes: [CONSTRAINT_NO_ELEVATION, CONSTRAINT_NO_ELEVATION],
+      },
+    ];
+    const before = durableCounts(dir);
+    expect(() =>
+      store.provisionVerifiedExperienceBatch(document as never),
+    ).toThrow('META_EXPERIENCE_INVALID');
+    expect(durableCounts(dir)).toEqual(before);
+  });
+
+  it('rolls back EVERYTHING when a later Case consent is expired (in-transaction ROLLBACK)', () => {
+    const { store, dir } = makeStore('rb-expired');
+    const document = batchDocument() as never as {
+      cases: { consent: Record<string, unknown> }[];
+    };
+    document.cases[1].consent = {
+      ...document.cases[1].consent,
+      expiresAt: hoursFromNow(-1),
+    };
+    const before = durableCounts(dir);
+    // Phase 1 passes (grammar is valid); the #285 write-time expiry check
+    // fires INSIDE the transaction after Case A wrote — and must undo it.
+    expect(() =>
+      store.provisionVerifiedExperienceBatch(document as never),
+    ).toThrow('META_CONSENT_EXPIRED');
+    expect(durableCounts(dir)).toEqual(before);
+  });
+
+  it('rolls back EVERYTHING on an injected pre-existing receipt digest conflict (pre-existing rows untouched)', () => {
+    const { store, dir } = makeStore('rb-conflict');
+    // Inject the durable conflict BEFORE the batch: a genuine receipt row for
+    // case-beta@outcome-r1 whose digest the batch later contradicts.
+    const seeded = receiptRecord('case-beta');
+    store.recordOutcomeReceipt(seeded);
+    const conflictReceipt = {
+      caseRef: 'case-beta',
+      revision: 'outcome-r1',
+      sha256: sha256('evidence:TAMPERED'),
+    };
+    const document = batchDocument();
+    document.cases[1] = {
+      receipt: conflictReceipt,
+      consent: consentRecord(
+        'case-beta',
+        'outcome-r1',
+        conflictReceipt.sha256,
+      ) as never,
+      experiences: [
+        batchExperience('case-beta', { sourceDigest: conflictReceipt.sha256 }),
+      ] as never,
+    };
+    const before = durableCounts(dir);
+    expect(() =>
+      store.provisionVerifiedExperienceBatch(document),
+    ).toThrow('META_RECEIPT_CONFLICT');
+    expect(durableCounts(dir)).toEqual(before);
+  });
+
+  it('strict schema: extra keys at batch/vocabulary/case/experience levels refuse before any write', () => {
+    const { store, dir } = makeStore('strict-g3');
+    const before = durableCounts(dir);
+
+    const extraBatchKey = { ...batchDocument(), operatorNote: 'x' } as never;
+    expect(() =>
+      store.provisionVerifiedExperienceBatch(extraBatchKey),
+    ).toThrow('META_PROVISION_BATCH_INVALID');
+
+    const docVocabExtra = batchDocument() as never as {
+      vocabulary: Record<string, unknown>;
+    };
+    docVocabExtra.vocabulary.extraKind = ['code.x'];
+    expect(() =>
+      store.provisionVerifiedExperienceBatch(docVocabExtra as never),
+    ).toThrow('META_PROVISION_BATCH_INVALID');
+
+    const docCaseExtra = batchDocument() as never as {
+      cases: Record<string, unknown>[];
+    };
+    docCaseExtra.cases[0] = { ...docCaseExtra.cases[0], note: 'x' };
+    expect(() =>
+      store.provisionVerifiedExperienceBatch(docCaseExtra as never),
+    ).toThrow('META_PROVISION_BATCH_INVALID');
+
+    const docExpExtra = batchDocument() as never as {
+      cases: { experiences: Record<string, unknown>[] }[];
+    };
+    docExpExtra.cases[0].experiences[0] = {
+      ...docExpExtra.cases[0].experiences[0],
+      note: 'x',
+    };
+    expect(() =>
+      store.provisionVerifiedExperienceBatch(docExpExtra as never),
+    ).toThrow('META_EXPERIENCE_INVALID');
+
+    expect(durableCounts(dir)).toEqual(before);
+  });
+
+  it('pinned-file production path: a later-Case Store conflict rolls back the WHOLE batch', () => {
+    const { store, dir } = makeStore('pinned-rb');
+    // Pre-existing genuine durable receipt for case-beta@outcome-r1.
+    const seed = {
+      receipt: receiptRecord('case-beta'),
+      consent: consentRecord('case-beta', 'outcome-r1', sha256('evidence:case-beta:outcome-r1')),
+    };
+    const seedFile = provisionViaPinnedFile(store, dir, 'seed.json', seed);
+    provisionMetaFromHostFile({ store, file: seedFile, sha256: pinnedSha(seed) });
+    const snapshot = durableCounts(dir);
+    // Generation-2 pinned document: valid Case A, then Case B whose receipt
+    // digest conflicts with the durable row — a Store-level failure that the
+    // Control API phase 1 cannot see; the Host batch transaction must undo
+    // Case A together with anything Case B touched.
+    const conflictReceipt = {
+      caseRef: 'case-beta',
+      revision: 'outcome-r1',
+      sha256: sha256('evidence:TAMPERED'),
+    };
+    const broken = {
+      vocabulary: {
+        capabilityIds: [CAPABILITY],
+        taskClasses: [TASK_CLASS],
+        patternIds: [PATTERN],
+        tags: [TAG_HIGH_SUCCESS],
+        constraintCodes: [CONSTRAINT_NO_ELEVATION],
+      },
+      cases: [
+        {
+          receipt: receiptRecord('case-alpha'),
+          consent: consentRecord('case-alpha', 'outcome-r1', sha256('evidence:case-alpha:outcome-r1')),
+          experiences: [experienceRecord()],
+        },
+        {
+          receipt: conflictReceipt,
+          consent: consentRecord('case-beta', 'outcome-r1', conflictReceipt.sha256),
+          experiences: [experienceRecord()],
+        },
+      ],
+    };
+    const file = provisionViaPinnedFile(store, dir, 'broken.json', broken);
+    expect(() =>
+      provisionMetaFromHostFile({ store, file, sha256: pinnedSha(broken) }),
+    ).toThrow('META_RECEIPT_CONFLICT');
+    expect(durableCounts(dir)).toEqual(snapshot);
   });
 });
