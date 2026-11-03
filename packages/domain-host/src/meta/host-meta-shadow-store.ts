@@ -707,25 +707,33 @@ export class HostMetaShadowStore implements MetaFeedbackHostPort {
 
   /**
    * Generation-3 Host-owned atomic provisioning (Owner
-   * OWNER_SHUN_V030_R03C_G3_HOST_ATOMIC_BATCH_APPROVE).
+   * OWNER_SHUN_V030_R03C_G3_HOST_ATOMIC_BATCH_APPROVE); generation 4 adds the
+   * immutable consentRef declaration identity (Owner repair record
+   * R1_BLOCK_CONSENT_REPLAY_REPAIR_WITHIN_SAME_13_PATH_SCOPE).
    *
    * Phase 1 validates the COMPLETE document against every Store-level
    * precondition: exact object keys at batch/vocabulary/case level, exact
    * experience keys, closed-world code grammar, per-kind vocabulary bounds,
    * duplicate vocabulary codes, exact receipt/consent/experience source
    * bindings, opt-in required when experiences attach, bounded Case and
-   * experience totals, within-batch duplicate experience rejection and
-   * closed-world vocabulary membership. Validation reads only — no writes.
+   * experience totals, within-batch duplicate experience rejection,
+   * duplicate consentRef rejection across all Case entries, and closed-world
+   * vocabulary membership. Validation reads only — no writes.
    *
    * Phase 2 applies EVERYTHING — vocabulary registration, every receipt,
    * every consent and every experience — inside ONE `BEGIN IMMEDIATE`
-   * transaction through the transaction-aware helpers above. Any validation
-   * remainder, receipt conflict, consent/currentness failure or insertion
-   * error ROLLBACKs the whole batch: a failed document leaves zero durable
-   * vocabulary, receipts, consents or experiences. The #285 authoritative
-   * checks (genuine receipt identity/digest/currentness, current opt-in
-   * consent, expiry, declaration-order supersession, revocation, registered
-   * vocabulary, idempotent/conflict behavior) run inside that transaction.
+   * transaction through the transaction-aware helpers above. Consents use
+   * `#recordProvisionConsentInTx`, where a consentRef is an immutable
+   * declaration identity: an exact existing declaration is a true no-op that
+   * keeps its original declaration_seq (so replaying an old pinned batch can
+   * never supersede a later opt-out), and any drift under the same
+   * consentRef conflicts. Any validation remainder, receipt conflict,
+   * consent/currentness failure or insertion error ROLLBACKs the whole
+   * batch: a failed document leaves zero durable vocabulary, receipts,
+   * consents or experiences. The #285 authoritative checks (genuine receipt
+   * identity/digest/currentness, current opt-in consent, expiry,
+   * declaration-order supersession, revocation, registered vocabulary,
+   * idempotent/conflict behavior) run inside that transaction.
    */
   provisionVerifiedExperienceBatch(input: MetaProvisionBatchInput): MetaProvisionBatchResult {
     const batch = this.#normalizeProvisionBatch(input);
@@ -736,7 +744,7 @@ export class HostMetaShadowStore implements MetaFeedbackHostPort {
       }
       for (const entry of batch.cases) {
         this.#recordOutcomeReceiptInTx(entry.receipt);
-        this.#recordOptInConsentInTx(entry.consent);
+        this.#recordProvisionConsentInTx(entry.consent);
         for (const experience of entry.experiences) {
           this.#recordSharedExperienceInTx(
             experience.normalized,
@@ -757,6 +765,79 @@ export class HostMetaShadowStore implements MetaFeedbackHostPort {
       consents: batch.cases.length,
       experiences: batch.cases.reduce((total, entry) => total + entry.experiences.length, 0),
     };
+  }
+
+  /**
+   * Batch-path consent write with IMMUTABLE consentRef identity
+   * (generation-4 repair of the PR #320 review P1): a consentRef is a durable
+   * consent-declaration identity, never a reusable upsert key.
+   *
+   * MUST run inside an already-open transaction. An exact existing
+   * declaration is a true no-op — its original `declaration_seq` is preserved
+   * and recency is untouched, so replaying an old pinned batch can never
+   * promote a historical opt-in over a later opt-out. The same consentRef
+   * with any different field, or bound to another Case/source, is a
+   * declaration-identity conflict. A fresh consentRef keeps the #285
+   * declaration-order sequence semantics and opt-out revocation behavior.
+   * The public `recordOptInConsent` API intentionally keeps its historical
+   * REPLACE semantics and is not routed through this helper.
+   */
+  #recordProvisionConsentInTx(input: MetaOptInConsentInput): void {
+    const existing = this.#db
+      .prepare('SELECT * FROM meta_opt_in_consents WHERE consent_ref=?')
+      .get(input.consentRef) as ConsentRow | undefined;
+    if (existing !== undefined) {
+      const identical =
+        existing.revision === input.revision &&
+        existing.case_ref === input.caseRef &&
+        existing.source_revision === input.sourceRevision &&
+        existing.source_digest === input.sourceDigest &&
+        existing.operator_id === input.operatorId &&
+        existing.operator_subject_ref === input.operatorSubjectRef &&
+        existing.authorization_revision === input.authorizationRevision &&
+        existing.currentness_ref === input.currentnessRef &&
+        existing.opt_in === (input.optIn ? 1 : 0) &&
+        existing.expires_at === input.expiresAt;
+      if (!identical) throw new Error('META_CONSENT_CONFLICT');
+      return;
+    }
+    const nextSeq = (
+      this.#db
+        .prepare(
+          `SELECT COALESCE(MAX(declaration_seq),0)+1 AS next_seq
+           FROM meta_opt_in_consents WHERE case_ref=? AND source_revision=?`,
+        )
+        .get(input.caseRef, input.sourceRevision) as { next_seq: number }
+    ).next_seq;
+    this.#db
+      .prepare(
+        `INSERT INTO meta_opt_in_consents(
+           consent_ref,revision,case_ref,source_revision,source_digest,
+           operator_id,operator_subject_ref,authorization_revision,
+           currentness_ref,opt_in,expires_at,declaration_seq) VALUES(?,?,?,?,?,?,?,?,?,?,?,?)`,
+      )
+      .run(
+        input.consentRef,
+        input.revision,
+        input.caseRef,
+        input.sourceRevision,
+        input.sourceDigest,
+        input.operatorId,
+        input.operatorSubjectRef,
+        input.authorizationRevision,
+        input.currentnessRef,
+        input.optIn ? 1 : 0,
+        input.expiresAt,
+        nextSeq,
+      );
+    if (!input.optIn) {
+      this.#db
+        .prepare(
+          `UPDATE meta_verified_experiences SET revoked_at=?
+           WHERE case_ref=? AND source_revision=? AND revoked_at IS NULL`,
+        )
+        .run(new Date().toISOString(), input.caseRef, input.sourceRevision);
+    }
   }
 
   /**
@@ -810,6 +891,7 @@ export class HostMetaShadowStore implements MetaFeedbackHostPort {
     }
     const seenCaseRevisions = new Set<string>();
     const seenExperienceIds = new Set<string>();
+    const seenConsentRefs = new Set<string>();
     const cases: NormalizedProvisionCase[] = [];
     let totalExperiences = 0;
     for (const entry of input.cases) {
@@ -818,6 +900,7 @@ export class HostMetaShadowStore implements MetaFeedbackHostPort {
         declaredCodes,
         seenCaseRevisions,
         seenExperienceIds,
+        seenConsentRefs,
       );
       cases.push(normalized);
       totalExperiences += normalized.experiences.length;
@@ -833,6 +916,7 @@ export class HostMetaShadowStore implements MetaFeedbackHostPort {
     declaredCodes: ReadonlyMap<MetaExperienceVocabularyKind, ReadonlySet<string>>,
     seenCaseRevisions: Set<string>,
     seenExperienceIds: Set<string>,
+    seenConsentRefs: Set<string>,
   ): NormalizedProvisionCase {
     if (
       typeof entry !== 'object' ||
@@ -862,6 +946,12 @@ export class HostMetaShadowStore implements MetaFeedbackHostPort {
       (entry as Record<string, unknown>).consent,
       receipt,
     );
+    // consentRef is an immutable declaration identity: one batch may never
+    // declare the same consentRef twice (generation-4 phase-1 guarantee).
+    if (seenConsentRefs.has(consent.consentRef)) {
+      throw new TypeError('META_PROVISION_BATCH_INVALID');
+    }
+    seenConsentRefs.add(consent.consentRef);
     const experiencesRaw: unknown = (entry as Record<string, unknown>).experiences;
     if (!Array.isArray(experiencesRaw)) {
       throw new TypeError('META_PROVISION_BATCH_INVALID');
