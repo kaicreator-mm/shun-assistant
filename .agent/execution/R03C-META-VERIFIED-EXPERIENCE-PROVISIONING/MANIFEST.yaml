@@ -1,0 +1,65 @@
+pack_id: shun-v030-r03c-meta-verified-experience-provisioning-local-r2
+task_id: R03C-PROVIDER-META-PRODUCTION-INTEGRATOR
+issue: "#288"
+repository: kaicreator-mm/shun-assistant
+version: v0.3.0
+parent_issue: "#280"
+repair_finding: "PR #316 comment 6610635105 — no production producer for meta_verified_experiences"
+architecture_plan_ref: "#305 comment 6610639759"
+owner_authorization_refs:
+  - "#280 comment 6584396368"
+  - "#280 comment 6585799747"
+  - "#280 comment 6596114371"
+  - "#280 comment 6603602254"
+  - "#280 comment 6606593448"
+standard_revision: 2c395c55569fe2edf3f4135f12d3d069e526d0b7
+execution_profile: LOCAL_BUILDER
+execution_environment: LOCAL
+admission_mode: SINGLE_WRITER_ADMISSION
+admission_generation: 2
+protected_claim_key: "kaicreator-mm/shun-assistant#288:builder:__default__"
+source_base_sha: 1ce653384542459bf5a38eb09943037dcfd1db0c
+source_base_tree: 8615c84b6dfd90e958a4138136b417d59a0145b5
+source_base_branch: JIT_only_task/v0.3.0-r03c-provider-meta-integrator-web-r1
+pack_branch: JIT_only_task/v0.3.0-r03c-meta-verified-experience-provisioning-pack-r2
+jit_branch: JIT_only_task/v0.3.0-r03c-meta-verified-experience-provisioning-local-r2
+execution_pack_path: .agent/execution/R03C-META-VERIFIED-EXPERIENCE-PROVISIONING/MANIFEST.yaml
+allowed_write_set:
+  - apps/control-api/src/main.ts
+  - apps/control-api/src/server.ts
+  - apps/control-api/src/v03/composition-journeys.ts
+  - apps/control-api/src/v03/composition-production.ts
+  - packages/domain-app/src/activation/modules/business-provider.mjs
+  - packages/domain-app/src/activation/modules/capability-provider.mjs
+  - packages/domain-app/src/activation/modules/business-meta-memory.mjs
+  - packages/domain-app/src/activation/modules/capability-meta-memory.mjs
+  - tests/integration/v03/r03c-provider-global/provider-global-route.test.ts
+  - tests/integration/v03/r03c-meta-shared/meta-shared-production.test.ts
+  - tests/integration/v03/r02-a-build/ensure-consumer.mjs
+  - docs/implementation/v0.3/r03c-production/PRODUCTION_WIRING.md
+required_repairs:
+  - "Extend the existing operator-owned, SHA-256-pinned Meta provisioning file so each Case can include a bounded list of normalized verified experiences in addition to its genuine outcome receipt and opt-in consent."
+  - "Define and validate an explicit closed-world vocabulary section in the same pinned file; register only those trusted operator-pinned capability/task-class/pattern/tag/constraint codes with the existing HostMetaShadowStore before recording experiences."
+  - "Derive each experience caseRef/sourceRevision/sourceDigest from its enclosing receipt; require matching current opt-in consent and let recordSharedExperience re-check receipt/consent/currentness/revocation."
+  - "Keep experience payload fields exact-key and bounded: capabilityId, taskClass, patternId, verifiedOutcome, tags and constraintCodes only; reject free text, unknown keys, unknown vocabulary, duplicates, mismatched source identity and over-limit batches."
+  - "Preserve legacy single-record provisioning and the existing bounded multi-Case format; fail closed on malformed input. Validate the complete document before the first durable write."
+  - "Do not add an HTTP/API/model-facing writer. The only new ingestion path is trusted operator-local provisioning protected by the existing exact SHA-256 pin."
+  - "Replace the production integration test's direct store.registerMeta*/recordSharedExperience fixture seeding with the pinned provisioning path; then prove a clean production composition can retrieve Case A's experience from Case B through HTTP -> selected K -> externalEffect:false C -> existing Host SQLite."
+  - "Add negative tests for malformed/unknown vocabulary, consent/receipt mismatch, invalid experience payload and a malformed later Case entry; prove the query cannot expose partially seeded experiences."
+  - "Keep Provider behavior unchanged; do not widen the original 12-path write set."
+pre_ci:
+  - "Verify this pack-only commit is a one-file manifest diff whose parent is exactly source_base_sha."
+  - "The source_base_sha exact-tree syntax preflight is already recorded at #288 comment 6610289598; repeat Node 24.21.0 syntax preflight on the final changed source tree before any source CI."
+  - "Run scoped lint/typecheck and focused Meta/Provider integration tests, then tools/task-check.sh."
+  - "Record exact HEAD/tree, write-set comparison, commands, exit codes and Woodpecker Push/PR Build IDs."
+forbidden:
+  - "any source path outside the exact 12-path allowed_write_set"
+  - "new Host database, Kernel, dispatcher, authority channel, HTTP write route or direct SQL from DomainApp"
+  - "caller/model-supplied verified outcome, raw prompt/file content, secrets or unrestricted free text"
+  - "automatic Shadow promotion, policy mutation, Permit/grant/approval creation or execution"
+  - "real UAC prompt, Provider installation, persistent Windows effect, paid LLM or cloud sync"
+  - "main, version/v0.2.0, PR merge, tag or release"
+merge_authorized: false
+release_authorized: false
+source_write_authorized: true
+notes: "This is a fresh generation-2 repair admission for the same #288 task and unchanged Owner-approved 12-path write set. Generation-1 delivery #316 remains open and unmerged; source_base_sha is the exact delivered HEAD. No source edit is admitted until this pack is CI-qualified and a fresh generation-2 CAS Claim is recorded by the actual LOCAL_BUILDER identity."
