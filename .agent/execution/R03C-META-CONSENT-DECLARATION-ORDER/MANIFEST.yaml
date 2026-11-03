@@ -1,0 +1,42 @@
+pack_id: shun-v030-r03c-meta-consent-declaration-order-local-builder-r1
+task_id: R03C-META-CONSENT-DECLARATION-ORDER
+issue: "#285"
+repository: kaicreator-mm/shun-assistant
+version: v0.3.0
+parent_issue: "#280"
+owner_authorization_ref: "#280 comment 6584396368"
+owner_execution_amendment_ref: "#280 comment 6585799747"
+standard_revision: 2c395c55569fe2edf3f4135f12d3d069e526d0b7
+execution_profile: LOCAL_BUILDER
+execution_environment: LOCAL
+source_base_sha: 55ab03e0a67df7d966ad260e8441a018ff02a0e9
+source_base_tree: bc20c6104babc29b78d1c3c6eb3b8763d7a07386
+branch: JIT_only_task/v0.3.0-r03c-meta-shared-sqlite-local-builder-r2
+execution_pack_path: .agent/execution/R03C-META-CONSENT-DECLARATION-ORDER/MANIFEST.yaml
+protected_claim_key: "kaicreator-mm/shun-assistant#285:builder:__default__"
+admission_mode: SINGLE_WRITER_ADMISSION
+admission_generation: 4
+repair_finding: "PR #300 comment 6595261804 R03C-META-P1-CONSENT-LEXICOGRAPHIC-ORDER-BYPASS"
+allowed_write_set:
+  - packages/domain-host/src/meta/host-meta-shadow-store.ts
+  - tests/integration/v03/r03c-meta-shared/meta-shared-store.test.ts
+  - tests/integration/v03/r03c-meta-shared/vitest.config.ts
+plan:
+  - "Define current consent by a durable transactional declaration-order sequence for each (caseRef, sourceRevision), not lexicographic comparison of opaque revision strings."
+  - "Implement a safe SQLite schema migration for declaration order, or explicitly validate a monotonic revision contract and reject out-of-order writes. Do not silently select an older opt-in."
+  - "Ensure recordSharedExperience, authorizeCurrentFeedback, runMetaFeedbackWorkflow, and querySharedExperiences all use the same current-consent selector."
+  - "Add regression: opt-in consent-rev-2 -> later opt-out consent-rev-10 -> current consent is opt-out; recording, feedback authorization and retrieval fail closed."
+  - "Add restart durability and later re-opt-in tests; new opt-in may authorize new records only and must never resurrect revoked experiences."
+  - "Preserve generation-3 transactional opt-out revocation, idempotent explicit revoke API, snapshot-consistent query and all existing concurrency/positive behavior."
+pre_ci:
+  - "Exact-tree Windows Node 24 syntax preflight before any CI."
+  - "Scoped strict TypeScript, lint, typecheck and tests before Woodpecker."
+  - "Record exact Node/pnpm versions, commands, exit codes, Build IDs and exact SHA."
+forbidden:
+  - "any path outside allowed_write_set"
+  - "new Kernel, dispatcher, database or cloud sync"
+  - "raw prompts/files/credentials"
+  - "Permit/grant/policy mutation, auto-execution or Shadow promotion"
+  - "main, version/v0.2.0, merge, tag or release"
+  - "paid LLM, Provider install, UAC or physical Windows effects"
+notes: "Generation-4 repair of P1 R03C-META-P1-CONSENT-LEXICOGRAPHIC-ORDER-BYPASS. Generation-3 delivery SHA 55ab03e0a67df7d966ad260e8441a018ff02a0e9 remains exact-SHA CI-qualified, but not Owner-final-review eligible until this repair is delivered and qualified."
