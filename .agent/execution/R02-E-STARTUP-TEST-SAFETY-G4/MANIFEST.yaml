@@ -1,0 +1,60 @@
+pack_id: shun-v030-r02-e-startup-test-safety-g4
+task_id: R02-E
+issue: "#269"
+reviewed_source_pr: "#328"
+reviewed_source_sha: a67b8f21c8c50ca947b2097725902f08b6c795fb
+reviewed_source_tree: b9f5ad97a9ba8ae158c31bccb28d2c1882a93821
+repository: kaicreator-mm/shun-assistant
+version: v0.3.0
+standard_revision: 2c395c55569fe2edf3f4135f12d3d069e526d0b7
+owner_authorization_ref: "#260 comment 6545077384 OWNER_SHUN_V030_R02_AMENDMENT_R1_APPROVE"
+review_block_ref: "#328 comment 6622722536"
+execution_profile: LOCAL_BUILDER
+execution_environment: LOCAL
+admission_mode: SINGLE_WRITER_ADMISSION
+admission_generation: 4
+protected_claim_key: "kaicreator-mm/shun-assistant#269:builder:__default__"
+source_base_sha: a67b8f21c8c50ca947b2097725902f08b6c795fb
+source_base_tree: b9f5ad97a9ba8ae158c31bccb28d2c1882a93821
+source_base_branch: JIT_only_task/v0.3.0-r02e-node26-compatible-runner-local-g3
+pack_branch: JIT_only_task/v0.3.0-r02e-startup-safety-pack-g4
+jit_branch: JIT_only_task/v0.3.0-r02e-startup-safety-local-g4
+execution_pack_path: .agent/execution/R02-E-STARTUP-TEST-SAFETY-G4/MANIFEST.yaml
+findings:
+  P1:
+    - "startup-runner.test.ts inherits process.env in spawned API processes."
+    - "cloudInterpreterFromEnvironment enables real egress when SHUN_CLOUD_ENABLED=1 and reads DEEPSEEK_API_KEY."
+    - "The production negative test sends a forged-reference POST; if the guard regresses, inherited cloud configuration could allow a paid request before the test fails."
+  P2:
+    - "readPinned silently accepts a required fixture when SHA256SUMS.txt has no entry."
+    - "The Windows production fixture invokes node --import tsx directly instead of the exact package script pnpm --filter @shun/control-api dev."
+    - "Process cleanup must remain bounded and must not leave a listener/process if an assertion fails."
+approved_write_set:
+  - tests/integration/v03/r02-e-production/startup-runner.test.ts
+allowed_write_set:
+  - tests/integration/v03/r02-e-production/startup-runner.test.ts
+required_changes:
+  - "Build a sanitized child environment used by every spawned API process. Explicitly set SHUN_CLOUD_ENABLED=0 and remove DEEPSEEK_API_KEY, SHUN_CLOUD_LEDGER_FILE, SHUN_CLOUD_AUTHORITY_FILE, SHUN_CLOUD_PUBLIC_KEY_FILE, SHUN_CLOUD_PUBLIC_KEY_SPKI_SHA256. Do not inherit cloud egress configuration into any test child."
+  - "Assert in the Windows production fixture that SHUN_CLOUD_ENABLED is disabled before starting the server and before the forged-reference POST. No live credentials, no real cloud API calls."
+  - "Make readPinned fail if SHA256SUMS.txt lacks a valid 64-hex receipt for any required fixture; compare the computed digest unconditionally."
+  - "Run the real-storage production fixture through the exact pnpm --filter @shun/control-api dev package script, not only node --import tsx. Preserve the existing Node24/Node26 test coverage and prove the default package entry boots the real production composition."
+  - "Make process cleanup failure-safe: retain child references and terminate the process tree in afterAll/finally if any assertion fails; attach exit observers before sending termination; confirm the loopback port is released."
+scope:
+  - "Test-harness safety and acceptance quality only; no product source or runtime behavior changes."
+  - "Do not change package.json, pnpm-lock.yaml, apps/control-api/src/**, native modules, root engines, production composition, R04 UI or any other path."
+test_contract:
+  - "Verify exact source base/manifest and acquire fresh generation-4 CAS Claim before source edit."
+  - "Run Node 24.21 tracked-source syntax preflight before source CI."
+  - "Run focused r02-e-production suite on Windows Node24.21 and Node26.13; production fixture must use exact pnpm dev command on both where supported."
+  - "Run full tools/task-check.sh, lint/typecheck and frozen-lockfile install; no unrelated files."
+  - "Run Woodpecker Push/PR and Actions CI at exact final source SHA only after syntax preflight."
+  - "Report actual command lines, versions, counts, exit codes, Build IDs and production boot output; preserve UNKNOWN where a platform cannot run a test."
+forbidden:
+  - "Any file outside tests/integration/v03/r02-e-production/startup-runner.test.ts"
+  - "Any inherited real cloud egress configuration, paid LLM/API request, UAC, Provider install, persistent Windows effects, or external data disclosure"
+  - "Any source edit before pack CI is SUCCESS and fresh generation-4 CAS Claim is recorded"
+  - "Any merge, tag, release, deployment, main or version/v0.2.0 mutation"
+notes: "Generation-3 claim shun-v030-r02-e-zc-g3 is terminal. Do not reuse it. Generation-4 is limited to one already Owner-approved R02-E test file. PR #328 remains the original G3 source delivery and must not be merged until a safe replacement/repair has been independently reviewed. No standalone LOCAL_VALIDATION; Builder owns repair, preflight, tests and CI."
+source_write_authorized: true
+merge_authorized: false
+release_authorized: false
