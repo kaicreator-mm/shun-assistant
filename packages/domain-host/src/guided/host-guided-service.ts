@@ -37,6 +37,14 @@ type LedgerRow = {
   readonly row_sha256: string;
 };
 const CASE_KEY = 'selected-case';
+const MARKER_KEY = 'schema';
+const SCHEMA_VERSION = 5;
+const GUIDED_TABLES = [
+  'guided_selected_case',
+  'guided_step_answers',
+  'guided_step_refusals',
+  'guided_consumed_steps',
+] as const;
 const TASK_ID = /^[A-Za-z][A-Za-z0-9._-]{0,127}$/;
 const STEP_ID = /^[A-Za-z0-9][A-Za-z0-9_.:-]{0,159}$/;
 const TERMINAL_HISTORY = new Set(['ACCEPTED', 'REFUSED', 'OBSERVATION_RECEIPT']);
@@ -50,10 +58,13 @@ export class HostGuidedService {
   readonly #db: DatabaseSync;
   readonly #clock: () => number;
   /**
-   * Set when the open-time ledger migration cannot prove a complete replay
-   * fence from the persisted evidence. The service then fails closed: staging
-   * and decisions are refused with the stable code until the state is
-   * repaired out of band. Never reset silently, never deletes data.
+   * Set when the database cannot prove a complete, trusted replay fence:
+   * either a non-empty pre-G5 database without a provenance marker (its
+   * prior-Case terminal history may have been discarded and is
+   * unrecoverable), or a marked database whose schema, marker, row digests
+   * or payload bindings fail validation. The service then fails closed:
+   * staging and decisions are refused with the stable code until the state
+   * is repaired out of band. Never reset silently, never deletes data.
    */
   #ledgerUnavailable: string | null = null;
 
@@ -66,49 +77,8 @@ export class HostGuidedService {
     this.#db.exec('PRAGMA journal_mode=WAL');
     this.#db.exec('PRAGMA synchronous=FULL');
     this.#db.exec('PRAGMA busy_timeout=5000');
-    this.#db.exec(`CREATE TABLE IF NOT EXISTS guided_selected_case (
-      slot TEXT PRIMARY KEY CHECK (slot='selected-case'),
-      state_json TEXT NOT NULL,
-      revision INTEGER NOT NULL
-    )`);
-    this.#db.exec(`CREATE TABLE IF NOT EXISTS guided_step_answers (
-      step_id TEXT PRIMARY KEY,
-      task_id TEXT NOT NULL,
-      case_ref_json TEXT NOT NULL,
-      template_digest TEXT NOT NULL,
-      outcome_json TEXT NOT NULL,
-      outcome_sha256 TEXT NOT NULL,
-      recorded_at_unix_ms INTEGER NOT NULL
-    )`);
-    // A refused ASK submission is durable evidence of the refusal, but it is
-    // a separately typed receipt: it never lands in guided_step_answers and
-    // can never be read back as an accepted answer.
-    this.#db.exec(`CREATE TABLE IF NOT EXISTS guided_step_refusals (
-      step_id TEXT PRIMARY KEY,
-      task_id TEXT NOT NULL,
-      case_ref_json TEXT NOT NULL,
-      template_digest TEXT NOT NULL,
-      refusal_json TEXT NOT NULL,
-      refusal_sha256 TEXT NOT NULL,
-      recorded_at_unix_ms INTEGER NOT NULL
-    )`);
-    // G4: Host-private durable consumed-step ledger. The uniqueness fence is
-    // global — keyed by stepId, independent of the single selected-Case row —
-    // so a step consumed under Case A stays fenced after A -> B -> A and
-    // across service/process restarts. Rows are never exposed through
-    // state(); they are internal replay evidence with row-integrity digests.
-    this.#db.exec(`CREATE TABLE IF NOT EXISTS guided_consumed_steps (
-      step_id TEXT PRIMARY KEY,
-      task_id TEXT NOT NULL,
-      case_ref_json TEXT NOT NULL,
-      template_digest TEXT NOT NULL,
-      terminal_event TEXT NOT NULL CHECK (terminal_event IN ('USER_SUBMIT','OBSERVATION_RECEIPT')),
-      terminal_decision TEXT NOT NULL CHECK (terminal_decision IN ('ANSWER','APPROVE','REFUSE')),
-      recorded_at_unix_ms INTEGER NOT NULL,
-      row_sha256 TEXT NOT NULL
-    )`);
     this.#clock = clock;
-    this.#migrateLedger();
+    this.#initializeOrValidate();
   }
 
   /** Only callable by a trusted process-side selection, never an HTTP route. */
@@ -358,6 +328,15 @@ export class HostGuidedService {
           ? (outcomeEvent === 'OBSERVATION_RECEIPT' ? 'OBSERVATION_RECEIPT' : 'REFUSED')
           : 'ACCEPTED',
       }];
+      // The durable ledger binds every terminal outcome; check it BEFORE any
+      // payload write so a pre-existing row (the step was already consumed)
+      // fails closed as STALE with nothing written. The check-then-insert is
+      // race-free because BEGIN IMMEDIATE excludes every other writer for
+      // the whole transaction.
+      if (this.#ledgerRow(stored.step.stepId)) {
+        this.#db.exec('ROLLBACK');
+        return { status: 'STALE', code: 'GUIDED_STEP_ALREADY_CONSUMED' };
+      }
       // Only an accepted ANSWER persists an answer row. An ASK refusal is
       // persisted as a separately typed durable refusal receipt (digest
       // verified) so the submitted payload is preserved as evidence but can
@@ -417,18 +396,11 @@ export class HostGuidedService {
           return { status: 'STALE', code: 'GUIDED_REFUSAL_ALREADY_RECORDED' };
         }
       }
-      // The consumed-step ledger binds every terminal outcome (ANSWER,
+      // The consumed-step ledger records every terminal outcome (ANSWER,
       // APPROVE, REFUSE on ASK/REVIEW_EFFECT, and the INSPECT Host receipt)
       // in the same transaction as the payload receipt above and the
-      // selected-case CAS below. A pre-existing row means the step was
-      // already consumed: fail closed as STALE and roll everything back —
-      // RECORDED is never reported unless all durable writes commit. The
-      // check-then-insert is race-free because BEGIN IMMEDIATE already
-      // excludes every other writer for the whole transaction.
-      if (this.#ledgerRow(stored.step.stepId)) {
-        this.#db.exec('ROLLBACK');
-        return { status: 'STALE', code: 'GUIDED_STEP_ALREADY_CONSUMED' };
-      }
+      // selected-case CAS below — RECORDED is never reported unless all
+      // durable writes commit.
       const terminalEvent = outcomeEvent === 'OBSERVATION_RECEIPT' ? 'OBSERVATION_RECEIPT' : 'USER_SUBMIT';
       const terminalDecision = raw.decision === 'ANSWER' ? 'ANSWER' : raw.decision === 'APPROVE' ? 'APPROVE' : 'REFUSE';
       const caseRefJson = JSON.stringify(stored.step.caseRef);
@@ -551,7 +523,7 @@ export class HostGuidedService {
   /**
    * Row-integrity digest over the canonical field binding. The ledger is
    * internal replay evidence; a mismatched digest means the durable layer
-   * can no longer be trusted, so migration fails closed instead of fencing
+   * can no longer be trusted, so validation fails closed instead of fencing
    * (or not fencing) on corrupt data.
    */
   #ledgerDigest(row: Omit<LedgerRow, 'row_sha256'>): string {
@@ -562,22 +534,166 @@ export class HostGuidedService {
     ).digest('hex');
   }
 
+  /** Provenance-marker digest binding the schema generation to its init time. */
+  #markerDigest(version: number, initializedAtUnixMs: number): string {
+    return createHash('sha256')
+      .update(`guided-schema-marker|v${version}|${initializedAtUnixMs}`, 'utf8')
+      .digest('hex');
+  }
+
+  /** Names of every guided-domain table currently present in the database. */
+  #guidedTables(): Set<string> {
+    const rows = this.#db.prepare(
+      `SELECT name FROM sqlite_master WHERE type='table' AND name LIKE 'guided\\_%' ESCAPE '\\'`,
+    ).all() as unknown as { readonly name: string }[];
+    return new Set(rows.map((row) => row.name));
+  }
+
   /**
-   * Open-time, transactional, idempotent backfill of the consumed-step
-   * ledger from everything the persisted state can prove: digest-verified
-   * answer/refusal payload rows and the terminal history of the currently
-   * persisted selected Case. Previously discarded other-Case history is not
-   * reconstructable and is not claimed; ambiguous or corrupt evidence fails
-   * closed with a stable code and never deletes or resets data.
+   * G5 admission: inspect the database schema and data state BEFORE creating
+   * any table or marker. A trusted provenance marker enables validation;
+   * a completely empty database (no guided table at all) may initialize;
+   * anything else is a pre-G5 or partially initialized database whose
+   * complete prior-Case replay history is unprovable, and fails closed.
    */
-  #migrateLedger(): void {
+  #initializeOrValidate(): void {
     try {
-      this.#db.exec('BEGIN IMMEDIATE');
-      const existing = this.#db.prepare(`SELECT step_id,task_id,case_ref_json,template_digest,
+      const tables = this.#guidedTables();
+      if (tables.has('guided_schema_marker')) {
+        this.#validateMarked(tables);
+        return;
+      }
+      if (tables.size === 0) {
+        this.#initializeFresh();
+        return;
+      }
+      throw new Error('pre-G5 database without provenance marker');
+    } catch {
+      this.#ledgerUnavailable = 'GUIDED_LEDGER_MIGRATION_AMBIGUOUS';
+    }
+  }
+
+  #createTables(): void {
+    this.#db.exec(`CREATE TABLE guided_selected_case (
+      slot TEXT PRIMARY KEY CHECK (slot='selected-case'),
+      state_json TEXT NOT NULL,
+      revision INTEGER NOT NULL
+    )`);
+    this.#db.exec(`CREATE TABLE guided_step_answers (
+      step_id TEXT PRIMARY KEY,
+      task_id TEXT NOT NULL,
+      case_ref_json TEXT NOT NULL,
+      template_digest TEXT NOT NULL,
+      outcome_json TEXT NOT NULL,
+      outcome_sha256 TEXT NOT NULL,
+      recorded_at_unix_ms INTEGER NOT NULL
+    )`);
+    // A refused ASK submission is durable evidence of the refusal, but it is
+    // a separately typed receipt: it never lands in guided_step_answers and
+    // can never be read back as an accepted answer.
+    this.#db.exec(`CREATE TABLE guided_step_refusals (
+      step_id TEXT PRIMARY KEY,
+      task_id TEXT NOT NULL,
+      case_ref_json TEXT NOT NULL,
+      template_digest TEXT NOT NULL,
+      refusal_json TEXT NOT NULL,
+      refusal_sha256 TEXT NOT NULL,
+      recorded_at_unix_ms INTEGER NOT NULL
+    )`);
+    // Host-private durable consumed-step ledger. The uniqueness fence is
+    // global — keyed by stepId, independent of the single selected-Case row —
+    // so a step consumed under Case A stays fenced after A -> B -> A and
+    // across service/process restarts. Rows are never exposed through
+    // state(); they are internal replay evidence with row-integrity digests.
+    this.#db.exec(`CREATE TABLE guided_consumed_steps (
+      step_id TEXT PRIMARY KEY,
+      task_id TEXT NOT NULL,
+      case_ref_json TEXT NOT NULL,
+      template_digest TEXT NOT NULL,
+      terminal_event TEXT NOT NULL CHECK (terminal_event IN ('USER_SUBMIT','OBSERVATION_RECEIPT')),
+      terminal_decision TEXT NOT NULL CHECK (terminal_decision IN ('ANSWER','APPROVE','REFUSE')),
+      recorded_at_unix_ms INTEGER NOT NULL,
+      row_sha256 TEXT NOT NULL
+    )`);
+    this.#db.exec(`CREATE TABLE guided_schema_marker (
+      slot TEXT PRIMARY KEY CHECK (slot='schema'),
+      schema_version INTEGER NOT NULL,
+      initialized_at_unix_ms INTEGER NOT NULL,
+      marker_sha256 TEXT NOT NULL
+    )`);
+  }
+
+  /**
+   * Initialize a provably fresh database: all tables and the G5 provenance
+   * marker commit in ONE transaction. A crash before the commit leaves no
+   * marker and (at most) no tables, so either the database re-initializes
+   * cleanly or — if any partial table exists — stays fail-closed.
+   */
+  #initializeFresh(): void {
+    const initializedAt = this.#clock();
+    this.#db.exec('BEGIN IMMEDIATE');
+    try {
+      this.#createTables();
+      this.#db.prepare(`INSERT INTO guided_schema_marker(
+        slot,schema_version,initialized_at_unix_ms,marker_sha256
+      ) VALUES(?,?,?,?)`).run(
+        MARKER_KEY, SCHEMA_VERSION, initializedAt,
+        this.#markerDigest(SCHEMA_VERSION, initializedAt),
+      );
+      this.#db.exec('COMMIT');
+    } catch {
+      this.#rollback();
+      throw new Error('fresh initialization failed');
+    }
+  }
+
+  /** True when the ledger row binds exactly the given terminal evidence. */
+  #ledgerAgrees(
+    row: LedgerRow,
+    taskId: string,
+    caseRefJson: string,
+    templateDigest: string,
+    terminalEvent: string,
+    terminalDecision: string,
+    recordedAtUnixMs: number,
+  ): boolean {
+    return row.task_id === taskId && row.case_ref_json === caseRefJson &&
+      row.template_digest === templateDigest && row.terminal_event === terminalEvent &&
+      row.terminal_decision === terminalDecision && row.recorded_at_unix_ms === recordedAtUnixMs;
+  }
+
+  /**
+   * Validate a marked G5 database before enabling mutations: marker version
+   * and digest, every table present, every ledger and payload row digest,
+   * cross-table conflicts across the COMPLETE datasets (any stepId in both
+   * payload tables is ambiguous regardless of the selected Case), payload to
+   * ledger bindings for every row, and the terminal classification of a
+   * persisted CONSUMED selected Case. Any inconsistency fails closed without
+   * modifying a single row. No backfill happens here: a database that did
+   * not start life under G5 has no trusted provenance and was rejected
+   * before this path.
+   */
+  #validateMarked(tables: ReadonlySet<string>): void {
+    this.#db.exec('BEGIN IMMEDIATE');
+    try {
+      for (const name of GUIDED_TABLES) {
+        if (!tables.has(name)) throw new Error(`missing table ${name}`);
+      }
+      const marker = this.#db.prepare(`SELECT schema_version, initialized_at_unix_ms, marker_sha256
+        FROM guided_schema_marker WHERE slot=?`).get(MARKER_KEY) as
+        | { readonly schema_version: number; readonly initialized_at_unix_ms: number; readonly marker_sha256: string }
+        | undefined;
+      if (!marker || marker.schema_version !== SCHEMA_VERSION ||
+          marker.marker_sha256 !== this.#markerDigest(marker.schema_version, marker.initialized_at_unix_ms)) {
+        throw new Error('untrusted provenance marker');
+      }
+      const ledgerRows = this.#db.prepare(`SELECT step_id,task_id,case_ref_json,template_digest,
         terminal_event,terminal_decision,recorded_at_unix_ms,row_sha256
         FROM guided_consumed_steps`).all() as unknown as LedgerRow[];
-      for (const row of existing) {
+      const ledgerById = new Map<string, LedgerRow>();
+      for (const row of ledgerRows) {
         if (this.#ledgerDigest(row) !== row.row_sha256) throw new Error('ledger row digest mismatch');
+        ledgerById.set(row.step_id, row);
       }
       const answerRows = this.#db.prepare(`SELECT step_id,task_id,case_ref_json,template_digest,
         outcome_json,outcome_sha256,recorded_at_unix_ms FROM guided_step_answers`).all() as unknown as {
@@ -601,34 +717,37 @@ export class HostGuidedService {
       }
       const answerById = new Map(answerRows.map((row) => [row.step_id, row]));
       const refusalById = new Map(refusalRows.map((row) => [row.step_id, row]));
-      const backfill = this.#db.prepare(`INSERT OR IGNORE INTO guided_consumed_steps(
-        step_id,task_id,case_ref_json,template_digest,terminal_event,terminal_decision,recorded_at_unix_ms,row_sha256
-      ) VALUES(?,?,?,?,?,?,?,?)`);
-      const writeRow = (row: Omit<LedgerRow, 'row_sha256'>): void => {
-        backfill.run(row.step_id, row.task_id, row.case_ref_json, row.template_digest,
-          row.terminal_event, row.terminal_decision, row.recorded_at_unix_ms, this.#ledgerDigest(row));
-      };
+      // Historical conflicts across the complete datasets: a stepId present
+      // in BOTH payload tables is ambiguous no matter which Case is
+      // currently selected. Never resolved silently, never masked.
+      for (const stepId of answerById.keys()) {
+        if (refusalById.has(stepId)) throw new Error('conflicting answer+refusal evidence');
+      }
+      // Every payload row must bind to an agreeing ledger row, and every
+      // ANSWER ledger row must bind back to its payload.
       for (const row of answerRows) {
-        writeRow({
-          step_id: row.step_id, task_id: row.task_id, case_ref_json: row.case_ref_json,
-          template_digest: row.template_digest, terminal_event: 'USER_SUBMIT',
-          terminal_decision: 'ANSWER', recorded_at_unix_ms: row.recorded_at_unix_ms,
-        });
+        const ledger = ledgerById.get(row.step_id);
+        if (!ledger || !this.#ledgerAgrees(ledger, row.task_id, row.case_ref_json,
+            row.template_digest, 'USER_SUBMIT', 'ANSWER', row.recorded_at_unix_ms)) {
+          throw new Error('answer/ledger binding mismatch');
+        }
       }
       for (const row of refusalRows) {
-        writeRow({
-          step_id: row.step_id, task_id: row.task_id, case_ref_json: row.case_ref_json,
-          template_digest: row.template_digest, terminal_event: 'USER_SUBMIT',
-          terminal_decision: 'REFUSE', recorded_at_unix_ms: row.recorded_at_unix_ms,
-        });
+        const ledger = ledgerById.get(row.step_id);
+        if (!ledger || !this.#ledgerAgrees(ledger, row.task_id, row.case_ref_json,
+            row.template_digest, 'USER_SUBMIT', 'REFUSE', row.recorded_at_unix_ms)) {
+          throw new Error('refusal/ledger binding mismatch');
+        }
+      }
+      for (const row of ledgerRows) {
+        if (row.terminal_decision === 'ANSWER' && !answerById.has(row.step_id)) {
+          throw new Error('unbound ledger answer row');
+        }
       }
       const current = this.#read();
       if (current && current.state === 'CONSUMED') {
-        // Classify the terminal decision of the persisted consumed Case from
-        // provable evidence only; any inconsistency is ambiguous and fails
-        // closed. Note prior-Case terminal rows that were discarded when
-        // their Case was deselected are not reconstructable and are not
-        // claimed as fenced.
+        // The terminal decision of the persisted consumed Case must be
+        // provable from its own evidence and agree with the ledger row.
         const last = current.history[current.history.length - 1];
         if (!last || !TERMINAL_HISTORY.has(last.status) || last.stepId !== current.step.stepId) {
           throw new Error('consumed case terminal state unprovable');
@@ -638,51 +757,43 @@ export class HostGuidedService {
         const answerRow = answerById.get(current.step.stepId);
         const refusalRow = refusalById.get(current.step.stepId);
         if (answerRow && refusalRow) throw new Error('conflicting consumption evidence');
-        const caseRefJson = JSON.stringify(current.step.caseRef);
-        let terminal: Omit<LedgerRow, 'row_sha256'>;
+        let terminalEvent: string;
+        let terminalDecision: string;
         if (answerRow) {
           if (last.status !== 'ACCEPTED') throw new Error('answer evidence conflicts with history');
-          terminal = {
-            step_id: current.step.stepId, task_id: current.step.taskId, case_ref_json: caseRefJson,
-            template_digest: current.step.templateRef.digest, terminal_event: 'USER_SUBMIT',
-            terminal_decision: 'ANSWER', recorded_at_unix_ms: consumedAt,
-          };
+          terminalEvent = 'USER_SUBMIT';
+          terminalDecision = 'ANSWER';
         } else if (refusalRow) {
           if (last.status !== 'REFUSED') throw new Error('refusal evidence conflicts with history');
-          terminal = {
-            step_id: current.step.stepId, task_id: current.step.taskId, case_ref_json: caseRefJson,
-            template_digest: current.step.templateRef.digest, terminal_event: 'USER_SUBMIT',
-            terminal_decision: 'REFUSE', recorded_at_unix_ms: consumedAt,
-          };
+          terminalEvent = 'USER_SUBMIT';
+          terminalDecision = 'REFUSE';
         } else if (last.status === 'ACCEPTED') {
           // An ASK answer always persists a payload row, so ACCEPTED without
           // one is provably a REVIEW_EFFECT approval.
-          terminal = {
-            step_id: current.step.stepId, task_id: current.step.taskId, case_ref_json: caseRefJson,
-            template_digest: current.step.templateRef.digest, terminal_event: 'USER_SUBMIT',
-            terminal_decision: 'APPROVE', recorded_at_unix_ms: consumedAt,
-          };
+          terminalEvent = 'USER_SUBMIT';
+          terminalDecision = 'APPROVE';
         } else if (last.status === 'REFUSED') {
-          // A G3 ASK refusal always persists a typed refusal receipt, so
+          // A G3-era ASK refusal always persists a typed refusal receipt, so
           // REFUSED without one is provably a REVIEW_EFFECT refusal.
-          terminal = {
-            step_id: current.step.stepId, task_id: current.step.taskId, case_ref_json: caseRefJson,
-            template_digest: current.step.templateRef.digest, terminal_event: 'USER_SUBMIT',
-            terminal_decision: 'REFUSE', recorded_at_unix_ms: consumedAt,
-          };
+          terminalEvent = 'USER_SUBMIT';
+          terminalDecision = 'REFUSE';
         } else {
-          terminal = {
-            step_id: current.step.stepId, task_id: current.step.taskId, case_ref_json: caseRefJson,
-            template_digest: current.step.templateRef.digest, terminal_event: 'OBSERVATION_RECEIPT',
-            terminal_decision: 'REFUSE', recorded_at_unix_ms: consumedAt,
-          };
+          terminalEvent = 'OBSERVATION_RECEIPT';
+          terminalDecision = 'REFUSE';
         }
-        writeRow(terminal);
+        const ledgerRow = ledgerById.get(current.step.stepId);
+        if (!ledgerRow || ledgerRow.terminal_event !== terminalEvent ||
+            ledgerRow.terminal_decision !== terminalDecision ||
+            !this.#ledgerAgrees(ledgerRow, current.step.taskId,
+              JSON.stringify(current.step.caseRef), current.step.templateRef.digest,
+              terminalEvent, terminalDecision, consumedAt)) {
+          throw new Error('history/ledger terminal mismatch');
+        }
       }
       this.#db.exec('COMMIT');
     } catch {
       this.#rollback();
-      this.#ledgerUnavailable = 'GUIDED_LEDGER_MIGRATION_AMBIGUOUS';
+      throw new Error('marked database validation failed');
     }
   }
 
