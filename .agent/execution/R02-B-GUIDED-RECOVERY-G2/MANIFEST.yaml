@@ -1,0 +1,65 @@
+pack_id: shun-v030-r02-b-guided-recovery-decision-matrix-g2
+task_id: R02-B
+issue: "#263"
+repository: kaicreator-mm/shun-assistant
+version: v0.3.0
+parent_issue: "#260"
+standard_revision: 2c395c55569fe2edf3f4135f12d3d069e526d0b7
+owner_authorization_refs:
+  - "#260 OWNER_SHUN_V030_R02_AMENDMENT_R1_APPROVE"
+  - "Current project conversation: continue Shun Assistant v0.3.0 under ADS #1359 Delivery-First"
+  - "#263 R1 review comment 6625739846"
+execution_profile: WEB_BUILDER
+execution_environment: WEB
+admission_mode: SINGLE_WRITER_ADMISSION
+admission_generation: 2
+protected_claim_key: "kaicreator-mm/shun-assistant#263:builder:__default__"
+source_base_sha: faaaec8f842fb85d8cf38a5bd04b505a4181e39c
+source_base_tree: 1387a0fe3fff8d63f9bbbab06a8cb13ab596a908
+source_base_branch: wip/v0.3.0-r02-owner-repairs
+pack_branch: JIT_only_task/v0.3.0-r02-b-guided-pack-g2
+jit_branch: JIT_only_task/v0.3.0-r02-b-guided-local-g2
+execution_pack_path: .agent/execution/R02-B-GUIDED-RECOVERY-G2/MANIFEST.yaml
+scope_amendment:
+  reason: "R1 found the pure Guided validator must distinguish PAUSED from CURRENT to implement the already-frozen PAUSE/RESUME events honestly."
+  added_path:
+    - packages/domain-computer/src/guided/guided-journey.ts
+  owner_instruction_source: "Current project conversation continues normal v0.3.0 implementation under ADS #1359 Delivery-First; this is a bounded in-scope Guided lifecycle repair, not a high-impact action."
+finding:
+  - "Expired CURRENT step remains CURRENT after a refused late decision; stageTrustedSelection rejects all CURRENT rows, so a new Host observation cannot recover the selected Case."
+  - "provisionGuidedCaseFromHostFile returns RESTORED for any currentStep without checking expiry or observation revision."
+  - "REFUSE is not restricted to REVIEW_EFFECT; an ASK USER_SUBMIT can be consumed as REFUSED and its answer is not persisted."
+  - "Templates advertise BACK/PAUSE/RESUME, but durable state has only CURRENT/CONSUMED and every accepted event is consumed; no actual PAUSE/RESUME transition exists."
+approved_write_set:
+  - packages/domain-host/src/guided/host-guided-service.ts
+  - packages/domain-computer/src/guided/guided-journey.ts
+  - apps/control-api/src/v03/composition-guided.ts
+  - tests/integration/v03/r02-b-guided/durable-guided.test.ts
+allowed_write_set:
+  - packages/domain-host/src/guided/host-guided-service.ts
+  - packages/domain-computer/src/guided/guided-journey.ts
+  - apps/control-api/src/v03/composition-guided.ts
+  - tests/integration/v03/r02-b-guided/durable-guided.test.ts
+plan:
+  - "Add an explicit durable PAUSED state; PAUSE must preserve the current StepSpec, RESUME must restore CURRENT only while the Host observation and StepSpec remain valid."
+  - "Define BACK as a non-consuming navigation event for the current one-step Guided form; it must not mint authority or erase submitted answers."
+  - "Make ANSWER valid only for ASK/USER_SUBMIT; APPROVE and REFUSE valid only for REVIEW_EFFECT. Reject mismatched decision/kind/event combinations before consuming the step."
+  - "When a CURRENT or PAUSED step expires, refuse late decisions and allow a fresh Host observation to replace it only if task/Case identity is preserved, revision advances and observedAt advances. Same/older revision replay remains refused."
+  - "Make state() and provisionGuidedCaseFromHostFile distinguish valid restore from expired restage; never return RESTORED for an expired step."
+  - "Keep the one-step model, SQLite BEGIN IMMEDIATE/CAS, durable answer digest, restart fence, no auto-grant, no Permit and no Kernel/effect send."
+test_contract:
+  - "Pack PR must be exactly one manifest path, exact parent source_base_sha/tree, and all pack CI SUCCESS before source edit."
+  - "After pack CI, create a fresh Generation-2 CAS Claim bound to this exact pack/source base; G1 is terminal and cannot be reused."
+  - "Run exact-tree syntax preflight before source-changing CI."
+  - "Add deterministic tests for expiry refusal + fresh-revision recovery, same-revision replay refusal, valid CURRENT restore, PAUSE/RESUME across restart, BACK non-consumption, ASK REFUSE rejection, REVIEW_EFFECT REFUSE preservation and no grant/effect."
+  - "Run r02-b-guided suite, full task-check, Woodpecker Push/PR on exact final SHA; preserve Node>=24 compatibility."
+  - "Web Controller independently reviews final exact SHA; Builder must not self-approve."
+forbidden:
+  - "Any path outside the four exact allowed paths"
+  - "apps/control-api/src/server.ts, main.ts, HTTP route expansion or UI source"
+  - "Any second Guided workflow engine, K, Journal, sender, grant or Permit"
+  - "Paid LLM, Provider installation, UAC, physical Windows effects or external data disclosure"
+  - "main, version/v0.2.0, WIP integration merge, tag, release or deployment"
+source_write_authorized: true
+merge_authorized: false
+release_authorized: false
