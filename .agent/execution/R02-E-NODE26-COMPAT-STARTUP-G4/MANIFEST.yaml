@@ -1,0 +1,60 @@
+pack_id: shun-v030-r02-e-node24-node26-production-startup-g4-test-hardening
+task_id: R02-E
+issue: "#269"
+repository: kaicreator-mm/shun-assistant
+version: v0.3.0
+parent_issue: "#260"
+standard_revision: 2c395c55569fe2edf3f4135f12d3d069e526d0b7
+owner_authorization_refs:
+  - "#260 comment 6545077384 OWNER_SHUN_V030_R02_AMENDMENT_R1_APPROVE"
+  - "#328 comment 6622722536 independent R1 findings"
+  - "Current Owner direction: local Builder owns repair and verification; no LOCAL_VALIDATION dispatch"
+execution_profile: LOCAL_BUILDER
+execution_environment: LOCAL
+admission_mode: SINGLE_WRITER_ADMISSION
+admission_generation: 4
+protected_claim_key: "kaicreator-mm/shun-assistant#269:builder:__default__"
+source_base_sha: a67b8f21c8c50ca947b2097725902f08b6c795fb
+source_base_tree: b9f5ad97a9ba8ae158c31bccb28d2c1882a93821
+source_base_branch: JIT_only_task/v0.3.0-r02e-node26-compatible-runner-local-g3
+pack_branch: JIT_only_task/v0.3.0-r02e-node26-compatible-runner-pack-g4
+jit_branch: JIT_only_task/v0.3.0-r02e-node26-compatible-runner-local-g4
+execution_pack_path: .agent/execution/R02-E-NODE26-COMPAT-STARTUP-G4/MANIFEST.yaml
+finding:
+  - "PR #328 R1 P1: startup-runner API child processes inherit process.env; a host SHUN_CLOUD_ENABLED=1 and DEEPSEEK_API_KEY can enable paid cloud egress during the forged-reference negative test."
+  - "PR #328 R1 P2: readPinned accepts fixture files when SHA256SUMS.txt has no matching digest receipt."
+  - "PR #328 R1 P2: the Windows real-storage production test invokes node --import tsx directly instead of the exact operator command pnpm --filter @shun/control-api dev."
+approved_write_set:
+  - tests/integration/v03/r02-e-production/startup-runner.test.ts
+allowed_write_set:
+  - tests/integration/v03/r02-e-production/startup-runner.test.ts
+plan:
+  - "Create one sanitized environment helper for every spawned Control API process. Force SHUN_CLOUD_ENABLED=0 and remove DEEPSEEK_API_KEY, SHUN_CLOUD_LEDGER_FILE, SHUN_CLOUD_AUTHORITY_FILE, SHUN_CLOUD_PUBLIC_KEY_FILE and SHUN_CLOUD_PUBLIC_KEY_SPKI_SHA256 after applying test overrides."
+  - "Use the sanitized environment for both DEMO and real-storage process launches; assert the production child environment is cloud-disabled and contains none of the listed secret/authority variables before sending the forged-reference POST."
+  - "Make readPinned fail closed: require exactly one SHA256SUMS.txt entry for each required fixture, require a lowercase 64-hex digest, and compare it with the actual SHA-256."
+  - "Run the Windows real-storage production startup through the exact operator command pnpm --filter @shun/control-api dev, not a direct node --import tsx invocation. Keep bounded process-tree termination and eventual loopback port refusal."
+  - "Preserve the existing Node 24/26 startup, production BUILD activation, Guided readback, gateway refusal, loopback and shutdown assertions. No real cloud credential, paid call, Provider install, UAC or persistent Windows effect."
+test_contract:
+  - "Before source edit, verify the pack-only PR has exactly one manifest path, exact parent source_base_sha, and source_base_tree as declared."
+  - "Do not source-edit until pack Push/PR checks are SUCCESS and a fresh Generation-4 CAS Claim is accepted on source_base_sha."
+  - "The Generation-4 Claim is terminally distinct from G3 and is restricted to the one exact test path above; do not append repairs to G3."
+  - "Run exact-tree tracked-source syntax preflight before any source-changing CI."
+  - "Run focused r02-e-production startup suite, typecheck, lint and full tools/task-check.sh; then exact-SHA Woodpecker Push/PR CI and required GitHub checks."
+  - "Record exact HEAD/tree, all commands/exit codes, Node 24.21 and Node 26 results, and actual Build IDs in Issue #269."
+  - "Web Controller independently reviews the delivered exact SHA; no self-approval or merge based on Builder CI."
+forbidden:
+  - "Any source path other than tests/integration/v03/r02-e-production/startup-runner.test.ts"
+  - "apps/control-api/package.json, pnpm-lock.yaml, native/index.ts, root package.json or engines"
+  - "apps/control-api/src/**, packages/**, R04 UI, CI configuration, or any other task lane"
+  - "Any real cloud credential, paid LLM request, provider installation, UAC, Windows physical effect or external disclosure"
+  - "main, version/v0.2.0, integration branch mutation, merge, tag, release or deployment"
+pre_ci:
+  - "Pack Push/PR checks must be fully SUCCESS before local Builder claim."
+  - "No source edit before fresh Generation-4 CAS claim acceptance."
+  - "Source syntax preflight must PASS on the final exact source tree before source-changing CI."
+  - "All API child process environments must be proven cloud-disabled before any negative gateway POST."
+  - "Missing or duplicate fixture digest receipts must fail closed."
+  - "Production startup test must invoke the exact package dev command and verify real-storage BUILD activation, not DEMO."
+source_write_authorized: true
+merge_authorized: false
+release_authorized: false
