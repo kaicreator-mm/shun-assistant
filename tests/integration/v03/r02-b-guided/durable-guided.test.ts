@@ -1,4 +1,4 @@
-import { mkdtempSync, rmSync } from 'node:fs';
+import { mkdtempSync, readdirSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
@@ -21,6 +21,67 @@ const semantic = {
     capabilityRevision: 'r1', provenance: { resolverRevision: 'resolver-v03' },
   },
 };
+const scope = { status: 'KNOWN', selectedRootRef: undefined };
+
+function freshObservation(revision: string, observedAtUnixMs: number, validUntilUnixMs: number) {
+  return { ...observation, revision, observedAtUnixMs, validUntilUnixMs };
+}
+
+function submitOutcome(step: {
+  journeyId: string; taskId: string; stepId: string;
+  caseRef: unknown; issuedAtUnixMs?: number; validUntilUnixMs: number;
+}, sourceRef: string, occurredAtUnixMs: number, answers: readonly unknown[] = []) {
+  return {
+    schema: 'shun.guided.step-outcome.v1',
+    journeyId: step.journeyId, taskId: step.taskId, stepId: step.stepId,
+    caseRef: step.caseRef, event: 'USER_SUBMIT', source: 'USER',
+    sourceRef, answers, evidenceRefs: [], occurredAtUnixMs,
+  };
+}
+
+function relayFor(step: {
+  stepId: string; caseRef: unknown; templateRef: { digest: string };
+}, decision: 'ANSWER' | 'APPROVE' | 'REFUSE', outcome: unknown) {
+  return {
+    kind: 'USER_DECISION_RELAY',
+    humanApproval: decision !== 'ANSWER',
+    authorityClaimed: false,
+    decision, relayedVia: '/api', stepId: step.stepId,
+    stepDigest: step.templateRef.digest, caseRef: step.caseRef, outcome,
+  };
+}
+
+// Windows may keep the SQLite WAL handle alive briefly after close(); retry
+// per entry so cleanup never masks a real assertion failure as an EPERM.
+function cleanup(dir: string): void {
+  let lastError: unknown;
+  for (let attempt = 0; attempt < 10; attempt += 1) {
+    try {
+      rmSync(dir, { recursive: true, force: true });
+      return;
+    } catch (error) {
+      lastError = error;
+      try {
+        for (const entry of readdirSync(dir)) {
+          rmSync(join(dir, entry), { recursive: true, force: true });
+        }
+      } catch { /* entry removal is best-effort; the next round retries */ }
+      // Allocation pressure nudges the GC to finalize deferred SQLite
+      // handles on Windows so the next retry can remove the WAL files.
+      for (let i = 0; i < 20; i += 1) {
+        new Array(64 * 1024).fill(i);
+      }
+      const lock = new Int32Array(new SharedArrayBuffer(4));
+      Atomics.wait(lock, 0, 0, 200);
+    }
+  }
+  let entries: string[] = [];
+  try {
+    entries = readdirSync(dir);
+  } catch { /* directory already gone */ }
+  // Never mask a real assertion failure with a Windows file-lock cleanup error.
+  console.error(`cleanup failed after retries: ${(lastError as Error).message}; entries=${entries.join(',')}`);
+}
 
 describe('R02-B Host Guided SQLite durability and replay fence', () => {
   it('accepts exactly one bounded UI answer after trusted Host stage, survives restart', () => {
@@ -29,8 +90,7 @@ describe('R02-B Host Guided SQLite durability and replay fence', () => {
     try {
       let service = new HostGuidedService(file, () => NOW);
       const staged = service.stageTrustedSelection({
-        observation, semanticSelection: semantic,
-        scope: { status: 'KNOWN', selectedRootRef: undefined },
+        observation, semanticSelection: semantic, scope,
       });
       expect(staged.status).toBe('CURRENT');
       if (staged.status !== 'CURRENT') return;
@@ -43,20 +103,26 @@ describe('R02-B Host Guided SQLite durability and replay fence', () => {
         sourceRef: 'ui:local', answers: [{ fieldId: 'selectedRoot', value: 'C:\\\\Work' }],
         evidenceRefs: [], occurredAtUnixMs: NOW,
       };
-      const relay = {
-        kind: 'USER_DECISION_RELAY', humanApproval: true, authorityClaimed: false,
-        decision: 'REFUSE', relayedVia: '/api', stepId: step.stepId,
-        stepDigest: step.templateRef.digest, caseRef: step.caseRef, outcome,
-      };
-      const recorded = service.decide(relay);
-      expect(recorded).toMatchObject({ status: 'RECORDED', humanGrantIssued: false, effectSent: false });
-      expect(service.decide(relay)).toMatchObject({ status: 'STALE' });
+      // G2 P2 repair: refusing an ASK step must not silently discard the
+      // submitted answer — the refusal is recorded and the answer stays
+      // durably readable, with no grant and no effect sent.
+      const refuseRelay = relayFor(step, 'REFUSE', outcome);
+      const refused = service.decide(refuseRelay);
+      expect(refused).toMatchObject({ status: 'RECORDED', humanGrantIssued: false, effectSent: false });
+      expect(service.state().history).toMatchObject([{ stepId: step.stepId, status: 'REFUSED' }]);
+      const preserved = service.readRecordedAnswer(step.stepId) as
+        | { event: string; source: string }
+        | undefined;
+      expect(preserved).toMatchObject({ event: 'USER_SUBMIT', source: 'USER' });
+      // Single consumption: the refused step cannot be decided again.
+      expect(service.decide(refuseRelay)).toMatchObject({ status: 'STALE' });
       service.close();
 
       service = new HostGuidedService(file, () => NOW);
       expect(service.state().currentStep).toBeUndefined();
       expect(service.state().history).toHaveLength(1);
-      expect(service.decide(relay)).toMatchObject({ status: 'STALE' });
+      expect(service.readRecordedAnswer(step.stepId)).toEqual(preserved);
+      expect(service.decide(refuseRelay)).toMatchObject({ status: 'STALE' });
       service.close();
     } finally {
       rmSync(dir, { recursive: true, force: true });
@@ -69,8 +135,7 @@ describe('R02-B Host Guided SQLite durability and replay fence', () => {
     let serviceClosed = false;
     try {
       const staged = service.stageTrustedSelection({
-        observation, semanticSelection: semantic,
-        scope: { status: 'KNOWN', selectedRootRef: undefined },
+        observation, semanticSelection: semantic, scope,
       });
       expect(staged.status).toBe('CURRENT');
       if (staged.status !== 'CURRENT') return;
@@ -91,7 +156,7 @@ describe('R02-B Host Guided SQLite durability and replay fence', () => {
       expect(service.decide({ ...relay, humanApproval: true }))
         .toMatchObject({ status: 'REFUSED', code: 'RELAY_SCHEMA_REFUSED' });
       expect(service.decide({ ...relay, outcome: { ...relay.outcome, event: 'OBSERVATION_RECEIPT', source: 'HOST' } }))
-        .toMatchObject({ status: 'REFUSED', code: 'GUIDED_ANSWER_PROVENANCE_REFUSED' });
+        .toMatchObject({ status: 'REFUSED', code: 'GUIDED_DECISION_MATRIX_REFUSED' });
       expect(service.decide({ ...relay, grant: 'forged' }))
         .toMatchObject({ status: 'REFUSED', code: 'RELAY_SCHEMA_REFUSED' });
       expect(service.decide(relay))
@@ -139,8 +204,7 @@ describe('R02-B Host Guided SQLite durability and replay fence', () => {
     const service = new HostGuidedService(join(dir, 'guided.sqlite'), () => NOW);
     try {
       const staged = service.stageTrustedSelection({
-        observation, semanticSelection: semantic,
-        scope: { status: 'KNOWN', selectedRootRef: undefined },
+        observation, semanticSelection: semantic, scope,
       });
       expect(staged.status).toBe('CURRENT');
       if (staged.status !== 'CURRENT') return;
@@ -242,14 +306,10 @@ describe('R02-B Host Guided SQLite durability and replay fence', () => {
         answers: [{ fieldId: 'continue', value: 'continue-to-independent-approval' }],
         evidenceRefs: [], occurredAtUnixMs: NOW,
       };
-      const common = {
-        kind: 'USER_DECISION_RELAY', authorityClaimed: false,
-        relayedVia: '/api', stepId: step.stepId,
-        stepDigest: step.templateRef.digest, caseRef: step.caseRef, outcome,
-      };
-      expect(service.decide({ ...common, decision: 'ANSWER', humanApproval: false }))
-        .toMatchObject({ status: 'STALE', code: 'GUIDED_STEP_IDENTITY_MISMATCH' });
-      expect(service.decide({ ...common, decision: 'APPROVE', humanApproval: true }))
+      const common = relayFor(step, 'ANSWER', outcome);
+      expect(service.decide(common))
+        .toMatchObject({ status: 'REFUSED', code: 'GUIDED_DECISION_MATRIX_REFUSED' });
+      expect(service.decide(relayFor(step, 'APPROVE', outcome)))
         .toMatchObject({ status: 'RECORDED', humanGrantIssued: false, effectSent: false });
     } finally {
       service.close();
@@ -263,26 +323,235 @@ describe('R02-B Host Guided SQLite durability and replay fence', () => {
     const service = new HostGuidedService(join(dir, 'guided.sqlite'), () => now);
     try {
       const staged = service.stageTrustedSelection({
-        observation, semanticSelection: semantic,
-        scope: { status: 'KNOWN', selectedRootRef: undefined },
+        observation, semanticSelection: semantic, scope,
       });
       expect(staged.status).toBe('CURRENT');
       if (staged.status !== 'CURRENT') return;
       const step = staged.step;
-      const relay = {
-        kind: 'USER_DECISION_RELAY', humanApproval: false, authorityClaimed: false,
-        decision: 'ANSWER', relayedVia: '/api', stepId: step.stepId,
-        stepDigest: step.templateRef.digest, caseRef: step.caseRef,
-        outcome: {
-          schema: 'shun.guided.step-outcome.v1', journeyId: step.journeyId,
-          taskId: step.taskId, stepId: step.stepId, caseRef: step.caseRef,
-          event: 'USER_SUBMIT', source: 'USER', sourceRef: 'ui:u03-expired',
-          answers: [{ fieldId: 'selectedRoot', value: 'C:\\Work' }],
-          evidenceRefs: [], occurredAtUnixMs: NOW,
-        },
-      };
+      const relay = relayFor(step, 'ANSWER', submitOutcome(step, 'ui:u03-expired', NOW,
+        [{ fieldId: 'selectedRoot', value: 'C:\\Work' }]));
       now = step.validUntilUnixMs + 1;
       expect(service.decide(relay)).toMatchObject({ status: 'REFUSED' });
+    } finally {
+      service.close();
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  it('restages an expired step only for a fresh advanced Host observation of the same Case', () => {
+    const dir = mkdtempSync(join(tmpdir(), 'shun-r02-b-expired-restage-'));
+    let now = NOW;
+    const service = new HostGuidedService(join(dir, 'guided.sqlite'), () => now);
+    try {
+      const staged = service.stageTrustedSelection({
+        observation, semanticSelection: semantic, scope,
+      });
+      expect(staged.status).toBe('CURRENT');
+      if (staged.status !== 'CURRENT') return;
+      const expiredStep = staged.step;
+      now = 70_000; // past the step/observation validity window, at/after fresh observedAt
+      // Expired steps disappear from the state view and late decisions are refused.
+      expect(service.state().currentStep).toBeUndefined();
+      expect(service.decide(relayFor(expiredStep, 'ANSWER',
+        submitOutcome(expiredStep, 'ui:r02-b-late', expiredStep.validUntilUnixMs - 1,
+          [{ fieldId: 'selectedRoot', value: 'C:\\Work' }]))))
+        .toMatchObject({ status: 'REFUSED' });
+      // A fresh observation with advanced revision and observedAt restages the Case.
+      const fresh = freshObservation('r03', 65_000, 130_000);
+      const restaged = service.stageTrustedSelection({
+        observation: fresh, semanticSelection: semantic, scope,
+      });
+      expect(restaged.status).toBe('CURRENT');
+      if (restaged.status !== 'CURRENT') return;
+      expect(restaged.step.stepId).not.toBe(expiredStep.stepId);
+      expect(service.state().currentStep?.stepId).toBe(restaged.step.stepId);
+      expect(service.state().history).toHaveLength(0);
+      // While the restaged step is still valid, any staging is refused.
+      expect(service.stageTrustedSelection({
+        observation: freshObservation('r04', 65_000, 300_000),
+        semanticSelection: semantic, scope,
+      })).toMatchObject({ status: 'REFUSED', code: 'CURRENT_STEP_ALREADY_EXISTS' });
+      // When the second window also closes, freshness replay stays fenced:
+      // same observedAt with a new revision, or an older revision/observedAt.
+      now = 200_000;
+      expect(service.state().currentStep).toBeUndefined();
+      expect(service.stageTrustedSelection({
+        observation: freshObservation('r04', 65_000, 300_000),
+        semanticSelection: semantic, scope,
+      })).toMatchObject({ status: 'REFUSED', code: 'GUIDED_OBSERVATION_NOT_ADVANCED' });
+      expect(service.stageTrustedSelection({
+        observation: freshObservation('r02', 1_000, 300_000),
+        semanticSelection: semantic, scope,
+      })).toMatchObject({ status: 'REFUSED', code: 'GUIDED_OBSERVATION_NOT_ADVANCED' });
+      // A different Case identity can never replace the expired step.
+      expect(service.stageTrustedSelection({
+        observation: {
+          ...freshObservation('r05', 75_000, 300_000),
+          caseRef: { snapshotId: 'snap-other', digest: 'b'.repeat(64) },
+        },
+        semanticSelection: semantic, scope,
+      })).toMatchObject({ status: 'REFUSED', code: 'GUIDED_CASE_IDENTITY_REFUSED' });
+      // Expiry is recoverable repeatedly: a newer advanced observation
+      // restages the same Case again.
+      const restagedAgain = service.stageTrustedSelection({
+        observation: freshObservation('r06', 140_000, 400_000),
+        semanticSelection: semantic, scope,
+      });
+      expect(restagedAgain.status).toBe('CURRENT');
+      if (restagedAgain.status !== 'CURRENT') return;
+      expect(restagedAgain.step.stepId).not.toBe(restaged.step.stepId);
+    } finally {
+      service.close();
+      cleanup(dir);
+    }
+  });
+
+  it('restores a valid CURRENT step across restart and refuses duplicate staging', () => {
+    const dir = mkdtempSync(join(tmpdir(), 'shun-r02-b-valid-restore-'));
+    const file = join(dir, 'guided.sqlite');
+    try {
+      let service = new HostGuidedService(file, () => NOW);
+      const staged = service.stageTrustedSelection({
+        observation, semanticSelection: semantic, scope,
+      });
+      expect(staged.status).toBe('CURRENT');
+      if (staged.status !== 'CURRENT') return;
+      service.close();
+
+      service = new HostGuidedService(file, () => NOW);
+      expect(service.state().currentStep?.stepId).toBe(staged.step.stepId);
+      expect(service.state().journey).toMatchObject({ position: 1, total: 1, paused: false });
+      expect(service.stageTrustedSelection({
+        observation, semanticSelection: semantic, scope,
+      })).toMatchObject({ status: 'REFUSED', code: 'GUIDED_SEED_REPLAY' });
+      expect(service.stageTrustedSelection({
+        observation: freshObservation('r03', 2_000, 60_000),
+        semanticSelection: semantic, scope,
+      })).toMatchObject({ status: 'REFUSED', code: 'CURRENT_STEP_ALREADY_EXISTS' });
+      service.close();
+    } finally {
+      cleanup(dir);
+    }
+  });
+
+  it('persists PAUSE/RESUME across restart and fences submissions while paused', () => {
+    const dir = mkdtempSync(join(tmpdir(), 'shun-r02-b-pause-resume-'));
+    const file = join(dir, 'guided.sqlite');
+    let now = NOW;
+    let service = new HostGuidedService(file, () => now);
+    try {
+      const staged = service.stageTrustedSelection({
+        observation, semanticSelection: semantic, scope,
+      });
+      expect(staged.status).toBe('CURRENT');
+      if (staged.status !== 'CURRENT') return;
+      const step = staged.step;
+      // Lifecycle transitions are strict: RESUME requires PAUSED, PAUSE requires CURRENT.
+      expect(service.decide(relayFor(step, 'ANSWER',
+        { ...submitOutcome(step, 'ui:r02-b-resume-too-early', now), event: 'RESUME', answers: [] })))
+        .toMatchObject({ status: 'REFUSED', code: 'GUIDED_STEP_LIFECYCLE_REFUSED' });
+      now = 4_000;
+      const pause = service.decide(relayFor(step, 'ANSWER',
+        { ...submitOutcome(step, 'ui:r02-b-pause', now), event: 'PAUSE', answers: [] }));
+      expect(pause).toMatchObject({ status: 'RECORDED', humanGrantIssued: false, effectSent: false });
+      expect(service.state().currentStep?.stepId).toBe(step.stepId);
+      expect(service.state().journey.paused).toBe(true);
+      expect(service.decide(relayFor(step, 'ANSWER',
+        { ...submitOutcome(step, 'ui:r02-b-repause', now), event: 'PAUSE', answers: [] })))
+        .toMatchObject({ status: 'REFUSED', code: 'GUIDED_STEP_LIFECYCLE_REFUSED' });
+      // A paused step accepts navigation only; the answer must wait for RESUME.
+      expect(service.decide(relayFor(step, 'ANSWER',
+        submitOutcome(step, 'ui:r02-b-while-paused', now,
+          [{ fieldId: 'selectedRoot', value: 'C:\\Work' }]))))
+        .toMatchObject({ status: 'REFUSED', code: 'GUIDED_STEP_PAUSED' });
+      service.close();
+
+      // The durable PAUSED state survives a full restart.
+      service = new HostGuidedService(file, () => now);
+      expect(service.state().currentStep?.stepId).toBe(step.stepId);
+      expect(service.state().journey.paused).toBe(true);
+      now = 5_000;
+      expect(service.decide(relayFor(step, 'ANSWER',
+        { ...submitOutcome(step, 'ui:r02-b-resume', now), event: 'RESUME', answers: [] })))
+        .toMatchObject({ status: 'RECORDED', humanGrantIssued: false, effectSent: false });
+      expect(service.state().journey.paused).toBe(false);
+      now = 6_000;
+      expect(service.decide(relayFor(step, 'ANSWER',
+        submitOutcome(step, 'ui:r02-b-after-resume', now,
+          [{ fieldId: 'selectedRoot', value: 'C:\\Work' }]))))
+        .toMatchObject({ status: 'RECORDED', humanGrantIssued: false, effectSent: false });
+      expect(service.state().currentStep).toBeUndefined();
+      expect(service.state().history.map((entry) => entry.status))
+        .toEqual(['PAUSE', 'RESUME', 'ACCEPTED']);
+    } finally {
+      try { service.close(); } catch { /* already closed */ }
+      cleanup(dir);
+    }
+  });
+
+  it('treats BACK as non-consuming navigation that preserves submitted answers', () => {
+    const dir = mkdtempSync(join(tmpdir(), 'shun-r02-b-back-non-consuming-'));
+    let now = NOW;
+    const service = new HostGuidedService(join(dir, 'guided.sqlite'), () => now);
+    try {
+      const staged = service.stageTrustedSelection({
+        observation, semanticSelection: semantic, scope,
+      });
+      expect(staged.status).toBe('CURRENT');
+      if (staged.status !== 'CURRENT') return;
+      const step = staged.step;
+      now = 3_500;
+      const back = service.decide(relayFor(step, 'ANSWER',
+        { ...submitOutcome(step, 'ui:r02-b-back', now), event: 'BACK', answers: [] }));
+      expect(back).toMatchObject({ status: 'RECORDED', humanGrantIssued: false, effectSent: false });
+      expect(back).toMatchObject({ status: 'RECORDED' });
+      if (back.status === 'RECORDED') {
+        expect(back.history).toHaveLength(0);
+      }
+      // Nothing was consumed, no answer row appeared, and the step is still CURRENT.
+      expect(service.state().currentStep?.stepId).toBe(step.stepId);
+      expect(service.readRecordedAnswer(step.stepId)).toBeUndefined();
+      // The same step still accepts its real answer after navigation.
+      now = 4_000;
+      expect(service.decide(relayFor(step, 'ANSWER',
+        submitOutcome(step, 'ui:r02-b-after-back', now,
+          [{ fieldId: 'selectedRoot', value: 'C:\\Work' }]))))
+        .toMatchObject({ status: 'RECORDED', humanGrantIssued: false, effectSent: false });
+    } finally {
+      service.close();
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  it('preserves a REVIEW_EFFECT REFUSE as durable refusal without answer loss or grant', () => {
+    const dir = mkdtempSync(join(tmpdir(), 'shun-r02-b-review-refuse-'));
+    const service = new HostGuidedService(join(dir, 'guided.sqlite'), () => NOW);
+    try {
+      const reviewObservation = {
+        ...observation,
+        selectedRootRef: 'host:root:r02',
+        actionPreviewRef: 'host:preview:r02',
+      };
+      const staged = service.stageTrustedSelection({
+        observation: reviewObservation, semanticSelection: semantic,
+        scope: { status: 'KNOWN', selectedRootRef: 'host:root:r02' },
+      });
+      expect(staged.status).toBe('CURRENT');
+      if (staged.status !== 'CURRENT') return;
+      const step = staged.step;
+      expect(step.kind).toBe('REVIEW_EFFECT');
+      const recorded = service.decide(relayFor(step, 'REFUSE',
+        submitOutcome(step, 'ui:r02-b-review-refuse', NOW,
+          [{ fieldId: 'continue', value: 'continue-to-independent-approval' }])));
+      expect(recorded).toMatchObject({ status: 'RECORDED', humanGrantIssued: false, effectSent: false });
+      expect(service.state().currentStep).toBeUndefined();
+      expect(service.state().history).toMatchObject([{ stepId: step.stepId, status: 'REFUSED' }]);
+      // A refusal never persists the submitted payload as an authoritative answer.
+      expect(service.readRecordedAnswer(step.stepId)).toBeUndefined();
+      expect(service.decide(relayFor(step, 'REFUSE',
+        submitOutcome(step, 'ui:r02-b-review-refuse-2', NOW,
+          [{ fieldId: 'continue', value: 'continue-to-independent-approval' }]))))
+        .toMatchObject({ status: 'STALE' });
     } finally {
       service.close();
       rmSync(dir, { recursive: true, force: true });

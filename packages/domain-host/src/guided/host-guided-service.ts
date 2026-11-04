@@ -17,7 +17,7 @@ type StoredCase = {
   readonly observation: unknown;
   readonly semanticSelection: unknown;
   readonly scope: unknown;
-  readonly state: 'CURRENT' | 'CONSUMED';
+  readonly state: 'CURRENT' | 'PAUSED' | 'CONSUMED';
   readonly history: readonly { readonly at: string; readonly stepId: string; readonly status: string }[];
 };
 
@@ -79,25 +79,53 @@ export class HostGuidedService {
     });
     if (next.status !== 'STEP') return { status: 'REFUSED', code: next.code };
     if (!TASK_ID.test(next.step.taskId)) return { status: 'REFUSED', code: 'TASK_ID_INVALID' };
-    const state: StoredCase = {
+    const fresh: StoredCase = {
       step: next.step, observation: input.observation,
       semanticSelection: input.semanticSelection, scope: input.scope,
       state: 'CURRENT', history: [],
     };
-    const serialized = JSON.stringify(state);
-    if (serialized.length > 262_144) return { status: 'REFUSED', code: 'GUIDED_STATE_TOO_LARGE' };
     try {
       this.#db.exec('BEGIN IMMEDIATE');
       const current = this.#read();
+      // An expired step is replaced, not resurrected: keep the durable case
+      // history across the restage so prior consumption evidence survives.
+      const state: StoredCase = current ? { ...fresh, history: current.history } : fresh;
+      const serialized = JSON.stringify(state);
+      if (serialized.length > 262_144) {
+        this.#db.exec('ROLLBACK');
+        return { status: 'REFUSED', code: 'GUIDED_STATE_TOO_LARGE' };
+      }
       // A consumed step may never be reissued under the same identity after
       // a restart: the next Host observation must advance the real revision.
+      // The same fence also covers replaying an identical expired observation.
       if (current && current.step.stepId === next.step.stepId) {
         this.#db.exec('ROLLBACK');
         return { status: 'REFUSED', code: 'GUIDED_SEED_REPLAY' };
       }
-      if (current?.state === 'CURRENT') {
-        this.#db.exec('ROLLBACK');
-        return { status: 'REFUSED', code: 'CURRENT_STEP_ALREADY_EXISTS' };
+      if (current && (current.state === 'CURRENT' || current.state === 'PAUSED')) {
+        if (now <= current.step.validUntilUnixMs) {
+          this.#db.exec('ROLLBACK');
+          return { status: 'REFUSED', code: 'CURRENT_STEP_ALREADY_EXISTS' };
+        }
+        // Expired step: only a fresh, advanced Host observation for the same
+        // task/Case identity may replace it; anything else stays fenced.
+        if (next.step.taskId !== current.step.taskId ||
+            JSON.stringify(next.step.caseRef) !== JSON.stringify(current.step.caseRef)) {
+          this.#db.exec('ROLLBACK');
+          return { status: 'REFUSED', code: 'GUIDED_CASE_IDENTITY_REFUSED' };
+        }
+        const previous = isRecord(current.observation) ? current.observation : null;
+        const incoming = isRecord(input.observation) ? input.observation : null;
+        const previousRevision = previous?.revision;
+        const incomingRevision = incoming?.revision;
+        const previousObservedAt = previous?.observedAtUnixMs;
+        const incomingObservedAt = incoming?.observedAtUnixMs;
+        if (typeof previousRevision !== 'string' || typeof incomingRevision !== 'string' ||
+            typeof previousObservedAt !== 'number' || typeof incomingObservedAt !== 'number' ||
+            incomingRevision === previousRevision || !(incomingObservedAt > previousObservedAt)) {
+          this.#db.exec('ROLLBACK');
+          return { status: 'REFUSED', code: 'GUIDED_OBSERVATION_NOT_ADVANCED' };
+        }
       }
       const revision = this.#row()?.revision ?? 0;
       this.#db.prepare(`INSERT INTO guided_selected_case(slot,state_json,revision)
@@ -123,10 +151,15 @@ export class HostGuidedService {
     if (!stored) {
       return { scope: undefined, journey: { paused: false }, history: [] };
     }
+    // An expired step is neither current nor recoverable through this view:
+    // the next trusted Host observation must restage it. Paused steps stay
+    // visible so the UI can offer RESUME while they remain valid.
+    const live = (stored.state === 'CURRENT' || stored.state === 'PAUSED') &&
+      this.#clock() <= stored.step.validUntilUnixMs;
     return {
-      currentStep: stored.state === 'CURRENT' ? stored.step : undefined,
+      currentStep: live ? stored.step : undefined,
       scope: stored.scope,
-      journey: { position: 1, total: 1, paused: stored.state !== 'CURRENT' },
+      journey: { position: 1, total: 1, paused: stored.state === 'PAUSED' && live },
       history: stored.history,
     };
   }
@@ -146,31 +179,65 @@ export class HostGuidedService {
       this.#db.exec('BEGIN IMMEDIATE');
       const row = this.#row();
       const stored = row && this.#read(row);
-      if (!stored || stored.state !== 'CURRENT' || !row) {
+      if (!stored || !row || stored.state === 'CONSUMED') {
         this.#db.exec('ROLLBACK');
         return { status: 'STALE', code: 'GUIDED_STEP_NOT_CURRENT' };
       }
-      // Untrusted ASK answers must not impersonate trusted Host receipts.
-      if (raw.decision === 'ANSWER' &&
-          (!isRecord(raw.outcome) || raw.outcome.event !== 'USER_SUBMIT' ||
-           raw.outcome.source !== 'USER')) {
+      const outcomeEvent = isRecord(raw.outcome) && typeof raw.outcome.event === 'string'
+        ? raw.outcome.event
+        : undefined;
+      const navigation = outcomeEvent === 'BACK' || outcomeEvent === 'PAUSE' ||
+        outcomeEvent === 'RESUME';
+      // Explicit decision matrix, enforced before anything is consumed:
+      // - ANSWER submits data only on ASK steps;
+      // - APPROVE decides only REVIEW_EFFECT submissions;
+      // - REFUSE covers REVIEW_EFFECT submissions, ASK submissions and
+      //   INSPECT Host receipts. An ASK refusal persists the submitted
+      //   answers durably (see below) so a refusal can never silently
+      //   discard user data; navigation (BACK/PAUSE/RESUME) never mints
+      //   authority and rides only under the non-approving ANSWER relay.
+      const submission = outcomeEvent === 'USER_SUBMIT';
+      let matrixValid: boolean;
+      if (navigation) {
+        matrixValid = raw.decision === 'ANSWER';
+      } else if (raw.decision === 'ANSWER') {
+        matrixValid = stored.step.kind === 'ASK' && submission;
+      } else if (raw.decision === 'APPROVE') {
+        matrixValid = stored.step.kind === 'REVIEW_EFFECT' && submission;
+      } else {
+        matrixValid = (submission &&
+            (stored.step.kind === 'REVIEW_EFFECT' || stored.step.kind === 'ASK')) ||
+          (outcomeEvent === 'OBSERVATION_RECEIPT' && stored.step.kind === 'INSPECT');
+      }
+      if (!matrixValid) {
         this.#db.exec('ROLLBACK');
-        return { status: 'REFUSED', code: 'GUIDED_ANSWER_PROVENANCE_REFUSED' };
+        return { status: 'REFUSED', code: 'GUIDED_DECISION_MATRIX_REFUSED' };
+      }
+      // A paused step accepts navigation only; submissions wait for RESUME.
+      if (stored.state === 'PAUSED' && !navigation) {
+        this.#db.exec('ROLLBACK');
+        return { status: 'REFUSED', code: 'GUIDED_STEP_PAUSED' };
       }
       if (raw.stepId !== stored.step.stepId ||
           raw.stepDigest !== stored.step.templateRef.digest ||
-          JSON.stringify(raw.caseRef) !== JSON.stringify(stored.step.caseRef) ||
-          ((raw.decision === 'ANSWER' && stored.step.kind !== 'ASK') ||
-           (raw.decision === 'APPROVE' && stored.step.kind !== 'REVIEW_EFFECT')))  {
+          JSON.stringify(raw.caseRef) !== JSON.stringify(stored.step.caseRef)) {
         this.#db.exec('ROLLBACK');
         return { status: 'STALE', code: 'GUIDED_STEP_IDENTITY_MISMATCH' };
+      }
+      // Untrusted ASK answers must not impersonate trusted Host receipts.
+      if (raw.decision === 'ANSWER' &&
+          (!isRecord(raw.outcome) || raw.outcome.source !== 'USER')) {
+        this.#db.exec('ROLLBACK');
+        return { status: 'REFUSED', code: 'GUIDED_ANSWER_PROVENANCE_REFUSED' };
       }
       const checked = validateGuidedStepOutcome({
         stepSpec: stored.step,
         currentObservation: stored.observation,
         currentSemanticSelection: stored.semanticSelection,
         currentStepId: stored.step.stepId,
-        currentStepState: stored.state,
+        // The pure validator's state enum has no PAUSED; a paused step is
+        // still live Host state, so it validates as CURRENT.
+        currentStepState: 'CURRENT',
         outcome: raw.outcome,
         nowUnixMs: now,
       });
@@ -178,12 +245,49 @@ export class HostGuidedService {
         this.#db.exec('ROLLBACK');
         return { status: 'REFUSED', code: checked.code };
       }
+      if (outcomeEvent === 'BACK') {
+        // Non-consuming navigation: no authority minted, no durable change,
+        // and any previously submitted answers stay recorded.
+        this.#db.exec('ROLLBACK');
+        return { status: 'RECORDED', humanGrantIssued: false, effectSent: false, history: stored.history };
+      }
+      if (outcomeEvent === 'PAUSE' || outcomeEvent === 'RESUME') {
+        if ((outcomeEvent === 'PAUSE' && stored.state !== 'CURRENT') ||
+            (outcomeEvent === 'RESUME' && stored.state !== 'PAUSED')) {
+          this.#db.exec('ROLLBACK');
+          return { status: 'REFUSED', code: 'GUIDED_STEP_LIFECYCLE_REFUSED' };
+        }
+        const history = [...stored.history, {
+          at: new Date(now).toISOString(),
+          stepId: stored.step.stepId,
+          status: outcomeEvent,
+        }];
+        const updated: StoredCase = {
+          ...stored,
+          state: outcomeEvent === 'PAUSE' ? 'PAUSED' : 'CURRENT',
+          history,
+        };
+        const change = this.#db.prepare(`UPDATE guided_selected_case
+          SET state_json=?, revision=revision+1 WHERE slot=? AND revision=?`)
+          .run(JSON.stringify(updated), CASE_KEY, row.revision);
+        if (change.changes !== 1) {
+          this.#db.exec('ROLLBACK');
+          return { status: 'STALE', code: 'GUIDED_CONCURRENT_CONSUMPTION' };
+        }
+        this.#db.exec('COMMIT');
+        return { status: 'RECORDED', humanGrantIssued: false, effectSent: false, history };
+      }
       const history = [...stored.history, {
         at: new Date(now).toISOString(),
         stepId: stored.step.stepId,
         status: raw.decision === 'REFUSE' ? 'REFUSED' : 'ACCEPTED',
       }];
-      if (raw.decision === 'ANSWER') {
+      // The submitted data is persisted for ASK steps under both ANSWER and
+      // REFUSE: refusing an ASK step must never silently discard the user's
+      // submitted answers (R02-B P2 repair).
+      const persistAnswer = raw.decision === 'ANSWER' ||
+        (raw.decision === 'REFUSE' && stored.step.kind === 'ASK');
+      if (persistAnswer) {
         const outcomeJson = JSON.stringify(checked.outcome);
         if (typeof outcomeJson !== 'string' || outcomeJson.length > 65_536) {
           this.#db.exec('ROLLBACK');
