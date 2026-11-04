@@ -62,6 +62,18 @@ export class HostGuidedService {
       outcome_sha256 TEXT NOT NULL,
       recorded_at_unix_ms INTEGER NOT NULL
     )`);
+    // A refused ASK submission is durable evidence of the refusal, but it is
+    // a separately typed receipt: it never lands in guided_step_answers and
+    // can never be read back as an accepted answer.
+    this.#db.exec(`CREATE TABLE IF NOT EXISTS guided_step_refusals (
+      step_id TEXT PRIMARY KEY,
+      task_id TEXT NOT NULL,
+      case_ref_json TEXT NOT NULL,
+      template_digest TEXT NOT NULL,
+      refusal_json TEXT NOT NULL,
+      refusal_sha256 TEXT NOT NULL,
+      recorded_at_unix_ms INTEGER NOT NULL
+    )`);
     this.#clock = clock;
   }
 
@@ -79,28 +91,38 @@ export class HostGuidedService {
     });
     if (next.status !== 'STEP') return { status: 'REFUSED', code: next.code };
     if (!TASK_ID.test(next.step.taskId)) return { status: 'REFUSED', code: 'TASK_ID_INVALID' };
-    const fresh: StoredCase = {
-      step: next.step, observation: input.observation,
-      semanticSelection: input.semanticSelection, scope: input.scope,
-      state: 'CURRENT', history: [],
-    };
     try {
       this.#db.exec('BEGIN IMMEDIATE');
       const current = this.#read();
-      // An expired step is replaced, not resurrected: keep the durable case
-      // history across the restage so prior consumption evidence survives.
-      const state: StoredCase = current ? { ...fresh, history: current.history } : fresh;
+      const sameCase = !!current &&
+        next.step.taskId === current.step.taskId &&
+        JSON.stringify(next.step.caseRef) === JSON.stringify(current.step.caseRef);
+      // Replay fence. The immediate-step check covers a live CURRENT/PAUSED
+      // step (not yet in history); the history scan covers every step this
+      // Case already consumed or navigated, so consuming r02 never reopens a
+      // historically consumed r01 — even behind a later observedAt.
+      if (current && current.step.stepId === next.step.stepId) {
+        this.#db.exec('ROLLBACK');
+        return { status: 'REFUSED', code: 'GUIDED_SEED_REPLAY' };
+      }
+      if (current && sameCase &&
+          current.history.some((entry) => entry.stepId === next.step.stepId)) {
+        this.#db.exec('ROLLBACK');
+        return { status: 'REFUSED', code: 'GUIDED_SEED_REPLAY' };
+      }
+      // History is carried only within one task/Case identity. A genuinely
+      // different Case starts a clean history so prior-Case step metadata is
+      // never returned through state().
+      const fresh: StoredCase = {
+        step: next.step, observation: input.observation,
+        semanticSelection: input.semanticSelection, scope: input.scope,
+        state: 'CURRENT', history: [],
+      };
+      const state: StoredCase = current && sameCase ? { ...fresh, history: current.history } : fresh;
       const serialized = JSON.stringify(state);
       if (serialized.length > 262_144) {
         this.#db.exec('ROLLBACK');
         return { status: 'REFUSED', code: 'GUIDED_STATE_TOO_LARGE' };
-      }
-      // A consumed step may never be reissued under the same identity after
-      // a restart: the next Host observation must advance the real revision.
-      // The same fence also covers replaying an identical expired observation.
-      if (current && current.step.stepId === next.step.stepId) {
-        this.#db.exec('ROLLBACK');
-        return { status: 'REFUSED', code: 'GUIDED_SEED_REPLAY' };
       }
       if (current && (current.state === 'CURRENT' || current.state === 'PAUSED')) {
         if (now <= current.step.validUntilUnixMs) {
@@ -109,20 +131,18 @@ export class HostGuidedService {
         }
         // Expired step: only a fresh, advanced Host observation for the same
         // task/Case identity may replace it; anything else stays fenced.
-        if (next.step.taskId !== current.step.taskId ||
-            JSON.stringify(next.step.caseRef) !== JSON.stringify(current.step.caseRef)) {
+        if (!sameCase) {
           this.#db.exec('ROLLBACK');
           return { status: 'REFUSED', code: 'GUIDED_CASE_IDENTITY_REFUSED' };
         }
-        const previous = isRecord(current.observation) ? current.observation : null;
-        const incoming = isRecord(input.observation) ? input.observation : null;
-        const previousRevision = previous?.revision;
-        const incomingRevision = incoming?.revision;
-        const previousObservedAt = previous?.observedAtUnixMs;
-        const incomingObservedAt = incoming?.observedAtUnixMs;
-        if (typeof previousRevision !== 'string' || typeof incomingRevision !== 'string' ||
-            typeof previousObservedAt !== 'number' || typeof incomingObservedAt !== 'number' ||
-            incomingRevision === previousRevision || !(incomingObservedAt > previousObservedAt)) {
+        if (!this.#observationAdvanced(current.observation, input.observation)) {
+          this.#db.exec('ROLLBACK');
+          return { status: 'REFUSED', code: 'GUIDED_OBSERVATION_NOT_ADVANCED' };
+        }
+      } else if (current && current.state === 'CONSUMED' && sameCase) {
+        // Same-Case progression after consumption also requires a fresh Host
+        // observation; a stale or replayed observation stays fenced.
+        if (!this.#observationAdvanced(current.observation, input.observation)) {
           this.#db.exec('ROLLBACK');
           return { status: 'REFUSED', code: 'GUIDED_OBSERVATION_NOT_ADVANCED' };
         }
@@ -189,13 +209,16 @@ export class HostGuidedService {
       const navigation = outcomeEvent === 'BACK' || outcomeEvent === 'PAUSE' ||
         outcomeEvent === 'RESUME';
       // Explicit decision matrix, enforced before anything is consumed:
-      // - ANSWER submits data only on ASK steps;
+      // - ANSWER submits data only on ASK steps and is the only tuple that
+      //   persists an accepted answer row;
       // - APPROVE decides only REVIEW_EFFECT submissions;
       // - REFUSE covers REVIEW_EFFECT submissions, ASK submissions and
       //   INSPECT Host receipts. An ASK refusal persists the submitted
-      //   answers durably (see below) so a refusal can never silently
-      //   discard user data; navigation (BACK/PAUSE/RESUME) never mints
-      //   authority and rides only under the non-approving ANSWER relay.
+      //   answers as a separately typed refusal receipt (never an answer
+      //   row, never returned by readRecordedAnswer); an INSPECT Host
+      //   receipt is recorded in history as OBSERVATION_RECEIPT, not
+      //   REFUSED. Navigation (BACK/PAUSE/RESUME) never mints authority and
+      //   rides only under the non-approving ANSWER relay.
       const submission = outcomeEvent === 'USER_SUBMIT';
       let matrixValid: boolean;
       if (navigation) {
@@ -280,14 +303,19 @@ export class HostGuidedService {
       const history = [...stored.history, {
         at: new Date(now).toISOString(),
         stepId: stored.step.stepId,
-        status: raw.decision === 'REFUSE' ? 'REFUSED' : 'ACCEPTED',
+        // A REFUSE is a refusal, but a trusted Host observation receipt is
+        // recorded as what it is — an observation receipt — never mislabeled
+        // REFUSED and never implying human refusal, grant or effect.
+        status: raw.decision === 'REFUSE'
+          ? (outcomeEvent === 'OBSERVATION_RECEIPT' ? 'OBSERVATION_RECEIPT' : 'REFUSED')
+          : 'ACCEPTED',
       }];
-      // The submitted data is persisted for ASK steps under both ANSWER and
-      // REFUSE: refusing an ASK step must never silently discard the user's
-      // submitted answers (R02-B P2 repair).
-      const persistAnswer = raw.decision === 'ANSWER' ||
-        (raw.decision === 'REFUSE' && stored.step.kind === 'ASK');
-      if (persistAnswer) {
+      // Only an accepted ANSWER persists an answer row. An ASK refusal is
+      // persisted as a separately typed durable refusal receipt (digest
+      // verified) so the submitted payload is preserved as evidence but can
+      // never be read back as an accepted answer; a REVIEW_EFFECT refusal
+      // records no payload at all.
+      if (raw.decision === 'ANSWER') {
         const outcomeJson = JSON.stringify(checked.outcome);
         if (typeof outcomeJson !== 'string' || outcomeJson.length > 65_536) {
           this.#db.exec('ROLLBACK');
@@ -308,6 +336,37 @@ export class HostGuidedService {
         if (saved.changes !== 1) {
           this.#db.exec('ROLLBACK');
           return { status: 'STALE', code: 'GUIDED_ANSWER_ALREADY_RECORDED' };
+        }
+      } else if (raw.decision === 'REFUSE' && stored.step.kind === 'ASK') {
+        const refusal = {
+          schema: 'shun.guided.refusal-receipt.v1',
+          stepId: stored.step.stepId,
+          taskId: stored.step.taskId,
+          caseRef: stored.step.caseRef,
+          templateDigest: stored.step.templateRef.digest,
+          decision: 'REFUSE',
+          outcome: checked.outcome,
+        };
+        const refusalJson = JSON.stringify(refusal);
+        if (typeof refusalJson !== 'string' || refusalJson.length > 65_536) {
+          this.#db.exec('ROLLBACK');
+          return { status: 'REFUSED', code: 'GUIDED_REFUSAL_TOO_LARGE' };
+        }
+        const refusalSha256 = createHash('sha256').update(refusalJson, 'utf8').digest('hex');
+        const saved = this.#db.prepare(`INSERT INTO guided_step_refusals(
+          step_id,task_id,case_ref_json,template_digest,refusal_json,refusal_sha256,recorded_at_unix_ms
+        ) VALUES(?,?,?,?,?,?,?)`).run(
+          stored.step.stepId,
+          stored.step.taskId,
+          JSON.stringify(stored.step.caseRef),
+          stored.step.templateRef.digest,
+          refusalJson,
+          refusalSha256,
+          now,
+        );
+        if (saved.changes !== 1) {
+          this.#db.exec('ROLLBACK');
+          return { status: 'STALE', code: 'GUIDED_REFUSAL_ALREADY_RECORDED' };
         }
       }
       const updated: StoredCase = { ...stored, state: 'CONSUMED', history };
@@ -347,6 +406,27 @@ export class HostGuidedService {
     }
   }
 
+  /**
+   * Trusted Host-only readback for the explicit refusal outcome of the exact
+   * consumed ASK step. A refused payload is preserved as refusal evidence —
+   * never as an accepted answer — and the digest detects local corruption.
+   */
+  readRecordedRefusal(stepId: string): unknown | undefined {
+    if (typeof stepId !== 'string' || !STEP_ID.test(stepId)) return undefined;
+    const row = this.#db.prepare(`SELECT refusal_json,refusal_sha256
+      FROM guided_step_refusals WHERE step_id=?`).get(stepId) as
+      | { refusal_json: string; refusal_sha256: string }
+      | undefined;
+    if (!row || !/^[a-f0-9]{64}$/.test(row.refusal_sha256)) return undefined;
+    const digest = createHash('sha256').update(row.refusal_json, 'utf8').digest('hex');
+    if (digest !== row.refusal_sha256) return undefined;
+    try {
+      return JSON.parse(row.refusal_json) as unknown;
+    } catch {
+      return undefined;
+    }
+  }
+
   close(): void { this.#db.close(); }
 
   #row(): Row | null {
@@ -357,6 +437,22 @@ export class HostGuidedService {
   #read(row: Row | null = this.#row()): StoredCase | null {
     if (!row) return null;
     return JSON.parse(row.state_json) as StoredCase;
+  }
+
+  /**
+   * A replacing Host observation is fresh only when its revision token
+   * differs and its observedAt is strictly later than the stored one.
+   */
+  #observationAdvanced(storedObservation: unknown, incomingObservation: unknown): boolean {
+    const previous = isRecord(storedObservation) ? storedObservation : null;
+    const incoming = isRecord(incomingObservation) ? incomingObservation : null;
+    const previousRevision = previous?.revision;
+    const incomingRevision = incoming?.revision;
+    const previousObservedAt = previous?.observedAtUnixMs;
+    const incomingObservedAt = incoming?.observedAtUnixMs;
+    return typeof previousRevision === 'string' && typeof incomingRevision === 'string' &&
+      typeof previousObservedAt === 'number' && typeof incomingObservedAt === 'number' &&
+      incomingRevision !== previousRevision && incomingObservedAt > previousObservedAt;
   }
 
   #rollback(): void {

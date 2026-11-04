@@ -103,17 +103,23 @@ describe('R02-B Host Guided SQLite durability and replay fence', () => {
         sourceRef: 'ui:local', answers: [{ fieldId: 'selectedRoot', value: 'C:\\\\Work' }],
         evidenceRefs: [], occurredAtUnixMs: NOW,
       };
-      // G2 P2 repair: refusing an ASK step must not silently discard the
-      // submitted answer — the refusal is recorded and the answer stays
-      // durably readable, with no grant and no effect sent.
+      // G3 repair: refusing an ASK step persists a separately typed refusal
+      // receipt — the submitted payload is preserved as explicit refusal
+      // evidence but is never returned by readRecordedAnswer as an accepted
+      // answer, with no grant and no effect sent.
       const refuseRelay = relayFor(step, 'REFUSE', outcome);
       const refused = service.decide(refuseRelay);
       expect(refused).toMatchObject({ status: 'RECORDED', humanGrantIssued: false, effectSent: false });
       expect(service.state().history).toMatchObject([{ stepId: step.stepId, status: 'REFUSED' }]);
-      const preserved = service.readRecordedAnswer(step.stepId) as
-        | { event: string; source: string }
+      expect(service.readRecordedAnswer(step.stepId)).toBeUndefined();
+      const refusal = service.readRecordedRefusal(step.stepId) as
+        | { schema: string; decision: string; outcome: { event: string; source: string } }
         | undefined;
-      expect(preserved).toMatchObject({ event: 'USER_SUBMIT', source: 'USER' });
+      expect(refusal).toMatchObject({
+        schema: 'shun.guided.refusal-receipt.v1',
+        decision: 'REFUSE',
+        outcome: { event: 'USER_SUBMIT', source: 'USER' },
+      });
       // Single consumption: the refused step cannot be decided again.
       expect(service.decide(refuseRelay)).toMatchObject({ status: 'STALE' });
       service.close();
@@ -121,7 +127,8 @@ describe('R02-B Host Guided SQLite durability and replay fence', () => {
       service = new HostGuidedService(file, () => NOW);
       expect(service.state().currentStep).toBeUndefined();
       expect(service.state().history).toHaveLength(1);
-      expect(service.readRecordedAnswer(step.stepId)).toEqual(preserved);
+      expect(service.readRecordedAnswer(step.stepId)).toBeUndefined();
+      expect(service.readRecordedRefusal(step.stepId)).toEqual(refusal);
       expect(service.decide(refuseRelay)).toMatchObject({ status: 'STALE' });
       service.close();
     } finally {
@@ -551,6 +558,150 @@ describe('R02-B Host Guided SQLite durability and replay fence', () => {
       expect(service.decide(relayFor(step, 'REFUSE',
         submitOutcome(step, 'ui:r02-b-review-refuse-2', NOW,
           [{ fieldId: 'continue', value: 'continue-to-independent-approval' }]))))
+        .toMatchObject({ status: 'STALE' });
+    } finally {
+      service.close();
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  it('fences historical step replay after a newer same-Case step is consumed', () => {
+    const dir = mkdtempSync(join(tmpdir(), 'shun-r02-b-history-replay-'));
+    let now = NOW;
+    const service = new HostGuidedService(join(dir, 'guided.sqlite'), () => now);
+    try {
+      const first = service.stageTrustedSelection({
+        observation: freshObservation('g3-r01', 1_000, 60_000),
+        semanticSelection: semantic, scope,
+      });
+      expect(first.status).toBe('CURRENT');
+      if (first.status !== 'CURRENT') return;
+      expect(service.decide(relayFor(first.step, 'ANSWER',
+        submitOutcome(first.step, 'ui:g3-r01', now,
+          [{ fieldId: 'selectedRoot', value: 'C:\\Work' }]))))
+        .toMatchObject({ status: 'RECORDED', humanGrantIssued: false, effectSent: false });
+      now = 10_000;
+      const second = service.stageTrustedSelection({
+        observation: freshObservation('g3-r02', 10_000, 60_000),
+        semanticSelection: semantic, scope,
+      });
+      expect(second.status).toBe('CURRENT');
+      if (second.status !== 'CURRENT') return;
+      expect(second.step.stepId).not.toBe(first.step.stepId);
+      expect(service.decide(relayFor(second.step, 'ANSWER',
+        submitOutcome(second.step, 'ui:g3-r02', now,
+          [{ fieldId: 'selectedRoot', value: 'C:\\Work' }]))))
+        .toMatchObject({ status: 'RECORDED', humanGrantIssued: false, effectSent: false });
+      expect(service.state().history).toHaveLength(2);
+      // Replaying the historically consumed r01 is fenced even when the
+      // replayed observation carries a later observedAt.
+      now = 20_000;
+      expect(service.stageTrustedSelection({
+        observation: freshObservation('g3-r01', 20_000, 90_000),
+        semanticSelection: semantic, scope,
+      })).toMatchObject({ status: 'REFUSED', code: 'GUIDED_SEED_REPLAY' });
+      // Replaying the just-consumed r02 under its own revision is fenced too.
+      expect(service.stageTrustedSelection({
+        observation: freshObservation('g3-r02', 20_000, 90_000),
+        semanticSelection: semantic, scope,
+      })).toMatchObject({ status: 'REFUSED', code: 'GUIDED_SEED_REPLAY' });
+      // A new token with an older observedAt is stale after CONSUMED.
+      expect(service.stageTrustedSelection({
+        observation: freshObservation('g3-r03', 5_000, 90_000),
+        semanticSelection: semantic, scope,
+      })).toMatchObject({ status: 'REFUSED', code: 'GUIDED_OBSERVATION_NOT_ADVANCED' });
+      // A genuinely advanced observation still progresses the same Case and
+      // keeps the carried history.
+      const third = service.stageTrustedSelection({
+        observation: freshObservation('g3-r03', 20_000, 90_000),
+        semanticSelection: semantic, scope,
+      });
+      expect(third.status).toBe('CURRENT');
+      if (third.status !== 'CURRENT') return;
+      expect(service.state().history).toHaveLength(2);
+      expect(service.decide(relayFor(third.step, 'ANSWER',
+        submitOutcome(third.step, 'ui:g3-r03', now,
+          [{ fieldId: 'selectedRoot', value: 'C:\\Work' }]))))
+        .toMatchObject({ status: 'RECORDED', humanGrantIssued: false, effectSent: false });
+      expect(service.state().history).toHaveLength(3);
+    } finally {
+      service.close();
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  it('starts a clean history for a genuinely different Case after consumption', () => {
+    const dir = mkdtempSync(join(tmpdir(), 'shun-r02-b-case-isolation-'));
+    let now = NOW;
+    const service = new HostGuidedService(join(dir, 'guided.sqlite'), () => now);
+    try {
+      const first = service.stageTrustedSelection({
+        observation, semanticSelection: semantic, scope,
+      });
+      expect(first.status).toBe('CURRENT');
+      if (first.status !== 'CURRENT') return;
+      const caseA = first.step.caseRef;
+      expect(service.decide(relayFor(first.step, 'ANSWER',
+        submitOutcome(first.step, 'ui:g3-case-a', now,
+          [{ fieldId: 'selectedRoot', value: 'C:\\Work' }]))))
+        .toMatchObject({ status: 'RECORDED', humanGrantIssued: false, effectSent: false });
+      expect(service.state().history).toHaveLength(1);
+      now = 10_000;
+      const stagedB = service.stageTrustedSelection({
+        observation: {
+          ...freshObservation('g3-b1', 10_000, 90_000),
+          caseRef: { snapshotId: 'snap-g3-b', digest: 'c'.repeat(64) },
+        },
+        semanticSelection: semantic, scope,
+      });
+      expect(stagedB.status).toBe('CURRENT');
+      if (stagedB.status !== 'CURRENT') return;
+      expect(stagedB.step.caseRef).not.toEqual(caseA);
+      // Prior-Case step metadata never leaks into the new Case's projection.
+      expect(service.state().history).toEqual([]);
+      expect(service.state().currentStep?.stepId).toBe(stagedB.step.stepId);
+      expect(service.decide(relayFor(stagedB.step, 'ANSWER',
+        submitOutcome(stagedB.step, 'ui:g3-case-b', now,
+          [{ fieldId: 'selectedRoot', value: 'C:\\Work' }]))))
+        .toMatchObject({ status: 'RECORDED', humanGrantIssued: false, effectSent: false });
+      expect(service.state().history.map((entry) => entry.stepId))
+        .toEqual([stagedB.step.stepId]);
+    } finally {
+      service.close();
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  it('records an INSPECT Host receipt as OBSERVATION_RECEIPT, never as REFUSED', () => {
+    const dir = mkdtempSync(join(tmpdir(), 'shun-r02-b-inspect-receipt-'));
+    const service = new HostGuidedService(join(dir, 'guided.sqlite'), () => NOW);
+    try {
+      const staged = service.stageTrustedSelection({
+        observation: { ...observation, revision: 'g3-insp', selectedRootRef: 'host:root:g3' },
+        semanticSelection: semantic,
+        scope: { status: 'KNOWN', selectedRootRef: 'host:root:g3' },
+      });
+      expect(staged.status).toBe('CURRENT');
+      if (staged.status !== 'CURRENT') return;
+      const step = staged.step;
+      expect(step.kind).toBe('INSPECT');
+      const hostReceipt = {
+        schema: 'shun.guided.step-outcome.v1',
+        journeyId: step.journeyId, taskId: step.taskId, stepId: step.stepId,
+        caseRef: step.caseRef, event: 'OBSERVATION_RECEIPT', source: 'HOST',
+        sourceRef: 'host:obs:r02', answers: [], evidenceRefs: ['host:scope:r02'],
+        occurredAtUnixMs: NOW,
+      };
+      const receipt = service.decide(relayFor(step, 'REFUSE', hostReceipt));
+      expect(receipt).toMatchObject({ status: 'RECORDED', humanGrantIssued: false, effectSent: false });
+      expect(service.state().history)
+        .toMatchObject([{ stepId: step.stepId, status: 'OBSERVATION_RECEIPT' }]);
+      // A Host receipt is neither an accepted answer nor a user refusal
+      // payload, and it never implies human approval, grant or effect.
+      expect(service.readRecordedAnswer(step.stepId)).toBeUndefined();
+      expect(service.readRecordedRefusal(step.stepId)).toBeUndefined();
+      expect(service.state().currentStep).toBeUndefined();
+      expect(service.decide(relayFor(step, 'REFUSE', hostReceipt)))
         .toMatchObject({ status: 'STALE' });
     } finally {
       service.close();
