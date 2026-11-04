@@ -24,13 +24,25 @@
  * server is stopped in a finally so a failed assertion can never leak
  * the child process tree or its loopback listener.
  *
+ * G6 cleanup confirmation (PR #332 R1 P2 repair): the taskkill helper
+ * handle is retained and, when the timeout wins, the helper is terminated
+ * and reaped within a hard bound — no helper child may be left running.
+ * Timeout/nonzero fallback no longer pretends that killing the direct
+ * pnpm.cmd/shell wrapper proves the descendant tree stopped: killTree
+ * reports an explicit result, every finally path inspects the bounded
+ * child-exit outcome AND verifies eventual loopback port refusal, and a
+ * cleanup failure is surfaced as a secondary diagnostic (preserving the
+ * original assertion failure). Deterministic negative coverage forces
+ * taskkill timeout and non-zero exit and exercises a wrapper/descendant
+ * listener so an orphan can never survive silently.
+ *
  * Zero paid calls / zero physical effects: no cloud interpreter is
  * configured (every LLM effect fails closed CLOUD_UNAVAILABLE), no Provider
  * install, no UAC, no persistent Windows effect beyond temp fixture files.
  */
 import { spawn, spawnSync } from 'node:child_process';
 import { createHash, generateKeyPairSync } from 'node:crypto';
-import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { get as httpGet } from 'node:http';
 import { createConnection, createServer } from 'node:net';
 import { tmpdir } from 'node:os';
@@ -189,50 +201,207 @@ function rawGet(
 /**
  * Hard bound for the Windows taskkill tree termination below. taskkill
  * normally completes in well under a second; anything past this bound is
- * treated as failure and falls back to killing the direct child.
+ * treated as failure and bounded retry/fallback paths take over.
  */
 const TASKKILL_TIMEOUT_MS = 10_000;
 
 /**
- * Kill the whole spawned process tree (pnpm wrapper smoke test cleanup).
- *
- * G5 P2 repair: Windows tree termination is hard-bounded and failure-safe.
- * The G4 unbounded synchronous `spawnSync('taskkill')` could hang without
- * limit, and its latency sat outside every later wait bound, so taskkill
- * is now spawned asynchronously and awaited with a hard timeout; on
- * timeout or a non-zero exit it falls back to killing at least the direct
- * wrapper child so no orphan is silently tolerated. The POSIX group kill
- * is immediate and stays synchronous. Never throws: cleanup must not mask
- * a test's original assertion failure — the success path verifies
- * shutdown truthfully via the bounded exit wait and the eventual
- * port-refusal assertion. Idempotent: a child that already exited is a
- * no-op, so finally blocks may call this unconditionally.
+ * Hard bound for reaping a taskkill helper that lost its own timeout race:
+ * the helper must die to SIGKILL well inside this bound, or cleanup is
+ * reported as failed (helperReaped=false).
  */
-async function killTree(child: ReturnType<typeof spawn>): Promise<void> {
+const TASKKILL_REAP_TIMEOUT_MS = 5_000;
+
+/** Bounded wait for a cleaned-up child to actually exit in cleanupChild. */
+const CHILD_EXIT_BOUND_MS = 20_000;
+
+interface KillTreeResult {
+  /**
+   * True only when a taskkill attempt exited 0, i.e. the OS confirmed the
+   * tree termination. A wrapper-only fallback NEVER sets this: killing the
+   * direct pnpm.cmd/shell child is not proof that descendants stopped.
+   */
+  treeKillConfirmed: boolean;
+  /** No taskkill helper survived: every timed-out helper was terminated and reaped within its bound. */
+  helperReaped: boolean;
+  /** Per-attempt outcomes and fallback notes, for secondary diagnostics. */
+  detail: string;
+}
+
+/**
+ * Negative-test injection points (never used by production cleanup paths):
+ * replace the taskkill executable and/or supply verbatim arguments so a
+ * deterministic timeout (never-exiting helper) or non-zero exit (bogus
+ * PID) can be forced without touching the real taskkill binary.
+ */
+interface KillTreeOptions {
+  timeoutMs?: number;
+  taskkillCommand?: string;
+  taskkillArgs?: string[];
+}
+
+/**
+ * Kill the whole spawned process tree and REPORT what could be proven.
+ *
+ * G6 P2 repair of the G5 killTree:
+ * - The taskkill helper child handle is retained for the whole attempt; when
+ *   the timeout wins the helper is terminated (SIGKILL / TerminateProcess)
+ *   and reaped within TASKKILL_REAP_TIMEOUT_MS — no helper child may be left
+ *   running, and a helper that survives is reported (helperReaped=false).
+ * - Timeout or non-zero exit triggers ONE bounded retry with the real tree
+ *   kill; only if that also fails is the direct wrapper child SIGKILLed as a
+ *   last resort, and that fallback is explicitly recorded as "descendant
+ *   termination unconfirmed" rather than treated as tree cleanup.
+ * - The POSIX group kill is immediate and stays synchronous.
+ *
+ * Idempotent: a child that already exited is a no-op (the caller's
+ * port-refusal verification is what surfaces a leaked descendant), so
+ * finally blocks may call this unconditionally. Never throws: cleanup must
+ * not mask a test's original assertion failure — cleanupChild aggregates an
+ * honest result and guaranteeCleanup surfaces it.
+ */
+async function killTree(
+  child: ReturnType<typeof spawn>,
+  options: KillTreeOptions = {},
+): Promise<KillTreeResult> {
   const pid = child.pid;
-  if (!pid || child.exitCode !== null || child.signalCode !== null) return;
+  const alreadyExited = !pid || child.exitCode !== null || child.signalCode !== null;
   if (!isWindows) {
-    try {
-      process.kill(-pid, 'SIGKILL');
-    } catch {
-      child.kill('SIGKILL');
+    if (!alreadyExited) {
+      try {
+        process.kill(-pid, 'SIGKILL');
+      } catch {
+        child.kill('SIGKILL');
+      }
     }
-    return;
+    return {
+      treeKillConfirmed: true,
+      helperReaped: true,
+      detail: alreadyExited ? 'posix: child already exited' : 'posix: process-group SIGKILL',
+    };
   }
-  const taskkillExit = new Promise<number | null>((resolved) => {
-    const killer = spawn('taskkill', ['/PID', String(pid), '/T', '/F'], {
-      stdio: 'ignore',
+  if (alreadyExited) {
+    // The wrapper may be gone while a descendant still owns the listener;
+    // it can no longer be reached by PID, so the tree kill is unconfirmed
+    // and the caller's port-refusal check is what surfaces the orphan.
+    return {
+      treeKillConfirmed: false,
+      helperReaped: true,
+      detail: 'windows: child already exited before killTree; descendants unreachable by PID',
+    };
+  }
+  const timeoutMs = options.timeoutMs ?? TASKKILL_TIMEOUT_MS;
+  const detail: string[] = [];
+  let helperReaped = true;
+  let treeKillConfirmed = false;
+
+  const attempt = async (): Promise<'OK' | 'FAILED' | 'TIMEOUT'> => {
+    const killer = spawn(
+      options.taskkillCommand ?? 'taskkill',
+      options.taskkillArgs ?? ['/PID', String(pid), '/T', '/F'],
+      { stdio: 'ignore' },
+    );
+    const outcome = new Promise<number | null>((resolved) => {
+      killer.once('exit', (code) => resolved(code));
+      killer.once('error', () => resolved(null));
     });
-    killer.once('exit', (code) => resolved(code));
-    killer.once('error', () => resolved(null));
-  });
-  const outcome = await Promise.race([
-    taskkillExit,
-    delay(TASKKILL_TIMEOUT_MS).then(() => 'TIMEOUT' as const),
-  ]);
-  // taskkill timeout, spawn error (null) or a non-zero exit all mean the
-  // tree kill could not be confirmed; fall back to the direct child.
-  if (outcome === 'TIMEOUT' || outcome !== 0) child.kill('SIGKILL');
+    let timer: NodeJS.Timeout | undefined;
+    const timeout = new Promise<'TIMEOUT'>((resolved) => {
+      timer = setTimeout(() => resolved('TIMEOUT'), timeoutMs);
+      timer.unref();
+    });
+    const result = await Promise.race([
+      outcome.then((code) => (code === 0 ? ('OK' as const) : ('FAILED' as const))),
+      timeout,
+    ]);
+    clearTimeout(timer);
+    if (result !== 'TIMEOUT') return result;
+    // G6 P2: the timeout won — terminate the retained helper handle and
+    // reap it within a hard bound; a helper that survives is reported.
+    killer.kill('SIGKILL');
+    const reaped = await waitForExit(killer, TASKKILL_REAP_TIMEOUT_MS);
+    if (reaped === 'TIMEOUT') {
+      helperReaped = false;
+      detail.push('taskkill helper survived SIGKILL and the reap bound');
+    } else {
+      detail.push('timed-out taskkill helper terminated and reaped');
+    }
+    return 'TIMEOUT';
+  };
+
+  const first = await attempt();
+  detail.push(`attempt 1: ${first}`);
+  if (first === 'OK') {
+    treeKillConfirmed = true;
+  } else {
+    // G6 P2: one bounded retry of the real tree kill before any
+    // wrapper-only fallback; the injection (negative tests) applies to
+    // every attempt, production callers retry the real taskkill.
+    const second = await attempt();
+    detail.push(`attempt 2: ${second}`);
+    if (second === 'OK') treeKillConfirmed = true;
+  }
+  if (!treeKillConfirmed && child.exitCode === null && child.signalCode === null) {
+    // Last-resort direct-child kill. Explicitly NOT proof that descendants
+    // stopped: cleanupChild must still verify port refusal and report
+    // cleanup failure when the listener outlives the wrapper.
+    child.kill('SIGKILL');
+    detail.push('fell back to direct-child SIGKILL; descendant termination unconfirmed');
+  }
+  return { treeKillConfirmed, helperReaped, detail: detail.join('; ') };
+}
+
+interface CleanupResult {
+  ok: boolean;
+  detail: string;
+  childExit: { code: number | null; signal: NodeJS.Signals | null } | 'TIMEOUT';
+  portRefused: boolean;
+  kill: KillTreeResult;
+}
+
+/**
+ * Bounded, verified cleanup: kill the tree, wait for the child exit inside
+ * a hard bound, and verify that the loopback port eventually refuses
+ * connections. ok requires all three — helper reaped, child exited, port
+ * refused — so a leaked descendant listener makes cleanup failure explicit
+ * instead of silent. Idempotent; never throws.
+ */
+async function cleanupChild(
+  child: ReturnType<typeof spawn>,
+  port: number,
+  options: KillTreeOptions = {},
+): Promise<CleanupResult> {
+  const kill = await killTree(child, options);
+  const childExit = await waitForExit(child, CHILD_EXIT_BOUND_MS);
+  const portRefused = await portRefusesConnectionEventually(port);
+  const ok = kill.helperReaped && childExit !== 'TIMEOUT' && portRefused;
+  const parts = [
+    `childExit=${childExit === 'TIMEOUT' ? 'TIMEOUT' : `code ${childExit.code} signal ${childExit.signal}`}`,
+    `portRefused=${portRefused}`,
+    `taskkillTreeConfirmed=${kill.treeKillConfirmed}`,
+    kill.detail,
+  ];
+  if (!ok) parts.unshift('CLEANUP FAILURE');
+  return { ok, detail: parts.join('; '), childExit, portRefused, kill };
+}
+
+/**
+ * G6 P2 finally-path contract: run bounded verified cleanup and surface its
+ * result. When the test body already failed, the original assertion failure
+ * must win — the cleanup diagnostic goes to stderr. When the body passed, a
+ * cleanup failure throws and fails the test. Cleanup itself never throws.
+ */
+async function guaranteeCleanup(
+  child: ReturnType<typeof spawn>,
+  port: number,
+  bodyFailed: boolean,
+  options: KillTreeOptions = {},
+): Promise<void> {
+  const cleanup = await cleanupChild(child, port, options);
+  if (cleanup.ok) return;
+  const diagnostic = `[startup-runner] cleanup failure: ${cleanup.detail}`;
+  if (bodyFailed) console.error(diagnostic);
+  else throw new Error(diagnostic);
 }
 
 describe('R02-E default dev startup runner (Node 24 strip-mode repair)', () => {
@@ -247,6 +416,7 @@ describe('R02-E default dev startup runner (Node 24 strip-mode repair)', () => {
       shell: isWindows,
       detached: !isWindows,
     });
+    let bodyFailed = false;
     try {
       const output = collect(child);
       const up = await waitForHttp(port, 60_000);
@@ -254,24 +424,28 @@ describe('R02-E default dev startup runner (Node 24 strip-mode repair)', () => {
       expect(up, `server did not come up; output:\n${text}`).toBe(true);
       expect(text).not.toContain('ERR_UNSUPPORTED_TYPESCRIPT_SYNTAX');
       expect(text).toContain('Shun control surface (T08 DEMO ONLY)');
-      // G5 P2: bounded tree kill, bounded exit wait, then verify the
+      // G5/G6: bounded tree kill, bounded exit wait, then verify the
       // loopback listener is actually gone.
       await killTree(child);
       await waitForExit(child, 15_000);
       expect(await portRefusesConnectionEventually(port)).toBe(true);
+    } catch (error) {
+      bodyFailed = true;
+      throw error;
     } finally {
-      // G5 P2: a failed assertion above must never leak the child process
-      // tree or its loopback listener into the rest of the run. killTree
-      // and waitForExit never throw and are no-ops once the child has
-      // exited, so cleanup cannot mask the original assertion failure.
-      await killTree(child);
-      await waitForExit(child, 15_000);
+      // G6 P2: a failed assertion above must never leak the child process
+      // tree or its loopback listener into the rest of the run. The
+      // bounded cleanup result is inspected: failure is surfaced as a
+      // secondary diagnostic when the body already failed, and fails the
+      // test when the body passed.
+      await guaranteeCleanup(child, port, bodyFailed);
     }
   });
 
   it('tsx entry boots DEMO on loopback, refuses hostile Host, reports Guided truthfully, shuts down deterministically', async () => {
     const port = await freePort();
     const { child, output } = startViaTsx(port, {});
+    let bodyFailed = false;
     try {
       const up = await waitForHttp(port, 60_000);
       const text = output.text();
@@ -291,32 +465,40 @@ describe('R02-E default dev startup runner (Node 24 strip-mode repair)', () => {
       child.kill('SIGTERM');
       expectCleanShutdown(await waitForExit(child, 20_000));
       expect(await portRefusesConnectionEventually(port)).toBe(true);
+    } catch (error) {
+      bodyFailed = true;
+      throw error;
     } finally {
-      // G5 P2: guaranteed cleanup even when an assertion above failed.
-      await killTree(child);
-      await waitForExit(child, 20_000);
+      // G6 P2: verified cleanup on every path; failure surfaced, never
+      // silent, never masking the original assertion failure.
+      await guaranteeCleanup(child, port, bodyFailed);
     }
   });
 
   it('unknown SHUN_CONTROL_MODE fails closed — never a silent DEMO fallback', async () => {
     const port = await freePort();
     const { child, output } = startViaTsx(port, { SHUN_CONTROL_MODE: 'bogus' });
+    let bodyFailed = false;
     try {
       const exit = await waitForExit(child, 30_000);
       expect(exit, 'boot must refuse and exit').not.toBe('TIMEOUT');
       expect(output.text()).toContain('Unknown SHUN_CONTROL_MODE: refusing to start');
       if (exit !== 'TIMEOUT') expect(exit.code).not.toBe(0);
       expect(await portRefusesConnectionEventually(port)).toBe(true);
+    } catch (error) {
+      bodyFailed = true;
+      throw error;
     } finally {
-      // G5 P2: a stuck boot refusal (TIMEOUT) must not survive the test.
-      await killTree(child);
-      await waitForExit(child, 20_000);
+      // G6 P2: a stuck boot refusal (TIMEOUT) must not survive the test,
+      // and cleanup failure must be surfaced, not silent.
+      await guaranteeCleanup(child, port, bodyFailed);
     }
   });
 
   it('real-storage mode without trusted config fails closed with the exact missing gate', async () => {
     const port = await freePort();
     const { child, output } = startViaTsx(port, { SHUN_CONTROL_MODE: 'real-storage' });
+    let bodyFailed = false;
     try {
       const exit = await waitForExit(child, 30_000);
       expect(exit, 'boot must refuse and exit').not.toBe('TIMEOUT');
@@ -325,10 +507,13 @@ describe('R02-E default dev startup runner (Node 24 strip-mode repair)', () => {
       );
       if (exit !== 'TIMEOUT') expect(exit.code).not.toBe(0);
       expect(await portRefusesConnectionEventually(port)).toBe(true);
+    } catch (error) {
+      bodyFailed = true;
+      throw error;
     } finally {
-      // G5 P2: a stuck boot refusal (TIMEOUT) must not survive the test.
-      await killTree(child);
-      await waitForExit(child, 20_000);
+      // G6 P2: a stuck boot refusal (TIMEOUT) must not survive the test,
+      // and cleanup failure must be surfaced, not silent.
+      await guaranteeCleanup(child, port, bodyFailed);
     }
   });
 });
@@ -627,6 +812,7 @@ export const routeWorkflowIntent = __dhv10RouterBundle.routeWorkflowIntent;
         shell: isWindows,
         detached: !isWindows,
       });
+      let bodyFailed = false;
       try {
         const output = collect(child);
         const up = await waitForHttp(port, 90_000);
@@ -682,13 +868,195 @@ export const routeWorkflowIntent = __dhv10RouterBundle.routeWorkflowIntent;
         await killTree(child);
         expectCleanShutdown(await waitForExit(child, 20_000));
         expect(await portRefusesConnectionEventually(port)).toBe(true);
+      } catch (error) {
+        bodyFailed = true;
+        throw error;
       } finally {
-        // G5 P2: a failed production assertion must never leak the server
-        // child or its loopback listener. killTree and waitForExit never
-        // throw, so cleanup cannot mask the original assertion failure.
-        await killTree(child);
-        await waitForExit(child, 20_000);
+        // G6 P2: a failed production assertion must never leak the server
+        // child or its loopback listener; the bounded cleanup result is
+        // inspected and any cleanup failure is surfaced, never silent.
+        await guaranteeCleanup(child, port, bodyFailed);
       }
     }, 180_000);
+  },
+);
+
+describe.skipIf(!isWindows)(
+  'R02-E G6 bounded cleanup — deterministic negative coverage (taskkill timeout / nonzero / orphan listener)',
+  () => {
+    let dir: string;
+
+    beforeAll(() => {
+      dir = mkdtempSync(join(tmpdir(), 'shun-r02e-g6-cleanup-'));
+    });
+
+    afterAll(() => {
+      for (let attempt = 0; attempt < 5; attempt++) {
+        try {
+          rmSync(dir, { recursive: true, force: true });
+          break;
+        } catch {
+          Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, 200);
+        }
+      }
+    });
+
+    /** node -e one-liner: a minimal loopback HTTP listener on `port`. */
+    const listenerOn = (port: number): string =>
+      `require('node:http').createServer((q,s)=>s.end('ok')).listen(${port})`;
+
+    /**
+     * A real two-level tree: wrapper node process → grandchild node HTTP
+     * listener. The wrapper publishes the grandchild PID so tests can prove
+     * (via process existence and port refusal) whether any orphan survives.
+     */
+    function startWrapperTree(port: number): {
+      child: ReturnType<typeof spawn>;
+      pidFile: string;
+    } {
+      const pidFile = join(dir, `grandchild-${port}.pid`);
+      const wrapperScript = [
+        "const { spawn } = require('node:child_process');",
+        "const { writeFileSync } = require('node:fs');",
+        `const kid = spawn(process.execPath, ['-e', ${JSON.stringify(listenerOn(port))}], { stdio: 'ignore' });`,
+        `writeFileSync(${JSON.stringify(pidFile)}, String(kid.pid));`,
+        'setInterval(() => {}, 1e9);',
+      ].join('\n');
+      const child = spawn(process.execPath, ['-e', wrapperScript], { stdio: 'ignore' });
+      return { child, pidFile };
+    }
+
+    async function publishedPid(pidFile: string): Promise<number> {
+      const deadline = Date.now() + 15_000;
+      while (Date.now() < deadline) {
+        if (existsSync(pidFile)) {
+          const pid = Number(readFileSync(pidFile, 'utf8').trim());
+          if (pid > 0) return pid;
+        }
+        await delay(100);
+      }
+      return 0;
+    }
+
+    /** Test-local teardown for an orphan PID the production fallback could not reach. */
+    async function killPublishedPid(pid: number): Promise<void> {
+      const killer = spawn('taskkill', ['/PID', String(pid), '/T', '/F'], { stdio: 'ignore' });
+      await waitForExit(killer, TASKKILL_TIMEOUT_MS);
+    }
+
+    it('taskkill timeout: the helper is terminated and reaped, fallback runs, and the listener still dies', async () => {
+      const port = await freePort();
+      const child = spawn(process.execPath, ['-e', listenerOn(port)], { stdio: 'ignore' });
+      let bodyFailed = false;
+      try {
+        expect(await waitForHttp(port, 15_000)).toBe(true);
+        // Fake taskkill: a node process that never exits, so each bounded
+        // attempt (first + retry) must hit the timeout and force
+        // terminate-and-reap of the retained helper handle.
+        const kill = await killTree(child, {
+          taskkillCommand: process.execPath,
+          taskkillArgs: ['-e', 'setInterval(() => {}, 1e9)'],
+          timeoutMs: 2_000,
+        });
+        expect(kill.treeKillConfirmed).toBe(false);
+        expect(kill.helperReaped).toBe(true);
+        expect(kill.detail).toContain('terminated and reaped');
+        // The wrapper-only fallback still killed the direct listener. The
+        // honest report: port free again, but the taskkill tree kill was
+        // never confirmed.
+        const cleanup = await cleanupChild(child, port);
+        expect(cleanup.portRefused).toBe(true);
+        expect(cleanup.ok).toBe(true);
+        expect(cleanup.kill.treeKillConfirmed).toBe(false);
+      } catch (error) {
+        bodyFailed = true;
+        throw error;
+      } finally {
+        await guaranteeCleanup(child, port, bodyFailed);
+      }
+    }, 60_000);
+
+    it('taskkill nonzero exit: fallback is not tree cleanup, and a port that outlives the child is an explicit cleanup failure', async () => {
+      const port = await freePort();
+      const { child, pidFile } = startWrapperTree(port);
+      let bodyFailed = false;
+      let grandchildPid = 0;
+      try {
+        grandchildPid = await publishedPid(pidFile);
+        expect(grandchildPid).toBeGreaterThan(0);
+        expect(await waitForHttp(port, 15_000)).toBe(true);
+
+        // Real taskkill binary but pointed at a PID that does not exist:
+        // both bounded attempts exit non-zero. The fallback SIGKILL of the
+        // wrapper is recorded honestly: it is NOT reported as a confirmed
+        // tree kill.
+        const kill = await killTree(child, { taskkillArgs: ['/PID', '999999', '/T', '/F'] });
+        expect(kill.treeKillConfirmed).toBe(false);
+        expect(kill.helperReaped).toBe(true);
+        expect(kill.detail).toContain('descendant termination unconfirmed');
+
+        // Deterministic cleanup-failure surfacing, independent of whether
+        // this host lets grandchildren outlive the wrapper: a listener on a
+        // separate port that is NOT part of the child's tree (models a
+        // leaked descendant from a previous failed cleanup). Cleanup of the
+        // child itself succeeds, the port still accepts connections, and
+        // the failure MUST be explicit rather than silent.
+        const strayPort = await freePort();
+        const stray = spawn(process.execPath, ['-e', listenerOn(strayPort)], { stdio: 'ignore' });
+        let strayBodyFailed = false;
+        try {
+          expect(await waitForHttp(strayPort, 15_000)).toBe(true);
+          const cleanup = await cleanupChild(child, strayPort);
+          expect(cleanup.childExit).not.toBe('TIMEOUT');
+          expect(cleanup.portRefused).toBe(false);
+          expect(cleanup.ok).toBe(false);
+          expect(cleanup.detail).toContain('CLEANUP FAILURE');
+
+          // guaranteeCleanup contract: with a failed body the cleanup
+          // diagnostic must not mask the original failure (resolves); with
+          // a passing body it must fail the test (rejects).
+          await expect(guaranteeCleanup(child, strayPort, true)).resolves.toBeUndefined();
+          await expect(guaranteeCleanup(child, strayPort, false)).rejects.toThrow(
+            /cleanup failure/,
+          );
+        } catch (error) {
+          strayBodyFailed = true;
+          throw error;
+        } finally {
+          await guaranteeCleanup(stray, strayPort, strayBodyFailed);
+        }
+      } catch (error) {
+        bodyFailed = true;
+        throw error;
+      } finally {
+        if (grandchildPid > 0) await killPublishedPid(grandchildPid);
+        await guaranteeCleanup(child, port, bodyFailed);
+      }
+    }, 90_000);
+
+    it('real taskkill tree termination on a wrapper/descendant listener leaves no orphan', async () => {
+      const port = await freePort();
+      const { child, pidFile } = startWrapperTree(port);
+      let bodyFailed = false;
+      let grandchildPid = 0;
+      try {
+        grandchildPid = await publishedPid(pidFile);
+        expect(grandchildPid).toBeGreaterThan(0);
+        expect(await waitForHttp(port, 15_000)).toBe(true);
+
+        const cleanup = await cleanupChild(child, port);
+        expect(cleanup.ok).toBe(true);
+        expect(cleanup.kill.treeKillConfirmed).toBe(true);
+        expect(cleanup.portRefused).toBe(true);
+        // The descendant process itself is gone, not just its listener.
+        expect(() => process.kill(grandchildPid, 0)).toThrow();
+      } catch (error) {
+        bodyFailed = true;
+        throw error;
+      } finally {
+        if (grandchildPid > 0) await killPublishedPid(grandchildPid);
+        await guaranteeCleanup(child, port, bodyFailed);
+      }
+    }, 60_000);
   },
 );
