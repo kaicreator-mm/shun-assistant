@@ -1,0 +1,55 @@
+pack_id: shun-v030-r02-e-node26-production-startup-g7-tree-kill-proof
+task_id: R02-E
+issue: "#269"
+repository: kaicreator-mm/shun-assistant
+version: v0.3.0
+parent_issue: "#260"
+standard_revision: 2c395c55569fe2edf3f4135f12d3d069e526d0b7
+owner_authorization_refs:
+  - "#260 OWNER_SHUN_V030_R02_AMENDMENT_R1_APPROVE"
+  - "Current project instruction: continue v0.3.0 under ADS #1359 Delivery-First; reviewer repairs defects within the active write set"
+  - "#350 independent Exact-SHA R2 audit comment 6642975180"
+  - "#333 G6 Execution Pack and CI qualification"
+execution_profile: WEB_BUILDER
+execution_environment: WEB_SOURCE_WITH_WINDOWS_CI
+admission_mode: SINGLE_WRITER_ADMISSION
+admission_generation: 7
+protected_claim_key: "kaicreator-mm/shun-assistant#269:builder:__default__"
+source_base_sha: 9e97a6a2576f761caae9fba26cd40e5d9a678d68
+source_base_tree: 1d86c6789033422783d8b743807dac8783b57dc2
+source_base_branch: JIT_only_task/v0.3.0-r02e-node26-compatible-runner-local-g6
+pack_branch: JIT_only_task/v0.3.0-r02e-node26-compatible-runner-pack-g7
+jit_branch: JIT_only_task/v0.3.0-r02e-node26-compatible-runner-local-g7
+execution_pack_path: .agent/execution/R02-E-NODE26-COMPAT-STARTUP-G7/MANIFEST.yaml
+finding:
+  - "PR #350 R2 P2: cleanupChild can report ok=true when treeKillConfirmed=false because ok omits the tree-kill confirmation."
+  - "PR #350 timeout test asserts cleanup.ok=true while explicitly reporting taskkillTreeConfirmed=false."
+  - "PR #350 non-zero test probes an unrelated strayPort and does not assert the actual wrapper/grandchild listener is cleaned or reported as failure."
+approved_write_set:
+  - tests/integration/v03/r02-e-production/startup-runner.test.ts
+allowed_write_set:
+  - tests/integration/v03/r02-e-production/startup-runner.test.ts
+plan:
+  - "Make cleanup success require a confirmed process-tree kill for shell/wrapper launches; if taskkill times out or exits non-zero and only the direct wrapper can be killed, return explicit cleanup failure even if the listener port is currently refused."
+  - "Preserve confirmed tree-kill evidence across the existing second finally-path cleanup call; an already-exited wrapper must not erase a previously confirmed successful tree kill."
+  - "Keep direct Node leaf-process cleanup explicit and bounded without pretending that an unconfirmed wrapper tree was killed."
+  - "Add deterministic wrapper->non-listening-grandchild coverage: after taskkill failure, the parent/wrapper may exit and the port may be closed, but cleanup must still return ok=false until the descendant is explicitly reaped or complete tree termination is confirmed."
+  - "Correct the non-zero test to inspect the actual listener port and published grandchild PID while the descendant is alive; do not use an unrelated port as a substitute for the target process tree."
+  - "Retain timeout helper termination/reap, idempotence, bounded child-exit wait, port-refusal verification, and original assertion-failure preservation."
+test_contract:
+  - "This pack PR must contain exactly this one manifest path and one commit directly parented to source_base_sha 9e97a6a2576f761caae9fba26cd40e5d9a678d68."
+  - "After pack Push and PR Woodpecker checks are SUCCESS at the exact pack HEAD, acquire a fresh Generation-7 DISPATCH_CLAIMED event bound to this pack, source base/tree, actual operator/session identity and exact one-path write set."
+  - "No source edit before fresh G7 CAS Claim acceptance; do not reuse G6 or earlier claims."
+  - "Run tracked-source JS/TS syntax preflight before source-changing CI."
+  - "Run focused r02-e-production tests on Windows Node 24.21.0 and 26.13.0; include the new non-listening-descendant negative case and confirm every helper/descendant is reaped."
+  - "Run full tools/task-check.sh and exact-SHA Woodpecker Push/PR checks; .woodpecker.yml is the authoritative real CI gate, GitHub Actions are supplementary."
+  - "Record exact HEAD/tree/base, changed paths, Node versions, commands/exit codes, Woodpecker build IDs, taskkill timeout/nonzero results, helper reap, descendant PID exit and port-refusal evidence on Issue #269."
+  - "Independent Exact-SHA review of the repaired HEAD is mandatory; this repair author must not self-approve."
+forbidden:
+  - "Any source path other than tests/integration/v03/r02-e-production/startup-runner.test.ts"
+  - "Any production source, UI, CI configuration, package manifest or lockfile change"
+  - "Any paid cloud credential/request, Provider installation, UAC, physical Windows effect or external disclosure"
+  - "WIP integration merge, version/v0.3.0 merge, main/version/v0.2.0 mutation, tag, release or deployment"
+source_write_authorized: true
+merge_authorized: false
+release_authorized: false
