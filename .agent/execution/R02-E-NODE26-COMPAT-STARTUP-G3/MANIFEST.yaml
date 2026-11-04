@@ -1,0 +1,64 @@
+pack_id: shun-v030-r02-e-node24-node26-production-startup-g3
+task_id: R02-E
+issue: "#269"
+repository: kaicreator-mm/shun-assistant
+version: v0.3.0
+parent_issue: "#260"
+standard_revision: 2c395c55569fe2edf3f4135f12d3d069e526d0b7
+owner_authorization_refs:
+  - "#260 comment 6545077384 OWNER_SHUN_V030_R02_AMENDMENT_R1_APPROVE"
+  - "#269 comment 6584110565 NODE24_NODE26_ENGINE_COMPATIBILITY_ASSESSMENT"
+  - "#292 R04-U04 exact Windows boot evidence"
+  - "#280 comment 6606933588 LOCAL_BUILDER_ONLY_HANDOFF_POLICY"
+execution_profile: LOCAL_BUILDER
+execution_environment: LOCAL
+admission_mode: SINGLE_WRITER_ADMISSION
+admission_generation: 3
+protected_claim_key: "kaicreator-mm/shun-assistant#269:builder:__default__"
+source_base_sha: f22617f2231960c27bc4a55f6b6b33133f09a2b5
+source_base_tree: f3931da9749720ef36766eb3bbacd002ec1ee51a
+source_base_branch: wip/v0.3.0-r02-owner-repairs
+pack_branch: JIT_only_task/v0.3.0-r02e-node26-compatible-runner-pack-g3
+jit_branch: JIT_only_task/v0.3.0-r02e-node26-compatible-runner-local-g3
+execution_pack_path: .agent/execution/R02-E-NODE26-COMPAT-STARTUP-G3/MANIFEST.yaml
+finding:
+  - "#292 confirmed Windows Node 24.21.0 default control-api dev startup ERR_UNSUPPORTED_TYPESCRIPT_SYNTAX at native/index.ts:187."
+  - "#269 comment 6584110565: --experimental-transform-types is a diagnostic for Node24 only and incompatible with declared engines.node >=24 for Node26."
+approved_write_set:
+  - apps/control-api/package.json
+  - pnpm-lock.yaml
+  - tests/integration/v03/r02-e-production/startup-runner.test.ts
+allowed_write_set:
+  - apps/control-api/package.json
+  - pnpm-lock.yaml
+  - tests/integration/v03/r02-e-production/startup-runner.test.ts
+plan:
+  - "Use a pinned compatible TypeScript runner (prefer established tsx) as the existing control-api dev entry, without changing native/index.ts or the real BUILD/Host composition."
+  - "Pin the runner with an explicit version, update pnpm-lock.yaml using pnpm 10.34.5, and keep package runtime dependency placement appropriate for this invocation. Do not introduce unnecessary tooling or duplicate execution paths."
+  - "Node 24.21.0 default pnpm --filter @shun/control-api dev must boot with no ERR_UNSUPPORTED_TYPESCRIPT_SYNTAX, without implicit demo=>production substitution; test the declared Node >=24 range on Node26 if available."
+  - "Add a bounded startup-runner regression in the already approved R02-E production test directory, covering runtime launch, loopback-only behavior, deterministic shutdown and no hidden fallback. It must not install a Provider, create UAC prompts, send paid LLM requests or run persistent Windows effects."
+  - "For a properly configured real-storage fixture, prove the actual production BUILD is active, same selected K/Host composition is used, and Guided state/StepSpec plus gateway behave truthfully. A DEMO-only process and 503 Guided state do not qualify."
+  - "If genuine production-mode fixture cannot be established without credentials or physical effects, report the exact missing gate as UNKNOWN and do not claim production PASS."
+  - "No UI work, no root package.json engines modification, no widening the write set, no native/index.ts edit, no second SDK/K, sender or dispatcher."
+test_contract:
+  - "Check exact baseline/manifest and acquire a fresh generation-3 CAS Claim with local builder identity before source edit."
+  - "Run Node 24.21.0 exact-tree JS/TS parser syntax preflight before any source CI. Validate all tracked JS/TS and browser modules."
+  - "Run focused startup regression, typecheck, lint, full tools/task-check.sh and Woodpecker Push/PR CI; report actual commands/exit codes and Build IDs."
+  - "Node 26 smoke is required for claiming the declared >=24 engine support; when unavailable report NOT_TESTED, not PASS. Do not narrow the root engines range under this write set."
+  - "Review that launch errors do not trigger a misleading DEMO fallback; all fail-closed outcomes remain truthful."
+forbidden:
+  - "apps/control-api/native/index.ts"
+  - "root package.json or the Node engines range"
+  - "any source path outside the three exact approved paths"
+  - "R04 UI changes, Control API semantic/policy bypass, real Provider install, UAC or persistent Windows effect"
+  - "paid model requests, secrets, cloud sync or externally shared case data"
+  - "main, version/v0.2.0, merge, tag, release or deployment"
+pre_ci:
+  - "Verify the pack-only commit has exactly one manifest path diff, and exact parent is source_base_sha."
+  - "Do not source-edit until Pack Push/PR CI is fully SUCCESS and a fresh accepted generation-3 CAS Claim is recorded."
+  - "Source syntax preflight must PASS before first source-changing push/PR CI."
+  - "Record exact HEAD/tree, source path comparison, tests, Node versions and Woodpecker Build IDs in GitHub Issue #269."
+notes: "The original R02-E source work has terminal completed Claims (generations 1 and 2). This is a fresh limited generation-3 repair of the confirmed Windows startup issue, using only files already within the Owner-approved R02-E write set. No standalone LOCAL_VALIDATION. Local BUILDER owns repair, tests and validation. Post-delivery Web Controller independently reviews the exact SHA."
+source_write_authorized: true
+merge_authorized: false
+release_authorized: false
