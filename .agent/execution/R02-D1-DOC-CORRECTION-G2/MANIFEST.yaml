@@ -1,0 +1,45 @@
+pack_id: shun-v030-r02-d1-english-guide-paid-budget-fact-correction-g2
+task_id: R02-D1
+issue: "#266"
+repository: kaicreator-mm/shun-assistant
+version: v0.3.0
+parent_issue: "#260"
+standard_revision: 2c395c55569fe2edf3f4135f12d3d069e526d0b7
+owner_authorization_refs:
+  - "#260 OWNER_SHUN_V030_R02_AMENDMENT_R1_APPROVE"
+  - "Current project conversation: continue v0.3.0 under ADS #1359 Delivery-First"
+  - "#266 R1 review comment 6625809156"
+execution_profile: WEB_BUILDER
+execution_environment: WEB
+admission_mode: SINGLE_WRITER_ADMISSION
+admission_generation: 2
+protected_claim_key: "kaicreator-mm/shun-assistant#266:builder:__default__"
+source_base_sha: faaaec8f842fb85d8cf38a5bd04b505a4181e39c
+source_base_tree: 1387a0fe3fff8d63f9bbbab06a8cb13ab596a908
+source_base_branch: wip/v0.3.0-r02-owner-repairs
+pack_branch: JIT_only_task/v0.3.0-r02-d1-doc-correction-pack-g2
+jit_branch: JIT_only_task/v0.3.0-r02-d1-doc-correction-local-g2
+execution_pack_path: .agent/execution/R02-D1-DOC-CORRECTION-G2/MANIFEST.yaml
+finding:
+  - "The English operator guide says J03 budget-exhausted, but the authorized real-journeys receipt records 7 of 8 amended completions used."
+approved_write_set:
+  - docs/guide/v0.3/README.en.md
+allowed_write_set:
+  - docs/guide/v0.3/README.en.md
+plan:
+  - "Replace only the inaccurate J03 budget-exhausted phrase with the exact receipt fact: two authorized final CN/EN completions, 7 of 8 amended completions used, do not rerun without new Owner authorization."
+  - "Preserve the independent paid-consent, zero-send-on-denial and no-rerun boundaries."
+  - "Do not alter Chinese guide, receipts, authority records, source code, CI or other docs."
+test_contract:
+  - "Pack PR must contain exactly one manifest path and bind to the exact WIP base SHA/tree."
+  - "After pack CI SUCCESS, acquire a fresh Generation-2 CAS Claim; G1 is terminal."
+  - "Apply one-line correction only; verify diff is exactly the allowed path."
+  - "Run Markdown/documentation lint if present and exact-SHA Woodpecker Push/PR CI; no local Windows task is needed."
+  - "Controller independently verifies the receipt statement and exact final diff."
+forbidden:
+  - "Any path other than docs/guide/v0.3/README.en.md"
+  - "Changes to paid ceiling, credentials, receipts, source, CI, Provider or runtime"
+  - "main, version/v0.2.0, WIP integration merge, tag, release or deployment"
+source_write_authorized: true
+merge_authorized: false
+release_authorized: false
