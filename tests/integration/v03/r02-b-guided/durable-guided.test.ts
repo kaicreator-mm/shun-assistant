@@ -5,6 +5,7 @@ import { join } from 'node:path';
 import { DatabaseSync } from 'node:sqlite';
 import { describe, expect, it } from 'vitest';
 import { HostGuidedService } from '../../../../packages/domain-host/src/guided/host-guided-service.ts';
+import type { GuidedProvenanceAuthority } from '../../../../packages/domain-host/src/guided/guided-provenance-authority.ts';
 
 const NOW = 3_000;
 const observation = {
@@ -85,10 +86,11 @@ function cleanup(dir: string): void {
   console.error(`cleanup failed after retries: ${(lastError as Error).message}; entries=${entries.join(',')}`);
 }
 
-// ---------- G4: durable Host-private consumed-step ledger helpers ----------
+// ---------- G4-G6: durable Host-private consumed-step ledger helpers ----------
 
 type LedgerRowView = {
   step_id: string; task_id: string; case_ref_json: string; template_digest: string;
+  step_kind: string; receipt_kind: string;
   terminal_event: string; terminal_decision: string; recorded_at_unix_ms: number;
   row_sha256: string;
 };
@@ -107,7 +109,8 @@ function sha256Hex(value: string): string {
 function ledgerRowSha(row: Omit<LedgerRowView, 'row_sha256'>): string {
   return sha256Hex(
     `${row.step_id}|${row.task_id}|${row.case_ref_json}|${row.template_digest}|` +
-    `${row.terminal_event}|${row.terminal_decision}|${row.recorded_at_unix_ms}`,
+    `${row.step_kind}|${row.receipt_kind}|${row.terminal_event}|${row.terminal_decision}|` +
+    `${row.recorded_at_unix_ms}`,
   );
 }
 
@@ -115,7 +118,7 @@ function readLedger(file: string): LedgerRowView[] {
   const db = new DatabaseSync(file);
   try {
     return db.prepare(`SELECT step_id,task_id,case_ref_json,template_digest,
-      terminal_event,terminal_decision,recorded_at_unix_ms,row_sha256
+      step_kind,receipt_kind,terminal_event,terminal_decision,recorded_at_unix_ms,row_sha256
       FROM guided_consumed_steps ORDER BY step_id`).all() as unknown as LedgerRowView[];
   } finally {
     db.close();
@@ -143,22 +146,20 @@ function guidedTableNames(file: string): string[] {
   }
 }
 
-type MarkerRowView = {
+type ReceiptRowView = {
   schema_version: number;
-  initialized_at_unix_ms: number;
-  marker_sha256: string;
+  schema_digest: string;
+  database_id: string;
+  issued_at_unix_ms: number;
+  receipt_digest: string;
 };
 
-// Mirrors the service's provenance-marker digest binding.
-function markerShaHex(version: number, initializedAtUnixMs: number): string {
-  return sha256Hex(`guided-schema-marker|v${version}|${initializedAtUnixMs}`);
-}
-
-function readMarker(file: string): MarkerRowView | undefined {
+function readReceipt(file: string): ReceiptRowView | undefined {
   const db = new DatabaseSync(file);
   try {
-    return db.prepare(`SELECT schema_version, initialized_at_unix_ms, marker_sha256
-      FROM guided_schema_marker WHERE slot='schema'`).get() as MarkerRowView | undefined;
+    return db.prepare(`SELECT schema_version, schema_digest, database_id,
+      issued_at_unix_ms, receipt_digest
+      FROM guided_schema_receipt WHERE slot='schema'`).get() as ReceiptRowView | undefined;
   } finally {
     db.close();
   }
@@ -1115,11 +1116,13 @@ describe('R02-B Host Guided SQLite durability and replay fence', () => {
     }
     // A durable ledger row exists for a step the selected Case still presents
     // as CURRENT (e.g. a partially-rolled-back legacy write). Seeded as a
-    // REFUSE row: it needs no payload binding, so open-time validation of
-    // the marked database passes and the decision-time fence is what fires.
+    // REVIEW_EFFECT REFUSE/NONE row: it needs no payload binding, so
+    // open-time validation of the receipt-bearing database passes and the
+    // decision-time fence is what fires.
     const seeded: LedgerRowView = {
       step_id: step.stepId, task_id: step.taskId,
       case_ref_json: JSON.stringify(step.caseRef), template_digest: step.templateRef.digest,
+      step_kind: 'REVIEW_EFFECT', receipt_kind: 'NONE',
       terminal_event: 'USER_SUBMIT', terminal_decision: 'REFUSE', recorded_at_unix_ms: NOW,
       row_sha256: '',
     };
@@ -1127,9 +1130,11 @@ describe('R02-B Host Guided SQLite durability and replay fence', () => {
     const db = new DatabaseSync(file);
     try {
       db.prepare(`INSERT INTO guided_consumed_steps(
-        step_id,task_id,case_ref_json,template_digest,terminal_event,terminal_decision,recorded_at_unix_ms,row_sha256
-      ) VALUES(?,?,?,?,?,?,?,?)`).run(
+        step_id,task_id,case_ref_json,template_digest,step_kind,receipt_kind,
+        terminal_event,terminal_decision,recorded_at_unix_ms,row_sha256
+      ) VALUES(?,?,?,?,?,?,?,?,?,?)`).run(
         seeded.step_id, seeded.task_id, seeded.case_ref_json, seeded.template_digest,
+        seeded.step_kind, seeded.receipt_kind,
         seeded.terminal_event, seeded.terminal_decision, seeded.recorded_at_unix_ms, seeded.row_sha256,
       );
     } finally {
@@ -1192,7 +1197,7 @@ describe('R02-B Host Guided SQLite durability and replay fence', () => {
       // nor a provenance marker existed under G3. Case A's terminal history
       // was discarded when Case B was selected and cannot be reconstructed.
       dropTable(file, 'guided_consumed_steps');
-      dropTable(file, 'guided_schema_marker');
+      dropTable(file, 'guided_schema_receipt');
       // Reopen under G5: the complete replay fence is unknowable, so every
       // mutation path fails closed with the stable migration code.
       service = new HostGuidedService(file, () => now);
@@ -1345,7 +1350,7 @@ describe('R02-B Host Guided SQLite durability and replay fence', () => {
     // provenance marker, so prior-Case terminal history discarded before G4
     // ran cannot be proven recoverable. G5 must fail closed, not extend a
     // possibly-partial fence.
-    dropTable(file, 'guided_schema_marker');
+    dropTable(file, 'guided_schema_receipt');
     service = new HostGuidedService(file, () => NOW);
     try {
       expect(service.stageTrustedSelection({
@@ -1367,22 +1372,24 @@ describe('R02-B Host Guided SQLite durability and replay fence', () => {
   });
 
   it('G5: a provably fresh database initializes transactionally and reopens idempotently', () => {
-    const dir = mkdtempSync(join(tmpdir(), 'shun-g5-fresh-init-'));
+    const dir = mkdtempSync(join(tmpdir(), 'shun-g6-fresh-init-'));
     const file = join(dir, 'guided.sqlite');
     let service = new HostGuidedService(file, () => NOW);
     let consumed: GuidedStep;
     try {
-      // The provenance marker is committed with the schema in one
-      // transaction and is digest-bound to its version and init time.
-      const marker = readMarker(file);
-      expect(marker).toBeDefined();
-      if (!marker) return;
-      expect(marker.schema_version).toBe(5);
-      expect(marker.marker_sha256)
-        .toBe(markerShaHex(marker.schema_version, marker.initialized_at_unix_ms));
+      // The authority receipt is committed with the exact schema in one
+      // transaction and binds the schema version, canonical schema digest
+      // and an authority-issued database identifier.
+      const receipt = readReceipt(file);
+      expect(receipt).toBeDefined();
+      if (!receipt) return;
+      expect(receipt.schema_version).toBe(6);
+      expect(receipt.schema_digest).toMatch(/^[a-f0-9]{64}$/);
+      expect(receipt.database_id).toMatch(/^guidedb-/);
+      expect(receipt.receipt_digest).toMatch(/^[a-f0-9]{64}$/);
       expect(guidedTableNames(file)).toEqual([
         'guided_consumed_steps',
-        'guided_schema_marker',
+        'guided_schema_receipt',
         'guided_selected_case',
         'guided_step_answers',
         'guided_step_refusals',
@@ -1395,31 +1402,32 @@ describe('R02-B Host Guided SQLite durability and replay fence', () => {
       if (staged.status !== 'CURRENT') return;
       consumed = staged.step;
       expect(service.decide(relayFor(staged.step, 'ANSWER',
-        submitOutcome(staged.step, 'ui:g5-fresh', NOW,
+        submitOutcome(staged.step, 'ui:g6-fresh', NOW,
           [{ fieldId: 'selectedRoot', value: 'C:\\Work' }]))))
         .toMatchObject({ status: 'RECORDED', humanGrantIssued: false, effectSent: false });
       service.close();
 
-      // Reopen: the marked database validates marker, schema, every ledger
-      // and payload digest and binding, then keeps operating — and the
-      // validation writes nothing (idempotent: marker byte-identical).
+      // Reopen: the receipt-bearing database validates the exact schema,
+      // the receipt against the authority, every ledger and payload
+      // envelope, digest and binding, then keeps operating — and the
+      // validation writes nothing (idempotent: receipt byte-identical).
       service = new HostGuidedService(file, () => NOW);
-      expect(readMarker(file)).toEqual(marker);
+      expect(readReceipt(file)).toEqual(receipt);
       expect(service.state().currentStep).toBeUndefined();
       expect(service.readRecordedAnswer(consumed.stepId)).toBeDefined();
       const progressed = service.stageTrustedSelection({
-        observation: freshObservation('g5-f2', 2_000, 60_000),
+        observation: freshObservation('g6-f2', 2_000, 60_000),
         semanticSelection: semantic, scope,
       });
       expect(progressed.status).toBe('CURRENT');
       if (progressed.status === 'CURRENT') {
         expect(service.decide(relayFor(progressed.step, 'REFUSE',
-          submitOutcome(progressed.step, 'ui:g5-fresh-2', NOW,
+          submitOutcome(progressed.step, 'ui:g6-fresh-2', NOW,
             [{ fieldId: 'selectedRoot', value: 'C:\\Work' }]))))
           .toMatchObject({ status: 'RECORDED', humanGrantIssued: false, effectSent: false });
       }
       service.close();
-      expect(readMarker(file)).toEqual(marker);
+      expect(readReceipt(file)).toEqual(receipt);
       expect(tableCount(file, 'guided_consumed_steps')).toBe(2);
     } finally {
       try { service.close(); } catch { /* already closed */ }
@@ -1568,6 +1576,8 @@ describe('R02-B Host Guided SQLite durability and replay fence', () => {
       { field: 'task_id', value: 'tampered-task' },
       { field: 'case_ref_json', value: JSON.stringify({ snapshotId: 'snap-tampered', digest: '9'.repeat(64) }) },
       { field: 'template_digest', value: 'e'.repeat(64) },
+      { field: 'step_kind', value: 'REVIEW_EFFECT' },
+      { field: 'receipt_kind', value: 'NONE' },
       { field: 'terminal_event', value: 'OBSERVATION_RECEIPT' },
       { field: 'terminal_decision', value: 'REFUSE' },
       { field: 'recorded_at_unix_ms', value: NOW + 1 },
@@ -1610,6 +1620,471 @@ describe('R02-B Host Guided SQLite durability and replay fence', () => {
       // The tampered ledger row and the original payload row are preserved.
       expect(tableCount(file, 'guided_consumed_steps')).toBe(1);
       expect(tableCount(file, 'guided_step_answers')).toBe(1);
+      cleanup(dir);
+    }
+  });
+
+  // ---------- G6: trusted provenance authority ----------
+
+  // Explicitly test-only authority: the secret lives in this test file,
+  // never in the database, and its registry is an external in-memory trust
+  // record keyed by canonical database path.
+  function createTestGuidedProvenanceAuthority(secret: string): GuidedProvenanceAuthority {
+    const registry = new Map<string, { readonly databaseId: string; readonly schemaDigest: string }>();
+    const digest = (receipt: { readonly databaseId: string; readonly schemaVersion: number;
+      readonly schemaDigest: string; readonly issuedAtUnixMs: number }): string =>
+      sha256Hex(`${secret}|${receipt.databaseId}|${receipt.schemaVersion}|${receipt.schemaDigest}|${receipt.issuedAtUnixMs}`);
+    return {
+      issueFreshReceipt({ canonicalDatabasePath, schemaDigest, issuedAtUnixMs }) {
+        const databaseId = `guidedb-${sha256Hex(`${secret}|${canonicalDatabasePath}`).slice(0, 24)}`;
+        registry.set(canonicalDatabasePath, { databaseId, schemaDigest });
+        const receipt = { schemaVersion: 6, schemaDigest, databaseId, issuedAtUnixMs };
+        return { ...receipt, receiptDigest: digest(receipt) };
+      },
+      verifyReceipt(receipt: unknown, canonicalDatabasePath: string) {
+        if (typeof receipt !== 'object' || receipt === null) return false;
+        const record = receipt as Record<string, unknown>;
+        const expected = registry.get(canonicalDatabasePath);
+        if (!expected || record.databaseId !== expected.databaseId ||
+            record.schemaDigest !== expected.schemaDigest || record.schemaVersion !== 6 ||
+            typeof record.issuedAtUnixMs !== 'number' || typeof record.receiptDigest !== 'string') {
+          return false;
+        }
+        return digest({
+          databaseId: String(record.databaseId),
+          schemaVersion: 6,
+          schemaDigest: String(record.schemaDigest),
+          issuedAtUnixMs: record.issuedAtUnixMs,
+        }) === record.receiptDigest;
+      },
+    };
+  }
+
+  it('G6: a forged G5-style self-asserted marker on a legacy database fails closed', () => {
+    const dir = mkdtempSync(join(tmpdir(), 'shun-g6-forged-marker-'));
+    const file = join(dir, 'guided.sqlite');
+    let service = new HostGuidedService(file, () => NOW);
+    let step: GuidedStep;
+    try {
+      const staged = service.stageTrustedSelection({
+        observation, semanticSelection: semantic, scope,
+      });
+      expect(staged.status).toBe('CURRENT');
+      if (staged.status !== 'CURRENT') return;
+      step = staged.step;
+      expect(service.decide(relayFor(step, 'ANSWER',
+        submitOutcome(step, 'ui:g6-forge', NOW,
+          [{ fieldId: 'selectedRoot', value: 'C:\\Work' }]))))
+        .toMatchObject({ status: 'RECORDED' });
+    } finally {
+      service.close();
+    }
+    // Reduce the database to a G4-era shape, then attach a G5-style marker
+    // minted with the exact PUBLIC G5 formula — the attack G6 must refuse.
+    dropTable(file, 'guided_schema_receipt');
+    dropTable(file, 'guided_consumed_steps');
+    const db = new DatabaseSync(file);
+    try {
+      db.exec(`CREATE TABLE guided_schema_marker (
+        slot TEXT PRIMARY KEY CHECK (slot='schema'),
+        schema_version INTEGER NOT NULL,
+        initialized_at_unix_ms INTEGER NOT NULL,
+        marker_sha256 TEXT NOT NULL
+      )`);
+      db.prepare(`INSERT INTO guided_schema_marker(
+        slot,schema_version,initialized_at_unix_ms,marker_sha256
+      ) VALUES(?,?,?,?)`).run(
+        'schema', 5, NOW, sha256Hex(`guided-schema-marker|v5|${NOW}`),
+      );
+    } finally {
+      db.close();
+    }
+    service = new HostGuidedService(file, () => NOW);
+    try {
+      expect(service.stageTrustedSelection({
+        observation: freshObservation('g6-fg1', 2_000, 60_000),
+        semanticSelection: semantic, scope,
+      })).toMatchObject({ status: 'REFUSED', code: 'GUIDED_LEDGER_MIGRATION_AMBIGUOUS' });
+      expect(service.decide(relayFor(step, 'ANSWER',
+        submitOutcome(step, 'ui:g6-forge-replay', NOW,
+          [{ fieldId: 'selectedRoot', value: 'C:\\Work' }]))))
+        .toMatchObject({ status: 'UNKNOWN', code: 'GUIDED_LEDGER_MIGRATION_AMBIGUOUS' });
+    } finally {
+      service.close();
+    }
+    // Every original row — and the forged marker itself — is preserved.
+    expect(tableCount(file, 'guided_step_answers')).toBe(1);
+    expect(tableCount(file, 'guided_selected_case')).toBe(1);
+    expect(tableCount(file, 'guided_schema_marker')).toBe(1);
+    cleanup(dir);
+  });
+
+  it('G6: a receipt copied to a different database identity fails verification', () => {
+    const dir = mkdtempSync(join(tmpdir(), 'shun-g6-copied-receipt-'));
+    const file1 = join(dir, 'guided-one.sqlite');
+    const file2 = join(dir, 'guided-two.sqlite');
+    const auth = createTestGuidedProvenanceAuthority('test-secret-copied-receipt');
+    const file1Unix = file1.replace(/\\/g, '/');
+    const file2Unix = file2.replace(/\\/g, '/');
+    let service = new HostGuidedService(file1, () => NOW, auth);
+    try {
+      const staged = service.stageTrustedSelection({
+        observation, semanticSelection: semantic, scope,
+      });
+      expect(staged.status).toBe('CURRENT');
+      if (staged.status !== 'CURRENT') return;
+      expect(service.decide(relayFor(staged.step, 'ANSWER',
+        submitOutcome(staged.step, 'ui:g6-copy', NOW,
+          [{ fieldId: 'selectedRoot', value: 'C:\\Work' }]))))
+        .toMatchObject({ status: 'RECORDED' });
+    } finally {
+      service.close();
+    }
+    // Clone the whole database — receipt included — to a different path.
+    const clone = new DatabaseSync(file1);
+    try {
+      clone.exec(`VACUUM INTO '${file2Unix}'`);
+    } finally {
+      clone.close();
+    }
+    // The original opens fine at its own identity.
+    service = new HostGuidedService(file1, () => NOW, auth);
+    expect(service.state().currentStep).toBeUndefined();
+    service.close();
+    // The copy cannot be verified: the authority's external record binds
+    // the receipt's databaseId to the original path only.
+    const copied = new HostGuidedService(file2, () => NOW, auth);
+    try {
+      expect(copied.stageTrustedSelection({
+        observation, semanticSelection: semantic, scope,
+      })).toMatchObject({ status: 'REFUSED', code: 'GUIDED_LEDGER_MIGRATION_AMBIGUOUS' });
+      expect(copied.decide({ kind: 'USER_DECISION_RELAY' }))
+        .toMatchObject({ status: 'UNKNOWN', code: 'GUIDED_LEDGER_MIGRATION_AMBIGUOUS' });
+    } finally {
+      copied.close();
+    }
+    // The copied database file is untouched.
+    expect(tableCount(file2, 'guided_step_answers')).toBe(1);
+    cleanup(dir);
+  });
+
+  it('G6: reopen depends on the authority external record, not on receipt bytes in the database', () => {
+    const dir = mkdtempSync(join(tmpdir(), 'shun-g6-external-record-'));
+    const file = join(dir, 'guided.sqlite');
+    const auth = createTestGuidedProvenanceAuthority('test-secret-external-record');
+    let service = new HostGuidedService(file, () => NOW, auth);
+    try {
+      const staged = service.stageTrustedSelection({
+        observation, semanticSelection: semantic, scope,
+      });
+      expect(staged.status).toBe('CURRENT');
+      if (staged.status !== 'CURRENT') return;
+      expect(service.decide(relayFor(staged.step, 'ANSWER',
+        submitOutcome(staged.step, 'ui:g6-ext', NOW,
+          [{ fieldId: 'selectedRoot', value: 'C:\\Work' }]))))
+        .toMatchObject({ status: 'RECORDED' });
+    } finally {
+      service.close();
+    }
+    // Same authority instance: its protected record knows this path.
+    service = new HostGuidedService(file, () => NOW, auth);
+    expect(service.state().currentStep).toBeUndefined();
+    service.close();
+    // A brand-new authority with an empty external record must refuse the
+    // identical bytes — trust never comes from the database contents.
+    const stranger = createTestGuidedProvenanceAuthority('test-secret-external-record');
+    const reopened = new HostGuidedService(file, () => NOW, stranger);
+    try {
+      expect(reopened.stageTrustedSelection({
+        observation: freshObservation('g6-ext1', 2_000, 60_000),
+        semanticSelection: semantic, scope,
+      })).toMatchObject({ status: 'REFUSED', code: 'GUIDED_LEDGER_MIGRATION_AMBIGUOUS' });
+      expect(reopened.decide({ kind: 'USER_DECISION_RELAY' }))
+        .toMatchObject({ status: 'UNKNOWN', code: 'GUIDED_LEDGER_MIGRATION_AMBIGUOUS' });
+    } finally {
+      reopened.close();
+    }
+    expect(tableCount(file, 'guided_step_answers')).toBe(1);
+    cleanup(dir);
+  });
+
+  it('G6: schema drift with a retained receipt fails closed without modifying data', () => {
+    const dir = mkdtempSync(join(tmpdir(), 'shun-g6-schema-drift-'));
+    const file = join(dir, 'guided.sqlite');
+    let service = new HostGuidedService(file, () => NOW);
+    try {
+      const staged = service.stageTrustedSelection({
+        observation, semanticSelection: semantic, scope,
+      });
+      expect(staged.status).toBe('CURRENT');
+      if (staged.status !== 'CURRENT') return;
+      expect(service.decide(relayFor(staged.step, 'ANSWER',
+        submitOutcome(staged.step, 'ui:g6-drift', NOW,
+          [{ fieldId: 'selectedRoot', value: 'C:\\Work' }]))))
+        .toMatchObject({ status: 'RECORDED' });
+    } finally {
+      service.close();
+    }
+    // Plant an extra guided object while the receipt stays in place.
+    const db = new DatabaseSync(file);
+    try {
+      db.exec('CREATE INDEX guided_tamper_idx ON guided_step_answers(step_id)');
+    } finally {
+      db.close();
+    }
+    service = new HostGuidedService(file, () => NOW);
+    try {
+      expect(service.stageTrustedSelection({
+        observation: freshObservation('g6-drift1', 2_000, 60_000),
+        semanticSelection: semantic, scope,
+      })).toMatchObject({ status: 'REFUSED', code: 'GUIDED_LEDGER_MIGRATION_AMBIGUOUS' });
+      expect(service.decide({ kind: 'USER_DECISION_RELAY' }))
+        .toMatchObject({ status: 'UNKNOWN', code: 'GUIDED_LEDGER_MIGRATION_AMBIGUOUS' });
+    } finally {
+      service.close();
+    }
+    expect(tableCount(file, 'guided_step_answers')).toBe(1);
+    expect(tableCount(file, 'guided_consumed_steps')).toBe(1);
+    cleanup(dir);
+  });
+
+  it('G6: a recomputed digest over tampered embedded answer content fails open and readback', () => {
+    const dir = mkdtempSync(join(tmpdir(), 'shun-g6-answer-tamper-'));
+    const file = join(dir, 'guided.sqlite');
+    let service = new HostGuidedService(file, () => NOW);
+    let step: GuidedStep;
+    let answer: Record<string, unknown> | undefined;
+    try {
+      const staged = service.stageTrustedSelection({
+        observation, semanticSelection: semantic, scope,
+      });
+      expect(staged.status).toBe('CURRENT');
+      if (staged.status !== 'CURRENT') return;
+      step = staged.step;
+      const relay = relayFor(step, 'ANSWER',
+        submitOutcome(step, 'ui:g6-tamper-a', NOW,
+          [{ fieldId: 'selectedRoot', value: 'C:\\Work' }]));
+      answer = (relay as { outcome: Record<string, unknown> }).outcome;
+      expect(service.decide(relay)).toMatchObject({ status: 'RECORDED' });
+    } finally {
+      service.close();
+    }
+    // Tamper the EMBEDDED step identity and recompute the unkeyed payload
+    // digest: digest equality alone must not be enough.
+    const tampered = JSON.stringify({ ...answer, stepId: 'guided:tampered:step' });
+    const db = new DatabaseSync(file);
+    try {
+      db.prepare('UPDATE guided_step_answers SET outcome_json=?, outcome_sha256=? WHERE step_id=?')
+        .run(tampered, sha256Hex(tampered), step.stepId);
+    } finally {
+      db.close();
+    }
+    service = new HostGuidedService(file, () => NOW);
+    try {
+      expect(service.stageTrustedSelection({
+        observation: freshObservation('g6-ta1', 2_000, 60_000),
+        semanticSelection: semantic, scope,
+      })).toMatchObject({ status: 'REFUSED', code: 'GUIDED_LEDGER_MIGRATION_AMBIGUOUS' });
+      // Host readback rejects the tampered envelope without modifying data.
+      expect(service.readRecordedAnswer(step.stepId)).toBeUndefined();
+    } finally {
+      service.close();
+    }
+    expect(tableCount(file, 'guided_step_answers')).toBe(1);
+    cleanup(dir);
+  });
+
+  it('G6: a recomputed digest over tampered embedded refusal content fails open and readback', () => {
+    const dir = mkdtempSync(join(tmpdir(), 'shun-g6-refusal-tamper-'));
+    const file = join(dir, 'guided.sqlite');
+    let service = new HostGuidedService(file, () => NOW);
+    let step: GuidedStep;
+    try {
+      const staged = service.stageTrustedSelection({
+        observation, semanticSelection: semantic, scope,
+      });
+      expect(staged.status).toBe('CURRENT');
+      if (staged.status !== 'CURRENT') return;
+      step = staged.step;
+      expect(service.decide(relayFor(step, 'REFUSE',
+        submitOutcome(step, 'ui:g6-tamper-r', NOW,
+          [{ fieldId: 'selectedRoot', value: 'C:\\Work' }]))))
+        .toMatchObject({ status: 'RECORDED' });
+    } finally {
+      service.close();
+    }
+    // Tamper the nested outcome identity inside the typed refusal envelope
+    // and recompute the digest.
+    const db = new DatabaseSync(file);
+    let tampered: string;
+    try {
+      const row = db.prepare('SELECT refusal_json FROM guided_step_refusals WHERE step_id=?')
+        .get(step.stepId) as { refusal_json: string } | undefined;
+      if (!row) return;
+      const parsed = JSON.parse(row.refusal_json) as { outcome: Record<string, unknown> };
+      tampered = JSON.stringify({
+        ...parsed,
+        outcome: { ...parsed.outcome, stepId: 'guided:tampered:step' },
+      });
+      db.prepare('UPDATE guided_step_refusals SET refusal_json=?, refusal_sha256=? WHERE step_id=?')
+        .run(tampered, sha256Hex(tampered), step.stepId);
+    } finally {
+      db.close();
+    }
+    service = new HostGuidedService(file, () => NOW);
+    try {
+      expect(service.stageTrustedSelection({
+        observation: freshObservation('g6-tr1', 2_000, 60_000),
+        semanticSelection: semantic, scope,
+      })).toMatchObject({ status: 'REFUSED', code: 'GUIDED_LEDGER_MIGRATION_AMBIGUOUS' });
+      expect(service.readRecordedRefusal(step.stepId)).toBeUndefined();
+    } finally {
+      service.close();
+    }
+    expect(tableCount(file, 'guided_step_refusals')).toBe(1);
+    cleanup(dir);
+  });
+
+  it('G6: a consumed ASK refusal with its payload deleted fails closed while ledger and history remain', () => {
+    const dir = mkdtempSync(join(tmpdir(), 'shun-g6-lost-ask-refusal-'));
+    const file = join(dir, 'guided.sqlite');
+    let service = new HostGuidedService(file, () => NOW);
+    let step: GuidedStep;
+    try {
+      const staged = service.stageTrustedSelection({
+        observation, semanticSelection: semantic, scope,
+      });
+      expect(staged.status).toBe('CURRENT');
+      if (staged.status !== 'CURRENT') return;
+      step = staged.step;
+      expect(step.kind).toBe('ASK');
+      expect(service.decide(relayFor(step, 'REFUSE',
+        submitOutcome(step, 'ui:g6-lost-r', NOW,
+          [{ fieldId: 'selectedRoot', value: 'C:\\Work' }]))))
+        .toMatchObject({ status: 'RECORDED' });
+    } finally {
+      service.close();
+    }
+    // Destroy the refusal payload; the ledger still says this ASK step was
+    // terminally refused, which is now unprovable — fail closed. (A
+    // REVIEW_EFFECT REFUSE or INSPECT receipt with no payload stays valid
+    // because its ledger kind proves the absence.)
+    const db = new DatabaseSync(file);
+    try {
+      db.prepare('DELETE FROM guided_step_refusals WHERE step_id=?').run(step.stepId);
+    } finally {
+      db.close();
+    }
+    service = new HostGuidedService(file, () => NOW);
+    try {
+      expect(service.stageTrustedSelection({
+        observation: freshObservation('g6-lr1', 2_000, 60_000),
+        semanticSelection: semantic, scope,
+      })).toMatchObject({ status: 'REFUSED', code: 'GUIDED_LEDGER_MIGRATION_AMBIGUOUS' });
+      expect(service.decide(relayFor(step, 'REFUSE',
+        submitOutcome(step, 'ui:g6-lost-replay', NOW,
+          [{ fieldId: 'selectedRoot', value: 'C:\\Work' }]))))
+        .toMatchObject({ status: 'UNKNOWN', code: 'GUIDED_LEDGER_MIGRATION_AMBIGUOUS' });
+    } finally {
+      service.close();
+    }
+    expect(tableCount(file, 'guided_consumed_steps')).toBe(1);
+    expect(tableCount(file, 'guided_step_refusals')).toBe(0);
+    expect(tableCount(file, 'guided_selected_case')).toBe(1);
+    cleanup(dir);
+  });
+
+  it('G6: a G3 database that lost Case-A REVIEW_EFFECT terminal history fails closed with all data preserved', () => {
+    const dir = mkdtempSync(join(tmpdir(), 'shun-g6-g3-lost-history-'));
+    const file = join(dir, 'guided.sqlite');
+    let now = NOW;
+    let service = new HostGuidedService(file, () => now);
+    let reviewStep: GuidedStep;
+    let caseBStep: GuidedStep;
+    try {
+      // Case A consumes a REVIEW_EFFECT approval — the exact history that
+      // G3's single selected-Case row destroys on a Case switch.
+      const reviewA = {
+        ...observation, revision: 'g6-h1',
+        selectedRootRef: 'host:root:g6-h', actionPreviewRef: 'host:preview:g6-h',
+      };
+      const stagedA = service.stageTrustedSelection({
+        observation: reviewA, semanticSelection: semantic,
+        scope: { status: 'KNOWN', selectedRootRef: 'host:root:g6-h' },
+      });
+      expect(stagedA.status).toBe('CURRENT');
+      if (stagedA.status !== 'CURRENT') return;
+      reviewStep = stagedA.step;
+      expect(reviewStep.kind).toBe('REVIEW_EFFECT');
+      expect(service.decide(relayFor(reviewStep, 'APPROVE',
+        submitOutcome(reviewStep, 'ui:g6-h-approve', now,
+          [{ fieldId: 'continue', value: 'continue-to-independent-approval' }]))))
+        .toMatchObject({ status: 'RECORDED', humanGrantIssued: false, effectSent: false });
+      // Case B replaces the single selected-Case row; Case A's terminal
+      // history is gone. G3 had no ledger and no receipt.
+      now = 10_000;
+      const stagedB = service.stageTrustedSelection({
+        observation: {
+          ...freshObservation('g6-hb1', 10_000, 90_000),
+          caseRef: { snapshotId: 'snap-g6-hb', digest: '7'.repeat(64) },
+        },
+        semanticSelection: semantic, scope,
+      });
+      expect(stagedB.status).toBe('CURRENT');
+      if (stagedB.status !== 'CURRENT') return;
+      caseBStep = stagedB.step;
+      expect(service.decide(relayFor(caseBStep, 'ANSWER',
+        submitOutcome(caseBStep, 'ui:g6-hb', now,
+          [{ fieldId: 'selectedRoot', value: 'C:\\Work' }]))))
+        .toMatchObject({ status: 'RECORDED', humanGrantIssued: false, effectSent: false });
+      service.close();
+
+      dropTable(file, 'guided_schema_receipt');
+      dropTable(file, 'guided_consumed_steps');
+      // G6 open without a verifiable external receipt fails closed.
+      service = new HostGuidedService(file, () => now);
+      expect(service.stageTrustedSelection({
+        observation: freshObservation('g6-h2', 20_000, 120_000),
+        semanticSelection: semantic, scope,
+      })).toMatchObject({ status: 'REFUSED', code: 'GUIDED_LEDGER_MIGRATION_AMBIGUOUS' });
+      expect(service.decide(relayFor(reviewStep, 'APPROVE',
+        submitOutcome(reviewStep, 'ui:g6-h-replay', now,
+          [{ fieldId: 'continue', value: 'continue-to-independent-approval' }]))))
+        .toMatchObject({ status: 'UNKNOWN', code: 'GUIDED_LEDGER_MIGRATION_AMBIGUOUS' });
+      // The complete original database is preserved — including Case B's
+      // still-readable answer.
+      expect(service.readRecordedAnswer(caseBStep.stepId)).toBeDefined();
+      expect(tableCount(file, 'guided_step_answers')).toBe(1);
+      expect(tableCount(file, 'guided_selected_case')).toBe(1);
+      service.close();
+    } finally {
+      try { service.close(); } catch { /* already closed */ }
+      cleanup(dir);
+    }
+  });
+
+  it('G6: two racing first openers converge on one valid schema', () => {
+    const dir = mkdtempSync(join(tmpdir(), 'shun-g6-race-init-'));
+    const file = join(dir, 'guided.sqlite');
+    const first = new HostGuidedService(file, () => NOW);
+    let second: HostGuidedService | null = null;
+    try {
+      // The second opener serializes on BEGIN IMMEDIATE, re-reads the first
+      // opener's committed schema and validates it — it does not attempt a
+      // duplicate CREATE and is not left unavailable.
+      second = new HostGuidedService(file, () => NOW);
+      const staged = first.stageTrustedSelection({
+        observation, semanticSelection: semantic, scope,
+      });
+      expect(staged.status).toBe('CURRENT');
+      if (staged.status !== 'CURRENT') return;
+      expect(second.stageTrustedSelection({
+        observation, semanticSelection: semantic, scope,
+      })).toMatchObject({ status: 'REFUSED', code: 'GUIDED_SEED_REPLAY' });
+      expect(second.state().currentStep?.stepId).toBe(staged.step.stepId);
+    } finally {
+      try { first.close(); } catch { /* already closed */ }
+      try { second?.close(); } catch { /* already closed */ }
       cleanup(dir);
     }
   });
