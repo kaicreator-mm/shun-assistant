@@ -394,44 +394,71 @@ export function verifyRecipeRevision(identity: RecipeRevisionIdentity): boolean 
   return identity.revisionSha256 === computeRecipeRevision(identity);
 }
 
-export const ProviderCatalogArtifactSchema = z
-  .strictObject({
-    providerId: Ref,
-    catalogRevision: Ref,
-    bindingId: Ref,
-    scopedVerifierId: Ref,
-    /** Exact signed curator-catalog identity and per-capability binding evidence. */
-    catalogManifestSha256: Sha256HexSchema,
-    bindingEvidenceSha256: Sha256HexSchema,
-    version: Ref,
-    capabilityId: Ref,
-    artifactKind: z.enum(['CLI', 'NATIVE_ADDON']),
-    platform: z.literal('windows-x64'),
-    artifactSha256: Sha256HexSchema,
-    origin: z.url().refine((value) => {
-      try {
-        const u = new URL(value);
-        return (
-          value.startsWith('https://') &&
-          u.protocol === 'https:' &&
-          u.username === '' &&
-          u.password === ''
-        );
-      } catch {
-        return false;
-      }
-    }, 'provider acquisition origin must be credential-free HTTPS'),
-    entrypoint: Ref,
-    /** Required only for a native addon. CLI has no ABI requirement. */
-    abiRevision: Ref.optional(),
-    signerKeyId: Ref,
-    /** Not a proof of trusted signing; T05 verifies against pinned curator roots. */
-    curatorSignature: Ref,
-    dependencySha256: z.array(Sha256HexSchema),
-  })
-  .superRefine((artifact, ctx) => {
-    if (artifact.artifactKind === 'NATIVE_ADDON' && !artifact.abiRevision) {
-      ctx.addIssue({ code: 'custom', message: 'native addon requires exact ABI revision' });
+/**
+ * Shared strict signed-catalog descriptor fields. Every branch of the
+ * artifact union reuses exactly these fields so both privilege shapes carry
+ * the same signed surface.
+ */
+const ProviderCatalogDescriptorFields = {
+  providerId: Ref,
+  catalogRevision: Ref,
+  bindingId: Ref,
+  scopedVerifierId: Ref,
+  /** Exact signed curator-catalog identity and per-capability binding evidence. */
+  catalogManifestSha256: Sha256HexSchema,
+  bindingEvidenceSha256: Sha256HexSchema,
+  version: Ref,
+  capabilityId: Ref,
+  platform: z.literal('windows-x64'),
+  artifactSha256: Sha256HexSchema,
+  origin: z.url().refine((value) => {
+    try {
+      const u = new URL(value);
+      return (
+        value.startsWith('https://') &&
+        u.protocol === 'https:' &&
+        u.username === '' &&
+        u.password === ''
+      );
+    } catch {
+      return false;
     }
-  });
+  }, 'provider acquisition origin must be credential-free HTTPS'),
+  entrypoint: Ref,
+  signerKeyId: Ref,
+  /** Not a proof of trusted signing; T05 verifies against pinned curator roots. */
+  curatorSignature: Ref,
+  dependencySha256: z.array(Sha256HexSchema),
+} as const;
+
+/**
+ * Curator-signed privilege requirement over the strict signed descriptor.
+ * Omitted is interpreted as USER for backward compatibility with existing
+ * signed catalog descriptors. ELEVATED is valid only for a CLI artifact;
+ * native add-ons stay in-process/user-context and must not request elevation.
+ * The field lives inside the strict signed object, so it participates in the
+ * canonical signed bytes: changing USER↔ELEVATED without a fresh curator
+ * signature fails verification.
+ */
+export const ProviderCatalogArtifactSchema = z.union([
+  z
+    .strictObject({
+      ...ProviderCatalogDescriptorFields,
+      artifactKind: z.enum(['CLI', 'NATIVE_ADDON']),
+      requiredPrivilege: z.literal('USER').optional(),
+      /** Required only for a native addon. CLI has no ABI requirement. */
+      abiRevision: Ref.optional(),
+    })
+    .superRefine((artifact, ctx) => {
+      if (artifact.artifactKind === 'NATIVE_ADDON' && !artifact.abiRevision) {
+        ctx.addIssue({ code: 'custom', message: 'native addon requires exact ABI revision' });
+      }
+    }),
+  z.strictObject({
+    ...ProviderCatalogDescriptorFields,
+    artifactKind: z.literal('CLI'),
+    requiredPrivilege: z.literal('ELEVATED'),
+    abiRevision: Ref.optional(),
+  }),
+]);
 export type ProviderCatalogArtifact = z.infer<typeof ProviderCatalogArtifactSchema>;

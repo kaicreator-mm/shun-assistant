@@ -1,5 +1,5 @@
 import { createHash, generateKeyPairSync, sign } from 'node:crypto';
-import { canonicalJson } from '@shun/contracts';
+import { canonicalJson, ProviderCatalogArtifactSchema } from '@shun/contracts';
 import { describe, expect, it } from 'vitest';
 import { CuratedProviderVerifier } from '../src/curated-provider.ts';
 
@@ -259,5 +259,62 @@ describe('T05 curated Provider trust-bound admission', () => {
     expect(() => new CuratedProviderVerifier([root], [scope, scope])).toThrow(
       'INVALID_TRUST_CONFIGURATION',
     );
+  });
+});
+
+describe('curator-signed Provider privilege requirement', () => {
+  it('verifies legacy descriptors without the field and explicit USER unchanged', () => {
+    const verifier = configured();
+    // Legacy signed bytes never contained the field: byte-for-byte compatible.
+    const legacy = verifier.verify(makeArtifact());
+    expect(legacy.ok).toBe(true);
+    if (legacy.ok) expect('requiredPrivilege' in legacy.artifact).toBe(false);
+    const user = verifier.verify(makeArtifact({ requiredPrivilege: 'USER' }));
+    expect(user.ok).toBe(true);
+    if (user.ok) expect(user.artifact.requiredPrivilege).toBe('USER');
+  });
+
+  it('verifies a signed CLI descriptor that declares ELEVATED', () => {
+    const verifier = configured();
+    const verified = verifier.verify(makeArtifact({ requiredPrivilege: 'ELEVATED' }));
+    expect(verified.ok).toBe(true);
+    if (verified.ok) expect(verified.artifact.requiredPrivilege).toBe('ELEVATED');
+  });
+
+  it('rejects USER↔ELEVATED tampering without a fresh curator signature', () => {
+    const verifier = configured();
+    const user = makeArtifact({ requiredPrivilege: 'USER' });
+    expect(verifier.verify({ ...user, requiredPrivilege: 'ELEVATED' })).toMatchObject({
+      ok: false,
+      code: 'CATALOG_SIGNATURE_INVALID',
+    });
+    const elevated = makeArtifact({ requiredPrivilege: 'ELEVATED' });
+    expect(verifier.verify({ ...elevated, requiredPrivilege: 'USER' })).toMatchObject({
+      ok: false,
+      code: 'CATALOG_SIGNATURE_INVALID',
+    });
+    // Stripping the declared privilege also changes the signed bytes.
+    const stripped = { ...elevated, requiredPrivilege: undefined };
+    expect(verifier.verify(stripped)).toMatchObject({
+      ok: false,
+      code: 'CATALOG_SIGNATURE_INVALID',
+    });
+  });
+
+  it('refuses NATIVE_ADDON elevation in the schema and at admission', () => {
+    // Zod surface: no union branch accepts an elevated native addon.
+    const forged = {
+      ...scope,
+      entrypoint: 'sharp-win32-x64.node',
+      abiRevision: '137',
+      artifactKind: 'NATIVE_ADDON' as const,
+      requiredPrivilege: 'ELEVATED',
+      signerKeyId: issuer,
+      dependencySha256: [],
+      curatorSignature: 'base64-signature-value',
+    };
+    expect(ProviderCatalogArtifactSchema.safeParse(forged).success).toBe(false);
+    // Admission path refuses before any scope or signature consideration.
+    expect(configured().verify(forged)).toMatchObject({ ok: false, code: 'CATALOG_UNTRUSTED' });
   });
 });
