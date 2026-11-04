@@ -1,0 +1,64 @@
+pack_id: shun-v030-r02-b-guided-legacy-migration-g5
+task_id: R02-B
+issue: "#263"
+repository: kaicreator-mm/shun-assistant
+version: v0.3.0
+parent_issue: "#260"
+standard_revision: 2c395c55569fe2edf3f4135f12d3d069e526d0b7
+owner_authorization_refs:
+  - "#260 OWNER_SHUN_V030_R02_AMENDMENT_R1_APPROVE"
+  - "Current project conversation: continue v0.3.0 under ADS #1359 Delivery-First"
+  - "#263 G4 independent Exact-SHA R1 review comment 6633248016"
+execution_profile: LOCAL_BUILDER
+execution_environment: LOCAL
+admission_mode: SINGLE_WRITER_ADMISSION
+admission_generation: 5
+protected_claim_key: "kaicreator-mm/shun-assistant#263:builder:__default__"
+source_base_sha: ad5c3f7db0aad5b4bc49959e519d850dcb42ce51
+source_base_tree: d132f334276df99972a36f9e20be53ac836013f0
+source_base_branch: JIT_only_task/v0.3.0-r02-b-guided-local-g4
+pack_branch: JIT_only_task/v0.3.0-r02-b-guided-pack-g5
+jit_branch: JIT_only_task/v0.3.0-r02-b-guided-local-g5
+execution_pack_path: .agent/execution/R02-B-GUIDED-LEGACY-MIGRATION-G5/MANIFEST.yaml
+findings:
+  - "P1-01: G4's open-time migration cannot prove a complete replay fence for an existing G3/G4 database. G3 overwrote the single selected-Case row on A->B; prior-Case REVIEW_EFFECT APPROVE/REFUSE and INSPECT receipts have no answer/refusal payload row and their terminal history is irrecoverable. G4 creates guided_consumed_steps before migration and then backfills only answer/refusal rows plus the currently selected Case terminal history. It commits a partial ledger and permits mutations rather than failing closed."
+  - "P2-01: answer/refusal conflicts are checked only for the currently selected CONSUMED step. A non-current step present in both payload tables is silently resolved by INSERT OR IGNORE; existing ledger rows are also not cross-checked against matching payload bindings."
+  - "P2-02: Builder reports tools/task-check.sh exit 0, but that path and scripts/task-check.sh are absent from the exact G4 source tree. Remote CI is green; local task-check evidence needs an actual reproducible tracked command/path."
+approved_write_set:
+  - packages/domain-host/src/guided/host-guided-service.ts
+  - tests/integration/v03/r02-b-guided/durable-guided.test.ts
+allowed_write_set:
+  - packages/domain-host/src/guided/host-guided-service.ts
+  - tests/integration/v03/r02-b-guided/durable-guided.test.ts
+design_contract:
+  - "Inspect database schema and data state before creating any G5 ledger/schema marker. Do not infer that a database is fresh merely because a ledger table can be created."
+  - "Introduce an explicit durable schema/migration provenance marker, written atomically only after a complete, verifiable initialization. A G3/G4 database without a trusted marker cannot prove that prior-Case terminal history was not discarded."
+  - "Fail closed with stable GUIDED_LEDGER_MIGRATION_AMBIGUOUS for every mutation path on any non-empty pre-G5 database whose complete prior-Case replay history cannot be proven. This includes databases with a G4 ledger but no trusted G5 provenance marker: G4 itself could have initialized after G3 had already discarded other-Case REVIEW_EFFECT/INSPECT history. Preserve all existing rows; do not silently reset, delete or claim complete migration."
+  - "Only a provably empty database may initialize a new G5 schema marker and ledger automatically. If a safe explicit migration path is available, it must prove complete history from a trusted source and record that provenance; do not invent missing events."
+  - "Once a trusted G5 marker exists, validate its schema/version and every existing ledger row before enabling mutations. Keep initialization and marker commit transactional; a partially created table without the marker must remain fail-closed on restart."
+  - "Validate conflicts across the complete answer/refusal/ledger datasets before any backfill or commit. Any stepId present in both answer and refusal tables is ambiguous regardless of whether it is the currently selected Case. Verify every matching existing ledger row agrees on taskId, Case identity, template digest, terminal event/decision and timestamp; INSERT OR IGNORE must never silently mask a mismatch."
+  - "Preserve G4 global stepId uniqueness, atomic terminal consumption, A->B->A replay fence, service/process restart, REVIEW_EFFECT APPROVE/REFUSE and INSPECT receipt coverage, two-instance exactly-once, BACK non-consumption, PAUSE/RESUME lifecycle, and no ledger exposure through state()/HTTP."
+  - "Preserve all G3/G4 payload digest, currentness, expiry recovery, Case isolation, typed ASK refusal, OBSERVATION_RECEIPT, no grant/Permit/Kernel/effect behavior."
+test_contract:
+  - "Pack PR must be exactly one manifest path on the exact G4 source HEAD/tree; all pack CI checks SUCCESS before source edits."
+  - "After pack CI, create a fresh Generation-5 CAS Claim bound to this exact pack HEAD/tree, source base/tree and exact two-path write set. G1-G4 Claims are terminal and cannot be reused."
+  - "Legacy G3 database regression: consume a Case-A REVIEW_EFFECT APPROVE or REFUSE / INSPECT receipt, switch to Case B so G3's single selected-case row drops A history, then open with G5. Prove the database fails closed because the complete replay fence is unknowable; all original data remains."
+  - "Legacy G4 database regression: non-empty DB with a ledger but no trusted G5 provenance marker fails closed; empty new DB initializes and operates normally; a partial initialization without committed marker remains fail-closed after restart."
+  - "Add non-current historical conflict regression: the same stepId in answer and refusal tables must fail closed even when another Case is currently selected."
+  - "Add existing-ledger mismatch regressions for taskId, caseRef, template digest, terminal event/decision and timestamp; fail closed without modifying existing data."
+  - "Prove marker creation is transactional and idempotent; reopen a marked G5 DB and verify all ledger/payload bindings and row digests."
+  - "Retain and rerun all 23 G4 focused tests plus adjacent R02-E production and R02-V journey suites, full tracked R02 typecheck and full CI-equivalent workspace lint/typecheck/test."
+  - "Tracked-source syntax preflight must record exact Node version, exact driver SHA-256, exact argv (no placeholders), tracked-source glob and count, exit code, output digest and resulting source SHA. Preserve the driver/evidence in the Issue comment or CI artifact without expanding the source write set."
+  - "At exact G5 source SHA, run Windows Node 24.21.0 focused and adjacent suites and exact-SHA Woodpecker Push/PR plus GitHub Actions contracts/executor-windows."
+  - "The G4 Builder's tools/task-check.sh claim must be reconciled. At G4 exact tree, tools/task-check.sh and scripts/task-check.sh are absent. Record NOT_PRESENT if unavailable; run and report the actual tracked commands instead. Do not claim an absent script."
+  - "Controller independently reviews final exact SHA; Builder must not self-approve."
+forbidden:
+  - "Any path outside the exact two allowed paths"
+  - "apps/control-api/src/server.ts, main.ts, HTTP route expansion, UI source, packages/domain-computer changes or composition changes"
+  - "Any second Guided workflow engine, K, Journal, sender, grant, Permit or effect dispatcher"
+  - "Paid LLM, Provider installation, UAC, physical Windows effects or external data disclosure"
+  - "main, version/v0.2.0, WIP integration merge, version merge, tag, release or deployment"
+claim_admitted: false
+source_write_authorized: false
+merge_authorized: false
+release_authorized: false
