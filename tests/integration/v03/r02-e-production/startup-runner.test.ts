@@ -18,6 +18,12 @@
  * fixture digest receipts in SHA256SUMS.txt are mandatory, unique per
  * fixture and lowercase 64-hex (fail closed when missing).
  *
+ * G5 bounded cleanup (PR #330 R1 P2 repair): Windows taskkill tree
+ * termination is asynchronous with a hard timeout and an explicit
+ * fallback, never the G4 unbounded synchronous spawnSync; every spawned
+ * server is stopped in a finally so a failed assertion can never leak
+ * the child process tree or its loopback listener.
+ *
  * Zero paid calls / zero physical effects: no cloud interpreter is
  * configured (every LLM effect fails closed CLOUD_UNAVAILABLE), no Provider
  * install, no UAC, no persistent Windows effect beyond temp fixture files.
@@ -134,6 +140,12 @@ async function waitForExit(
   child: ReturnType<typeof spawn>,
   timeoutMs: number,
 ): Promise<{ code: number | null; signal: NodeJS.Signals | null } | 'TIMEOUT'> {
+  // Idempotent: a child that already exited (e.g. reaped by a finally
+  // cleanup after the success path did its bounded wait) has no second
+  // 'exit' event to await, so report the recorded outcome directly.
+  if (child.exitCode !== null || child.signalCode !== null) {
+    return { code: child.exitCode, signal: child.signalCode };
+  }
   return new Promise((resolved) => {
     const timer = setTimeout(() => resolved('TIMEOUT'), timeoutMs);
     child.once('exit', (code, signal) => {
@@ -174,20 +186,53 @@ function rawGet(
   });
 }
 
-/** Kill the whole spawned process tree (pnpm wrapper smoke test cleanup). */
-function killTree(child: ReturnType<typeof spawn>): void {
-  if (isWindows && child.pid) {
-    spawnSync('taskkill', ['/PID', String(child.pid), '/T', '/F'], { stdio: 'ignore' });
-  } else if (child.pid) {
-    // POSIX: the dev server is a grandchild (pnpm → tsx → node); killing only
-    // the direct child would orphan the listener. The child was spawned
-    // detached, so a group kill takes the whole tree.
+/**
+ * Hard bound for the Windows taskkill tree termination below. taskkill
+ * normally completes in well under a second; anything past this bound is
+ * treated as failure and falls back to killing the direct child.
+ */
+const TASKKILL_TIMEOUT_MS = 10_000;
+
+/**
+ * Kill the whole spawned process tree (pnpm wrapper smoke test cleanup).
+ *
+ * G5 P2 repair: Windows tree termination is hard-bounded and failure-safe.
+ * The G4 unbounded synchronous `spawnSync('taskkill')` could hang without
+ * limit, and its latency sat outside every later wait bound, so taskkill
+ * is now spawned asynchronously and awaited with a hard timeout; on
+ * timeout or a non-zero exit it falls back to killing at least the direct
+ * wrapper child so no orphan is silently tolerated. The POSIX group kill
+ * is immediate and stays synchronous. Never throws: cleanup must not mask
+ * a test's original assertion failure — the success path verifies
+ * shutdown truthfully via the bounded exit wait and the eventual
+ * port-refusal assertion. Idempotent: a child that already exited is a
+ * no-op, so finally blocks may call this unconditionally.
+ */
+async function killTree(child: ReturnType<typeof spawn>): Promise<void> {
+  const pid = child.pid;
+  if (!pid || child.exitCode !== null || child.signalCode !== null) return;
+  if (!isWindows) {
     try {
-      process.kill(-child.pid, 'SIGKILL');
+      process.kill(-pid, 'SIGKILL');
     } catch {
       child.kill('SIGKILL');
     }
+    return;
   }
+  const taskkillExit = new Promise<number | null>((resolved) => {
+    const killer = spawn('taskkill', ['/PID', String(pid), '/T', '/F'], {
+      stdio: 'ignore',
+    });
+    killer.once('exit', (code) => resolved(code));
+    killer.once('error', () => resolved(null));
+  });
+  const outcome = await Promise.race([
+    taskkillExit,
+    delay(TASKKILL_TIMEOUT_MS).then(() => 'TIMEOUT' as const),
+  ]);
+  // taskkill timeout, spawn error (null) or a non-zero exit all mean the
+  // tree kill could not be confirmed; fall back to the direct child.
+  if (outcome === 'TIMEOUT' || outcome !== 0) child.kill('SIGKILL');
 }
 
 describe('R02-E default dev startup runner (Node 24 strip-mode repair)', () => {
@@ -202,60 +247,89 @@ describe('R02-E default dev startup runner (Node 24 strip-mode repair)', () => {
       shell: isWindows,
       detached: !isWindows,
     });
-    const output = collect(child);
-    const up = await waitForHttp(port, 60_000);
-    const text = output.text();
-    expect(up, `server did not come up; output:\n${text}`).toBe(true);
-    expect(text).not.toContain('ERR_UNSUPPORTED_TYPESCRIPT_SYNTAX');
-    expect(text).toContain('Shun control surface (T08 DEMO ONLY)');
-    killTree(child);
-    await waitForExit(child, 15_000);
-    expect(await portRefusesConnectionEventually(port)).toBe(true);
+    try {
+      const output = collect(child);
+      const up = await waitForHttp(port, 60_000);
+      const text = output.text();
+      expect(up, `server did not come up; output:\n${text}`).toBe(true);
+      expect(text).not.toContain('ERR_UNSUPPORTED_TYPESCRIPT_SYNTAX');
+      expect(text).toContain('Shun control surface (T08 DEMO ONLY)');
+      // G5 P2: bounded tree kill, bounded exit wait, then verify the
+      // loopback listener is actually gone.
+      await killTree(child);
+      await waitForExit(child, 15_000);
+      expect(await portRefusesConnectionEventually(port)).toBe(true);
+    } finally {
+      // G5 P2: a failed assertion above must never leak the child process
+      // tree or its loopback listener into the rest of the run. killTree
+      // and waitForExit never throw and are no-ops once the child has
+      // exited, so cleanup cannot mask the original assertion failure.
+      await killTree(child);
+      await waitForExit(child, 15_000);
+    }
   });
 
   it('tsx entry boots DEMO on loopback, refuses hostile Host, reports Guided truthfully, shuts down deterministically', async () => {
     const port = await freePort();
     const { child, output } = startViaTsx(port, {});
-    const up = await waitForHttp(port, 60_000);
-    const text = output.text();
-    expect(up, `server did not come up; output:\n${text}`).toBe(true);
-    expect(text).not.toContain('ERR_UNSUPPORTED_TYPESCRIPT_SYNTAX');
-    expect(text).toContain('T08 DEMO ONLY');
-    expect(text).toContain('v0.3 production BUILD inactive');
+    try {
+      const up = await waitForHttp(port, 60_000);
+      const text = output.text();
+      expect(up, `server did not come up; output:\n${text}`).toBe(true);
+      expect(text).not.toContain('ERR_UNSUPPORTED_TYPESCRIPT_SYNTAX');
+      expect(text).toContain('T08 DEMO ONLY');
+      expect(text).toContain('v0.3 production BUILD inactive');
 
-    const hostile = await rawGet(port, '/', { host: 'attacker.example' });
-    expect(hostile.status).toBe(403);
-    expect(hostile.body).toContain('LOCAL_ONLY_VIOLATION');
+      const hostile = await rawGet(port, '/', { host: 'attacker.example' });
+      expect(hostile.status).toBe(403);
+      expect(hostile.body).toContain('LOCAL_ONLY_VIOLATION');
 
-    const guided = await rawGet(port, '/api/v03/guided/state', { host: `127.0.0.1:${port}` });
-    expect(guided.status).toBe(503);
-    expect(guided.body).toContain('V03_GUIDED_UNAVAILABLE');
+      const guided = await rawGet(port, '/api/v03/guided/state', { host: `127.0.0.1:${port}` });
+      expect(guided.status).toBe(503);
+      expect(guided.body).toContain('V03_GUIDED_UNAVAILABLE');
 
-    child.kill('SIGTERM');
-    expectCleanShutdown(await waitForExit(child, 20_000));
-    expect(await portRefusesConnectionEventually(port)).toBe(true);
+      child.kill('SIGTERM');
+      expectCleanShutdown(await waitForExit(child, 20_000));
+      expect(await portRefusesConnectionEventually(port)).toBe(true);
+    } finally {
+      // G5 P2: guaranteed cleanup even when an assertion above failed.
+      await killTree(child);
+      await waitForExit(child, 20_000);
+    }
   });
 
   it('unknown SHUN_CONTROL_MODE fails closed — never a silent DEMO fallback', async () => {
     const port = await freePort();
     const { child, output } = startViaTsx(port, { SHUN_CONTROL_MODE: 'bogus' });
-    const exit = await waitForExit(child, 30_000);
-    expect(exit, 'boot must refuse and exit').not.toBe('TIMEOUT');
-    expect(output.text()).toContain('Unknown SHUN_CONTROL_MODE: refusing to start');
-    if (exit !== 'TIMEOUT') expect(exit.code).not.toBe(0);
-    expect(await portRefusesConnectionEventually(port)).toBe(true);
+    try {
+      const exit = await waitForExit(child, 30_000);
+      expect(exit, 'boot must refuse and exit').not.toBe('TIMEOUT');
+      expect(output.text()).toContain('Unknown SHUN_CONTROL_MODE: refusing to start');
+      if (exit !== 'TIMEOUT') expect(exit.code).not.toBe(0);
+      expect(await portRefusesConnectionEventually(port)).toBe(true);
+    } finally {
+      // G5 P2: a stuck boot refusal (TIMEOUT) must not survive the test.
+      await killTree(child);
+      await waitForExit(child, 20_000);
+    }
   });
 
   it('real-storage mode without trusted config fails closed with the exact missing gate', async () => {
     const port = await freePort();
     const { child, output } = startViaTsx(port, { SHUN_CONTROL_MODE: 'real-storage' });
-    const exit = await waitForExit(child, 30_000);
-    expect(exit, 'boot must refuse and exit').not.toBe('TIMEOUT');
-    expect(output.text()).toContain(
-      'Missing trusted local configuration SHUN_REAL_STORAGE_ROOT; refusing real mode',
-    );
-    if (exit !== 'TIMEOUT') expect(exit.code).not.toBe(0);
-    expect(await portRefusesConnectionEventually(port)).toBe(true);
+    try {
+      const exit = await waitForExit(child, 30_000);
+      expect(exit, 'boot must refuse and exit').not.toBe('TIMEOUT');
+      expect(output.text()).toContain(
+        'Missing trusted local configuration SHUN_REAL_STORAGE_ROOT; refusing real mode',
+      );
+      if (exit !== 'TIMEOUT') expect(exit.code).not.toBe(0);
+      expect(await portRefusesConnectionEventually(port)).toBe(true);
+    } finally {
+      // G5 P2: a stuck boot refusal (TIMEOUT) must not survive the test.
+      await killTree(child);
+      await waitForExit(child, 20_000);
+    }
   });
 });
 
@@ -289,9 +363,7 @@ describe.skipIf(!isWindows)(
       const entries = receipts.get(name);
       expect(
         entries,
-        `fixture ${name} must have exactly one SHA256SUMS receipt (found ${
-          entries?.length ?? 0
-        })`,
+        `fixture ${name} must have exactly one SHA256SUMS receipt (found ${entries?.length ?? 0})`,
       ).toHaveLength(1);
       const expected = entries![0];
       expect(expected).toMatch(/^[0-9a-f]{64}$/);
@@ -547,7 +619,7 @@ export const routeWorkflowIntent = __dhv10RouterBundle.routeWorkflowIntent;
 
       // G4 P2: the EXACT operator command, not a direct node/tsx invocation.
       // On Windows .cmd requires a shell; the whole pnpm → tsx → node tree
-      // is terminated with taskkill /T (bounded process-tree cleanup).
+      // is terminated with taskkill /T (hard-bounded by the G5 killTree).
       const child = spawn(PNPM, ['--filter', '@shun/control-api', 'dev'], {
         cwd: repoRoot,
         env: { ...childEnv, SHUN_CONTROL_PORT: String(port) },
@@ -555,57 +627,68 @@ export const routeWorkflowIntent = __dhv10RouterBundle.routeWorkflowIntent;
         shell: isWindows,
         detached: !isWindows,
       });
-      const output = collect(child);
-      const up = await waitForHttp(port, 90_000);
-      const text = output.text();
-      expect(up, `production surface did not come up; output:\n${text}`).toBe(true);
-      expect(text).not.toContain('ERR_UNSUPPORTED_TYPESCRIPT_SYNTAX');
-      expect(text).toContain('Shun control surface (REAL bounded C-003)');
-      expect(text).not.toContain('T08 DEMO ONLY');
-      expect(text).not.toContain('v0.3 production BUILD inactive');
-      // The production DomainHarness is activated and the issued reference log
-      // binds the gateway to the exact selected Guided Case (same K/Host).
-      expect(text).toMatch(/v0\.3 public DomainHarness activated: subjectDigest=[0-9a-f]{64}/);
-      expect(text).toContain(`v0.3 submit references issued (case ${caseId}, step `);
+      try {
+        const output = collect(child);
+        const up = await waitForHttp(port, 90_000);
+        const text = output.text();
+        expect(up, `production surface did not come up; output:\n${text}`).toBe(true);
+        expect(text).not.toContain('ERR_UNSUPPORTED_TYPESCRIPT_SYNTAX');
+        expect(text).toContain('Shun control surface (REAL bounded C-003)');
+        expect(text).not.toContain('T08 DEMO ONLY');
+        expect(text).not.toContain('v0.3 production BUILD inactive');
+        // The production DomainHarness is activated and the issued reference log
+        // binds the gateway to the exact selected Guided Case (same K/Host).
+        expect(text).toMatch(/v0\.3 public DomainHarness activated: subjectDigest=[0-9a-f]{64}/);
+        expect(text).toContain(`v0.3 submit references issued (case ${caseId}, step `);
 
-      const guided = await rawGet(port, '/api/v03/guided/state', { host: `127.0.0.1:${port}` });
-      expect(guided.status, guided.body).toBe(200);
-      const state = JSON.parse(guided.body) as { currentStep?: { taskId?: string } };
-      expect(state.currentStep?.taskId).toBe(caseId);
+        const guided = await rawGet(port, '/api/v03/guided/state', { host: `127.0.0.1:${port}` });
+        expect(guided.status, guided.body).toBe(200);
+        const state = JSON.parse(guided.body) as { currentStep?: { taskId?: string } };
+        expect(state.currentStep?.taskId).toBe(caseId);
 
-      // Unauthenticated submit (valid-shaped forged references) is refused
-      // truthfully pre-Kernel: 422 KERNEL_REFUSED, never a fake success.
-      const forged = await fetch(`http://127.0.0.1:${port}/api/v03/gateway/submit`, {
-        method: 'POST',
-        headers: {
-          'content-type': 'application/json',
-          host: `127.0.0.1:${port}`,
-        },
-        body: JSON.stringify({
-          caseId,
-          request: {
-            taskId: caseId,
-            goal: 'Summarize the selected folder.',
-            objects: [],
-            constraints: {},
-            policyContext: {
-              privacyPolicy: { localOnly: true, externalDisclosure: 'FORBIDDEN' },
-              environmentPolicy: { allowedBackendKinds: ['LOCAL_WINDOWS'], allowElevation: false },
-            },
+        // Unauthenticated submit (valid-shaped forged references) is refused
+        // truthfully pre-Kernel: 422 KERNEL_REFUSED, never a fake success.
+        const forged = await fetch(`http://127.0.0.1:${port}/api/v03/gateway/submit`, {
+          method: 'POST',
+          headers: {
+            'content-type': 'application/json',
+            host: `127.0.0.1:${port}`,
           },
-          currentnessRef: `shun.currentness.v1/${'a'.repeat(48)}`,
-          approvalRef: `shun.approval.v1/${'b'.repeat(48)}`,
-        }),
-      });
-      const receipt = (await forged.json()) as { status?: string };
-      expect(forged.status).toBe(422);
-      expect(receipt.status).toBe('KERNEL_REFUSED');
+          body: JSON.stringify({
+            caseId,
+            request: {
+              taskId: caseId,
+              goal: 'Summarize the selected folder.',
+              objects: [],
+              constraints: {},
+              policyContext: {
+                privacyPolicy: { localOnly: true, externalDisclosure: 'FORBIDDEN' },
+                environmentPolicy: {
+                  allowedBackendKinds: ['LOCAL_WINDOWS'],
+                  allowElevation: false,
+                },
+              },
+            },
+            currentnessRef: `shun.currentness.v1/${'a'.repeat(48)}`,
+            approvalRef: `shun.approval.v1/${'b'.repeat(48)}`,
+          }),
+        });
+        const receipt = (await forged.json()) as { status?: string };
+        expect(forged.status).toBe(422);
+        expect(receipt.status).toBe('KERNEL_REFUSED');
 
-      // Windows cannot signal through the pnpm → tsx wrapper chain; the
-      // bounded tree kill is the deterministic shutdown path here.
-      killTree(child);
-      expectCleanShutdown(await waitForExit(child, 20_000));
-      expect(await portRefusesConnectionEventually(port)).toBe(true);
+        // Windows cannot signal through the pnpm → tsx wrapper chain; the
+        // bounded tree kill is the deterministic shutdown path here.
+        await killTree(child);
+        expectCleanShutdown(await waitForExit(child, 20_000));
+        expect(await portRefusesConnectionEventually(port)).toBe(true);
+      } finally {
+        // G5 P2: a failed production assertion must never leak the server
+        // child or its loopback listener. killTree and waitForExit never
+        // throw, so cleanup cannot mask the original assertion failure.
+        await killTree(child);
+        await waitForExit(child, 20_000);
+      }
     }, 180_000);
   },
 );
