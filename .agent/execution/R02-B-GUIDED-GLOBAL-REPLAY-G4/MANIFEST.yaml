@@ -1,0 +1,59 @@
+pack_id: shun-v030-r02-b-guided-global-replay-ledger-g4
+task_id: R02-B
+issue: "#263"
+repository: kaicreator-mm/shun-assistant
+version: v0.3.0
+parent_issue: "#260"
+standard_revision: 2c395c55569fe2edf3f4135f12d3d069e526d0b7
+owner_authorization_refs:
+  - "#260 OWNER_SHUN_V030_R02_AMENDMENT_R1_APPROVE"
+  - "Current project conversation: continue v0.3.0 under ADS #1359 Delivery-First"
+  - "#263 independent Exact-SHA R1 review comment 6630590580"
+execution_profile: LOCAL_BUILDER
+execution_environment: LOCAL
+admission_mode: SINGLE_WRITER_ADMISSION
+admission_generation: 4
+protected_claim_key: "kaicreator-mm/shun-assistant#263:builder:__default__"
+source_base_sha: 0b196a957faf2efb0ecbf6fa13e1aecac5cfc399
+source_base_tree: 4253a937e8831b1aeae71e663e3e8e527f400e23
+source_base_branch: JIT_only_task/v0.3.0-r02-b-guided-local-g3
+pack_branch: JIT_only_task/v0.3.0-r02-b-guided-pack-g4
+jit_branch: JIT_only_task/v0.3.0-r02-b-guided-local-g4
+execution_pack_path: .agent/execution/R02-B-GUIDED-GLOBAL-REPLAY-G4/MANIFEST.yaml
+findings:
+  - "P2-01: the G3 replay fence is scoped to the currently selected StoredCase row/history. Switching Case A -> Case B replaces the single guided_selected_case row and drops A history. Returning to A can regenerate the same deterministic stepId while the old observation remains valid; sameCase=false bypasses the consumed freshness check. REVIEW_EFFECT APPROVE/REFUSE and INSPECT OBSERVATION_RECEIPT have no answer/refusal row to provide a second durable fence, so they can be consumed again."
+  - "P2-02: G3 records only an exact-tree --experimental-transform-types import of the changed Host service. The frozen pack gate requires tracked-source syntax preflight evidence (exact command, Node version, tracked source set/count and exit code); this evidence is not present in the Builder receipt."
+approved_write_set:
+  - packages/domain-host/src/guided/host-guided-service.ts
+  - tests/integration/v03/r02-b-guided/durable-guided.test.ts
+allowed_write_set:
+  - packages/domain-host/src/guided/host-guided-service.ts
+  - tests/integration/v03/r02-b-guided/durable-guided.test.ts
+design_contract:
+  - "Add a durable Host-private consumed-step ledger whose uniqueness fence is independent of the currently selected Case. Bind each row to stepId, taskId, canonical Case identity/digest, template digest, terminal event/decision and consumed timestamp; protect integrity as appropriate."
+  - "stageTrustedSelection must check the durable ledger before replacing the selected Case. Any previously consumed stepId is refused with a stable replay code even after A -> B -> A, service restart, or process restart. Do not expose ledger rows or other-Case history through state()/HTTP."
+  - "decide must write the consumed-step ledger in the same SQLite BEGIN IMMEDIATE transaction as the terminal outcome receipt and selected-case CAS update. Cover ANSWER, APPROVE, REFUSE (ASK and REVIEW_EFFECT), and REFUSE + INSPECT + OBSERVATION_RECEIPT. Unique conflicts fail closed as STALE/REFUSED; never report RECORDED unless all durable writes commit."
+  - "BACK remains non-consuming navigation. PAUSE/RESUME remain lifecycle transitions and do not create a terminal consumed-step ledger row. A later terminal decision consumes the step exactly once."
+  - "Preserve current answer/refusal digest receipts, typed refusal semantics, OBSERVATION_RECEIPT history label, PAUSE/RESUME, expiry recovery, same-Case observation freshness, SQLite durability/CAS and zero grant/Permit/Kernel/effect behavior."
+  - "Migration must be idempotent and transactional. Backfill all provable consumption evidence from guided_step_answers, guided_step_refusals and the currently persisted selected-Case terminal history. Do not claim that previously discarded other-Case REVIEW_EFFECT/INSPECT history can be reconstructed. If an existing legacy DB cannot prove a complete replay fence, fail closed with an explicit stable migration/unknown code; never silently clear/reset state or imply complete migration."
+test_contract:
+  - "Pack PR must be exactly one manifest path, exact parent source_base_sha/tree, and all pack CI checks SUCCESS before source edit."
+  - "After pack CI, create a fresh Generation-4 CAS Claim bound to this exact pack/source base. G1/G2/G3 claims are terminal and cannot be reused."
+  - "Add A -> B -> A regressions with same deterministic Case A step identity, including restart between Case switches. Prove the old A step cannot be staged/consumed again and B state() never exposes A history."
+  - "Cover REVIEW_EFFECT APPROVE, REVIEW_EFFECT REFUSE and INSPECT OBSERVATION_RECEIPT replay after A -> B -> A; include durable restart/readback and zero grant/effect assertions."
+  - "Cover ASK ANSWER and ASK REFUSE ledger insertion, idempotent migration/backfill, unique conflict/concurrent consumption, and BACK/PAUSE/RESUME non-consumption."
+  - "Add a legacy-DB migration regression proving known records are backfilled and ambiguous prior-Case history is not falsely treated as complete; fail closed without data deletion."
+  - "Retain all G3 regressions: same-Case historical-step replay, observation freshness, Case projection isolation, typed ASK refusal receipt, INSPECT observation receipt, expiry recovery, pause/resume and restart."
+  - "Run the exact frozen tracked-source syntax preflight before source-changing CI. Record exact command, Node version, tracked source file set/count, exit code and resulting SHA; a single-file import smoke test is not a substitute."
+  - "Run Windows Node 24.21.0 focused r02-b-guided suite, adjacent r02-e-production and r02-v-journeys suites, full tools/task-check.sh and exact-SHA Woodpecker Push/PR plus required GitHub Actions checks. Repair failures in this same Builder run."
+  - "Controller independently reviews the final exact SHA; Builder must not self-approve."
+forbidden:
+  - "Any path outside the exact two allowed paths"
+  - "apps/control-api/src/server.ts, main.ts, HTTP route expansion, UI source, or packages/domain-computer changes"
+  - "Any second Guided workflow engine, K, Journal, sender, grant, Permit or effect dispatcher"
+  - "Paid LLM, Provider installation, UAC, physical Windows effects or external data disclosure"
+  - "main, version/v0.2.0, WIP integration merge, version merge, tag, release or deployment"
+claim_admitted: false
+source_write_authorized: true
+merge_authorized: false
+release_authorized: false
