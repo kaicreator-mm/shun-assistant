@@ -1,14 +1,22 @@
 /**
- * R02-E Generation-3 startup-runner regression (Issue #269): the default
- * control-api dev entry must boot the REAL import graph under Node 24's
- * strip-only TypeScript mode without ERR_UNSUPPORTED_TYPESCRIPT_SYNTAX
- * (native/index.ts constructor parameter properties), must stay truthful
- * (no hidden DEMO fallback for a requested real mode), must bind loopback
- * only, and must shut down deterministically. On Windows it additionally
- * boots the full real-storage production composition (operator-pinned BUILD,
- * durable Guided Case, SQLite K docs, cloud journal, Host reference ledger)
- * through the same entry and reads back production BUILD activation plus a
- * truthful Guided state and gateway over HTTP.
+ * R02-E Generation-3 startup-runner regression (Issue #269), hardened in
+ * Generation-4 (PR #328 R1 findings): the default control-api dev entry must
+ * boot the REAL import graph under Node 24's strip-only TypeScript mode
+ * without ERR_UNSUPPORTED_TYPESCRIPT_SYNTAX (native/index.ts constructor
+ * parameter properties), must stay truthful (no hidden DEMO fallback for a
+ * requested real mode), must bind loopback only, and must shut down
+ * deterministically. On Windows it additionally boots the full real-storage
+ * production composition (operator-pinned BUILD, durable Guided Case, SQLite
+ * K docs, cloud journal, Host reference ledger) through the EXACT operator
+ * command `pnpm --filter @shun/control-api dev` and reads back production
+ * BUILD activation plus a truthful Guided state and gateway over HTTP.
+ *
+ * G4 test-safety hardening: every spawned Control API process runs in a
+ * sanitized environment that forces SHUN_CLOUD_ENABLED=0 and strips
+ * DEEPSEEK_API_KEY plus all SHUN_CLOUD_* authority/ledger variables, so a
+ * regression at the forged-reference seam can never reach paid egress;
+ * fixture digest receipts in SHA256SUMS.txt are mandatory, unique per
+ * fixture and lowercase 64-hex (fail closed when missing).
  *
  * Zero paid calls / zero physical effects: no cloud interpreter is
  * configured (every LLM effect fails closed CLOUD_UNAVAILABLE), no Provider
@@ -36,6 +44,28 @@ const PNPM = isWindows ? 'pnpm.cmd' : 'pnpm';
 const sha256Hex = (value: string): string =>
   createHash('sha256').update(value, 'utf8').digest('hex');
 
+/**
+ * G4 P1 hardening: variables that must never reach a spawned Control API
+ * process. SHUN_CLOUD_ENABLED is forced to '0'; the rest are deleted so a
+ * host shell cannot arm the real cloud interpreter (paid egress) even if the
+ * security boundary under test regresses. Applied AFTER caller overrides so
+ * no override can re-enable the cloud lane.
+ */
+const STRIPPED_CLOUD_KEYS = [
+  'DEEPSEEK_API_KEY',
+  'SHUN_CLOUD_LEDGER_FILE',
+  'SHUN_CLOUD_AUTHORITY_FILE',
+  'SHUN_CLOUD_PUBLIC_KEY_FILE',
+  'SHUN_CLOUD_PUBLIC_KEY_SPKI_SHA256',
+] as const;
+
+function sanitizedEnv(overrides: NodeJS.ProcessEnv): NodeJS.ProcessEnv {
+  const env: NodeJS.ProcessEnv = { ...process.env, ...overrides };
+  env.SHUN_CLOUD_ENABLED = '0';
+  for (const key of STRIPPED_CLOUD_KEYS) delete env[key];
+  return env;
+}
+
 /** One free loopback port, obtained the same way the product probes do. */
 async function freePort(): Promise<number> {
   const probe = createServer();
@@ -53,11 +83,14 @@ function collect(child: ReturnType<typeof spawn>): { text: () => string } {
   return { text: () => out };
 }
 
-/** Boot main.ts through the pinned tsx runner exactly as the dev script does. */
+/**
+ * Boot main.ts through the pinned tsx runner (the resolved dev script target).
+ * The child always receives a cloud-sanitized environment (G4 P1).
+ */
 function startViaTsx(port: number, env: NodeJS.ProcessEnv) {
   const child = spawn(process.execPath, ['--import', 'tsx', 'src/main.ts'], {
     cwd: apiDir,
-    env: { ...process.env, ...env, SHUN_CONTROL_PORT: String(port) },
+    env: { ...sanitizedEnv(env), SHUN_CONTROL_PORT: String(port) },
     stdio: ['ignore', 'pipe', 'pipe'],
   });
   return { child, output: collect(child) };
@@ -164,7 +197,7 @@ describe('R02-E default dev startup runner (Node 24 strip-mode repair)', () => {
     // POSIX detaches so killTree can take the whole pnpm → tsx → node group.
     const child = spawn(PNPM, ['--filter', '@shun/control-api', 'dev'], {
       cwd: repoRoot,
-      env: { ...process.env, SHUN_CONTROL_PORT: String(port) },
+      env: { ...sanitizedEnv({}), SHUN_CONTROL_PORT: String(port) },
       stdio: ['ignore', 'pipe', 'pipe'],
       shell: isWindows,
       detached: !isWindows,
@@ -236,18 +269,33 @@ describe.skipIf(!isWindows)(
     let env: NodeJS.ProcessEnv;
     let caseId: string;
 
+    /**
+     * G4 P2 hardening: fail closed. Every required fixture MUST have exactly
+     * one SHA256SUMS.txt receipt, the receipt MUST be lowercase 64-hex, and
+     * the computed digest MUST match. A missing or duplicated receipt fails
+     * the test instead of silently accepting unpinned content.
+     */
     function readPinned(name: string): string {
       const source = readFileSync(join(t11Fixtures, name), 'utf8');
-      const receipts = new Map<string, string>();
+      const receipts = new Map<string, string[]>();
       for (const line of readFileSync(join(t11Fixtures, 'SHA256SUMS.txt'), 'utf8').split(/\r?\n/)) {
         const match = line.match(/^([0-9a-f]{64})\s+\*?(.+)$/);
         const [, digest, fileName] = match ?? [];
         if (typeof digest === 'string' && typeof fileName === 'string') {
-          receipts.set(fileName.trim(), digest);
+          const key = fileName.trim();
+          receipts.set(key, [...(receipts.get(key) ?? []), digest]);
         }
       }
-      const expected = receipts.get(name);
-      if (expected !== undefined) expect(sha256Hex(source)).toBe(expected);
+      const entries = receipts.get(name);
+      expect(
+        entries,
+        `fixture ${name} must have exactly one SHA256SUMS receipt (found ${
+          entries?.length ?? 0
+        })`,
+      ).toHaveLength(1);
+      const expected = entries![0];
+      expect(expected).toMatch(/^[0-9a-f]{64}$/);
+      expect(sha256Hex(source)).toBe(expected);
       return source;
     }
 
@@ -405,14 +453,13 @@ export const routeWorkflowIntent = __dhv10RouterBundle.routeWorkflowIntent;
         {
           cwd: repoRoot,
           encoding: 'utf8',
-          env: {
-            ...process.env,
+          env: sanitizedEnv({
             SHUN_ISSUER_WORKSPACE: workspace,
             SHUN_REGISTRY_CURRENTNESS_FILE: currentnessFile,
             SHUN_REGISTRY_PUBLIC_KEY_FILE: publicKeyFile,
             SHUN_ISSUER_PRIVATE_KEY_FILE: privateKeyFile,
             SHUN_ISSUER_TARGET_PRIVILEGE_MODE: privilegeMode,
-          },
+          }),
         },
       );
       expect(issuer.status, `issuer failed: ${issuer.stderr?.slice(0, 2000)}`).toBe(0);
@@ -490,7 +537,25 @@ export const routeWorkflowIntent = __dhv10RouterBundle.routeWorkflowIntent;
     });
 
     it('boots production: real BUILD activated, same selected K/Host, truthful Guided and gateway, deterministic shutdown', async () => {
-      const { child, output } = startViaTsx(port, env);
+      // G4 P1: prove the cloud egress lane is disabled in the exact
+      // environment the production child will receive, BEFORE any gateway
+      // POST. A regression at the forged-reference seam can then never
+      // reach paid cloud egress.
+      const childEnv = sanitizedEnv(env);
+      expect(childEnv.SHUN_CLOUD_ENABLED).toBe('0');
+      for (const key of STRIPPED_CLOUD_KEYS) expect(childEnv).not.toHaveProperty(key);
+
+      // G4 P2: the EXACT operator command, not a direct node/tsx invocation.
+      // On Windows .cmd requires a shell; the whole pnpm → tsx → node tree
+      // is terminated with taskkill /T (bounded process-tree cleanup).
+      const child = spawn(PNPM, ['--filter', '@shun/control-api', 'dev'], {
+        cwd: repoRoot,
+        env: { ...childEnv, SHUN_CONTROL_PORT: String(port) },
+        stdio: ['ignore', 'pipe', 'pipe'],
+        shell: isWindows,
+        detached: !isWindows,
+      });
+      const output = collect(child);
       const up = await waitForHttp(port, 90_000);
       const text = output.text();
       expect(up, `production surface did not come up; output:\n${text}`).toBe(true);
@@ -536,7 +601,9 @@ export const routeWorkflowIntent = __dhv10RouterBundle.routeWorkflowIntent;
       expect(forged.status).toBe(422);
       expect(receipt.status).toBe('KERNEL_REFUSED');
 
-      child.kill('SIGTERM');
+      // Windows cannot signal through the pnpm → tsx wrapper chain; the
+      // bounded tree kill is the deterministic shutdown path here.
+      killTree(child);
       expectCleanShutdown(await waitForExit(child, 20_000));
       expect(await portRefusesConnectionEventually(port)).toBe(true);
     }, 180_000);
