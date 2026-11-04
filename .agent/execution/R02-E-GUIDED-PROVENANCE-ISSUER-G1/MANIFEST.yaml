@@ -1,0 +1,66 @@
+pack_id: shun-v030-r02e-guided-provenance-issuer-g1
+task_id: R02-E-GUIDED-AUTHORITY
+issue: "#348"
+parent_issue: "#269"
+repository: kaicreator-mm/shun-assistant
+version: v0.3.0
+standard_revision: 2c395c55569fe2edf3f4135f12d3d069e526d0b7
+owner_authorization_refs:
+  - "#260 OWNER_SHUN_V030_R02_AMENDMENT_R1_APPROVE"
+  - "Current project instruction: continue v0.3.0 under ADS #1359 Delivery-First"
+  - "#263 G6 WIP integration PR #347, exact merge SHA 39e4f85f3fa01d9f4b20ba73adcf79cbc42707f5"
+  - "#269 architecture handoff comment #6640644444"
+execution_profile: LOCAL_BUILDER
+execution_environment: WINDOWS_LOCAL
+admission_mode: SINGLE_WRITER_ADMISSION
+admission_generation: 1
+protected_claim_key: "kaicreator-mm/shun-assistant#348:builder:__default__"
+source_base_sha: 39e4f85f3fa01d9f4b20ba73adcf79cbc42707f5
+source_base_tree: cb8b14856f223622a80f85a0317026f455198983
+source_base_branch: JIT_only_task/v0.3.0-r02e-guided-authority-local-g1
+pack_branch: JIT_only_task/v0.3.0-r02e-guided-authority-pack-g1
+jit_branch: JIT_only_task/v0.3.0-r02e-guided-authority-local-g1
+execution_pack_path: .agent/execution/R02-E-GUIDED-PROVENANCE-ISSUER-G1/MANIFEST.yaml
+approved_write_set:
+  - apps/control-api/src/real-storage/guided-provenance-issuance.ts
+  - apps/control-api/scripts/issue-guided-provenance.ts
+  - apps/control-api/test/guided-provenance-issuance.test.ts
+allowed_write_set:
+  - apps/control-api/src/real-storage/guided-provenance-issuance.ts
+  - apps/control-api/scripts/issue-guided-provenance.ts
+  - apps/control-api/test/guided-provenance-issuance.test.ts
+design_contract:
+  - "The R02-B G6 GuidedProvenanceAuthority contract is the integration boundary. This task provides a production-grade external receipt issuer and verify-only runtime adapter; R02-E #269 remains the sole owner of main.ts/composition injection."
+  - "Use an Ed25519-signed operator-preissued receipt. Receipt payload binds schema/version, exact canonical DDL digest, canonical absolute DB path, authority-issued random databaseId and issuedAt. Use canonical JSON and explicit domain separation for signature bytes."
+  - "The runtime adapter is verify-only. Its issueFreshReceipt implementation reads and validates the already-provisioned receipt; it MUST NOT sign or access a private key in-process. Missing/malformed/mismatched receipt returns a stable fail-closed authority error."
+  - "The runtime trust directory is a fixed build-time/default path under C:\\ProgramData\\Shun\\authority\\guided-provenance, not argv or environment-controlled. Tests may inject a temp directory. Trust anchor and receipt are outside SQLite and outside the DB directory."
+  - "The trust anchor contains the Ed25519 public key and its SPKI SHA-256 fingerprint. Its trust derives from an operator-protected directory/file ACL (Administrators/SYSTEM owner, runtime read-only), not from the trust file's own contents or an environment variable. Runtime must verify the required Windows ownership/ACL policy before accepting the trust anchor."
+  - "The operator issuer runs only on Windows and requires an already-elevated token; it must not trigger UAC itself. Private key path is supplied only to the operator-side issuer, must be outside repo/workspace/DB scope, and is never copied, logged, uploaded or read by the runtime adapter."
+  - "Issuer validates private/public key pair is Ed25519 and matches, refuses path aliases/reparse points and unprotected output parents, generates a random databaseId, signs the exact receipt, and atomically creates trust/receipt files without overwriting existing records."
+  - "A copied receipt or database moved to a different canonical path fails. Schema generation or DDL change requires a new explicitly provisioned receipt. No automatic blessing/backfill of non-empty G3/G4/G5 databases."
+  - "No default to developmentGuidedProvenanceAuthority for production storage. No environment variable, same-directory secret, SQLite key, public hash or self-signed marker may establish trust."
+  - "Do not edit main.ts, server.ts, composition-*.ts or UI here; #269 owns production injection after this primitive is independently reviewed."
+test_contract:
+  - "Pack PR must contain exactly one manifest path and one commit, directly parented to source_base_sha 39e4f85f3fa01d9f4b20ba73adcf79cbc42707f5 with source_base_tree cb8b14856f223622a80f85a0317026f455198983."
+  - "After all pack checks are SUCCESS, create a fresh Generation-1 DISPATCH_CLAIMED event on Issue #348 bound to exact pack HEAD/tree, source base/tree, operator/session/dispatch identity and exact three-path write set."
+  - "Use ephemeral test-only Ed25519 keys. Tests must prove valid issuance/verification; signature tamper; receipt tamper; wrong DB path; copied receipt; wrong schema version/digest; unknown/extra fields; missing trust anchor/receipt; public-key fingerprint mismatch; unsafe/reparse output path; unprotected ACL; and no overwrite."
+  - "Prove the runtime adapter does not read, accept or depend on any private-key path or secret environment variable. Instrument the runtime adapter tests so no signing API or private-key import is reachable."
+  - "Run Windows Node 24.21.0 and Node 26.13.0 focused issuer/adapter tests. Run tracked-source syntax preflight before source-changing CI; record Node version, driver SHA-256, exact argv, tracked glob/count, exit and output digest."
+  - "Run full tracked lint/typecheck/test and exact-SHA Woodpecker Push/PR. The repository .woodpecker.yml is the authoritative real CI gate; GitHub Actions are supplementary and are not a required gate if they do not trigger."
+  - "Record exact HEAD/tree/base, changed paths, commands/exit codes, key-handling assertions and Windows ACL/owner evidence in Issue #348. Never attach private keys or signed production receipts."
+  - "Controller performs independent Exact-SHA R1. If the reviewer finds a defect inside this exact write set, the reviewer repairs it directly on a fresh bounded repair generation/Claim where feasible; do not hand back a validation-only task or allow Builder self-approval."
+integration_handoff:
+  - "R02-E #269 must inject the verified runtime adapter into HostGuidedService via its existing main.ts/composition write set."
+  - "Until #269 injects the real adapter and an operator provisions the matching receipt, production Guided startup remains fail-closed. This task alone does not make production startup ready."
+forbidden:
+  - "Any path outside the exact three allowed paths"
+  - "apps/control-api/src/main.ts, apps/control-api/src/server.ts, apps/control-api/src/v03/composition-*.ts, UI, package manifests or lockfile"
+  - "packages/executor-windows/**, Domain Computer, SDK private src, Kernel, sender, grant, Permit or effect dispatcher"
+  - "Any production private key, HMAC secret, credential or real signed production receipt in source, tests, CI artifacts, GitHub comments or SQLite"
+  - "Any UAC prompt initiated by the script, automatic elevation, physical Windows effect, paid LLM request, Provider installation or external disclosure"
+  - "Any destructive migration, data deletion/reset, automatic blessing of untrusted legacy DBs"
+  - "WIP integration merge, version/v0.3.0 merge, main/version/v0.2.0 mutation, tag, release or deployment"
+claim_admitted: false
+source_write_authorized: false
+merge_authorized: false
+release_authorized: false
