@@ -4,6 +4,7 @@
  * consent issuer, ActionController grant or effect dispatcher.
  * Only the trusted Host composition calls stageTrustedSelection.
  */
+import { createHash } from 'node:crypto';
 import { DatabaseSync } from 'node:sqlite';
 import {
   createNextGuidedStep,
@@ -26,7 +27,8 @@ export type GuidedDecisionReceipt =
 
 type Row = { readonly state_json: string; readonly revision: number };
 const CASE_KEY = 'selected-case';
-const ID = /^[A-Za-z][A-Za-z0-9._-]{0,127}$/;
+const TASK_ID = /^[A-Za-z][A-Za-z0-9._-]{0,127}$/;
+const STEP_ID = /^[A-Za-z0-9][A-Za-z0-9_.:-]{0,159}$/;
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return value !== null && typeof value === 'object' && !Array.isArray(value) &&
@@ -51,6 +53,15 @@ export class HostGuidedService {
       state_json TEXT NOT NULL,
       revision INTEGER NOT NULL
     )`);
+    this.#db.exec(`CREATE TABLE IF NOT EXISTS guided_step_answers (
+      step_id TEXT PRIMARY KEY,
+      task_id TEXT NOT NULL,
+      case_ref_json TEXT NOT NULL,
+      template_digest TEXT NOT NULL,
+      outcome_json TEXT NOT NULL,
+      outcome_sha256 TEXT NOT NULL,
+      recorded_at_unix_ms INTEGER NOT NULL
+    )`);
     this.#clock = clock;
   }
 
@@ -67,7 +78,7 @@ export class HostGuidedService {
       nowUnixMs: now,
     });
     if (next.status !== 'STEP') return { status: 'REFUSED', code: next.code };
-    if (!ID.test(next.step.taskId)) return { status: 'REFUSED', code: 'TASK_ID_INVALID' };
+    if (!TASK_ID.test(next.step.taskId)) return { status: 'REFUSED', code: 'TASK_ID_INVALID' };
     const state: StoredCase = {
       step: next.step, observation: input.observation,
       semanticSelection: input.semanticSelection, scope: input.scope,
@@ -124,9 +135,10 @@ export class HostGuidedService {
   decide(raw: unknown): GuidedDecisionReceipt {
     if (!isRecord(raw) || Object.keys(raw).sort().join('|') !==
       ['authorityClaimed','caseRef','decision','humanApproval','kind','outcome','relayedVia','stepDigest','stepId'].sort().join('|') ||
-      raw.kind !== 'USER_DECISION_RELAY' || raw.humanApproval !== true ||
+      raw.kind !== 'USER_DECISION_RELAY' ||
       raw.authorityClaimed !== false || raw.relayedVia !== '/api' ||
-      (raw.decision !== 'APPROVE' && raw.decision !== 'REFUSE')) {
+      !((raw.decision === 'ANSWER' && raw.humanApproval === false) ||
+        ((raw.decision === 'APPROVE' || raw.decision === 'REFUSE') && raw.humanApproval === true))) {
       return { status: 'REFUSED', code: 'RELAY_SCHEMA_REFUSED' };
     }
     const now = this.#clock();
@@ -138,10 +150,18 @@ export class HostGuidedService {
         this.#db.exec('ROLLBACK');
         return { status: 'STALE', code: 'GUIDED_STEP_NOT_CURRENT' };
       }
+      // Untrusted ASK answers must not impersonate trusted Host receipts.
+      if (raw.decision === 'ANSWER' &&
+          (!isRecord(raw.outcome) || raw.outcome.event !== 'USER_SUBMIT' ||
+           raw.outcome.source !== 'USER')) {
+        this.#db.exec('ROLLBACK');
+        return { status: 'REFUSED', code: 'GUIDED_ANSWER_PROVENANCE_REFUSED' };
+      }
       if (raw.stepId !== stored.step.stepId ||
           raw.stepDigest !== stored.step.templateRef.digest ||
           JSON.stringify(raw.caseRef) !== JSON.stringify(stored.step.caseRef) ||
-          (raw.decision === 'APPROVE' && stored.step.kind !== 'REVIEW_EFFECT')) {
+          ((raw.decision === 'ANSWER' && stored.step.kind !== 'ASK') ||
+           (raw.decision === 'APPROVE' && stored.step.kind !== 'REVIEW_EFFECT')))  {
         this.#db.exec('ROLLBACK');
         return { status: 'STALE', code: 'GUIDED_STEP_IDENTITY_MISMATCH' };
       }
@@ -163,6 +183,29 @@ export class HostGuidedService {
         stepId: stored.step.stepId,
         status: raw.decision === 'REFUSE' ? 'REFUSED' : 'ACCEPTED',
       }];
+      if (raw.decision === 'ANSWER') {
+        const outcomeJson = JSON.stringify(checked.outcome);
+        if (typeof outcomeJson !== 'string' || outcomeJson.length > 65_536) {
+          this.#db.exec('ROLLBACK');
+          return { status: 'REFUSED', code: 'GUIDED_ANSWER_TOO_LARGE' };
+        }
+        const outcomeSha256 = createHash('sha256').update(outcomeJson, 'utf8').digest('hex');
+        const saved = this.#db.prepare(`INSERT INTO guided_step_answers(
+          step_id,task_id,case_ref_json,template_digest,outcome_json,outcome_sha256,recorded_at_unix_ms
+        ) VALUES(?,?,?,?,?,?,?)`).run(
+          stored.step.stepId,
+          stored.step.taskId,
+          JSON.stringify(stored.step.caseRef),
+          stored.step.templateRef.digest,
+          outcomeJson,
+          outcomeSha256,
+          now,
+        );
+        if (saved.changes !== 1) {
+          this.#db.exec('ROLLBACK');
+          return { status: 'STALE', code: 'GUIDED_ANSWER_ALREADY_RECORDED' };
+        }
+      }
       const updated: StoredCase = { ...stored, state: 'CONSUMED', history };
       const change = this.#db.prepare(`UPDATE guided_selected_case
         SET state_json=?, revision=revision+1 WHERE slot=? AND revision=?`)
@@ -176,6 +219,27 @@ export class HostGuidedService {
     } catch {
       this.#rollback();
       return { status: 'UNKNOWN', code: 'GUIDED_DURABILITY_UNKNOWN' };
+    }
+  }
+
+  /**
+   * Trusted Host-only readback for the exact consumed ASK step. This is not
+   * included in the HTTP state projection; the digest detects local record
+   * corruption before an answer is reused by a later Host step.
+   */
+  readRecordedAnswer(stepId: string): unknown | undefined {
+    if (typeof stepId !== 'string' || !STEP_ID.test(stepId)) return undefined;
+    const row = this.#db.prepare(`SELECT outcome_json,outcome_sha256
+      FROM guided_step_answers WHERE step_id=?`).get(stepId) as
+      | { outcome_json: string; outcome_sha256: string }
+      | undefined;
+    if (!row || !/^[a-f0-9]{64}$/.test(row.outcome_sha256)) return undefined;
+    const digest = createHash('sha256').update(row.outcome_json, 'utf8').digest('hex');
+    if (digest !== row.outcome_sha256) return undefined;
+    try {
+      return JSON.parse(row.outcome_json) as unknown;
+    } catch {
+      return undefined;
     }
   }
 

@@ -1,0 +1,43 @@
+schema: ads/execution-pack/v1
+task_id: U03-GUIDED-ANSWER
+issue: 281
+owner_authorization: "kaicreator-mm/shun-assistant#279 OWNER_SHUN_V030_R04_U03_GUIDED_ANSWER_FULL_AUTH"
+baseline:
+  branch: wip/v0.3.0-r02-owner-repairs
+  sha: be2e81722a70ee3d0bd5634bc83d97d733c20b78
+  tree: 8d6d6ee5fc4277e6b0b64b2d22e6f66575fe2889
+execution_branch: wip/v0.3.0-u03-guided-answer
+role: WEB_BUILDER
+validation_role: LOCAL_VALIDATION
+integration_target: wip/v0.3.0-r02-owner-repairs
+allowed_write_set:
+  - packages/domain-host/src/guided/host-guided-service.ts
+  - tests/integration/v03/r02-b-guided/durable-guided.test.ts
+acceptance:
+  - ASK-only ANSWER with humanApproval=false and authorityClaimed=false
+  - exact Host-current StepSpec, CaseRef, task, journey, step ID, template digest and validity
+  - reuse validateGuidedStepOutcome for exact StepOutcome/provenance/answers/choices
+  - durable atomic single-consumption and replay/supersession fence
+  - truthful UNKNOWN on uncertain SQLite persistence
+  - RECORDED always humanGrantIssued=false and effectSent=false
+  - no K send, Kernel Journal, Permit, grant, provider activation, cloud send or effect
+  - preserve existing REVIEW_EFFECT APPROVE/REFUSE behavior
+pre_ci:
+  required: node scripts/v03-ci/preflight-ui-syntax.mjs
+  then: lint/typecheck and scoped tests
+  ci: self-hosted Woodpecker push and pull_request at exact SHA
+forbidden:
+  - main
+  - version/v0.2.0
+  - tag
+  - release
+  - paid LLM
+  - physical Windows effects
+  - external data disclosure
+claim:
+  status: pending
+  required_event: DISPATCH_CLAIMED
+  claim_generation: 1
+review:
+  policy: independent_exact_sha_required
+  merge: only into wip/v0.3.0-r02-owner-repairs after CI success and independent PASS
