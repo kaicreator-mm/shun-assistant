@@ -8,7 +8,7 @@
 - Check out the exact approved monorepo SHA. Use `corepack enable` and `pnpm install --frozen-lockfile`.
 - Loopback UI: `http://127.0.0.1:7788`. `pnpm --filter @shun/control-api dev` starts the current development surface. Demo is simulated and proves no real v0.3 Kernel/Host production journey.
 - Real-storage mode (`SHUN_CONTROL_MODE=real-storage`) requires trusted workspace, SQLite, registry revision/public key and Host authorization secret configuration. Missing authoritative configuration must fail closed. Never promote test credentials.
-- Verified at the recorded exact HEADs (see `docs/implementation/v0.3/r02-validation/`): real B-040 read-only collection; loopback HTTP truth (200/202/409/422/503) over the selected public v0.10.3 DomainApp; real paid DeepSeek CN/EN (J03, budget-exhausted, do not re-run); real scoped Windows effects, signed Provider first use and durable Shadow feedback through the SAME selected K (R03-INT journey routes). Physical/paid legs are env-gated test journeys, not a production-operation approval.
+- Verified at the recorded exact HEADs (see `docs/implementation/v0.3/r02-validation/`): real B-040 read-only collection; loopback HTTP truth (200/202/409/422/503) over the selected public v0.10.3 DomainApp; real paid DeepSeek CN/EN (J03: two authorized final CN/EN completions; 7 of 8 amended completions used; do not rerun without new Owner authorization); real scoped Windows effects, signed Provider first use and durable Shadow feedback through the SAME selected K (R03-INT journey routes). Physical/paid legs are env-gated test journeys, not a production-operation approval.
 
 ## Authority boundaries
 
