@@ -9,8 +9,8 @@ owner_authorization_refs:
   - "#260 OWNER_SHUN_V030_R02_AMENDMENT_R1_APPROVE"
   - "Current project conversation: continue Shun Assistant v0.3.0 under ADS #1359 Delivery-First"
   - "#263 R1 review comment 6625739846"
-execution_profile: WEB_BUILDER
-execution_environment: WEB
+execution_profile: LOCAL_BUILDER
+execution_environment: LOCAL
 admission_mode: SINGLE_WRITER_ADMISSION
 admission_generation: 2
 protected_claim_key: "kaicreator-mm/shun-assistant#263:builder:__default__"
@@ -50,10 +50,12 @@ plan:
 test_contract:
   - "Pack PR must be exactly one manifest path, exact parent source_base_sha/tree, and all pack CI SUCCESS before source edit."
   - "After pack CI, create a fresh Generation-2 CAS Claim bound to this exact pack/source base; G1 is terminal and cannot be reused."
-  - "Run exact-tree syntax preflight before source-changing CI."
+  - "On Windows Node 24.21.0, run exact-tree tracked JS/TS syntax preflight before source-changing CI."
+  - "Run the r02-b-guided suite and full task-check locally before pushing the source PR; repair failures in the same Builder run."
   - "Add deterministic tests for expiry refusal + fresh-revision recovery, same-revision replay refusal, valid CURRENT restore, PAUSE/RESUME across restart, BACK non-consumption, ASK REFUSE rejection, REVIEW_EFFECT REFUSE preservation and no grant/effect."
   - "Run r02-b-guided suite, full task-check, Woodpecker Push/PR on exact final SHA; preserve Node>=24 compatibility."
-  - "Web Controller independently reviews final exact SHA; Builder must not self-approve."
+  - "Local Builder performs implementation, repair, syntax preflight, focused tests and full task-check in one continuous run; no LOCAL_VALIDATION-only handoff."
+  - "Controller independently reviews final exact SHA; Builder must not self-approve."
 forbidden:
   - "Any path outside the four exact allowed paths"
   - "apps/control-api/src/server.ts, main.ts, HTTP route expansion or UI source"
