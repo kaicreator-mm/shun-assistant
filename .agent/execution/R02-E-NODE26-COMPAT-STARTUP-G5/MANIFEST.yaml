@@ -1,0 +1,56 @@
+pack_id: shun-v030-r02-e-node24-node26-production-startup-g5-cleanup
+task_id: R02-E
+issue: "#269"
+repository: kaicreator-mm/shun-assistant
+version: v0.3.0
+parent_issue: "#260"
+standard_revision: 2c395c55569fe2edf3f4135f12d3d069e526d0b7
+owner_authorization_refs:
+  - "#260 comment 6545077384 OWNER_SHUN_V030_R02_AMENDMENT_R1_APPROVE"
+  - "#330 comment 6624003320 independent R1 P2 cleanup finding"
+execution_profile: LOCAL_BUILDER
+execution_environment: LOCAL
+admission_mode: SINGLE_WRITER_ADMISSION
+admission_generation: 5
+protected_claim_key: "kaicreator-mm/shun-assistant#269:builder:__default__"
+source_base_sha: 1d7d5c1d969b612255f7eb22536d64e04f0ead88
+source_base_tree: 7d3c13d5cd013a3f73f334f6403ef96f4b268d9e
+source_base_branch: JIT_only_task/v0.3.0-r02e-node26-compatible-runner-local-g4
+pack_branch: JIT_only_task/v0.3.0-r02e-node26-compatible-runner-pack-g5
+jit_branch: JIT_only_task/v0.3.0-r02e-node26-compatible-runner-local-g5
+execution_pack_path: .agent/execution/R02-E-NODE26-COMPAT-STARTUP-G5/MANIFEST.yaml
+finding:
+  - "PR #330 R1 P2: killTree() uses synchronous taskkill spawnSync without a timeout, so process-tree termination itself is unbounded."
+  - "PR #330 R1 P2: server cleanup runs only after assertions; failures after startup can leave child process trees and loopback listeners alive."
+approved_write_set:
+  - tests/integration/v03/r02-e-production/startup-runner.test.ts
+allowed_write_set:
+  - tests/integration/v03/r02-e-production/startup-runner.test.ts
+plan:
+  - "Make Windows process-tree termination hard-bounded. Use an explicit timeout for taskkill and deterministic failure/fallback behavior; do not allow a synchronous cleanup command to block indefinitely."
+  - "Track every spawned Control API child and guarantee cleanup in finally/afterEach even when startup, HTTP, banner or security assertions fail."
+  - "Keep cleanup idempotent: already-exited children are harmless; preserve the original assertion failure while surfacing cleanup failure as a secondary diagnostic."
+  - "After termination, await child exit with a hard bound and verify the loopback port eventually refuses connections."
+  - "Preserve G4 cloud-sanitized environment, mandatory fixture digest checks, exact pnpm dev production boot, real BUILD/Guided/gateway assertions and Node 24/26 compatibility."
+test_contract:
+  - "Before source edit, verify pack PR has exactly one manifest path, exact parent source_base_sha and exact source_base_tree."
+  - "Do not source-edit until pack Push/PR checks are SUCCESS and a fresh Generation-5 CAS Claim is accepted on source_base_sha."
+  - "Generation-5 Claim is terminally distinct from G3/G4 and restricted to the one exact test path; do not amend G3 or G4 source branches."
+  - "Run exact-tree tracked-source JS/TS syntax preflight before any source-changing CI."
+  - "Run focused r02-e-production suite on Windows Node 24.21.0 and Node 26.13.0, full tools/task-check.sh, and exact-SHA Woodpecker Push/PR CI."
+  - "Record exact HEAD/tree, commands/exit codes, Node versions, build IDs and cleanup-failure behavior in Issue #269."
+  - "Web Controller independently reviews the delivered exact SHA; Builder must not self-approve."
+forbidden:
+  - "Any source path other than tests/integration/v03/r02-e-production/startup-runner.test.ts"
+  - "apps/control-api/package.json, pnpm-lock.yaml, native/index.ts, root package.json or engines"
+  - "apps/control-api/src/**, packages/**, R04 UI, CI configuration, or any other task lane"
+  - "Any real cloud credential, paid LLM request, Provider installation, UAC, Windows physical effect or external disclosure"
+  - "main, version/v0.2.0, WIP integration branch mutation, merge, tag, release or deployment"
+pre_ci:
+  - "Pack Push/PR checks must be fully SUCCESS before local Builder claim."
+  - "No source edit before fresh Generation-5 CAS claim acceptance."
+  - "Source syntax preflight must PASS on the final exact source tree before source-changing CI."
+  - "Every spawned server must be stopped in failure and success paths; cleanup must be hard-bounded."
+source_write_authorized: true
+merge_authorized: false
+release_authorized: false
