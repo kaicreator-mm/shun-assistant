@@ -1,6 +1,8 @@
+import { createHash } from 'node:crypto';
 import { mkdtempSync, readdirSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+import { DatabaseSync } from 'node:sqlite';
 import { describe, expect, it } from 'vitest';
 import { HostGuidedService } from '../../../../packages/domain-host/src/guided/host-guided-service.ts';
 
@@ -81,6 +83,62 @@ function cleanup(dir: string): void {
   } catch { /* directory already gone */ }
   // Never mask a real assertion failure with a Windows file-lock cleanup error.
   console.error(`cleanup failed after retries: ${(lastError as Error).message}; entries=${entries.join(',')}`);
+}
+
+// ---------- G4: durable Host-private consumed-step ledger helpers ----------
+
+type LedgerRowView = {
+  step_id: string; task_id: string; case_ref_json: string; template_digest: string;
+  terminal_event: string; terminal_decision: string; recorded_at_unix_ms: number;
+  row_sha256: string;
+};
+
+// The exact StepSpec shape produced by a trusted staging, derived from the
+// service itself so the fixtures need no deep package imports.
+type GuidedStep = Extract<ReturnType<HostGuidedService['stageTrustedSelection']>,
+  { readonly status: 'CURRENT' }>['step'];
+
+function sha256Hex(value: string): string {
+  return createHash('sha256').update(value, 'utf8').digest('hex');
+}
+
+// Mirrors the service's canonical ledger row-integrity binding so test
+// fixtures that pre-seed ledger rows produce digest-verifiable rows.
+function ledgerRowSha(row: Omit<LedgerRowView, 'row_sha256'>): string {
+  return sha256Hex(
+    `${row.step_id}|${row.task_id}|${row.case_ref_json}|${row.template_digest}|` +
+    `${row.terminal_event}|${row.terminal_decision}|${row.recorded_at_unix_ms}`,
+  );
+}
+
+function readLedger(file: string): LedgerRowView[] {
+  const db = new DatabaseSync(file);
+  try {
+    return db.prepare(`SELECT step_id,task_id,case_ref_json,template_digest,
+      terminal_event,terminal_decision,recorded_at_unix_ms,row_sha256
+      FROM guided_consumed_steps ORDER BY step_id`).all() as unknown as LedgerRowView[];
+  } finally {
+    db.close();
+  }
+}
+
+function dropLedgerTable(file: string): void {
+  const db = new DatabaseSync(file);
+  try {
+    db.exec('DROP TABLE IF EXISTS guided_consumed_steps');
+  } finally {
+    db.close();
+  }
+}
+
+function tableCount(file: string, table: string): number {
+  const db = new DatabaseSync(file);
+  try {
+    const row = db.prepare(`SELECT COUNT(*) AS n FROM ${table}`).get() as { n: number } | undefined;
+    return row?.n ?? -1;
+  } finally {
+    db.close();
+  }
 }
 
 describe('R02-B Host Guided SQLite durability and replay fence', () => {
@@ -707,6 +765,536 @@ describe('R02-B Host Guided SQLite durability and replay fence', () => {
       service.close();
       rmSync(dir, { recursive: true, force: true });
     }
+  });
+
+  it('G4: fences A->B->A replay of a consumed REVIEW_EFFECT APPROVE across restart', () => {
+    const dir = mkdtempSync(join(tmpdir(), 'shun-g4-aba-approve-'));
+    const file = join(dir, 'guided.sqlite');
+    let now = NOW;
+    let service = new HostGuidedService(file, () => now);
+    try {
+      const reviewA = {
+        ...observation, revision: 'g4-a1',
+        selectedRootRef: 'host:root:g4-a', actionPreviewRef: 'host:preview:g4-a',
+      };
+      const stagedA = service.stageTrustedSelection({
+        observation: reviewA, semanticSelection: semantic,
+        scope: { status: 'KNOWN', selectedRootRef: 'host:root:g4-a' },
+      });
+      expect(stagedA.status).toBe('CURRENT');
+      if (stagedA.status !== 'CURRENT') return;
+      const stepA = stagedA.step;
+      expect(stepA.kind).toBe('REVIEW_EFFECT');
+      const approve = service.decide(relayFor(stepA, 'APPROVE',
+        submitOutcome(stepA, 'ui:g4-a-approve', now,
+          [{ fieldId: 'continue', value: 'continue-to-independent-approval' }])));
+      expect(approve).toMatchObject({ status: 'RECORDED', humanGrantIssued: false, effectSent: false });
+      expect(readLedger(file)).toHaveLength(1);
+
+      // Switch to a genuinely different Case B and consume it too.
+      now = 10_000;
+      const stagedB = service.stageTrustedSelection({
+        observation: {
+          ...freshObservation('g4-b1', 10_000, 90_000),
+          selectedRootRef: 'host:root:g4-b', actionPreviewRef: 'host:preview:g4-b',
+          caseRef: { snapshotId: 'snap-g4-b', digest: 'd'.repeat(64) },
+        },
+        semanticSelection: semantic,
+        scope: { status: 'KNOWN', selectedRootRef: 'host:root:g4-b' },
+      });
+      expect(stagedB.status).toBe('CURRENT');
+      if (stagedB.status !== 'CURRENT') return;
+      const stepB = stagedB.step;
+      expect(stepB.caseRef).not.toEqual(stepA.caseRef);
+      // B's projection starts clean: no A history, no ledger exposure.
+      expect(service.state().history).toEqual([]);
+      expect(Object.keys(service.state()).sort())
+        .toEqual(['currentStep', 'history', 'journey', 'scope']);
+      expect(service.decide(relayFor(stepB, 'APPROVE',
+        submitOutcome(stepB, 'ui:g4-b-approve', now,
+          [{ fieldId: 'continue', value: 'continue-to-independent-approval' }]))))
+        .toMatchObject({ status: 'RECORDED', humanGrantIssued: false, effectSent: false });
+      expect(readLedger(file)).toHaveLength(2);
+      service.close();
+
+      // Restart, then attempt A -> B -> A with A's original still-valid
+      // observation: the durable ledger refuses the regenerated stepId.
+      service = new HostGuidedService(file, () => now);
+      expect(service.state().history.map((entry) => entry.stepId)).toEqual([stepB.stepId]);
+      expect(service.stageTrustedSelection({
+        observation: reviewA, semanticSelection: semantic,
+        scope: { status: 'KNOWN', selectedRootRef: 'host:root:g4-a' },
+      })).toMatchObject({ status: 'REFUSED', code: 'GUIDED_SEED_REPLAY' });
+      // The old A step cannot be consumed again either.
+      expect(service.decide(relayFor(stepA, 'APPROVE',
+        submitOutcome(stepA, 'ui:g4-a-replay', now,
+          [{ fieldId: 'continue', value: 'continue-to-independent-approval' }]))))
+        .toMatchObject({ status: 'STALE' });
+      expect(readLedger(file)).toHaveLength(2);
+      // The fence is per consumed step, not a Case deadlock: a fresh advanced
+      // Host observation for A still progresses.
+      now = 20_000;
+      const stagedA2 = service.stageTrustedSelection({
+        observation: { ...reviewA, revision: 'g4-a2', observedAtUnixMs: 15_000 },
+        semanticSelection: semantic,
+        scope: { status: 'KNOWN', selectedRootRef: 'host:root:g4-a' },
+      });
+      expect(stagedA2.status).toBe('CURRENT');
+      if (stagedA2.status !== 'CURRENT') return;
+      expect(stagedA2.step.stepId).not.toBe(stepA.stepId);
+      expect(service.decide(relayFor(stagedA2.step, 'REFUSE',
+        submitOutcome(stagedA2.step, 'ui:g4-a2-refuse', now,
+          [{ fieldId: 'continue', value: 'continue-to-independent-approval' }]))))
+        .toMatchObject({ status: 'RECORDED', humanGrantIssued: false, effectSent: false });
+      expect(readLedger(file)).toHaveLength(3);
+      service.close();
+    } finally {
+      try { service.close(); } catch { /* already closed */ }
+      cleanup(dir);
+    }
+  });
+
+  it('G4: fences A->B->A replay of REVIEW_EFFECT REFUSE and INSPECT receipts across restarts', () => {
+    const dir = mkdtempSync(join(tmpdir(), 'shun-g4-aba-refuse-inspect-'));
+    const file = join(dir, 'guided.sqlite');
+    let now = NOW;
+    let service = new HostGuidedService(file, () => now);
+    try {
+      // Case A: REVIEW_EFFECT, terminally refused.
+      const reviewA = {
+        ...observation, revision: 'g4-r1',
+        selectedRootRef: 'host:root:g4-r', actionPreviewRef: 'host:preview:g4-r',
+      };
+      const stagedA = service.stageTrustedSelection({
+        observation: reviewA, semanticSelection: semantic,
+        scope: { status: 'KNOWN', selectedRootRef: 'host:root:g4-r' },
+      });
+      expect(stagedA.status).toBe('CURRENT');
+      if (stagedA.status !== 'CURRENT') return;
+      const stepA = stagedA.step;
+      expect(stepA.kind).toBe('REVIEW_EFFECT');
+      expect(service.decide(relayFor(stepA, 'REFUSE',
+        submitOutcome(stepA, 'ui:g4-r-refuse', now,
+          [{ fieldId: 'continue', value: 'continue-to-independent-approval' }]))))
+        .toMatchObject({ status: 'RECORDED', humanGrantIssued: false, effectSent: false });
+      service.close();
+
+      // Restart; switch to Case B (INSPECT) and record a Host receipt.
+      now = 6_000;
+      service = new HostGuidedService(file, () => now);
+      const inspectB = {
+        ...freshObservation('g4-i1', 5_000, 90_000),
+        selectedRootRef: 'host:root:g4-i',
+        caseRef: { snapshotId: 'snap-g4-i', digest: 'e'.repeat(64) },
+      };
+      const stagedB = service.stageTrustedSelection({
+        observation: inspectB, semanticSelection: semantic,
+        scope: { status: 'KNOWN', selectedRootRef: 'host:root:g4-i' },
+      });
+      expect(stagedB.status).toBe('CURRENT');
+      if (stagedB.status !== 'CURRENT') return;
+      const stepB = stagedB.step;
+      expect(stepB.kind).toBe('INSPECT');
+      const hostReceipt = {
+        schema: 'shun.guided.step-outcome.v1',
+        journeyId: stepB.journeyId, taskId: stepB.taskId, stepId: stepB.stepId,
+        caseRef: stepB.caseRef, event: 'OBSERVATION_RECEIPT', source: 'HOST',
+        sourceRef: 'host:obs:r02', answers: [], evidenceRefs: ['host:scope:r02'],
+        occurredAtUnixMs: now,
+      };
+      const receipt = service.decide(relayFor(stepB, 'REFUSE', hostReceipt));
+      expect(receipt).toMatchObject({ status: 'RECORDED', humanGrantIssued: false, effectSent: false });
+      expect(service.state().history)
+        .toMatchObject([{ stepId: stepB.stepId, status: 'OBSERVATION_RECEIPT' }]);
+      service.close();
+
+      // Restart; A -> B -> A replay attempts are fenced by the durable ledger.
+      service = new HostGuidedService(file, () => now);
+      expect(service.state().history.map((entry) => entry.stepId)).toEqual([stepB.stepId]);
+      expect(service.stageTrustedSelection({
+        observation: reviewA, semanticSelection: semantic,
+        scope: { status: 'KNOWN', selectedRootRef: 'host:root:g4-r' },
+      })).toMatchObject({ status: 'REFUSED', code: 'GUIDED_SEED_REPLAY' });
+      expect(service.stageTrustedSelection({
+        observation: inspectB, semanticSelection: semantic,
+        scope: { status: 'KNOWN', selectedRootRef: 'host:root:g4-i' },
+      })).toMatchObject({ status: 'REFUSED', code: 'GUIDED_SEED_REPLAY' });
+      expect(service.decide(relayFor(stepA, 'REFUSE',
+        submitOutcome(stepA, 'ui:g4-r-replay', now,
+          [{ fieldId: 'continue', value: 'continue-to-independent-approval' }]))))
+        .toMatchObject({ status: 'STALE' });
+      expect(service.decide(relayFor(stepB, 'REFUSE', hostReceipt)))
+        .toMatchObject({ status: 'STALE' });
+      // Both terminal outcomes are durably bound with verifiable integrity.
+      const rows = readLedger(file);
+      expect(rows).toHaveLength(2);
+      for (const row of rows) {
+        expect(row.row_sha256).toBe(ledgerRowSha(row));
+      }
+      expect(rows.find((row) => row.step_id === stepA.stepId)).toMatchObject({
+        terminal_event: 'USER_SUBMIT', terminal_decision: 'REFUSE',
+      });
+      expect(rows.find((row) => row.step_id === stepB.stepId)).toMatchObject({
+        terminal_event: 'OBSERVATION_RECEIPT', terminal_decision: 'REFUSE',
+      });
+      service.close();
+    } finally {
+      try { service.close(); } catch { /* already closed */ }
+      cleanup(dir);
+    }
+  });
+
+  it('G4: BACK/PAUSE/RESUME never consume; ASK ANSWER and ASK REFUSE each bind exactly one ledger row', () => {
+    const dir = mkdtempSync(join(tmpdir(), 'shun-g4-lifecycle-ledger-'));
+    const file = join(dir, 'guided.sqlite');
+    let now = NOW;
+    const service = new HostGuidedService(file, () => now);
+    try {
+      const staged = service.stageTrustedSelection({
+        observation, semanticSelection: semantic, scope,
+      });
+      expect(staged.status).toBe('CURRENT');
+      if (staged.status !== 'CURRENT') return;
+      const step = staged.step;
+      expect(step.kind).toBe('ASK');
+      // BACK is non-consuming navigation: no ledger row, step stays CURRENT.
+      const back = service.decide(relayFor(step, 'ANSWER',
+        { ...submitOutcome(step, 'ui:g4-back', now), event: 'BACK', answers: [] }));
+      expect(back).toMatchObject({ status: 'RECORDED', humanGrantIssued: false, effectSent: false });
+      expect(readLedger(file)).toHaveLength(0);
+      expect(service.state().currentStep?.stepId).toBe(step.stepId);
+      // PAUSE/RESUME are lifecycle transitions, not terminal consumption.
+      now = 3_500;
+      expect(service.decide(relayFor(step, 'ANSWER',
+        { ...submitOutcome(step, 'ui:g4-pause', now), event: 'PAUSE', answers: [] })))
+        .toMatchObject({ status: 'RECORDED', humanGrantIssued: false, effectSent: false });
+      expect(readLedger(file)).toHaveLength(0);
+      expect(service.decide(relayFor(step, 'ANSWER',
+        { ...submitOutcome(step, 'ui:g4-resume', now), event: 'RESUME', answers: [] })))
+        .toMatchObject({ status: 'RECORDED', humanGrantIssued: false, effectSent: false });
+      expect(readLedger(file)).toHaveLength(0);
+      // The terminal ANSWER binds exactly one ledger row.
+      now = 4_000;
+      expect(service.decide(relayFor(step, 'ANSWER',
+        submitOutcome(step, 'ui:g4-answer', now,
+          [{ fieldId: 'selectedRoot', value: 'C:\\Work' }]))))
+        .toMatchObject({ status: 'RECORDED', humanGrantIssued: false, effectSent: false });
+      const afterAnswer = readLedger(file);
+      expect(afterAnswer).toHaveLength(1);
+      const [answerRow] = afterAnswer;
+      expect(answerRow).toMatchObject({
+        step_id: step.stepId, terminal_event: 'USER_SUBMIT', terminal_decision: 'ANSWER',
+      });
+      if (!answerRow) return;
+      expect(answerRow.row_sha256).toBe(ledgerRowSha(answerRow));
+      // Same-Case progression on a fresh advanced observation, then an ASK
+      // REFUSE binds a second ledger row.
+      now = 10_000;
+      const staged2 = service.stageTrustedSelection({
+        observation: freshObservation('g4-c2', 10_000, 90_000),
+        semanticSelection: semantic, scope,
+      });
+      expect(staged2.status).toBe('CURRENT');
+      if (staged2.status !== 'CURRENT') return;
+      const step2 = staged2.step;
+      now = 11_000;
+      expect(service.decide(relayFor(step2, 'REFUSE',
+        submitOutcome(step2, 'ui:g4-refuse', now,
+          [{ fieldId: 'selectedRoot', value: 'C:\\Work' }]))))
+        .toMatchObject({ status: 'RECORDED', humanGrantIssued: false, effectSent: false });
+      const afterRefuse = readLedger(file);
+      expect(afterRefuse).toHaveLength(2);
+      expect(afterRefuse.find((row) => row.step_id === step2.stepId)).toMatchObject({
+        terminal_event: 'USER_SUBMIT', terminal_decision: 'REFUSE',
+      });
+      // The historically consumed first step stays fenced via the ledger.
+      expect(service.stageTrustedSelection({
+        observation, semanticSelection: semantic, scope,
+      })).toMatchObject({ status: 'REFUSED', code: 'GUIDED_SEED_REPLAY' });
+      service.close();
+
+      // Restart: the ledger is durable and the refusal receipt survives.
+      const restarted = new HostGuidedService(file, () => now);
+      try {
+        expect(readLedger(file)).toHaveLength(2);
+        expect(restarted.decide(relayFor(step2, 'REFUSE',
+          submitOutcome(step2, 'ui:g4-refuse-replay', now,
+            [{ fieldId: 'selectedRoot', value: 'C:\\Work' }]))))
+          .toMatchObject({ status: 'STALE' });
+        expect(restarted.readRecordedRefusal(step2.stepId)).toMatchObject({
+          schema: 'shun.guided.refusal-receipt.v1', decision: 'REFUSE',
+        });
+      } finally {
+        restarted.close();
+      }
+    } finally {
+      try { service.close(); } catch { /* already closed */ }
+      cleanup(dir);
+    }
+  });
+
+  it('G4: two service instances cannot consume the same step concurrently', () => {
+    const dir = mkdtempSync(join(tmpdir(), 'shun-g4-concurrent-'));
+    const file = join(dir, 'guided.sqlite');
+    const first = new HostGuidedService(file, () => NOW);
+    let second: HostGuidedService | null = null;
+    try {
+      const staged = first.stageTrustedSelection({
+        observation, semanticSelection: semantic, scope,
+      });
+      expect(staged.status).toBe('CURRENT');
+      if (staged.status !== 'CURRENT') return;
+      const relay = relayFor(staged.step, 'ANSWER',
+        submitOutcome(staged.step, 'ui:g4-concurrent', NOW,
+          [{ fieldId: 'selectedRoot', value: 'C:\\Work' }]));
+      second = new HostGuidedService(file, () => NOW);
+      const results = [first.decide(relay), second.decide(relay)];
+      expect(results.filter((result) => result.status === 'RECORDED')).toHaveLength(1);
+      expect(results.filter((result) => result.status === 'STALE')).toHaveLength(1);
+      for (const result of results) {
+        if (result.status === 'RECORDED') {
+          expect(result.humanGrantIssued).toBe(false);
+          expect(result.effectSent).toBe(false);
+        }
+      }
+      expect(readLedger(file)).toHaveLength(1);
+    } finally {
+      try { first.close(); } catch { /* already closed */ }
+      try { second?.close(); } catch { /* already closed */ }
+      cleanup(dir);
+    }
+  });
+
+  it('G4: a pre-seeded ledger row for a still-current step fails closed without persisting an answer', () => {
+    const dir = mkdtempSync(join(tmpdir(), 'shun-g4-ledger-conflict-'));
+    const file = join(dir, 'guided.sqlite');
+    let service = new HostGuidedService(file, () => NOW);
+    let step: GuidedStep;
+    try {
+      const staged = service.stageTrustedSelection({
+        observation, semanticSelection: semantic, scope,
+      });
+      expect(staged.status).toBe('CURRENT');
+      if (staged.status !== 'CURRENT') return;
+      step = staged.step;
+    } finally {
+      service.close();
+    }
+    // A durable ledger row exists for a step the selected Case still presents
+    // as CURRENT (e.g. a partially-rolled-back legacy write): the unique
+    // conflict must fail closed and roll back the whole decision.
+    const seeded: LedgerRowView = {
+      step_id: step.stepId, task_id: step.taskId,
+      case_ref_json: JSON.stringify(step.caseRef), template_digest: step.templateRef.digest,
+      terminal_event: 'USER_SUBMIT', terminal_decision: 'ANSWER', recorded_at_unix_ms: NOW,
+      row_sha256: '',
+    };
+    seeded.row_sha256 = ledgerRowSha(seeded);
+    const db = new DatabaseSync(file);
+    try {
+      db.prepare(`INSERT INTO guided_consumed_steps(
+        step_id,task_id,case_ref_json,template_digest,terminal_event,terminal_decision,recorded_at_unix_ms,row_sha256
+      ) VALUES(?,?,?,?,?,?,?,?)`).run(
+        seeded.step_id, seeded.task_id, seeded.case_ref_json, seeded.template_digest,
+        seeded.terminal_event, seeded.terminal_decision, seeded.recorded_at_unix_ms, seeded.row_sha256,
+      );
+    } finally {
+      db.close();
+    }
+    service = new HostGuidedService(file, () => NOW);
+    try {
+      expect(service.decide(relayFor(step, 'ANSWER',
+        submitOutcome(step, 'ui:g4-conflict', NOW,
+          [{ fieldId: 'selectedRoot', value: 'C:\\Work' }]))))
+        .toMatchObject({ status: 'STALE', code: 'GUIDED_STEP_ALREADY_CONSUMED' });
+      // The rolled-back answer is not persisted and the step stays CURRENT.
+      expect(service.readRecordedAnswer(step.stepId)).toBeUndefined();
+      expect(service.state().currentStep?.stepId).toBe(step.stepId);
+    } finally {
+      service.close();
+      cleanup(dir);
+    }
+  });
+
+  it('G4: idempotently backfills the ledger from provable legacy evidence and fences replay', () => {
+    const dir = mkdtempSync(join(tmpdir(), 'shun-g4-migration-backfill-'));
+    const file = join(dir, 'guided.sqlite');
+    let now = NOW;
+    let service = new HostGuidedService(file, () => now);
+    let stepA: GuidedStep;
+    let stepB: GuidedStep;
+    try {
+      // Case A (ASK) answered, then a genuinely different Case B answered —
+      // the exact G3-era state whose cross-Case replay fence was missing.
+      const stagedA = service.stageTrustedSelection({
+        observation, semanticSelection: semantic, scope,
+      });
+      expect(stagedA.status).toBe('CURRENT');
+      if (stagedA.status !== 'CURRENT') return;
+      stepA = stagedA.step;
+      expect(service.decide(relayFor(stepA, 'ANSWER',
+        submitOutcome(stepA, 'ui:g4-m-a', now,
+          [{ fieldId: 'selectedRoot', value: 'C:\\Work' }]))))
+        .toMatchObject({ status: 'RECORDED', humanGrantIssued: false, effectSent: false });
+      now = 10_000;
+      const stagedB = service.stageTrustedSelection({
+        observation: {
+          ...freshObservation('g4-m1', 10_000, 90_000),
+          caseRef: { snapshotId: 'snap-g4-m', digest: 'f'.repeat(64) },
+        },
+        semanticSelection: semantic, scope,
+      });
+      expect(stagedB.status).toBe('CURRENT');
+      if (stagedB.status !== 'CURRENT') return;
+      stepB = stagedB.step;
+      expect(service.decide(relayFor(stepB, 'ANSWER',
+        submitOutcome(stepB, 'ui:g4-m-b', now,
+          [{ fieldId: 'selectedRoot', value: 'C:\\Work' }]))))
+        .toMatchObject({ status: 'RECORDED', humanGrantIssued: false, effectSent: false });
+      service.close();
+
+      // Simulate the pre-G4 schema: the consumed-step ledger did not exist.
+      dropLedgerTable(file);
+      // Reopen: the migration backfills the digest-verified answer rows and
+      // the persisted CONSUMED terminal, all inside one transaction.
+      service = new HostGuidedService(file, () => now);
+      expect(readLedger(file)).toHaveLength(2);
+      // Idempotent: reopening changes nothing and stays consistent.
+      service.close();
+      service = new HostGuidedService(file, () => now);
+      const rows = readLedger(file);
+      expect(rows).toHaveLength(2);
+      for (const row of rows) {
+        expect(row.row_sha256).toBe(ledgerRowSha(row));
+      }
+      expect(rows.find((row) => row.step_id === stepA.stepId)).toMatchObject({
+        terminal_event: 'USER_SUBMIT', terminal_decision: 'ANSWER',
+      });
+      expect(rows.find((row) => row.step_id === stepB.stepId)).toMatchObject({
+        terminal_event: 'USER_SUBMIT', terminal_decision: 'ANSWER',
+      });
+      // A -> B -> A replay is now fenced from the backfilled evidence alone,
+      // and B's projection still exposes no A history.
+      expect(service.state().history.map((entry) => entry.stepId)).toEqual([stepB.stepId]);
+      expect(service.stageTrustedSelection({
+        observation, semanticSelection: semantic, scope,
+      })).toMatchObject({ status: 'REFUSED', code: 'GUIDED_SEED_REPLAY' });
+      expect(service.decide(relayFor(stepA, 'ANSWER',
+        submitOutcome(stepA, 'ui:g4-m-replay', now,
+          [{ fieldId: 'selectedRoot', value: 'C:\\Work' }]))))
+        .toMatchObject({ status: 'STALE' });
+      // Migration never deletes provable payload evidence.
+      expect(service.readRecordedAnswer(stepA.stepId)).toBeDefined();
+      service.close();
+    } finally {
+      try { service.close(); } catch { /* already closed */ }
+      cleanup(dir);
+    }
+  });
+
+  it('G4: conflicting legacy consumption evidence fails closed without deleting data', () => {
+    const dir = mkdtempSync(join(tmpdir(), 'shun-g4-migration-conflict-'));
+    const file = join(dir, 'guided.sqlite');
+    let service = new HostGuidedService(file, () => NOW);
+    let step: GuidedStep;
+    let relay: ReturnType<typeof relayFor>;
+    try {
+      const staged = service.stageTrustedSelection({
+        observation, semanticSelection: semantic, scope,
+      });
+      expect(staged.status).toBe('CURRENT');
+      if (staged.status !== 'CURRENT') return;
+      step = staged.step;
+      relay = relayFor(step, 'ANSWER',
+        submitOutcome(step, 'ui:g4-conflict-a', NOW,
+          [{ fieldId: 'selectedRoot', value: 'C:\\Work' }]));
+      expect(service.decide(relay)).toMatchObject({ status: 'RECORDED' });
+    } finally {
+      service.close();
+    }
+    // Tampered legacy state: an answer row AND a refusal row now claim the
+    // same consumed step — the terminal decision is unprovable.
+    const refusal = {
+      schema: 'shun.guided.refusal-receipt.v1',
+      stepId: step.stepId, taskId: step.taskId, caseRef: step.caseRef,
+      templateDigest: step.templateRef.digest, decision: 'REFUSE',
+      outcome: (relay as { outcome: unknown }).outcome,
+    };
+    const refusalJson = JSON.stringify(refusal);
+    const db = new DatabaseSync(file);
+    try {
+      db.prepare(`INSERT INTO guided_step_refusals(
+        step_id,task_id,case_ref_json,template_digest,refusal_json,refusal_sha256,recorded_at_unix_ms
+      ) VALUES(?,?,?,?,?,?,?)`).run(
+        step.stepId, step.taskId, JSON.stringify(step.caseRef), step.templateRef.digest,
+        refusalJson, sha256Hex(refusalJson), NOW,
+      );
+    } finally {
+      db.close();
+    }
+    service = new HostGuidedService(file, () => NOW);
+    try {
+      // Fail closed with the stable migration code on every mutation path.
+      expect(service.stageTrustedSelection({
+        observation, semanticSelection: semantic, scope,
+      })).toMatchObject({ status: 'REFUSED', code: 'GUIDED_LEDGER_MIGRATION_AMBIGUOUS' });
+      expect(service.decide(relay))
+        .toMatchObject({ status: 'UNKNOWN', code: 'GUIDED_LEDGER_MIGRATION_AMBIGUOUS' });
+    } finally {
+      service.close();
+    }
+    // No silent reset: every original row is still present.
+    expect(tableCount(file, 'guided_step_answers')).toBe(1);
+    expect(tableCount(file, 'guided_step_refusals')).toBe(1);
+    expect(tableCount(file, 'guided_selected_case')).toBe(1);
+    cleanup(dir);
+  });
+
+  it('G4: corrupt legacy digest fails closed and preserves data', () => {
+    const dir = mkdtempSync(join(tmpdir(), 'shun-g4-migration-corrupt-'));
+    const file = join(dir, 'guided.sqlite');
+    let service = new HostGuidedService(file, () => NOW);
+    let step: GuidedStep;
+    try {
+      const staged = service.stageTrustedSelection({
+        observation, semanticSelection: semantic, scope,
+      });
+      expect(staged.status).toBe('CURRENT');
+      if (staged.status !== 'CURRENT') return;
+      step = staged.step;
+      expect(service.decide(relayFor(step, 'ANSWER',
+        submitOutcome(step, 'ui:g4-corrupt', NOW,
+          [{ fieldId: 'selectedRoot', value: 'C:\\Work' }]))))
+        .toMatchObject({ status: 'RECORDED' });
+    } finally {
+      service.close();
+    }
+    // Corrupt the persisted answer digest: the evidence can no longer be
+    // trusted, so the ledger cannot be established.
+    const db = new DatabaseSync(file);
+    try {
+      db.prepare('UPDATE guided_step_answers SET outcome_sha256=? WHERE step_id=?')
+        .run('0'.repeat(64), step.stepId);
+    } finally {
+      db.close();
+    }
+    service = new HostGuidedService(file, () => NOW);
+    try {
+      expect(service.stageTrustedSelection({
+        observation: freshObservation('g4-x1', 2_000, 60_000),
+        semanticSelection: semantic, scope,
+      })).toMatchObject({ status: 'REFUSED', code: 'GUIDED_LEDGER_MIGRATION_AMBIGUOUS' });
+      expect(service.decide(relayFor(step, 'ANSWER',
+        submitOutcome(step, 'ui:g4-corrupt-replay', NOW,
+          [{ fieldId: 'selectedRoot', value: 'C:\\Work' }]))))
+        .toMatchObject({ status: 'UNKNOWN', code: 'GUIDED_LEDGER_MIGRATION_AMBIGUOUS' });
+    } finally {
+      service.close();
+    }
+    // The corrupt row is preserved, not deleted or reset.
+    expect(tableCount(file, 'guided_step_answers')).toBe(1);
+    expect(tableCount(file, 'guided_selected_case')).toBe(1);
+    cleanup(dir);
   });
 
 });
