@@ -1,0 +1,60 @@
+pack_id: shun-v030-r02-e-node24-node26-production-startup-g6-cleanup-confirmation
+task_id: R02-E
+issue: "#269"
+repository: kaicreator-mm/shun-assistant
+version: v0.3.0
+parent_issue: "#260"
+standard_revision: 2c395c55569fe2edf3f4135f12d3d069e526d0b7
+owner_authorization_refs:
+  - "#260 comment 6545077384 OWNER_SHUN_V030_R02_AMENDMENT_R1_APPROVE"
+  - "#331 G5 execution pack; CI fully SUCCESS"
+  - "#332 R1 review comment 6625351167 P2 cleanup guarantee finding"
+execution_profile: LOCAL_BUILDER
+execution_environment: LOCAL
+admission_mode: SINGLE_WRITER_ADMISSION
+admission_generation: 6
+protected_claim_key: "kaicreator-mm/shun-assistant#269:builder:__default__"
+source_base_sha: da8d09a0b88bd8a3d43e2b21e447f31f25e293be
+source_base_tree: a0c1a4bef287fcef2363381ea33fd08edc126700
+source_base_branch: JIT_only_task/v0.3.0-r02e-node26-compatible-runner-local-g5
+pack_branch: JIT_only_task/v0.3.0-r02e-node26-compatible-runner-pack-g6
+jit_branch: JIT_only_task/v0.3.0-r02e-node26-compatible-runner-local-g6
+execution_pack_path: .agent/execution/R02-E-NODE26-COMPAT-STARTUP-G6/MANIFEST.yaml
+finding:
+  - "PR #332 R1 P2: if taskkill times out or returns nonzero, only the direct pnpm.cmd/shell wrapper is killed; the descendant tsx/node listener is not proven terminated."
+  - "PR #332 R1 P2: the taskkill helper process is not retained or terminated/reaped when the timeout wins."
+  - "PR #332 R1 P2: finally discards waitForExit TIMEOUT and does not verify port refusal, so cleanup failure can be silent and an orphan can survive a failed assertion."
+approved_write_set:
+  - tests/integration/v03/r02-e-production/startup-runner.test.ts
+allowed_write_set:
+  - tests/integration/v03/r02-e-production/startup-runner.test.ts
+plan:
+  - "Retain the taskkill helper child handle and on timeout terminate and reap the helper with a hard bound; no helper child may be left running."
+  - "Make timeout/nonzero fallback terminate the complete spawned process tree, or return an explicit cleanup-failed result; never treat killing only pnpm.cmd/the shell wrapper as proof that descendants stopped."
+  - "In every finally path, inspect the bounded child-exit result and verify eventual loopback port refusal. Cleanup failure must be surfaced as a secondary diagnostic while preserving the original assertion failure."
+  - "Add deterministic negative coverage for taskkill timeout and nonzero exit, plus a wrapper/descendant listener case proving no orphan remains or that cleanup failure is explicitly surfaced."
+  - "Keep cleanup idempotent and bounded; do not leave unresolved timers or helper processes after a successful kill."
+  - "Preserve G4 cloud sanitization, mandatory fixture digest checks, exact pnpm dev production boot, real BUILD/Guided/gateway assertions and Node 24/26 compatibility."
+test_contract:
+  - "Verify this pack PR contains exactly one manifest path, exact parent source_base_sha and exact source_base_tree."
+  - "Wait for exact-SHA Woodpecker Push and PR checks to be SUCCESS before source edit. Repository .woodpecker.yml is the authoritative real CI gate and explicitly says not to use GitHub Actions; Actions checks are not required for pack/source admission when they are not triggered."
+  - "G5 source PR #332 has no traceable DISPATCH_CLAIMED event on Issue #269. Record this as an admission-evidence gap; do not fabricate or backdate a G5 Claim. G5 R1 remains BLOCK and its CI is now complete. A fresh Generation-6 Claim is independently required and is sufficient for G6 source writes once this pack CI is SUCCESS."
+  - "Acquire a fresh Generation-6 CAS Claim bound to this pack PR/manifest and exact source_base_sha; do not reuse G3/G4/G5 claims."
+  - "Run exact-tree tracked-source JS/TS syntax preflight before any source-changing CI."
+  - "Run focused r02-e-production suite on Windows Node 24.21.0 and Node 26.13.0, full tools/task-check.sh, and exact-SHA Woodpecker Push/PR CI."
+  - "Record exact HEAD/tree, commands/exit codes, Node versions, build IDs, taskkill timeout/nonzero test evidence, child reaping and final port-refusal evidence in Issue #269."
+  - "Web Controller independently reviews the final exact SHA; Builder must not self-approve."
+forbidden:
+  - "Any source path other than tests/integration/v03/r02-e-production/startup-runner.test.ts"
+  - "apps/control-api/package.json, pnpm-lock.yaml, native/index.ts, root package.json or engines"
+  - "apps/control-api/src/**, packages/**, R04 UI, CI configuration, or any other task lane"
+  - "Any real cloud credential, paid LLM request, Provider installation, UAC, Windows physical effect or external disclosure"
+  - "main, version/v0.2.0, WIP integration branch mutation, merge, tag, release or deployment"
+pre_ci:
+  - "Pack Push/PR checks must be fully SUCCESS before local Builder claim."
+  - "No source edit before fresh Generation-6 CAS Claim acceptance."
+  - "Source syntax preflight must PASS on the final exact source tree before source-changing CI."
+  - "Every spawned server and taskkill helper must be stopped/reaped in success and failure paths; cleanup failure must be observable."
+source_write_authorized: true
+merge_authorized: false
+release_authorized: false
