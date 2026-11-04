@@ -1,0 +1,70 @@
+pack_id: shun-v030-r02-e-guided-provenance-issuer-g2-acl-and-key-scope
+task_id: R02-E-GUIDED-AUTHORITY
+issue: "#348"
+repository: kaicreator-mm/shun-assistant
+version: v0.3.0
+parent_issue: "#269"
+standard_revision: 2c395c55569fe2edf3f4135f12d3d069e526d0b7
+owner_authorization_refs:
+  - "#260 OWNER_SHUN_V030_R02_AMENDMENT_R1_APPROVE"
+  - "Current project instruction: continue v0.3.0 under ADS #1359 Delivery-First; reviewer repairs defects within the active write set"
+  - "#351 independent Exact-SHA R1 audit comment 6642977132"
+  - "#349 G1 Execution Pack and CI qualification"
+execution_profile: WEB_BUILDER
+execution_environment: WEB_SOURCE_WITH_WINDOWS_CI
+admission_mode: SINGLE_WRITER_ADMISSION
+admission_generation: 2
+protected_claim_key: "kaicreator-mm/shun-assistant#348:builder:__default__"
+source_base_sha: b0d5a7c1d7595fd46dc7a8268a225a9932903ca7
+source_base_tree: 45e1c34f766373111f2906dbe8d7f8e99cb20305
+source_base_branch: JIT_only_task/v0.3.0-r02e-guided-authority-local-g1
+pack_branch: JIT_only_task/v0.3.0-r02e-guided-authority-pack-g2
+jit_branch: JIT_only_task/v0.3.0-r02e-guided-authority-local-g2
+execution_pack_path: .agent/execution/R02-E-GUIDED-PROVENANCE-ISSUER-G2/MANIFEST.yaml
+finding:
+  - "PR #351 R1 P1: assertGuidedPrivateKeyScope omits the actual SQLite database directory, selected trust directory and OS temp directory despite the issuer's stated key-custody contract."
+  - "PR #351 R1 P2: Get-Acl owner is read, but DACL allow/deny access rules and inherited ACEs are not inspected; an Administrators-owned trust tree can still grant untrusted principals write/modify/delete/ACL-control rights."
+  - "PR #351 R1 P2: recursive ACL enumeration may silently skip inaccessible entries and accept a partial scan."
+  - "PR #351 R1 P2: runGuidedIssuerCli accepts SHUN_GUIDED_TRUST_DIR even though runtime trust location is a fixed build-time ProgramData path."
+  - "Database/trust directory overlap is not rejected for a custom trust directory."
+approved_write_set:
+  - apps/control-api/src/real-storage/guided-provenance-issuance.ts
+  - apps/control-api/scripts/issue-guided-provenance.ts
+  - apps/control-api/test/guided-provenance-issuance.test.ts
+allowed_write_set:
+  - apps/control-api/src/real-storage/guided-provenance-issuance.ts
+  - apps/control-api/scripts/issue-guided-provenance.ts
+  - apps/control-api/test/guided-provenance-issuance.test.ts
+design_contract:
+  - "Keep runtime adapter verify-only; no private-key import, signing API, key environment variable or secret access in runtime."
+  - "Private key must be outside workspace/repository, actual DB directory, selected trust directory, OS temp directory, and ~/.shun; validate canonical path and no reparse aliases before reading."
+  - "Reject database/trust path overlap in both directions. Production CLI must always use the fixed default C:\ProgramData\Shun\authority\guided-provenance; trustDir injection remains available only to direct test calls."
+  - "ACL inspection must return owner SID and complete DACL access rules for every object in the trust tree, including inherited ACEs; any enumeration/translation/access error or partial scan fails closed."
+  - "Require Administrators/SYSTEM ownership; reject any allow ACE for non-privileged principals that grants write data, append, create files/directories, write attributes/extended attributes, delete, delete-child, modify, change permissions or take ownership. Preserve read-only access for the runtime identity; do not require every principal to be denied read."
+  - "Apply the same ACL assessment in both runtime verification and operator issuance. The issuer must not report success when the resulting trust tree would be rejected by runtime."
+  - "PowerShell traversal must be deterministic, include root + all descendants, use terminating errors, and verify the scanned paths are complete; reparse points must not be silently followed or omitted."
+  - "No production private key or receipt in repository, CI, GitHub comments or SQLite."
+test_contract:
+  - "This pack PR must contain exactly this one manifest path and one commit directly parented to source_base_sha b0d5a7c1d7595fd46dc7a8268a225a9932903ca7."
+  - "After pack Push and PR Woodpecker checks are SUCCESS at the exact pack HEAD, acquire a fresh Generation-2 DISPATCH_CLAIMED event bound to this pack, source base/tree, actual operator/session identity and exact three-path write set."
+  - "No source edit before fresh G2 CAS Claim acceptance; do not reuse G1 claim."
+  - "Add positive and negative ACL tests: Administrators/SYSTEM owners with read-only Users/runtime ACEs accepted; Users/Everyone/Authenticated Users write/modify/delete/WRITE_DAC/WRITE_OWNER grants rejected; inherited dangerous ACE rejected; deny ACE and read-only ACE handled correctly; missing/partial/failed PowerShell scan rejected."
+  - "Add private-key scope tests for workspace, DB parent, custom trust directory, OS temp and ~/.shun; all must refuse before key read/signing."
+  - "Add tests that DB path and trust directory cannot overlap and that production CLI does not accept SHUN_GUIDED_TRUST_DIR."
+  - "Run tracked-source syntax preflight, focused tests on Windows Node 24.21.0 and Node 26.13.0, app typecheck/lint, full tools/task-check.sh and exact-SHA Woodpecker Push/PR."
+  - "Record exact HEAD/tree/base, three-path diff, Node versions, commands/exit codes, Woodpecker IDs, ACL rule snapshots and private-key scope rejection evidence on Issue #348; never include private key or signed production receipt."
+  - "Independent Exact-SHA review of the repaired HEAD is mandatory; repair author must not self-approve."
+integration_handoff:
+  - "R02-E #269 remains sole production composition integrator and must inject this verify-only adapter with a source-pinned SPKI fingerprint and fixed ProgramData trust path."
+  - "Production Guided startup remains fail-closed until #269 wires the adapter and the operator provisions the matching protected trust receipt."
+forbidden:
+  - "Any path outside the exact three approved paths"
+  - "apps/control-api/src/main.ts, apps/control-api/src/server.ts, composition files, package manifests or lockfile"
+  - "packages/executor-windows/**, Domain Computer, SDK private src, Kernel, sender, grant, Permit or effect dispatcher"
+  - "Any production private key, HMAC secret, credential or signed production receipt in source, tests, CI artifacts, GitHub comments or SQLite"
+  - "Any UAC prompt initiated by the script, automatic elevation, physical Windows effect, paid LLM request, Provider installation or external disclosure"
+  - "Any destructive migration, data deletion/reset, automatic blessing of untrusted legacy DBs"
+  - "WIP integration merge, version/v0.3.0 merge, main/version/v0.2.0 mutation, tag, release or deployment"
+source_write_authorized: true
+merge_authorized: false
+release_authorized: false
