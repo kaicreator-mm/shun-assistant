@@ -57,6 +57,107 @@ async function until(condition: () => boolean, timeoutMs = 10_000): Promise<void
   }
 }
 
+type MetaCandidateReader = Pick<HostMetaShadowStore, 'listShadowCandidates' | 'readShadowCandidate'>;
+
+/** Shared assertion used by the physical UI loop and a CI-runnable pure test. */
+function assertSingleNewMetaCandidate(
+  reader: MetaCandidateReader,
+  candidateIdsBeforeSubmit: ReadonlySet<string>,
+): void {
+  const newCandidates = reader
+    .listShadowCandidates()
+    .filter((candidate) => !candidateIdsBeforeSubmit.has(candidate.candidateId));
+  expect(newCandidates).toHaveLength(1);
+  const newCandidate = newCandidates[0];
+  if (!newCandidate) throw new Error('expected one new Meta Shadow candidate');
+  const persisted = reader.readShadowCandidate(newCandidate.candidateId);
+  expect(persisted).toBeDefined();
+  const payload = JSON.parse(persisted!.payloadJson) as {
+    kind: string;
+    lifecycle: string;
+    active: boolean;
+    source: { caseRef: string; revision: string };
+    feedback: { rating: string; category: string; correction?: string };
+  };
+  expect(payload).toMatchObject({
+    kind: 'META_FEEDBACK',
+    lifecycle: 'FUTURE_BUILD_SHADOW',
+    active: false,
+    source: { caseRef: 'task-r03b-ui-src', revision: 'outcome-r1' },
+    feedback: {
+      rating: 'HELPFUL',
+      category: 'OTHER',
+      correction: 'NO_CORRECTION',
+    },
+  });
+  expect(persisted!.lifecycle).toBe('FUTURE_BUILD_SHADOW');
+  expect(persisted!.active).toBe(false);
+}
+
+describe('R03B UI Meta candidate correlation assertion (CI-runnable)', () => {
+  it('accepts exactly one newly persisted candidate with the expected provenance', () => {
+    const candidate = {
+      candidateId: 'candidate-new',
+      payloadJson: JSON.stringify({
+        kind: 'META_FEEDBACK',
+        lifecycle: 'FUTURE_BUILD_SHADOW',
+        active: false,
+        source: { caseRef: 'task-r03b-ui-src', revision: 'outcome-r1' },
+        feedback: { rating: 'HELPFUL', category: 'OTHER', correction: 'NO_CORRECTION' },
+      }),
+      lifecycle: 'FUTURE_BUILD_SHADOW',
+      active: false,
+    };
+    const reader = {
+      listShadowCandidates: () => [{ candidateId: 'candidate-old' }, candidate],
+      readShadowCandidate: (id: string) => id === candidate.candidateId ? candidate : undefined,
+    } as unknown as MetaCandidateReader;
+    assertSingleNewMetaCandidate(reader, new Set(['candidate-old']));
+  });
+
+  it('rejects zero, multiple, missing-payload and mismatched-provenance candidates', () => {
+    const empty = {
+      listShadowCandidates: () => [{ candidateId: 'candidate-old' }],
+      readShadowCandidate: () => undefined,
+    } as unknown as MetaCandidateReader;
+    expect(() => assertSingleNewMetaCandidate(empty, new Set(['candidate-old']))).toThrow();
+
+    const multiple = {
+      listShadowCandidates: () => [
+        { candidateId: 'candidate-old' },
+        { candidateId: 'candidate-a' },
+        { candidateId: 'candidate-b' },
+      ],
+      readShadowCandidate: () => undefined,
+    } as unknown as MetaCandidateReader;
+    expect(() => assertSingleNewMetaCandidate(multiple, new Set(['candidate-old']))).toThrow();
+
+    const missingPayload = {
+      listShadowCandidates: () => [{ candidateId: 'candidate-new' }],
+      readShadowCandidate: () => undefined,
+    } as unknown as MetaCandidateReader;
+    expect(() => assertSingleNewMetaCandidate(missingPayload, new Set())).toThrow();
+
+    const mismatch = {
+      candidateId: 'candidate-new',
+      payloadJson: JSON.stringify({
+        kind: 'META_FEEDBACK',
+        lifecycle: 'FUTURE_BUILD_SHADOW',
+        active: false,
+        source: { caseRef: 'another-case', revision: 'outcome-r1' },
+        feedback: { rating: 'HELPFUL', category: 'OTHER', correction: 'NO_CORRECTION' },
+      }),
+      lifecycle: 'FUTURE_BUILD_SHADOW',
+      active: false,
+    };
+    const wrongSource = {
+      listShadowCandidates: () => [mismatch],
+      readShadowCandidate: () => mismatch,
+    } as unknown as MetaCandidateReader;
+    expect(() => assertSingleNewMetaCandidate(wrongSource, new Set())).toThrow();
+  });
+});
+
 describe.skipIf(!RUN_PHYSICAL)(
   'R03B UI loop: real shipped CN/EN UI → API → K → Host (physical)',
   () => {
@@ -265,13 +366,13 @@ describe.skipIf(!RUN_PHYSICAL)(
           dom.byId('v03-j-meta-rating')!.value = 'HELPFUL';
           dom.byId('v03-j-meta-category')!.value = 'OTHER';
           dom.byId('v03-j-meta-correction')!.value = 'NO_CORRECTION';
+          const candidateIdsBeforeSubmit = new Set(
+            store.listShadowCandidates().map((candidate) => candidate.candidateId),
+          );
           dom.byId('v03-j-meta-run')!.click();
           await until(() => (dom.byId('v03-j-meta-status')?.textContent ?? '').length > 0);
           expect(dom.byId('v03-j-meta-status')?.textContent).toContain(completed.text ?? '');
-          const candidates = store.listShadowCandidates().filter(
-            (candidate) => !candidate.candidateId.includes(locale) || true,
-          );
-          expect(candidates.length).toBeGreaterThanOrEqual(1);
+          assertSingleNewMetaCandidate(store, candidateIdsBeforeSubmit);
         } finally {
           dom.restore();
         }
