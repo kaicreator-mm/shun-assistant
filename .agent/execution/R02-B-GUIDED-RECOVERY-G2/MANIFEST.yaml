@@ -30,8 +30,6 @@ approved_write_set:
   - tests/integration/v03/r02-b-guided/durable-guided.test.ts
 allowed_write_set:
   - packages/domain-host/src/guided/host-guided-service.ts
-  - packages/domain-computer/src/guided/guided-journey.ts
-  - apps/control-api/src/v03/composition-guided.ts
   - tests/integration/v03/r02-b-guided/durable-guided.test.ts
 plan:
   - "Add an explicit durable PAUSED state; PAUSE must preserve the current StepSpec, RESUME must restore CURRENT only while the Host observation and StepSpec remain valid."
