@@ -38,8 +38,8 @@ import {
   GUIDED_PROVENANCE_TRUST_ANCHOR_SCHEMA,
   type GuidedReceiptBody,
   type GuidedReceiptEnvelope,
-  type GuidedTrustAclSnapshot,
   type GuidedTrustAccessRule,
+  type GuidedTrustAclSnapshot,
   guidedPublicKeySpkiSha256,
   inspectWindowsGuidedTrustAcl,
   writeGuidedReceiptAtomically,
@@ -723,7 +723,6 @@ describe('runtime adapter is verify-only (no signing reachability)', () => {
   });
 });
 
-
 describe('G2 DACL and issuer-key custody repairs', () => {
   it('rejects inherited nonprivileged DACL write/DELETE/WRITE_DAC/WRITE_OWNER rights', () => {
     const fixture = makeFixture();
@@ -731,18 +730,23 @@ describe('G2 DACL and issuer-key custody repairs', () => {
       for (const mask of [2, 0x10000, 0x40000, 0x80000, 0x001f01ff]) {
         const rows = protectedAcl(fixture.trustDir, []).map((row) => ({
           ...row,
-          accessRules: [...row.accessRules, {
-            identitySid: 'S-1-5-11',
-            rightsMask: mask,
-            accessType: 'Allow' as const,
-            isInherited: true,
-          }],
+          accessRules: [
+            ...row.accessRules,
+            {
+              identitySid: 'S-1-5-11',
+              rightsMask: mask,
+              accessType: 'Allow' as const,
+              isInherited: true,
+            },
+          ],
         }));
         expect(assessGuidedTrustProtection(fixture.trustDir, [], rows)).toEqual(
           expect.arrayContaining([expect.stringContaining('non-privileged write')]),
         );
       }
-    } finally { rmSync(fixture.root, { recursive: true, force: true }); }
+    } finally {
+      rmSync(fixture.root, { recursive: true, force: true });
+    }
   });
 
   it('allows read-only Users ACE and inherited deny ACE', () => {
@@ -750,27 +754,43 @@ describe('G2 DACL and issuer-key custody repairs', () => {
     try {
       const rows = protectedAcl(fixture.trustDir, []).map((row) => ({
         ...row,
-        accessRules: [...row.accessRules, {
-          identitySid: 'S-1-1-0',
-          rightsMask: 0x001f01ff,
-          accessType: 'Deny' as const,
-          isInherited: true,
-        }],
+        accessRules: [
+          ...row.accessRules,
+          {
+            identitySid: 'S-1-1-0',
+            rightsMask: 0x001f01ff,
+            accessType: 'Deny' as const,
+            isInherited: true,
+          },
+        ],
       }));
       expect(assessGuidedTrustProtection(fixture.trustDir, [], rows)).toEqual([]);
-    } finally { rmSync(fixture.root, { recursive: true, force: true }); }
+    } finally {
+      rmSync(fixture.root, { recursive: true, force: true });
+    }
   });
 
   it('fails closed when ACL scan is incomplete or a rule SID cannot translate', () => {
     const fixture = makeFixture();
     try {
       const rows = protectedAcl(fixture.trustDir, []);
-      expect(assessGuidedTrustProtection(fixture.trustDir, [], rows.slice(0, 1))).not.toEqual([]);
-      expect(assessGuidedTrustProtection(fixture.trustDir, [], [
-        { ...rows[0]!, accessRules: [{ identitySid: null, rightsMask: 2, accessType: 'Allow', isInherited: true }] },
-        ...rows.slice(1),
-      ])).not.toEqual([]);
-    } finally { rmSync(fixture.root, { recursive: true, force: true }); }
+      expect(
+        assessGuidedTrustProtection(fixture.trustDir, [], rows.slice(0, 1)),
+      ).not.toEqual([]);
+      expect(
+        assessGuidedTrustProtection(fixture.trustDir, [], [
+          {
+            ...rows[0]!,
+            accessRules: [
+              { identitySid: null, rightsMask: 2, accessType: 'Allow', isInherited: true },
+            ],
+          },
+          ...rows.slice(1),
+        ]),
+      ).not.toEqual([]);
+    } finally {
+      rmSync(fixture.root, { recursive: true, force: true });
+    }
   });
 
   it('rejects OS temp, database, trust, and workspace private-key paths', () => {
@@ -782,37 +802,61 @@ describe('G2 DACL and issuer-key custody repairs', () => {
         join(fixture.trustDir, 'key.pem'),
         join(fixture.workspaceRoot, 'key.pem'),
       ]) {
-        expect(() => assertGuidedPrivateKeyScope(
-          path, fixture.workspaceRoot, fixture.dbPath, fixture.trustDir,
-        )).toThrow('GUIDED_PROVENANCE_ISSUER_KEY_SCOPE_REFUSED');
+        expect(() =>
+          assertGuidedPrivateKeyScope(
+            path,
+            fixture.workspaceRoot,
+            fixture.dbPath,
+            fixture.trustDir,
+          ),
+        ).toThrow('GUIDED_PROVENANCE_ISSUER_KEY_SCOPE_REFUSED');
       }
-    } finally { rmSync(fixture.root, { recursive: true, force: true }); }
+    } finally {
+      rmSync(fixture.root, { recursive: true, force: true });
+    }
   });
 
   it('rejects overlapping database and trust directories in either direction', () => {
     const fixture = makeFixture();
     try {
       const keyFile = join(fixture.keyDir, 'issuer.pem');
-      writeFileSync(keyFile, fixture.keys.privateKey.export({ type: 'pkcs8', format: 'pem' }).toString());
+      writeFileSync(
+        keyFile,
+        fixture.keys.privateKey.export({ type: 'pkcs8', format: 'pem' }).toString(),
+      );
       const args = {
-        schemaDigest: DIGEST_A, privateKeyPath: keyFile,
-        workspaceRoot: fixture.workspaceRoot, inspectAcl: protectedInspector,
+        schemaDigest: DIGEST_A,
+        privateKeyPath: keyFile,
+        workspaceRoot: fixture.workspaceRoot,
+        inspectAcl: protectedInspector,
         testOnlyAllowTemporaryKey: true,
       };
-      expect(() => issueGuidedProvenanceReceipt({
-        ...args, databasePath: join(fixture.trustDir, 'inside.db'), trustDir: fixture.trustDir,
-      })).toThrow('GUIDED_PROVENANCE_ISSUER_DATABASE_INSIDE_TRUST_DIR');
+      expect(() =>
+        issueGuidedProvenanceReceipt({
+          ...args,
+          databasePath: join(fixture.trustDir, 'inside.db'),
+          trustDir: fixture.trustDir,
+        }),
+      ).toThrow('GUIDED_PROVENANCE_ISSUER_DATABASE_INSIDE_TRUST_DIR');
       const nestedTrust = join(fixture.dbDir, 'nested-trust');
       mkdirSync(nestedTrust);
-      expect(() => issueGuidedProvenanceReceipt({
-        ...args, databasePath: fixture.dbPath, trustDir: nestedTrust,
-      })).toThrow('GUIDED_PROVENANCE_ISSUER_TRUST_INSIDE_DATABASE_DIR');
-    } finally { rmSync(fixture.root, { recursive: true, force: true }); }
+      expect(() =>
+        issueGuidedProvenanceReceipt({
+          ...args,
+          databasePath: fixture.dbPath,
+          trustDir: nestedTrust,
+        }),
+      ).toThrow('GUIDED_PROVENANCE_ISSUER_TRUST_INSIDE_DATABASE_DIR');
+    } finally {
+      rmSync(fixture.root, { recursive: true, force: true });
+    }
   });
 
   it('rejects production CLI trust-directory overrides before elevation check', () => {
-    expect(() => runGuidedIssuerCli({
-      SHUN_GUIDED_TRUST_DIR: 'C:\\wrong\\user-writable',
-    })).toThrow('ISSUER_TRUST_DIR_OVERRIDE_FORBIDDEN');
+    expect(() =>
+      runGuidedIssuerCli({
+        SHUN_GUIDED_TRUST_DIR: 'C:\\wrong\\user-writable',
+      }),
+    ).toThrow('ISSUER_TRUST_DIR_OVERRIDE_FORBIDDEN');
   });
 });
