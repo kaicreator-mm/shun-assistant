@@ -965,7 +965,6 @@ describe.skipIf(!isWindows)(
     it('taskkill timeout: the helper is terminated and reaped, fallback runs, and the listener still dies', async () => {
       const port = await freePort();
       const child = spawn(process.execPath, ['-e', listenerOn(port)], { stdio: 'ignore' });
-      let bodyFailed = false;
       try {
         expect(await waitForHttp(port, 15_000)).toBe(true);
         // Fake taskkill: a node process that never exits, so each bounded
@@ -988,9 +987,6 @@ describe.skipIf(!isWindows)(
         expect(cleanup.detail).toContain('CLEANUP FAILURE');
         expect(cleanup.detail).toContain('treeTerminationProven=false');
         expect(cleanup.kill.treeKillConfirmed).toBe(false);
-      } catch (error) {
-        bodyFailed = true;
-        throw error;
       } finally {
         // Deliberately failed taskkill cannot be retroactively certified.
         await guaranteeCleanup(child, port, true);
