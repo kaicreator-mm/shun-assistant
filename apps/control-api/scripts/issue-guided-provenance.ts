@@ -28,6 +28,7 @@ import { dirname, resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { GUIDED_SCHEMA_VERSION } from '../../../packages/domain-host/src/guided/guided-provenance-authority.ts';
 import {
+  assertGuidedPathOutside,
   assertGuidedPrivateKeyScope,
   assertGuidedRegularCanonicalPath,
   assessGuidedTrustProtection,
@@ -132,6 +133,8 @@ export interface GuidedIssuanceInput {
   readonly databaseId?: string;
   /** ACL snapshot injector (tests). Production uses the real Windows scan. */
   readonly inspectAcl?: GuidedAclInspector;
+  /** Test-only ephemeral key exception: CLI never supplies this flag. */
+  readonly testOnlyAllowTemporaryKey?: boolean;
 }
 
 export interface GuidedIssuanceResult {
@@ -159,12 +162,21 @@ export function issueGuidedProvenanceReceipt(input: GuidedIssuanceInput): Guided
       ? defaultGuidedProvenanceTrustDirectory()
       : assertGuidedRegularCanonicalPath(input.trustDir, 'ISSUER_TRUST_DIR_UNTRUSTED');
   const canonicalDbPath = assertGuidedIssuerDatabasePath(input.databasePath, workspaceRoot);
+  // Disjoint trust and database roots, even for a directly injected test path.
+  assertGuidedPathOutside(canonicalDbPath, [trustDir], 'ISSUER_DATABASE_INSIDE_TRUST_DIR');
+  assertGuidedPathOutside(trustDir, [dirname(canonicalDbPath)], 'ISSUER_TRUST_INSIDE_DATABASE_DIR');
 
   const privateKeyPath = assertGuidedRegularCanonicalPath(
     input.privateKeyPath,
     'ISSUER_PRIVATE_KEY_PATH_UNTRUSTED',
   );
-  assertGuidedPrivateKeyScope(privateKeyPath, workspaceRoot);
+  assertGuidedPrivateKeyScope(
+    privateKeyPath,
+    workspaceRoot,
+    canonicalDbPath,
+    trustDir,
+    input.testOnlyAllowTemporaryKey === true && input.inspectAcl !== undefined,
+  );
 
   // The trust tree itself must be alias-free and outside every forbidden
   // scope before anything is written into it.
@@ -265,13 +277,15 @@ function requiredFrom(env: NodeJS.ProcessEnv, name: string): string {
 }
 
 export function runGuidedIssuerCli(env: NodeJS.ProcessEnv = process.env): GuidedIssuanceResult {
+  if (env.SHUN_GUIDED_TRUST_DIR !== undefined) {
+    throw new Error('ISSUER_TRUST_DIR_OVERRIDE_FORBIDDEN');
+  }
   assertGuidedIssuerElevated();
   const result = issueGuidedProvenanceReceipt({
     databasePath: requiredFrom(env, 'SHUN_GUIDED_DATABASE_PATH'),
     schemaDigest: requiredFrom(env, 'SHUN_GUIDED_SCHEMA_DIGEST'),
     privateKeyPath: requiredFrom(env, 'SHUN_GUIDED_ISSUER_PRIVATE_KEY_FILE'),
     workspaceRoot: requiredFrom(env, 'SHUN_GUIDED_WORKSPACE_ROOT'),
-    trustDir: env.SHUN_GUIDED_TRUST_DIR,
   });
   // Evidence lines only: identifiers, paths and fingerprints. NEVER key
   // material, key paths' contents, or anything derived from the secret half.
