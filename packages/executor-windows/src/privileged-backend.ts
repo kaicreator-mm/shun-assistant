@@ -514,6 +514,19 @@ type RelayResult = {
   hresult?: string;
   error?: string;
   timedOut?: boolean;
+  /** Observed lifecycle diagnostics (Issue #345): wall time from spawn call to resolution. */
+  elapsedMs?: number;
+  /** Whether the OS actually created the relay process (spawn event fired). */
+  spawned?: boolean;
+  /** Bytes the relay wrote to stdout/stderr before resolution (0 = silent init-phase stall). */
+  outputBytes?: number;
+  /** taskkill tree-kill exit code, when a timeout kill was issued. */
+  killExitCode?: number;
+  /**
+   * True when the relay process tree was observed to exit after the timeout
+   * kill (no orphan); false means the kill grace elapsed without an exit.
+   */
+  killConfirmed?: boolean;
 };
 
 /**
@@ -538,6 +551,17 @@ function stdioTail(): { push(chunk: Buffer | string): void; tail(): string | und
   };
 }
 
+/**
+ * Bounded wait for the relay tree to die after a timeout taskkill (Issue
+ * #345): the launcher-side promise must SETTLE even when the killed tree
+ * never produces an exit event, so a wedged relay cannot hang the caller
+ * (or the test suite) forever behind an unresolvable pending promise. The
+ * `killConfirmed: false` record is orphan evidence for diagnostics, not a
+ * cleanup excuse — the kill itself stays fire-and-forget on the
+ * non-elevated relay tree.
+ */
+const RELAY_KILL_GRACE_MS = 15000;
+
 // Exported for the N-R2-1 negative controls (test/evidence tooling): the
 // privileged-path relay spawn must demonstrably carry a sterilized
 // environment. Security callers still enter through PrivilegedWindowsExecutionBackend.
@@ -560,6 +584,9 @@ export async function spawnRelay(params: {
   const sterileEnv = privilegedSpawnEnv();
   const stdout = stdioTail();
   const stderr = stdioTail();
+  const startedAtMs = Date.now();
+  let spawned = false;
+  let outputBytes = 0;
   const child = spawn(
     params.powershellExe,
     [
@@ -580,30 +607,93 @@ export async function spawnRelay(params: {
     ],
     { shell: false, windowsHide: true, env: sterileEnv },
   );
-  child.stdout?.on('data', (c: Buffer) => stdout.push(c));
-  child.stderr?.on('data', (c: Buffer) => stderr.push(c));
+  child.stdout?.on('data', (c: Buffer) => {
+    outputBytes += c.length;
+    stdout.push(c);
+  });
+  child.stderr?.on('data', (c: Buffer) => {
+    outputBytes += c.length;
+    stderr.push(c);
+  });
+  child.once('spawn', () => {
+    spawned = true;
+  });
   params.onRelayPid?.(child.pid ?? -1);
   return new Promise((resolve) => {
+    let settled = false;
     let timedOut = false;
+    let killExitCode: number | undefined;
+    let killConfirmed = false;
+    let killGraceTimer: ReturnType<typeof setTimeout> | undefined;
+    const lifecycle = () => ({
+      elapsedMs: Date.now() - startedAtMs,
+      spawned,
+      outputBytes,
+      ...(killExitCode !== undefined ? { killExitCode } : {}),
+      ...(timedOut ? { killConfirmed } : {}),
+    });
+    const tails = (): string =>
+      [stderr.tail(), stdout.tail()].filter((t) => t !== undefined).join(' | ');
+    const timeoutDiagnostics = (): string =>
+      [
+        `relay did not exit within ${params.timeoutMs}ms`,
+        `spawned=${spawned}`,
+        `outputBytes=${outputBytes}`,
+        ...(killExitCode !== undefined ? [`taskkillExit=${killExitCode}`] : []),
+        `treeExitedAfterKill=${killConfirmed}`,
+        tails(),
+      ]
+        .filter((part) => part !== '')
+        .join('; ');
+    const settle = (result: RelayResult): void => {
+      if (settled) return;
+      settled = true;
+      clearTimeout(timer);
+      if (killGraceTimer) clearTimeout(killGraceTimer);
+      resolve(result);
+    };
     const timer = setTimeout(() => {
       timedOut = true;
       // The relay tree is NON-elevated: tree-kill reaches it. The elevated
       // helper child survives (Access Denied) — exactly why the helper owns
       // its deadline and the journal decides the outcome (§8.2.1).
       if (child.pid) {
-        spawn(params.taskkillExe, ['/PID', String(child.pid), '/T', '/F'], {
+        const kill = spawn(params.taskkillExe, ['/PID', String(child.pid), '/T', '/F'], {
           shell: false,
           windowsHide: true,
           env: sterileEnv,
         });
+        kill.on('error', () => {
+          if (killExitCode === undefined) killExitCode = -1;
+        });
+        kill.on('exit', (code) => {
+          if (killExitCode === undefined) killExitCode = code ?? -1;
+        });
+        killGraceTimer = setTimeout(() => {
+          settle({
+            kind: 'TIMED_OUT',
+            timedOut,
+            error: timeoutDiagnostics(),
+            ...lifecycle(),
+            killConfirmed: false,
+          });
+        }, RELAY_KILL_GRACE_MS);
+      } else {
+        settle({
+          kind: 'TIMED_OUT',
+          timedOut,
+          error: timeoutDiagnostics(),
+          ...lifecycle(),
+          killConfirmed: false,
+        });
       }
     }, params.timeoutMs);
     child.on('error', (err) => {
-      clearTimeout(timer);
-      resolve({ kind: 'SPAWN_ERROR', error: String(err) });
+      settle({ kind: 'SPAWN_ERROR', error: String(err), ...lifecycle() });
     });
     child.on('exit', () => {
-      clearTimeout(timer);
+      // The tree died on its own (or under the kill): proven-gone evidence.
+      if (timedOut) killConfirmed = true;
       let relay: Record<string, unknown> | undefined;
       try {
         if (existsSync(params.relayFile)) {
@@ -612,27 +702,35 @@ export async function spawnRelay(params: {
       } catch {
         relay = undefined;
       }
-      const diagnostics = [stderr.tail(), stdout.tail()].filter((t) => t !== undefined).join(' | ');
+      const diagnostics = tails();
       if (timedOut && !relay) {
-        resolve({ kind: 'TIMED_OUT', timedOut, error: diagnostics || undefined });
-        return;
-      }
-      if (!relay) {
-        resolve({ kind: 'NO_RELAY', timedOut, error: diagnostics || undefined });
-        return;
-      }
-      if (relay.kind === 'UAC_DECLINED') {
-        resolve({
-          kind: 'UAC_DECLINED',
-          hresult: typeof relay.hresult === 'string' ? relay.hresult : undefined,
-          error: typeof relay.error === 'string' ? relay.error : undefined,
+        settle({
+          kind: 'TIMED_OUT',
+          timedOut,
+          error: timeoutDiagnostics(),
+          ...lifecycle(),
+          killConfirmed: true,
         });
         return;
       }
-      resolve({
+      if (!relay) {
+        settle({ kind: 'NO_RELAY', timedOut, error: diagnostics || undefined, ...lifecycle() });
+        return;
+      }
+      if (relay.kind === 'UAC_DECLINED') {
+        settle({
+          kind: 'UAC_DECLINED',
+          hresult: typeof relay.hresult === 'string' ? relay.hresult : undefined,
+          error: typeof relay.error === 'string' ? relay.error : undefined,
+          ...lifecycle(),
+        });
+        return;
+      }
+      settle({
         kind: 'RAN',
         exitCode: typeof relay.exitCode === 'number' ? relay.exitCode : undefined,
         childPid: typeof relay.childPid === 'number' ? relay.childPid : undefined,
+        ...lifecycle(),
       });
     });
   });

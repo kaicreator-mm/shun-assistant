@@ -19,6 +19,12 @@
 // first proves the injection mechanism is real on this host (a poisoned
 // NODE_OPTIONS really does execute attacker JS in a spawned node), then the
 // privileged-path assertions pin that the mechanism has no carrier.
+//
+// The launcher→relay describe additionally pins the spawn LIFECYCLE
+// deterministically (Issue #345): controlled startup delay before relay
+// readiness, timeout tree-kill with bounded launcher-side cleanup, spawn
+// error and NO_RELAY classification, and an orphan-free process tree after
+// both the RAN and TIMED_OUT outcomes.
 import { spawn } from 'node:child_process';
 import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -72,9 +78,10 @@ describe('N-R2-1 — the injection mechanism itself (control, expected to succee
  * Probe relay: same argv shape and relay.json protocol as the real pinned
  * relay, but it NEVER elevates — it records which hostile variables reached
  * its own process environment and reports through a side channel (the first
- * HelperArgsJson entry).
+ * HelperArgsJson entry). `preDelayMs` injects a controlled startup delay
+ * before the relay becomes ready (deterministic readiness/timeout coverage).
  */
-const PROBE_RELAY = `
+const probeRelayScript = (preDelayMs = 0): string => `
 param(
   [Parameter(Mandatory = $true)][string] $NodeExe,
   [Parameter(Mandatory = $true)][string] $HelperBundle,
@@ -83,7 +90,7 @@ param(
 )
 $ErrorActionPreference = 'Stop'
 $probeFile = (ConvertFrom-Json $HelperArgsJson)[0]
-$observed = @()
+${preDelayMs > 0 ? `Start-Sleep -Milliseconds ${preDelayMs}\n` : ''}$observed = @()
 foreach ($name in @(${OBSERVED_VARS.map((n) => `'${n}'`).join(',')})) {
   if ($null -ne [Environment]::GetEnvironmentVariable($name)) { $observed += $name }
 }
@@ -94,6 +101,18 @@ $utf8 = New-Object System.Text.UTF8Encoding($false)
   ((ConvertTo-Json @{ kind = 'RAN'; exitCode = 0; childPid = 0 } -Compress) + [Environment]::NewLine),
   $utf8
 )
+exit 0
+`;
+
+/** Relay that settles the spawn lifecycle without ever writing the relay file. */
+const SILENT_EXIT_RELAY = `
+param(
+  [Parameter(Mandatory = $true)][string] $NodeExe,
+  [Parameter(Mandatory = $true)][string] $HelperBundle,
+  [Parameter(Mandatory = $true)][string] $HelperArgsJson,
+  [Parameter(Mandatory = $true)][string] $RelayFile
+)
+$ErrorActionPreference = 'Stop'
 exit 0
 `;
 
@@ -112,31 +131,87 @@ describe.skipIf(!ON_WINDOWS)(
       'System32',
       'taskkill.exe',
     );
+    const machineTasklist = join(
+      process.env.SystemRoot ?? 'C:\\Windows',
+      'System32',
+      'tasklist.exe',
+    );
 
-    let dir: string;
-    let relayScript: string;
+    /**
+     * Issue #345 evidence: on the GitHub windows-2025 executor the
+     * sterilized-environment relay start is deterministically SLOW — the
+     * PowerShell engine initializes for 29-51s across six healthy runs
+     * (empty stdio, no script output; ~0.4s on a dev workstation) before
+     * the probe script runs, and two runs crossed the former 60,000 ms
+     * bound at ~60.3s. This budget (~3.5x the observed maximum) keeps the
+     * assertion measuring ENVIRONMENT STERILIZATION instead of runner
+     * startup latency; the timeout semantics themselves are pinned
+     * deterministically by the dedicated lifecycle tests below, and a
+     * future breach now carries structured lifecycle evidence
+     * (spawned/outputBytes/taskkillExit/killConfirmed) instead of silence.
+     */
+    const RELAY_STARTUP_BUDGET_MS = 180000;
+
     let poisoned: string | undefined;
     let nodePath: string | undefined;
+    let dirs: string[] = [];
 
     afterEach(() => {
       if (poisoned !== undefined) {
         if (poisoned === '') delete process.env.NODE_OPTIONS;
         else process.env.NODE_OPTIONS = poisoned;
+        poisoned = undefined;
       }
       if (nodePath !== undefined) {
         if (nodePath === '') delete process.env.NODE_PATH;
         else process.env.NODE_PATH = nodePath;
+        nodePath = undefined;
       }
-      if (dir?.startsWith(tmpdir())) rmSync(dir, { recursive: true, force: true });
+      for (const dir of dirs) {
+        if (dir.startsWith(tmpdir())) rmSync(dir, { recursive: true, force: true });
+      }
+      dirs = [];
     });
 
+    const makeProbeDir = (script: string): { dir: string; relayScript: string } => {
+      const dir = mkdtempSync(join(tmpdir(), 'shun-envrelay-'));
+      dirs.push(dir);
+      const relayScript = join(dir, 'probe-relay.ps1');
+      writeFileSync(relayScript, script, 'utf8');
+      return { dir, relayScript };
+    };
+
+    /**
+     * Locale-independent orphan proof: poll the MACHINE tasklist until the
+     * pid disappears. A live process always shows a CSV row quoting the
+     * pid; "no tasks" banners differ per locale and never quote the pid.
+     */
+    const processGone = async (pid: number, deadlineMs = 15000): Promise<boolean> => {
+      const deadline = Date.now() + deadlineMs;
+      for (;;) {
+        const listing = await new Promise<string>((resolve) => {
+          const probe = spawn(machineTasklist, ['/FI', `PID eq ${pid}`, '/FO', 'CSV', '/NH'], {
+            shell: false,
+            windowsHide: true,
+          });
+          let text = '';
+          probe.stdout?.on('data', (c: Buffer) => {
+            text += c.toString();
+          });
+          probe.on('error', () => resolve(''));
+          probe.on('exit', () => resolve(text));
+        });
+        if (!listing.includes(`"${pid}"`)) return true;
+        if (Date.now() >= deadline) return false;
+        await new Promise((resolveTimer) => setTimeout(resolveTimer, 250));
+      }
+    };
+
     it('spawnRelay runs the relay with a sterilized environment (NODE_OPTIONS/NODE_PATH have no carrier)', {
-      timeout: 120000,
+      timeout: RELAY_STARTUP_BUDGET_MS + 60000,
     }, async () => {
       expect(existsSync(machinePowershell)).toBe(true);
-      dir = mkdtempSync(join(tmpdir(), 'shun-envrelay-'));
-      relayScript = join(dir, 'probe-relay.ps1');
-      writeFileSync(relayScript, PROBE_RELAY, 'utf8');
+      const { dir, relayScript } = makeProbeDir(probeRelayScript(2500));
       const probeFile = join(dir, 'relay-env.json');
 
       // Poison THIS process's environment exactly like a same-user attacker
@@ -148,6 +223,7 @@ describe.skipIf(!ON_WINDOWS)(
       process.env.NODE_OPTIONS = `--require=${canaryJs}`;
       process.env.NODE_PATH = 'D:\\attacker\\node_modules';
 
+      let relayPid = -1;
       const result = await spawnRelay({
         powershellExe: machinePowershell,
         taskkillExe: machineTaskkill,
@@ -156,12 +232,93 @@ describe.skipIf(!ON_WINDOWS)(
         helperBundle: join(dir, 'unused-bundle.mjs'),
         helperArgs: [probeFile],
         relayFile: join(dir, 'relay.json'),
-        timeoutMs: 60000,
+        timeoutMs: RELAY_STARTUP_BUDGET_MS,
+        onRelayPid: (pid) => {
+          relayPid = pid;
+        },
       });
       expect(result, `relay result: ${JSON.stringify(result)}`).toMatchObject({ kind: 'RAN' });
       expect(existsSync(probeFile)).toBe(true);
       const observed = JSON.parse(readFileSync(probeFile, 'utf8')) as string[];
       expect(observed).toEqual([]);
+      // The 2,500 ms controlled startup delay really delayed readiness.
+      expect(result.elapsedMs).toBeGreaterThanOrEqual(2000);
+      // Orphan proof: the relay tree is gone once the result is RAN.
+      expect(await processGone(relayPid)).toBe(true);
+    });
+
+    it('spawnRelay bounds a hung relay: timeout kill, bounded cleanup, no orphan process tree', {
+      timeout: 90000,
+    }, async () => {
+      const { dir, relayScript } = makeProbeDir(probeRelayScript(30000));
+      const probeFile = join(dir, 'relay-env.json');
+      const relayFile = join(dir, 'relay.json');
+
+      let relayPid = -1;
+      const result = await spawnRelay({
+        powershellExe: machinePowershell,
+        taskkillExe: machineTaskkill,
+        nodeExe: process.execPath,
+        relayScript,
+        helperBundle: join(dir, 'unused-bundle.mjs'),
+        helperArgs: [probeFile],
+        relayFile,
+        timeoutMs: 3000,
+        onRelayPid: (pid) => {
+          relayPid = pid;
+        },
+      });
+      expect(result, `relay result: ${JSON.stringify(result)}`).toMatchObject({
+        kind: 'TIMED_OUT',
+        timedOut: true,
+        // Bounded cleanup: the launcher settled its promise and proved the
+        // tree died — it never hangs behind an unresolvable pending spawn.
+        killConfirmed: true,
+      });
+      expect(existsSync(relayFile)).toBe(false);
+      expect(existsSync(probeFile)).toBe(false);
+      // Orphan proof: the tree-kill reached the relay; nothing lingers.
+      expect(await processGone(relayPid)).toBe(true);
+    });
+
+    it('spawnRelay reports a structured SPAWN_ERROR when the relay host cannot be launched', {
+      timeout: 30000,
+    }, async () => {
+      const { dir, relayScript } = makeProbeDir(probeRelayScript());
+      const result = await spawnRelay({
+        powershellExe: join(dir, 'no-such-powershell.exe'),
+        taskkillExe: machineTaskkill,
+        nodeExe: process.execPath,
+        relayScript,
+        helperBundle: join(dir, 'unused-bundle.mjs'),
+        helperArgs: [join(dir, 'relay-env.json')],
+        relayFile: join(dir, 'relay.json'),
+        timeoutMs: 10000,
+      });
+      expect(result, `relay result: ${JSON.stringify(result)}`).toMatchObject({
+        kind: 'SPAWN_ERROR',
+      });
+    });
+
+    it('spawnRelay classifies a relay that exits without writing the relay file as NO_RELAY', {
+      timeout: RELAY_STARTUP_BUDGET_MS + 60000,
+    }, async () => {
+      const { dir, relayScript } = makeProbeDir(SILENT_EXIT_RELAY);
+      const result = await spawnRelay({
+        powershellExe: machinePowershell,
+        taskkillExe: machineTaskkill,
+        nodeExe: process.execPath,
+        relayScript,
+        helperBundle: join(dir, 'unused-bundle.mjs'),
+        helperArgs: [join(dir, 'relay-env.json')],
+        relayFile: join(dir, 'relay.json'),
+        timeoutMs: RELAY_STARTUP_BUDGET_MS,
+      });
+      expect(result, `relay result: ${JSON.stringify(result)}`).toMatchObject({
+        kind: 'NO_RELAY',
+        timedOut: false,
+      });
+      expect(existsSync(join(dir, 'relay.json'))).toBe(false);
     });
   },
 );
