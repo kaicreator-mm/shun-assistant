@@ -105,7 +105,7 @@ function protectedAcl(trustDir: string, extraPaths: readonly string[]): GuidedTr
     path,
     ownerSid: 'S-1-5-32-544',
     accessRules: [
-      { identitySid: 'S-1-5-32-545', rightsMask: 0x20089, accessType: 'Allow', isInherited: true },
+      { identitySid: 'S-1-5-32-545', rightsMask: 0x200a9, accessType: 'Allow', isInherited: true },
     ] as GuidedTrustAccessRule[],
   }));
 }
@@ -765,7 +765,7 @@ describe('G2 DACL and issuer-key custody repairs', () => {
         accessRules: [
           ...row.accessRules,
           {
-            identitySid: 'S-1-1-0',
+            identitySid: 'S-1-5-99',
             rightsMask: 0x001f01ff,
             accessType: 'Deny' as const,
             isInherited: true,
@@ -773,6 +773,37 @@ describe('G2 DACL and issuer-key custody repairs', () => {
         ],
       }));
       expect(assessGuidedTrustProtection(fixture.trustDir, [], rows)).toEqual([]);
+    } finally {
+      rmSync(fixture.root, { recursive: true, force: true });
+    }
+  });
+
+  it('fails closed when Users/Authenticated Users cannot read or traverse the trust tree', () => {
+    const fixture = makeFixture();
+    try {
+      const noRead = protectedAcl(fixture.trustDir, []).map((row) => ({
+        ...row,
+        accessRules: [],
+      }));
+      expect(assessGuidedTrustProtection(fixture.trustDir, [], noRead)).toEqual(
+        expect.arrayContaining([expect.stringContaining('runtime read/execute')]),
+      );
+
+      const deniedRead = protectedAcl(fixture.trustDir, []).map((row) => ({
+        ...row,
+        accessRules: [
+          ...row.accessRules,
+          {
+            identitySid: 'S-1-1-0',
+            rightsMask: 0x00000001,
+            accessType: 'Deny' as const,
+            isInherited: true,
+          },
+        ],
+      }));
+      expect(assessGuidedTrustProtection(fixture.trustDir, [], deniedRead)).toEqual(
+        expect.arrayContaining([expect.stringContaining('runtime read/execute')]),
+      );
     } finally {
       rmSync(fixture.root, { recursive: true, force: true });
     }
