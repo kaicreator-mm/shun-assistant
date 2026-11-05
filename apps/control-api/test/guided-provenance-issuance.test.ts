@@ -814,18 +814,20 @@ describe('G2 DACL and issuer-key custody repairs', () => {
     try {
       const rows = protectedAcl(fixture.trustDir, []);
       expect(assessGuidedTrustProtection(fixture.trustDir, [], rows.slice(0, 1))).not.toEqual([]);
+      const [firstRow, ...restRows] = rows;
+      if (!firstRow) throw new Error('fixture produced no ACL rows');
       expect(
         assessGuidedTrustProtection(
           fixture.trustDir,
           [],
           [
             {
-              ...rows[0]!,
+              ...firstRow,
               accessRules: [
                 { identitySid: null, rightsMask: 2, accessType: 'Allow', isInherited: true },
               ],
             },
-            ...rows.slice(1),
+            ...restRows,
           ],
         ),
       ).not.toEqual([]);

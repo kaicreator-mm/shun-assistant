@@ -310,7 +310,10 @@ export function inspectWindowsGuidedTrustAcl(
     '  [pscustomobject]@{ path = $p; ownerSid = $ownerSid; accessRules = $rules }',
     '}',
     '$rows | ConvertTo-Json -Compress -Depth 8',
-  ].join('; ');
+    // Newline-joined, never "; "-joined: a semicolon immediately inside a
+    // script block or hash literal ({; / @{;) is a PowerShell parse error,
+    // which would make every real probe fail closed as a parser failure.
+  ].join('\n');
   const env = { ...process.env };
   env.SHUN_GUIDED_ACL_ROOT = trustDir;
   env.SHUN_GUIDED_ACL_EXTRA = extraPaths.join(';');
@@ -403,7 +406,7 @@ export function assessGuidedTrustProtection(
     }
   }
   for (const path of required) {
-    if (!seen.has(norm(path))) reasons.push('guided trust ACL scan is incomplete: ' + path);
+    if (!seen.has(norm(path))) reasons.push(`guided trust ACL scan is incomplete: ${path}`);
   }
   return reasons;
 }
