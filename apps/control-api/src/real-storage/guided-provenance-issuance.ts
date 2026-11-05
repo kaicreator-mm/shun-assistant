@@ -31,8 +31,8 @@ import {
   rmSync,
   writeFileSync,
 } from 'node:fs';
-import { homedir } from 'node:os';
-import { isAbsolute, resolve, sep } from 'node:path';
+import { homedir, tmpdir } from 'node:os';
+import { dirname, isAbsolute, resolve, sep } from 'node:path';
 import { canonicalJson } from '@shun/contracts';
 import {
   GUIDED_SCHEMA_VERSION,
@@ -243,28 +243,31 @@ export function readGuidedTrustAnchor(trustDir: string): GuidedTrustAnchor {
   return anchor;
 }
 
+/** Complete Windows DACL allow/deny entry, including inherited ACEs. */
+export interface GuidedTrustAccessRule {
+  readonly identitySid: string | null;
+  readonly rightsMask: number;
+  readonly accessType: 'Allow' | 'Deny';
+  readonly isInherited: boolean;
+}
 export interface GuidedTrustAclEntry {
   readonly path: string;
   readonly ownerSid: string | null;
+  readonly accessRules: readonly GuidedTrustAccessRule[];
 }
-
-/**
- * Snapshot of the Windows owner SIDs of the trust tree. `undefined` means
- * the probe failed and callers MUST fail closed.
- */
 export type GuidedTrustAclSnapshot = ReadonlyArray<GuidedTrustAclEntry>;
-
 export type GuidedAclInspector = (
   trustDir: string,
   extraPaths: readonly string[],
 ) => GuidedTrustAclSnapshot | undefined;
-
 const PRIVILEGED_OWNER_SIDS = new Set(['S-1-5-18', 'S-1-5-32-544']);
+// Write/create/append/attributes/delete/write-DAC/take-ownership and generic write/all.
+const DANGEROUS_WRITE_MASK =
+  0x00000002 | 0x00000004 | 0x00000010 | 0x00000040 |
+  0x00000100 | 0x00010000 | 0x00040000 | 0x00080000 |
+  0x10000000 | 0x40000000;
 
-/**
- * Real Windows owner scan (read-only Get-Acl over the whole trust tree).
- * Returns undefined on any probe failure — never guess.
- */
+/** Read-only, terminating whole-tree Get-Acl: no partial scan counts as success. */
 export function inspectWindowsGuidedTrustAcl(
   trustDir: string,
   extraPaths: readonly string[] = [],
@@ -273,23 +276,30 @@ export function inspectWindowsGuidedTrustAcl(
   const systemRoot = process.env.SystemRoot ?? 'C:\\Windows';
   const powershell = resolve(systemRoot, 'System32', 'WindowsPowerShell', 'v1.0', 'powershell.exe');
   const script = [
+    '$ErrorActionPreference = "Stop"',
     '$root = $env:SHUN_GUIDED_ACL_ROOT',
+    'if (-not (Test-Path -LiteralPath $root -PathType Container)) { throw "TRUST_ROOT_MISSING" }',
     '$paths = New-Object System.Collections.Generic.List[string]',
     '$paths.Add($root)',
-    'if (Test-Path -LiteralPath $root) {',
-    '  Get-ChildItem -LiteralPath $root -Force -Recurse | ForEach-Object { $paths.Add($_.FullName) }',
-    '}',
+    'Get-ChildItem -LiteralPath $root -Force -Recurse -ErrorAction Stop | ForEach-Object { $paths.Add($_.FullName) }',
     'foreach ($extra in @($env:SHUN_GUIDED_ACL_EXTRA -split ";")) {',
     '  if ($extra -and -not $paths.Contains($extra)) { $paths.Add($extra) }',
     '}',
     '$rows = foreach ($p in $paths) {',
-    '  try {',
-    '    $acl = Get-Acl -LiteralPath $p',
-    '    $owner = New-Object System.Security.Principal.NTAccount($acl.Owner)',
-    '    [pscustomobject]@{ path = $p; ownerSid = $owner.Translate([System.Security.Principal.SecurityIdentifier]).Value }',
-    '  } catch { [pscustomobject]@{ path = $p; ownerSid = $null } }',
+    '  $acl = Get-Acl -LiteralPath $p -ErrorAction Stop',
+    '  $owner = New-Object System.Security.Principal.NTAccount($acl.Owner)',
+    '  $ownerSid = $owner.Translate([System.Security.Principal.SecurityIdentifier]).Value',
+    '  $rules = @($acl.Access | ForEach-Object {',
+    '    [pscustomobject]@{',
+    '      identitySid = $_.IdentityReference.Translate([System.Security.Principal.SecurityIdentifier]).Value',
+    '      rightsMask = [int64]$_.FileSystemRights',
+    '      accessType = $_.AccessControlType.ToString()',
+    '      isInherited = [bool]$_.IsInherited',
+    '    }',
+    '  })',
+    '  [pscustomobject]@{ path = $p; ownerSid = $ownerSid; accessRules = $rules }',
     '}',
-    '$rows | ConvertTo-Json -Compress',
+    '$rows | ConvertTo-Json -Compress -Depth 8',
   ].join('; ');
   const env = { ...process.env };
   env.SHUN_GUIDED_ACL_ROOT = trustDir;
@@ -303,41 +313,72 @@ export function inspectWindowsGuidedTrustAcl(
       env,
       maxBuffer: 4 * 1024 * 1024,
     }).trim();
-    const decoded = JSON.parse(out) as
-      | { readonly path: string; readonly ownerSid: string | null }
-      | ReadonlyArray<{ readonly path: string; readonly ownerSid: string | null }>;
+    const decoded: unknown = JSON.parse(out);
     const rows = Array.isArray(decoded) ? decoded : [decoded];
-    return rows.length > 0 ? rows : undefined;
+    return rows.length > 0 ? (rows as GuidedTrustAclEntry[]) : undefined;
   } catch {
     return undefined;
   }
 }
 
-/**
- * Enforce the protection policy on the trust tree: every scanned object
- * (trust dir, trust anchor, every receipt) must be owned by
- * Administrators/SYSTEM so the filtered runtime token can hold read-only
- * access only. An absent snapshot or any non-privileged owner fails closed.
- * Callers may inject a snapshot (tests); production passes the real scan.
- */
+/** Owners AND effective writable DACL entries must meet the pinned policy. */
 export function assessGuidedTrustProtection(
   trustDir: string,
   receiptPaths: readonly string[],
   snapshot?: GuidedTrustAclSnapshot,
 ): string[] {
   const rows = snapshot ?? inspectWindowsGuidedTrustAcl(trustDir, receiptPaths);
-  if (!rows) return ['guided trust ACL/owner probe failed (fail closed)'];
+  if (!rows) return ['guided trust ACL/DACL probe failed (fail closed)'];
   const reasons: string[] = [];
-  const canonicalTrustDir = resolve(trustDir).toLowerCase();
-  if (!rows.some((row) => resolve(row.path).toLowerCase() === canonicalTrustDir)) {
-    reasons.push('guided trust directory absent from ACL scan');
-  }
+  const norm = (path: string): string => resolve(path).toLowerCase();
+  const required = [
+    trustDir,
+    resolve(trustDir, GUIDED_PROVENANCE_TRUST_ANCHOR_FILE),
+    resolve(trustDir, GUIDED_PROVENANCE_RECEIPTS_SUBDIR),
+    ...receiptPaths,
+  ].filter((path) => existsSync(path));
+  const seen = new Set<string>();
   for (const row of rows) {
-    if (!row.ownerSid || !PRIVILEGED_OWNER_SIDS.has(row.ownerSid)) {
-      reasons.push(
-        `guided trust object owner is not Administrators/SYSTEM: ${row.path} (${row.ownerSid ?? 'unresolvable'})`,
-      );
+    if (
+      !row ||
+      typeof row.path !== 'string' ||
+      typeof row.ownerSid !== 'string' ||
+      !PRIVILEGED_OWNER_SIDS.has(row.ownerSid) ||
+      !Array.isArray(row.accessRules)
+    ) {
+      reasons.push('guided trust object has invalid owner or incomplete DACL snapshot');
+      continue;
     }
+    const key = norm(row.path);
+    if (seen.has(key)) reasons.push('guided trust ACL scan has duplicate objects');
+    seen.add(key);
+    try {
+      assertGuidedRegularCanonicalPath(row.path, 'TRUST_PATH_UNTRUSTED');
+    } catch {
+      reasons.push('guided trust ACL scan contains symlink/reparse/alias');
+    }
+    for (const rule of row.accessRules) {
+      if (
+        !rule ||
+        typeof rule.identitySid !== 'string' ||
+        !Number.isSafeInteger(rule.rightsMask) ||
+        (rule.accessType !== 'Allow' && rule.accessType !== 'Deny') ||
+        typeof rule.isInherited !== 'boolean'
+      ) {
+        reasons.push('guided trust DACL contains malformed or untranslatable rule');
+        continue;
+      }
+      if (
+        rule.accessType === 'Allow' &&
+        !PRIVILEGED_OWNER_SIDS.has(rule.identitySid) &&
+        ((rule.rightsMask | 0) & DANGEROUS_WRITE_MASK) !== 0
+      ) {
+        reasons.push('guided trust DACL grants non-privileged write/modify/delete/ACL-control');
+      }
+    }
+  }
+  for (const path of required) {
+    if (!seen.has(norm(path))) reasons.push('guided trust ACL scan is incomplete: ' + path);
   }
   return reasons;
 }
@@ -370,11 +411,20 @@ export function assertGuidedPathOutside(
 }
 
 /** An issuer key must never live in scopes the runtime or repo can reach. */
-export function assertGuidedPrivateKeyScope(issuerKeyPath: string, workspaceRoot: string): void {
+export function assertGuidedPrivateKeyScope(
+  issuerKeyPath: string,
+  workspaceRoot: string,
+  databasePath?: string,
+  trustDir?: string,
+  testOnlyAllowTemporaryKey = false,
+): void {
   const forbiddenRoots = [
     workspaceRoot,
     defaultGuidedProvenanceTrustDirectory(),
     resolve(homedir(), '.shun'),
+    ...(databasePath ? [dirname(resolve(databasePath))] : []),
+    ...(trustDir ? [trustDir] : []),
+    ...(!testOnlyAllowTemporaryKey ? [tmpdir()] : []),
   ];
   assertGuidedPathOutside(issuerKeyPath, forbiddenRoots, 'ISSUER_KEY_SCOPE_REFUSED');
 }
