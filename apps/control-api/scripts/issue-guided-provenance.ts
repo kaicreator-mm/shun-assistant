@@ -31,10 +31,12 @@ import {
   assertGuidedPathOutside,
   assertGuidedPrivateKeyScope,
   assertGuidedRegularCanonicalPath,
+  assessGuidedTrustAncestorProtection,
   assessGuidedTrustProtection,
   buildGuidedReceiptSigningBytes,
   canonicalGuidedDatabasePath,
   defaultGuidedProvenanceTrustDirectory,
+  defaultGuidedTrustAncestorChain,
   GUIDED_PROVENANCE_DIGEST_PATTERN,
   GUIDED_PROVENANCE_RECEIPT_SCHEMA,
   GUIDED_PROVENANCE_TRUST_ANCHOR_FILE,
@@ -133,7 +135,11 @@ export interface GuidedIssuanceInput {
   readonly databaseId?: string;
   /** ACL snapshot injector (tests). Production uses the real Windows scan. */
   readonly inspectAcl?: GuidedAclInspector;
-  /** Test-only ephemeral key exception: CLI never supplies this flag. */
+  /**
+   * Test-only ephemeral key exception: requires an injected ACL snapshot AND
+   * a test-runner context (VITEST); the CLI never supplies this flag and it
+   * throws outside a test runner even if set.
+   */
   readonly testOnlyAllowTemporaryKey?: boolean;
 }
 
@@ -155,6 +161,11 @@ export interface GuidedIssuanceResult {
 export function issueGuidedProvenanceReceipt(input: GuidedIssuanceInput): GuidedIssuanceResult {
   if (!GUIDED_PROVENANCE_DIGEST_PATTERN.test(input.schemaDigest)) {
     throw new Error('ISSUER_SCHEMA_DIGEST_INVALID');
+  }
+  // The OS-temp key relaxation is test-only: refuse it anywhere outside a
+  // test runner, even when paired with an injected ACL snapshot.
+  if (input.testOnlyAllowTemporaryKey === true && process.env.VITEST === undefined) {
+    throw new Error('ISSUER_TEST_ONLY_KEY_FLAG_OUTSIDE_TEST_CONTEXT');
   }
   const workspaceRoot = resolve(input.workspaceRoot);
   const trustDir =
@@ -188,6 +199,24 @@ export function issueGuidedProvenanceReceipt(input: GuidedIssuanceInput): Guided
     if (created.toLowerCase() !== trustDir.toLowerCase()) {
       rmSync(trustDir, { recursive: true, force: true });
       throw new Error('ISSUER_TRUST_DIR_ALIAS');
+    }
+  }
+
+  // The baked-in production trust root must sit under an operator-protected
+  // ancestor chain; a runtime-writable ancestor would allow rename/swap of
+  // the whole trust root that tree-local DACL cannot prevent. Injected
+  // non-default test trust directories are exempt.
+  if (
+    resolve(trustDir).toLowerCase() ===
+    resolve(defaultGuidedProvenanceTrustDirectory()).toLowerCase()
+  ) {
+    const ancestors = defaultGuidedTrustAncestorChain();
+    const ancestorReasons = assessGuidedTrustAncestorProtection(
+      ancestors,
+      input.inspectAcl ? input.inspectAcl(ancestors[0] ?? '', ancestors.slice(1)) : undefined,
+    );
+    if (ancestorReasons.length > 0) {
+      throw new Error(`ISSUER_TRUST_ANCESTORS_UNPROTECTED:${ancestorReasons.join(' | ')}`);
     }
   }
 

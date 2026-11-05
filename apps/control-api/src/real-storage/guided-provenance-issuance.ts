@@ -261,6 +261,9 @@ export type GuidedAclInspector = (
   extraPaths: readonly string[],
 ) => GuidedTrustAclSnapshot | undefined;
 const PRIVILEGED_OWNER_SIDS = new Set(['S-1-5-18', 'S-1-5-32-544']);
+// CREATOR OWNER / CREATOR GROUP are inheritance placeholders: they never
+// grant direct access to anyone and only take meaning on child objects.
+const PLACEHOLDER_INHERITANCE_SIDS = new Set(['S-1-3-0', 'S-1-3-1']);
 // Write/create/append/attributes/delete/write-DAC/take-ownership and generic write/all.
 const DANGEROUS_WRITE_MASK =
   0x00000002 |
@@ -273,25 +276,51 @@ const DANGEROUS_WRITE_MASK =
   0x00080000 |
   0x10000000 |
   0x40000000;
+// Ancestors are policy-bound, not content-bound: the OS-default ProgramData
+// ACL grants Users "create children" (0x116) on the folder itself, which
+// cannot rename, delete, swap or re-ACL an existing admin-owned entry. Only
+// delete/delete-child/ACL-control/take-ownership/generic-write grants enable
+// the ancestor swap attack and are refused there.
+const ANCESTOR_DANGEROUS_WRITE_MASK =
+  0x00000040 | 0x00010000 | 0x00040000 | 0x00080000 | 0x10000000 | 0x40000000;
 const RUNTIME_READ_ALLOW_SIDS = new Set(['S-1-5-11', 'S-1-5-32-545']);
-const RUNTIME_READ_DENY_SIDS = new Set(['S-1-1-0', 'S-1-5-11', 'S-1-5-32-545']);
+// Deny ACEs for ANY of these break runtime reads: every interactive local
+// token carries Everyone, Authenticated Users, Users, INTERACTIVE, LOCAL and
+// CONSOLE_LOGON, regardless of which account the runtime service runs as.
+const RUNTIME_READ_DENY_SIDS = new Set([
+  'S-1-1-0',
+  'S-1-5-11',
+  'S-1-5-32-545',
+  'S-1-5-4',
+  'S-1-2-0',
+  'S-1-2-1',
+]);
 const REQUIRED_RUNTIME_READ_MASK = 0x00000001 | 0x00000008 | 0x00000020 | 0x00000080;
 
-/** Read-only, terminating whole-tree Get-Acl: no partial scan counts as success. */
+/**
+ * Read-only, terminating Get-Acl probe: no partial scan counts as success.
+ * Recursive by default (whole trust tree); callers enumerating a known path
+ * list (ancestor directories) pass `{ recursive: false }` to scan exactly
+ * the root plus `extraPaths`, nothing more.
+ */
 export function inspectWindowsGuidedTrustAcl(
   trustDir: string,
   extraPaths: readonly string[] = [],
+  options: { readonly recursive?: boolean } = {},
 ): GuidedTrustAclSnapshot | undefined {
   if (process.platform !== 'win32') return undefined;
   const systemRoot = process.env.SystemRoot ?? 'C:\\Windows';
   const powershell = resolve(systemRoot, 'System32', 'WindowsPowerShell', 'v1.0', 'powershell.exe');
+  const recurse = options.recursive !== false;
   const script = [
     '$ErrorActionPreference = "Stop"',
     '$root = $env:SHUN_GUIDED_ACL_ROOT',
     'if (-not (Test-Path -LiteralPath $root -PathType Container)) { throw "TRUST_ROOT_MISSING" }',
     '$paths = New-Object System.Collections.Generic.List[string]',
     '$paths.Add($root)',
-    'Get-ChildItem -LiteralPath $root -Force -Recurse -ErrorAction Stop | ForEach-Object { $paths.Add($_.FullName) }',
+    'if ($env:SHUN_GUIDED_ACL_RECURSE -eq "1") {',
+    '  Get-ChildItem -LiteralPath $root -Force -Recurse -ErrorAction Stop | ForEach-Object { $paths.Add($_.FullName) }',
+    '}',
     'foreach ($extra in @($env:SHUN_GUIDED_ACL_EXTRA -split ";")) {',
     '  if ($extra -and -not $paths.Contains($extra)) { $paths.Add($extra) }',
     '}',
@@ -317,6 +346,7 @@ export function inspectWindowsGuidedTrustAcl(
   const env = { ...process.env };
   env.SHUN_GUIDED_ACL_ROOT = trustDir;
   env.SHUN_GUIDED_ACL_EXTRA = extraPaths.join(';');
+  env.SHUN_GUIDED_ACL_RECURSE = recurse ? '1' : '0';
   delete env.PSModulePath;
   try {
     const out = execFileSync(powershell, ['-NoProfile', '-NonInteractive', '-Command', script], {
@@ -334,43 +364,43 @@ export function inspectWindowsGuidedTrustAcl(
   }
 }
 
-/** Owners AND effective writable DACL entries must meet the pinned policy. */
-export function assessGuidedTrustProtection(
-  trustDir: string,
-  receiptPaths: readonly string[],
-  snapshot?: GuidedTrustAclSnapshot,
+/**
+ * Owners AND effective writable DACL entries must meet the pinned policy.
+ * Shared by the trust-tree and ancestor-chain assessments.
+ */
+function assessGuidedAclSnapshot(
+  rows: readonly unknown[],
+  required: readonly string[],
+  dangerousWriteMask: number,
 ): string[] {
-  const rows = snapshot ?? inspectWindowsGuidedTrustAcl(trustDir, receiptPaths);
-  if (!rows) return ['guided trust ACL/DACL probe failed (fail closed)'];
   const reasons: string[] = [];
   const norm = (path: string): string => resolve(path).toLowerCase();
-  const required = [
-    trustDir,
-    resolve(trustDir, GUIDED_PROVENANCE_TRUST_ANCHOR_FILE),
-    resolve(trustDir, GUIDED_PROVENANCE_RECEIPTS_SUBDIR),
-    ...receiptPaths,
-  ].filter((path) => existsSync(path));
   const seen = new Set<string>();
   for (const row of rows) {
     if (
       !row ||
-      typeof row.path !== 'string' ||
-      typeof row.ownerSid !== 'string' ||
-      !PRIVILEGED_OWNER_SIDS.has(row.ownerSid) ||
-      !Array.isArray(row.accessRules)
+      typeof (row as { path?: unknown }).path !== 'string' ||
+      typeof (row as { ownerSid?: unknown }).ownerSid !== 'string' ||
+      !PRIVILEGED_OWNER_SIDS.has((row as { ownerSid: string }).ownerSid) ||
+      !Array.isArray((row as { accessRules?: unknown }).accessRules)
     ) {
       reasons.push('guided trust object has invalid owner or incomplete DACL snapshot');
       continue;
     }
-    const key = norm(row.path);
+    const entry = row as unknown as GuidedTrustAclEntry;
+    const key = norm(entry.path);
     if (seen.has(key)) reasons.push('guided trust ACL scan has duplicate objects');
     seen.add(key);
-    try {
-      assertGuidedRegularCanonicalPath(row.path, 'TRUST_PATH_UNTRUSTED');
-    } catch {
-      reasons.push('guided trust ACL scan contains symlink/reparse/alias');
+    // Real probe rows always exist; injected rows may describe not-yet-created
+    // paths (ancestor fixtures), which carry no reparse evidence either way.
+    if (existsSync(entry.path)) {
+      try {
+        assertGuidedRegularCanonicalPath(entry.path, 'TRUST_PATH_UNTRUSTED');
+      } catch {
+        reasons.push('guided trust ACL scan contains symlink/reparse/alias');
+      }
     }
-    for (const rule of row.accessRules) {
+    for (const rule of entry.accessRules) {
       if (
         !rule ||
         typeof rule.identitySid !== 'string' ||
@@ -384,18 +414,19 @@ export function assessGuidedTrustProtection(
       if (
         rule.accessType === 'Allow' &&
         !PRIVILEGED_OWNER_SIDS.has(rule.identitySid) &&
-        ((rule.rightsMask | 0) & DANGEROUS_WRITE_MASK) !== 0
+        !PLACEHOLDER_INHERITANCE_SIDS.has(rule.identitySid) &&
+        ((rule.rightsMask | 0) & dangerousWriteMask) !== 0
       ) {
         reasons.push('guided trust DACL grants non-privileged write/modify/delete/ACL-control');
       }
     }
-    const runtimeReadAllowed = row.accessRules.some(
+    const runtimeReadAllowed = entry.accessRules.some(
       (rule) =>
         rule.accessType === 'Allow' &&
         RUNTIME_READ_ALLOW_SIDS.has(rule.identitySid ?? '') &&
         ((rule.rightsMask | 0) & REQUIRED_RUNTIME_READ_MASK) === REQUIRED_RUNTIME_READ_MASK,
     );
-    const runtimeReadDenied = row.accessRules.some(
+    const runtimeReadDenied = entry.accessRules.some(
       (rule) =>
         rule.accessType === 'Deny' &&
         RUNTIME_READ_DENY_SIDS.has(rule.identitySid ?? '') &&
@@ -409,6 +440,69 @@ export function assessGuidedTrustProtection(
     if (!seen.has(norm(path))) reasons.push(`guided trust ACL scan is incomplete: ${path}`);
   }
   return reasons;
+}
+
+/** Assess the trust tree itself: anchor, receipts dir and every receipt. */
+export function assessGuidedTrustProtection(
+  trustDir: string,
+  receiptPaths: readonly string[],
+  snapshot?: GuidedTrustAclSnapshot,
+): string[] {
+  const rows = snapshot ?? inspectWindowsGuidedTrustAcl(trustDir, receiptPaths);
+  if (!rows) return ['guided trust ACL/DACL probe failed (fail closed)'];
+  const required = [
+    trustDir,
+    resolve(trustDir, GUIDED_PROVENANCE_TRUST_ANCHOR_FILE),
+    resolve(trustDir, GUIDED_PROVENANCE_RECEIPTS_SUBDIR),
+    ...receiptPaths,
+  ].filter((path) => existsSync(path));
+  return assessGuidedAclSnapshot(rows, required, DANGEROUS_WRITE_MASK);
+}
+
+/**
+ * Ancestor directories of the baked-in default trust root
+ * (C:\ProgramData\Shun\authority, C:\ProgramData\Shun, C:\ProgramData).
+ * Derived from the default constant so the chain tracks future changes; the
+ * walk must terminate at %ProgramData% or it fails closed.
+ */
+export function defaultGuidedTrustAncestorChain(): string[] {
+  const stopRoot = resolve(process.env.ProgramData ?? 'C:\\ProgramData').toLowerCase();
+  const chain: string[] = [];
+  let current = dirname(defaultGuidedProvenanceTrustDirectory());
+  for (let depth = 0; depth < 8; depth += 1) {
+    chain.push(current);
+    if (resolve(current).toLowerCase() === stopRoot) return chain;
+    const parent = dirname(current);
+    if (parent.toLowerCase() === current.toLowerCase()) break;
+    current = parent;
+  }
+  reject('TRUST_ANCESTOR_CHAIN_UNREACHABLE');
+}
+
+/**
+ * Assess the ancestor chain of the default trust root: same ownership and
+ * deny policy as the tree, but a narrower write mask (see
+ * ANCESTOR_DANGEROUS_WRITE_MASK), probed non-recursively over the enumerated
+ * directories only. A runtime-writable ancestor would allow rename/swap
+ * attacks on the trust root that tree-local DACL cannot prevent.
+ */
+export function assessGuidedTrustAncestorProtection(
+  ancestorPaths: readonly string[],
+  snapshot?: GuidedTrustAclSnapshot,
+): string[] {
+  const first = ancestorPaths[0];
+  if (!first) return ['guided trust ancestor ACL/DACL probe failed (no ancestors)'];
+  const rows =
+    snapshot ??
+    inspectWindowsGuidedTrustAcl(first, ancestorPaths.slice(1), {
+      recursive: false,
+    });
+  if (!rows) return ['guided trust ancestor ACL/DACL probe failed (fail closed)'];
+  return assessGuidedAclSnapshot(
+    rows,
+    ancestorPaths.filter((path) => existsSync(path)),
+    ANCESTOR_DANGEROUS_WRITE_MASK,
+  );
 }
 
 /**

@@ -27,10 +27,12 @@ import {
 import {
   assertGuidedPrivateKeyScope,
   assertGuidedRegularCanonicalPath,
+  assessGuidedTrustAncestorProtection,
   assessGuidedTrustProtection,
   buildGuidedReceiptSigningBytes,
   canonicalGuidedDatabasePath,
   createExternalGuidedProvenanceAuthority,
+  defaultGuidedTrustAncestorChain,
   type ExternalGuidedAuthorityOptions,
   GUIDED_PROVENANCE_RECEIPT_SCHEMA,
   GUIDED_PROVENANCE_RECEIPTS_SUBDIR,
@@ -901,5 +903,161 @@ describe('G2 DACL and issuer-key custody repairs', () => {
         SHUN_GUIDED_TRUST_DIR: 'C:\\wrong\\user-writable',
       }),
     ).toThrow('ISSUER_TRUST_DIR_OVERRIDE_FORBIDDEN');
+  });
+
+  it('refuses deny read ACEs for interactive-logon SIDs the runtime token always holds', () => {
+    const fixture = makeFixture();
+    try {
+      for (const sid of ['S-1-5-4', 'S-1-2-0', 'S-1-2-1']) {
+        const rows = protectedAcl(fixture.trustDir, []).map((row) => ({
+          ...row,
+          accessRules: [
+            ...row.accessRules,
+            {
+              identitySid: sid,
+              rightsMask: 0x00000001,
+              accessType: 'Deny' as const,
+              isInherited: true,
+            },
+          ],
+        }));
+        expect(assessGuidedTrustProtection(fixture.trustDir, [], rows)).toEqual(
+          expect.arrayContaining([expect.stringContaining('runtime read/execute')]),
+        );
+      }
+    } finally {
+      rmSync(fixture.root, { recursive: true, force: true });
+    }
+  });
+
+  it('exempts CREATOR OWNER/CREATOR GROUP placeholder ACEs from the write check', () => {
+    const fixture = makeFixture();
+    try {
+      for (const sid of ['S-1-3-0', 'S-1-3-1']) {
+        const rows = protectedAcl(fixture.trustDir, []).map((row) => ({
+          ...row,
+          accessRules: [
+            ...row.accessRules,
+            {
+              identitySid: sid,
+              rightsMask: 0x001f01ff,
+              accessType: 'Allow' as const,
+              isInherited: true,
+            },
+          ],
+        }));
+        expect(assessGuidedTrustProtection(fixture.trustDir, [], rows)).toEqual([]);
+      }
+    } finally {
+      rmSync(fixture.root, { recursive: true, force: true });
+    }
+  });
+
+  it('assesses the default-trust ancestor chain and refuses non-privileged write on it', () => {
+    const chain = defaultGuidedTrustAncestorChain();
+    expect(chain.map((path) => path.toLowerCase())).toEqual([
+      'c:\\programdata\\shun\\authority',
+      'c:\\programdata\\shun',
+      'c:\\programdata',
+    ]);
+    const ancestorRow = (path: string) => ({
+      path,
+      ownerSid: 'S-1-5-18',
+      accessRules: [
+        {
+          identitySid: 'S-1-5-32-545',
+          rightsMask: 0x001200a9,
+          accessType: 'Allow',
+          isInherited: true,
+        },
+      ] as GuidedTrustAccessRule[],
+    });
+    const healthy = chain.map(ancestorRow);
+    expect(assessGuidedTrustAncestorProtection(chain, healthy)).toEqual([]);
+    // OS-default ProgramData shape: Users "create children" (0x116) on the
+    // folder itself cannot rename/delete/re-ACL an existing admin-owned entry.
+    const defaultCreate = chain.map((path, index) =>
+      index === 2
+        ? {
+            ...ancestorRow(path),
+            accessRules: [
+              ...ancestorRow(path).accessRules,
+              {
+                identitySid: 'S-1-5-32-545',
+                rightsMask: 0x00000116,
+                accessType: 'Allow' as const,
+                isInherited: true,
+              },
+            ],
+          }
+        : ancestorRow(path),
+    );
+    expect(assessGuidedTrustAncestorProtection(chain, defaultCreate)).toEqual([]);
+    const deletable = chain.map((path, index) =>
+      index === 1
+        ? {
+            ...ancestorRow(path),
+            accessRules: [
+              ...ancestorRow(path).accessRules,
+              {
+                identitySid: 'S-1-5-11',
+                rightsMask: 0x00010000,
+                accessType: 'Allow' as const,
+                isInherited: true,
+              },
+            ],
+          }
+        : ancestorRow(path),
+    );
+    expect(assessGuidedTrustAncestorProtection(chain, deletable)).toEqual(
+      expect.arrayContaining([expect.stringContaining('non-privileged write')]),
+    );
+    expect(assessGuidedTrustAncestorProtection(chain, healthy.slice(0, 2))).not.toEqual([]);
+    const deniedTraverse = chain.map((path, index) =>
+      index === 0
+        ? {
+            ...ancestorRow(path),
+            accessRules: [
+              ...ancestorRow(path).accessRules,
+              {
+                identitySid: 'S-1-5-4',
+                rightsMask: 0x00000020,
+                accessType: 'Deny' as const,
+                isInherited: true,
+              },
+            ],
+          }
+        : ancestorRow(path),
+    );
+    expect(assessGuidedTrustAncestorProtection(chain, deniedTraverse)).toEqual(
+      expect.arrayContaining([expect.stringContaining('runtime read/execute')]),
+    );
+  });
+
+  it('refuses the test-only temporary-key flag outside a test-runner context', () => {
+    const fixture = makeFixture();
+    const originalVitest = process.env.VITEST;
+    delete process.env.VITEST;
+    try {
+      const keyFile = join(fixture.keyDir, 'issuer.pem');
+      writeFileSync(
+        keyFile,
+        fixture.keys.privateKey.export({ type: 'pkcs8', format: 'pem' }).toString(),
+      );
+      expect(() =>
+        issueGuidedProvenanceReceipt({
+          schemaDigest: DIGEST_A,
+          databasePath: fixture.dbPath,
+          privateKeyPath: keyFile,
+          workspaceRoot: fixture.workspaceRoot,
+          trustDir: fixture.trustDir,
+          inspectAcl: protectedInspector,
+          testOnlyAllowTemporaryKey: true,
+        }),
+      ).toThrow('ISSUER_TEST_ONLY_KEY_FLAG_OUTSIDE_TEST_CONTEXT');
+    } finally {
+      if (originalVitest !== undefined) process.env.VITEST = originalVitest;
+      rmSync(fixture.root, { recursive: true, force: true });
+    }
   });
 });
