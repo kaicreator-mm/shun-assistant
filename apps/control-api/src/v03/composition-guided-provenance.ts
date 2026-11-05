@@ -6,7 +6,7 @@
  * never accepted from environment, CLI, database or receipt input.
  */
 import { execFileSync } from 'node:child_process';
-import { existsSync, lstatSync, readFileSync } from 'node:fs';
+import { lstatSync, readFileSync } from 'node:fs';
 import { dirname, isAbsolute, resolve } from 'node:path';
 import type { HostGuidedService } from '../../../../packages/domain-host/src/guided/host-guided-service.ts';
 import { HostGuidedService as HostGuidedServiceImpl } from '../../../../packages/domain-host/src/guided/host-guided-service.ts';
@@ -247,9 +247,9 @@ export function createProductionGuidedService(
   try {
     service = new HostGuidedServiceImpl(resolve(databaseFile), Date.now, authority);
     const probe = service.decide(null);
-    if (probe.status !== 'REFUSED' || probe.code !== 'RELAY_SCHEMA_REFUSED') {
-      const code = 'code' in probe ? probe.code : probe.status;
-      throw new Error(`V03_GUIDED_PROVENANCE_UNAVAILABLE:${code}`);
+    const probeCode = 'code' in probe ? probe.code : undefined;
+    if (probe.status !== 'REFUSED' || probeCode !== 'RELAY_SCHEMA_REFUSED') {
+      throw new Error(`V03_GUIDED_PROVENANCE_UNAVAILABLE:${probeCode ?? probe.status}`);
     }
     return service;
   } catch (error) {
