@@ -58,6 +58,7 @@ design_contract:
   - "The runtime inspector supplied to createExternalGuidedProvenanceAuthority must include pinPath in each ACL snapshot. G5 still verifies anchor, receipts and ancestors."
   - "Copy the reviewed #357 startup-runner test first, then modify only its production-startup case under this parent write set. It must assert truthful startup refusal/no listener when no external operator receipt exists; no DEMO fallback counts as PASS."
   - "Production-startup tests use ephemeral test keys and explicit ACL snapshots in a temporary trust directory. Cover valid signature path, missing/malformed pin, missing anchor/receipt, unsafe ACL and alias refusal."
+  - "HostGuidedService catches provenance initialization errors and exposes them as UNKNOWN through decide(); immediately after construction call decide(null), and if it returns UNKNOWN close the service and throw before listener creation. A healthy service returns a side-effect-free REFUSED for this invalid probe input."
   - "If operator trust material is not provisioned, record KEY_NOT_PROVISIONED and keep production startup fail-closed. Do not create new production trust material."
 test_contract:
   - "Pack PR has exactly one manifest path and exact parent source_base.sha."
