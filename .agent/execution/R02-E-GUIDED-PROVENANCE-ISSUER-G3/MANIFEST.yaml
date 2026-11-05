@@ -1,0 +1,70 @@
+pack_id: shun-v030-r02-e-guided-provenance-issuer-g3-acl-hardening
+task_id: R02-E-GUIDED-AUTHORITY
+issue: "#348"
+repository: kaicreator-mm/shun-assistant
+version: v0.3.0
+parent_issue: "#269"
+standard_revision: 2c395c55569fe2edf3f4135f12d3d069e526d0b7
+owner_authorization_refs:
+  - "#260 OWNER_SHUN_V030_R02_AMENDMENT_R1_APPROVE"
+  - "Current project instruction: continue v0.3.0 under ADS #1359 Delivery-First; reviewer repairs defects within the active write set"
+  - "#355 independent Exact-SHA R2 audit comment 6656433668"
+  - "#353 G2 Execution Pack and CI qualification"
+execution_profile: WEB_BUILDER
+execution_environment: WEB_SOURCE_WITH_WINDOWS_CI
+admission_mode: SINGLE_WRITER_ADMISSION
+admission_generation: 3
+protected_claim_key: "kaicreator-mm/shun-assistant#348:builder:__default__"
+source_base_sha: de65f3ef874304d712df1d0a80ae09e6c65700cd
+source_base_tree: 4113ef58328e78ab36cc292905af9ad6a32e4d75
+source_base_branch: JIT_only_task/v0.3.0-r02e-guided-authority-local-g2
+pack_branch: JIT_only_task/v0.3.0-r02e-guided-authority-pack-g3
+jit_branch: JIT_only_task/v0.3.0-r02e-guided-authority-local-g3
+execution_pack_path: .agent/execution/R02-E-GUIDED-PROVENANCE-ISSUER-G3/MANIFEST.yaml
+finding:
+  - "PR #355 R2 P2: runtime-read deny-ACE coverage watches only Everyone/Authenticated Users/Users; a Deny ACE with read bits against INTERACTIVE (S-1-5-4), LOCAL (S-1-2-0), CONSOLE_LOGON (S-1-2-1) or other runtime-token SIDs passes the runtime-read-preserved check while blocking runtime reads."
+  - "PR #355 R2 P2: ancestor directories of the default trust root (C:\\ProgramData\\Shun\\authority, C:\\ProgramData\\Shun, C:\\ProgramData) are outside the ACL scan; a runtime-writable ancestor enables rename/swap TOCTOU on the trust root that tree-local DACL cannot prevent."
+  - "PR #355 R2 P2: testOnlyAllowTemporaryKey is enforced only by convention (paired with an injected inspectAcl); nothing binds it to an actual test context, so a future production wrapper injecting a real cached snapshot plus the flag would silently permit a signing key in the runtime-writable OS temp dir."
+approved_write_set:
+  - apps/control-api/src/real-storage/guided-provenance-issuance.ts
+  - apps/control-api/scripts/issue-guided-provenance.ts
+  - apps/control-api/test/guided-provenance-issuance.test.ts
+allowed_write_set:
+  - apps/control-api/src/real-storage/guided-provenance-issuance.ts
+  - apps/control-api/scripts/issue-guided-provenance.ts
+  - apps/control-api/test/guided-provenance-issuance.test.ts
+design_contract:
+  - "Keep runtime adapter verify-only; no private-key import, signing API, key environment variable or secret access in runtime."
+  - "Private key must be outside workspace/repository, actual DB directory, selected trust directory, OS temp directory, and ~/.shun; validate canonical path and no reparse aliases before reading."
+  - "Reject database/trust path overlap in both directions. Production CLI must always use the fixed default C:\\ProgramData\\Shun\\authority\\guided-provenance; trustDir injection remains available only to direct test calls."
+  - "ACL inspection must return owner SID and complete DACL access rules for every object in the trust tree, including inherited ACEs; any enumeration/translation/access error or partial scan fails closed."
+  - "Require Administrators/SYSTEM ownership; reject any allow ACE for non-privileged principals that grants write data, append, create files/directories, write attributes/extended attributes, delete, delete-child, modify, change permissions or take ownership; exempt CREATOR OWNER (S-1-3-0) and CREATOR GROUP (S-1-3-1) inheritance placeholders, which never grant direct access. Preserve read-only access for the runtime identity."
+  - "Treat any Deny ACE carrying required-read bits (read data/read EA/execute/read attributes) for Everyone, Authenticated Users, Users, INTERACTIVE, LOCAL or CONSOLE_LOGON as breaking runtime read access."
+  - "For the baked-in default trust directory only, probe the ancestor chain up to and including C:\\ProgramData (non-recursive) and apply the same ownership/write/deny policy; injected non-default test trust directories are exempt. Ancestor probe failure or coverage gap fails closed."
+  - "testOnlyAllowTemporaryKey additionally requires an explicit test-runner context (process.env.VITEST defined); outside it the flag throws a coded error. The OS-temp key relaxation remains impossible for the production CLI."
+  - "Apply the same ACL assessment in both runtime verification and operator issuance. The issuer must not report success when the resulting trust tree would be rejected by runtime."
+  - "PowerShell traversal must be deterministic, include root + all descendants unless a caller explicitly requests a non-recursive scan of enumerated paths only, use terminating errors, and verify the scanned paths are complete; reparse points must not be silently followed or omitted."
+  - "No production private key or receipt in repository, CI, GitHub comments or SQLite."
+test_contract:
+  - "This pack PR must contain exactly this one manifest path and one commit directly parented to source_base_sha de65f3ef874304d712df1d0a80ae09e6c65700cd."
+  - "After pack Push and PR Woodpecker checks are SUCCESS at the exact pack HEAD, acquire a fresh Generation-3 DISPATCH_CLAIMED event bound to this pack, source base/tree, actual operator/session identity and exact three-path write set."
+  - "No source edit before fresh G3 CAS Claim acceptance; do not reuse G2 claim."
+  - "Add negative tests: deny read ACE for INTERACTIVE/LOCAL/CONSOLE_LOGON refused; non-privileged write ACE on an ancestor refused; missing ancestor coverage refused; testOnlyAllowTemporaryKey outside a test-runner context throws the coded error."
+  - "Add positive tests: CREATOR OWNER/CREATOR GROUP placeholder FullControl ACE exempt from the write check; benign Deny ACE for an unrelated SID (S-1-5-99) still accepted; default-trust ancestor chain helper returns the ProgramData chain."
+  - "Run tracked-source syntax preflight, focused tests on Windows Node 24.21.0 and Node 26.13.0, app typecheck/lint, full tools/task-check.sh and exact-SHA Woodpecker Push/PR."
+  - "Record exact HEAD/tree/base, three-path diff, Node versions, commands/exit codes, Woodpecker IDs, ACL rule snapshots and private-key scope rejection evidence on Issue #348; never include private key or signed production receipt."
+  - "Independent Exact-SHA review of the repaired HEAD is mandatory; repair author must not self-approve."
+integration_handoff:
+  - "R02-E #269 remains sole production composition integrator and must inject this verify-only adapter with a source-pinned SPKI fingerprint and fixed ProgramData trust path."
+  - "Production Guided startup remains fail-closed until #269 wires the adapter and the operator provisions the matching protected trust receipt."
+forbidden:
+  - "Any path outside the exact three approved paths"
+  - "apps/control-api/src/main.ts, apps/control-api/src/server.ts, composition files, package manifests or lockfile"
+  - "packages/executor-windows/**, Domain Computer, SDK private src, Kernel, sender, grant, Permit or effect dispatcher"
+  - "Any production private key, HMAC secret, credential or signed production receipt in source, tests, CI artifacts, GitHub comments or SQLite"
+  - "Any UAC prompt initiated by the script, automatic elevation, physical Windows effect, paid LLM request, Provider installation or external disclosure"
+  - "Any destructive migration, data deletion/reset, automatic blessing of untrusted legacy DBs"
+  - "WIP integration merge, version/v0.3.0 merge, main/version/v0.2.0 mutation, tag, release or deployment"
+source_write_authorized: true
+merge_authorized: false
+release_authorized: false
