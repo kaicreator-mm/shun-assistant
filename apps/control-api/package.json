@@ -10,7 +10,7 @@
     "lint": "biome check . --max-diagnostics=200",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
-    "dev": "node src/main.ts"
+    "dev": "node --experimental-transform-types src/main.ts"
   },
   "dependencies": {
     "@shun/contracts": "workspace:*",
