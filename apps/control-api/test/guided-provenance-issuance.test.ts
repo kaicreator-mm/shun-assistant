@@ -538,8 +538,16 @@ describe('Windows trust-tree ACL/owner policy (fail closed)', () => {
     try {
       provisionReceipt(fixture, signedEnvelope(fixture));
       const unprotected = (trustDir: string, extraPaths: readonly string[]) => [
-        { path: trustDir, ownerSid: 'S-1-5-32-545' }, // Users — never a trust owner.
-        ...extraPaths.map((path) => ({ path, ownerSid: 'S-1-5-32-545' as const })),
+        {
+          path: trustDir,
+          ownerSid: 'S-1-5-32-545',
+          accessRules: [],
+        }, // Users — never a trust owner.
+        ...extraPaths.map((path) => ({
+          path,
+          ownerSid: 'S-1-5-32-545' as const,
+          accessRules: [],
+        })),
       ];
       const authority = authorityFor(fixture, { inspectAcl: unprotected });
       expect(() =>
