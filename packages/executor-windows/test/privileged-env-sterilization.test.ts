@@ -22,9 +22,11 @@
 //
 // The launcher→relay describe additionally pins the spawn LIFECYCLE
 // deterministically (Issue #345): controlled startup delay before relay
-// readiness, timeout tree-kill with bounded launcher-side cleanup, spawn
-// error and NO_RELAY classification, and an orphan-free process tree after
-// both the RAN and TIMED_OUT outcomes.
+// readiness, timeout tree-kill with bounded launcher-side cleanup of BOTH
+// the relay tree AND the taskkill helper itself (P1-01: explicit helper
+// disposition, direct-kill fallback when the helper fails, and orphan
+// proof for both pids), spawn error and NO_RELAY classification, and an
+// orphan-free process tree after both the RAN and TIMED_OUT outcomes.
 import { spawn } from 'node:child_process';
 import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -136,6 +138,19 @@ describe.skipIf(!ON_WINDOWS)(
       'System32',
       'tasklist.exe',
     );
+    // Negative-path taskkill stubs (native Windows, always present):
+    // - robocopy.exe exits nonzero (~16) fast for the argv shape, proving
+    //   the launcher falls back to the direct relay-root kill when the
+    //   helper reports failure without killing anything.
+    // - cmd.exe IGNORES the /PID /T /F switches and drops into its
+    //   interactive REPL reading the never-fed stdin pipe, proving the
+    //   helper's OWN lifecycle is bounded and the stuck helper is reaped.
+    const machineRobocopy = join(
+      process.env.SystemRoot ?? 'C:\\Windows',
+      'System32',
+      'robocopy.exe',
+    );
+    const machineCmd = join(process.env.SystemRoot ?? 'C:\\Windows', 'System32', 'cmd.exe');
 
     /**
      * Issue #345 evidence: on the GitHub windows-2025 executor the
@@ -255,6 +270,7 @@ describe.skipIf(!ON_WINDOWS)(
       const relayFile = join(dir, 'relay.json');
 
       let relayPid = -1;
+      let helperPid = -1;
       const result = await spawnRelay({
         powershellExe: machinePowershell,
         taskkillExe: machineTaskkill,
@@ -267,6 +283,9 @@ describe.skipIf(!ON_WINDOWS)(
         onRelayPid: (pid) => {
           relayPid = pid;
         },
+        onTaskkillPid: (pid) => {
+          helperPid = pid;
+        },
       });
       expect(result, `relay result: ${JSON.stringify(result)}`).toMatchObject({
         kind: 'TIMED_OUT',
@@ -274,11 +293,153 @@ describe.skipIf(!ON_WINDOWS)(
         // Bounded cleanup: the launcher settled its promise and proved the
         // tree died — it never hangs behind an unresolvable pending spawn.
         killConfirmed: true,
+        // P1-01: the taskkill helper itself has an explicit, bounded
+        // disposition — it exited zero and its lifecycle is closed.
+        killDisposition: 'EXITED_ZERO',
+        killHelperConfirmed: true,
       });
       expect(existsSync(relayFile)).toBe(false);
       expect(existsSync(probeFile)).toBe(false);
-      // Orphan proof: the tree-kill reached the relay; nothing lingers.
+      expect(result.taskkillPid).toBe(helperPid);
+      expect(result.taskkillPid).toBeGreaterThan(0);
+      // The real taskkill worked: no direct-kill fallback was needed.
+      expect(result.fallbackKillUsed).toBe(false);
+      // Orphan proof: the tree-kill reached the relay AND the taskkill
+      // helper itself is gone; nothing lingers (P1-01).
       expect(await processGone(relayPid)).toBe(true);
+      expect(await processGone(helperPid)).toBe(true);
+    });
+
+    it('spawnRelay bounds a taskkill spawn failure: SPAWN_ERROR disposition, direct fallback, no orphan', {
+      timeout: 60000,
+    }, async () => {
+      const { dir, relayScript } = makeProbeDir(probeRelayScript(30000));
+      const relayFile = join(dir, 'relay.json');
+
+      let relayPid = -1;
+      let helperPid = -2;
+      const result = await spawnRelay({
+        powershellExe: machinePowershell,
+        taskkillExe: join(dir, 'no-such-taskkill.exe'),
+        nodeExe: process.execPath,
+        relayScript,
+        helperBundle: join(dir, 'unused-bundle.mjs'),
+        helperArgs: [join(dir, 'relay-env.json')],
+        relayFile,
+        timeoutMs: 3000,
+        onRelayPid: (pid) => {
+          relayPid = pid;
+        },
+        onTaskkillPid: (pid) => {
+          helperPid = pid;
+        },
+      });
+      expect(result, `relay result: ${JSON.stringify(result)}`).toMatchObject({
+        kind: 'TIMED_OUT',
+        timedOut: true,
+        // The helper never came into existence; the launcher's direct
+        // relay-root kill fallback proved the tree gone anyway.
+        killConfirmed: true,
+        killDisposition: 'SPAWN_ERROR',
+        taskkillPid: -1,
+        fallbackKillUsed: true,
+        killHelperConfirmed: true,
+      });
+      expect(existsSync(relayFile)).toBe(false);
+      expect(helperPid).toBe(-1);
+      // Orphan proof: the fallback reached the relay; no helper exists.
+      expect(await processGone(relayPid)).toBe(true);
+    });
+
+    it('spawnRelay bounds a failing taskkill (nonzero exit): direct fallback, relay and helper both gone', {
+      timeout: 60000,
+    }, async () => {
+      expect(existsSync(machineRobocopy)).toBe(true);
+      const { dir, relayScript } = makeProbeDir(probeRelayScript(30000));
+      const relayFile = join(dir, 'relay.json');
+
+      let relayPid = -1;
+      let helperPid = -1;
+      const result = await spawnRelay({
+        powershellExe: machinePowershell,
+        // robocopy exits nonzero for the /PID /T /F argv without killing
+        // anything — the helper "ran but failed" path.
+        taskkillExe: machineRobocopy,
+        nodeExe: process.execPath,
+        relayScript,
+        helperBundle: join(dir, 'unused-bundle.mjs'),
+        helperArgs: [join(dir, 'relay-env.json')],
+        relayFile,
+        timeoutMs: 3000,
+        onRelayPid: (pid) => {
+          relayPid = pid;
+        },
+        onTaskkillPid: (pid) => {
+          helperPid = pid;
+        },
+      });
+      expect(result, `relay result: ${JSON.stringify(result)}`).toMatchObject({
+        kind: 'TIMED_OUT',
+        timedOut: true,
+        // The nonzero helper could not be trusted: the direct fallback
+        // killed the relay root and the exit was observed.
+        killConfirmed: true,
+        killDisposition: 'EXITED_NONZERO',
+        fallbackKillUsed: true,
+        killHelperConfirmed: true,
+      });
+      expect(result.killExitCode).toBeGreaterThan(0);
+      expect(existsSync(relayFile)).toBe(false);
+      // Orphan proof: helper pid (robocopy) AND relay pid are both gone.
+      expect(await processGone(relayPid)).toBe(true);
+      expect(await processGone(helperPid)).toBe(true);
+    });
+
+    it('spawnRelay reaps a hung taskkill helper: bounded helper lifecycle, direct fallback, no orphan of either', {
+      timeout: 120000,
+    }, async () => {
+      expect(existsSync(machineCmd)).toBe(true);
+      const { dir, relayScript } = makeProbeDir(probeRelayScript(30000));
+      const relayFile = join(dir, 'relay.json');
+
+      let relayPid = -1;
+      let helperPid = -1;
+      const result = await spawnRelay({
+        powershellExe: machinePowershell,
+        // cmd.exe ignores /PID /T /F and blocks forever on its never-fed
+        // stdin pipe — the "helper outlived its own bound" path.
+        taskkillExe: machineCmd,
+        nodeExe: process.execPath,
+        relayScript,
+        helperBundle: join(dir, 'unused-bundle.mjs'),
+        helperArgs: [join(dir, 'relay-env.json')],
+        relayFile,
+        timeoutMs: 3000,
+        onRelayPid: (pid) => {
+          relayPid = pid;
+        },
+        onTaskkillPid: (pid) => {
+          helperPid = pid;
+        },
+      });
+      expect(result, `relay result: ${JSON.stringify(result)}`).toMatchObject({
+        kind: 'TIMED_OUT',
+        timedOut: true,
+        // The stuck helper hit its own grace bound and was reaped; the
+        // direct fallback killed the relay root and both exits were
+        // observed — no disposition was left implicit.
+        killConfirmed: true,
+        killDisposition: 'TIMED_OUT',
+        fallbackKillUsed: true,
+        killHelperConfirmed: true,
+      });
+      expect(existsSync(relayFile)).toBe(false);
+      expect(result.taskkillPid).toBe(helperPid);
+      expect(result.taskkillPid).toBeGreaterThan(0);
+      // Orphan proof: BOTH the hung helper (cmd) and the relay are gone —
+      // the launcher reaps what it spawns (P1-01).
+      expect(await processGone(relayPid)).toBe(true);
+      expect(await processGone(helperPid)).toBe(true);
     });
 
     it('spawnRelay reports a structured SPAWN_ERROR when the relay host cannot be launched', {
