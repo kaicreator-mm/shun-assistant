@@ -205,11 +205,9 @@ export function issueGuidedProvenanceReceipt(input: GuidedIssuanceInput): Guided
   // The baked-in production trust root must sit under an operator-protected
   // ancestor chain; a runtime-writable ancestor would allow rename/swap of
   // the whole trust root that tree-local DACL cannot prevent. Injected
-  // non-default test trust directories are exempt.
-  if (
-    resolve(trustDir).toLowerCase() ===
-    resolve(defaultGuidedProvenanceTrustDirectory()).toLowerCase()
-  ) {
+  // non-default test trust directories are exempt. Lexical comparison keeps
+  // this deterministic on every platform.
+  if (trustDir.toLowerCase() === defaultGuidedProvenanceTrustDirectory().toLowerCase()) {
     const ancestors = defaultGuidedTrustAncestorChain();
     const ancestorReasons = assessGuidedTrustAncestorProtection(
       ancestors,

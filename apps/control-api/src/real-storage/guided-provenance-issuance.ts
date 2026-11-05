@@ -462,19 +462,19 @@ export function assessGuidedTrustProtection(
 /**
  * Ancestor directories of the baked-in default trust root
  * (C:\ProgramData\Shun\authority, C:\ProgramData\Shun, C:\ProgramData).
- * Derived from the default constant so the chain tracks future changes; the
- * walk must terminate at %ProgramData% or it fails closed.
+ * Purely lexical over the default constant (no fs, no platform path
+ * semantics) so the chain is identical on every host; the walk must reach
+ * %ProgramData% or it fails closed.
  */
 export function defaultGuidedTrustAncestorChain(): string[] {
-  const stopRoot = resolve(process.env.ProgramData ?? 'C:\\ProgramData').toLowerCase();
+  const programData = (process.env.ProgramData ?? 'C:\\ProgramData').replace(/[\\/]+$/, '');
+  const rootSegments = defaultGuidedProvenanceTrustDirectory().split(/[\\/]+/);
   const chain: string[] = [];
-  let current = dirname(defaultGuidedProvenanceTrustDirectory());
-  for (let depth = 0; depth < 8; depth += 1) {
-    chain.push(current);
-    if (resolve(current).toLowerCase() === stopRoot) return chain;
-    const parent = dirname(current);
-    if (parent.toLowerCase() === current.toLowerCase()) break;
-    current = parent;
+  // Stop above the drive root (length >= 2 keeps at least 'C:' + one segment).
+  for (let length = rootSegments.length - 1; length >= 2; length -= 1) {
+    const candidate = rootSegments.slice(0, length).join('\\');
+    chain.push(candidate);
+    if (candidate.toLowerCase() === programData.toLowerCase()) return chain;
   }
   reject('TRUST_ANCESTOR_CHAIN_UNREACHABLE');
 }
@@ -498,11 +498,10 @@ export function assessGuidedTrustAncestorProtection(
       recursive: false,
     });
   if (!rows) return ['guided trust ancestor ACL/DACL probe failed (fail closed)'];
-  return assessGuidedAclSnapshot(
-    rows,
-    ancestorPaths.filter((path) => existsSync(path)),
-    ANCESTOR_DANGEROUS_WRITE_MASK,
-  );
+  // No existsSync filter: a real probe already fails closed on any missing
+  // ancestor, and injected snapshots must deterministically cover every
+  // enumerated path on every platform.
+  return assessGuidedAclSnapshot(rows, [...ancestorPaths], ANCESTOR_DANGEROUS_WRITE_MASK);
 }
 
 /**
