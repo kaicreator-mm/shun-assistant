@@ -215,15 +215,11 @@ describe.skipIf(!ON_WINDOWS)(
         // another asynchronous child whose own cleanup would need proving.
         // Fail closed: a missing tasklist, timeout, spawn error, or nonzero
         // exit must never be interpreted as proof that the target is gone.
-        const probe = spawnSync(
-          tasklistExe,
-          ['/FI', `PID eq ${pid}`, '/FO', 'CSV', '/NH'],
-          {
-            encoding: 'utf8',
-            timeout: 5000,
-            windowsHide: true,
-          },
-        );
+        const probe = spawnSync(tasklistExe, ['/FI', `PID eq ${pid}`, '/FO', 'CSV', '/NH'], {
+          encoding: 'utf8',
+          timeout: 5000,
+          windowsHide: true,
+        });
         if (probe.error) {
           throw new Error(
             `tasklist probe failed for PID ${pid}: ${probe.error.message}; stderr=${probe.stderr ?? ''}`,
@@ -242,9 +238,9 @@ describe.skipIf(!ON_WINDOWS)(
     };
 
     it('processGone fails closed when the tasklist probe cannot be started', async () => {
-      await expect(
-        processGone(1, 1000, join(tmpdir(), 'no-such-tasklist.exe')),
-      ).rejects.toThrow(/tasklist probe failed/);
+      await expect(processGone(1, 1000, join(tmpdir(), 'no-such-tasklist.exe'))).rejects.toThrow(
+        /tasklist probe failed/,
+      );
       await expect(processGone(-1)).rejects.toThrow(/positive PID/);
     });
 
