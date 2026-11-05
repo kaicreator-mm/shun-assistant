@@ -263,9 +263,16 @@ export type GuidedAclInspector = (
 const PRIVILEGED_OWNER_SIDS = new Set(['S-1-5-18', 'S-1-5-32-544']);
 // Write/create/append/attributes/delete/write-DAC/take-ownership and generic write/all.
 const DANGEROUS_WRITE_MASK =
-  0x00000002 | 0x00000004 | 0x00000010 | 0x00000040 |
-  0x00000100 | 0x00010000 | 0x00040000 | 0x00080000 |
-  0x10000000 | 0x40000000;
+  0x00000002 |
+  0x00000004 |
+  0x00000010 |
+  0x00000040 |
+  0x00000100 |
+  0x00010000 |
+  0x00040000 |
+  0x00080000 |
+  0x10000000 |
+  0x40000000;
 
 /** Read-only, terminating whole-tree Get-Acl: no partial scan counts as success. */
 export function inspectWindowsGuidedTrustAcl(
