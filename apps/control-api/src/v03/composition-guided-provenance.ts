@@ -88,7 +88,7 @@ function assertNoWindowsReparsePoint(path: string): void {
     'if ($item.PSIsContainer) { throw "GUIDED_TRUST_PIN_NOT_REGULAR_FILE" }',
     'if (($item.Attributes -band [System.IO.FileAttributes]::ReparsePoint) -ne 0) { throw "GUIDED_TRUST_PIN_REPARSE_POINT" }',
     'if (-not ($item -is [System.IO.FileInfo])) { throw "GUIDED_TRUST_PIN_NOT_REGULAR_FILE" }',
-  ].join('\\n');
+  ].join('\n');
   try {
     execFileSync(powershell, ['-NoProfile', '-NonInteractive', '-Command', script], {
       encoding: 'utf8',
