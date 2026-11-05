@@ -273,6 +273,9 @@ const DANGEROUS_WRITE_MASK =
   0x00080000 |
   0x10000000 |
   0x40000000;
+const RUNTIME_READ_ALLOW_SIDS = new Set(['S-1-5-11', 'S-1-5-32-545']);
+const RUNTIME_READ_DENY_SIDS = new Set(['S-1-1-0', 'S-1-5-11', 'S-1-5-32-545']);
+const REQUIRED_RUNTIME_READ_MASK = 0x00000001 | 0x00000008 | 0x00000020 | 0x00000080;
 
 /** Read-only, terminating whole-tree Get-Acl: no partial scan counts as success. */
 export function inspectWindowsGuidedTrustAcl(
@@ -382,6 +385,21 @@ export function assessGuidedTrustProtection(
       ) {
         reasons.push('guided trust DACL grants non-privileged write/modify/delete/ACL-control');
       }
+    }
+    const runtimeReadAllowed = row.accessRules.some(
+      (rule) =>
+        rule.accessType === 'Allow' &&
+        RUNTIME_READ_ALLOW_SIDS.has(rule.identitySid ?? '') &&
+        ((rule.rightsMask | 0) & REQUIRED_RUNTIME_READ_MASK) === REQUIRED_RUNTIME_READ_MASK,
+    );
+    const runtimeReadDenied = row.accessRules.some(
+      (rule) =>
+        rule.accessType === 'Deny' &&
+        RUNTIME_READ_DENY_SIDS.has(rule.identitySid ?? '') &&
+        ((rule.rightsMask | 0) & REQUIRED_RUNTIME_READ_MASK) !== 0,
+    );
+    if (!runtimeReadAllowed || runtimeReadDenied) {
+      reasons.push('guided trust DACL does not preserve runtime read/execute access');
     }
   }
   for (const path of required) {
