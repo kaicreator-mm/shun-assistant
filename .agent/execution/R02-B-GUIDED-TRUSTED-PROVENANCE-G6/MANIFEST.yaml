@@ -1,0 +1,79 @@
+pack_id: shun-v030-r02-b-guided-trusted-provenance-g6
+task_id: R02-B
+issue: "#263"
+repository: kaicreator-mm/shun-assistant
+version: v0.3.0
+parent_issue: "#260"
+standard_revision: 2c395c55569fe2edf3f4135f12d3d069e526d0b7
+owner_authorization_refs:
+  - "#260 OWNER_SHUN_V030_R02_AMENDMENT_R1_APPROVE"
+  - "Current project conversation: continue v0.3.0 under ADS #1359 Delivery-First"
+  - "PR #343 formal independent Exact-SHA R1 review #5771391534 — BLOCK P0=0/P1=2/P2=3"
+  - "Issue #263 correction comment #6636248915 — prior PASS checkpoint withdrawn"
+execution_profile: LOCAL_BUILDER
+execution_environment: LOCAL
+admission_mode: SINGLE_WRITER_ADMISSION
+admission_generation: 6
+protected_claim_key: "kaicreator-mm/shun-assistant#263:builder:__default__"
+source_base_sha: 91463f709f7401d92e7902e43d92b9471063efdd
+source_base_tree: 82008b935cd4a9b90b4dc1730faab723b389d6bc
+source_base_branch: JIT_only_task/v0.3.0-r02-b-guided-local-g6
+pack_branch: JIT_only_task/v0.3.0-r02-b-guided-pack-g6
+jit_branch: JIT_only_task/v0.3.0-r02-b-guided-local-g6
+execution_pack_path: .agent/execution/R02-B-GUIDED-TRUSTED-PROVENANCE-G6/MANIFEST.yaml
+findings:
+  - "P1-01: G5 marker is a public deterministic SHA-256 over schema_version and initialized_at, stored in the same SQLite DB. A legacy G4 database can mint/copy the marker and appear G5. The validator checks table names, not exact DDL/constraints/indexes. The prior-Case history-loss fail-closed boundary is therefore not backed by trusted provenance."
+  - "P1-02: G5 validates only outcome_json/refusal_json SHA-256. It does not parse the JSON and bind embedded identity/event/decision/time fields to the indexed columns and ledger. A recomputed payload digest can conceal mismatched embedded content; Host readback returns the payload."
+  - "P2-01: A CONSUMED ASK step with last.status REFUSED and a missing refusal payload is classified as REVIEW_EFFECT REFUSE. The ledger does not retain StepKind, so historical ASK refusal loss cannot be distinguished."
+  - "P2-02: The G5 G3 legacy regression uses ASK answers in Cases A/B, not the exact lost-history scenario of Case-A REVIEW_EFFECT APPROVE/REFUSE or INSPECT receipt followed by Case B replacing the single selected-Case row."
+  - "P2-03: #initializeOrValidate reads the empty table set before BEGIN IMMEDIATE. Two concurrent first openers can both observe empty; the second waits, then plain CREATE TABLE fails and that opener becomes unavailable."
+approved_write_set:
+  - packages/domain-host/src/guided/host-guided-service.ts
+  - packages/domain-host/src/guided/guided-provenance-authority.ts
+  - tests/integration/v03/r02-b-guided/durable-guided.test.ts
+allowed_write_set:
+  - packages/domain-host/src/guided/host-guided-service.ts
+  - packages/domain-host/src/guided/guided-provenance-authority.ts
+  - tests/integration/v03/r02-b-guided/durable-guided.test.ts
+design_contract:
+  - "Replace the self-asserted same-database marker digest with an injected GuidedProvenanceAuthority contract. The authority must be external to the SQLite DB and cannot derive its trust from marker contents, an environment variable, or a key stored beside/in the DB."
+  - "The authority receipt must bind the exact Guided schema version, canonical DDL/schema digest, canonical database identity/path and an authority-issued database identifier. The authority must persist/verify an external receipt or equivalent protected trust record so a marker copied to another DB cannot be accepted."
+  - "No fallback to an unkeyed hash, a key stored in SQLite, a sidecar secret writable alongside the DB, or a self-signed marker. If the authority is absent or cannot verify, every mutation path fails closed with a stable UNKNOWN/REFUSED code."
+  - "The domain-host service exposes the authority contract and requires it for fresh initialization and marked reopen. This R02-B pack does not edit main.ts or composition; R02-E (#269) owns production adapter wiring in its existing composition/main write set. Until R02-E injects a real authority, production Guided initialization must fail closed rather than silently use a test or local key."
+  - "Bump the Guided schema generation. Any non-empty G3/G4/G5 database without a verifiable external receipt fails closed and preserves every row. Do not automatically bless or backfill a G5 DB whose marker is self-asserted."
+  - "Validate the exact schema definition on open: expected tables, columns, types, nullability, primary keys, CHECK constraints and indexes/DDL digest; bind the schema digest/version into the external receipt."
+  - "Parse and strictly validate every persisted Answer and Refusal envelope on open and on Host readback. Bind embedded schema, journey/task/step identity, Case identity, event/source, decision, template digest where represented, answer payload, evidence refs and occurredAt timestamp to the indexed row and consumed-step ledger. Digest equality alone is not sufficient."
+  - "Persist StepKind (ASK/REVIEW_EFFECT/INSPECT) and receipt kind in the consumed-step ledger. Enforce exact payload cardinality: ASK ANSWER requires one Answer receipt; ASK REFUSE requires one Refusal receipt; REVIEW_EFFECT APPROVE/REFUSE requires no Answer/Refusal payload; INSPECT OBSERVATION_RECEIPT requires neither. Missing ASK refusal evidence is ambiguous and fails closed."
+  - "Recheck database table/marker state only after acquiring BEGIN IMMEDIATE. Concurrent first openers must serialize; the second opener must re-read and validate the first opener's committed schema instead of attempting duplicate CREATE TABLE."
+  - "Keep the R02-B boundary: no HTTP route/server.ts, main.ts, UI, composition, Domain Computer, Kernel, sender, grant, Permit or effect-dispatcher edits in this pack."
+  - "Do not add a production signing key or secret to the repository, source tree, SQLite file, tests artifact or issue evidence. Tests may use an explicitly test-only authority whose secret stays outside the DB."
+test_contract:
+  - "Pack PR must contain exactly this one manifest path, parented to exact source_base_sha 91463f709f7401d92e7902e43d92b9471063efdd and source_base_tree 82008b935cd4a9b90b4dc1730faab723b389d6bc. All pack CI checks must be SUCCESS before source edits."
+  - "After pack CI, create a fresh Generation-6 DISPATCH_CLAIMED event on Issue #263 bound to this exact pack HEAD/tree, source base/tree, operator/session/dispatch identity and exact three-path write set. G1-G5 Claims are terminal and cannot be reused."
+  - "Forged-marker regression: create a non-empty legacy G4 DB, add a marker table/row with the exact public G5 SHA-256 formula, and prove the external authority rejects it and all rows remain unchanged."
+  - "Copied-receipt regression: copy a valid marker/receipt from a different DB identity/path into a legacy DB and prove verification fails closed."
+  - "Schema-tamper regression: change a column, CHECK constraint, index or DDL while retaining/copying a receipt; open must fail closed."
+  - "Answer payload tamper regression: alter embedded stepId/taskId/Case/event/source/occurredAt (and template binding envelope where applicable), recompute the unkeyed payload digest, and prove open/readback rejects it without modifying data."
+  - "Refusal payload tamper regression: alter embedded stepId/taskId/Case/templateDigest/decision/nested outcome/timestamp, recompute the digest, and prove open/readback rejects it."
+  - "ASK refusal cardinality regression: delete the refusal payload but retain the ledger/history; fail closed. REVIEW_EFFECT REFUSE without payload and INSPECT OBSERVATION_RECEIPT without payload remain valid only when StepKind/receipt-kind ledger evidence proves them."
+  - "G3 lost-history regression: Case A consumes REVIEW_EFFECT APPROVE or REFUSE and/or INSPECT OBSERVATION_RECEIPT, Case B replaces the single selected-Case row, then a G6 open without a valid external receipt fails closed and preserves the complete original DB."
+  - "Concurrent first-open regression: two service instances/processes race to initialize one empty DB; both must converge to a valid schema or one returns a bounded explicit failure without leaving a partial/ambiguous DB. No false unavailable state after another opener commits."
+  - "Retain all G4/G5 replay, restart, currentness, expiry, pause/resume, navigation, atomic consumption and concurrency coverage; add schema-version migration/legacy G5 fail-closed coverage."
+  - "Run tracked-source JS/TS syntax preflight before CI; record exact Node version, exact driver SHA-256, argv, tracked-source glob/count, exit code and output digest."
+  - "Run Windows Node 24.21.0 and 26.13.0 focused Guided tests, adjacent R02-E/R02-V suites, full tracked lint/typecheck/test and exact-SHA Woodpecker Push/PR plus GitHub Actions contracts/executor-windows."
+  - "Controller performs a fresh independent Exact-SHA R2; Builder must not self-approve."
+integration_handoff:
+  - "R02-E #269 must inject a real production GuidedProvenanceAuthority through its allowed apps/control-api/src/main.ts and composition-*.ts write set before the production Guided service can initialize. Do not close #263 by treating a test authority or unkeyed marker as production authority."
+  - "If the current Windows authority infrastructure cannot issue/verify a suitable external migration receipt without exposing its private key to the runtime process, create a separate bounded integration task and keep production Guided initialization fail-closed. Do not bypass the trust boundary."
+forbidden:
+  - "Any path outside the exact three allowed paths"
+  - "apps/control-api/src/main.ts, apps/control-api/src/server.ts, apps/control-api/src/v03/composition-*.ts, HTTP routes or UI"
+  - "packages/executor-windows/**, packages/domain-computer/**, SDK private src, Kernel, sender, grant, Permit or effect dispatcher"
+  - "Any signing private key, HMAC secret, production credential or operator key committed to source, pack or tests"
+  - "Any destructive migration, data deletion/reset, automatic blessing of untrusted G3/G4/G5 databases, or fabricated missing history"
+  - "Paid LLM, Provider installation, UAC, physical Windows effects or external data disclosure"
+  - "main, version/v0.2.0, WIP integration merge, version merge, tag, release or deployment"
+claim_admitted: false
+source_write_authorized: false
+merge_authorized: false
+release_authorized: false
