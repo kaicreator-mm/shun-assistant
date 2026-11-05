@@ -207,7 +207,7 @@ export function createProductionGuidedService(
   const ancestorSnapshot = inspectAclAncestors(defaultGuidedTrustAncestorChain());
   const aclReasons = assessGuidedTrustProtection(
     trustDir,
-    [pinPath],
+    [...receipts, pinPath],
     aclSnapshot,
     ancestorSnapshot,
   );
