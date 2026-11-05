@@ -215,6 +215,11 @@ const TASKKILL_REAP_TIMEOUT_MS = 5_000;
 /** Bounded wait for a cleaned-up child to actually exit in cleanupChild. */
 const CHILD_EXIT_BOUND_MS = 20_000;
 
+/** Windows exact tree-kill proof persists across later finally cleanup calls. */
+const windowsTreeKillHistory = new WeakMap<ReturnType<typeof spawn>, KillTreeResult>();
+/** Shell wrappers may orphan silent descendants that no longer own a port. */
+const wrapperProcessTrees = new WeakSet<ReturnType<typeof spawn>>();
+
 interface KillTreeResult {
   /**
    * True only when a taskkill attempt exited 0, i.e. the OS confirmed the
@@ -281,13 +286,11 @@ async function killTree(
     };
   }
   if (alreadyExited) {
-    // The wrapper may be gone while a descendant still owns the listener;
-    // it can no longer be reached by PID, so the tree kill is unconfirmed
-    // and the caller's port-refusal check is what surfaces the orphan.
-    return {
+    // Never erase the proof (or failure) of a previous taskkill attempt.
+    return windowsTreeKillHistory.get(child) ?? {
       treeKillConfirmed: false,
       helperReaped: true,
-      detail: 'windows: child already exited before killTree; descendants unreachable by PID',
+      detail: 'windows: child already exited without an attempted tree kill',
     };
   }
   const timeoutMs = options.timeoutMs ?? TASKKILL_TIMEOUT_MS;
@@ -348,7 +351,9 @@ async function killTree(
     child.kill('SIGKILL');
     detail.push('fell back to direct-child SIGKILL; descendant termination unconfirmed');
   }
-  return { treeKillConfirmed, helperReaped, detail: detail.join('; ') };
+  const result = { treeKillConfirmed, helperReaped, detail: detail.join('; ') };
+  windowsTreeKillHistory.set(child, result);
+  return result;
 }
 
 interface CleanupResult {
@@ -374,11 +379,21 @@ async function cleanupChild(
   const kill = await killTree(child, options);
   const childExit = await waitForExit(child, CHILD_EXIT_BOUND_MS);
   const portRefused = await portRefusesConnectionEventually(port);
-  const ok = kill.helperReaped && childExit !== 'TIMEOUT' && portRefused;
+  // A closed loopback listener is not a proof that OTHER descendants
+  // stopped. Any attempted-but-unconfirmed Windows tree kill is a failure,
+  // including if the wrapper exited after direct-child SIGKILL. Only a
+  // direct leaf process that exited without a kill attempt is exempt.
+  const treeTerminationProven =
+    !isWindows ||
+    kill.treeKillConfirmed ||
+    (!wrapperProcessTrees.has(child) && !windowsTreeKillHistory.has(child));
+  const ok =
+    kill.helperReaped && childExit !== 'TIMEOUT' && portRefused && treeTerminationProven;
   const parts = [
     `childExit=${childExit === 'TIMEOUT' ? 'TIMEOUT' : `code ${childExit.code} signal ${childExit.signal}`}`,
     `portRefused=${portRefused}`,
     `taskkillTreeConfirmed=${kill.treeKillConfirmed}`,
+    `treeTerminationProven=${treeTerminationProven}`,
     kill.detail,
   ];
   if (!ok) parts.unshift('CLEANUP FAILURE');
@@ -416,6 +431,7 @@ describe('R02-E default dev startup runner (Node 24 strip-mode repair)', () => {
       shell: isWindows,
       detached: !isWindows,
     });
+    wrapperProcessTrees.add(child);
     let bodyFailed = false;
     try {
       const output = collect(child);
@@ -812,6 +828,7 @@ export const routeWorkflowIntent = __dhv10RouterBundle.routeWorkflowIntent;
         shell: isWindows,
         detached: !isWindows,
       });
+      wrapperProcessTrees.add(child);
       let bodyFailed = false;
       try {
         const output = collect(child);
@@ -923,6 +940,7 @@ describe.skipIf(!isWindows)(
         'setInterval(() => {}, 1e9);',
       ].join('\n');
       const child = spawn(process.execPath, ['-e', wrapperScript], { stdio: 'ignore' });
+      wrapperProcessTrees.add(child);
       return { child, pidFile };
     }
 
@@ -947,7 +965,6 @@ describe.skipIf(!isWindows)(
     it('taskkill timeout: the helper is terminated and reaped, fallback runs, and the listener still dies', async () => {
       const port = await freePort();
       const child = spawn(process.execPath, ['-e', listenerOn(port)], { stdio: 'ignore' });
-      let bodyFailed = false;
       try {
         expect(await waitForHttp(port, 15_000)).toBe(true);
         // Fake taskkill: a node process that never exits, so each bounded
@@ -966,20 +983,19 @@ describe.skipIf(!isWindows)(
         // never confirmed.
         const cleanup = await cleanupChild(child, port);
         expect(cleanup.portRefused).toBe(true);
-        expect(cleanup.ok).toBe(true);
+        expect(cleanup.ok).toBe(false);
+        expect(cleanup.detail).toContain('CLEANUP FAILURE');
+        expect(cleanup.detail).toContain('treeTerminationProven=false');
         expect(cleanup.kill.treeKillConfirmed).toBe(false);
-      } catch (error) {
-        bodyFailed = true;
-        throw error;
       } finally {
-        await guaranteeCleanup(child, port, bodyFailed);
+        // Deliberately failed taskkill cannot be retroactively certified.
+        await guaranteeCleanup(child, port, true);
       }
     }, 60_000);
 
     it('taskkill nonzero exit: fallback is not tree cleanup, and a port that outlives the child is an explicit cleanup failure', async () => {
       const port = await freePort();
       const { child, pidFile } = startWrapperTree(port);
-      let bodyFailed = false;
       let grandchildPid = 0;
       try {
         grandchildPid = await publishedPid(pidFile);
@@ -995,44 +1011,55 @@ describe.skipIf(!isWindows)(
         expect(kill.helperReaped).toBe(true);
         expect(kill.detail).toContain('descendant termination unconfirmed');
 
-        // Deterministic cleanup-failure surfacing, independent of whether
-        // this host lets grandchildren outlive the wrapper: a listener on a
-        // separate port that is NOT part of the child's tree (models a
-        // leaked descendant from a previous failed cleanup). Cleanup of the
-        // child itself succeeds, the port still accepts connections, and
-        // the failure MUST be explicit rather than silent.
-        const strayPort = await freePort();
-        const stray = spawn(process.execPath, ['-e', listenerOn(strayPort)], { stdio: 'ignore' });
-        let strayBodyFailed = false;
-        try {
-          expect(await waitForHttp(strayPort, 15_000)).toBe(true);
-          const cleanup = await cleanupChild(child, strayPort);
-          expect(cleanup.childExit).not.toBe('TIMEOUT');
-          expect(cleanup.portRefused).toBe(false);
-          expect(cleanup.ok).toBe(false);
-          expect(cleanup.detail).toContain('CLEANUP FAILURE');
-
-          // guaranteeCleanup contract: with a failed body the cleanup
-          // diagnostic must not mask the original failure (resolves); with
-          // a passing body it must fail the test (rejects).
-          await expect(guaranteeCleanup(child, strayPort, true)).resolves.toBeUndefined();
-          await expect(guaranteeCleanup(child, strayPort, false)).rejects.toThrow(
-            /cleanup failure/,
-          );
-        } catch (error) {
-          strayBodyFailed = true;
-          throw error;
-        } finally {
-          await guaranteeCleanup(stray, strayPort, strayBodyFailed);
-        }
-      } catch (error) {
-        bodyFailed = true;
-        throw error;
+        // Inspect the REAL wrapper/grandchild tree rather than an unrelated
+        // port. Even if the listener happens to stop, an unconfirmed tree
+        // kill cannot claim that the grandchild was reaped.
+        const cleanup = await cleanupChild(child, port);
+        expect(cleanup.childExit).not.toBe('TIMEOUT');
+        expect(cleanup.ok).toBe(false);
+        expect(cleanup.detail).toContain('CLEANUP FAILURE');
+        expect(cleanup.detail).toContain('treeTerminationProven=false');
+        await expect(guaranteeCleanup(child, port, true)).resolves.toBeUndefined();
+        await expect(guaranteeCleanup(child, port, false)).rejects.toThrow(
+          /cleanup failure/,
+        );
       } finally {
         if (grandchildPid > 0) await killPublishedPid(grandchildPid);
-        await guaranteeCleanup(child, port, bodyFailed);
+        // Explicit teardown does not convert the failed kill into proof.
+        await guaranteeCleanup(child, port, true);
       }
     }, 90_000);
+
+    it('non-listening grandchild cannot be certified by a closed port after wrapper-only kill', async () => {
+      const port = await freePort();
+      const pidFile = join(dir, `silent-${port}.pid`);
+      const wrapperScript = [
+        "const { spawn } = require('node:child_process');",
+        "const { writeFileSync } = require('node:fs');",
+        "const kid = spawn(process.execPath, ['-e', 'setInterval(() => {}, 1e9)'], { stdio: 'ignore' });",
+        `writeFileSync(${JSON.stringify(pidFile)}, String(kid.pid));`,
+        'setInterval(() => {}, 1e9);',
+      ].join('\n');
+      const child = spawn(process.execPath, ['-e', wrapperScript], { stdio: 'ignore' });
+      wrapperProcessTrees.add(child);
+      let silentPid = 0;
+      try {
+        silentPid = await publishedPid(pidFile);
+        expect(silentPid).toBeGreaterThan(0);
+        expect(await portRefusesConnection(port)).toBe(true);
+        const kill = await killTree(child, { taskkillArgs: ['/PID', '999999', '/T', '/F'] });
+        expect(kill.treeKillConfirmed).toBe(false);
+        const cleanup = await cleanupChild(child, port);
+        expect(cleanup.portRefused).toBe(true);
+        expect(cleanup.childExit).not.toBe('TIMEOUT');
+        expect(cleanup.ok).toBe(false);
+        expect(cleanup.detail).toContain('treeTerminationProven=false');
+        expect(() => process.kill(silentPid, 0)).not.toThrow();
+      } finally {
+        if (silentPid > 0) await killPublishedPid(silentPid);
+        await guaranteeCleanup(child, port, true);
+      }
+    }, 60_000);
 
     it('real taskkill tree termination on a wrapper/descendant listener leaves no orphan', async () => {
       const port = await freePort();
