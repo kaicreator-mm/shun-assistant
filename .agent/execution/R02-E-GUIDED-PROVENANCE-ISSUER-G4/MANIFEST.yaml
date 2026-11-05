@@ -1,0 +1,59 @@
+pack_id: shun-v030-r02-e-guided-provenance-issuer-g4-programdata-anchor
+task_id: R02-E-GUIDED-AUTHORITY
+issue: "#348"
+repository: kaicreator-mm/shun-assistant
+version: v0.3.0
+parent_issue: "#269"
+standard_revision: 2c395c55569fe2edf3f4135f12d3d069e526d0b7
+owner_authorization_refs:
+  - "#260 OWNER_SHUN_V030_R02_AMENDMENT_R1_APPROVE"
+  - "Current project instruction: continue v0.3.0 under ADS #1359 Delivery-First; reviewer repairs defects within the active write set"
+  - "#348 independent Exact-SHA R4 finding comment 6658110320"
+  - "#358 G3 Execution Pack and CI qualification"
+execution_profile: WEB_BUILDER
+execution_environment: WEB_SOURCE_WITH_WINDOWS_CI
+admission_mode: SINGLE_WRITER_ADMISSION
+admission_generation: 4
+protected_claim_key: "kaicreator-mm/shun-assistant#348:builder:__default__"
+source_base_sha: 401f999155dc443c1877ffd6ddc2c5d1d78ec878
+source_base_tree: ccab70b88f0197457945452a42ebdf09eec4f4a5
+source_base_branch: JIT_only_task/v0.3.0-r02e-guided-authority-local-g3
+pack_branch: JIT_only_task/v0.3.0-r02e-guided-authority-pack-g4
+jit_branch: JIT_only_task/v0.3.0-r02e-guided-authority-local-g4
+execution_pack_path: .agent/execution/R02-E-GUIDED-PROVENANCE-ISSUER-G4/MANIFEST.yaml
+finding:
+  - "PR #359 R4 P2: defaultGuidedTrustAncestorChain() trusts caller-controlled process.env.ProgramData to choose the stop point; setting it to C:\\ProgramData\\Shun\\authority shortens the chain and omits C:\\ProgramData\\Shun and C:\\ProgramData."
+  - "PR #359 R4 P2: createExternalGuidedProvenanceAuthority().init() verifies only the trust-tree DACL and does not verify the default trust-root ancestor chain at runtime, contrary to the G3 design contract requiring the same ACL assessment in runtime and issuer."
+approved_write_set:
+  - apps/control-api/src/real-storage/guided-provenance-issuance.ts
+  - apps/control-api/test/guided-provenance-issuance.test.ts
+allowed_write_set:
+  - apps/control-api/src/real-storage/guided-provenance-issuance.ts
+  - apps/control-api/test/guided-provenance-issuance.test.ts
+design_contract:
+  - "The runtime trust root remains the source-pinned C:\\ProgramData\\Shun\\authority\\guided-provenance; ancestor validation must terminate at the source-pinned C:\\ProgramData, never an environment variable or other caller-controlled value."
+  - "A shared default-trust policy assessment must cover both trust-tree and ancestor-chain ACL/DACL at runtime before the pinned anchor is accepted, and must be reused for issuer post-write verification; the issuer retains its pre-write ancestor check."
+  - "defaultGuidedTrustAncestorChain() must return exactly C:\\ProgramData\\Shun\\authority, C:\\ProgramData\\Shun, C:\\ProgramData regardless of process.env.ProgramData."
+  - "Any impossible/malformed fixed path derivation fails closed; no fallback to caller-supplied ProgramData."
+  - "Do not change G3 ACL/DACL semantics, owner/write masks, runtime read deny policy, trust verification, issuer CLI, key custody or external authority contract."
+test_contract:
+  - "This pack PR must contain exactly this one manifest path and one commit directly parented to source_base_sha 401f999155dc443c1877ffd6ddc2c5d1d78ec878."
+  - "After pack Push and PR Woodpecker checks are SUCCESS at the exact pack HEAD, acquire a fresh Generation-4 DISPATCH_CLAIMED event bound to this pack, source base/tree, actual operator/session identity and exact two-path write set."
+  - "No source edit before fresh G4 CAS Claim acceptance; do not reuse G3 claim #6656763079."
+  - "Add a regression test that sets process.env.ProgramData to C:\\ProgramData\\Shun\\authority and proves the full three-ancestor chain remains unchanged; restore the original environment in finally."
+  - "Add tests for the shared runtime trust policy: a valid tree plus complete protected ancestor snapshot passes; a writable or incomplete ancestor snapshot fails closed; non-default injected test trust directories remain tree-only."
+  - "Retain the existing default-chain test and all G3 tests."
+  - "Run tracked-source syntax preflight, focused tests on Windows Node 24.21.0 and Node 26.13.0, app typecheck/lint, full tools/task-check.sh and exact-SHA Woodpecker Push/PR."
+  - "Record exact HEAD/tree/base, two-path diff, Node versions, commands/exit codes and Woodpecker IDs on Issue #348; no secrets or production receipts."
+integration_handoff:
+  - "R02-E #269 remains sole production composition integrator; this repair changes only the default ancestor path policy and its tests."
+forbidden:
+  - "Any path outside the exact two approved paths"
+  - "apps/control-api/scripts/issue-guided-provenance.ts, apps/control-api/src/main.ts, apps/control-api/src/server.ts, composition files, package manifests or lockfile"
+  - "packages/executor-windows/**, Domain Computer, SDK private src, Kernel, sender, grant, Permit or effect dispatcher"
+  - "Any production private key, HMAC secret, credential or signed production receipt in source, tests, CI artifacts or GitHub comments"
+  - "Any UAC prompt, automatic elevation, physical Windows effect, paid LLM request, Provider installation or external disclosure"
+  - "WIP integration merge, version/v0.3.0 merge, main/version/v0.2.0 mutation, tag, release or deployment"
+source_write_authorized: true
+merge_authorized: false
+release_authorized: false
