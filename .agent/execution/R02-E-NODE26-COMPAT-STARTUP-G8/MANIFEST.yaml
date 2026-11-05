@@ -1,0 +1,48 @@
+pack_id: shun-v030-r02-e-node26-process-tree-teardown-proof-g8
+task_id: R02-E
+issue: "#269"
+repository: kaicreator-mm/shun-assistant
+version: v0.3.0
+parent_issue: "#260"
+standard_revision: 2c395c55569fe2edf3f4135f12d3d069e526d0b7
+admission_generation: 8
+protected_claim_key: "kaicreator-mm/shun-assistant#269:builder:__default__"
+execution_profile: WEB_BUILDER_REPAIR
+execution_environment: WEB_SOURCE_WITH_WINDOWS_CI
+source_base_sha: 81213b1bc8f5b018f943e17b758f6b1573078192
+source_base_tree: 5007c21168b97a1674aff39e531df17da3390a37
+source_base_branch: JIT_only_task/v0.3.0-r02e-node26-compatible-runner-local-g7
+pack_branch: JIT_only_task/v0.3.0-r02e-node26-compatible-runner-pack-g8
+jit_branch: JIT_only_task/v0.3.0-r02e-node26-compatible-runner-local-g8
+execution_pack_path: .agent/execution/R02-E-NODE26-COMPAT-STARTUP-G8/MANIFEST.yaml
+finding:
+  - "PR #354 R2 P2-01: killPublishedPid ignores taskkill helper timeout and exit status, does not reap a timed-out helper, and does not prove the published descendant PID exited."
+  - "The silent-grandchild negative test can therefore pass with a surviving descendant/helper, contrary to the G7 test contract."
+approved_write_set:
+  - tests/integration/v03/r02-e-production/startup-runner.test.ts
+allowed_write_set:
+  - tests/integration/v03/r02-e-production/startup-runner.test.ts
+plan:
+  - "Make killPublishedPid fail closed: handle taskkill spawn error, non-zero exit and timeout explicitly."
+  - "If the taskkill helper times out, terminate it and verify helper exit within TASKKILL_REAP_TIMEOUT_MS; never silently return with a live helper."
+  - "After taskkill, verify the exact published target PID is gone using a bounded process-existence check. If taskkill fails or times out, use a bounded direct-PID SIGKILL fallback for this test-owned leaf process, then verify it exited."
+  - "Throw a deterministic cleanup error if either helper or target PID cannot be proven exited; preserve the original test-body failure while reporting cleanup failure."
+  - "Keep the source write set to the one existing startup-runner test file. Do not change production source, packages, lockfile, CI or other paths."
+test_contract:
+  - "This pack PR must contain exactly this one manifest path and one commit directly parented to source_base_sha 81213b1bc8f5b018f943e17b758f6b1573078192."
+  - "Wait for this exact pack HEAD's Woodpecker Push and PR checks to both report SUCCESS before creating a fresh Generation-8 DISPATCH_CLAIMED event."
+  - "The G8 Claim must bind this exact pack HEAD/tree, source base/tree, actual operator/session identity, source branch and exact one-path write set; do not reuse G7 or earlier Claims."
+  - "No source edit before G8 CAS Claim acceptance."
+  - "Run tracked-source JS/TS syntax preflight before source-changing CI."
+  - "Run focused r02-e-production tests on Windows Node 24.21.0 and 26.13.0; verify taskkill helper exit/reap and target PID exit in every teardown path."
+  - "Run full tools/task-check.sh and exact-SHA Woodpecker Push/PR checks; .woodpecker.yml is authoritative. GitHub Actions are supplementary."
+  - "Record exact HEAD/tree/base, one changed path, commands/exit codes, both Node versions, helper termination, target PID termination and evidence on Issue #269."
+  - "Independent Exact-SHA review of the repaired source SHA is mandatory; the repair author must not self-approve."
+forbidden:
+  - "Any source path other than tests/integration/v03/r02-e-production/startup-runner.test.ts"
+  - "Any production source, UI, CI configuration, package manifest or lockfile change"
+  - "Any paid cloud credential/request, Provider installation, UAC, physical Windows effect or external disclosure"
+  - "WIP integration merge, version/v0.3.0 merge, main/version/v0.2.0 mutation, tag, release or deployment"
+source_write_authorized: false
+merge_authorized: false
+release_authorized: false
