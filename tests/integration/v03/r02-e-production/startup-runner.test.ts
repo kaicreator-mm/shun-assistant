@@ -1043,7 +1043,7 @@ describe.skipIf(!isWindows)(
         "const kid = spawn(process.execPath, ['-e', 'setInterval(() => {}, 1e9)'], { stdio: 'ignore' });",
         `writeFileSync(${JSON.stringify(pidFile)}, String(kid.pid));`,
         'setInterval(() => {}, 1e9);',
-      ].join('\\n');
+      ].join('\n');
       const child = spawn(process.execPath, ['-e', wrapperScript], { stdio: 'ignore' });
       wrapperProcessTrees.add(child);
       let silentPid = 0;
