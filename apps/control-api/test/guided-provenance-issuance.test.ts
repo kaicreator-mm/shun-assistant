@@ -774,19 +774,21 @@ describe('G2 DACL and issuer-key custody repairs', () => {
     const fixture = makeFixture();
     try {
       const rows = protectedAcl(fixture.trustDir, []);
+      expect(assessGuidedTrustProtection(fixture.trustDir, [], rows.slice(0, 1))).not.toEqual([]);
       expect(
-        assessGuidedTrustProtection(fixture.trustDir, [], rows.slice(0, 1)),
-      ).not.toEqual([]);
-      expect(
-        assessGuidedTrustProtection(fixture.trustDir, [], [
-          {
-            ...rows[0]!,
-            accessRules: [
-              { identitySid: null, rightsMask: 2, accessType: 'Allow', isInherited: true },
-            ],
-          },
-          ...rows.slice(1),
-        ]),
+        assessGuidedTrustProtection(
+          fixture.trustDir,
+          [],
+          [
+            {
+              ...rows[0]!,
+              accessRules: [
+                { identitySid: null, rightsMask: 2, accessType: 'Allow', isInherited: true },
+              ],
+            },
+            ...rows.slice(1),
+          ],
+        ),
       ).not.toEqual([]);
     } finally {
       rmSync(fixture.root, { recursive: true, force: true });
