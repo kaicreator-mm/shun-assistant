@@ -101,7 +101,7 @@ function protectedAcl(trustDir: string, extraPaths: readonly string[]): GuidedTr
     join(trustDir, GUIDED_PROVENANCE_RECEIPTS_SUBDIR),
     ...extraPaths,
   ];
-  return [...new Set(paths)].map((path) => ({
+  return [...new Set(paths.filter(existsSync))].map((path) => ({
     path,
     ownerSid: 'S-1-5-32-544',
     accessRules: [
