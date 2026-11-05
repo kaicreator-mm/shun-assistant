@@ -201,7 +201,11 @@ describe.skipIf(!ON_WINDOWS)(
      * pid disappears. A live process always shows a CSV row quoting the
      * pid; "no tasks" banners differ per locale and never quote the pid.
      */
-    const processGone = async (pid: number, deadlineMs = 15000): Promise<boolean> => {
+    const processGone = async (
+      pid: number,
+      deadlineMs = 15000,
+      tasklistExe = machineTasklist,
+    ): Promise<boolean> => {
       if (!Number.isSafeInteger(pid) || pid <= 0) {
         throw new Error(`processGone requires a positive PID; received ${pid}`);
       }
@@ -212,7 +216,7 @@ describe.skipIf(!ON_WINDOWS)(
         // Fail closed: a missing tasklist, timeout, spawn error, or nonzero
         // exit must never be interpreted as proof that the target is gone.
         const probe = spawnSync(
-          machineTasklist,
+          tasklistExe,
           ['/FI', `PID eq ${pid}`, '/FO', 'CSV', '/NH'],
           {
             encoding: 'utf8',
@@ -236,6 +240,13 @@ describe.skipIf(!ON_WINDOWS)(
         await new Promise((resolveTimer) => setTimeout(resolveTimer, 250));
       }
     };
+
+    it('processGone fails closed when the tasklist probe cannot be started', async () => {
+      await expect(
+        processGone(1, 1000, join(tmpdir(), 'no-such-tasklist.exe')),
+      ).rejects.toThrow(/tasklist probe failed/);
+      await expect(processGone(-1)).rejects.toThrow(/positive PID/);
+    });
 
     it('spawnRelay runs the relay with a sterilized environment (NODE_OPTIONS/NODE_PATH have no carrier)', {
       timeout: RELAY_STARTUP_BUDGET_MS + 60000,
