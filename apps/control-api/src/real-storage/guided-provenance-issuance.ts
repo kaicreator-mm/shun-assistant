@@ -260,6 +260,14 @@ export type GuidedAclInspector = (
   trustDir: string,
   extraPaths: readonly string[],
 ) => GuidedTrustAclSnapshot | undefined;
+/**
+ * Bounded ancestor-chain snapshot injector (tests only): receives exactly
+ * the source-pinned default ancestor chain and nothing else. Production
+ * omits it and the real non-recursive Windows PowerShell probe runs.
+ */
+export type GuidedAclAncestorInspector = (
+  ancestorPaths: readonly string[],
+) => GuidedTrustAclSnapshot | undefined;
 const PRIVILEGED_OWNER_SIDS = new Set(['S-1-5-18', 'S-1-5-32-544']);
 // CREATOR OWNER / CREATOR GROUP are inheritance placeholders: they never
 // grant direct access to anyone and only take meaning on child objects.
@@ -442,11 +450,23 @@ function assessGuidedAclSnapshot(
   return reasons;
 }
 
-/** Assess the trust tree itself: anchor, receipts dir and every receipt. */
+/**
+ * Assess the trust tree itself: anchor, receipts dir and every receipt.
+ *
+ * This is the SHARED default-trust policy assessment: when `trustDir` is
+ * the source-pinned default trust directory, the ancestor chain of the
+ * trust root is assessed under the same ownership/DACL rules (narrower
+ * write mask) as part of this one call, so the runtime adapter's `init()`
+ * and the issuer's post-write verification enforce exactly one policy.
+ * An absent injected `ancestorSnapshot` means the real non-recursive
+ * Windows probe runs there (fail closed). Injected non-default test trust
+ * directories remain tree-only and exempt from the ancestor policy.
+ */
 export function assessGuidedTrustProtection(
   trustDir: string,
   receiptPaths: readonly string[],
   snapshot?: GuidedTrustAclSnapshot,
+  ancestorSnapshot?: GuidedTrustAclSnapshot,
 ): string[] {
   const rows = snapshot ?? inspectWindowsGuidedTrustAcl(trustDir, receiptPaths);
   if (!rows) return ['guided trust ACL/DACL probe failed (fail closed)'];
@@ -456,18 +476,32 @@ export function assessGuidedTrustProtection(
     resolve(trustDir, GUIDED_PROVENANCE_RECEIPTS_SUBDIR),
     ...receiptPaths,
   ].filter((path) => existsSync(path));
-  return assessGuidedAclSnapshot(rows, required, DANGEROUS_WRITE_MASK);
+  const reasons = assessGuidedAclSnapshot(rows, required, DANGEROUS_WRITE_MASK);
+  // Lexical comparison, identical to the issuer's default-root check: the
+  // combined ancestor policy binds only the source-pinned trust root. A
+  // tree-local DACL cannot prevent a rename/swap attack launched from a
+  // writable ancestor, so ancestor drift must fail the whole assessment.
+  if (trustDir.toLowerCase() === defaultGuidedProvenanceTrustDirectory().toLowerCase()) {
+    reasons.push(
+      ...assessGuidedTrustAncestorProtection(defaultGuidedTrustAncestorChain(), ancestorSnapshot),
+    );
+  }
+  return reasons;
 }
 
 /**
  * Ancestor directories of the baked-in default trust root
  * (C:\ProgramData\Shun\authority, C:\ProgramData\Shun, C:\ProgramData).
- * Purely lexical over the default constant (no fs, no platform path
- * semantics) so the chain is identical on every host; the walk must reach
- * %ProgramData% or it fails closed.
+ * Purely lexical over source-pinned constants (no fs, no platform path
+ * semantics, NO process.env consultation) so the chain is identical on
+ * every host. The walk terminates only at the source-pinned
+ * C:\ProgramData — never at a caller-controlled location: an exported
+ * ProgramData pointing inside the trust root must not be able to shorten
+ * or redirect the policy boundary. If the constant chain can never reach
+ * the pinned boundary it fails closed.
  */
 export function defaultGuidedTrustAncestorChain(): string[] {
-  const programData = (process.env.ProgramData ?? 'C:\\ProgramData').replace(/[\\/]+$/, '');
+  const programData = 'C:\\ProgramData';
   const rootSegments = defaultGuidedProvenanceTrustDirectory().split(/[\\/]+/);
   const chain: string[] = [];
   // Stop above the drive root (length >= 2 keeps at least 'C:' + one segment).
@@ -615,6 +649,13 @@ export interface ExternalGuidedAuthorityOptions {
   readonly pinnedSpkiSha256: string;
   /** ACL snapshot injector (tests). Production uses the real Windows scan. */
   readonly inspectAcl?: GuidedAclInspector;
+  /**
+   * Ancestor-chain ACL snapshot injector (tests, source-pinned default
+   * trust root only). Production omits it: the combined default-trust
+   * policy then probes the real ancestor chain non-recursively and fails
+   * closed on any probe failure or policy drift.
+   */
+  readonly inspectAclAncestors?: GuidedAclAncestorInspector;
 }
 
 /**
@@ -629,7 +670,7 @@ export interface ExternalGuidedAuthorityOptions {
 export function createExternalGuidedProvenanceAuthority(
   options: ExternalGuidedAuthorityOptions,
 ): GuidedProvenanceAuthority {
-  const { pinnedSpkiSha256, inspectAcl } = options;
+  const { pinnedSpkiSha256, inspectAcl, inspectAclAncestors } = options;
   if (
     typeof pinnedSpkiSha256 !== 'string' ||
     !GUIDED_PROVENANCE_DIGEST_PATTERN.test(pinnedSpkiSha256)
@@ -639,6 +680,9 @@ export function createExternalGuidedProvenanceAuthority(
   const trustDir = options.trustDir ?? defaultGuidedProvenanceTrustDirectory();
 
   // Verified lazily once per adapter instance: trust anchor pin + ACL policy.
+  // The policy is the shared combined assessment — for the source-pinned
+  // default trust root it also covers the ancestor chain — so a runtime
+  // verifier detects ancestor DACL drift exactly like operator issuance.
   let initialized: { publicKeyPem: string } | undefined;
   const init = (): { publicKeyPem: string } => {
     if (initialized) return initialized;
@@ -647,10 +691,12 @@ export function createExternalGuidedProvenanceAuthority(
     if (!timingSafeEqual(Buffer.from(actual, 'hex'), Buffer.from(pinnedSpkiSha256, 'hex'))) {
       reject('TRUST_PUBLIC_KEY_PIN_MISMATCH');
     }
+    const receipts = listGuidedReceiptPaths(trustDir);
     const reasons = assessGuidedTrustProtection(
       trustDir,
-      listGuidedReceiptPaths(trustDir),
-      inspectAcl ? inspectAcl(trustDir, listGuidedReceiptPaths(trustDir)) : undefined,
+      receipts,
+      inspectAcl ? inspectAcl(trustDir, receipts) : undefined,
+      inspectAclAncestors ? inspectAclAncestors(defaultGuidedTrustAncestorChain()) : undefined,
     );
     if (reasons.length > 0) reject(`TRUST_ACL_UNPROTECTED:${reasons.join(' | ')}`);
     initialized = { publicKeyPem: anchor.publicKeyPem };

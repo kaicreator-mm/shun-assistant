@@ -32,6 +32,7 @@ import {
   buildGuidedReceiptSigningBytes,
   canonicalGuidedDatabasePath,
   createExternalGuidedProvenanceAuthority,
+  defaultGuidedProvenanceTrustDirectory,
   defaultGuidedTrustAncestorChain,
   type ExternalGuidedAuthorityOptions,
   GUIDED_PROVENANCE_RECEIPT_SCHEMA,
@@ -114,6 +115,20 @@ function protectedAcl(trustDir: string, extraPaths: readonly string[]): GuidedTr
 
 const protectedInspector = (trustDir: string, extraPaths: readonly string[]) =>
   protectedAcl(trustDir, extraPaths);
+
+/** One healthy admin-owned ancestor row ( Administrators/SYSTEM-owned). */
+const protectedAncestorRow = (path: string) => ({
+  path,
+  ownerSid: 'S-1-5-18',
+  accessRules: [
+    {
+      identitySid: 'S-1-5-32-545',
+      rightsMask: 0x001200a9,
+      accessType: 'Allow',
+      isInherited: true,
+    },
+  ] as GuidedTrustAccessRule[],
+});
 
 function envelopeBody(
   fixture: Fixture,
@@ -710,6 +725,9 @@ describe('runtime adapter is verify-only (no signing reachability)', () => {
     // for the read-only ACL probe (mirrors executor anchor-protection).
     expect(source).not.toMatch(/pinnedSpkiSha256\s*=\s*process\.env/);
     expect(source).not.toMatch(/trustDir\s*=\s*process\.env/);
+    // G4: the trust-root ancestor boundary is source-pinned; a caller
+    // exported ProgramData must never shorten or redirect the chain.
+    expect(source).not.toMatch(/process\.env\.ProgramData/);
   });
 
   it('verifies receipts with only the public trust anchor present — no secret anywhere in the trust tree', () => {
@@ -1059,5 +1077,160 @@ describe('G2 DACL and issuer-key custody repairs', () => {
       if (originalVitest !== undefined) process.env.VITEST = originalVitest;
       rmSync(fixture.root, { recursive: true, force: true });
     }
+  });
+});
+
+describe('G4 repairs: pinned ancestor boundary and combined default-trust policy', () => {
+  it('pins the ancestor chain to source C:\\ProgramData even when process.env.ProgramData points inside the trust root', () => {
+    const original = process.env.ProgramData;
+    process.env.ProgramData = 'C:\\ProgramData\\Shun\\authority';
+    try {
+      expect(defaultGuidedTrustAncestorChain()).toEqual([
+        'C:\\ProgramData\\Shun\\authority',
+        'C:\\ProgramData\\Shun',
+        'C:\\ProgramData',
+      ]);
+    } finally {
+      if (original === undefined) delete process.env.ProgramData;
+      else process.env.ProgramData = original;
+    }
+  });
+
+  it('combined default-trust policy accepts healthy ancestors and the real ProgramData ACL shape', () => {
+    const trustDir = defaultGuidedProvenanceTrustDirectory();
+    const chain = defaultGuidedTrustAncestorChain();
+    const healthy = chain.map((path) => protectedAncestorRow(path));
+    expect(assessGuidedTrustProtection(trustDir, [], protectedAcl(trustDir, []), healthy)).toEqual(
+      [],
+    );
+    // The real OS-default ProgramData shape grants Users "create children"
+    // (0x116) on the folder itself; that cannot rename/delete/re-ACL an
+    // existing admin-owned entry and must stay accepted.
+    const realProgramDataShape = chain.map((path, index) =>
+      index === 2
+        ? {
+            ...protectedAncestorRow(path),
+            accessRules: [
+              ...protectedAncestorRow(path).accessRules,
+              {
+                identitySid: 'S-1-5-32-545',
+                rightsMask: 0x00000116,
+                accessType: 'Allow' as const,
+                isInherited: true,
+              },
+            ],
+          }
+        : protectedAncestorRow(path),
+    );
+    expect(
+      assessGuidedTrustProtection(trustDir, [], protectedAcl(trustDir, []), realProgramDataShape),
+    ).toEqual([]);
+  });
+
+  it('combined default-trust policy rejects writable, incomplete, read-denied or unprobed ancestors', () => {
+    const trustDir = defaultGuidedProvenanceTrustDirectory();
+    const chain = defaultGuidedTrustAncestorChain();
+    const tree = protectedAcl(trustDir, []);
+    const healthy = chain.map((path) => protectedAncestorRow(path));
+
+    // Ancestor writable by a non-privileged identity (DELETE on one entry).
+    const writable = chain.map((path, index) =>
+      index === 1
+        ? {
+            ...protectedAncestorRow(path),
+            accessRules: [
+              ...protectedAncestorRow(path).accessRules,
+              {
+                identitySid: 'S-1-5-11',
+                rightsMask: 0x00010000,
+                accessType: 'Allow' as const,
+                isInherited: true,
+              },
+            ],
+          }
+        : protectedAncestorRow(path),
+    );
+    expect(assessGuidedTrustProtection(trustDir, [], tree, writable)).toEqual(
+      expect.arrayContaining([expect.stringContaining('non-privileged write')]),
+    );
+
+    // Incomplete ancestor snapshot: one enumerated directory missing.
+    expect(assessGuidedTrustProtection(trustDir, [], tree, healthy.slice(0, 2))).toEqual(
+      expect.arrayContaining([expect.stringContaining('incomplete')]),
+    );
+
+    // Runtime read denied on the closest ancestor.
+    const readDenied = chain.map((path, index) =>
+      index === 0
+        ? {
+            ...protectedAncestorRow(path),
+            accessRules: [
+              ...protectedAncestorRow(path).accessRules,
+              {
+                identitySid: 'S-1-5-4',
+                rightsMask: 0x00000020,
+                accessType: 'Deny' as const,
+                isInherited: true,
+              },
+            ],
+          }
+        : protectedAncestorRow(path),
+    );
+    expect(assessGuidedTrustProtection(trustDir, [], tree, readDenied)).toEqual(
+      expect.arrayContaining([expect.stringContaining('runtime read/execute')]),
+    );
+
+    // Malformed ancestor row (owner not resolvable to a SID string).
+    const malformed = [
+      { path: chain[0] ?? '', ownerSid: null, accessRules: [] },
+      ...healthy.slice(1),
+    ];
+    expect(assessGuidedTrustProtection(trustDir, [], tree, malformed)).toEqual(
+      expect.arrayContaining([expect.stringContaining('invalid owner or incomplete')]),
+    );
+
+    // No injected ancestor snapshot: production defaults to the real
+    // non-recursive probe, which cannot prove a protected chain in test
+    // environments — fail closed rather than skip the ancestor policy.
+    expect(assessGuidedTrustProtection(trustDir, [], tree)).not.toEqual([]);
+  });
+
+  it('exempts injected non-default test trust directories from the ancestor policy', () => {
+    const fixture = makeFixture();
+    try {
+      // Tree-only injected snapshot on a non-default trust dir: no ancestor
+      // rows may be required and the real ancestor probe must not run.
+      expect(
+        assessGuidedTrustProtection(fixture.trustDir, [], protectedAcl(fixture.trustDir, [])),
+      ).toEqual([]);
+      provisionReceipt(fixture, signedEnvelope(fixture));
+      const authority = authorityFor(fixture);
+      const receipt = authority.issueFreshReceipt({
+        canonicalDatabasePath: fixture.dbPath,
+        schemaDigest: DIGEST_A,
+        issuedAtUnixMs: ISSUED_AT,
+      });
+      expect(authority.verifyReceipt(receipt, fixture.dbPath)).toBe(true);
+    } finally {
+      rmSync(fixture.root, { recursive: true, force: true });
+    }
+  });
+
+  it('runtime init never accepts the default trust root without the combined policy', () => {
+    const authority = createExternalGuidedProvenanceAuthority({
+      trustDir: defaultGuidedProvenanceTrustDirectory(),
+      pinnedSpkiSha256: 'a'.repeat(64),
+      inspectAcl: protectedInspector,
+      inspectAclAncestors: () => [],
+    });
+    expect(() =>
+      authority.issueFreshReceipt({
+        canonicalDatabasePath: join(tmpdir(), 'guided-default-root.db'),
+        schemaDigest: DIGEST_A,
+        issuedAtUnixMs: ISSUED_AT,
+      }),
+    ).toThrow(
+      /GUIDED_PROVENANCE_(TRUST_ANCHOR_MISSING|TRUST_PUBLIC_KEY_PIN_MISMATCH|TRUST_ACL_UNPROTECTED)/,
+    );
   });
 });
