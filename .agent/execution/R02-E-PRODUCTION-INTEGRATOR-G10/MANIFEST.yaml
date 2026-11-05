@@ -1,0 +1,74 @@
+pack_id: shun-v030-r02-e-production-integrator-g10
+task_id: R02-E-PRODUCTION-INTEGRATOR
+issue: "#269"
+parent_issue: "#259"
+repository: kaicreator-mm/shun-assistant
+version: v0.3.0
+standard_revision: 2c395c55569fe2edf3f4135f12d3d069e526d0b7
+admission_mode: SINGLE_WRITER_ADMISSION
+admission_generation: 10
+protected_claim_key: "kaicreator-mm/shun-assistant#269:builder:__default__"
+source_base:
+  branch: wip/v0.3.0-r02-owner-repairs
+  sha: 39e4f85f3fa01d9f4b20ba73adcf79cbc42707f5
+  tree: cb8b14856f223622a80f85a0317026f455198983
+native_dependencies:
+  issue_269_blocked_by: [262, 263, 264, 265]
+  issue_270_blocked_by: [269, 266, 267, 268]
+  issue_271_blocked_by: [270]
+dependency_inputs:
+  guided_authority:
+    issue: "#348"
+    pr: 363
+    head: d61c4e5c19f698157def9a90c13efac435d30fa9
+    tree: 04786bfeb85e2e43570f5203f0166b3673e8b082
+    review: "R6 PASS, comment 6663663653"
+    blobs:
+      apps/control-api/src/real-storage/guided-provenance-issuance.ts: a1d1867d9f44d75c8b83dfdbafc2b0094ee75347
+      apps/control-api/scripts/issue-guided-provenance.ts: 8fea28d3ed1d8046c569074deac824aca11c7fb9
+      apps/control-api/test/guided-provenance-issuance.test.ts: 17fa3056099368339dea2480c2f9924a54ccdd10
+  startup_runner_seed:
+    pr: 357
+    head: b23402850964030d7a96b325070256fe3ebad5eb
+    tree: 2033b8b29cf3160ecdc03814149584d6bc7cf111
+    blob: e8ea8d07b16f9a7d4d77561e82e83ebb89830e9c
+    review: "R1 PASS, comment 6656348123"
+authoring_write_set:
+  - apps/control-api/src/main.ts
+  - apps/control-api/src/v03/composition-guided-provenance.ts
+  - tests/integration/v03/r02-e-production/production-startup.test.ts
+  - tests/integration/v03/r02-e-production/startup-runner.test.ts
+dependency_import_paths:
+  - apps/control-api/src/real-storage/guided-provenance-issuance.ts
+  - apps/control-api/scripts/issue-guided-provenance.ts
+  - apps/control-api/test/guided-provenance-issuance.test.ts
+integration_union_path_set:
+  - apps/control-api/src/main.ts
+  - apps/control-api/src/v03/composition-guided-provenance.ts
+  - tests/integration/v03/r02-e-production/production-startup.test.ts
+  - tests/integration/v03/r02-e-production/startup-runner.test.ts
+  - apps/control-api/src/real-storage/guided-provenance-issuance.ts
+  - apps/control-api/scripts/issue-guided-provenance.ts
+  - apps/control-api/test/guided-provenance-issuance.test.ts
+design_contract:
+  - "Production real-storage Guided DB must use createProductionGuidedService and an explicit external verify-only authority. The HostGuidedService development default is forbidden in production, including temp-root DBs."
+  - "The public SPKI pin is loaded only from C:\\ProgramData\\Shun\\authority\\guided-provenance-trust-pin.json, derived from the source-pinned default trust directory. Never read it from environment, CLI, database or receipt data."
+  - "Require exact JSON keys schema and spkiSha256; schema is shun.guided.provenance-trust-pin.v1 and spkiSha256 is lowercase 64-hex. Missing, malformed, alias, symlink/reparse and non-regular files refuse before service/listener creation."
+  - "Use assessGuidedTrustProtection with pinPath included as a required path so the reviewed G5 ACL owner/DACL policy covers the pin file and source-pinned ProgramData ancestor chain. Reuse the G5 policy; do not duplicate masks."
+  - "The runtime inspector supplied to createExternalGuidedProvenanceAuthority must include pinPath in each ACL snapshot. G5 still verifies anchor, receipts and ancestors."
+  - "Copy the reviewed #357 startup-runner test first, then modify only its production-startup case under this parent write set. It must assert truthful startup refusal/no listener when no external operator receipt exists; no DEMO fallback counts as PASS."
+  - "Production-startup tests use ephemeral test keys and explicit ACL snapshots in a temporary trust directory. Cover valid signature path, missing/malformed pin, missing anchor/receipt, unsafe ACL and alias refusal."
+  - "HostGuidedService catches provenance initialization errors and exposes them as UNKNOWN through decide(); immediately after construction call decide(null), and if it returns UNKNOWN close the service and throw before listener creation. A healthy service returns a side-effect-free REFUSED for this invalid probe input."
+  - "If operator trust material is not provisioned, record KEY_NOT_PROVISIONED and keep production startup fail-closed. Do not create new production trust material."
+test_contract:
+  - "Pack PR has exactly one manifest path and exact parent source_base.sha."
+  - "After exact pack Woodpecker Push/PR SUCCESS, record a fresh G10 DISPATCH_CLAIMED event on #269 before any source edit."
+  - "Run exact-tree syntax/Biome preflight before source CI; then Node 24.21.0 and 26.13.0 focused tests, control-api lint/typecheck, tools/task-check.sh and exact-SHA Woodpecker Push/PR."
+  - "Native Windows Builder runs the changed startup-runner test under Node 24.21.0 and 26.13.0, checks no-listener refusal and reads the real fixed-path ACL state. Do not access signing credentials."
+  - "Record exact SHA/tree/base, changed paths, dependency blobs, test results, Windows evidence and pipeline IDs on #269."
+integration_constraints:
+  - "Only the four authoring paths and three dependency paths listed above."
+  - "No merge to WIP/version/main, no tag, release or deployment."
+source_write_authorized: false
+merge_authorized: false
+release_authorized: false
