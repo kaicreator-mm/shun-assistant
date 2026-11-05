@@ -287,11 +287,13 @@ async function killTree(
   }
   if (alreadyExited) {
     // Never erase the proof (or failure) of a previous taskkill attempt.
-    return windowsTreeKillHistory.get(child) ?? {
-      treeKillConfirmed: false,
-      helperReaped: true,
-      detail: 'windows: child already exited without an attempted tree kill',
-    };
+    return (
+      windowsTreeKillHistory.get(child) ?? {
+        treeKillConfirmed: false,
+        helperReaped: true,
+        detail: 'windows: child already exited without an attempted tree kill',
+      }
+    );
   }
   const timeoutMs = options.timeoutMs ?? TASKKILL_TIMEOUT_MS;
   const detail: string[] = [];
@@ -387,8 +389,7 @@ async function cleanupChild(
     !isWindows ||
     kill.treeKillConfirmed ||
     (!wrapperProcessTrees.has(child) && !windowsTreeKillHistory.has(child));
-  const ok =
-    kill.helperReaped && childExit !== 'TIMEOUT' && portRefused && treeTerminationProven;
+  const ok = kill.helperReaped && childExit !== 'TIMEOUT' && portRefused && treeTerminationProven;
   const parts = [
     `childExit=${childExit === 'TIMEOUT' ? 'TIMEOUT' : `code ${childExit.code} signal ${childExit.signal}`}`,
     `portRefused=${portRefused}`,
@@ -566,7 +567,7 @@ describe.skipIf(!isWindows)(
         entries,
         `fixture ${name} must have exactly one SHA256SUMS receipt (found ${entries?.length ?? 0})`,
       ).toHaveLength(1);
-      const expected = entries![0];
+      const expected = entries?.[0];
       expect(expected).toMatch(/^[0-9a-f]{64}$/);
       expect(sha256Hex(source)).toBe(expected);
       return source;
@@ -932,10 +933,17 @@ describe.skipIf(!isWindows)(
       pidFile: string;
     } {
       const pidFile = join(dir, `grandchild-${port}.pid`);
+      // The grandchild must be DETACHED: this Windows host (build 26300,
+      // verified 2026-11-05 on Node 24.21.0 and 26.13.0) auto-terminates
+      // non-detached children together with their parent — even on a NATURAL
+      // parent exit — so only a detached grandchild deterministically survives
+      // a wrapper-only kill and can serve as the "orphan witness". A real
+      // `taskkill /T /F` on the wrapper still reaches a detached descendant
+      // through the parent-PID chain (proven by the positive tree-kill test).
       const wrapperScript = [
         "const { spawn } = require('node:child_process');",
         "const { writeFileSync } = require('node:fs');",
-        `const kid = spawn(process.execPath, ['-e', ${JSON.stringify(listenerOn(port))}], { stdio: 'ignore' });`,
+        `const kid = spawn(process.execPath, ['-e', ${JSON.stringify(listenerOn(port))}], { stdio: 'ignore', detached: true });`,
         `writeFileSync(${JSON.stringify(pidFile)}, String(kid.pid));`,
         'setInterval(() => {}, 1e9);',
       ].join('\n');
@@ -956,10 +964,102 @@ describe.skipIf(!isWindows)(
       return 0;
     }
 
-    /** Test-local teardown for an orphan PID the production fallback could not reach. */
-    async function killPublishedPid(pid: number): Promise<void> {
-      const killer = spawn('taskkill', ['/PID', String(pid), '/T', '/F'], { stdio: 'ignore' });
-      await waitForExit(killer, TASKKILL_TIMEOUT_MS);
+    /** PID existence probe: ESRCH means gone; EPERM means it still exists. */
+    function isPidAlive(pid: number): boolean {
+      try {
+        process.kill(pid, 0);
+        return true;
+      } catch (error) {
+        const code = (error as NodeJS.ErrnoException).code;
+        if (code === 'ESRCH') return false;
+        if (code === 'EPERM') return true;
+        throw new Error(`cannot verify process PID ${pid}: ${String(error)}`);
+      }
+    }
+
+    /** Bounded proof that the exact published PID has exited. */
+    async function waitForPidExit(pid: number, timeoutMs: number): Promise<boolean> {
+      const deadline = Date.now() + timeoutMs;
+      while (Date.now() < deadline) {
+        if (!isPidAlive(pid)) return true;
+        await delay(100);
+      }
+      return !isPidAlive(pid);
+    }
+
+    /**
+     * Test-local teardown for a published leaf PID. taskkill status is
+     * observed; timeout helpers are killed and reaped; failed taskkill uses
+     * a bounded direct-PID SIGKILL fallback; success requires target PID exit.
+     * If the test body already failed, cleanup errors are reported without
+     * replacing the original assertion failure.
+     */
+    async function killPublishedPid(
+      pid: number,
+      options: KillTreeOptions = {},
+      bodyFailed = false,
+    ): Promise<void> {
+      try {
+        if (!Number.isSafeInteger(pid) || pid <= 0) {
+          throw new Error(`invalid published target PID: ${pid}`);
+        }
+        if (!isPidAlive(pid)) return;
+
+        const killer = spawn(
+          options.taskkillCommand ?? 'taskkill',
+          options.taskkillArgs ?? ['/PID', String(pid), '/T', '/F'],
+          { stdio: 'ignore' },
+        );
+        type TaskkillOutcome = { kind: 'EXIT'; code: number | null } | 'TIMEOUT' | 'SPAWN_ERROR';
+        let timer: NodeJS.Timeout | undefined;
+        const outcome = await new Promise<TaskkillOutcome>((resolveOutcome) => {
+          const finish = (result: TaskkillOutcome) => {
+            clearTimeout(timer);
+            resolveOutcome(result);
+          };
+          killer.once('error', () => finish('SPAWN_ERROR'));
+          killer.once('exit', (code) => finish({ kind: 'EXIT', code }));
+          timer = setTimeout(() => finish('TIMEOUT'), options.timeoutMs ?? TASKKILL_TIMEOUT_MS);
+          timer.unref();
+        });
+
+        let helperReaped = true;
+        if (outcome === 'TIMEOUT' || outcome === 'SPAWN_ERROR') {
+          if (killer.pid && killer.exitCode === null && killer.signalCode === null) {
+            killer.kill('SIGKILL');
+            helperReaped = (await waitForExit(killer, TASKKILL_REAP_TIMEOUT_MS)) !== 'TIMEOUT';
+          }
+        }
+
+        const taskkillSucceeded =
+          outcome !== 'TIMEOUT' && outcome !== 'SPAWN_ERROR' && outcome.code === 0;
+        let targetExited =
+          taskkillSucceeded && (await waitForPidExit(pid, TASKKILL_REAP_TIMEOUT_MS));
+
+        if (!targetExited) {
+          // The target is a test-owned leaf process, so direct-PID fallback
+          // cannot orphan its descendants. ESRCH is an acceptable race.
+          try {
+            process.kill(pid, 'SIGKILL');
+          } catch (error) {
+            if ((error as NodeJS.ErrnoException).code !== 'ESRCH') {
+              throw new Error(`direct-PID fallback failed for ${pid}: ${String(error)}`);
+            }
+          }
+          targetExited = await waitForPidExit(pid, TASKKILL_REAP_TIMEOUT_MS);
+        }
+
+        if (!helperReaped) {
+          throw new Error('taskkill helper did not exit within TASKKILL_REAP_TIMEOUT_MS');
+        }
+        if (!targetExited) {
+          throw new Error(`published target PID ${pid} survived taskkill and direct-PID fallback`);
+        }
+      } catch (error) {
+        const diagnostic = `[startup-runner] published PID cleanup failure: ${String(error)}`;
+        if (bodyFailed) console.error(diagnostic);
+        else throw new Error(diagnostic, { cause: error });
+      }
     }
 
     it('taskkill timeout: the helper is terminated and reaped, fallback runs, and the listener still dies', async () => {
@@ -996,6 +1096,7 @@ describe.skipIf(!isWindows)(
     it('taskkill nonzero exit: fallback is not tree cleanup, and a port that outlives the child is an explicit cleanup failure', async () => {
       const port = await freePort();
       const { child, pidFile } = startWrapperTree(port);
+      let bodyFailed = false;
       let grandchildPid = 0;
       try {
         grandchildPid = await publishedPid(pidFile);
@@ -1020,11 +1121,12 @@ describe.skipIf(!isWindows)(
         expect(cleanup.detail).toContain('CLEANUP FAILURE');
         expect(cleanup.detail).toContain('treeTerminationProven=false');
         await expect(guaranteeCleanup(child, port, true)).resolves.toBeUndefined();
-        await expect(guaranteeCleanup(child, port, false)).rejects.toThrow(
-          /cleanup failure/,
-        );
+        await expect(guaranteeCleanup(child, port, false)).rejects.toThrow(/cleanup failure/);
+      } catch (error) {
+        bodyFailed = true;
+        throw error;
       } finally {
-        if (grandchildPid > 0) await killPublishedPid(grandchildPid);
+        if (grandchildPid > 0) await killPublishedPid(grandchildPid, {}, bodyFailed);
         // Explicit teardown does not convert the failed kill into proof.
         await guaranteeCleanup(child, port, true);
       }
@@ -1033,15 +1135,21 @@ describe.skipIf(!isWindows)(
     it('non-listening grandchild cannot be certified by a closed port after wrapper-only kill', async () => {
       const port = await freePort();
       const pidFile = join(dir, `silent-${port}.pid`);
+      // Detached for the same host reason as startWrapperTree: a non-detached
+      // grandchild is auto-reaped with the wrapper on this host (even on a
+      // natural exit), which would silently defeat the "silent grandchild
+      // outlives a wrapper-only kill" premise this negative case exists to
+      // prove. See the wrapper-script comment in startWrapperTree.
       const wrapperScript = [
         "const { spawn } = require('node:child_process');",
         "const { writeFileSync } = require('node:fs');",
-        "const kid = spawn(process.execPath, ['-e', 'setInterval(() => {}, 1e9)'], { stdio: 'ignore' });",
+        `const kid = spawn(process.execPath, ['-e', 'setInterval(() => {}, 1e9)'], { stdio: 'ignore', detached: true });`,
         `writeFileSync(${JSON.stringify(pidFile)}, String(kid.pid));`,
         'setInterval(() => {}, 1e9);',
       ].join('\n');
       const child = spawn(process.execPath, ['-e', wrapperScript], { stdio: 'ignore' });
       wrapperProcessTrees.add(child);
+      let bodyFailed = false;
       let silentPid = 0;
       try {
         silentPid = await publishedPid(pidFile);
@@ -1055,9 +1163,56 @@ describe.skipIf(!isWindows)(
         expect(cleanup.ok).toBe(false);
         expect(cleanup.detail).toContain('treeTerminationProven=false');
         expect(() => process.kill(silentPid, 0)).not.toThrow();
+      } catch (error) {
+        bodyFailed = true;
+        throw error;
       } finally {
-        if (silentPid > 0) await killPublishedPid(silentPid);
+        if (silentPid > 0) await killPublishedPid(silentPid, {}, bodyFailed);
         await guaranteeCleanup(child, port, true);
+      }
+    }, 60_000);
+
+    it('published PID teardown handles spawn error, nonzero exit and timeout with verified fallback', async () => {
+      const cases: Array<{ label: string; options: KillTreeOptions }> = [
+        {
+          label: 'spawn error',
+          options: {
+            taskkillCommand: join(dir, 'missing-taskkill.exe'),
+            timeoutMs: 1_000,
+          },
+        },
+        {
+          label: 'nonzero exit',
+          options: {
+            taskkillCommand: process.execPath,
+            taskkillArgs: ['-e', 'process.exit(23)'],
+            timeoutMs: 2_000,
+          },
+        },
+        {
+          label: 'timeout and helper reap',
+          options: {
+            taskkillCommand: process.execPath,
+            taskkillArgs: ['-e', 'setInterval(() => {}, 1e9)'],
+            timeoutMs: 250,
+          },
+        },
+      ];
+      for (const scenario of cases) {
+        const target = spawn(process.execPath, ['-e', 'setInterval(() => {}, 1e9)'], {
+          stdio: 'ignore',
+        });
+        const targetPid = target.pid;
+        expect(targetPid).toBeDefined();
+        if (!targetPid) throw new Error('test target did not receive a PID');
+        try {
+          expect(isPidAlive(targetPid)).toBe(true);
+          await killPublishedPid(targetPid, scenario.options);
+          expect(isPidAlive(targetPid), scenario.label).toBe(false);
+          expect(await waitForExit(target, 1_000)).not.toBe('TIMEOUT');
+        } finally {
+          if (isPidAlive(targetPid)) await killPublishedPid(targetPid);
+        }
       }
     }, 60_000);
 
@@ -1081,7 +1236,7 @@ describe.skipIf(!isWindows)(
         bodyFailed = true;
         throw error;
       } finally {
-        if (grandchildPid > 0) await killPublishedPid(grandchildPid);
+        if (grandchildPid > 0) await killPublishedPid(grandchildPid, {}, bodyFailed);
         await guaranteeCleanup(child, port, bodyFailed);
       }
     }, 60_000);
