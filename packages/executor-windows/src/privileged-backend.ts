@@ -514,6 +514,44 @@ type RelayResult = {
   hresult?: string;
   error?: string;
   timedOut?: boolean;
+  /** Observed lifecycle diagnostics (Issue #345): wall time from spawn call to resolution. */
+  elapsedMs?: number;
+  /** Whether the OS actually created the relay process (spawn event fired). */
+  spawned?: boolean;
+  /** Bytes the relay wrote to stdout/stderr before resolution (0 = silent init-phase stall). */
+  outputBytes?: number;
+  /** taskkill tree-kill exit code, when a timeout kill was issued. */
+  killExitCode?: number;
+  /**
+   * True when the relay process tree was observed to exit after the timeout
+   * kill (no orphan); false means the kill grace elapsed without an exit.
+   * Exit evidence only — never cleanup optimism (Issue #345 P1-01).
+   */
+  killConfirmed?: boolean;
+  /**
+   * P1-01 (#345): explicit, bounded disposition of the taskkill helper
+   * itself — present on every TIMED_OUT result. EXITED_ZERO/EXITED_NONZERO:
+   * the helper exited with that class of code; SPAWN_ERROR: the helper never
+   * came into existence; TIMED_OUT: the helper hit its own grace bound and
+   * termination was requested (killHelperConfirmed separately records whether
+   * its exit was observed); NOT_ISSUED: no kill was issued (no relay pid to kill).
+   */
+  killDisposition?: 'NOT_ISSUED' | 'EXITED_ZERO' | 'EXITED_NONZERO' | 'SPAWN_ERROR' | 'TIMED_OUT';
+  /** P1-01: retained taskkill helper pid (-1 when the helper never spawned). */
+  taskkillPid?: number;
+  /**
+   * P1-01: the launcher's direct relay-root kill fallback was used because
+   * the helper could not be trusted (spawn error, nonzero exit, or its own
+   * bound elapsed without a tree kill).
+   */
+  fallbackKillUsed?: boolean;
+  /**
+   * P1-01: the helper's lifecycle is provably closed — it exited (any code),
+   * or it never came into existence. false only when the reaped helper's
+   * exit could not be observed within the outer kill grace (honest
+   * unproven-cleanup evidence, never reported as success).
+   */
+  killHelperConfirmed?: boolean;
 };
 
 /**
@@ -538,6 +576,26 @@ function stdioTail(): { push(chunk: Buffer | string): void; tail(): string | und
   };
 }
 
+/**
+ * Two bounded phases after a relay timeout kill (Issue #345, P1-01):
+ *
+ * - TASKKILL_KILL_GRACE_MS bounds the taskkill helper's OWN lifecycle. The
+ *   helper is a retained ChildProcess whose exit is explicitly awaited; if
+ *   it has not exited within this bound (or it errored / exited nonzero),
+ *   the launcher requests direct termination of the helper and falls back to
+ *   killing the relay root it owns. The helper's exit is observed within the
+ *   outer grace or reported as unconfirmed; it is never silently treated as
+ *   reaped.
+ * - RELAY_KILL_GRACE_MS is the hard ceiling for observing the relay root
+ *   exit after the kill. The timeout result settles only once BOTH
+ *   dispositions (helper + relay root) are explicit — and it never reports
+ *   cleanup success that cannot be proven: `killConfirmed` stays
+ *   exit-evidence only, and an unproven helper exit stays
+ *   `killHelperConfirmed: false`.
+ */
+const TASKKILL_KILL_GRACE_MS = 10000;
+const RELAY_KILL_GRACE_MS = 15000;
+
 // Exported for the N-R2-1 negative controls (test/evidence tooling): the
 // privileged-path relay spawn must demonstrably carry a sterilized
 // environment. Security callers still enter through PrivilegedWindowsExecutionBackend.
@@ -551,6 +609,8 @@ export async function spawnRelay(params: {
   relayFile: string;
   timeoutMs: number;
   onRelayPid?: (pid: number) => void;
+  /** P1-01 (#345): test/evidence hook — fires once with the taskkill helper pid (-1 = never spawned). */
+  onTaskkillPid?: (pid: number) => void;
 }): Promise<RelayResult> {
   const helperArgsJson = JSON.stringify(params.helperArgs);
   // N-R2-1: the relay host is the spawn UAC consents FOR — an inherited
@@ -560,6 +620,9 @@ export async function spawnRelay(params: {
   const sterileEnv = privilegedSpawnEnv();
   const stdout = stdioTail();
   const stderr = stdioTail();
+  const startedAtMs = Date.now();
+  let spawned = false;
+  let outputBytes = 0;
   const child = spawn(
     params.powershellExe,
     [
@@ -580,30 +643,184 @@ export async function spawnRelay(params: {
     ],
     { shell: false, windowsHide: true, env: sterileEnv },
   );
-  child.stdout?.on('data', (c: Buffer) => stdout.push(c));
-  child.stderr?.on('data', (c: Buffer) => stderr.push(c));
+  child.stdout?.on('data', (c: Buffer) => {
+    outputBytes += c.length;
+    stdout.push(c);
+  });
+  child.stderr?.on('data', (c: Buffer) => {
+    outputBytes += c.length;
+    stderr.push(c);
+  });
+  child.once('spawn', () => {
+    spawned = true;
+  });
   params.onRelayPid?.(child.pid ?? -1);
   return new Promise((resolve) => {
+    let settled = false;
     let timedOut = false;
+    let killExitCode: number | undefined;
+    let killConfirmed = false;
+    // P1-01 (#345): the taskkill helper is a retained child with its own
+    // bounded, explicit disposition, and the relay root gets a bounded
+    // direct-kill fallback whenever the helper cannot be trusted.
+    let killDisposition: RelayResult['killDisposition'] | undefined;
+    let taskkillPid: number | undefined;
+    let fallbackKillUsed = false;
+    let killHelperConfirmed = false;
+    let relayExitSeen = false;
+    let killGraceElapsed = false;
+    let killGraceTimer: ReturnType<typeof setTimeout> | undefined;
+    let taskkillTimer: ReturnType<typeof setTimeout> | undefined;
+    const lifecycle = () => ({
+      elapsedMs: Date.now() - startedAtMs,
+      spawned,
+      outputBytes,
+      ...(killExitCode !== undefined ? { killExitCode } : {}),
+    });
+    const tails = (): string =>
+      [stderr.tail(), stdout.tail()].filter((t) => t !== undefined).join(' | ');
+    const timeoutDiagnostics = (): string =>
+      [
+        `relay did not exit within ${params.timeoutMs}ms`,
+        `spawned=${spawned}`,
+        `outputBytes=${outputBytes}`,
+        ...(taskkillPid !== undefined ? [`taskkillPid=${taskkillPid}`] : []),
+        ...(killDisposition !== undefined ? [`taskkillDisposition=${killDisposition}`] : []),
+        ...(killExitCode !== undefined ? [`taskkillExit=${killExitCode}`] : []),
+        `fallbackKill=${fallbackKillUsed}`,
+        `treeExitedAfterKill=${killConfirmed}`,
+        `killHelperConfirmed=${killHelperConfirmed}`,
+        tails(),
+      ]
+        .filter((part) => part !== '')
+        .join('; ');
+    const settle = (result: RelayResult): void => {
+      if (settled) return;
+      settled = true;
+      clearTimeout(timer);
+      if (killGraceTimer) clearTimeout(killGraceTimer);
+      if (taskkillTimer) clearTimeout(taskkillTimer);
+      resolve(result);
+    };
+    /**
+     * P1-01: the TIMED_OUT result settles only when both dispositions are
+     * explicit — the taskkill helper's (bounded by TASKKILL_KILL_GRACE_MS)
+     * and the relay root's (bounded by RELAY_KILL_GRACE_MS). A reaped
+     * helper's exit is part of its disposition and is awaited within the
+     * outer grace, so the result never claims a helper lifecycle that is
+     * still open.
+     */
+    const settleTimedOut = (): void => {
+      if (settled || !timedOut) return;
+      if (killDisposition === undefined) return;
+      if (!relayExitSeen && !killGraceElapsed) return;
+      if (
+        killDisposition === 'TIMED_OUT' &&
+        taskkillPid !== undefined &&
+        taskkillPid > 0 &&
+        !killHelperConfirmed &&
+        !killGraceElapsed
+      ) {
+        return;
+      }
+      settle({
+        kind: 'TIMED_OUT',
+        timedOut,
+        error: timeoutDiagnostics(),
+        ...lifecycle(),
+        killConfirmed: relayExitSeen,
+        killDisposition,
+        taskkillPid,
+        fallbackKillUsed,
+        killHelperConfirmed,
+      });
+    };
     const timer = setTimeout(() => {
       timedOut = true;
       // The relay tree is NON-elevated: tree-kill reaches it. The elevated
       // helper child survives (Access Denied) — exactly why the helper owns
       // its deadline and the journal decides the outcome (§8.2.1).
       if (child.pid) {
-        spawn(params.taskkillExe, ['/PID', String(child.pid), '/T', '/F'], {
+        const kill = spawn(params.taskkillExe, ['/PID', String(child.pid), '/T', '/F'], {
           shell: false,
           windowsHide: true,
           env: sterileEnv,
         });
+        // P1-01: retain the helper pid and bound its exit/reap lifecycle.
+        taskkillPid = kill.pid ?? -1;
+        params.onTaskkillPid?.(taskkillPid);
+        let killSpawned = false;
+        kill.once('spawn', () => {
+          killSpawned = true;
+        });
+        const fallbackKill = (): void => {
+          // Bounded fallback for the DIRECT relay child (the process the
+          // launcher spawned and owns): the tree below the root is NOT
+          // reachable this way, so killConfirmed stays exit-evidence only.
+          if (fallbackKillUsed || relayExitSeen) return;
+          fallbackKillUsed = true;
+          child.kill();
+        };
+        kill.on('error', () => {
+          if (!killSpawned) {
+            // The helper never came into existence: nothing to prove gone.
+            if (killExitCode === undefined) killExitCode = -1;
+            killHelperConfirmed = true;
+            if (killDisposition === undefined) {
+              killDisposition = 'SPAWN_ERROR';
+              fallbackKill();
+            }
+            settleTimedOut();
+          }
+        });
+        kill.on('exit', (code) => {
+          killHelperConfirmed = true;
+          if (killDisposition === undefined) {
+            const resolved = code ?? -1;
+            killDisposition = resolved === 0 ? 'EXITED_ZERO' : 'EXITED_NONZERO';
+            if (killExitCode === undefined) killExitCode = resolved;
+            if (resolved !== 0) fallbackKill();
+          }
+          // Re-triggers a deferred settle: the helper's exit completes its
+          // disposition even when the relay root exited first.
+          settleTimedOut();
+        });
+        // P1-01: the helper's own grace bound. Fires when the helper is
+        // still running (reap it, disposition TIMED_OUT) or when it already
+        // exited zero without a proven relay exit (wedged tree) — either
+        // way the relay root gets the bounded direct fallback here.
+        taskkillTimer = setTimeout(() => {
+          if (killDisposition === undefined) {
+            killDisposition = 'TIMED_OUT';
+            kill.kill();
+          }
+          fallbackKill();
+          settleTimedOut();
+        }, TASKKILL_KILL_GRACE_MS);
+        killGraceTimer = setTimeout(() => {
+          killGraceElapsed = true;
+          if (killDisposition === undefined) killDisposition = 'TIMED_OUT';
+          settleTimedOut();
+        }, RELAY_KILL_GRACE_MS);
+      } else {
+        killDisposition = 'NOT_ISSUED';
+        settle({
+          kind: 'TIMED_OUT',
+          timedOut,
+          error: timeoutDiagnostics(),
+          ...lifecycle(),
+          killConfirmed: false,
+          killDisposition,
+        });
       }
     }, params.timeoutMs);
     child.on('error', (err) => {
-      clearTimeout(timer);
-      resolve({ kind: 'SPAWN_ERROR', error: String(err) });
+      settle({ kind: 'SPAWN_ERROR', error: String(err), ...lifecycle() });
     });
     child.on('exit', () => {
-      clearTimeout(timer);
+      relayExitSeen = true;
+      // The tree died on its own (or under the kill): proven-gone evidence.
+      if (timedOut) killConfirmed = true;
       let relay: Record<string, unknown> | undefined;
       try {
         if (existsSync(params.relayFile)) {
@@ -612,27 +829,29 @@ export async function spawnRelay(params: {
       } catch {
         relay = undefined;
       }
-      const diagnostics = [stderr.tail(), stdout.tail()].filter((t) => t !== undefined).join(' | ');
+      const diagnostics = tails();
       if (timedOut && !relay) {
-        resolve({ kind: 'TIMED_OUT', timedOut, error: diagnostics || undefined });
+        settleTimedOut();
         return;
       }
       if (!relay) {
-        resolve({ kind: 'NO_RELAY', timedOut, error: diagnostics || undefined });
+        settle({ kind: 'NO_RELAY', timedOut, error: diagnostics || undefined, ...lifecycle() });
         return;
       }
       if (relay.kind === 'UAC_DECLINED') {
-        resolve({
+        settle({
           kind: 'UAC_DECLINED',
           hresult: typeof relay.hresult === 'string' ? relay.hresult : undefined,
           error: typeof relay.error === 'string' ? relay.error : undefined,
+          ...lifecycle(),
         });
         return;
       }
-      resolve({
+      settle({
         kind: 'RAN',
         exitCode: typeof relay.exitCode === 'number' ? relay.exitCode : undefined,
         childPid: typeof relay.childPid === 'number' ? relay.childPid : undefined,
+        ...lifecycle(),
       });
     });
   });
