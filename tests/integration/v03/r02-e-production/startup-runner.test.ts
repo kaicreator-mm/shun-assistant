@@ -287,11 +287,13 @@ async function killTree(
   }
   if (alreadyExited) {
     // Never erase the proof (or failure) of a previous taskkill attempt.
-    return windowsTreeKillHistory.get(child) ?? {
-      treeKillConfirmed: false,
-      helperReaped: true,
-      detail: 'windows: child already exited without an attempted tree kill',
-    };
+    return (
+      windowsTreeKillHistory.get(child) ?? {
+        treeKillConfirmed: false,
+        helperReaped: true,
+        detail: 'windows: child already exited without an attempted tree kill',
+      }
+    );
   }
   const timeoutMs = options.timeoutMs ?? TASKKILL_TIMEOUT_MS;
   const detail: string[] = [];
@@ -387,8 +389,7 @@ async function cleanupChild(
     !isWindows ||
     kill.treeKillConfirmed ||
     (!wrapperProcessTrees.has(child) && !windowsTreeKillHistory.has(child));
-  const ok =
-    kill.helperReaped && childExit !== 'TIMEOUT' && portRefused && treeTerminationProven;
+  const ok = kill.helperReaped && childExit !== 'TIMEOUT' && portRefused && treeTerminationProven;
   const parts = [
     `childExit=${childExit === 'TIMEOUT' ? 'TIMEOUT' : `code ${childExit.code} signal ${childExit.signal}`}`,
     `portRefused=${portRefused}`,
@@ -566,7 +567,7 @@ describe.skipIf(!isWindows)(
         entries,
         `fixture ${name} must have exactly one SHA256SUMS receipt (found ${entries?.length ?? 0})`,
       ).toHaveLength(1);
-      const expected = entries![0];
+      const expected = entries?.[0];
       expect(expected).toMatch(/^[0-9a-f]{64}$/);
       expect(sha256Hex(source)).toBe(expected);
       return source;
@@ -932,10 +933,17 @@ describe.skipIf(!isWindows)(
       pidFile: string;
     } {
       const pidFile = join(dir, `grandchild-${port}.pid`);
+      // The grandchild must be DETACHED: this Windows host (build 26300,
+      // verified 2026-11-05 on Node 24.21.0 and 26.13.0) auto-terminates
+      // non-detached children together with their parent — even on a NATURAL
+      // parent exit — so only a detached grandchild deterministically survives
+      // a wrapper-only kill and can serve as the "orphan witness". A real
+      // `taskkill /T /F` on the wrapper still reaches a detached descendant
+      // through the parent-PID chain (proven by the positive tree-kill test).
       const wrapperScript = [
         "const { spawn } = require('node:child_process');",
         "const { writeFileSync } = require('node:fs');",
-        `const kid = spawn(process.execPath, ['-e', ${JSON.stringify(listenerOn(port))}], { stdio: 'ignore' });`,
+        `const kid = spawn(process.execPath, ['-e', ${JSON.stringify(listenerOn(port))}], { stdio: 'ignore', detached: true });`,
         `writeFileSync(${JSON.stringify(pidFile)}, String(kid.pid));`,
         'setInterval(() => {}, 1e9);',
       ].join('\n');
@@ -1002,10 +1010,7 @@ describe.skipIf(!isWindows)(
           options.taskkillArgs ?? ['/PID', String(pid), '/T', '/F'],
           { stdio: 'ignore' },
         );
-        type TaskkillOutcome =
-          | { kind: 'EXIT'; code: number | null }
-          | 'TIMEOUT'
-          | 'SPAWN_ERROR';
+        type TaskkillOutcome = { kind: 'EXIT'; code: number | null } | 'TIMEOUT' | 'SPAWN_ERROR';
         let timer: NodeJS.Timeout | undefined;
         const outcome = await new Promise<TaskkillOutcome>((resolveOutcome) => {
           const finish = (result: TaskkillOutcome) => {
@@ -1014,10 +1019,7 @@ describe.skipIf(!isWindows)(
           };
           killer.once('error', () => finish('SPAWN_ERROR'));
           killer.once('exit', (code) => finish({ kind: 'EXIT', code }));
-          timer = setTimeout(
-            () => finish('TIMEOUT'),
-            options.timeoutMs ?? TASKKILL_TIMEOUT_MS,
-          );
+          timer = setTimeout(() => finish('TIMEOUT'), options.timeoutMs ?? TASKKILL_TIMEOUT_MS);
           timer.unref();
         });
 
@@ -1029,11 +1031,10 @@ describe.skipIf(!isWindows)(
           }
         }
 
-        const taskkillSucceeded = outcome !== 'TIMEOUT' &&
-          outcome !== 'SPAWN_ERROR' &&
-          outcome.code === 0;
-        let targetExited = taskkillSucceeded &&
-          (await waitForPidExit(pid, TASKKILL_REAP_TIMEOUT_MS));
+        const taskkillSucceeded =
+          outcome !== 'TIMEOUT' && outcome !== 'SPAWN_ERROR' && outcome.code === 0;
+        let targetExited =
+          taskkillSucceeded && (await waitForPidExit(pid, TASKKILL_REAP_TIMEOUT_MS));
 
         if (!targetExited) {
           // The target is a test-owned leaf process, so direct-PID fallback
@@ -1120,9 +1121,7 @@ describe.skipIf(!isWindows)(
         expect(cleanup.detail).toContain('CLEANUP FAILURE');
         expect(cleanup.detail).toContain('treeTerminationProven=false');
         await expect(guaranteeCleanup(child, port, true)).resolves.toBeUndefined();
-        await expect(guaranteeCleanup(child, port, false)).rejects.toThrow(
-          /cleanup failure/,
-        );
+        await expect(guaranteeCleanup(child, port, false)).rejects.toThrow(/cleanup failure/);
       } catch (error) {
         bodyFailed = true;
         throw error;
@@ -1136,10 +1135,15 @@ describe.skipIf(!isWindows)(
     it('non-listening grandchild cannot be certified by a closed port after wrapper-only kill', async () => {
       const port = await freePort();
       const pidFile = join(dir, `silent-${port}.pid`);
+      // Detached for the same host reason as startWrapperTree: a non-detached
+      // grandchild is auto-reaped with the wrapper on this host (even on a
+      // natural exit), which would silently defeat the "silent grandchild
+      // outlives a wrapper-only kill" premise this negative case exists to
+      // prove. See the wrapper-script comment in startWrapperTree.
       const wrapperScript = [
         "const { spawn } = require('node:child_process');",
         "const { writeFileSync } = require('node:fs');",
-        "const kid = spawn(process.execPath, ['-e', 'setInterval(() => {}, 1e9)'], { stdio: 'ignore' });",
+        `const kid = spawn(process.execPath, ['-e', 'setInterval(() => {}, 1e9)'], { stdio: 'ignore', detached: true });`,
         `writeFileSync(${JSON.stringify(pidFile)}, String(kid.pid));`,
         'setInterval(() => {}, 1e9);',
       ].join('\n');
