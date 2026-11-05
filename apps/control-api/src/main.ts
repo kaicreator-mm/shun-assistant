@@ -1,18 +1,18 @@
 // CLI entry: run the local control surface on loopback.
-//   node src/main.ts            → http://127.0.0.1:7788
+//   node --experimental-transform-types src/main.ts → http://127.0.0.1:7788
 // Env:
 //   SHUN_CONTROL_PORT           — port (default 7788)
 //   SHUN_CONTROL_UI_DIR         — static UI directory (default ../control-ui/public)
 import { readFileSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { HostGuidedService } from '../../../packages/domain-host/src/guided/host-guided-service.ts';
 import { HostMetaShadowStore } from '../../../packages/domain-host/src/meta/host-meta-shadow-store.ts';
 import { cloudInterpreterFromEnvironment } from './cloud-interpret.ts';
 import { DemoShunBackend } from './demo/backend.ts';
 import { RealStorageControlBackend } from './real-storage/backend.ts';
 import { createControlServer } from './server.ts';
 import { provisionGuidedCaseFromHostFile } from './v03/composition-guided.ts';
+import { createProductionGuidedService } from './v03/composition-guided-provenance.ts';
 import {
   type JourneyBindingsConfig,
   provisionMetaFromHostFile,
@@ -68,7 +68,7 @@ if (guidedDb && mode !== 'real-storage') {
   throw new Error('V03_GUIDED_REQUIRES_REAL_STORAGE_MODE');
 }
 const guided =
-  guidedDb && mode === 'real-storage' ? new HostGuidedService(resolve(guidedDb)) : undefined;
+  guidedDb && mode === 'real-storage' ? createProductionGuidedService(resolve(guidedDb)) : undefined;
 
 // Restore or stage only operator-pinned Host observations. A browser cannot
 // supply an authority-bearing semantic selection or a selected root.
