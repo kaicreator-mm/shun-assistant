@@ -27,7 +27,7 @@
 // disposition, direct-kill fallback when the helper fails, and orphan
 // proof for both pids), spawn error and NO_RELAY classification, and an
 // orphan-free process tree after both the RAN and TIMED_OUT outcomes.
-import { spawn } from 'node:child_process';
+import { spawn, spawnSync } from 'node:child_process';
 import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -202,20 +202,35 @@ describe.skipIf(!ON_WINDOWS)(
      * pid; "no tasks" banners differ per locale and never quote the pid.
      */
     const processGone = async (pid: number, deadlineMs = 15000): Promise<boolean> => {
+      if (!Number.isSafeInteger(pid) || pid <= 0) {
+        throw new Error(`processGone requires a positive PID; received ${pid}`);
+      }
       const deadline = Date.now() + deadlineMs;
       for (;;) {
-        const listing = await new Promise<string>((resolve) => {
-          const probe = spawn(machineTasklist, ['/FI', `PID eq ${pid}`, '/FO', 'CSV', '/NH'], {
-            shell: false,
+        // spawnSync keeps this tiny system probe bounded and avoids creating
+        // another asynchronous child whose own cleanup would need proving.
+        // Fail closed: a missing tasklist, timeout, spawn error, or nonzero
+        // exit must never be interpreted as proof that the target is gone.
+        const probe = spawnSync(
+          machineTasklist,
+          ['/FI', `PID eq ${pid}`, '/FO', 'CSV', '/NH'],
+          {
+            encoding: 'utf8',
+            timeout: 5000,
             windowsHide: true,
-          });
-          let text = '';
-          probe.stdout?.on('data', (c: Buffer) => {
-            text += c.toString();
-          });
-          probe.on('error', () => resolve(''));
-          probe.on('exit', () => resolve(text));
-        });
+          },
+        );
+        if (probe.error) {
+          throw new Error(
+            `tasklist probe failed for PID ${pid}: ${probe.error.message}; stderr=${probe.stderr ?? ''}`,
+          );
+        }
+        if (probe.status !== 0) {
+          throw new Error(
+            `tasklist probe exited ${probe.status} for PID ${pid}; stderr=${probe.stderr ?? ''}`,
+          );
+        }
+        const listing = probe.stdout ?? '';
         if (!listing.includes(`"${pid}"`)) return true;
         if (Date.now() >= deadline) return false;
         await new Promise((resolveTimer) => setTimeout(resolveTimer, 250));
