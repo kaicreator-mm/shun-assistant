@@ -86,11 +86,15 @@ function makeFixture(): Fixture {
   const workspaceRoot = join(root, 'workspace');
   const trustDir = join(root, 'authority', 'guided-provenance');
   const pinPath = join(dirname(trustDir), 'guided-provenance-trust-pin.json');
-  const databasePath = join(workspaceRoot, 'guided.sqlite');
+  // The issuer refuses a Guided database inside the registry workspace root
+  // (ISSUER_DATABASE_PATH_INSIDE_FORBIDDEN_SCOPE): the durable store lives in
+  // its own directory, disjoint from the workspace and the trust tree.
+  const databasePath = join(root, 'guided-store', 'guided.sqlite');
   const scratchDatabasePath = join(root, 'scratch', 'schema.sqlite');
   const privateKeyPath = join(root, 'operator-key', 'issuer-private.pem');
   mkdirSync(workspaceRoot, { recursive: true });
   mkdirSync(trustDir, { recursive: true });
+  mkdirSync(dirname(databasePath), { recursive: true });
   mkdirSync(dirname(scratchDatabasePath), { recursive: true });
   mkdirSync(dirname(privateKeyPath), { recursive: true });
 
@@ -171,9 +175,22 @@ describe('R02-E production Guided composition', () => {
   it('refuses a missing pin before opening the Guided database', () => {
     const fixture = makeFixture();
     rmSync(fixture.pinPath);
-    expect(() =>
-      createProductionGuidedService(fixture.databasePath, testOverrides(fixture)),
-    ).toThrow('GUIDED_TRUST_PIN_UNTRUSTED');
+    // The manifest requires a KEY_NOT_PROVISIONED operator record when the
+    // fixed trust material was never provisioned, while startup stays
+    // fail-closed with the precise coded refusal.
+    const errors: string[] = [];
+    const originalError = console.error;
+    console.error = (...args: unknown[]) => {
+      errors.push(args.join(' '));
+    };
+    try {
+      expect(() =>
+        createProductionGuidedService(fixture.databasePath, testOverrides(fixture)),
+      ).toThrow('GUIDED_TRUST_PIN_UNTRUSTED');
+    } finally {
+      console.error = originalError;
+    }
+    expect(errors.some((line) => line.startsWith('KEY_NOT_PROVISIONED'))).toBe(true);
     expect(existsSync(fixture.databasePath)).toBe(false);
   });
 
@@ -186,6 +203,31 @@ describe('R02-E production Guided composition', () => {
         spkiSha256: 'a'.repeat(64),
         fallback: true,
       }),
+    );
+    expect(() =>
+      createProductionGuidedService(fixture.databasePath, testOverrides(fixture)),
+    ).toThrow('GUIDED_TRUST_PIN_MALFORMED');
+    expect(existsSync(fixture.databasePath)).toBe(false);
+
+    // Not JSON at all.
+    writeFileSync(fixture.pinPath, 'not json at all');
+    expect(() =>
+      createProductionGuidedService(fixture.databasePath, testOverrides(fixture)),
+    ).toThrow('GUIDED_TRUST_PIN_MALFORMED');
+
+    // Wrong schema constant.
+    writeFileSync(
+      fixture.pinPath,
+      JSON.stringify({ schema: 'shun.guided.provenance-trust-pin.v2', spkiSha256: 'a'.repeat(64) }),
+    );
+    expect(() =>
+      createProductionGuidedService(fixture.databasePath, testOverrides(fixture)),
+    ).toThrow('GUIDED_TRUST_PIN_MALFORMED');
+
+    // Digest must be lowercase 64-hex (an aliased uppercase encoding is refused).
+    writeFileSync(
+      fixture.pinPath,
+      JSON.stringify({ schema: TRUST_PIN_SCHEMA, spkiSha256: 'A'.repeat(64) }),
     );
     expect(() =>
       createProductionGuidedService(fixture.databasePath, testOverrides(fixture)),
@@ -284,7 +326,7 @@ describe('R02-E production Guided composition', () => {
   });
 
   it('keeps the exact operator entrypoint Node 24/26 transform-aware and uses external composition', () => {
-    const repoRoot = resolve(dirname(fileURLToPath(import.meta.url)), '../../../../..');
+    const repoRoot = resolve(dirname(fileURLToPath(import.meta.url)), '../../../..');
     const apiPackage = JSON.parse(
       readFileSync(resolve(repoRoot, 'apps/control-api/package.json'), 'utf8'),
     ) as { scripts?: { dev?: string } };

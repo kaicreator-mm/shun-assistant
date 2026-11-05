@@ -17,16 +17,16 @@ import {
   createExternalGuidedProvenanceAuthority,
   defaultGuidedProvenanceTrustDirectory,
   defaultGuidedTrustAncestorChain,
-  guidedPublicKeySpkiSha256,
-  guidedReceiptFileName,
   GUIDED_PROVENANCE_RECEIPTS_SUBDIR,
   GUIDED_PROVENANCE_TRUST_ANCHOR_FILE,
-  listGuidedReceiptPaths,
-  readGuidedTrustAnchor,
-  inspectWindowsGuidedTrustAcl,
   type GuidedAclAncestorInspector,
   type GuidedAclInspector,
   type GuidedTrustAclSnapshot,
+  guidedPublicKeySpkiSha256,
+  guidedReceiptFileName,
+  inspectWindowsGuidedTrustAcl,
+  listGuidedReceiptPaths,
+  readGuidedTrustAnchor,
 } from '../real-storage/guided-provenance-issuance.ts';
 
 const TRUST_PIN_FILE = 'guided-provenance-trust-pin.json';
@@ -71,6 +71,21 @@ function assertRegularFile(path: string, code: string, maxBytes: number): void {
   } catch {
     throw new Error(code);
   }
+}
+
+/**
+ * Operator trust material was never provisioned at this fixed path. Startup
+ * still fails closed with the precise coded error; this console record only
+ * distinguishes "not provisioned yet" from a corrupted or aliased trust file
+ * in the operator's boot output. Never creates trust material.
+ */
+function refuseWithKeyNotProvisionedRecord(path: string, code: string): never {
+  try {
+    lstatSync(path);
+  } catch {
+    console.error(`KEY_NOT_PROVISIONED ${path}`);
+  }
+  throw new Error(code);
 }
 
 /**
@@ -119,8 +134,11 @@ function readPinnedSpkiSha256(pinPath: string): string {
     throw new Error('GUIDED_TRUST_PIN_MALFORMED');
   }
   const value = raw as { readonly schema?: unknown; readonly spkiSha256?: unknown };
-  if (value.schema !== TRUST_PIN_SCHEMA || typeof value.spkiSha256 !== 'string' ||
-      !TRUST_PIN_DIGEST.test(value.spkiSha256)) {
+  if (
+    value.schema !== TRUST_PIN_SCHEMA ||
+    typeof value.spkiSha256 !== 'string' ||
+    !TRUST_PIN_DIGEST.test(value.spkiSha256)
+  ) {
     throw new Error('GUIDED_TRUST_PIN_MALFORMED');
   }
   return value.spkiSha256;
@@ -134,9 +152,12 @@ function resolveTrustPaths(overrides?: GuidedServiceTestOverrides): {
     if (process.env.VITEST === undefined) {
       throw new Error('GUIDED_TRUST_TEST_OVERRIDES_DISABLED');
     }
-    if (!isAbsolute(overrides.trustDir) || !isAbsolute(overrides.pinPath) ||
-        typeof overrides.inspectAcl !== 'function' ||
-        typeof overrides.inspectAclAncestors !== 'function') {
+    if (
+      !isAbsolute(overrides.trustDir) ||
+      !isAbsolute(overrides.pinPath) ||
+      typeof overrides.inspectAcl !== 'function' ||
+      typeof overrides.inspectAclAncestors !== 'function'
+    ) {
       throw new Error('GUIDED_TRUST_TEST_OVERRIDES_INVALID');
     }
     const trustDir = resolve(overrides.trustDir);
@@ -198,7 +219,11 @@ export function createProductionGuidedService(
     throw new Error('GUIDED_DATABASE_FILE_REQUIRED');
   }
   const { trustDir, pinPath } = resolveTrustPaths(overrides);
-  assertRegularFile(pinPath, 'GUIDED_TRUST_PIN_UNTRUSTED', MAX_PIN_BYTES);
+  try {
+    assertRegularFile(pinPath, 'GUIDED_TRUST_PIN_UNTRUSTED', MAX_PIN_BYTES);
+  } catch {
+    refuseWithKeyNotProvisionedRecord(pinPath, 'GUIDED_TRUST_PIN_UNTRUSTED');
+  }
   assertNoWindowsReparsePoint(pinPath);
 
   const receipts = listGuidedReceiptPaths(trustDir);
@@ -217,7 +242,11 @@ export function createProductionGuidedService(
 
   const pinnedSpkiSha256 = readPinnedSpkiSha256(pinPath);
   const anchorPath = resolve(trustDir, GUIDED_PROVENANCE_TRUST_ANCHOR_FILE);
-  assertRegularFile(anchorPath, 'GUIDED_TRUST_ANCHOR_UNTRUSTED', MAX_TRUST_FILE_BYTES);
+  try {
+    assertRegularFile(anchorPath, 'GUIDED_TRUST_ANCHOR_UNTRUSTED', MAX_TRUST_FILE_BYTES);
+  } catch {
+    refuseWithKeyNotProvisionedRecord(anchorPath, 'GUIDED_TRUST_ANCHOR_UNTRUSTED');
+  }
   const anchor = readGuidedTrustAnchor(trustDir);
   if (
     anchor.spkiSha256 !== pinnedSpkiSha256 ||
@@ -232,7 +261,18 @@ export function createProductionGuidedService(
     GUIDED_PROVENANCE_RECEIPTS_SUBDIR,
     guidedReceiptFileName(canonicalPath),
   );
-  assertRegularFile(receiptPath, 'GUIDED_PROVENANCE_RECEIPT_MISSING_OR_UNTRUSTED', MAX_TRUST_FILE_BYTES);
+  try {
+    assertRegularFile(
+      receiptPath,
+      'GUIDED_PROVENANCE_RECEIPT_MISSING_OR_UNTRUSTED',
+      MAX_TRUST_FILE_BYTES,
+    );
+  } catch {
+    refuseWithKeyNotProvisionedRecord(
+      receiptPath,
+      'GUIDED_PROVENANCE_RECEIPT_MISSING_OR_UNTRUSTED',
+    );
+  }
   if (!receipts.some((path) => resolve(path).toLowerCase() === receiptPath.toLowerCase())) {
     throw new Error('GUIDED_PROVENANCE_RECEIPT_NOT_IN_TRUST_TREE');
   }

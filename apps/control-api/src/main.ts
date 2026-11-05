@@ -68,7 +68,9 @@ if (guidedDb && mode !== 'real-storage') {
   throw new Error('V03_GUIDED_REQUIRES_REAL_STORAGE_MODE');
 }
 const guided =
-  guidedDb && mode === 'real-storage' ? createProductionGuidedService(resolve(guidedDb)) : undefined;
+  guidedDb && mode === 'real-storage'
+    ? createProductionGuidedService(resolve(guidedDb))
+    : undefined;
 
 // Restore or stage only operator-pinned Host observations. A browser cannot
 // supply an authority-bearing semantic selection or a selected root.
