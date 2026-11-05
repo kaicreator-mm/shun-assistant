@@ -533,7 +533,8 @@ type RelayResult = {
    * itself — present on every TIMED_OUT result. EXITED_ZERO/EXITED_NONZERO:
    * the helper exited with that class of code; SPAWN_ERROR: the helper never
    * came into existence; TIMED_OUT: the helper hit its own grace bound and
-   * was reaped; NOT_ISSUED: no kill was issued (no relay pid to kill).
+   * termination was requested (killHelperConfirmed separately records whether
+   * its exit was observed); NOT_ISSUED: no kill was issued (no relay pid to kill).
    */
   killDisposition?: 'NOT_ISSUED' | 'EXITED_ZERO' | 'EXITED_NONZERO' | 'SPAWN_ERROR' | 'TIMED_OUT';
   /** P1-01: retained taskkill helper pid (-1 when the helper never spawned). */
@@ -581,9 +582,10 @@ function stdioTail(): { push(chunk: Buffer | string): void; tail(): string | und
  * - TASKKILL_KILL_GRACE_MS bounds the taskkill helper's OWN lifecycle. The
  *   helper is a retained ChildProcess whose exit is explicitly awaited; if
  *   it has not exited within this bound (or it errored / exited nonzero),
- *   the launcher reaps the helper directly and falls back to killing the
- *   relay root it owns. The helper can never outlive the launcher promise
- *   as an unbounded orphan.
+ *   the launcher requests direct termination of the helper and falls back to
+ *   killing the relay root it owns. The helper's exit is observed within the
+ *   outer grace or reported as unconfirmed; it is never silently treated as
+ *   reaped.
  * - RELAY_KILL_GRACE_MS is the hard ceiling for observing the relay root
  *   exit after the kill. The timeout result settles only once BOTH
  *   dispositions (helper + relay root) are explicit — and it never reports
