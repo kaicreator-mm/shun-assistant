@@ -130,6 +130,32 @@ const protectedAncestorRow = (path: string) => ({
   ] as GuidedTrustAccessRule[],
 });
 
+/**
+ * Explicit default-trust tree snapshot: exactly the three required rows
+ * (trust root, trust-anchor file, receipts directory), SYSTEM-owned with the
+ * runtime read/execute allow ACE. Built without existsSync filtering so the
+ * combined-policy tests never depend on whether this host actually has the
+ * default trust directory on disk (an existsSync-filtered snapshot can come
+ * back empty and let a positive case pass on the ancestor rows alone).
+ */
+const protectedDefaultTrustTreeRows = (trustDir: string): GuidedTrustAclSnapshot =>
+  [
+    trustDir,
+    join(trustDir, GUIDED_PROVENANCE_TRUST_ANCHOR_FILE),
+    join(trustDir, GUIDED_PROVENANCE_RECEIPTS_SUBDIR),
+  ].map((path) => ({
+    path,
+    ownerSid: 'S-1-5-18',
+    accessRules: [
+      {
+        identitySid: 'S-1-5-32-545',
+        rightsMask: 0x001200a9,
+        accessType: 'Allow',
+        isInherited: true,
+      },
+    ] as GuidedTrustAccessRule[],
+  }));
+
 function envelopeBody(
   fixture: Fixture,
   overrides: Partial<GuidedReceiptBody> = {},
@@ -1099,10 +1125,13 @@ describe('G4 repairs: pinned ancestor boundary and combined default-trust policy
   it('combined default-trust policy accepts healthy ancestors and the real ProgramData ACL shape', () => {
     const trustDir = defaultGuidedProvenanceTrustDirectory();
     const chain = defaultGuidedTrustAncestorChain();
+    // Explicit, existsSync-free snapshot of exactly the three required trust
+    // rows; the positive case must pass on real tree rows, not on an empty
+    // snapshot filtered down by host filesystem state.
+    const tree = protectedDefaultTrustTreeRows(trustDir);
+    expect(tree).toHaveLength(3);
     const healthy = chain.map((path) => protectedAncestorRow(path));
-    expect(assessGuidedTrustProtection(trustDir, [], protectedAcl(trustDir, []), healthy)).toEqual(
-      [],
-    );
+    expect(assessGuidedTrustProtection(trustDir, [], tree, healthy)).toEqual([]);
     // The real OS-default ProgramData shape grants Users "create children"
     // (0x116) on the folder itself; that cannot rename/delete/re-ACL an
     // existing admin-owned entry and must stay accepted.
@@ -1122,15 +1151,17 @@ describe('G4 repairs: pinned ancestor boundary and combined default-trust policy
           }
         : protectedAncestorRow(path),
     );
-    expect(
-      assessGuidedTrustProtection(trustDir, [], protectedAcl(trustDir, []), realProgramDataShape),
-    ).toEqual([]);
+    expect(assessGuidedTrustProtection(trustDir, [], tree, realProgramDataShape)).toEqual([]);
   });
 
   it('combined default-trust policy rejects writable, incomplete, read-denied or unprobed ancestors', () => {
     const trustDir = defaultGuidedProvenanceTrustDirectory();
     const chain = defaultGuidedTrustAncestorChain();
-    const tree = protectedAcl(trustDir, []);
+    // Same explicit healthy tree snapshot as the positive case: the tree
+    // contributes no reasons, so every assertion below isolates its ancestor
+    // finding instead of possibly riding on an existsSync-emptied snapshot.
+    const tree = protectedDefaultTrustTreeRows(trustDir);
+    expect(tree).toHaveLength(3);
     const healthy = chain.map((path) => protectedAncestorRow(path));
 
     // Ancestor writable by a non-privileged identity (DELETE on one entry).
@@ -1216,21 +1247,66 @@ describe('G4 repairs: pinned ancestor boundary and combined default-trust policy
     }
   });
 
-  it('runtime init never accepts the default trust root without the combined policy', () => {
-    const authority = createExternalGuidedProvenanceAuthority({
-      trustDir: defaultGuidedProvenanceTrustDirectory(),
-      pinnedSpkiSha256: 'a'.repeat(64),
-      inspectAcl: protectedInspector,
-      inspectAclAncestors: () => [],
-    });
-    expect(() =>
-      authority.issueFreshReceipt({
-        canonicalDatabasePath: join(tmpdir(), 'guided-default-root.db'),
-        schemaDigest: DIGEST_A,
-        issuedAtUnixMs: ISSUED_AT,
-      }),
-    ).toThrow(
-      /GUIDED_PROVENANCE_(TRUST_ANCHOR_MISSING|TRUST_PUBLIC_KEY_PIN_MISMATCH|TRUST_ACL_UNPROTECTED)/,
+  it('runtime init wiring passes inspectAclAncestors(defaultGuidedTrustAncestorChain()) as the fourth combined-policy argument', () => {
+    // Deterministic source-wiring assertion over the actual `const init =`
+    // body: a runtime attempt against the default trust root would fail
+    // early on TRUST_ANCHOR_MISSING on most hosts and never reach the ACL
+    // evaluation, so the wiring is pinned statically instead. Comments are
+    // stripped first so only executable code is matched.
+    const modulePath = fileURLToPath(
+      new URL('../src/real-storage/guided-provenance-issuance.ts', import.meta.url),
+    );
+    const code = readFileSync(modulePath, 'utf8')
+      .replace(/\/\*[\s\S]*?\*\//g, '')
+      .replace(/\/\/[^\n]*/g, '');
+    const initStart = code.indexOf('const init =');
+    expect(initStart).toBeGreaterThan(-1);
+    const initEnd = code.indexOf('const receiptPathFor =', initStart);
+    expect(initEnd).toBeGreaterThan(initStart);
+    const initBody = code.slice(initStart, initEnd);
+    expect(initBody).toContain('assessGuidedTrustProtection(');
+
+    const callStart = initBody.indexOf('assessGuidedTrustProtection');
+    const openParen = initBody.indexOf('(', callStart);
+    expect(openParen).toBeGreaterThan(callStart);
+    let depth = 0;
+    let closeParen = -1;
+    for (let index = openParen; index < initBody.length; index += 1) {
+      const ch = initBody[index];
+      if (ch === '(') depth += 1;
+      else if (ch === ')') {
+        depth -= 1;
+        if (depth === 0) {
+          closeParen = index;
+          break;
+        }
+      }
+    }
+    expect(closeParen).toBeGreaterThan(openParen);
+
+    // Split the argument list on top-level commas only (nested calls keep
+    // their commas), and require exactly four arguments.
+    const argText = initBody.slice(openParen + 1, closeParen);
+    const args: string[] = [];
+    let current = '';
+    depth = 0;
+    for (const ch of argText) {
+      if (ch === '(') depth += 1;
+      else if (ch === ')') depth -= 1;
+      if (ch === ',' && depth === 0) {
+        args.push(current.trim());
+        current = '';
+      } else {
+        current += ch;
+      }
+    }
+    args.push(current.trim());
+    const filled = args.filter((arg) => arg.length > 0);
+    expect(filled).toHaveLength(4);
+    // Fourth argument must be sourced from the source-pinned ancestor chain
+    // through the bounded test injector — the combined default-trust policy.
+    expect(filled[3]).toMatch(
+      /inspectAclAncestors\s*\?\s*inspectAclAncestors\(defaultGuidedTrustAncestorChain\(\)\)\s*:\s*undefined/,
     );
   });
 });
