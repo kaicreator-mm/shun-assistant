@@ -1,0 +1,103 @@
+pack_id: shun-v030-r02-e-production-integrator-g9
+task_id: R02-E-PRODUCTION-INTEGRATOR
+issue: "#269"
+parent_issue: "#259"
+repository: kaicreator-mm/shun-assistant
+version: v0.3.0
+standard_revision: 2c395c55569fe2edf3f4135f12d3d069e526d0b7
+execution_profile: WEB_BUILDER_WITH_NATIVE_WINDOWS_BOOTSTRAP
+execution_environment: WEB_SOURCE_PLUS_NATIVE_WINDOWS
+admission_mode: SINGLE_WRITER_ADMISSION
+admission_generation: 9
+protected_claim_key: "kaicreator-mm/shun-assistant#269:builder:__default__"
+source_base:
+  branch: wip/v0.3.0-r02-owner-repairs
+  sha: 39e4f85f3fa01d9f4b20ba73adcf79cbc42707f5
+  tree: cb8b14856f223622a80f85a0317026f455198983
+  target_integration_branch: wip/v0.3.0-r02-owner-repairs
+native_dependencies:
+  issue_269_blocked_by:
+    - { issue: 262, state: CLOSED }
+    - { issue: 263, state: CLOSED }
+    - { issue: 264, state: CLOSED }
+    - { issue: 265, state: CLOSED }
+  issue_270_blocked_by:
+    - { issue: 269, state: OPEN }
+    - { issue: 266, state: CLOSED }
+    - { issue: 267, state: CLOSED }
+    - { issue: 268, state: CLOSED }
+  issue_271_blocked_by:
+    - { issue: 270, state: OPEN }
+dependency_inputs:
+  guided_external_authority:
+    issue: "#348"
+    source_pr: 363
+    exact_head: d61c4e5c19f698157def9a90c13efac435d30fa9
+    exact_tree: 04786bfeb85e2e43570f5203f0166b3673e8b082
+    exact_source_base: 03a338bdeb1ff160b6c1aa680d9b5bd6c359effe
+    independent_review: "PR #363 comment 6663663653 — R6 PASS, P0=0/P1=0/P2=0"
+    claim: "Issue #348 comment 6660564584"
+    builder_receipt: "Issue #348 comment 6663517297"
+    exact_blobs:
+      apps/control-api/src/real-storage/guided-provenance-issuance.ts: a1d1867d9f44d75c8b83dfdbafc2b0094ee75347
+      apps/control-api/scripts/issue-guided-provenance.ts: 8fea28d3ed1d8046c569074deac824aca11c7fb9
+      apps/control-api/test/guided-provenance-issuance.test.ts: 17fa3056099368339dea2480c2f9924a54ccdd10
+  startup_runner:
+    source_pr: 357
+    exact_head: b23402850964030d7a96b325070256fe3ebad5eb
+    exact_tree: 2033b8b29cf3160ecdc03814149584d6bc7cf111
+    independent_review: "PR #357 comment 6656348123 — R1 PASS, P0=0/P1=0/P2=0"
+    exact_blob:
+      tests/integration/v03/r02-e-production/startup-runner.test.ts: e8ea8d07b16f9a7d4d77561e82e83ebb89830e9c
+authoring_write_set:
+  - apps/control-api/src/main.ts
+  - apps/control-api/src/v03/composition-guided-provenance.ts
+  - tests/integration/v03/r02-e-production/production-startup.test.ts
+dependency_import_paths:
+  - apps/control-api/src/real-storage/guided-provenance-issuance.ts
+  - apps/control-api/scripts/issue-guided-provenance.ts
+  - apps/control-api/test/guided-provenance-issuance.test.ts
+  - tests/integration/v03/r02-e-production/startup-runner.test.ts
+integration_union_path_set:
+  - apps/control-api/src/main.ts
+  - apps/control-api/src/v03/composition-guided-provenance.ts
+  - tests/integration/v03/r02-e-production/production-startup.test.ts
+  - apps/control-api/src/real-storage/guided-provenance-issuance.ts
+  - apps/control-api/scripts/issue-guided-provenance.ts
+  - apps/control-api/test/guided-provenance-issuance.test.ts
+  - tests/integration/v03/r02-e-production/startup-runner.test.ts
+design_contract:
+  - "R02-E is the sole production integrator. Import the exact reviewed #348 source blobs and the exact reviewed #269 G8 startup-runner test as dependency inputs; do not modify those dependency files in this generation."
+  - "When SHUN_V03_GUIDED_DATABASE is configured in real-storage mode, main.ts must construct HostGuidedService only through createProductionGuidedService; never use the constructor's developmentGuidedProvenanceAuthority default, even for a temp-root database."
+  - "Demo mode must not open a production Guided database or require production trust material. If a Guided DB is configured outside real-storage mode, fail closed."
+  - "The external authority pin is public trust configuration, never a secret and never read from process.env, CLI input, DB metadata or the receipt being verified."
+  - "Read the pin only from the fixed sibling file C:\\ProgramData\\Shun\\authority\\guided-provenance-trust-pin.json (derived from defaultGuidedProvenanceTrustDirectory, not environment input). Require exact schema shun.guided.provenance-trust-pin.v1 and exactly one lowercase 64-hex spkiSha256 field."
+  - "Reject missing, malformed, aliased, symlink/reparse or non-regular pin files before constructing HostGuidedService."
+  - "The real ACL probe must explicitly include the pin file path and prove its row exists; assess its owner/DACL and the source-pinned default trust ancestor chain. Any missing row, probe failure, DACL drift or ancestor drift fails closed before listener creation."
+  - "The pin file contains only the public SPKI fingerprint. The private Ed25519 signing key remains offline/operator-side and is never read by Control API."
+  - "Production Guided authority must use createExternalGuidedProvenanceAuthority with the reviewed #348 implementation; no test authority, development authority, same-directory secret, self-issued marker or fallback."
+  - "The production-startup tests must prove missing/malformed pin, missing anchor/receipt and unsafe ACL refuse before listener creation; valid ephemeral test key + explicit injected ACL snapshots prove the external authority path; temp-root DB does not enable development fallback."
+  - "Keep the already reviewed startup-runner test byte-identical when importing it from PR #357."
+  - "Do not add a new Kernel, sender, effect dispatcher, paid LLM request, UAC prompt, elevation, real Windows physical effect or external disclosure."
+test_contract:
+  - "This pack PR must contain exactly one manifest path and be directly parented to source_base.sha."
+  - "After pack Push and PR Woodpecker checks are SUCCESS at the exact pack HEAD, acquire a fresh G9 DISPATCH_CLAIMED event on Issue #269 bound to this pack, manifest, source base/tree, operator/session and authoring_write_set."
+  - "No source edit before fresh G9 CAS Claim acceptance."
+  - "Copy dependency inputs byte-identically from their exact reviewed SHAs; do not copy any .agent/execution/**/MANIFEST.yaml into the source integration diff."
+  - "Run tracked-source syntax/Biome preflight on the exact tree before any source-changing CI. Then run Node 24.21.0 and 26.13.0 focused tests, control-api lint/typecheck, full tools/task-check.sh, and exact-SHA Woodpecker Push/PR."
+  - "Native Windows Builder must exercise the real Get-Acl probe for the fixed pin file and ProgramData ancestor chain; if no existing operator key is available, do not generate or export a private key without a separately recorded operator decision. Report KEY_NOT_PROVISIONED and keep production startup fail-closed."
+  - "Record exact HEAD/tree/base, path union, dependency blob identities, syntax preflight, test counts, Windows evidence and pipeline IDs on Issue #269."
+integration_constraints:
+  - "R02-E parent integration only. The imported #348 files remain owned by child Issue #348 and are byte-identical to its R6-reviewed candidate."
+  - "The #269 direct authoring write set remains the three authoring paths above; dependency paths are imported unchanged under their independently reviewed task evidence."
+  - "No version/v0.3.0, main or version/v0.2.0 merge; no tag, release or deployment."
+forbidden:
+  - "Any path outside integration_union_path_set"
+  - "Any edit to imported #348 or #269 G8 dependency paths in this generation"
+  - "Any production private key, credential or signed production receipt in source, tests, CI artifacts or GitHub comments"
+  - "Any environment-derived trust pin or development-authority fallback"
+  - "Any paid LLM, UAC/elevation, physical Windows effect, installation or external disclosure"
+  - "WIP/version/main merge, tag, release or deployment"
+source_write_authorized: false
+merge_authorized: false
+release_authorized: false
