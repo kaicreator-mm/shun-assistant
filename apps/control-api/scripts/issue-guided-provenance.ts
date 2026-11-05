@@ -28,8 +28,8 @@ import { dirname, resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { GUIDED_SCHEMA_VERSION } from '../../../packages/domain-host/src/guided/guided-provenance-authority.ts';
 import {
-  assertGuidedPrivateKeyScope,
   assertGuidedPathOutside,
+  assertGuidedPrivateKeyScope,
   assertGuidedRegularCanonicalPath,
   assessGuidedTrustProtection,
   buildGuidedReceiptSigningBytes,
