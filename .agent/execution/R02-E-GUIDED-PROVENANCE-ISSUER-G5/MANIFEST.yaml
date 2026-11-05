@@ -1,0 +1,56 @@
+pack_id: shun-v030-r02-e-guided-provenance-issuer-g5-runtime-policy-test-evidence
+task_id: R02-E-GUIDED-AUTHORITY
+issue: "#348"
+repository: kaicreator-mm/shun-assistant
+version: v0.3.0
+parent_issue: "#269"
+standard_revision: 2c395c55569fe2edf3f4135f12d3d069e526d0b7
+owner_authorization_refs:
+  - "#260 OWNER_SHUN_V030_R02_AMENDMENT_R1_APPROVE"
+  - "Current project instruction: continue v0.3.0 under ADS #1359 Delivery-First; reviewer repairs defects within the active write set"
+  - "#361 independent Exact-SHA R5 finding comment 6660405102"
+  - "#360 G4 Execution Pack and CI qualification"
+  - "#348 G4 source delivery comment 6659477537"
+execution_profile: WEB_BUILDER_REPAIR
+execution_environment: WEB_SOURCE_WITH_WINDOWS_CI
+admission_mode: SINGLE_WRITER_ADMISSION
+admission_generation: 5
+protected_claim_key: "kaicreator-mm/shun-assistant#348:builder:__default__"
+source_base_sha: 03a338bdeb1ff160b6c1aa680d9b5bd6c359effe
+source_base_tree: 0ce6b9fa783c51af59fd2e4dc85a150a1af0dbd6
+source_base_branch: JIT_only_task/v0.3.0-r02e-guided-authority-local-g4
+pack_branch: JIT_only_task/v0.3.0-r02e-guided-authority-pack-g5
+jit_branch: JIT_only_task/v0.3.0-r02e-guided-authority-review-g5
+execution_pack_path: .agent/execution/R02-E-GUIDED-PROVENANCE-ISSUER-G5/MANIFEST.yaml
+finding:
+  - "PR #361 R5 P2: runtime-init test permits TRUST_ANCHOR_MISSING and therefore never reaches init() ACL evaluation or proves inspectAclAncestors wiring."
+  - "PR #361 R5 P2: positive combined-policy test builds the default trust-tree snapshot through existsSync filtering, which can produce an empty snapshot; required paths are also existsSync-filtered, so the test may pass on ancestors alone."
+approved_write_set:
+  - apps/control-api/test/guided-provenance-issuance.test.ts
+allowed_write_set:
+  - apps/control-api/test/guided-provenance-issuance.test.ts
+design_contract:
+  - "G5 is test-evidence-only. Do not change the G4 production implementation or any other source path."
+  - "The runtime adapter wiring test must inspect the actual init() implementation body, strip comments before assertions, and prove that init() calls assessGuidedTrustProtection while passing the result of inspectAclAncestors(defaultGuidedTrustAncestorChain()) as the ancestor snapshot."
+  - "The positive combined-policy test must provide a non-empty explicit trust-tree snapshot containing the trust root, trust-anchor file and receipts directory, with privileged ownership and runtime read/execute DACLs; it must not depend on host existsSync state."
+  - "The positive combined-policy case must pair that explicit valid trust-tree snapshot with the complete healthy three-entry ancestor snapshot and assert an empty reason list."
+  - "Retain negative cases for writable, incomplete, read-denied, malformed and unprobed ancestor snapshots, plus non-default test trust directory exemption."
+test_contract:
+  - "This pack PR must contain exactly one manifest path and one commit directly parented to source_base_sha 03a338bdeb1ff160b6c1aa680d9b5bd6c359effe."
+  - "After pack Push and PR Woodpecker checks are SUCCESS at the exact pack HEAD, acquire a fresh Generation-5 DISPATCH_CLAIMED event bound to this pack, source base/tree, actual operator/session identity and exact one-path write set."
+  - "No source edit before fresh G5 CAS Claim acceptance; do not reuse G4 claim #6658625262."
+  - "Only tests/integration path apps/control-api/test/guided-provenance-issuance.test.ts may change."
+  - "Run exact-tree tracked-source syntax preflight before any source-changing CI; then focused Windows Node 24.21.0 and 26.13.0 tests, app lint/typecheck, full tools/task-check.sh, and exact-SHA Woodpecker Push/PR."
+  - "Record exact HEAD/tree/base, one-path diff, commands/exit codes, Node versions, test counts and pipeline IDs on Issue #348."
+integration_handoff:
+  - "R02-E #269 remains the sole production composition integrator. G5 changes test evidence only and does not alter runtime behavior."
+forbidden:
+  - "Any path outside apps/control-api/test/guided-provenance-issuance.test.ts"
+  - "apps/control-api/src/real-storage/guided-provenance-issuance.ts, apps/control-api/scripts/issue-guided-provenance.ts, apps/control-api/src/main.ts, apps/control-api/src/server.ts, composition files, package manifests or lockfile"
+  - "packages/executor-windows/**, Domain Computer, SDK private src, Kernel, sender, grant, Permit or effect dispatcher"
+  - "Any production private key, HMAC secret, credential or signed production receipt in source, tests, CI artifacts or GitHub comments"
+  - "Any UAC prompt, automatic elevation, physical Windows effect, paid LLM request, Provider installation or external disclosure"
+  - "WIP integration merge, version/v0.3.0 merge, main/version/v0.2.0 mutation, tag, release or deployment"
+source_write_authorized: true
+merge_authorized: false
+release_authorized: false
