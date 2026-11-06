@@ -1,41 +1,45 @@
-# R02 repair work-in-progress — Issue #259 / Owner Amendment #260
+# R02 closeout work status — Issue #259 / Owner Amendment #260
 
-**This is a source repair checkpoint, not a closeout, verification PASS, release, or request for interim review.** Owner explicitly deferred reviews until all fixes are implemented.
+**Status as of 2026-11-06:** R02-E and R02-V are complete; R02-R generation-2 closeout refresh is in progress. This file is a Delivery-First status/readiness handoff, not an independent R03 PASS or a release certificate.
 
-Frozen planning base: `version/v0.3.0@91420edca44009aa2c984c876104b40814a7c265`; Task Pack R1 blob `93247874e37d492b49f241d294017fd2fa6cb431`.
+## Progress vector
 
-Current implementation branch: `wip/v0.3.0-r02-owner-repairs`. Read GitHub current HEAD for the exact moving commit; do not copy old HEAD into a test result.
+| Dimension | Current state |
+|---|---|
+| R02 Outcome Task closure | **9/10 CLOSED** — #262–#270 closed; #271 active |
+| Native dependencies | 9/9 edges exist; #271's only prerequisite #270 is CLOSED; zero open blockers |
+| WIP candidate | \`47ecf345c4b96befd20db5c6d5673bbeaf027e49\` / tree \`8aff803fc2f80e9b683be3d5e8abea747c6677ea\` |
+| WIP candidate CI | Woodpecker Push #499 SUCCESS; PR event #500 was clone-only network failure / qualification NOT_RUN; one same-SHA retry #501 completed clone + full qualification SUCCESS; Actions contracts #42176394537 and executor-windows #42176394504 SUCCESS |
+| Version branch | \`version/v0.3.0@91420edca44009aa2c984c876104b40814a7c265\` / tree \`ea1557a1159c1f1eec458c297acaf491ce5157b8\`; unchanged |
+| WIP-to-version PR | #272 OPEN/UNMERGED; it is the review candidate, not a final version merge |
+| R02-V | #270 CLOSED; final independent Exact-SHA R2 PASS #6683020538 |
+| R02-R | Generation-2 WEB_BUILDER Claim #6683774019; pack PR #378 exact HEAD \`d04c384244fd2ece0773f9cdd74247f773ccb700\`; pack CI #518/#519 and Actions contracts/executor-windows all SUCCESS |
+| Local environment | NOT_REQUIRED for the current docs-only closeout |
+| Release | **BLOCKED**; no version merge, tag, release or deployment |
 
-| Finding | Bounded implementation now present | Not yet proven / remaining |
-|---|---|---|
-| F01 production route | Trusted manifest/real public SDK K/Host composition and shipping startup option; Guided routes and SQLite K docs | Draft Shun B/C Domain Package sources now exist with one governed K Permit and exact T04 LLM request shape, but installed/signed production module artifacts, full Host trust/request resolution, Windows execution and J01–J09 remain unproven; trusted Host Case accepts only SHA256-pinned startup source |
-| F02 Guided | Host SQLite single-use Step, replay/409, real HTTP State/Decision, UI relay and host-pinned trusted Case startup | Live selected root creation and complete preview/R2/Kernel journeys |
-| F03 BUILD | SHA-256-verified real selected K/S/B/C source admission, public SDK BUILD/activation against same bytes, fake facade rejection, offline trusted manifest assembler | Actual v0.10.3 package closure and integrated B/C binary/exports + existing T04 Host sender binding positive; prepared B/C source is not activated evidence |
-| F04 Gateway | K admitted != terminal, COMPLETED/UNKNOWN/refused typed mapping, redacted unknown/refused results, 202/409/422, no blind retry, tests | Exact-sha real K/Host execution, adversarial runtime tests not yet run |
-| F05 provenance | Public barrel issuer removed, package exports locked, Host internal issuance, durable SQLite issue/replay fence + restart tests | Trusted Host composition must actually wire the new durable fence/observation adapter, and end-to-end currentness must be validated |
-| F06 release J01–J09 | New evidence matrix, unchanged real-host acceptance requirement | Actual Windows Node>=24 and Woodpecker evidence; paid/physical steps Owner deferred |
-| Q01 historical task labels | Already normalized #229–#241 CLOSED + state:done | Independent final sign-off deferred |
-| Q02/Q05 documentation | ZH/EN operator and Provider trust/offline key custody guides + README | Installer/packaging/rollback physical validation |
-| Q03 qualification gate | Nested Vitest/MJS runner, R02 typechecks, fault-injection test, Woodpecker Node24 pipeline | Exact-SHA Woodpecker run and genuine injected failure exit |
-| Q04 frozen ABI mirror | New exact source manifest + real SDK activation (doesn't use legacy dummy BUILD for production) | Remove/retire historical placeholder BUILD as positive production claim |
-| Q06 B-040 | PowerShell stdout UTF-8, CN unit regression; future t12 receipts no longer overwrite immutable historical JSON | Actual zh-CN Windows read-only host proof and CI provenance |
+## R02-V final disposition
 
-## Nonwaivable facts — updated 2026-11-01 by the local ZCode builder session
+PR #377 is the evidence delivery for the post-R02-E targeted Windows requalification. Final HEAD \`1f7d5c7fce4a1b2dfa9ad1cebcac68b317449fa1\` / tree \`2074afcdaa035c480601182c6999b46d1123b851\`, base \`47ecf345c4b96befd20db5c6d5673bbeaf027e49\`. Final independent verifier result #6683020538: P0=0 / P1=0 / P2=0 open. Woodpecker #513/#514 and Actions contracts #42204356849 / executor-windows #42204364512 are SUCCESS.
 
-- GitHub native issue dependencies (9/9) were materialized via GraphQL
-  `addBlockedBy` and read back (#269 ← #262–#265, #270 ← #269/#266–#268,
-  #271 ← #270).
-- Execution Packs (`.agent/execution/R02-*`) committed at `710b2dc`; accepted
-  `DISPATCH_CLAIMED` CAS events posted on #262–#271 under Owner approval
-  #260. Source writes after `710b2dc` on this branch are Claim-covered.
-- Real Windows Node v24.21.0 execution completed: `pnpm lint`/`typecheck`/
-  `test` all EXIT=0 (integration 22/22 suites); see
-  `docs/implementation/v0.3/r02-validation/R02-VALIDATION-RECEIPT.md`.
-- Woodpecker repo registered and the exact-SHA pipeline executed; see
-  `WOODPECKER-CI-RECEIPT.md`.
-- Still true: no paid DeepSeek request, no real OS side effect, no tag, no
-  main/v0.2 merge, no release, no independent R03 self-approval.
+The final R2 review found and repaired P2-02 in the existing #270 write set: the evidence-reuse rationale had incorrectly claimed byte-identity across intermediate WIP changes. The receipt now relies on the independently qualified R03-INT/R03B/R03C chain plus the exact nine-path R02-E delta and green integrated-tree journey runs. A separate correction also removed the invalid TypeScript \`node --check\` claim. No product source or test blob changed in the final documentation correction.
 
-## Remaining delivery work before Owner's single final review
+**J07/J08 remain UNKNOWN overall** for positive selected-production-BUILD / fixed-ProgramData trust. Demo/static-asset/TEST_FIXTURE sub-results and fail-closed negatives are accurately scoped. Original authorized real J01–J06/J09 evidence is reused; no paid J03 or physical J02/J05 repetition occurred.
 
-Provision genuine public SDK v0.10.3 install with real package bytes, finish and activate the new selected Shun B/C sources, bind real Host immutable LLM request/currentness/query/action/consent, run nested CI and real Windows J01–J09 within authorized effect-free scope, record exact result/evidence (do not rewrite old V01 JSON). Only then submit a non-draft complete candidate for Owner's unified code/architecture/quality review.
+PR #377 remains OPEN/UNMERGED because its own G2 manifest sets \`merge_authorized: false\` and forbids WIP/version merge. It is linked as the evidence record for R03 review, not treated as an integrated source merge.
+
+## Independent side lanes — not counted as R02 Outcome closure
+
+- **#345 / PR #369:** final independent R2 PASS, P0/P1/P2=0/0/0; exact source HEAD \`140f72b4796611f5aef8665cf2cf615b5a1ed6cb\`; Woodpecker #486/#487 and Actions contracts #42109402135 / executor-windows #42109402208 SUCCESS; native Windows Node 24.21.0 and 26.13.0 qualification PASS. The pack says merge_authorized=false; PR remains unmerged and is not a predecessor of R02.
+- **#281 U03:** WIP-integrated under PR #282; one P2 coverage note for a dedicated multi-process concurrent-consumption regression remains visible. It is separate from the R02 DAG.
+- **#296:** persistent syntax-only CI preflight follow-up from R02-D2; separate from the frozen #267 acceptance and not a reason to reopen #267.
+
+## R03 readiness and release boundary
+
+\`READY_FOR_INDEPENDENT_R03_REVIEW=YES\` for the exact WIP candidate \`47ecf345c4b96befd20db5c6d5673bbeaf027e49\`, with PR #377's final independent evidence and J07/J08 UNKNOWNs linked explicitly. The R03 reviewer must decide the architecture/product disposition; this Controller does not self-approve R03.
+
+\`RELEASE_READINESS=BLOCKED\` because:
+1. \`version/v0.3.0\` remains at \`91420edca44009aa2c984c876104b40814a7c265\`; PR #272 is still open and no final version SHA/tree exists.
+2. J07/J08 positive selected-production-BUILD / fixed-ProgramData trust evidence remains UNKNOWN.
+3. Independent R03 review has not yet been completed.
+
+No main/version/v0.2.0 mutation, version merge, tag, release, deployment, paid request, UAC, Provider installation or new physical Windows effect is authorized by this closeout. Issue #259 remains OPEN.
