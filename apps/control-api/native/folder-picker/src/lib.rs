@@ -290,6 +290,12 @@ struct DirectoryFacts {
 /// below a junction/symlink, so the link target's subpaths are never
 /// touched by this process (P1-01). A successful result therefore always
 /// describes a reparse-free path.
+fn should_refuse_drive_type(drive_type: u32) -> bool {
+    // DRIVE_UNKNOWN, DRIVE_NO_ROOT_DIR and DRIVE_REMOTE. A mapped/network
+    // drive must be rejected before any path component is opened.
+    matches!(drive_type, 0 | 1 | 4)
+}
+
 fn directory_facts(path: &str) -> Option<DirectoryFacts> {
     if !is_plain_drive_path(path) {
         return None;
@@ -297,10 +303,10 @@ fn directory_facts(path: &str) -> Option<DirectoryFacts> {
     let drive_root = format!("{}\\", &path[..2]);
     let drive_wide = to_wide(&drive_root);
     let drive_type = unsafe { GetDriveTypeW(PCWSTR(drive_wide.as_ptr())) };
-    let is_network_path = drive_type == 4; // DRIVE_REMOTE
-    if drive_type == 0 || drive_type == 1 {
+    if should_refuse_drive_type(drive_type) {
         return None;
     }
+    let is_network_path = false;
     let is_volume_root = path.trim_end_matches('\\').eq_ignore_ascii_case(&path[..2]);
 
     let components: Vec<&str> = path[3..]
@@ -490,11 +496,19 @@ fn select_folder_inner() -> FolderSelectionResult {
 
 #[cfg(test)]
 mod tests {
-    use super::directory_facts;
+    use super::{directory_facts, should_refuse_drive_type};
     use std::fs;
     use std::path::{Path, PathBuf};
     use std::process::Command;
     use std::time::{SystemTime, UNIX_EPOCH};
+
+    #[test]
+    fn remote_drive_is_refused_before_component_traversal() {
+        assert!(should_refuse_drive_type(0)); // DRIVE_UNKNOWN
+        assert!(should_refuse_drive_type(1)); // DRIVE_NO_ROOT_DIR
+        assert!(should_refuse_drive_type(4)); // DRIVE_REMOTE
+        assert!(!should_refuse_drive_type(3)); // DRIVE_FIXED
+    }
 
     /// Session-independent traversal tests run against `directory_facts`
     /// (no interactive identity is required, so the assertions stay
