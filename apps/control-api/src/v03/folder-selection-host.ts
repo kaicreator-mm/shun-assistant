@@ -40,10 +40,8 @@ const SELECTION_DDL = `CREATE TABLE folder_selection_records (
   created_at_unix_ms INTEGER NOT NULL
 )`;
 
-type FolderIdentity = Readonly<{
-  userSid: string; logonSid: string; sessionId: number;
-  volumeSerial: string; fileId: string;
-}>;
+type UserIdentity = Readonly<{ userSid: string; logonSid: string; sessionId: number }>;
+type FolderIdentity = UserIdentity & Readonly<{ volumeSerial: string; fileId: string }>;
 type DirectoryIdentity = FolderIdentity & Readonly<{
   isDirectory: boolean; isReparsePoint: boolean;
   isNetworkPath: boolean; isVolumeRoot: boolean;
@@ -95,15 +93,18 @@ function safeLocalDirectoryPath(value: unknown): value is string {
   return root.length > 0 &&
     value.replace(/[\\\\]+$/g, '').toLowerCase() !== root.replace(/[\\\\]+$/g, '').toLowerCase();
 }
-function validIdentity(value: unknown): value is FolderIdentity {
-  if (!isRecord(value)) return false;
-  return typeof value.userSid === 'string' && SID.test(value.userSid) &&
+function validUserIdentity(value: unknown): value is UserIdentity {
+  return isRecord(value) && typeof value.userSid === 'string' && SID.test(value.userSid) &&
     typeof value.logonSid === 'string' && SID.test(value.logonSid) &&
-    Number.isSafeInteger(value.sessionId) && (value.sessionId as number) > 0 &&
-    typeof value.volumeSerial === 'string' && HEX_ID.test(value.volumeSerial) &&
-    typeof value.fileId === 'string' && HEX_ID.test(value.fileId);
+    Number.isSafeInteger(value.sessionId) && (value.sessionId as number) > 0;
 }
-function sameIdentity(expected: SelectionRow, user: FolderIdentity, directory: DirectoryIdentity): boolean {
+function validIdentity(value: unknown): value is FolderIdentity {
+  return validUserIdentity(value) && typeof (value as Record<string, unknown>).volumeSerial === 'string' &&
+    HEX_ID.test((value as Record<string, string>).volumeSerial) &&
+    typeof (value as Record<string, unknown>).fileId === 'string' &&
+    HEX_ID.test((value as Record<string, string>).fileId);
+}
+function sameIdentity(expected: SelectionRow, user: UserIdentity, directory: DirectoryIdentity): boolean {
   return user.userSid === expected.user_sid && user.logonSid === expected.logon_sid &&
     user.sessionId === expected.session_id && directory.userSid === expected.user_sid &&
     directory.logonSid === expected.logon_sid && directory.sessionId === expected.session_id &&
@@ -157,6 +158,120 @@ export class FolderSelectionHost {
       observeCurrentSelectedFolder: () => this.#observeRaw(),
     });
   }
+
+
+  async selectRoot(): Promise<FolderSelectionResult> {
+    const state = this.#guided.state();
+    const context = this.#guided.readTrustedContext();
+    if (!context || context.state !== 'CURRENT' ||
+        context.step.templateRef.artifactId !== 'shun.guided.select-root' ||
+        state.currentStep?.stepId !== context.step.stepId) {
+      return { status: 'STALE', code: 'GUIDED_SELECT_ROOT_NOT_CURRENT' };
+    }
+    let picked: ReturnType<FolderPickerNativePort['selectFolder']>;
+    try {
+      picked = this.#native.selectFolder();
+    } catch {
+      return { status: 'REFUSED', code: 'FOLDER_PICKER_UNAVAILABLE' };
+    }
+    if (picked.status === 'CANCELLED') return { status: 'CANCELLED' };
+    if (picked.status !== 'SELECTED' || !safeLocalDirectoryPath(picked.path) ||
+        !safeDisplayName(picked.displayName) || !validIdentity(picked.identity)) {
+      return { status: 'REFUSED', code: picked.status === 'REFUSED' ? picked.code : 'FOLDER_PICKER_RESULT_INVALID' };
+    }
+    const currentUser = this.#native.currentIdentity();
+    const directory = this.#native.inspectDirectory(picked.path);
+    if (!validUserIdentity(currentUser) || !isRecord(directory) ||
+        !sameIdentity({
+          user_sid: picked.identity.userSid,
+          logon_sid: picked.identity.logonSid,
+          session_id: picked.identity.sessionId,
+          volume_serial: picked.identity.volumeSerial,
+          file_id: picked.identity.fileId,
+        } as SelectionRow, currentUser, directory as DirectoryIdentity)) {
+      return { status: 'REFUSED', code: 'FOLDER_SELECTION_IDENTITY_REFUSED' };
+    }
+    if (
+      currentUser.userSid !== picked.identity.userSid ||
+      currentUser.logonSid !== picked.identity.logonSid ||
+      currentUser.sessionId !== picked.identity.sessionId
+    ) return { status: 'REFUSED', code: 'FOLDER_SELECTION_SESSION_MISMATCH' };
+
+    const now = this.#clock();
+    const expiresAtUnixMs = now + MAX_TTL_MS;
+    const selectionRef = `host:folder:${randomBytes(32).toString('hex')}`;
+    const volume = win32.parse(picked.path).root.slice(0, 2);
+    this.#db.exec('BEGIN IMMEDIATE');
+    try {
+      this.#db.prepare(`INSERT INTO folder_selection_records (
+        selection_ref,path,display_name,task_id,journey_id,case_ref_json,
+        origin_step_id,template_digest,user_sid,logon_sid,session_id,volume,
+        volume_serial,file_id,expires_at_unix_ms,created_at_unix_ms
+      ) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`).run(
+        selectionRef, picked.path, picked.displayName, context.step.taskId,
+        context.step.journeyId, stableJson(context.step.caseRef), context.step.stepId,
+        context.step.templateRef.digest, picked.identity.userSid, picked.identity.logonSid,
+        picked.identity.sessionId, volume, picked.identity.volumeSerial,
+        picked.identity.fileId, expiresAtUnixMs, now,
+      );
+      this.#db.exec('COMMIT');
+    } catch {
+      this.#db.exec('ROLLBACK');
+      return { status: 'REFUSED', code: 'FOLDER_SELECTION_LEDGER_WRITE_REFUSED' };
+    }
+    return { status: 'SELECTED', selectionRef, displayName: picked.displayName, expiresAtUnixMs };
+  }
+
+  validateSelectionAnswer(raw: unknown, step: {
+    readonly stepId: string; readonly taskId: string; readonly journeyId: string;
+    readonly caseRef: unknown; readonly templateRef: { readonly digest: string; readonly artifactId: string };
+  }): GuidedDecisionReceipt | null {
+    if (!isRecord(raw) || raw.decision !== 'ANSWER' ||
+        !isRecord(raw.outcome) || raw.outcome.event !== 'USER_SUBMIT') return null;
+    if (step.templateRef.artifactId !== 'shun.guided.select-root') {
+      return { status: 'REFUSED', code: 'FOLDER_SELECTION_STEP_REFUSED' };
+    }
+    const selectionRef = extractSelectionAnswer(raw);
+    if (!selectionRef) return { status: 'REFUSED', code: 'FOLDER_SELECTION_REQUIRED' };
+    const row = this.#selectionRow(selectionRef);
+    if (!row) return { status: 'REFUSED', code: 'FOLDER_SELECTION_UNKNOWN' };
+    const now = this.#clock();
+    if (row.expires_at_unix_ms <= now) return { status: 'STALE', code: 'FOLDER_SELECTION_EXPIRED' };
+    if (row.task_id !== step.taskId || row.journey_id !== step.journeyId ||
+        row.case_ref_json !== stableJson(step.caseRef) || row.origin_step_id !== step.stepId ||
+        row.template_digest !== step.templateRef.digest ||
+        raw.stepId !== step.stepId || raw.stepDigest !== step.templateRef.digest ||
+        stableJson(raw.caseRef) !== stableJson(step.caseRef)) {
+      return { status: 'STALE', code: 'FOLDER_SELECTION_STEP_BINDING_MISMATCH' };
+    }
+    return this.#verifySelectionIdentity(row)
+      ? null
+      : { status: 'STALE', code: 'FOLDER_SELECTION_IDENTITY_DRIFT' };
+  }
+
+  afterSelectionRecorded(raw: unknown, step: {
+    readonly stepId: string; readonly taskId: string; readonly journeyId: string;
+    readonly caseRef: unknown; readonly templateRef: { readonly digest: string; readonly artifactId: string };
+  }, receipt: GuidedDecisionReceipt): GuidedDecisionReceipt {
+    if (receipt.status !== 'RECORDED') return receipt;
+    const selectionRef = extractSelectionAnswer(raw);
+    const row = selectionRef ? this.#selectionRow(selectionRef) : undefined;
+    if (!selectionRef || !row || !this.#verifySelectionIdentity(row) ||
+        row.expires_at_unix_ms <= this.#clock() ||
+        row.task_id !== step.taskId || row.journey_id !== step.journeyId ||
+        row.case_ref_json !== stableJson(step.caseRef) || row.origin_step_id !== step.stepId ||
+        row.template_digest !== step.templateRef.digest) {
+      return { status: 'UNKNOWN', code: 'FOLDER_SELECTION_POST_DECISION_RECHECK_FAILED' };
+    }
+    const staged = this.#guided.stageTrustedSelectedRoot({
+      selectionRef,
+      expiresAtUnixMs: row.expires_at_unix_ms,
+    });
+    return staged.status === 'CURRENT'
+      ? receipt
+      : { status: 'UNKNOWN', code: `GUIDED_SELECTED_ROOT_STAGE_FAILED:${staged.code}` };
+  }
+
 
   #initializeLedger(): void {
     const objects = this.#db.prepare(
