@@ -1,0 +1,79 @@
+pack_id: shun-v030-r04-u05-a-host-selection-r0
+task_id: U05-A-HOST-SELECTION-OBSERVATION
+issue: '#381'
+parent_issue: '#380'
+repository: kaicreator-mm/shun-assistant
+version: v0.3.0
+standard_revision: 326aaf5b0188b53cb0ed5c38752a9e299e3f9efd
+task_pack_ref: 'issue:#381'
+delivery_principle: ADS_1359_DELIVERY_FIRST_CONSOLIDATED_REPAIR
+admission_mode: SINGLE_WRITER_ADMISSION
+claim_generation: 1
+pack_revision: 1
+owner_authorization: '#380 comment 6685260212 OWNER_SHUN_V030_R04_U05_L2_FREEZE_APPROVE'
+protected_claim_key: 'kaicreator-mm/shun-assistant#381:builder:__default__'
+dependencies:
+  product_contract: '#380 FROZEN'
+  completed_runtime_prerequisites: ['#269', '#270', '#281/#282']
+  blocked_by_planned: []
+pack_base:
+  branch: wip/v0.3.0-r02-owner-repairs
+  sha: 47ecf345c4b96befd20db5c6d5673bbeaf027e49
+  tree: 8aff803fc2f80e9b683be3d5e8abea747c6677ea
+  contract: 'Pack PR is exactly one manifest path and one commit directly parented to this exact WIP SHA; source branch must start from this exact WIP SHA.'
+execution:
+  profile: WEB_BUILDER_WITH_CONDITIONAL_LOCAL_BUILDER
+  environment: WEB_SOURCE_THEN_WINDOWS_BUILD_HOST
+  source_branch: JIT_only_task/v0.3.0-r04-u05-a-host-selection
+  integration_target: wip/v0.3.0-r02-owner-repairs
+  primary_builder: WEB_CONTROLLER
+  independent_reviewer: WEB_VERIFIER
+  conditional_local_builder: 'Only for Windows x64 Rust/N-API build, pinned .node artifact and interactive picker smoke; no standalone LOCAL_VALIDATION task.'
+  standalone_local_validation: false
+authoring_write_set:
+  - .agent/execution/R04-U05-A-HOST-SELECTION-R0/MANIFEST.yaml
+allowed_write_set:
+  - apps/control-api/native/Cargo.toml
+  - apps/control-api/native/Cargo.lock
+  - apps/control-api/native/README.md
+  - apps/control-api/native/folder-picker/Cargo.toml
+  - apps/control-api/native/folder-picker/src/lib.rs
+  - apps/control-api/native/folder-picker/shun_folder_picker.node
+  - apps/control-api/native/folder-picker/index.ts
+  - apps/control-api/native/folder-picker/artifacts.ts
+  - apps/control-api/src/v03/folder-selection-host.ts
+  - apps/control-api/src/v03/folder-selection-route.ts
+  - apps/control-api/src/v03/guided-route.ts
+  - apps/control-api/src/main.ts
+  - apps/control-api/src/server.ts
+  - packages/domain-host/src/guided/host-guided-service.ts
+  - tests/integration/v03/r02-b-guided/durable-guided.test.ts
+  - apps/control-api/test/folder-selection-host.test.ts
+  - apps/control-api/test/folder-selection-route.test.ts
+  - apps/control-api/test/folder-selection-server.test.ts
+acceptance:
+  - 'Use a dedicated pinned Windows Rust/N-API folder-picker addon based on Windows Shell IFileOpenDialog; do not extend the consent broker or invoke shell scripts.'
+  - 'Picker cancellation is typed and state-neutral; noninteractive desktop, native artifact mismatch, COM errors and unsupported platforms fail closed.'
+  - 'Issue 256-bit CSPRNG host:folder references bound to exact task/journey/CaseRef/origin step/template digest/user SID/logon session/volume serial/file ID; TTL <= 5 minutes.'
+  - 'Reject UNC/network/device paths, volume roots, non-directories, inaccessible directories, reparse points and identity drift; never return absolute path to HTTP/UI/model.'
+  - 'Validate the opaque selectionRef on the exact live select-root ASK decision; persist the reference as the answer and advance using existing HostObservation.selectedRootRef.'
+  - 'Add Host-only selected-root staging/readback; it must verify the durable accepted answer and be restart-safe without granting authority.'
+  - 'Implement ComputerFolderObservationHostPort via vertical-storage resolveScope/observeStorage and existing ComputerFolderObservationAdapter; metadata only, <=256 directories and <=4096 root files.'
+  - 'No file content, absolute path, raw OS error, grant, Permit, approval, Kernel Journal, K effect or filesystem mutation.'
+  - 'Selection/observation results remain OBSERVED_ONLY, localOnly, no external disclosure and executionAuthorized=false.'
+  - 'Exact-SHA focused tests cover forgery, replay, expiry, Case/step/session binding, restart, root replacement, reparse/UNC/device paths, cancellation, overflow and privacy.'
+test_contract:
+  - 'Before CI: JS/TS syntax preflight; cargo fmt --check; cargo build --release --locked for x86_64-pc-windows-gnu; focused Rust and TypeScript tests; applicable typecheck.'
+  - 'Windows Build Host uses apps/control-api/native/README.md pinned Node 24.21.0 import library/toolchain; commit the built .node artifact and pin its SHA256 in folder-picker/artifacts.ts.'
+  - 'Run a benign interactive picker select + cancel smoke test only; do not create, modify or delete filesystem contents.'
+  - 'Woodpecker Push/PR and GitHub Actions contracts/executor-windows must be terminal SUCCESS on final source SHA.'
+  - 'Fresh independent Exact-SHA review; reviewer may repair all in-scope findings in this exact write set, then a separate verifier reviews repaired SHA.'
+forbidden:
+  - 'No ProgramData mutation, UAC, Provider installation, paid LLM request or external data disclosure.'
+  - 'No real filesystem effect, file create/delete/move, plan approval, grant, Permit, Journal entry or K effect.'
+  - 'No writes outside allowed_write_set; no second writer; no source work before pack CI and generation-1 CAS Claim.'
+  - 'No main/version/v0.2.0/version/v0.3.0 merge, tag, release or deployment.'
+source_write_authorized: false
+merge_authorized: false
+release_authorized: false
+deployment_authorized: false
