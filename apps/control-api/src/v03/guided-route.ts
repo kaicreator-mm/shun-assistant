@@ -21,7 +21,10 @@ export interface V03GuidedRoute {
   httpStatus(result: GuidedDecisionReceipt): number;
 }
 
-export function createV03GuidedRoute(port: V03GuidedPort): V03GuidedRoute {
+export function createV03GuidedRoute(
+  port: V03GuidedPort,
+  folderSelection?: V03FolderSelectionRoutePort,
+): V03GuidedRoute {
   if (!port || typeof port.state !== 'function' || typeof port.decide !== 'function') {
     throw new TypeError('V03_GUIDED_HOST_UNAVAILABLE');
   }
@@ -30,6 +33,14 @@ export function createV03GuidedRoute(port: V03GuidedPort): V03GuidedRoute {
   return Object.freeze({
     state,
     decide,
+    async selectRoot() {
+      if (!folderSelection) return { status: 'REFUSED', code: 'FOLDER_SELECTION_UNAVAILABLE' };
+      return folderSelection.selectRoot();
+    },
+    async folderObservation() {
+      if (!folderSelection) return { ok: false, code: 'FOLDER_OBSERVATION_UNAVAILABLE' };
+      return folderSelection.observeCurrentSelectedFolder();
+    },
     httpStatus(result: GuidedDecisionReceipt) {
       switch (result.status) {
         case 'RECORDED':
