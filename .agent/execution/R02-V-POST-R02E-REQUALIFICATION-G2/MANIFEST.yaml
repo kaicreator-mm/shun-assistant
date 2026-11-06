@@ -1,0 +1,86 @@
+pack_id: shun-v030-r02-v-post-r02e-requalification-g2
+task_id: R02-V-POST-R02E-REQUALIFICATION
+issue: "#270"
+parent_issue: "#259"
+repository: kaicreator-mm/shun-assistant
+version: v0.3.0
+standard_revision: 2c395c55569fe2edf3f4135f12d3d069e526d0b7
+task_pack_ref: docs/planning/v0.3/R02-REPAIR-TASK-PACKS-R1.json@blob:93247874e37d492b49f241d294017fd2fa6cb431
+delivery_principle: ADS_1359_DELIVERY_FIRST_CONSOLIDATED_REPAIR
+admission_mode: SINGLE_WRITER_ADMISSION
+admission_generation: 2
+pack_revision: 1
+supersedes_source_claim: "#270 comment 6547910006 (generation-1 Claim; terminal COMPLETED event #6549001329 at the pre-integration baseline)"
+prior_real_journey_evidence: "#270 comment 6554881727 at 65b656fbf065acd28cb9bdaad494c024eff6f002; preserve as historical evidence, do not reattribute to this generation"
+protected_claim_key: "kaicreator-mm/shun-assistant#270:builder:__default__"
+pack_base:
+  branch: wip/v0.3.0-r02-owner-repairs
+  sha: 47ecf345c4b96befd20db5c6d5673bbeaf027e49
+  tree: 8aff803fc2f80e9b683be3d5e8abea747c6677ea
+  contract: "Manifest-only pack PR must be exactly one commit, one path, and direct-parented to this exact WIP SHA."
+execution:
+  profile: LOCAL_BUILDER
+  environment: LOCAL_WINDOWS
+  target_node_versions:
+    - 24.21.0
+    - 26.13.0
+  source_branch: JIT_only_task/v0.3.0-r02-v-post-r02e-requalification-g2
+  integration_target: wip/v0.3.0-r02-owner-repairs
+  primary_builder: LOCAL_AGENT
+  independent_reviewer: WEB_CONTROLLER
+  standalone_local_validation: false
+qualification_scope:
+  integrated_source:
+    head: 47ecf345c4b96befd20db5c6d5673bbeaf027e49
+    tree: 8aff803fc2f80e9b683be3d5e8abea747c6677ea
+    parent: 39e4f85f3fa01d9f4b20ba73adcf79cbc42707f5
+    source_pr: "#375"
+    changed_paths:
+      - apps/control-api/package.json
+      - apps/control-api/scripts/issue-guided-provenance.ts
+      - apps/control-api/src/main.ts
+      - apps/control-api/src/real-storage/guided-provenance-issuance.ts
+      - apps/control-api/src/v03/composition-guided-provenance.ts
+      - apps/control-api/test/guided-provenance-issuance.test.ts
+      - pnpm-lock.yaml
+      - tests/integration/v03/r02-e-production/production-startup.test.ts
+      - tests/integration/v03/r02-e-production/startup-runner.test.ts
+  affected_journeys:
+    - id: J07
+      reason: "Default production entrypoint/Node runner and trusted Guided authority injection changed in R02-E."
+      required: "Real Windows production startup and loopback HTTP surface on the integrated SHA; prove no-listener fail-closed behavior without valid trust material."
+    - id: J08
+      reason: "Production Guided trust authority is now externally injected and must be qualified through the integrated startup path."
+      required: "Real Windows Host SQLite Guided state/decision path, external signed trust receipt and pin, restart durability, replay/stale/refusal truthfulness; no Permit/grant or effect from ANSWER/REFUSE."
+  evidence_reuse:
+    source: "#270 comment 6554881727 and existing R02-INT/R03B/R03C exact-SHA receipts"
+    rule: "Reuse J01-J06/J09 only where exact source-path and environment equivalence is demonstrated against the current WIP tree. Never repeat J02/J03/J05 solely to refresh evidence. Do not mark any row PASS from fixture-only evidence."
+authoring_write_set:
+  - tests/integration/v03/r02-v-journeys/**
+  - docs/implementation/v0.3/r02-validation/J01-J09-QUALIFICATION.md
+  - docs/implementation/v0.3/r02-validation/R02-V-POST-R02E-REQUALIFICATION-RECEIPT.md
+design_contract:
+  - "Do not change product source, APIs, SDK, Host authority, UI, or any path outside the existing #270 protected write set."
+  - "Re-read current WIP HEAD/tree before source work; if it differs from pack_base, stop and regenerate the pack/Claim rather than rebasing silently."
+  - "Use the exact shipping Control API operator command (pnpm --filter @shun/control-api dev) on native Windows Node 24.21.0 and 26.13.0; no DEMO or fixture-only substitute for production startup."
+  - "Prove the real production startup refuses missing/malformed/untrusted pin or receipt with no listener and no Guided DB creation."
+  - "For positive J08, use only an ephemeral test-only Ed25519 issuer and isolated temp trust/database paths if required; record this explicitly as test-fixture trust, not real operator provisioning. If a true operator-pinned trust path cannot be established safely, keep positive production J08 UNKNOWN."
+  - "Exercise actual loopback HTTP and Host SQLite state/decision/restart/replay behavior; verify truthful COMPLETED/REFUSED/UNKNOWN mapping and zero unintended effects."
+  - "No real UAC, Provider installation, persistent Windows change, physical effect, paid LLM call, cloud send or external egress."
+test_contract:
+  - "Before any source push/CI, run exact-tree Node syntax/parse and Biome preflight, scoped lint/typecheck and focused tests; record commands, Node version and exit codes."
+  - "Run the affected J07/J08 production startup and Guided suites on both native Windows Node versions; include the R02-E production-startup/startup-runner regression suite where applicable."
+  - "Re-run the zero-paid/zero-physical R02-V production journey suite only as needed to prove the integrated default startup/Guided route; do not trigger gated physical or paid cases."
+  - "Record exact HEAD/tree, changed-file set, test output, selected BUILD identity, Host authority mode, loopback-only network evidence, SQLite restart evidence, refusal/replay negatives and all UNKNOWN limitations."
+  - "Run Woodpecker push and PR qualification on the exact delivered SHA after syntax preflight; record build IDs and every step. A green CI badge alone is not Windows qualification."
+  - "One consolidated Builder delivery, then one independent Exact-SHA review. Reviewer fixes all in-scope findings together under the same generation/write set and revalidates the resulting SHA; do not create serial review rounds for each finding."
+forbidden:
+  - "paid DeepSeek or any paid LLM request"
+  - "physical Windows effect, UAC prompt, Provider installation or persistent OS mutation"
+  - "main, version/v0.2.0, or version/v0.3.0 source mutation"
+  - "tag, release, deployment, or WIP merge"
+  - "new K, sender, dispatcher, authority API, or product scope expansion"
+source_write_authorized: true
+merge_authorized: false
+release_authorized: false
+deployment_authorized: false
