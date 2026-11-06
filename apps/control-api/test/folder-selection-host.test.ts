@@ -1,7 +1,7 @@
 import { mkdirSync, mkdtempSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
-import { DatabaseSync } from 'node:sqlite';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+import { DatabaseSync } from 'node:sqlite';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import type {
   GuidedDecisionReceipt,
@@ -663,8 +663,20 @@ describe.skipIf(process.platform !== 'win32')(
       const directory = mkdtempSync(join(tmpdir(), 'shun-r04-folder-migration-'));
       const databaseFile = join(directory, 'folder-selection.sqlite');
       const legacy = new DatabaseSync(databaseFile);
-      legacy.exec('CREATE TABLE folder_selection_records (selection_ref TEXT PRIMARY KEY, path TEXT NOT NULL, display_name TEXT NOT NULL, task_id TEXT NOT NULL, journey_id TEXT NOT NULL, case_ref_json TEXT NOT NULL, origin_step_id TEXT NOT NULL, template_digest TEXT NOT NULL, user_sid TEXT NOT NULL, logon_sid TEXT NOT NULL, session_id INTEGER NOT NULL, volume TEXT NOT NULL, volume_serial TEXT NOT NULL, file_id TEXT NOT NULL, expires_at_unix_ms INTEGER NOT NULL, created_at_unix_ms INTEGER NOT NULL)');
-      legacy.prepare('INSERT INTO folder_selection_records VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)').run(
+      legacy.exec(
+        [
+          'CREATE TABLE folder_selection_records (',
+          'selection_ref TEXT PRIMARY KEY, path TEXT NOT NULL, display_name TEXT NOT NULL,',
+          'task_id TEXT NOT NULL, journey_id TEXT NOT NULL, case_ref_json TEXT NOT NULL,',
+          'origin_step_id TEXT NOT NULL, template_digest TEXT NOT NULL, user_sid TEXT NOT NULL,',
+          'logon_sid TEXT NOT NULL, session_id INTEGER NOT NULL, volume TEXT NOT NULL,',
+          'volume_serial TEXT NOT NULL, file_id TEXT NOT NULL, expires_at_unix_ms INTEGER NOT NULL,',
+          'created_at_unix_ms INTEGER NOT NULL)',
+        ].join(' '),
+      );
+      legacy
+        .prepare('INSERT INTO folder_selection_records VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)')
+        .run(
         'host:folder:' + 'f'.repeat(64),
         join(directory, 'selected-root'),
         'Documents',
@@ -693,13 +705,17 @@ describe.skipIf(process.platform !== 'win32')(
       });
       const migrated = new DatabaseSync(databaseFile);
       try {
-        const columns = migrated.prepare('PRAGMA table_info(folder_selection_records)').all() as { name: string }[];
+        const columns = migrated
+          .prepare('PRAGMA table_info(folder_selection_records)')
+          .all() as { name: string }[];
         expect(columns.map((column) => column.name)).toEqual([
           'selection_ref', 'path', 'display_name', 'task_id', 'journey_id',
           'case_ref_json', 'origin_step_id', 'template_digest', 'volume',
           'volume_serial', 'file_id', 'expires_at_unix_ms', 'created_at_unix_ms',
         ]);
-        expect(migrated.prepare('SELECT selection_ref FROM folder_selection_records').get()).toEqual({
+        expect(
+          migrated.prepare('SELECT selection_ref FROM folder_selection_records').get(),
+        ).toEqual({
           selection_ref: 'host:folder:' + 'f'.repeat(64),
         });
       } finally {
