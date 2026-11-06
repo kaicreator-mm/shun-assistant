@@ -5,8 +5,8 @@
  * merged task lanes are re-exported as-is, no side effects run at import
  * time and no internal implementation detail leaves the package.
  *
- *   - semantic/goal-semantic (T03): issuance-style Host observation evidence
- *     and the goal semantic selection adapter.
+ *   - semantic/goal-semantic (T03): goal selection only; Host observation
+ *     issuance is deliberately internal and NOT a public package capability.
  *   - guided (T05): the approved step-template catalog and guided journey
  *     step/outcome adapters.
  *   - feedback (T06): the meta-feedback shadow candidate adapter.
@@ -25,4 +25,13 @@ export * from './guided/guided-contract.ts';
 export * from './guided/guided-journey.ts';
 export * from './provider/provider-jit.ts';
 export * from './recipes/recipe-replay.ts';
-export * from './semantic/goal-semantic.ts';
+export {
+  GOAL_SEMANTIC_SCHEMA,
+  HOST_OBJECT_OBSERVATION_SCHEMA,
+  selectGoalSemantic,
+  type GoalSemantic,
+  type GoalSemanticProvenance,
+  type GoalSemanticRejectionCode,
+  type GoalSemanticSelection,
+  type HostObjectObservationEvidence,
+} from './semantic/goal-semantic.ts';

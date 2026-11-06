@@ -1,0 +1,38 @@
+schema: ads/execution-pack/v1
+task_id: R03B-P2-UI-META-CORRELATION
+issue: 283
+owner_authorization: "shun-assistant#259 comment 6555994687 OWNER_SHUN_V030_R03B_CROSSCASE_UI_COMPOSITE_APPROVE"
+baseline:
+  branch: wip/v0.3.0-r02-owner-repairs
+  sha: be2e81722a70ee3d0bd5634bc83d97d733c20b78
+  tree: 8d6d6ee5fc4277e6b0b64b2d22e6f66575fe2889
+execution_branch: wip/v0.3.0-r03b-p2-ui-correlation-claimed
+role: WEB_BUILDER
+validation_role: LOCAL_VALIDATION
+integration_target: wip/v0.3.0-r02-owner-repairs
+allowed_write_set:
+  - tests/integration/v03/r02-v-journeys/ui-journeys-loop.test.ts
+acceptance:
+  - each locale snapshots candidate IDs before submission
+  - exactly one new candidate after each real UI submit
+  - candidate source case and revision are exact
+  - feedback rating/category/correction are exact
+  - lifecycle FUTURE_BUILD_SHADOW and active false
+pre_ci:
+  required: targeted TypeScript parser syntax check
+  ci: self-hosted Woodpecker push and pull_request at exact SHA after preflight receipt
+forbidden:
+  - production source changes
+  - main
+  - version/v0.2.0
+  - tag
+  - release
+  - paid LLM
+  - physical Windows effects
+claim:
+  status: pending
+  required_event: DISPATCH_CLAIMED
+  claim_generation: 1
+review:
+  policy: independent_exact_sha_required
+  merge: only into wip/v0.3.0-r02-owner-repairs after CI success and independent PASS

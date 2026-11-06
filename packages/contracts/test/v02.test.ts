@@ -1,3 +1,7 @@
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
+import Ajv2020 from 'ajv/dist/2020';
+import addFormats from 'ajv-formats';
 import { describe, expect, it } from 'vitest';
 import {
   CloudCallReceiptSchema,
@@ -411,5 +415,122 @@ describe('v0.2: curated signed Provider catalog is data only', () => {
         artifactKind: 'ARBITRARY_JS',
       }).success,
     ).toBe(false);
+  });
+
+  it('treats an omitted requiredPrivilege as USER and accepts explicit USER', () => {
+    const artifact = {
+      providerId: 'rg',
+      catalogRevision: 'catalog-r2',
+      bindingId: 'binding-rg-search',
+      scopedVerifierId: 'rg-verified-1',
+      catalogManifestSha256: SHA,
+      bindingEvidenceSha256: B,
+      version: '14.1',
+      capabilityId: 'file.search',
+      artifactKind: 'CLI',
+      platform: 'windows-x64',
+      artifactSha256: SHA,
+      origin: 'https://example.org/pinned.exe',
+      entrypoint: 'rg.exe',
+      signerKeyId: 'curator-key-1',
+      curatorSignature: 'base64-signature-value',
+      dependencySha256: [B],
+    };
+    // Legacy descriptor without the field still parses.
+    const legacy = ProviderCatalogArtifactSchema.parse(artifact);
+    expect(Object.isFrozen(legacy)).toBe(false);
+    expect('requiredPrivilege' in legacy).toBe(false);
+    expect(ProviderCatalogArtifactSchema.safeParse(artifact).success).toBe(true);
+    // Explicit USER is accepted on both artifact kinds (with addon ABI).
+    expect(
+      ProviderCatalogArtifactSchema.safeParse({ ...artifact, requiredPrivilege: 'USER' }).success,
+    ).toBe(true);
+    expect(
+      ProviderCatalogArtifactSchema.safeParse({
+        ...artifact,
+        artifactKind: 'NATIVE_ADDON',
+        abiRevision: 'node-v24-abi-1',
+        requiredPrivilege: 'USER',
+      }).success,
+    ).toBe(true);
+    // Unknown privilege values are refused by the strict signed surface.
+    expect(
+      ProviderCatalogArtifactSchema.safeParse({
+        ...artifact,
+        requiredPrivilege: 'ADMIN',
+      }).success,
+    ).toBe(false);
+    // Unknown keys stay rejected next to the new field.
+    expect(
+      ProviderCatalogArtifactSchema.safeParse({
+        ...artifact,
+        privilege: 'ELEVATED',
+      }).success,
+    ).toBe(false);
+  });
+
+  it('accepts ELEVATED only for CLI and rejects NATIVE_ADDON elevation on both surfaces', () => {
+    const artifact = {
+      providerId: 'rg',
+      catalogRevision: 'catalog-r2',
+      bindingId: 'binding-rg-search',
+      scopedVerifierId: 'rg-verified-1',
+      catalogManifestSha256: SHA,
+      bindingEvidenceSha256: B,
+      version: '14.1',
+      capabilityId: 'file.search',
+      artifactKind: 'CLI',
+      platform: 'windows-x64',
+      artifactSha256: SHA,
+      origin: 'https://example.org/pinned.exe',
+      entrypoint: 'rg.exe',
+      signerKeyId: 'curator-key-1',
+      curatorSignature: 'base64-signature-value',
+      dependencySha256: [B],
+    };
+    // A signed CLI descriptor may declare ELEVATED.
+    expect(
+      ProviderCatalogArtifactSchema.safeParse({ ...artifact, requiredPrivilege: 'ELEVATED' })
+        .success,
+    ).toBe(true);
+    // Native add-ons stay in-process: ELEVATED is refused even with ABI set.
+    expect(
+      ProviderCatalogArtifactSchema.safeParse({
+        ...artifact,
+        artifactKind: 'NATIVE_ADDON',
+        abiRevision: 'node-v24-abi-1',
+        requiredPrivilege: 'ELEVATED',
+      }).success,
+    ).toBe(false);
+
+    // The committed public JSON Schema carries the same decision.
+    const schemaPath = join(
+      import.meta.dirname,
+      '../src/schema/v02-provider-catalog-artifact.schema.json',
+    );
+    const ajv = new Ajv2020({ strict: false, allErrors: true });
+    addFormats(ajv);
+    const validate = ajv.compile(JSON.parse(readFileSync(schemaPath, 'utf8')));
+    const omitted = { ...artifact };
+    delete (omitted as { requiredPrivilege?: string }).requiredPrivilege;
+    expect(validate(omitted)).toBe(true);
+    expect(validate({ ...artifact, requiredPrivilege: 'USER' })).toBe(true);
+    expect(validate({ ...artifact, requiredPrivilege: 'ELEVATED' })).toBe(true);
+    expect(
+      validate({
+        ...artifact,
+        artifactKind: 'NATIVE_ADDON',
+        abiRevision: 'node-v24-abi-1',
+        requiredPrivilege: 'ELEVATED',
+      }),
+    ).toBe(false);
+    expect(
+      validate({
+        ...artifact,
+        artifactKind: 'NATIVE_ADDON',
+        abiRevision: 'node-v24-abi-1',
+        requiredPrivilege: 'USER',
+      }),
+    ).toBe(true);
   });
 });

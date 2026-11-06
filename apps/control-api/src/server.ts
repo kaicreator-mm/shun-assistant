@@ -18,7 +18,10 @@ import {
   suggestReadonlyOptimizations,
 } from '@shun/vertical-system';
 import { z } from 'zod';
-import type { ControlApiGateway } from '../../../packages/domain-app/src/api/gateway.ts';
+import type {
+  ControlApiGateway,
+  SendReceipt,
+} from '../../../packages/domain-app/src/api/gateway.ts';
 import { MINIMUM_SENDER_DEADLINE_BUDGET_MS } from '../../../packages/domain-host/src/cloud/openai-host.ts';
 import type { CloudInterpretPort } from './cloud-interpret.ts';
 import {
@@ -29,7 +32,13 @@ import {
 } from './errors.ts';
 import type { ControlBackend } from './ports.ts';
 import type { AuthorizedInventoryRecipeResult } from './recipe-inventory-run.ts';
+import type { JourneySubmits } from './v03/composition-journeys.ts';
 import { createV03GatewayRoute, type V03GatewayRoute } from './v03/gateway-route.ts';
+import {
+  createV03GuidedRoute,
+  type V03GuidedPort,
+  type V03GuidedRoute,
+} from './v03/guided-route.ts';
 
 export const CONTROL_API_REVISION = 'shun.control-api/0.1';
 
@@ -87,6 +96,35 @@ export interface ControlServerOptions {
    * the T09 `ControlApiGateway.submit` admission surface — never a raw send.
    */
   v03Gateway?: ControlApiGateway | (() => ControlApiGateway);
+  /**
+   * R03-INT — trusted journey submission surfaces (windows effect / provider
+   * first use / meta feedback) over the SAME selected DomainApp. Composition
+   * root injection only; each route is reference-authenticated before any
+   * Kernel entry, exactly like the goal gateway.
+   */
+  v03Journeys?: JourneySubmits;
+  /**
+   * R03C (#288) — Host-global Provider first-use surface: prepare() issues
+   * the Host requestRef + exact preview (no Guided Case, no reference pair);
+   * confirm() consumes the one-time requestRef and submits the fixed
+   * provider-global Business Intent through the selected K. Composition root
+   * injection only; the route accepts no intent, instance, path, args or
+   * privilege input of any kind.
+   */
+  v03ProviderGlobal?: {
+    prepare(): Promise<
+      | {
+          readonly ok: true;
+          readonly requestRef: string;
+          readonly preview: unknown;
+          readonly expiresAtUnixMs: number;
+        }
+      | { readonly ok: false; readonly code: string }
+    >;
+    confirm(raw: unknown): Promise<SendReceipt>;
+  };
+  /** Trusted process-side selected Guided Host state, never created from HTTP. */
+  v03Guided?: V03GuidedPort;
   /** Directory with the static control-ui app; omitted = API only. */
   uiDir?: string;
   /** Loopback host only; anything else is a construction-time refusal. */
@@ -137,6 +175,9 @@ export function createControlServer(options: ControlServerOptions): ControlServe
     return v03Route;
   };
 
+  const v03GuidedRoute: V03GuidedRoute | undefined =
+    options.v03Guided === undefined ? undefined : createV03GuidedRoute(options.v03Guided);
+
   const server = createServer((req, res) => {
     handle(options.backend, req, res, {
       host,
@@ -147,6 +188,9 @@ export function createControlServer(options: ControlServerOptions): ControlServe
       readBuiltinInventoryCandidate: options.readBuiltinInventoryCandidate,
       cloud: options.cloud,
       v03RouteFor,
+      v03GuidedRoute,
+      v03Journeys: options.v03Journeys,
+      v03ProviderGlobal: options.v03ProviderGlobal,
     }).catch((error: unknown) => {
       respondError(res, error);
     });
@@ -189,6 +233,20 @@ interface RouteContext {
   executeBuiltinInventoryRecipe?: ControlServerOptions['executeBuiltinInventoryRecipe'];
   readBuiltinInventoryCandidate?: ControlServerOptions['readBuiltinInventoryCandidate'];
   v03RouteFor: () => V03GatewayRoute | undefined;
+  v03GuidedRoute?: V03GuidedRoute;
+  v03Journeys?: JourneySubmits;
+  v03ProviderGlobal?: {
+    prepare(): Promise<
+      | {
+          readonly ok: true;
+          readonly requestRef: string;
+          readonly preview: unknown;
+          readonly expiresAtUnixMs: number;
+        }
+      | { readonly ok: false; readonly code: string }
+    >;
+    confirm(raw: unknown): Promise<SendReceipt>;
+  };
 }
 
 /**
@@ -448,6 +506,23 @@ async function handle(
     return respondJson(res, 200, result);
   }
 
+  // R02 Guided routes operate solely on trusted Host-owned durable state.
+  // They never accept a grant, full approval payload or Kernel Permit from
+  // the caller. Decisions are atomic single-use acknowledgement records.
+  if (method === 'GET' && url.pathname === '/api/v03/guided/state') {
+    if (!ctx.v03GuidedRoute) {
+      return respondJson(res, 503, { ok: false, code: 'V03_GUIDED_UNAVAILABLE' });
+    }
+    return respondJson(res, 200, ctx.v03GuidedRoute.state());
+  }
+  if (method === 'POST' && url.pathname === '/api/v03/guided/decision') {
+    if (!ctx.v03GuidedRoute) {
+      return respondJson(res, 503, { ok: false, code: 'V03_GUIDED_UNAVAILABLE' });
+    }
+    const result = ctx.v03GuidedRoute.decide(await readJsonBody(req, ctx.maxBodyBytes));
+    return respondJson(res, ctx.v03GuidedRoute.httpStatus(result), result);
+  }
+
   // T11 — the single v0.3 submission surface. Bounded JSON in, one T09
   // ControlApiGateway admission out: the gateway fully validates the
   // submission BEFORE the selected DomainApp facade is ever touched, so a
@@ -462,6 +537,84 @@ async function handle(
     const body = await readJsonBody(req, ctx.maxBodyBytes);
     const receipt = await route.submit(body);
     return respondJson(res, route.httpStatus(receipt), receipt);
+  }
+
+  // R03-INT — the journey submission surfaces. Same truthful receipt→HTTP
+  // mapping as the goal gateway: COMPLETED 200 / ADMITTED 202 / UNKNOWN 409 /
+  // REFUSED·KERNEL_REFUSED 422; absent bindings answer 503, never fake success.
+  if (
+    method === 'POST' &&
+    (url.pathname === '/api/v03/effect/submit' ||
+      url.pathname === '/api/v03/effect/probe' ||
+      url.pathname === '/api/v03/provider/first-use' ||
+      url.pathname === '/api/v03/meta/feedback' ||
+      url.pathname === '/api/v03/meta/shared-query')
+  ) {
+    const journeys = ctx.v03Journeys;
+    if (journeys === undefined) {
+      return respondJson(res, 503, { ok: false, code: 'V03_JOURNEYS_UNAVAILABLE' });
+    }
+    const body = await readJsonBody(req, ctx.maxBodyBytes);
+    const submit =
+      url.pathname === '/api/v03/effect/submit'
+        ? journeys.effectSubmit
+        : url.pathname === '/api/v03/effect/probe'
+          ? journeys.effectProbeSubmit
+          : url.pathname === '/api/v03/provider/first-use'
+            ? journeys.providerFirstUse
+            : url.pathname === '/api/v03/meta/feedback'
+              ? journeys.metaFeedback
+              : journeys.metaSharedQuery;
+    const receipt = await submit.call(journeys, body);
+    const status =
+      receipt.status === 'COMPLETED'
+        ? 200
+        : receipt.status === 'ADMITTED'
+          ? 202
+          : receipt.status === 'UNKNOWN'
+            ? 409
+            : 422;
+    return respondJson(res, status, receipt);
+  }
+
+  // R03C (#288) — Host-global Provider first-use, two steps:
+  //   POST /api/v03/provider/prepare  → Host-issued requestRef + exact preview
+  //   POST /api/v03/provider/confirm  → one-time requestRef → fixed K send
+  // No Guided Case, Case ID, currentnessRef or approvalRef is required or
+  // accepted. prepare/confirm accept no intent, instance, path, args or
+  // privilege input: the composition owns every fixed value.
+  if (method === 'POST' && url.pathname === '/api/v03/provider/prepare') {
+    const ops = ctx.v03ProviderGlobal;
+    if (ops === undefined) {
+      return respondJson(res, 503, { ok: false, code: 'V03_PROVIDER_GLOBAL_UNAVAILABLE' });
+    }
+    const prepared = await ops.prepare();
+    if (!prepared.ok) {
+      return respondJson(res, 422, { status: 'REFUSED', code: prepared.code });
+    }
+    return respondJson(res, 200, {
+      status: 'PREPARED',
+      requestRef: prepared.requestRef,
+      preview: prepared.preview,
+      expiresAtUnixMs: prepared.expiresAtUnixMs,
+    });
+  }
+  if (method === 'POST' && url.pathname === '/api/v03/provider/confirm') {
+    const ops = ctx.v03ProviderGlobal;
+    if (ops === undefined) {
+      return respondJson(res, 503, { ok: false, code: 'V03_PROVIDER_GLOBAL_UNAVAILABLE' });
+    }
+    const body = await readJsonBody(req, ctx.maxBodyBytes);
+    const receipt = await ops.confirm(body);
+    const status =
+      receipt.status === 'COMPLETED'
+        ? 200
+        : receipt.status === 'ADMITTED'
+          ? 202
+          : receipt.status === 'UNKNOWN'
+            ? 409
+            : 422;
+    return respondJson(res, status, receipt);
   }
 
   if (resource === 'tasks') {

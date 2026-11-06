@@ -43,7 +43,7 @@ function fakeFacade(): DomainAppSendFacade & { calls: () => number; payloads: un
     async send(payload: unknown) {
       calls += 1;
       payloads.push(payload);
-      return { status: 'admitted', effects: [] };
+      return { status: 'admitted', admitted: { effects: [] } };
     },
     calls: () => calls,
     payloads,
@@ -73,8 +73,8 @@ describe('T11 v0.3 gateway route is wired into the Control API server', () => {
     const port = await server.start();
     try {
       const sent = await post(port, '/api/v03/gateway/submit', validSubmission());
-      expect(sent.status).toBe(200);
-      expect(sent.body).toMatchObject({ status: 'SENT', sendCalls: 1 });
+      expect(sent.status).toBe(202);
+      expect(sent.body).toMatchObject({ status: 'ADMITTED', sendCalls: 1 });
       expect(facade.calls()).toBe(1);
       // The facade receives EXACTLY the validated canonical submission.
       expect(facade.payloads[0]).toMatchObject({
@@ -132,10 +132,10 @@ describe('T11 v0.3 gateway route is wired into the Control API server', () => {
       expect(health.status).toBe(200);
       expect(factoryCalls).toBe(0);
       const first = await post(port, '/api/v03/gateway/submit', validSubmission());
-      expect(first.status).toBe(200);
+      expect(first.status).toBe(202);
       expect(factoryCalls).toBe(1);
       const second = await post(port, '/api/v03/gateway/submit', validSubmission());
-      expect(second.status).toBe(200);
+      expect(second.status).toBe(202);
       expect(factoryCalls).toBe(1);
     } finally {
       await server.close();
@@ -156,9 +156,13 @@ describe('T11 v0.3 gateway route is wired into the Control API server', () => {
 });
 
 describe('T11 package public entries are side-effect-free controlled exits', () => {
-  it('domain-app exports the T09 composition and gateway adapters', async () => {
+  it('domain-app exports the gateway adapter and keeps the legacy composer internal', async () => {
     const app = await import('../../../../packages/domain-app/src/index.ts');
-    expect(typeof app.composeDomainBuild).toBe('function');
+    // Generation-2 (#303): the legacy T09 structural BUILD preview composer is
+    // @internal test-preview-only and must NOT leak through the public
+    // @shun/domain-app package root; production uses composeTrustedRuntimeBuild
+    // plus the real DomainHarness v0.10.3 buildV10App/activateV10App chain.
+    expect('composeDomainBuild' in app).toBe(false);
     expect(typeof app.createControlApiGateway).toBe('function');
     expect(app.V03_TRUSTED_CLOUD_INTERPRETER_PORT).toBe('shun.trusted-cloud-interpreter.v03');
     expect(app.V03_EXTERNAL_IMPORT_BINDINGS).toEqual({
@@ -168,9 +172,10 @@ describe('T11 package public entries are side-effect-free controlled exits', () 
 
   it('domain-computer exports every merged task adapter factory', async () => {
     const computer = await import('../../../../packages/domain-computer/src/index.ts');
+    // External package users must not mint the private Host observation mark.
+    expect('issueHostObjectObservation' in computer).toBe(false);
     for (const name of [
       'selectGoalSemantic',
-      'issueHostObjectObservation',
       'createNextGuidedStep',
       'validateGuidedStepOutcome',
       'validateGuidedAdvisory',

@@ -255,6 +255,163 @@ export const STRINGS = {
       authorityRelevant: true,
       polarity: 'PAUSED',
     },
+    // R03B production journeys panel: the operator pastes Host-issued
+    // reference pairs from the local launch console; every journey request
+    // relays those refs as-is and the UI never mints a ref, grant or approval.
+    'journeys.title': {
+      text: 'Production journeys',
+      authorityRelevant: false,
+    },
+    'journeys.note': {
+      text: 'Reference pairs come from the local launch console; the UI only relays them and never creates a grant or approval.',
+      authorityRelevant: true,
+      polarity: 'CONSENT',
+    },
+    'journeys.refsNeeded': {
+      text: 'No reference pair is filled in, so the UI cannot send this request.',
+      authorityRelevant: true,
+      polarity: 'REFUSE',
+    },
+    'journeys.noCase': {
+      text: 'Unknown case: there is no current guided step, so no journey request is sent.',
+      authorityRelevant: true,
+      polarity: 'UNKNOWN',
+    },
+    'journeys.refs.currentness': {
+      text: 'Currentness reference (from the launch console)',
+      authorityRelevant: false,
+    },
+    'journeys.refs.approval': {
+      text: 'Approval reference (from the launch console)',
+      authorityRelevant: false,
+    },
+    'journeys.effect.title': {
+      text: 'Effect journey',
+      authorityRelevant: false,
+    },
+    'journeys.effect.run': {
+      text: 'Send effect request',
+      authorityRelevant: false,
+    },
+    'journeys.effect.action': {
+      text: 'Action reference',
+      authorityRelevant: false,
+    },
+    'journeys.effect.plan': {
+      text: 'Plan reference',
+      authorityRelevant: false,
+    },
+    'journeys.effect.grant': {
+      text: 'Grant reference',
+      authorityRelevant: false,
+    },
+    'journeys.provider.title': {
+      text: 'Provider first-use journey',
+      authorityRelevant: false,
+    },
+    'journeys.provider.run': {
+      text: 'Send provider request',
+      authorityRelevant: false,
+    },
+    'journeys.provider.task': {
+      text: 'Provider task id',
+      authorityRelevant: false,
+    },
+    'journeys.meta.title': {
+      text: 'Meta feedback journey',
+      authorityRelevant: false,
+    },
+    'journeys.meta.run': {
+      text: 'Send feedback',
+      authorityRelevant: false,
+    },
+    'journeys.meta.case': {
+      text: 'Source case reference',
+      authorityRelevant: false,
+    },
+    'journeys.meta.revision': {
+      text: 'Source revision',
+      authorityRelevant: false,
+    },
+    'journeys.meta.rating': {
+      text: 'Rating',
+      authorityRelevant: false,
+    },
+    'journeys.meta.category': {
+      text: 'Category',
+      authorityRelevant: false,
+    },
+    'journeys.meta.correction': {
+      text: 'Correction',
+      authorityRelevant: false,
+    },
+    'journeys.rating.helpful': {
+      text: 'Helpful',
+      authorityRelevant: false,
+    },
+    'journeys.rating.notHelpful': {
+      text: 'Not helpful',
+      authorityRelevant: false,
+    },
+    'journeys.category.incorrectResult': {
+      text: 'Incorrect result',
+      authorityRelevant: false,
+    },
+    'journeys.category.missingStep': {
+      text: 'Missing step',
+      authorityRelevant: false,
+    },
+    'journeys.category.wrongTarget': {
+      text: 'Wrong target',
+      authorityRelevant: false,
+    },
+    'journeys.category.unsafeSuggestion': {
+      text: 'Unsafe suggestion',
+      authorityRelevant: false,
+    },
+    'journeys.category.tooComplex': {
+      text: 'Too complex',
+      authorityRelevant: false,
+    },
+    'journeys.category.other': {
+      text: 'Other',
+      authorityRelevant: false,
+    },
+    'journeys.correction.wrongObject': {
+      text: 'Wrong object',
+      authorityRelevant: false,
+    },
+    'journeys.correction.missingConstraint': {
+      text: 'Missing constraint',
+      authorityRelevant: false,
+    },
+    'journeys.correction.staleContext': {
+      text: 'Stale context',
+      authorityRelevant: false,
+    },
+    'journeys.correction.policyMismatch': {
+      text: 'Policy mismatch',
+      authorityRelevant: false,
+    },
+    'journeys.correction.noCorrection': {
+      text: 'No correction',
+      authorityRelevant: false,
+    },
+    'journeys.status.completed': {
+      text: 'Completed. The effect ran under the approval reference you relayed.',
+      authorityRelevant: true,
+      polarity: 'APPROVE',
+    },
+    'journeys.status.refused': {
+      text: 'Refused. The request was not completed.',
+      authorityRelevant: true,
+      polarity: 'REFUSE',
+    },
+    'journeys.status.unknown': {
+      text: 'Unknown result. Nothing is treated as done.',
+      authorityRelevant: true,
+      polarity: 'UNKNOWN',
+    },
   },
   zh: {
     'app.title': {
@@ -474,6 +631,162 @@ export const STRINGS = {
       text: '旅程已暂停。在恢复之前不会有任何操作运行。',
       authorityRelevant: true,
       polarity: 'PAUSED',
+    },
+    // R03B 生产旅程面板：操作员从本地启动控制台粘贴 Host 签发的引用对；
+    // 每个旅程请求只原样转发这些引用，UI 绝不铸造引用、授权或批准。
+    'journeys.title': {
+      text: '生产旅程',
+      authorityRelevant: false,
+    },
+    'journeys.note': {
+      text: '引用对来自本地启动控制台；UI 只原样转发它们，绝不自行创建授权或批准。',
+      authorityRelevant: true,
+      polarity: 'CONSENT',
+    },
+    'journeys.refsNeeded': {
+      text: '引用对尚未填写，UI 不能发送此请求。',
+      authorityRelevant: true,
+      polarity: 'REFUSE',
+    },
+    'journeys.noCase': {
+      text: '案例未知：当前没有引导步骤，因此不会发送任何旅程请求。',
+      authorityRelevant: true,
+      polarity: 'UNKNOWN',
+    },
+    'journeys.refs.currentness': {
+      text: '现行性引用（来自启动控制台）',
+      authorityRelevant: false,
+    },
+    'journeys.refs.approval': {
+      text: '批准引用（来自启动控制台）',
+      authorityRelevant: false,
+    },
+    'journeys.effect.title': {
+      text: '效果旅程',
+      authorityRelevant: false,
+    },
+    'journeys.effect.run': {
+      text: '发送效果请求',
+      authorityRelevant: false,
+    },
+    'journeys.effect.action': {
+      text: '操作引用',
+      authorityRelevant: false,
+    },
+    'journeys.effect.plan': {
+      text: '计划引用',
+      authorityRelevant: false,
+    },
+    'journeys.effect.grant': {
+      text: '授权引用',
+      authorityRelevant: false,
+    },
+    'journeys.provider.title': {
+      text: '提供方首次使用旅程',
+      authorityRelevant: false,
+    },
+    'journeys.provider.run': {
+      text: '发送提供方请求',
+      authorityRelevant: false,
+    },
+    'journeys.provider.task': {
+      text: '提供方任务 ID',
+      authorityRelevant: false,
+    },
+    'journeys.meta.title': {
+      text: '元反馈旅程',
+      authorityRelevant: false,
+    },
+    'journeys.meta.run': {
+      text: '发送反馈',
+      authorityRelevant: false,
+    },
+    'journeys.meta.case': {
+      text: '来源案例引用',
+      authorityRelevant: false,
+    },
+    'journeys.meta.revision': {
+      text: '来源修订',
+      authorityRelevant: false,
+    },
+    'journeys.meta.rating': {
+      text: '评分',
+      authorityRelevant: false,
+    },
+    'journeys.meta.category': {
+      text: '类别',
+      authorityRelevant: false,
+    },
+    'journeys.meta.correction': {
+      text: '纠正类型',
+      authorityRelevant: false,
+    },
+    'journeys.rating.helpful': {
+      text: '有帮助',
+      authorityRelevant: false,
+    },
+    'journeys.rating.notHelpful': {
+      text: '没有帮助',
+      authorityRelevant: false,
+    },
+    'journeys.category.incorrectResult': {
+      text: '结果不正确',
+      authorityRelevant: false,
+    },
+    'journeys.category.missingStep': {
+      text: '缺少步骤',
+      authorityRelevant: false,
+    },
+    'journeys.category.wrongTarget': {
+      text: '目标错误',
+      authorityRelevant: false,
+    },
+    'journeys.category.unsafeSuggestion': {
+      text: '不安全的建议',
+      authorityRelevant: false,
+    },
+    'journeys.category.tooComplex': {
+      text: '过于复杂',
+      authorityRelevant: false,
+    },
+    'journeys.category.other': {
+      text: '其他',
+      authorityRelevant: false,
+    },
+    'journeys.correction.wrongObject': {
+      text: '对象错误',
+      authorityRelevant: false,
+    },
+    'journeys.correction.missingConstraint': {
+      text: '缺少约束',
+      authorityRelevant: false,
+    },
+    'journeys.correction.staleContext': {
+      text: '上下文过期',
+      authorityRelevant: false,
+    },
+    'journeys.correction.policyMismatch': {
+      text: '策略不匹配',
+      authorityRelevant: false,
+    },
+    'journeys.correction.noCorrection': {
+      text: '无需纠正',
+      authorityRelevant: false,
+    },
+    'journeys.status.completed': {
+      text: '已完成。效果在您转发的批准引用下运行。',
+      authorityRelevant: true,
+      polarity: 'APPROVE',
+    },
+    'journeys.status.refused': {
+      text: '已拒绝。请求未完成。',
+      authorityRelevant: true,
+      polarity: 'REFUSE',
+    },
+    'journeys.status.unknown': {
+      text: '结果未知。任何内容都不会被视为已完成。',
+      authorityRelevant: true,
+      polarity: 'UNKNOWN',
     },
   },
 };
