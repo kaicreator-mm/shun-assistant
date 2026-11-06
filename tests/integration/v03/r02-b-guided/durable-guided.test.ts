@@ -211,6 +211,25 @@ function folderPickerNative(root: string) {
       isNetworkPath: false,
       isVolumeRoot: false,
     }),
+    acquireDirectoryLease: () => ({
+      leaseId: 'f'.repeat(32),
+      directory: {
+        ...folderIdentity,
+        isDirectory: true,
+        isReparsePoint: false,
+        isNetworkPath: false,
+        isVolumeRoot: false,
+      },
+    }),
+    verifyDirectoryLease: () => ({
+      ...folderIdentity,
+      isDirectory: true,
+      isReparsePoint: false,
+      isNetworkPath: false,
+      isVolumeRoot: false,
+    }),
+    releaseDirectoryLease: () => {},
+    directoryLeasePath: () => root,
   };
 }
 

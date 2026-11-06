@@ -130,6 +130,25 @@ function nativePort(root: string, overrides: Record<string, unknown> = {}) {
       isNetworkPath: false,
       isVolumeRoot: false,
     }),
+    acquireDirectoryLease: () => ({
+      leaseId: 'a'.repeat(32),
+      directory: {
+        ...identity,
+        isDirectory: true,
+        isReparsePoint: false,
+        isNetworkPath: false,
+        isVolumeRoot: false,
+      },
+    }),
+    verifyDirectoryLease: () => ({
+      ...identity,
+      isDirectory: true,
+      isReparsePoint: false,
+      isNetworkPath: false,
+      isVolumeRoot: false,
+    }),
+    releaseDirectoryLease: () => {},
+    directoryLeasePath: () => root,
     ...overrides,
   };
 }
@@ -329,6 +348,142 @@ describe.skipIf(process.platform !== 'win32')(
       expect(first.observation.totalBytes).toBe(second.observation.totalBytes);
       expect(first.observation.observedAt).toBe(second.observation.observedAt);
       expect(first.observation.scopeRevision).not.toBe(second.observation.scopeRevision);
+    });
+  },
+);
+
+describe.skipIf(process.platform !== 'win32')(
+  'R04 U05-A directory lease (P1-03 TOCTOU) holds the selected root through scan and receipt',
+  () => {
+    const cleanups: Array<() => void> = [];
+    afterEach(() => {
+      for (const cleanup of cleanups.splice(0)) cleanup();
+    });
+
+    it('holds the lease from pre-walk identity through the Host receipt, then releases it', async () => {
+      const events: string[] = [];
+      let held = false;
+      const storage: FolderSelectionStoragePort = {
+        resolveScope: async (_volume, declared) => {
+          events.push(`resolveScope:held=${held}`);
+          return { roots: [...declared.roots] };
+        },
+        observeStorage: async (scope, clock) => {
+          events.push(`observeStorage:held=${held}`);
+          return { ...evidence(scope.roots[0]!), observedAt: clock() };
+        },
+      };
+      const env = createEnvironment(storage, {
+        acquireDirectoryLease: () => {
+          held = true;
+          events.push('acquire');
+          return {
+            leaseId: 'a'.repeat(32),
+            directory: {
+              ...identity,
+              isDirectory: true,
+              isReparsePoint: false,
+              isNetworkPath: false,
+              isVolumeRoot: false,
+            },
+          };
+        },
+        releaseDirectoryLease: () => {
+          events.push('release');
+          held = false;
+        },
+      });
+      cleanups.push(env.cleanup);
+      const selected = await env.host.selectRoot();
+      if (selected.status !== 'SELECTED') throw new Error('selection failed');
+      env.host.afterSelectionRecorded(acceptedAnswer(selected.selectionRef), selectStep, recorded);
+      const result = await env.host.observeCurrentSelectedFolder();
+      expect(result.ok).toBe(true);
+      expect(env.guided.receiptCount()).toBe(1);
+      // The scan ran entirely inside the lease window; the release is the
+      // last native lease event, strictly after the Host-owned receipt.
+      expect(events).toEqual([
+        'acquire',
+        'resolveScope:held=true',
+        'observeStorage:held=true',
+        'release',
+      ]);
+      expect(held).toBe(false);
+    });
+
+    it('adversarial junction replacement: a native lease refusal opens no descendant metadata and records no receipt', async () => {
+      let storageCalled = false;
+      const storage: FolderSelectionStoragePort = {
+        resolveScope: async (_volume, declared) => {
+          storageCalled = true;
+          return { roots: [...declared.roots] };
+        },
+        observeStorage: async () => {
+          storageCalled = true;
+          throw new Error('storage must never be reached for a refused lease');
+        },
+      };
+      const env = createEnvironment(storage, {
+        acquireDirectoryLease: () => {
+          // The native chain found a reparse-replaced ancestor (the
+          // junction-replacement attack) and refused the lease.
+          throw new Error('FOLDER_PICKER_LEASE_PATH_REFUSED');
+        },
+      });
+      cleanups.push(env.cleanup);
+      const selected = await env.host.selectRoot();
+      if (selected.status !== 'SELECTED') throw new Error('selection failed');
+      env.host.afterSelectionRecorded(acceptedAnswer(selected.selectionRef), selectStep, recorded);
+
+      const result = await env.host.observeCurrentSelectedFolder();
+      expect(result).toEqual({ ok: false, code: 'FOLDER_OBSERVATION_UNAVAILABLE' });
+      // THE adversarial regression assertions: nothing below the replaced
+      // ancestor was opened, and no Host receipt exists.
+      expect(storageCalled).toBe(false);
+      expect(env.guided.receiptCount()).toBe(0);
+    });
+
+    it('withholds the receipt when the pinned lease identity drifts during the async scan', async () => {
+      const env = createEnvironment(undefined, {
+        verifyDirectoryLease: () => ({
+          ...identity,
+          fileId: 'deadbeefdeadbeef',
+          isDirectory: true,
+          isReparsePoint: false,
+          isNetworkPath: false,
+          isVolumeRoot: false,
+        }),
+      });
+      cleanups.push(env.cleanup);
+      const selected = await env.host.selectRoot();
+      if (selected.status !== 'SELECTED') throw new Error('selection failed');
+      env.host.afterSelectionRecorded(acceptedAnswer(selected.selectionRef), selectStep, recorded);
+      const result = await env.host.observeCurrentSelectedFolder();
+      expect(result).toEqual({ ok: false, code: 'FOLDER_OBSERVATION_UNAVAILABLE' });
+      expect(env.guided.receiptCount()).toBe(0);
+    });
+
+    it('releases the lease when the metadata walk itself fails', async () => {
+      let released = false;
+      const storage: FolderSelectionStoragePort = {
+        resolveScope: async (_volume, declared) => ({ roots: [...declared.roots] }),
+        observeStorage: async () => {
+          throw new Error('walk failed');
+        },
+      };
+      const env = createEnvironment(storage, {
+        releaseDirectoryLease: () => {
+          released = true;
+        },
+      });
+      cleanups.push(env.cleanup);
+      const selected = await env.host.selectRoot();
+      if (selected.status !== 'SELECTED') throw new Error('selection failed');
+      env.host.afterSelectionRecorded(acceptedAnswer(selected.selectionRef), selectStep, recorded);
+      const result = await env.host.observeCurrentSelectedFolder();
+      expect(result).toEqual({ ok: false, code: 'FOLDER_OBSERVATION_UNAVAILABLE' });
+      expect(released).toBe(true);
+      expect(env.guided.receiptCount()).toBe(0);
     });
   },
 );
@@ -567,7 +722,7 @@ describe.skipIf(process.platform !== 'win32')(
       ).toBe('FOLDER_SELECTION_DATABASE_PROGRAMDATA_REFUSED');
     });
 
-    it('the production factory refuses an out-of-boundary path before any native load', () => {
+    it('the production factory refuses an out-of-boundary database path fail-closed', () => {
       expect(() =>
         createProductionFolderSelectionHost({
           guided: createGuided().service,

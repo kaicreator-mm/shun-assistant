@@ -136,10 +136,60 @@ Frozen N-API surface: `pickFolder()` (async — the modal Shell dialog runs on
 a dedicated COM STA worker from the libuv thread pool, so the Node main event
 loop is never blocked; the promise settles with the same typed SELECTED /
 CANCELLED / REFUSED result), `inspectFolder(path)` (synchronous directory
-identity) and `currentIdentity()`. Directory-identity traversal terminates
-immediately at the first reparse-point component: no descendant of a
-junction/symlink is ever opened, so a successful identity always describes a
-reparse-free path (unit-tested in `src/lib.rs`).
+identity), `currentIdentity()`, and the P1-03 directory-lease set:
+`acquireDirectoryLease(path)` / `verifyDirectoryLease(lease)` /
+`releaseDirectoryLease(lease)` / `directoryLeasePath(lease)`.
+Directory-identity traversal terminates immediately at the first reparse-point
+component: no descendant of a junction/symlink is ever opened, so a successful
+identity always describes a reparse-free path (unit-tested in `src/lib.rs`).
+
+### P1-03 race-safe directory lease (TOCTOU closure)
+
+`inspectFolder` re-reads identity by path string — correct for one-shot
+checks, but it cannot bind an identity to a later metadata walk: between the
+check and `readdir`/`resolveScope`/`observeStorage` an ancestor could be
+swapped so the same path string resolves to a different directory. The lease
+closes that window:
+
+- **Handle-relative, reparse-free acquisition.** `acquireDirectoryLease`
+  walks the path component-by-component with `NtCreateFile`
+  (`RootDirectory` = the previously opened parent handle,
+  `FILE_OPEN_REPARSE_POINT`, `FILE_DIRECTORY_FILE`), refusing at the first
+  reparse or non-directory component. No descendant of a junction is ever
+  opened, and the acquisition-time view is exactly the directory the chain
+  pins.
+- **Object identity binding, not name pinning.** Empirically on this Windows
+  family (10.0.26300, NTFS) open handles WITHOUT `FILE_SHARE_DELETE` do
+  **not** block `MoveFileEx`/`RemoveDirectory` of an empty directory —
+  rename and delete both succeed against a live lease. The lease therefore
+  guarantees identity continuity: `verifyDirectoryLease` re-reads the pinned
+  handle's volume/file identity (captured at acquire; drift refuses typed),
+  and the held handle stays bound to the verified object across rename and
+  delete.
+- **Canonical walk path.** `directoryLeasePath` returns the pinned object's
+  own current DOS path via `GetFinalPathNameByHandleW` (read from the
+  handle, never re-resolved through possibly-replaced ancestors; a `\\?\`
+  prefix is stripped). The Host walks THIS path, so a junction planted at
+  the recorded location is never consulted; a moved/deleted object fails
+  the walk closed.
+- **Held through receipt.** The Host acquires the lease before any
+  descendant open, re-verifies the persisted row against the lease
+  directory + current user identity, walks, re-verifies the live binding +
+  lease + recorded path identity, and only then records the Host-owned
+  observation receipt; the lease is released in a `finally`. A replaced,
+  moved or expired root always ends in a typed refusal with no receipt, and
+  the adversarial regression tests prove no descendant metadata open reaches
+  the storage port on a refused lease.
+- **LocalAppData database guard.** The production factory acquires the same
+  lease on the database parent directory BEFORE the LocalAppData boundary
+  checks and holds it until SQLite has opened the file, binding the
+  check/open pair to the real parent location.
+
+Rust unit tests (`cargo test`, real junctions via `mklink /J` and real
+rename/delete against live pins) cover: junction component refusal without
+descending, identity continuity across rename, handle readability and
+path-resolution failure after delete, canonical-path freshness, and volume
+root / plain file / missing target shapes.
 
 ### Build and pin (Windows x64 Build Host, Node 24.21.0)
 

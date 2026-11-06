@@ -39,12 +39,41 @@ export type NativeFolderSelection =
       identity: FolderIdentity;
     }>;
 
+/**
+ * A live native directory lease: an opaque in-process token plus the
+ * identity of the pinned directory object captured at acquisition. The
+ * native side holds a handle chain from the volume root to the directory
+ * (opened handle-relatively, reparse-free, no FILE_SHARE_DELETE) for as long
+ * as the lease is not released. On this Windows family the handles do not
+ * block rename/delete of the directory, so the lease's guarantees are object
+ * identity continuity plus a canonical object path — never the recorded
+ * spelling — for all path-based walks inside the lease window.
+ */
+export type NativeDirectoryLease = Readonly<{
+  leaseId: string;
+  directory: FolderDirectoryIdentity;
+}>;
+
 export interface FolderPickerNativePort {
   /** Frozen contract: the modal Shell dialog runs on a dedicated COM STA
    * async worker; the Node main event loop is never blocked. */
   pickFolder(): Promise<NativeFolderSelection>;
   currentIdentity(): FolderUserIdentity;
   inspectFolder(path: string): FolderDirectoryIdentity;
+  /** Pins the directory chain for `path` and returns the lease plus the
+   * identity read from the pinned handle. Fails closed on any reparse
+   * component, non-directory component or non-plain-drive path. */
+  acquireDirectoryLease(path: string): NativeDirectoryLease;
+  /** Re-reads the directory identity from the pinned handle of a live lease;
+   * refuses with a typed drift code if the captured identity no longer
+   * matches. */
+  verifyDirectoryLease(lease: NativeDirectoryLease): FolderDirectoryIdentity;
+  /** Releases the lease and every handle in its chain. */
+  releaseDirectoryLease(lease: NativeDirectoryLease): void;
+  /** The pinned object's own current DOS path (read from the held handle),
+   * for path-based walks that must not consult a possibly-replaced recorded
+   * location. */
+  directoryLeasePath(lease: NativeDirectoryLease): string;
 }
 
 const nativeDirectory = dirname(fileURLToPath(import.meta.url));
@@ -88,6 +117,18 @@ type RawSelectionResult = {
   };
 };
 
+type RawDirectoryIdentity = {
+  userSid?: string;
+  logonSid?: string;
+  sessionId?: number;
+  volumeSerial?: string;
+  fileId?: string;
+  isDirectory?: boolean;
+  isReparsePoint?: boolean;
+  isNetworkPath?: boolean;
+  isVolumeRoot?: boolean;
+};
+
 type RawAddon = {
   pickFolder(): Promise<RawSelectionResult>;
   currentIdentity(): {
@@ -95,17 +136,14 @@ type RawAddon = {
     logonSid?: string;
     sessionId?: number;
   };
-  inspectFolder(path: string): {
-    userSid?: string;
-    logonSid?: string;
-    sessionId?: number;
-    volumeSerial?: string;
-    fileId?: string;
-    isDirectory?: boolean;
-    isReparsePoint?: boolean;
-    isNetworkPath?: boolean;
-    isVolumeRoot?: boolean;
+  inspectFolder(path: string): RawDirectoryIdentity;
+  acquireDirectoryLease(path: string): {
+    leaseId?: string;
+    directory?: RawDirectoryIdentity;
   };
+  verifyDirectoryLease(leaseId: string): RawDirectoryIdentity;
+  releaseDirectoryLease(leaseId: string): void;
+  directoryLeasePath(leaseId: string): string;
 };
 
 function mapIdentity(raw: NonNullable<RawSelectionResult['identity']>): FolderIdentity {
@@ -126,6 +164,25 @@ function mapIdentity(raw: NonNullable<RawSelectionResult['identity']>): FolderId
   };
 }
 
+function mapDirectoryIdentity(raw: RawDirectoryIdentity): FolderDirectoryIdentity {
+  const identity = mapIdentity(raw);
+  if (
+    typeof raw.isDirectory !== 'boolean' ||
+    typeof raw.isReparsePoint !== 'boolean' ||
+    typeof raw.isNetworkPath !== 'boolean' ||
+    typeof raw.isVolumeRoot !== 'boolean'
+  ) {
+    throw new Error('FOLDER_PICKER_DIRECTORY_IDENTITY_INVALID');
+  }
+  return {
+    ...identity,
+    isDirectory: raw.isDirectory,
+    isReparsePoint: raw.isReparsePoint,
+    isNetworkPath: raw.isNetworkPath,
+    isVolumeRoot: raw.isVolumeRoot,
+  };
+}
+
 export function loadFolderPicker(): FolderPickerNativePort {
   const check = verifyFolderPickerArtifact();
   if (!check.ok) throw new Error(check.code ?? 'FOLDER_PICKER_ARTIFACT_REFUSED');
@@ -135,7 +192,11 @@ export function loadFolderPicker(): FolderPickerNativePort {
     !addon ||
     typeof addon.pickFolder !== 'function' ||
     typeof addon.currentIdentity !== 'function' ||
-    typeof addon.inspectFolder !== 'function'
+    typeof addon.inspectFolder !== 'function' ||
+    typeof addon.acquireDirectoryLease !== 'function' ||
+    typeof addon.verifyDirectoryLease !== 'function' ||
+    typeof addon.releaseDirectoryLease !== 'function' ||
+    typeof addon.directoryLeasePath !== 'function'
   ) {
     throw new Error('FOLDER_PICKER_ADDON_API_INVALID');
   }
@@ -188,23 +249,42 @@ export function loadFolderPicker(): FolderPickerNativePort {
       };
     },
     inspectFolder(path: string): FolderDirectoryIdentity {
-      const raw = addon.inspectFolder(path);
-      const identity = mapIdentity(raw);
-      if (
-        typeof raw.isDirectory !== 'boolean' ||
-        typeof raw.isReparsePoint !== 'boolean' ||
-        typeof raw.isNetworkPath !== 'boolean' ||
-        typeof raw.isVolumeRoot !== 'boolean'
-      ) {
-        throw new Error('FOLDER_PICKER_DIRECTORY_IDENTITY_INVALID');
+      return mapDirectoryIdentity(addon.inspectFolder(path));
+    },
+    acquireDirectoryLease(path: string): NativeDirectoryLease {
+      if (typeof path !== 'string' || path.length === 0) {
+        throw new Error('FOLDER_PICKER_LEASE_PATH_REQUIRED');
+      }
+      const raw = addon.acquireDirectoryLease(path);
+      if (!raw || typeof raw.leaseId !== 'string' || !/^[a-f0-9]{32}$/.test(raw.leaseId)) {
+        throw new Error('FOLDER_PICKER_LEASE_ID_INVALID');
       }
       return {
-        ...identity,
-        isDirectory: raw.isDirectory,
-        isReparsePoint: raw.isReparsePoint,
-        isNetworkPath: raw.isNetworkPath,
-        isVolumeRoot: raw.isVolumeRoot,
+        leaseId: raw.leaseId,
+        directory: mapDirectoryIdentity(raw.directory ?? {}),
       };
+    },
+    verifyDirectoryLease(lease: NativeDirectoryLease): FolderDirectoryIdentity {
+      if (!lease || typeof lease.leaseId !== 'string') {
+        throw new Error('FOLDER_PICKER_LEASE_INVALID');
+      }
+      return mapDirectoryIdentity(addon.verifyDirectoryLease(lease.leaseId));
+    },
+    releaseDirectoryLease(lease: NativeDirectoryLease): void {
+      if (!lease || typeof lease.leaseId !== 'string') {
+        throw new Error('FOLDER_PICKER_LEASE_INVALID');
+      }
+      addon.releaseDirectoryLease(lease.leaseId);
+    },
+    directoryLeasePath(lease: NativeDirectoryLease): string {
+      if (!lease || typeof lease.leaseId !== 'string') {
+        throw new Error('FOLDER_PICKER_LEASE_INVALID');
+      }
+      const path = addon.directoryLeasePath(lease.leaseId);
+      if (typeof path !== 'string' || path.length === 0) {
+        throw new Error('FOLDER_PICKER_LEASE_PATH_UNAVAILABLE');
+      }
+      return path;
     },
   });
 }

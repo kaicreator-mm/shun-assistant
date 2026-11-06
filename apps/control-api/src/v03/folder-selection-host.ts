@@ -25,6 +25,7 @@ import type {
 import {
   type FolderPickerNativePort,
   loadFolderPicker,
+  type NativeDirectoryLease,
   type NativeFolderSelection,
 } from '../../native/folder-picker/index.ts';
 
@@ -245,6 +246,12 @@ export class FolderSelectionHost {
   readonly #observationAdapter: ReturnType<typeof createComputerFolderObservationAdapter>;
   /** One modal picker at a time: the async dialog must not overlap itself. */
   #pickInFlight = false;
+  /**
+   * The lease held for the duration of one `observeCurrentSelectedFolder`
+   * call, visible to the adapter's raw callback so the metadata walk uses
+   * the pinned object's canonical path. Never set outside that window.
+   */
+  #observationLease: NativeDirectoryLease | null = null;
 
   constructor(input: {
     readonly guided: HostGuidedService;
@@ -261,7 +268,11 @@ export class FolderSelectionHost {
       !input.native ||
       typeof input.native.pickFolder !== 'function' ||
       typeof input.native.currentIdentity !== 'function' ||
-      typeof input.native.inspectFolder !== 'function'
+      typeof input.native.inspectFolder !== 'function' ||
+      typeof input.native.acquireDirectoryLease !== 'function' ||
+      typeof input.native.verifyDirectoryLease !== 'function' ||
+      typeof input.native.releaseDirectoryLease !== 'function' ||
+      typeof input.native.directoryLeasePath !== 'function'
     ) {
       throw new TypeError('FOLDER_SELECTION_HOST_CONFIG_REQUIRED');
     }
@@ -530,28 +541,91 @@ export class FolderSelectionHost {
   async observeCurrentSelectedFolder(): Promise<ComputerFolderObservationResult> {
     const binding = this.#captureObservationBinding();
     if (!binding) return { ok: false, code: 'FOLDER_NOT_SELECTED' };
-
-    const result = await this.#observationAdapter.observeCurrentSelectedFolder();
-    if (!result.ok) return result;
-
-    // The metadata scan is asynchronous. Re-read the exact live INSPECT
-    // binding and native directory identity immediately before the Host-owned
-    // OBSERVATION_RECEIPT transition. A stale scan can never consume a newer
-    // Case/step or a replaced directory.
     const row = this.#selectionRow(binding.selectionRef);
-    if (
-      !this.#sameObservationBinding(binding) ||
-      !row ||
-      !this.#rowMatchesObservationBinding(row, binding) ||
-      !this.#verifySelectionIdentity(row)
-    ) {
+    if (!row || !this.#rowMatchesObservationBinding(row, binding)) {
       return { ok: false, code: 'FOLDER_OBSERVATION_UNAVAILABLE' };
     }
-    const receipt = this.#guided.recordHostObservationReceipt();
-    if (receipt.status !== 'RECORDED') {
+
+    // P1-03: the pinning directory lease is acquired BEFORE any descendant
+    // open and held until after the Host-owned receipt. Its handle-relative,
+    // reparse-free acquisition proves the recorded path still names the
+    // recorded object at this instant; the canonical object path (read from
+    // the pinned handle) keeps every path-based walk inside the window off
+    // any junction planted at the recorded location; post-walk lease + path
+    // re-verification refuses any replacement before a receipt can exist.
+    let lease: NativeDirectoryLease;
+    try {
+      lease = this.#native.acquireDirectoryLease(row.path);
+    } catch {
       return { ok: false, code: 'FOLDER_OBSERVATION_UNAVAILABLE' };
     }
-    return result;
+    try {
+      if (!this.#leaseMatchesRow(lease, row) || !this.#verifySelectionIdentity(row)) {
+        return { ok: false, code: 'FOLDER_OBSERVATION_UNAVAILABLE' };
+      }
+      this.#observationLease = lease;
+      let result: ComputerFolderObservationResult;
+      try {
+        result = await this.#observationAdapter.observeCurrentSelectedFolder();
+      } finally {
+        this.#observationLease = null;
+      }
+      if (!result.ok) return result;
+
+      // The metadata scan is asynchronous. Re-read the exact live INSPECT
+      // binding, the persisted row and BOTH native identities (pinned handle
+      // + recorded path) immediately before the Host-owned
+      // OBSERVATION_RECEIPT transition. A stale scan can never consume a
+      // newer Case/step or a replaced directory.
+      const latestRow = this.#selectionRow(binding.selectionRef);
+      if (
+        !this.#sameObservationBinding(binding) ||
+        !latestRow ||
+        !this.#rowMatchesObservationBinding(latestRow, binding) ||
+        !this.#verifyLeaseAgainstRow(lease, latestRow) ||
+        !this.#verifySelectionIdentity(latestRow)
+      ) {
+        return { ok: false, code: 'FOLDER_OBSERVATION_UNAVAILABLE' };
+      }
+      const receipt = this.#guided.recordHostObservationReceipt();
+      if (receipt.status !== 'RECORDED') {
+        return { ok: false, code: 'FOLDER_OBSERVATION_UNAVAILABLE' };
+      }
+      return result;
+    } finally {
+      try {
+        this.#native.releaseDirectoryLease(lease);
+      } catch {
+        // Cleanup is best-effort; the observation outcome is already decided.
+      }
+    }
+  }
+
+  #leaseMatchesRow(lease: NativeDirectoryLease, row: SelectionRow): boolean {
+    try {
+      const user = this.#native.currentIdentity();
+      return (
+        validUserIdentity(user) &&
+        isRecord(lease.directory) &&
+        sameIdentity(row, user, lease.directory as DirectoryIdentity)
+      );
+    } catch {
+      return false;
+    }
+  }
+
+  #verifyLeaseAgainstRow(lease: NativeDirectoryLease, row: SelectionRow): boolean {
+    try {
+      const directory = this.#native.verifyDirectoryLease(lease);
+      const user = this.#native.currentIdentity();
+      return (
+        validUserIdentity(user) &&
+        isRecord(directory) &&
+        sameIdentity(row, user, directory as DirectoryIdentity)
+      );
+    } catch {
+      return false;
+    }
   }
 
   #selectionRow(selectionRef: string): SelectionRow | undefined {
@@ -591,13 +665,24 @@ export class FolderSelectionHost {
     ) {
       throw new Error('FOLDER_SELECTION_IDENTITY_DRIFT');
     }
-    const rootEntries = await readdir(row.path, { withFileTypes: true });
+    // The walk runs against the pinned object's own canonical path, never
+    // the recorded spelling: a junction planted at the recorded location is
+    // never consulted, and a moved/deleted object fails the walk closed.
+    const lease = this.#observationLease;
+    if (!lease) throw new Error('FOLDER_SELECTION_LEASE_UNAVAILABLE');
+    let leasePath: string;
+    try {
+      leasePath = this.#native.directoryLeasePath(lease);
+    } catch {
+      throw new Error('FOLDER_SELECTION_LEASE_UNAVAILABLE');
+    }
+    const rootEntries = await readdir(leasePath, { withFileTypes: true });
     const rootDirectories = rootEntries.filter((entry) => entry.isDirectory()).length;
     const rootFiles = rootEntries.length - rootDirectories;
     if (rootDirectories > MAX_DIRECTORIES || rootFiles > MAX_ROOT_FILES) {
       throw new Error('FOLDER_OBSERVATION_OVERFLOW');
     }
-    const scope = await this.#storage.resolveScope(row.volume, { roots: [row.path] });
+    const scope = await this.#storage.resolveScope(row.volume, { roots: [leasePath] });
     const evidence = await this.#storage.observeStorage(scope, () =>
       new Date(this.#clock()).toISOString(),
     );
@@ -806,9 +891,10 @@ export class FolderSelectionHost {
 /**
  * The folder-selection SQLite ledger is per-user private state. Refuse
  * lexical escapes, pre-existing junction/symlink escapes and paths whose
- * actual filesystem target cannot be resolved. This is a startup path check;
- * native folder observation still requires a separate handle lease to close
- * post-check replacement races.
+ * actual filesystem target cannot be resolved. ProgramData contamination is
+ * refused BEFORE any LocalAppData containment or parent-resolution check so
+ * the typed code is always the most specific one; this is a startup path
+ * check, and the production factory pins the parent chain across it.
  */
 export function folderSelectionDatabaseRefusal(databaseFile: unknown): string | null {
   if (process.platform !== 'win32') return 'FOLDER_SELECTION_DATABASE_NOT_WINDOWS';
@@ -838,6 +924,17 @@ export function folderSelectionDatabaseRefusal(databaseFile: unknown): string | 
   };
   const strictlyInside = (root: string, value: string): boolean =>
     fold(value).startsWith(fold(root) + '\\');
+
+  // ProgramData refusal comes first, both lexically and against the resolved
+  // LocalAppData root: a ProgramData target (or a LocalAppData redirected
+  // into ProgramData) is refused as ProgramData regardless of any other
+  // boundary outcome, and no parent-resolution detail leaks first.
+  if (typeof programData === 'string' && programData.length > 0) {
+    const programDataRoot = resolve(programData);
+    if (within(programDataRoot, base) || within(programDataRoot, target)) {
+      return 'FOLDER_SELECTION_DATABASE_PROGRAMDATA_REFUSED';
+    }
+  }
   if (!strictlyInside(base, target)) {
     return 'FOLDER_SELECTION_DATABASE_OUTSIDE_LOCALAPPDATA';
   }
@@ -847,10 +944,21 @@ export function folderSelectionDatabaseRefusal(databaseFile: unknown): string | 
   let realBase: string;
   let realParent: string;
   let realTarget: string;
+  let realProgramData: string | null = null;
   try {
     realBase = realpathSync.native(base);
   } catch {
     return 'FOLDER_SELECTION_DATABASE_LOCALAPPDATA_UNRESOLVED';
+  }
+  if (typeof programData === 'string' && programData.length > 0) {
+    try {
+      realProgramData = realpathSync.native(resolve(programData));
+    } catch {
+      return 'FOLDER_SELECTION_DATABASE_PROGRAMDATA_UNVERIFIABLE';
+    }
+    if (within(realProgramData, realBase)) {
+      return 'FOLDER_SELECTION_DATABASE_PROGRAMDATA_REFUSED';
+    }
   }
   try {
     realParent = realpathSync.native(dirname(target));
@@ -859,6 +967,9 @@ export function folderSelectionDatabaseRefusal(databaseFile: unknown): string | 
   }
   if (!within(realBase, realParent)) {
     return 'FOLDER_SELECTION_DATABASE_OUTSIDE_LOCALAPPDATA';
+  }
+  if (realProgramData !== null && within(realProgramData, realParent)) {
+    return 'FOLDER_SELECTION_DATABASE_PROGRAMDATA_REFUSED';
   }
   try {
     lstatSync(target);
@@ -877,25 +988,8 @@ export function folderSelectionDatabaseRefusal(databaseFile: unknown): string | 
     if (code !== 'ENOENT') return 'FOLDER_SELECTION_DATABASE_PATH_UNVERIFIABLE';
     realTarget = win32.join(realParent, basename(target));
   }
-
-  if (typeof programData === 'string' && programData.length > 0) {
-    const programDataRoot = resolve(programData);
-    if (within(programDataRoot, base) || within(programDataRoot, target)) {
-      return 'FOLDER_SELECTION_DATABASE_PROGRAMDATA_REFUSED';
-    }
-    let realProgramData: string;
-    try {
-      realProgramData = realpathSync.native(programDataRoot);
-    } catch {
-      return 'FOLDER_SELECTION_DATABASE_PROGRAMDATA_UNVERIFIABLE';
-    }
-    if (
-      within(realProgramData, realBase) ||
-      within(realProgramData, realParent) ||
-      within(realProgramData, realTarget)
-    ) {
-      return 'FOLDER_SELECTION_DATABASE_PROGRAMDATA_REFUSED';
-    }
+  if (realProgramData !== null && within(realProgramData, realTarget)) {
+    return 'FOLDER_SELECTION_DATABASE_PROGRAMDATA_REFUSED';
   }
   if (!strictlyInside(realBase, realTarget)) {
     return 'FOLDER_SELECTION_DATABASE_OUTSIDE_LOCALAPPDATA';
@@ -908,12 +1002,37 @@ export function createProductionFolderSelectionHost(input: {
   readonly databaseFile: string;
   readonly clock?: () => number;
 }): FolderSelectionHost {
-  const refusal = folderSelectionDatabaseRefusal(input.databaseFile);
-  if (refusal) throw new Error(refusal);
-  return new FolderSelectionHost({
-    ...input,
-    native: loadFolderPicker(),
-  });
+  const native = loadFolderPicker();
+  // P1-03: pin the database parent chain BEFORE the LocalAppData boundary
+  // checks and keep it pinned until SQLite has opened the file. The check/open
+  // pair is then bound to the real parent location: a junction planted at the
+  // recorded location between check and open is never consulted, and after
+  // the open SQLite's own handle keeps the file bound. On this Windows
+  // family the pins do not block rename/delete, so the guard's guarantee is
+  // location binding via the canonical parent path, not exclusion.
+  const resolvedDatabaseFile = resolve(input.databaseFile);
+  const parentDirectory = dirname(resolvedDatabaseFile);
+  let guard: NativeDirectoryLease | undefined;
+  try {
+    guard = native.acquireDirectoryLease(parentDirectory);
+    const canonicalParent = native.directoryLeasePath(guard);
+    const canonicalDatabaseFile = win32.join(canonicalParent, basename(resolvedDatabaseFile));
+    const refusal = folderSelectionDatabaseRefusal(canonicalDatabaseFile);
+    if (refusal) throw new Error(refusal);
+    return new FolderSelectionHost({
+      ...input,
+      databaseFile: canonicalDatabaseFile,
+      native,
+    });
+  } finally {
+    if (guard) {
+      try {
+        native.releaseDirectoryLease(guard);
+      } catch {
+        // Cleanup is best-effort; the factory outcome is already decided.
+      }
+    }
+  }
 }
 
 export type FolderSelectionHostPort = Pick<

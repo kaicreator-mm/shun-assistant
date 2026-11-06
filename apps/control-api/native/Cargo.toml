@@ -6,6 +6,8 @@ members = ["broker", "host", "folder-picker"]
 napi = { version = "3", default-features = false, features = ["napi8"] }
 napi-derive = "3"
 windows = { version = "0.62", features = [
+  "Wdk_Foundation",
+  "Wdk_Storage_FileSystem",
   "Win32_Foundation",
   "Win32_Graphics_Gdi",
   "Win32_Security",
