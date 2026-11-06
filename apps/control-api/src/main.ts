@@ -18,6 +18,8 @@ import {
   provisionMetaFromHostFile,
 } from './v03/composition-journeys.ts';
 import { createProductionV03Gateway } from './v03/composition-production.ts';
+import { createProductionFolderSelectionHost } from './v03/folder-selection-host.ts';
+import { createV03FolderSelectionRoute } from './v03/folder-selection-route.ts';
 
 const here = dirname(fileURLToPath(import.meta.url));
 const port = Number.parseInt(process.env.SHUN_CONTROL_PORT ?? '7788', 10);
@@ -71,6 +73,23 @@ const guided =
   guidedDb && mode === 'real-storage'
     ? createProductionGuidedService(resolve(guidedDb))
     : undefined;
+
+// R04 U05-A folder picker is opt-in trusted local configuration. Its native
+// artifact is hash-pinned and fails closed; no browser input selects the DB.
+const folderSelectionDb = process.env.SHUN_V03_FOLDER_SELECTION_DATABASE;
+if (folderSelectionDb && (!guided || mode !== 'real-storage')) {
+  throw new Error('V03_FOLDER_SELECTION_REQUIRES_GUIDED_REAL_STORAGE');
+}
+const folderSelectionHost =
+  folderSelectionDb && guided
+    ? createProductionFolderSelectionHost({
+        guided,
+        databaseFile: resolve(folderSelectionDb),
+      })
+    : undefined;
+const folderSelectionRoute = folderSelectionHost
+  ? createV03FolderSelectionRoute(folderSelectionHost)
+  : undefined;
 
 // Restore or stage only operator-pinned Host observations. A browser cannot
 // supply an authority-bearing semantic selection or a selected root.
@@ -190,6 +209,7 @@ const handle = createControlServer({
   executeBuiltinInventoryRecipe,
   cloud,
   v03Guided: guided,
+  v03FolderSelection: folderSelectionRoute,
   v03Gateway: production?.gateway,
   v03Journeys: production?.journeys,
   v03ProviderGlobal: production?.providerGlobal,
