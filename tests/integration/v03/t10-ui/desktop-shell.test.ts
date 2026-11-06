@@ -208,7 +208,15 @@ describe('R04 source contract: the shipped desktop surface replaces technical op
     expect(app).toContain("folderHint:'使用 Windows 文件夹选择器选择目录。");
     expect(app).not.toMatch(/:\s*'[^']*\bHost\b[^']*'/i);
     expect(html).toContain('What is available in this version');
-    expect(html).toContain('This preview does not read or change any files.');
+    expect(html).toContain('This overview reads filesystem metadata only; it does not open or modify file contents.');
+    expect(app).toContain("actionFolderDesc:'Choose a folder for a task and view read-only metadata.");
+    expect(app).toContain("actionFolderDesc:'为当前任务选择文件夹并查看只读元数据；");
+    expect(app).toContain("safetyPreview:'Folder overview shows directory names");
+    expect(app).toContain("safetyPreview:'文件夹概况显示目录名称");
+    expect(app).toContain("folderTotalSize:'Total size'");
+    expect(app).toContain("folderTotalSize:'总大小'");
+    expect(app).toContain("projected.totalBytes");
+    expect(app).toContain("projected.directories.length");
     expect(html).not.toContain('review a plan and decide what happens');
   });
 
