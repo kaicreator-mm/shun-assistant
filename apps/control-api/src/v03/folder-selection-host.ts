@@ -355,7 +355,9 @@ export class FolderSelectionHost {
     const expiresAtUnixMs = now + MAX_TTL_MS;
     const selectionRef = `host:folder:${randomBytes(32).toString('hex')}`;
     const volume =
-      process.platform === 'win32' ? win32.parse(picked.path).root.slice(0, 2) : posix.parse(picked.path).root;
+      process.platform === 'win32'
+        ? win32.parse(picked.path).root.slice(0, 2)
+        : posix.parse(picked.path).root;
     this.#db.exec('BEGIN IMMEDIATE');
     try {
       this.#db
