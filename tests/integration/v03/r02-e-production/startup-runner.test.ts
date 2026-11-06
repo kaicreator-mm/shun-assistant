@@ -46,7 +46,7 @@
  * created. A DEMO banner or a 503-only Guided surface is never accepted as
  * production success.
  *
- * G11 pinned-runner amendment (Issue #371, pack PR #372): Node 26 removed
+ * G11 pinned-runner amendment (Issue #371, pack PR #373): Node 26 removed
  * `--experimental-transform-types` entirely, and Node 26 strip-only mode
  * still refuses the real import graph's parameter properties, so the G10-R2
  * dev entry (`node --experimental-transform-types src/main.ts`) cannot boot
