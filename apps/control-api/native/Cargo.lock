@@ -306,6 +306,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "shun-folder-picker"
+version = "0.3.0"
+dependencies = [
+ "napi",
+ "napi-derive",
+ "windows",
+]
+
+[[package]]
 name = "slab"
 version = "0.4.12"
 source = "registry+https://github.com/rust-lang/crates.io-index"
