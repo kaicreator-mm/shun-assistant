@@ -447,7 +447,13 @@ fn open_directory_chain(path: &str) -> Option<DirectoryChain> {
         .split('\\')
         .filter(|part| !part.is_empty())
         .collect();
-    build_directory_chain(root_handle, root_info, is_volume_root, &components, open_child_directory)
+    build_directory_chain(
+        root_handle,
+        root_info,
+        is_volume_root,
+        &components,
+        open_child_directory,
+    )
 }
 
 fn directory_identity_from_handle(
@@ -489,6 +495,120 @@ fn random_lease_id() -> Option<String> {
         return None;
     }
     Some(bytes.iter().map(|byte| format!("{byte:02x}")).collect())
+}
+
+/// Reads the current canonical DOS path of an already-held directory handle.
+/// This is a best-effort locator for the pinned object; it does not make any
+/// later path-string resolution atomic (see the README lease section).
+fn canonical_path_for_handle(handle: HANDLE) -> Option<String> {
+    use windows::Win32::Storage::FileSystem::{
+        GetFinalPathNameByHandleW, FILE_NAME_NORMALIZED, GETFINALPATHNAMEBYHANDLE_FLAGS,
+        VOLUME_NAME_DOS,
+    };
+    // Both flags are 0; the type does not implement BitOr, so combine by value.
+    let flags = GETFINALPATHNAMEBYHANDLE_FLAGS(FILE_NAME_NORMALIZED.0 | VOLUME_NAME_DOS.0);
+    let mut buffer = vec![0u16; 520];
+    let written = unsafe { GetFinalPathNameByHandleW(handle, &mut buffer, flags) } as usize;
+    if written == 0 || written >= buffer.len() {
+        let mut grown = vec![0u16; written.saturating_add(2).max(4096)];
+        let grown_written =
+            unsafe { GetFinalPathNameByHandleW(handle, &mut grown, flags) } as usize;
+        if grown_written == 0 || grown_written >= grown.len() {
+            return None;
+        }
+        buffer = grown;
+        return finalize_canonical_path(&buffer[..grown_written]);
+    }
+    finalize_canonical_path(&buffer[..written])
+}
+
+fn finalize_canonical_path(wide: &[u16]) -> Option<String> {
+    let text = String::from_utf16_lossy(wide);
+    let stripped = text.strip_prefix("\\\\?\\").unwrap_or(&text);
+    if stripped.is_empty() {
+        return None;
+    }
+    Some(stripped.to_string())
+}
+
+/// Acquires a pinning directory lease for `path`. The returned lease id is an
+/// opaque in-process token holding a parent-first chain of open handles. The
+/// lease preserves a verifiable identity anchor for rechecks; it is not an
+/// exclusion guarantee against Windows rename/delete (see the README).
+#[napi]
+pub fn acquire_directory_lease(path: String) -> Result<FolderDirectoryLease> {
+    let chain = open_directory_chain(&path)
+        .ok_or_else(|| Error::new(Status::GenericFailure, "FOLDER_PICKER_LEASE_PATH_REFUSED"))?;
+    let directory = directory_identity_from_handle(&chain.info, chain.is_volume_root);
+    let lease_id = random_lease_id()
+        .ok_or_else(|| Error::new(Status::GenericFailure, "FOLDER_PICKER_LEASE_ID_UNAVAILABLE"))?;
+    lease_registry()
+        .lock()
+        .map_err(|_| {
+            Error::new(
+                Status::GenericFailure,
+                "FOLDER_PICKER_LEASE_REGISTRY_LOCKED",
+            )
+        })?
+        .insert(lease_id.clone(), chain);
+    Ok(FolderDirectoryLease {
+        lease_id,
+        directory,
+    })
+}
+
+/// Re-reads the directory identity from the pinned target handle of a live
+/// lease. The stable volume/file identity is re-reported from the held
+/// object; a mismatch with the acquired identity refuses with a typed
+/// drift code.
+#[napi]
+pub fn verify_directory_lease(lease_id: String) -> Result<FolderDirectoryIdentity> {
+    let registry = lease_registry().lock().map_err(|_| {
+        Error::new(
+            Status::GenericFailure,
+            "FOLDER_PICKER_LEASE_REGISTRY_LOCKED",
+        )
+    })?;
+    let chain = registry
+        .get(&lease_id)
+        .ok_or_else(|| Error::new(Status::GenericFailure, "FOLDER_PICKER_LEASE_UNKNOWN"))?;
+    let mut info = BY_HANDLE_FILE_INFORMATION::default();
+    unsafe { GetFileInformationByHandle(chain.target(), &mut info) }.map_err(|_| {
+        Error::new(
+            Status::GenericFailure,
+            "FOLDER_PICKER_LEASE_VERIFY_UNAVAILABLE",
+        )
+    })?;
+    let file_index = ((info.nFileIndexHigh as u64) << 32) | info.nFileIndexLow as u64;
+    if info.dwVolumeSerialNumber != chain.volume_serial || file_index != chain.file_index {
+        return Err(Error::new(
+            Status::GenericFailure,
+            "FOLDER_PICKER_LEASE_IDENTITY_DRIFT",
+        ));
+    }
+    Ok(directory_identity_from_handle(&info, chain.is_volume_root))
+}
+
+/// Releases a lease and every handle in its chain. Releasing an unknown or
+/// already-released lease is a typed error, never a silent no-op.
+#[napi]
+pub fn release_directory_lease(lease_id: String) -> Result<()> {
+    let removed = lease_registry()
+        .lock()
+        .map_err(|_| {
+            Error::new(
+                Status::GenericFailure,
+                "FOLDER_PICKER_LEASE_REGISTRY_LOCKED",
+            )
+        })?
+        .remove(&lease_id);
+    if removed.is_none() {
+        return Err(Error::new(
+            Status::GenericFailure,
+            "FOLDER_PICKER_LEASE_UNKNOWN",
+        ));
+    }
+    Ok(())
 }
 
 /// Returns the current DOS path reported by the held target handle.
@@ -615,11 +735,11 @@ mod tests {
         build_directory_chain, directory_facts, open_directory_chain, open_pinning_directory,
         should_refuse_drive_type,
     };
-    use windows::Win32::Storage::FileSystem::BY_HANDLE_FILE_INFORMATION;
     use std::fs;
     use std::path::{Path, PathBuf};
     use std::process::Command;
     use std::time::{SystemTime, UNIX_EPOCH};
+    use windows::Win32::Storage::FileSystem::BY_HANDLE_FILE_INFORMATION;
 
     fn handle_is_open(handle: super::HANDLE) -> bool {
         let mut info = BY_HANDLE_FILE_INFORMATION::default();
@@ -643,7 +763,10 @@ mod tests {
             |_parent, _name| None,
         );
         assert!(missing.is_none());
-        assert!(!handle_is_open(root_raw), "missing child leaked the root handle");
+        assert!(
+            !handle_is_open(root_raw),
+            "missing child leaked the root handle"
+        );
 
         // Reparse child: both the root and just-opened junction handle must
         // be dropped, and no later component may be requested.
@@ -669,9 +792,18 @@ mod tests {
             },
         );
         assert!(reparse.is_none());
-        assert_eq!(opens, 1, "a descendant below the reparse point was requested");
-        assert!(!handle_is_open(root_raw), "reparse refusal leaked the root handle");
-        assert!(!handle_is_open(child_raw), "reparse refusal leaked the child handle");
+        assert_eq!(
+            opens, 1,
+            "a descendant below the reparse point was requested"
+        );
+        assert!(
+            !handle_is_open(root_raw),
+            "reparse refusal leaked the root handle"
+        );
+        assert!(
+            !handle_is_open(child_raw),
+            "reparse refusal leaked the child handle"
+        );
         remove_junction(&link);
 
         // Non-directory child: the acquired child handle and its parent chain
@@ -692,8 +824,14 @@ mod tests {
             |_parent, _name| child.take(),
         );
         assert!(non_directory.is_none());
-        assert!(!handle_is_open(root_raw), "non-directory refusal leaked the root handle");
-        assert!(!handle_is_open(child_raw), "non-directory refusal leaked the child handle");
+        assert!(
+            !handle_is_open(root_raw),
+            "non-directory refusal leaked the root handle"
+        );
+        assert!(
+            !handle_is_open(child_raw),
+            "non-directory refusal leaked the child handle"
+        );
 
         fs::remove_dir_all(&root).expect("cleanup");
     }
