@@ -399,12 +399,14 @@ export class HostGuidedService {
     if (this.#ledgerUnavailable) {
       return { status: 'UNKNOWN', code: this.#ledgerUnavailable };
     }
+    const trustedObservationRelay = isRecord(raw) && this.#trustedHostObservationRelays.has(raw);
     if (!isRecord(raw) || Object.keys(raw).sort().join('|') !==
       ['authorityClaimed','caseRef','decision','humanApproval','kind','outcome','relayedVia','stepDigest','stepId'].sort().join('|') ||
       raw.kind !== 'USER_DECISION_RELAY' ||
       raw.authorityClaimed !== false || raw.relayedVia !== '/api' ||
       !((raw.decision === 'ANSWER' && raw.humanApproval === false) ||
-        ((raw.decision === 'APPROVE' || raw.decision === 'REFUSE') && raw.humanApproval === true))) {
+        ((raw.decision === 'APPROVE' || raw.decision === 'REFUSE') && raw.humanApproval === true) ||
+        (trustedObservationRelay && raw.decision === 'OBSERVED' && raw.humanApproval === false))) {
       return { status: 'REFUSED', code: 'RELAY_SCHEMA_REFUSED' };
     }
     const now = this.#clock();
@@ -440,10 +442,13 @@ export class HostGuidedService {
         matrixValid = stored.step.kind === 'ASK' && submission;
       } else if (raw.decision === 'APPROVE') {
         matrixValid = stored.step.kind === 'REVIEW_EFFECT' && submission;
+      } else if (raw.decision === 'OBSERVED') {
+        matrixValid = trustedObservationRelay &&
+          outcomeEvent === 'OBSERVATION_RECEIPT' && stored.step.kind === 'INSPECT';
       } else {
         matrixValid = (submission &&
             (stored.step.kind === 'REVIEW_EFFECT' || stored.step.kind === 'ASK')) ||
-          (outcomeEvent === 'OBSERVATION_RECEIPT' && stored.step.kind === 'INSPECT');
+          (trustedObservationRelay && outcomeEvent === 'OBSERVATION_RECEIPT' && stored.step.kind === 'INSPECT');
       }
       if (!matrixValid) {
         this.#db.exec('ROLLBACK');
@@ -529,9 +534,9 @@ export class HostGuidedService {
         // A REFUSE is a refusal, but a trusted Host observation receipt is
         // recorded as what it is — an observation receipt — never mislabeled
         // REFUSED and never implying human refusal, grant or effect.
-        status: raw.decision === 'REFUSE'
-          ? (outcomeEvent === 'OBSERVATION_RECEIPT' ? 'OBSERVATION_RECEIPT' : 'REFUSED')
-          : 'ACCEPTED',
+        status: outcomeEvent === 'OBSERVATION_RECEIPT'
+          ? 'OBSERVATION_RECEIPT'
+          : raw.decision === 'REFUSE' ? 'REFUSED' : 'ACCEPTED',
       }];
       // The durable ledger binds every terminal outcome; check it BEFORE any
       // payload write so a pre-existing row (the step was already consumed)
@@ -654,6 +659,54 @@ export class HostGuidedService {
     } catch {
       this.#rollback();
       return { status: 'UNKNOWN', code: 'GUIDED_DURABILITY_UNKNOWN' };
+    }
+  }
+
+  /**
+   * Record the exact current INSPECT step after a successful Host-only
+   * observation. This capability never crosses the HTTP boundary.
+   */
+  recordHostObservationReceipt(): GuidedDecisionReceipt {
+    if (this.#ledgerUnavailable) return { status: 'UNKNOWN', code: this.#ledgerUnavailable };
+    const stored = this.#read();
+    if (
+      !stored ||
+      stored.state !== 'CURRENT' ||
+      stored.step.kind !== 'INSPECT' ||
+      !isRecord(stored.observation) ||
+      typeof stored.observation.selectedRootRef !== 'string' ||
+      stored.step.evidenceRefs.length === 0
+    ) return { status: 'REFUSED', code: 'GUIDED_INSPECT_NOT_CURRENT' };
+    const now = this.#clock();
+    const outcome = {
+      schema: 'shun.guided.step-outcome.v1',
+      journeyId: stored.step.journeyId,
+      taskId: stored.step.taskId,
+      stepId: stored.step.stepId,
+      caseRef: stored.step.caseRef,
+      event: 'OBSERVATION_RECEIPT',
+      source: 'HOST',
+      sourceRef: stored.observation.sourceRef,
+      answers: [],
+      evidenceRefs: [...stored.step.evidenceRefs],
+      occurredAtUnixMs: now,
+    };
+    const relay = {
+      kind: 'USER_DECISION_RELAY',
+      humanApproval: false,
+      authorityClaimed: false,
+      decision: 'OBSERVED',
+      relayedVia: '/api',
+      stepId: stored.step.stepId,
+      stepDigest: stored.step.templateRef.digest,
+      caseRef: stored.step.caseRef,
+      outcome,
+    };
+    this.#trustedHostObservationRelays.add(relay);
+    try {
+      return this.decide(relay);
+    } finally {
+      this.#trustedHostObservationRelays.delete(relay);
     }
   }
 
