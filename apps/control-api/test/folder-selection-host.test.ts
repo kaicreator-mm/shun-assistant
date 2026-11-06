@@ -705,7 +705,6 @@ describe.skipIf(process.platform !== 'win32')(
           NOW + SELECTION_TTL_MS,
           NOW,
         );
-      );
       legacy.close();
       const root = join(directory, 'selected-root');
       mkdirSync(root);
