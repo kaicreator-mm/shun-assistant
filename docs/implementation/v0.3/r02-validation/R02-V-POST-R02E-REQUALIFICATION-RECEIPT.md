@@ -38,7 +38,7 @@ The default production entrypoint/Node runner (J07) and the trusted Guided autho
 ```text
 # Biome preflight on the exact new files (root biome.json)              EXIT=0 (0 problems)
 node scripts/v03-ci/typecheck-r02.mjs                                   EXIT=0 (PASS 7 — r02-v-journeys included)
-node --experimental-transform-types --check <each new file>             EXIT=0 (parse)
+No Node `--check` invocation is claimed for `.ts` files: Node's TypeScript support does not apply to `--check`. TypeScript parsing is covered by `typecheck-r02` and the Vitest/tsx runs on each native Node version below.
 
 # — Node v24.21.0 (PATH-preempted fnm dir; logged node -v first) —
 vitest run --config tests/integration/v03/r02-v-journeys/vitest.config.ts j07-… j08-…   EXIT=0 (9 passed / 9)
