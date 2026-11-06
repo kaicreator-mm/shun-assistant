@@ -1,6 +1,6 @@
 /**
  * R04 U05-A — private, task-bound folder selection and metadata observation.
- * Absolute paths and OS identity remain inside this Host module and SQLite.
+ * Absolute paths remain inside this Host module and SQLite; no OS user identity is persisted.
  */
 import { createHash, randomBytes } from 'node:crypto';
 import { lstatSync, realpathSync } from 'node:fs';
@@ -30,7 +30,6 @@ import {
 } from '../../native/folder-picker/index.ts';
 
 const SELECTION_REF = /^host:folder:[a-f0-9]{64}$/;
-const SID = /^S-1-[0-9-]+$/;
 const HEX_ID = /^[a-f0-9]{1,32}$/i;
 const MAX_TTL_MS = 5 * 60_000;
 const MAX_DIRECTORIES = 256;
@@ -44,9 +43,6 @@ const SELECTION_DDL = `CREATE TABLE folder_selection_records (
   case_ref_json TEXT NOT NULL,
   origin_step_id TEXT NOT NULL,
   template_digest TEXT NOT NULL,
-  user_sid TEXT NOT NULL,
-  logon_sid TEXT NOT NULL,
-  session_id INTEGER NOT NULL,
   volume TEXT NOT NULL,
   volume_serial TEXT NOT NULL,
   file_id TEXT NOT NULL,
@@ -54,8 +50,7 @@ const SELECTION_DDL = `CREATE TABLE folder_selection_records (
   created_at_unix_ms INTEGER NOT NULL
 )`;
 
-type UserIdentity = Readonly<{ userSid: string; logonSid: string; sessionId: number }>;
-type FolderIdentity = UserIdentity & Readonly<{ volumeSerial: string; fileId: string }>;
+type FolderIdentity = Readonly<{ volumeSerial: string; fileId: string }>;
 type DirectoryIdentity = FolderIdentity &
   Readonly<{
     isDirectory: boolean;
@@ -72,9 +67,6 @@ type SelectionRow = {
   case_ref_json: string;
   origin_step_id: string;
   template_digest: string;
-  user_sid: string;
-  logon_sid: string;
-  session_id: number;
   volume: string;
   volume_serial: string;
   file_id: string;
@@ -156,39 +148,30 @@ function safeLocalDirectoryPath(value: unknown): value is string {
     value.replace(/[\\\\]+$/g, '').toLowerCase() !== root.replace(/[\\\\]+$/g, '').toLowerCase()
   );
 }
-function validUserIdentity(value: unknown): value is UserIdentity {
+function validIdentity(value: unknown): value is FolderIdentity {
   return (
     isRecord(value) &&
-    typeof value.userSid === 'string' &&
-    SID.test(value.userSid) &&
-    typeof value.logonSid === 'string' &&
-    SID.test(value.logonSid) &&
-    Number.isSafeInteger(value.sessionId) &&
-    (value.sessionId as number) > 0
+    typeof value.volumeSerial === 'string' &&
+    HEX_ID.test(value.volumeSerial) &&
+    typeof value.fileId === 'string' &&
+    HEX_ID.test(value.fileId)
   );
 }
-function validIdentity(value: unknown): value is FolderIdentity {
-  if (!validUserIdentity(value)) return false;
-  const record = value as Record<string, unknown>;
+function validDirectoryIdentity(value: unknown): value is DirectoryIdentity {
   return (
-    typeof record.volumeSerial === 'string' &&
-    HEX_ID.test(record.volumeSerial) &&
-    typeof record.fileId === 'string' &&
-    HEX_ID.test(record.fileId)
+    validIdentity(value) &&
+    isRecord(value) &&
+    typeof value.isDirectory === 'boolean' &&
+    typeof value.isReparsePoint === 'boolean' &&
+    typeof value.isNetworkPath === 'boolean' &&
+    typeof value.isVolumeRoot === 'boolean'
   );
 }
-function sameIdentity(
-  expected: SelectionRow,
-  user: UserIdentity,
+function sameDirectoryIdentity(
+  expected: Pick<SelectionRow, 'volume_serial' | 'file_id'>,
   directory: DirectoryIdentity,
 ): boolean {
   return (
-    user.userSid === expected.user_sid &&
-    user.logonSid === expected.logon_sid &&
-    user.sessionId === expected.session_id &&
-    directory.userSid === expected.user_sid &&
-    directory.logonSid === expected.logon_sid &&
-    directory.sessionId === expected.session_id &&
     directory.volumeSerial.toLowerCase() === expected.volume_serial.toLowerCase() &&
     directory.fileId.toLowerCase() === expected.file_id.toLowerCase() &&
     directory.isDirectory &&
@@ -247,11 +230,11 @@ export class FolderSelectionHost {
   /** One modal picker at a time: the async dialog must not overlap itself. */
   #pickInFlight = false;
   /**
-   * The lease held for the duration of one `observeCurrentSelectedFolder`
-   * call, visible to the adapter's raw callback so the metadata walk uses
-   * the pinned object's canonical path. Never set outside that window.
+   * Best-effort native directory lease held during one observation. The
+   * metadata walk remains path-based and can race with namespace changes;
+   * this lease is defense-in-depth, not an atomic scan guarantee.
    */
-  #observationLease: NativeDirectoryLease | null = null;
+  #observationLease: NativeDirectoryLease | null = null;  #observationLease: NativeDirectoryLease | null = null;
 
   constructor(input: {
     readonly guided: HostGuidedService;
@@ -267,7 +250,6 @@ export class FolderSelectionHost {
       (!win32.isAbsolute(input.databaseFile) && !input.databaseFile.startsWith('/')) ||
       !input.native ||
       typeof input.native.pickFolder !== 'function' ||
-      typeof input.native.currentIdentity !== 'function' ||
       typeof input.native.inspectFolder !== 'function' ||
       typeof input.native.acquireDirectoryLease !== 'function' ||
       typeof input.native.verifyDirectoryLease !== 'function' ||
@@ -330,37 +312,24 @@ export class FolderSelectionHost {
         code: picked.status === 'REFUSED' ? picked.code : 'FOLDER_PICKER_RESULT_INVALID',
       };
     }
-    let currentUser: ReturnType<FolderPickerNativePort['currentIdentity']>;
     let directory: ReturnType<FolderPickerNativePort['inspectFolder']>;
     try {
-      currentUser = this.#native.currentIdentity();
       directory = this.#native.inspectFolder(picked.path);
     } catch {
       return { status: 'REFUSED', code: 'FOLDER_SELECTION_IDENTITY_UNAVAILABLE' };
     }
     if (
-      !validUserIdentity(currentUser) ||
-      !isRecord(directory) ||
-      !sameIdentity(
+      !validDirectoryIdentity(directory) ||
+      !sameDirectoryIdentity(
         {
-          user_sid: picked.identity.userSid,
-          logon_sid: picked.identity.logonSid,
-          session_id: picked.identity.sessionId,
           volume_serial: picked.identity.volumeSerial,
           file_id: picked.identity.fileId,
-        } as SelectionRow,
-        currentUser,
-        directory as DirectoryIdentity,
+        } as Pick<SelectionRow, 'volume_serial' | 'file_id'>,
+        directory,
       )
     ) {
       return { status: 'REFUSED', code: 'FOLDER_SELECTION_IDENTITY_REFUSED' };
     }
-    if (
-      currentUser.userSid !== picked.identity.userSid ||
-      currentUser.logonSid !== picked.identity.logonSid ||
-      currentUser.sessionId !== picked.identity.sessionId
-    )
-      return { status: 'REFUSED', code: 'FOLDER_SELECTION_SESSION_MISMATCH' };
 
     const now = this.#clock();
     const expiresAtUnixMs = now + MAX_TTL_MS;
@@ -372,11 +341,12 @@ export class FolderSelectionHost {
     this.#db.exec('BEGIN IMMEDIATE');
     try {
       this.#db
-        .prepare(`INSERT INTO folder_selection_records (
-        selection_ref,path,display_name,task_id,journey_id,case_ref_json,
-        origin_step_id,template_digest,user_sid,logon_sid,session_id,volume,
-        volume_serial,file_id,expires_at_unix_ms,created_at_unix_ms
-      ) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`)
+        .prepare(
+          'INSERT INTO folder_selection_records (' +
+            'selection_ref,path,display_name,task_id,journey_id,case_ref_json,' +
+            'origin_step_id,template_digest,volume,volume_serial,file_id,' +
+            'expires_at_unix_ms,created_at_unix_ms) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)',
+        )
         .run(
           selectionRef,
           picked.path,
@@ -386,9 +356,6 @@ export class FolderSelectionHost {
           stableJson(context.step.caseRef),
           context.step.stepId,
           context.step.templateRef.digest,
-          picked.identity.userSid,
-          picked.identity.logonSid,
-          picked.identity.sessionId,
           volume,
           picked.identity.volumeSerial,
           picked.identity.fileId,
@@ -490,8 +457,8 @@ export class FolderSelectionHost {
    *
    * It re-reads the exact accepted answer from the guided ledger and the
    * exact selection row, then verifies expiry, task/journey/Case/origin
-   * step/template-digest binding, the current user/logon/session identity
-   * and the native root identity before re-invoking the existing Host-only
+   * step/template-digest binding and native root identity before re-invoking
+   * the existing Host-only
    * `stageTrustedSelectedRoot()`. Stale, expired or mismatched rows remain
    * refused/stale — recovery never extends a TTL, restages a consumed
    * answer silently or issues any authority.
@@ -546,13 +513,11 @@ export class FolderSelectionHost {
       return { ok: false, code: 'FOLDER_OBSERVATION_UNAVAILABLE' };
     }
 
-    // P1-03: the pinning directory lease is acquired BEFORE any descendant
-    // open and held until after the Host-owned receipt. Its handle-relative,
-    // reparse-free acquisition proves the recorded path still names the
-    // recorded object at this instant; the canonical object path (read from
-    // the pinned handle) keeps every path-based walk inside the window off
-    // any junction planted at the recorded location; post-walk lease + path
-    // re-verification refuses any replacement before a receipt can exist.
+    // Defense-in-depth: acquire a reparse-free native directory lease before
+    // the path-based metadata walk and recheck the root identity afterwards.
+    // This does NOT make readdir/resolveScope/observeStorage handle-relative
+    // or atomic; a transient path replacement during that walk remains an
+    // Owner-accepted v0.3.0 residual risk.
     let lease: NativeDirectoryLease;
     try {
       lease = this.#native.acquireDirectoryLease(row.path);
@@ -602,27 +567,16 @@ export class FolderSelectionHost {
   }
 
   #leaseMatchesRow(lease: NativeDirectoryLease, row: SelectionRow): boolean {
-    try {
-      const user = this.#native.currentIdentity();
-      return (
-        validUserIdentity(user) &&
-        isRecord(lease.directory) &&
-        sameIdentity(row, user, lease.directory as DirectoryIdentity)
-      );
-    } catch {
-      return false;
-    }
+    return (
+      validDirectoryIdentity(lease.directory) &&
+      sameDirectoryIdentity(row, lease.directory)
+    );
   }
 
   #verifyLeaseAgainstRow(lease: NativeDirectoryLease, row: SelectionRow): boolean {
     try {
       const directory = this.#native.verifyDirectoryLease(lease);
-      const user = this.#native.currentIdentity();
-      return (
-        validUserIdentity(user) &&
-        isRecord(directory) &&
-        sameIdentity(row, user, directory as DirectoryIdentity)
-      );
+      return validDirectoryIdentity(directory) && sameDirectoryIdentity(row, directory);
     } catch {
       return false;
     }
@@ -632,8 +586,8 @@ export class FolderSelectionHost {
     return this.#db
       .prepare(
         `SELECT selection_ref,path,display_name,task_id,journey_id,case_ref_json,
-        origin_step_id,template_digest,user_sid,logon_sid,session_id,volume,
-        volume_serial,file_id,expires_at_unix_ms,created_at_unix_ms
+        origin_step_id,template_digest,volume,volume_serial,file_id,
+        expires_at_unix_ms,created_at_unix_ms
        FROM folder_selection_records WHERE selection_ref=?`,
       )
       .get(selectionRef) as SelectionRow | undefined;
@@ -642,13 +596,8 @@ export class FolderSelectionHost {
   #verifySelectionIdentity(row: SelectionRow): boolean {
     if (row.expires_at_unix_ms <= this.#clock()) return false;
     try {
-      const user = this.#native.currentIdentity();
       const directory = this.#native.inspectFolder(row.path);
-      return (
-        validUserIdentity(user) &&
-        isRecord(directory) &&
-        sameIdentity(row, user, directory as DirectoryIdentity)
-      );
+      return validDirectoryIdentity(directory) && sameDirectoryIdentity(row, directory);
     } catch {
       return false;
     }
@@ -665,9 +614,9 @@ export class FolderSelectionHost {
     ) {
       throw new Error('FOLDER_SELECTION_IDENTITY_DRIFT');
     }
-    // The walk runs against the pinned object's own canonical path, never
-    // the recorded spelling: a junction planted at the recorded location is
-    // never consulted, and a moved/deleted object fails the walk closed.
+    // Use the native lease's current canonical path as a best-effort locator.
+    // The subsequent metadata APIs still resolve a path string; replacement
+    // between this call and any descendant open is an accepted residual risk.
     const lease = this.#observationLease;
     if (!lease) throw new Error('FOLDER_SELECTION_LEASE_UNAVAILABLE');
     let leasePath: string;
@@ -864,37 +813,47 @@ export class FolderSelectionHost {
     const columns = this.#db
       .prepare('PRAGMA table_info(folder_selection_records)')
       .all() as unknown as { name: string }[];
-    const expected = [
-      'selection_ref',
-      'path',
-      'display_name',
-      'task_id',
-      'journey_id',
-      'case_ref_json',
-      'origin_step_id',
-      'template_digest',
-      'user_sid',
-      'logon_sid',
-      'session_id',
-      'volume',
-      'volume_serial',
-      'file_id',
-      'expires_at_unix_ms',
-      'created_at_unix_ms',
+    const actual = columns.map((column) => column.name);
+    const current = [
+      'selection_ref', 'path', 'display_name', 'task_id', 'journey_id',
+      'case_ref_json', 'origin_step_id', 'template_digest', 'volume',
+      'volume_serial', 'file_id', 'expires_at_unix_ms', 'created_at_unix_ms',
     ];
-    if (columns.map((column) => column.name).join('|') !== expected.join('|')) {
+    if (actual.join('|') === current.join('|')) return;
+
+    const legacy = [
+      'selection_ref', 'path', 'display_name', 'task_id', 'journey_id',
+      'case_ref_json', 'origin_step_id', 'template_digest', 'user_sid',
+      'logon_sid', 'session_id', 'volume', 'volume_serial', 'file_id',
+      'expires_at_unix_ms', 'created_at_unix_ms',
+    ];
+    if (actual.join('|') !== legacy.join('|')) {
       throw new Error('FOLDER_SELECTION_LEDGER_SCHEMA_REFUSED');
+    }
+
+    // Remove obsolete SID/session columns without losing valid per-account
+    // selections. This migration is transactional; identity authorization
+    // fields are deliberately not copied into the device-scoped schema.
+    this.#db.exec('BEGIN IMMEDIATE');
+    try {
+      this.#db.exec('ALTER TABLE folder_selection_records RENAME TO folder_selection_records_legacy');
+      this.#db.exec(SELECTION_DDL);
+      this.#db.prepare('INSERT INTO folder_selection_records (selection_ref,path,display_name,task_id,journey_id,case_ref_json,origin_step_id,template_digest,volume,volume_serial,file_id,expires_at_unix_ms,created_at_unix_ms) SELECT selection_ref,path,display_name,task_id,journey_id,case_ref_json,origin_step_id,template_digest,volume,volume_serial,file_id,expires_at_unix_ms,created_at_unix_ms FROM folder_selection_records_legacy').run();
+      this.#db.exec('DROP TABLE folder_selection_records_legacy');
+      this.#db.exec('COMMIT');
+    } catch {
+      try { this.#db.exec('ROLLBACK'); } catch { /* retain the original failure */ }
+      throw new Error('FOLDER_SELECTION_LEDGER_MIGRATION_REFUSED');
     }
   }
 }
 
 /**
- * The folder-selection SQLite ledger is per-user private state. Refuse
- * lexical escapes, pre-existing junction/symlink escapes and paths whose
- * actual filesystem target cannot be resolved. ProgramData contamination is
- * refused BEFORE any LocalAppData containment or parent-resolution check so
- * the typed code is always the most specific one; this is a startup path
- * check, and the production factory pins the parent chain across it.
+ * The folder-selection SQLite ledger is per-Windows-account LocalAppData
+ * state. Refuse lexical escapes, pre-existing junction/symlink escapes and
+ * paths whose actual filesystem target cannot be resolved. ProgramData
+ * contamination is refused before LocalAppData containment checks. The
+ * validation-to-SQLite-open race remains an accepted residual risk.
  */
 export function folderSelectionDatabaseRefusal(databaseFile: unknown): string | null {
   if (process.platform !== 'win32') return 'FOLDER_SELECTION_DATABASE_NOT_WINDOWS';
@@ -1003,13 +962,11 @@ export function createProductionFolderSelectionHost(input: {
   readonly clock?: () => number;
 }): FolderSelectionHost {
   const native = loadFolderPicker();
-  // P1-03: pin the database parent chain BEFORE the LocalAppData boundary
-  // checks and keep it pinned until SQLite has opened the file. The check/open
-  // pair is then bound to the real parent location: a junction planted at the
-  // recorded location between check and open is never consulted, and after
-  // the open SQLite's own handle keeps the file bound. On this Windows
-  // family the pins do not block rename/delete, so the guard's guarantee is
-  // location binding via the canonical parent path, not exclusion.
+  // Best-effort defense-in-depth: resolve the current parent through a
+  // reparse-free native directory lease before checking LocalAppData
+  // containment. DatabaseSync still opens by path, so this does NOT make the
+  // check/open pair atomic; a replacement race remains an Owner-accepted
+  // v0.3.0 residual risk.
   const resolvedDatabaseFile = resolve(input.databaseFile);
   const parentDirectory = dirname(resolvedDatabaseFile);
   let guard: NativeDirectoryLease | undefined;

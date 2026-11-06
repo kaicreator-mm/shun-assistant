@@ -181,12 +181,9 @@ function tableCount(file: string, table: string): number {
 
 // ---------- U05-A: Host startup recovery for the select-root crash window ----------
 
-// Mock native picker identity; the native addon itself is exercised by the
+// Mock native directory identity; the native addon itself is exercised by the
 // Rust unit tests and the interactive desktop smoke, not by this file.
 const folderIdentity = {
-  userSid: 'S-1-5-21-9-8-7-1001',
-  logonSid: 'S-1-5-5-0-4321',
-  sessionId: 1,
   volumeSerial: '9a8b7c6d',
   fileId: '0fedcba987654321',
 };
@@ -198,11 +195,6 @@ function folderPickerNative(root: string) {
       path: root,
       displayName: 'Documents',
       identity: folderIdentity,
-    }),
-    currentIdentity: () => ({
-      userSid: folderIdentity.userSid,
-      logonSid: folderIdentity.logonSid,
-      sessionId: folderIdentity.sessionId,
     }),
     inspectFolder: () => ({
       ...folderIdentity,

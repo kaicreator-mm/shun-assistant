@@ -9,17 +9,10 @@ import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { FOLDER_PICKER_ADDON_SHA256 } from './artifacts.ts';
 
-export type FolderUserIdentity = Readonly<{
-  userSid: string;
-  logonSid: string;
-  sessionId: number;
+export type FolderIdentity = Readonly<{
+  volumeSerial: string;
+  fileId: string;
 }>;
-
-export type FolderIdentity = FolderUserIdentity &
-  Readonly<{
-    volumeSerial: string;
-    fileId: string;
-  }>;
 
 export type FolderDirectoryIdentity = FolderIdentity &
   Readonly<{
@@ -41,13 +34,9 @@ export type NativeFolderSelection =
 
 /**
  * A live native directory lease: an opaque in-process token plus the
- * identity of the pinned directory object captured at acquisition. The
- * native side holds a handle chain from the volume root to the directory
- * (opened handle-relatively, reparse-free, no FILE_SHARE_DELETE) for as long
- * as the lease is not released. On this Windows family the handles do not
- * block rename/delete of the directory, so the lease's guarantees are object
- * identity continuity plus a canonical object path — never the recorded
- * spelling — for all path-based walks inside the lease window.
+ * volume/file identity captured from a reparse-free handle chain. It is
+ * defense-in-depth only. Downstream metadata APIs still walk by path, so
+ * replacement during the path-based scan remains a documented residual risk.
  */
 export type NativeDirectoryLease = Readonly<{
   leaseId: string;
@@ -58,7 +47,6 @@ export interface FolderPickerNativePort {
   /** Frozen contract: the modal Shell dialog runs on a dedicated COM STA
    * async worker; the Node main event loop is never blocked. */
   pickFolder(): Promise<NativeFolderSelection>;
-  currentIdentity(): FolderUserIdentity;
   inspectFolder(path: string): FolderDirectoryIdentity;
   /** Pins the directory chain for `path` and returns the lease plus the
    * identity read from the pinned handle. Fails closed on any reparse
@@ -109,18 +97,12 @@ type RawSelectionResult = {
   path?: string;
   displayName?: string;
   identity?: {
-    userSid?: string;
-    logonSid?: string;
-    sessionId?: number;
     volumeSerial?: string;
     fileId?: string;
   };
 };
 
 type RawDirectoryIdentity = {
-  userSid?: string;
-  logonSid?: string;
-  sessionId?: number;
   volumeSerial?: string;
   fileId?: string;
   isDirectory?: boolean;
@@ -131,11 +113,6 @@ type RawDirectoryIdentity = {
 
 type RawAddon = {
   pickFolder(): Promise<RawSelectionResult>;
-  currentIdentity(): {
-    userSid?: string;
-    logonSid?: string;
-    sessionId?: number;
-  };
   inspectFolder(path: string): RawDirectoryIdentity;
   acquireDirectoryLease(path: string): {
     leaseId?: string;
@@ -147,21 +124,10 @@ type RawAddon = {
 };
 
 function mapIdentity(raw: NonNullable<RawSelectionResult['identity']>): FolderIdentity {
-  if (
-    typeof raw.userSid !== 'string' ||
-    typeof raw.logonSid !== 'string' ||
-    !Number.isSafeInteger(raw.sessionId) ||
-    typeof raw.volumeSerial !== 'string' ||
-    typeof raw.fileId !== 'string'
-  )
+  if (typeof raw.volumeSerial !== 'string' || typeof raw.fileId !== 'string') {
     throw new Error('FOLDER_PICKER_IDENTITY_INVALID');
-  return {
-    userSid: raw.userSid,
-    logonSid: raw.logonSid,
-    sessionId: raw.sessionId as number,
-    volumeSerial: raw.volumeSerial,
-    fileId: raw.fileId,
-  };
+  }
+  return { volumeSerial: raw.volumeSerial, fileId: raw.fileId };
 }
 
 function mapDirectoryIdentity(raw: RawDirectoryIdentity): FolderDirectoryIdentity {
@@ -191,7 +157,6 @@ export function loadFolderPicker(): FolderPickerNativePort {
   if (
     !addon ||
     typeof addon.pickFolder !== 'function' ||
-    typeof addon.currentIdentity !== 'function' ||
     typeof addon.inspectFolder !== 'function' ||
     typeof addon.acquireDirectoryLease !== 'function' ||
     typeof addon.verifyDirectoryLease !== 'function' ||
@@ -234,21 +199,7 @@ export function loadFolderPicker(): FolderPickerNativePort {
         return { status: 'REFUSED', code: 'FOLDER_PICKER_IDENTITY_INVALID' };
       }
     },
-    currentIdentity(): FolderUserIdentity {
-      const raw = addon.currentIdentity();
-      if (
-        typeof raw.userSid !== 'string' ||
-        typeof raw.logonSid !== 'string' ||
-        !Number.isSafeInteger(raw.sessionId)
-      )
-        throw new Error('FOLDER_PICKER_USER_IDENTITY_UNAVAILABLE');
-      return {
-        userSid: raw.userSid,
-        logonSid: raw.logonSid,
-        sessionId: raw.sessionId as number,
-      };
-    },
-    inspectFolder(path: string): FolderDirectoryIdentity {
+    inspectFolder(path: string): FolderDirectoryIdentity {    inspectFolder(path: string): FolderDirectoryIdentity {
       return mapDirectoryIdentity(addon.inspectFolder(path));
     },
     acquireDirectoryLease(path: string): NativeDirectoryLease {

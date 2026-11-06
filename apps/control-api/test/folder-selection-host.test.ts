@@ -1,4 +1,5 @@
 import { mkdirSync, mkdtempSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
+import { DatabaseSync } from 'node:sqlite';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
@@ -16,9 +17,6 @@ import {
 const NOW = 1_800_000_000_000;
 const SELECTION_TTL_MS = 5 * 60_000;
 const identity = {
-  userSid: 'S-1-5-21-1-2-3-1001',
-  logonSid: 'S-1-5-5-0-1234',
-  sessionId: 1,
   volumeSerial: '1a2b3c4d',
   fileId: '0123456789abcdef',
 };
@@ -118,12 +116,7 @@ function nativePort(root: string, overrides: Record<string, unknown> = {}) {
       displayName: 'Documents',
       identity,
     }),
-    currentIdentity: () => ({
-      userSid: identity.userSid,
-      logonSid: identity.logonSid,
-      sessionId: identity.sessionId,
-    }),
-    inspectFolder: () => ({
+    inspectFolder: () => ({    inspectFolder: () => ({
       ...identity,
       isDirectory: true,
       isReparsePoint: false,
@@ -261,16 +254,11 @@ describe.skipIf(process.platform !== 'win32')(
       expect(await env.host.selectRoot().then((r) => r.status)).toBe('SELECTED');
     });
 
-    it('turns native identity exceptions into redacted typed refusal', async () => {
-      const env = createEnvironment(undefined, {
-        currentIdentity: () => {
-          throw new Error('raw token detail must not escape');
-        },
-      });
+    it('does not require or persist a Windows SID, logon SID or session identity', async () => {
+      const env = createEnvironment();
       cleanups.push(env.cleanup);
       const result = await env.host.selectRoot();
-      expect(result).toEqual({ status: 'REFUSED', code: 'FOLDER_SELECTION_IDENTITY_UNAVAILABLE' });
-      expect(JSON.stringify(result)).not.toContain('raw token detail');
+      expect(result).toMatchObject({ status: 'SELECTED', displayName: 'Documents' });
     });
 
     it('refuses an inspectFolder exception without leaking its OS detail', async () => {
@@ -353,14 +341,14 @@ describe.skipIf(process.platform !== 'win32')(
 );
 
 describe.skipIf(process.platform !== 'win32')(
-  'R04 U05-A directory lease (P1-03 TOCTOU) holds the selected root through scan and receipt',
+  'R04 U05-A directory lease defense-in-depth and accepted path-scan race',
   () => {
     const cleanups: Array<() => void> = [];
     afterEach(() => {
       for (const cleanup of cleanups.splice(0)) cleanup();
     });
 
-    it('holds the lease from pre-walk identity through the Host receipt, then releases it', async () => {
+    it('keeps the best-effort lease through scan and receipt, then releases it', async () => {
       const events: string[] = [];
       let held = false;
       const storage: FolderSelectionStoragePort = {
@@ -400,8 +388,8 @@ describe.skipIf(process.platform !== 'win32')(
       const result = await env.host.observeCurrentSelectedFolder();
       expect(result.ok).toBe(true);
       expect(env.guided.receiptCount()).toBe(1);
-      // The scan ran entirely inside the lease window; the release is the
-      // last native lease event, strictly after the Host-owned receipt.
+      // The lease remains held during the path-based scan and Host receipt.
+      // This ordering is defense-in-depth only; it does not prove atomicity.
       expect(events).toEqual([
         'acquire',
         'resolveScope:held=true',
@@ -437,8 +425,9 @@ describe.skipIf(process.platform !== 'win32')(
 
       const result = await env.host.observeCurrentSelectedFolder();
       expect(result).toEqual({ ok: false, code: 'FOLDER_OBSERVATION_UNAVAILABLE' });
-      // THE adversarial regression assertions: nothing below the replaced
-      // ancestor was opened, and no Host receipt exists.
+      // The native reparse refusal prevents the storage port from being
+      // reached, and no Host receipt exists. This does not claim to close a
+      // replacement race after path-based walking has begun.
       expect(storageCalled).toBe(false);
       expect(env.guided.receiptCount()).toBe(0);
     });
@@ -664,10 +653,60 @@ describe.skipIf(process.platform !== 'win32')(
       if (temporaryRoot) rmSync(temporaryRoot, { recursive: true, force: true });
     });
 
-    it('accepts a database strictly inside the current user LOCALAPPDATA', () => {
+    it('accepts a database strictly inside the current Windows account LOCALAPPDATA', () => {
       expect(
         folderSelectionDatabaseRefusal(join(localAppDataRoot, 'Shun', 'folder-selection.sqlite')),
       ).toBe(null);
+    });
+
+    it('migrates legacy per-account records without retaining SID/session columns', () => {
+      const directory = mkdtempSync(join(tmpdir(), 'shun-r04-folder-migration-'));
+      const databaseFile = join(directory, 'folder-selection.sqlite');
+      const legacy = new DatabaseSync(databaseFile);
+      legacy.exec('CREATE TABLE folder_selection_records (selection_ref TEXT PRIMARY KEY, path TEXT NOT NULL, display_name TEXT NOT NULL, task_id TEXT NOT NULL, journey_id TEXT NOT NULL, case_ref_json TEXT NOT NULL, origin_step_id TEXT NOT NULL, template_digest TEXT NOT NULL, user_sid TEXT NOT NULL, logon_sid TEXT NOT NULL, session_id INTEGER NOT NULL, volume TEXT NOT NULL, volume_serial TEXT NOT NULL, file_id TEXT NOT NULL, expires_at_unix_ms INTEGER NOT NULL, created_at_unix_ms INTEGER NOT NULL)');
+      legacy.prepare('INSERT INTO folder_selection_records VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)').run(
+        'host:folder:' + 'f'.repeat(64),
+        join(directory, 'selected-root'),
+        'Documents',
+        'task-folder-r04',
+        'journey-folder-r04',
+        '{"digest":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","snapshotId":"case-folder-r04"}',
+        'step-select-root',
+        'b'.repeat(64),
+        'S-1-5-21-1-2-3-1001',
+        'S-1-5-5-0-1234',
+        1,
+        'C:',
+        '1a2b3c4d',
+        '0123456789abcdef',
+        NOW + SELECTION_TTL_MS,
+        NOW,
+      );
+      legacy.close();
+      const root = join(directory, 'selected-root');
+      mkdirSync(root);
+      const host = new FolderSelectionHost({
+        guided: createGuided().service,
+        databaseFile,
+        native: nativePort(root),
+        clock: () => NOW,
+      });
+      const migrated = new DatabaseSync(databaseFile);
+      try {
+        const columns = migrated.prepare('PRAGMA table_info(folder_selection_records)').all() as { name: string }[];
+        expect(columns.map((column) => column.name)).toEqual([
+          'selection_ref', 'path', 'display_name', 'task_id', 'journey_id',
+          'case_ref_json', 'origin_step_id', 'template_digest', 'volume',
+          'volume_serial', 'file_id', 'expires_at_unix_ms', 'created_at_unix_ms',
+        ]);
+        expect(migrated.prepare('SELECT selection_ref FROM folder_selection_records').get()).toEqual({
+          selection_ref: 'host:folder:' + 'f'.repeat(64),
+        });
+      } finally {
+        migrated.close();
+        host.close();
+        rmSync(directory, { recursive: true, force: true });
+      }
     });
 
     it('refuses ProgramData, UNC/device paths and out-of-profile locations', () => {

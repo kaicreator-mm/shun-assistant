@@ -1,7 +1,7 @@
 //! Windows Shell folder picker and metadata-only directory identity.
 //!
 //! This addon exposes no path-taking UI fallback and never reads file contents.
-//! The TypeScript Host keeps absolute paths and token/file identity private.
+//! The TypeScript Host keeps absolute paths and volume/file identity private.
 
 #![allow(clippy::missing_safety_doc)]
 
@@ -20,12 +20,7 @@ use windows::Wdk::Storage::FileSystem::{
     NTCREATEFILE_CREATE_OPTIONS,
 };
 use windows::Win32::Foundation::{
-    CloseHandle, LocalFree, ERROR_CANCELLED, HANDLE, HLOCAL, OBJ_CASE_INSENSITIVE, UNICODE_STRING,
-};
-use windows::Win32::Security::Authorization::ConvertSidToStringSidW;
-use windows::Win32::Security::{
-    GetTokenInformation, TokenGroups, TokenSessionId, TokenUser, TOKEN_GROUPS, TOKEN_QUERY,
-    TOKEN_USER,
+    CloseHandle, ERROR_CANCELLED, HANDLE, OBJ_CASE_INSENSITIVE, UNICODE_STRING,
 };
 use windows::Win32::Storage::FileSystem::{
     CreateFileW, GetDriveTypeW, GetFileInformationByHandle, BY_HANDLE_FILE_INFORMATION,
@@ -38,7 +33,6 @@ use windows::Win32::System::Com::{
 use windows::Win32::System::StationsAndDesktops::{
     CloseDesktop, OpenInputDesktop, DESKTOP_CONTROL_FLAGS, DESKTOP_READOBJECTS,
 };
-use windows::Win32::System::Threading::{GetCurrentProcess, OpenProcessToken};
 use windows::Win32::System::IO::IO_STATUS_BLOCK;
 use windows::Win32::UI::Shell::{
     FileOpenDialog, IFileOpenDialog, FOS_FORCEFILESYSTEM, FOS_PATHMUSTEXIST, FOS_PICKFOLDERS,
@@ -46,26 +40,13 @@ use windows::Win32::UI::Shell::{
 };
 
 #[napi(object)]
-pub struct FolderUserIdentity {
-    pub user_sid: String,
-    pub logon_sid: String,
-    pub session_id: u32,
-}
-
-#[napi(object)]
 pub struct FolderIdentity {
-    pub user_sid: String,
-    pub logon_sid: String,
-    pub session_id: u32,
     pub volume_serial: String,
     pub file_id: String,
 }
 
 #[napi(object)]
 pub struct FolderDirectoryIdentity {
-    pub user_sid: String,
-    pub logon_sid: String,
-    pub session_id: u32,
     pub volume_serial: String,
     pub file_id: String,
     pub is_directory: bool,
@@ -156,97 +137,6 @@ unsafe fn wide_ptr_to_string(pointer: *const u16) -> Option<String> {
     Some(String::from_utf16_lossy(unsafe {
         slice::from_raw_parts(pointer, length)
     }))
-}
-
-fn sid_to_string(sid: windows::Win32::Security::PSID) -> Option<String> {
-    let mut value = windows::core::PWSTR::null();
-    unsafe { ConvertSidToStringSidW(sid, &mut value) }.ok()?;
-    let text = unsafe { wide_ptr_to_string(value.0) };
-    let _ = unsafe { LocalFree(Some(HLOCAL(value.0 as *mut c_void))) };
-    text
-}
-
-fn token_user_sid(token: HANDLE) -> Option<String> {
-    let mut needed = 0u32;
-    let _ = unsafe { GetTokenInformation(token, TokenUser, None, 0, &mut needed) };
-    if needed == 0 {
-        return None;
-    }
-    let mut buffer = vec![0u8; needed as usize];
-    unsafe {
-        GetTokenInformation(
-            token,
-            TokenUser,
-            Some(buffer.as_mut_ptr().cast()),
-            needed,
-            &mut needed,
-        )
-    }
-    .ok()?;
-    let user = unsafe { &*(buffer.as_ptr() as *const TOKEN_USER) };
-    sid_to_string(user.User.Sid)
-}
-
-fn token_logon_sid(token: HANDLE) -> Option<String> {
-    let mut needed = 0u32;
-    let _ = unsafe { GetTokenInformation(token, TokenGroups, None, 0, &mut needed) };
-    if needed == 0 {
-        return None;
-    }
-    let mut buffer = vec![0u8; needed as usize];
-    unsafe {
-        GetTokenInformation(
-            token,
-            TokenGroups,
-            Some(buffer.as_mut_ptr().cast()),
-            needed,
-            &mut needed,
-        )
-    }
-    .ok()?;
-    let groups = unsafe { &*(buffer.as_ptr() as *const TOKEN_GROUPS) };
-    const SE_GROUP_LOGON_ID: u32 = 0xC000_0000;
-    let entries =
-        unsafe { slice::from_raw_parts(groups.Groups.as_ptr(), groups.GroupCount as usize) };
-    entries
-        .iter()
-        .find(|entry| entry.Attributes & SE_GROUP_LOGON_ID == SE_GROUP_LOGON_ID)
-        .and_then(|entry| sid_to_string(entry.Sid))
-}
-
-fn token_session_id(token: HANDLE) -> Option<u32> {
-    let mut session_id = 0u32;
-    let mut returned = 0u32;
-    unsafe {
-        GetTokenInformation(
-            token,
-            TokenSessionId,
-            Some((&mut session_id as *mut u32).cast()),
-            std::mem::size_of::<u32>() as u32,
-            &mut returned,
-        )
-    }
-    .ok()?;
-    Some(session_id)
-}
-
-fn current_identity_inner() -> Option<FolderUserIdentity> {
-    let mut token = HANDLE::default();
-    unsafe { OpenProcessToken(GetCurrentProcess(), TOKEN_QUERY, &mut token) }.ok()?;
-    let _owned = OwnedHandle(token);
-    let user_sid = token_user_sid(token)?;
-    let logon_sid = token_logon_sid(token)?;
-    let session_id = token_session_id(token)?;
-    // Session 0 is a service/non-interactive session. Do not pretend it can
-    // present a trustworthy user-selected Shell folder.
-    if session_id == 0 {
-        return None;
-    }
-    Some(FolderUserIdentity {
-        user_sid,
-        logon_sid,
-        session_id,
-    })
 }
 
 fn is_plain_drive_path(path: &str) -> bool {
@@ -365,12 +255,8 @@ fn directory_facts(path: &str) -> Option<DirectoryFacts> {
 }
 
 fn inspect_folder_inner(path: &str) -> Option<FolderDirectoryIdentity> {
-    let identity = current_identity_inner()?;
     let facts = directory_facts(path)?;
     Some(FolderDirectoryIdentity {
-        user_sid: identity.user_sid,
-        logon_sid: identity.logon_sid,
-        session_id: identity.session_id,
         volume_serial: format!("{:08x}", facts.info.dwVolumeSerialNumber),
         file_id: format!(
             "{:08x}{:08x}",
@@ -384,33 +270,25 @@ fn inspect_folder_inner(path: &str) -> Option<FolderDirectoryIdentity> {
 }
 
 // ---------------------------------------------------------------------------
-// Race-safe directory handle lease (P1-03 TOCTOU closure).
+// Native directory lease — defense-in-depth, not an atomic path-scan lock.
 //
-// `directory_facts`/`inspect_folder` re-read identity by path string, which
-// is correct for one-shot checks but cannot bind an identity to the metadata
-// walk: between the identity check and `readdir`/`resolveScope`/
-// `observeStorage`, an ancestor could be renamed/replaced with a junction so
-// the same path string resolves to a different directory. The lease closes
-// that window: every path component from the volume root to the target is
-// opened HANDLE-RELATIVELY (NtCreateFile with RootDirectory) with
-// FILE_OPEN_REPARSE_POINT, so a junction/symlink component is never
-// traversed, and every handle is opened WITHOUT FILE_SHARE_DELETE, so no
-// component in the chain can be renamed, replaced or deleted while the lease
-// is held. Every path-string re-resolution performed inside the lease window
-// (by Node or vertical-storage) therefore stays bound to the same directory
-// objects, and the held target handle pins the exact file identity.
+// Acquisition walks components handle-relatively and refuses reparse points.
+// The held handles allow identity rechecks and canonical-path lookup, but
+// downstream readdir/resolveScope/observeStorage still consume path strings.
+// Rename/replacement can race with those operations; this is an Owner-accepted
+// v0.3.0 residual risk. The lease does not claim to block rename/delete.
 // ---------------------------------------------------------------------------
 
 const FILE_ATTRIBUTE_DIRECTORY_U32: u32 = 0x0000_0010;
 const FILE_ATTRIBUTE_REPARSE_POINT_U32: u32 = 0x0000_0400;
-/// READ | WRITE, never DELETE: a handle with this share mask blocks any
-/// rename/delete/replace of the object while it stays open.
+/// Share READ and WRITE, but not DELETE. Windows may still permit directory
+/// rename/delete with these handles open; this is not an exclusion guarantee.
 const PINNING_SHARE_MODE: u32 = 0x0000_0001 | 0x0000_0002;
 
 /// A held chain of open handles, parent-first, ending at the target
 /// directory. The chain is the lease: dropping it releases every pin.
 struct DirectoryChain {
-    handles: Vec<HANDLE>,
+    handles: Vec<OwnedHandle>,
     info: BY_HANDLE_FILE_INFORMATION,
     is_volume_root: bool,
     volume_serial: u32,
@@ -425,24 +303,17 @@ unsafe impl Send for DirectoryChain {}
 
 impl DirectoryChain {
     fn target(&self) -> HANDLE {
-        *self.handles.last().expect("chain always has a root handle")
-    }
-}
-
-impl Drop for DirectoryChain {
-    fn drop(&mut self) {
-        for handle in &self.handles {
-            if !handle.is_invalid() {
-                let _ = unsafe { CloseHandle(*handle) };
-            }
-        }
+        self.handles
+            .last()
+            .expect("chain always has a root handle")
+            .0
     }
 }
 
 /// Opens one absolute path for attribute reads and KEEPS the handle. The
 /// handle is opened with backup semantics + OPEN_REPARSE_POINT and a
 /// no-DELETE share mask so it can serve as a pinning chain link.
-fn open_pinning_directory(path: &str) -> Option<(HANDLE, BY_HANDLE_FILE_INFORMATION)> {
+fn open_pinning_directory(path: &str) -> Option<(OwnedHandle, BY_HANDLE_FILE_INFORMATION)> {
     let wide = to_wide(path);
     let flags =
         windows::Win32::Storage::FileSystem::FILE_FLAGS_AND_ATTRIBUTES(0x0200_0000 | 0x0020_0000);
@@ -458,22 +329,19 @@ fn open_pinning_directory(path: &str) -> Option<(HANDLE, BY_HANDLE_FILE_INFORMAT
         )
     }
     .ok()?;
+    let owned = OwnedHandle(handle);
     let mut info = BY_HANDLE_FILE_INFORMATION::default();
-    if unsafe { GetFileInformationByHandle(handle, &mut info) }.is_err() {
-        let _ = unsafe { CloseHandle(handle) };
-        return None;
-    }
-    Some((handle, info))
+    unsafe { GetFileInformationByHandle(handle, &mut info) }.ok()?;
+    Some((owned, info))
 }
 
-/// Opens one child DIRECTORY by name relative to an already-held parent
-/// handle. Handle-relative open is what makes the chain race-free: the parent
-/// handle is pinned, so the child can only ever be the object that was inside
-// THIS parent at open time, never a path re-resolution.
+/// Opens one child directory by name relative to an already-held parent
+/// handle. This avoids re-resolving ancestors during chain acquisition, but
+/// does not make later path-based metadata walks atomic.
 fn open_child_directory(
     parent: HANDLE,
     name: &str,
-) -> Option<(HANDLE, BY_HANDLE_FILE_INFORMATION)> {
+) -> Option<(OwnedHandle, BY_HANDLE_FILE_INFORMATION)> {
     // NUL-terminated UTF-16; NtCreateFile reads exactly Length bytes.
     let mut buffer: Vec<u16> = name.encode_utf16().chain(std::iter::once(0)).collect();
     let byte_len = (buffer.len() - 1) * 2;
@@ -510,56 +378,46 @@ fn open_child_directory(
     if status.is_err() {
         return None;
     }
+    let owned = OwnedHandle(handle);
     let mut info = BY_HANDLE_FILE_INFORMATION::default();
-    if unsafe { GetFileInformationByHandle(handle, &mut info) }.is_err() {
-        let _ = unsafe { CloseHandle(handle) };
-        return None;
-    }
-    Some((handle, info))
+    unsafe { GetFileInformationByHandle(handle, &mut info) }.ok()?;
+    Some((owned, info))
 }
 
 /// Builds a pinning handle chain for one plain-drive absolute path. Any
 /// reparse component, non-directory component, network/unknown drive or
 /// malformed path refuses with None; no descendant of a junction is ever
 /// opened.
-fn open_directory_chain(path: &str) -> Option<DirectoryChain> {
-    if !is_plain_drive_path(path) {
-        return None;
-    }
-    let drive_root = format!("{}\\", &path[..2]);
-    let drive_wide = to_wide(&drive_root);
-    let drive_type = unsafe { GetDriveTypeW(PCWSTR(drive_wide.as_ptr())) };
-    if should_refuse_drive_type(drive_type) {
-        return None;
-    }
-    let is_volume_root = path.trim_end_matches('\\').eq_ignore_ascii_case(&path[..2]);
-
-    let (root_handle, root_info) = open_pinning_directory(&drive_root)?;
+fn build_directory_chain<F>(
+    root_handle: OwnedHandle,
+    root_info: BY_HANDLE_FILE_INFORMATION,
+    is_volume_root: bool,
+    components: &[&str],
+    mut open_child: F,
+) -> Option<DirectoryChain>
+where
+    F: FnMut(HANDLE, &str) -> Option<(OwnedHandle, BY_HANDLE_FILE_INFORMATION)>,
+{
+    // Retain every acquired handle in an RAII vector. Any early return or
+    // refusal drops the complete partial chain, including missing/reparse/
+    // non-directory child failures.
     if root_info.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY_U32 == 0
         || root_info.dwFileAttributes & FILE_ATTRIBUTE_REPARSE_POINT_U32 != 0
     {
-        let _ = unsafe { CloseHandle(root_handle) };
         return None;
     }
     let mut handles = vec![root_handle];
     let mut info = root_info;
-    let components: Vec<&str> = path[3..]
-        .split('\\')
-        .filter(|part| !part.is_empty())
-        .collect();
-    for component in &components {
-        let parent = *handles.last().expect("chain always has a parent");
-        let (handle, child_info) = open_child_directory(parent, component)?;
+    for component in components {
+        let parent = handles.last()?.0;
+        let (child_handle, child_info) = open_child(parent, component)?;
         let attributes = child_info.dwFileAttributes;
         if attributes & FILE_ATTRIBUTE_DIRECTORY_U32 == 0
             || attributes & FILE_ATTRIBUTE_REPARSE_POINT_U32 != 0
         {
-            // Fail closed without descending through a link and without
-            // keeping a pin on a non-directory object.
-            let _ = unsafe { CloseHandle(handle) };
             return None;
         }
-        handles.push(handle);
+        handles.push(child_handle);
         info = child_info;
     }
     let volume_serial = info.dwVolumeSerialNumber;
@@ -573,20 +431,32 @@ fn open_directory_chain(path: &str) -> Option<DirectoryChain> {
     })
 }
 
+fn open_directory_chain(path: &str) -> Option<DirectoryChain> {
+    if !is_plain_drive_path(path) {
+        return None;
+    }
+    let drive_root = format!("{}\\", &path[..2]);
+    let drive_wide = to_wide(&drive_root);
+    let drive_type = unsafe { GetDriveTypeW(PCWSTR(drive_wide.as_ptr())) };
+    if should_refuse_drive_type(drive_type) {
+        return None;
+    }
+    let is_volume_root = path.trim_end_matches('\\').eq_ignore_ascii_case(&path[..2]);
+    let (root_handle, root_info) = open_pinning_directory(&drive_root)?;
+    let components: Vec<&str> = path[3..]
+        .split('\\')
+        .filter(|part| !part.is_empty())
+        .collect();
+    build_directory_chain(root_handle, root_info, is_volume_root, &components, open_child_directory)
+}
+
 fn directory_identity_from_handle(
-    user: &FolderUserIdentity,
     info: &BY_HANDLE_FILE_INFORMATION,
     is_volume_root: bool,
 ) -> FolderDirectoryIdentity {
     FolderDirectoryIdentity {
-        user_sid: user.user_sid.clone(),
-        logon_sid: user.logon_sid.clone(),
-        session_id: user.session_id,
         volume_serial: format!("{:08x}", info.dwVolumeSerialNumber),
         file_id: format!("{:08x}{:08x}", info.nFileIndexHigh, info.nFileIndexLow),
-        // The chain only ever pins directories and refuses every reparse
-        // component, so a live lease always describes a reparse-free
-        // directory.
         is_directory: true,
         is_reparse_point: false,
         is_network_path: false,
@@ -611,161 +481,9 @@ fn random_lease_id() -> Option<String> {
     Some(bytes.iter().map(|byte| format!("{byte:02x}")).collect())
 }
 
-/// The pinned object's own current DOS path, read from the held handle —
-/// never re-resolved through possibly-replaced ancestors. A `\\?\` prefix is
-/// stripped so downstream path-based walks get a plain drive path; the object
-/// identity is already bound to the handle, so this string is only a locator.
-fn canonical_path_for_handle(handle: HANDLE) -> Option<String> {
-    use windows::Win32::Storage::FileSystem::{
-        GetFinalPathNameByHandleW, FILE_NAME_NORMALIZED, GETFINALPATHNAMEBYHANDLE_FLAGS,
-        VOLUME_NAME_DOS,
-    };
-    // Both flags are 0; the type does not implement BitOr, so combine by value.
-    let flags = GETFINALPATHNAMEBYHANDLE_FLAGS(FILE_NAME_NORMALIZED.0 | VOLUME_NAME_DOS.0);
-    let mut buffer = vec![0u16; 520];
-    let written = unsafe { GetFinalPathNameByHandleW(handle, &mut buffer, flags) } as usize;
-    if written == 0 || written >= buffer.len() {
-        let mut grown = vec![0u16; written.saturating_add(2).max(4096)];
-        let grown_written =
-            unsafe { GetFinalPathNameByHandleW(handle, &mut grown, flags) } as usize;
-        if grown_written == 0 || grown_written >= grown.len() {
-            return None;
-        }
-        buffer = grown;
-        return finalize_canonical_path(&buffer[..grown_written]);
-    }
-    finalize_canonical_path(&buffer[..written])
-}
-
-fn finalize_canonical_path(wide: &[u16]) -> Option<String> {
-    let text = String::from_utf16_lossy(wide);
-    let stripped = text.strip_prefix("\\\\?\\").unwrap_or(&text);
-    if stripped.is_empty() {
-        return None;
-    }
-    Some(stripped.to_string())
-}
-
-#[napi]
-pub fn current_identity() -> Result<FolderUserIdentity> {
-    current_identity_inner().ok_or_else(|| {
-        Error::new(
-            Status::GenericFailure,
-            "FOLDER_PICKER_USER_IDENTITY_UNAVAILABLE",
-        )
-    })
-}
-
-#[napi]
-pub fn inspect_folder(path: String) -> Result<FolderDirectoryIdentity> {
-    inspect_folder_inner(&path).ok_or_else(|| {
-        Error::new(
-            Status::GenericFailure,
-            "FOLDER_PICKER_DIRECTORY_IDENTITY_UNAVAILABLE",
-        )
-    })
-}
-
-/// Acquires a pinning directory lease for `path`. The returned lease id is an
-/// opaque in-process token; the held handle chain pins every path component
-/// (no rename/replace/delete) until [`release_directory_lease`] is called.
-/// The returned identity is read from the pinned target handle itself.
-#[napi]
-pub fn acquire_directory_lease(path: String) -> Result<FolderDirectoryLease> {
-    let user = current_identity_inner().ok_or_else(|| {
-        Error::new(
-            Status::GenericFailure,
-            "FOLDER_PICKER_LEASE_IDENTITY_UNAVAILABLE",
-        )
-    })?;
-    let chain = open_directory_chain(&path)
-        .ok_or_else(|| Error::new(Status::GenericFailure, "FOLDER_PICKER_LEASE_PATH_REFUSED"))?;
-    let directory = directory_identity_from_handle(&user, &chain.info, chain.is_volume_root);
-    let lease_id = random_lease_id()
-        .ok_or_else(|| Error::new(Status::GenericFailure, "FOLDER_PICKER_LEASE_ID_UNAVAILABLE"))?;
-    lease_registry()
-        .lock()
-        .map_err(|_| {
-            Error::new(
-                Status::GenericFailure,
-                "FOLDER_PICKER_LEASE_REGISTRY_LOCKED",
-            )
-        })?
-        .insert(lease_id.clone(), chain);
-    Ok(FolderDirectoryLease {
-        lease_id,
-        directory,
-    })
-}
-
-/// Re-reads the directory identity from the pinned target handle of a live
-/// lease. The handle pins the object, so the stable volume/file identity is
-/// re-reported; a captured-identity mismatch refuses with a typed drift code.
-#[napi]
-pub fn verify_directory_lease(lease_id: String) -> Result<FolderDirectoryIdentity> {
-    let user = current_identity_inner().ok_or_else(|| {
-        Error::new(
-            Status::GenericFailure,
-            "FOLDER_PICKER_LEASE_IDENTITY_UNAVAILABLE",
-        )
-    })?;
-    let registry = lease_registry().lock().map_err(|_| {
-        Error::new(
-            Status::GenericFailure,
-            "FOLDER_PICKER_LEASE_REGISTRY_LOCKED",
-        )
-    })?;
-    let chain = registry
-        .get(&lease_id)
-        .ok_or_else(|| Error::new(Status::GenericFailure, "FOLDER_PICKER_LEASE_UNKNOWN"))?;
-    let mut info = BY_HANDLE_FILE_INFORMATION::default();
-    unsafe { GetFileInformationByHandle(chain.target(), &mut info) }.map_err(|_| {
-        Error::new(
-            Status::GenericFailure,
-            "FOLDER_PICKER_LEASE_VERIFY_UNAVAILABLE",
-        )
-    })?;
-    let file_index = ((info.nFileIndexHigh as u64) << 32) | info.nFileIndexLow as u64;
-    if info.dwVolumeSerialNumber != chain.volume_serial || file_index != chain.file_index {
-        return Err(Error::new(
-            Status::GenericFailure,
-            "FOLDER_PICKER_LEASE_IDENTITY_DRIFT",
-        ));
-    }
-    Ok(directory_identity_from_handle(
-        &user,
-        &info,
-        chain.is_volume_root,
-    ))
-}
-
-/// Releases a lease and every pinning handle in its chain. Releasing an
-/// unknown or already-released lease is a typed error, never a silent no-op,
-/// so a double-release cannot mask a live pin.
-#[napi]
-pub fn release_directory_lease(lease_id: String) -> Result<()> {
-    let removed = lease_registry()
-        .lock()
-        .map_err(|_| {
-            Error::new(
-                Status::GenericFailure,
-                "FOLDER_PICKER_LEASE_REGISTRY_LOCKED",
-            )
-        })?
-        .remove(&lease_id);
-    if removed.is_none() {
-        return Err(Error::new(
-            Status::GenericFailure,
-            "FOLDER_PICKER_LEASE_UNKNOWN",
-        ));
-    }
-    Ok(())
-}
-
-/// The pinned object's own current DOS path (see
-/// [`canonical_path_for_handle`]). The Host walks THIS path through
-/// resolveScope/observeStorage so a junction planted at the recorded location
-/// is never consulted.
+/// Returns the current DOS path reported by the held target handle.
+/// Downstream storage still resolves this path string; this is not an atomic
+/// handle-relative metadata walk.
 #[napi]
 pub fn directory_lease_path(lease_id: String) -> Result<String> {
     let registry = lease_registry().lock().map_err(|_| {
@@ -812,11 +530,6 @@ pub fn pick_folder() -> AsyncTask<PickFolderTask> {
 }
 
 fn select_folder_inner() -> FolderSelectionResult {
-    let identity = match current_identity_inner() {
-        Some(value) => value,
-        None => return refused("FOLDER_PICKER_INTERACTIVE_IDENTITY_UNAVAILABLE"),
-    };
-
     let desktop =
         match unsafe { OpenInputDesktop(DESKTOP_CONTROL_FLAGS(0), false, DESKTOP_READOBJECTS) } {
             Ok(value) => value,
@@ -867,9 +580,6 @@ fn select_folder_inner() -> FolderSelectionResult {
         || directory.is_reparse_point
         || directory.is_network_path
         || directory.is_volume_root
-        || directory.user_sid != identity.user_sid
-        || directory.logon_sid != identity.logon_sid
-        || directory.session_id != identity.session_id
     {
         return refused("FOLDER_PICKER_DIRECTORY_REFUSED");
     }
@@ -883,9 +593,6 @@ fn select_folder_inner() -> FolderSelectionResult {
         path: Some(path),
         display_name: Some(display_name),
         identity: Some(FolderIdentity {
-            user_sid: directory.user_sid,
-            logon_sid: directory.logon_sid,
-            session_id: directory.session_id,
             volume_serial: directory.volume_serial,
             file_id: directory.file_id,
         }),
@@ -894,11 +601,90 @@ fn select_folder_inner() -> FolderSelectionResult {
 
 #[cfg(test)]
 mod tests {
-    use super::{directory_facts, open_directory_chain, should_refuse_drive_type};
+    use super::{
+        build_directory_chain, directory_facts, open_directory_chain, open_pinning_directory,
+        should_refuse_drive_type,
+    };
+    use windows::Win32::Storage::FileSystem::BY_HANDLE_FILE_INFORMATION;
     use std::fs;
     use std::path::{Path, PathBuf};
     use std::process::Command;
     use std::time::{SystemTime, UNIX_EPOCH};
+
+    fn handle_is_open(handle: super::HANDLE) -> bool {
+        let mut info = BY_HANDLE_FILE_INFORMATION::default();
+        unsafe { super::GetFileInformationByHandle(handle, &mut info) }.is_ok()
+    }
+
+    #[test]
+    fn partial_chain_failures_drop_every_acquired_handle() {
+        let root = drive_scratch("partial-chain-drop");
+        let drive_root = format!("{}\\", root_str_drive());
+
+        // Missing child: the already-open volume-root handle must be dropped
+        // when the child opener returns None.
+        let (root_handle, root_info) = open_pinning_directory(&drive_root).expect("drive root");
+        let root_raw = root_handle.0;
+        let missing = build_directory_chain(
+            root_handle,
+            root_info,
+            false,
+            &["missing"],
+            |_parent, _name| None,
+        );
+        assert!(missing.is_none());
+        assert!(!handle_is_open(root_raw), "missing child leaked the root handle");
+
+        // Reparse child: both the root and just-opened junction handle must
+        // be dropped, and no later component may be requested.
+        let target = root.join("target");
+        fs::create_dir_all(&target).expect("junction target");
+        let link = root.join("link");
+        create_junction(&link, &target);
+        let (root_handle, root_info) = open_pinning_directory(&drive_root).expect("drive root");
+        let root_raw = root_handle.0;
+        let (child_handle, child_info) =
+            open_pinning_directory(link.to_str().expect("junction path")).expect("junction handle");
+        let child_raw = child_handle.0;
+        let mut opens = 0;
+        let reparse = build_directory_chain(
+            root_handle,
+            root_info,
+            false,
+            &["link", "child"],
+            |_parent, _name| {
+                opens += 1;
+                Some((child_handle, child_info))
+            },
+        );
+        assert!(reparse.is_none());
+        assert_eq!(opens, 1, "a descendant below the reparse point was requested");
+        assert!(!handle_is_open(root_raw), "reparse refusal leaked the root handle");
+        assert!(!handle_is_open(child_raw), "reparse refusal leaked the child handle");
+        remove_junction(&link);
+
+        // Non-directory child: the acquired child handle and its parent chain
+        // must both be released on the typed refusal.
+        let file = root.join("plain-file.txt");
+        fs::write(&file, "x").expect("plain file");
+        let (root_handle, root_info) = open_pinning_directory(&drive_root).expect("drive root");
+        let root_raw = root_handle.0;
+        let (child_handle, child_info) =
+            open_pinning_directory(file.to_str().expect("file path")).expect("file handle");
+        let child_raw = child_handle.0;
+        let non_directory = build_directory_chain(
+            root_handle,
+            root_info,
+            false,
+            &["plain-file.txt"],
+            |_parent, _name| Some((child_handle, child_info)),
+        );
+        assert!(non_directory.is_none());
+        assert!(!handle_is_open(root_raw), "non-directory refusal leaked the root handle");
+        assert!(!handle_is_open(child_raw), "non-directory refusal leaked the child handle");
+
+        fs::remove_dir_all(&root).expect("cleanup");
+    }
 
     #[test]
     fn remote_drive_is_refused_before_component_traversal() {
@@ -1093,11 +879,8 @@ mod tests {
 
         // Empirical Windows semantics (this host, 10.0.26300): rename and
         // delete of a directory with open no-FILE_SHARE_DELETE handles both
-        // SUCCEED — handle pinning does not block either operation. The lease
-        // therefore binds OBJECT IDENTITY, not the name: whatever the attacker
-        // does to the name, every identity read stays bound to the originally
-        // verified directory object and every path re-resolution that no
-        // longer reaches it fails closed.
+        // SUCCEED. The lease retains a handle to the original object, but it
+        // does not exclude namespace changes or make path-based walks atomic.
         fs::rename(&leaf, parent.join("leaf-moved")).expect("rename allowed while held");
         let moved_facts = directory_facts(&moved_plain).expect("moved facts");
         assert_eq!(
@@ -1109,7 +892,8 @@ mod tests {
             "the pinned handle must follow the same object across a rename"
         );
         // The canonical path read from the pinned handle reflects the new
-        // name, so a walk that uses it never consults the recorded location.
+        // name. It is a best-effort locator, not a lock on subsequent path
+        // resolution by the storage walker.
         let canonical = super::canonical_path_for_handle(chain.target()).expect("canonical path");
         assert!(
             canonical.to_lowercase().ends_with("leaf-moved"),
