@@ -137,7 +137,7 @@ export class FolderSelectionHost {
     readonly clock?: () => number;
     readonly storage?: FolderSelectionStoragePort;
   }) {
-    if (!input || !input.guided || typeof input.databaseFile !== 'string' ||
+    if (typeof input.databaseFile !== 'string' ||
         !input.databaseFile || input.databaseFile === ':memory:' ||
         (!win32.isAbsolute(input.databaseFile) && !input.databaseFile.startsWith('/')) ||
         !input.native || typeof input.native.selectFolder !== 'function' ||
@@ -477,6 +477,7 @@ export class FolderSelectionHost {
       throw new Error('FOLDER_SELECTION_LEDGER_SCHEMA_REFUSED');
     }
   }
+}
 
 export function createProductionFolderSelectionHost(input: {
   readonly guided: HostGuidedService;
