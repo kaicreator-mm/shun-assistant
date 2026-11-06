@@ -329,13 +329,19 @@ describe('R02-E production Guided composition', () => {
     const repoRoot = resolve(dirname(fileURLToPath(import.meta.url)), '../../../..');
     const apiPackage = JSON.parse(
       readFileSync(resolve(repoRoot, 'apps/control-api/package.json'), 'utf8'),
-    ) as { scripts?: { dev?: string } };
+    ) as { scripts?: { dev?: string }; devDependencies?: Record<string, string | undefined> };
     const main = readFileSync(resolve(repoRoot, 'apps/control-api/src/main.ts'), 'utf8');
     const composition = readFileSync(
       resolve(repoRoot, 'apps/control-api/src/v03/composition-guided-provenance.ts'),
       'utf8',
     );
-    expect(apiPackage.scripts?.dev).toBe('node --experimental-transform-types src/main.ts');
+    // G11 (Issue #371, pack PR #373): Node 26 removed
+    // `--experimental-transform-types`; the exact operator entrypoint stays
+    // transform-aware on Node 24 AND 26 through the exact pinned
+    // TypeScript-aware runner declared in package.json (reproducible
+    // lockfile, frozen install). No floating range, no direct-node fallback.
+    expect(apiPackage.scripts?.dev).toBe('tsx src/main.ts');
+    expect(apiPackage.devDependencies?.tsx).toBe('4.23.15');
     expect(main).toContain('createProductionGuidedService(resolve(guidedDb))');
     expect(main).not.toContain('new HostGuidedService');
     expect(composition).not.toContain('SHUN_GUIDED_PROVENANCE_TRUST_PIN');

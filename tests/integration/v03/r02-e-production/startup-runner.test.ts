@@ -1,8 +1,8 @@
 /**
  * R02-E Generation-3 startup-runner regression (Issue #269), hardened in
  * Generation-4 (PR #328 R1 findings): the default control-api dev entry must
- * boot the REAL import graph under Node 24's strip-only TypeScript mode
- * without ERR_UNSUPPORTED_TYPESCRIPT_SYNTAX (native/index.ts constructor
+ * boot the REAL import graph through a TypeScript-aware runner without
+ * ERR_UNSUPPORTED_TYPESCRIPT_SYNTAX (native/index.ts constructor
  * parameter properties), must stay truthful (no hidden DEMO fallback for a
  * requested real mode), must bind loopback only, and must shut down
  * deterministically. On Windows it additionally boots the full real-storage
@@ -46,6 +46,19 @@
  * created. A DEMO banner or a 503-only Guided surface is never accepted as
  * production success.
  *
+ * G11 pinned-runner amendment (Issue #371, pack PR #372): Node 26 removed
+ * `--experimental-transform-types` entirely, and Node 26 strip-only mode
+ * still refuses the real import graph's parameter properties, so the G10-R2
+ * dev entry (`node --experimental-transform-types src/main.ts`) cannot boot
+ * on Node 26.13.0. The dev script now runs the exact pinned TypeScript-aware
+ * runner `tsx@4.23.15` declared in `apps/control-api/package.json`
+ * (`dev: "tsx src/main.ts"`; reproducible lockfile, frozen install). Every
+ * test-side boot through "the dev runner mode" resolves that same pinned
+ * local CLI — never a floating pnpm dlx, network-time resolution, or
+ * global/transitive loader — and the removed flag must not reappear in any
+ * dev-command output. Production composition, trust gates, and cleanup
+ * contracts are unchanged.
+ *
  * Zero paid calls / zero physical effects: no cloud interpreter is
  * configured (every LLM effect fails closed CLOUD_UNAVAILABLE), no Provider
  * install, no UAC, no persistent Windows effect beyond temp fixture files.
@@ -65,6 +78,13 @@ import { consumerDir } from '../r02-a-build/ensure-consumer.mjs';
 const here = dirname(fileURLToPath(import.meta.url));
 const repoRoot = resolve(here, '../../../..');
 const apiDir = join(repoRoot, 'apps/control-api');
+/**
+ * G11: the exact pinned TypeScript-aware dev runner (`tsx@4.23.15`, the
+ * declared devDependency of @shun/control-api), resolved from the workspace
+ * install — never a floating pnpm dlx, network-time resolution, or
+ * global/transitive loader.
+ */
+const PINNED_TSX_CLI = join(apiDir, 'node_modules', 'tsx', 'dist', 'cli.mjs');
 const isWindows = process.platform === 'win32';
 const PNPM = isWindows ? 'pnpm.cmd' : 'pnpm';
 
@@ -112,12 +132,18 @@ function collect(child: ReturnType<typeof spawn>): { text: () => string } {
 
 /**
  * Boot main.ts through the exact dev runner mode of the current entrypoint
- * (`node --experimental-transform-types`, the G10-R2 dev script target; the
- * tree no longer carries a tsx dependency). The child always receives a
- * cloud-sanitized environment (G4 P1).
+ * (`tsx src/main.ts`, the G11 pinned-runner dev script target: Node 26
+ * removed `--experimental-transform-types` and strip-only mode cannot
+ * transform the real import graph's parameter properties). The pinned
+ * runner must be present from the declared devDependency; the child always
+ * receives a cloud-sanitized environment (G4 P1).
  */
-function startViaTransformRunner(port: number, env: NodeJS.ProcessEnv) {
-  const child = spawn(process.execPath, ['--experimental-transform-types', 'src/main.ts'], {
+function startViaPinnedRunner(port: number, env: NodeJS.ProcessEnv) {
+  expect(
+    existsSync(PINNED_TSX_CLI),
+    'pinned tsx runner must be installed from the declared devDependency',
+  ).toBe(true);
+  const child = spawn(process.execPath, [PINNED_TSX_CLI, 'src/main.ts'], {
     cwd: apiDir,
     env: { ...sanitizedEnv(env), SHUN_CONTROL_PORT: String(port) },
     stdio: ['ignore', 'pipe', 'pipe'],
@@ -431,7 +457,7 @@ async function guaranteeCleanup(
   else throw new Error(diagnostic);
 }
 
-describe('R02-E default dev startup runner (Node 24 strip-mode repair)', () => {
+describe('R02-E default dev startup runner (G11 pinned TypeScript-aware runner)', () => {
   it('default pnpm --filter @shun/control-api dev boots the real graph with no TypeScript syntax error', async () => {
     const port = await freePort();
     // The exact operator default command; on Windows .cmd requires a shell.
@@ -451,6 +477,9 @@ describe('R02-E default dev startup runner (Node 24 strip-mode repair)', () => {
       const text = output.text();
       expect(up, `server did not come up; output:\n${text}`).toBe(true);
       expect(text).not.toContain('ERR_UNSUPPORTED_TYPESCRIPT_SYNTAX');
+      // G11: the Node-26-removed transform flag must never reappear in the
+      // exact operator command's output (no `node: bad option` regression).
+      expect(text).not.toContain('--experimental-transform-types');
       expect(text).toContain('Shun control surface (T08 DEMO ONLY)');
       // G5/G6: bounded tree kill, bounded exit wait, then verify the
       // loopback listener is actually gone.
@@ -472,7 +501,7 @@ describe('R02-E default dev startup runner (Node 24 strip-mode repair)', () => {
 
   it('dev runner entry boots DEMO on loopback, refuses hostile Host, reports Guided truthfully, shuts down deterministically', async () => {
     const port = await freePort();
-    const { child, output } = startViaTransformRunner(port, {});
+    const { child, output } = startViaPinnedRunner(port, {});
     let bodyFailed = false;
     try {
       const up = await waitForHttp(port, 60_000);
@@ -505,7 +534,7 @@ describe('R02-E default dev startup runner (Node 24 strip-mode repair)', () => {
 
   it('unknown SHUN_CONTROL_MODE fails closed — never a silent DEMO fallback', async () => {
     const port = await freePort();
-    const { child, output } = startViaTransformRunner(port, { SHUN_CONTROL_MODE: 'bogus' });
+    const { child, output } = startViaPinnedRunner(port, { SHUN_CONTROL_MODE: 'bogus' });
     let bodyFailed = false;
     try {
       const exit = await waitForExit(child, 30_000);
@@ -525,7 +554,7 @@ describe('R02-E default dev startup runner (Node 24 strip-mode repair)', () => {
 
   it('real-storage mode without trusted config fails closed with the exact missing gate', async () => {
     const port = await freePort();
-    const { child, output } = startViaTransformRunner(port, { SHUN_CONTROL_MODE: 'real-storage' });
+    const { child, output } = startViaPinnedRunner(port, { SHUN_CONTROL_MODE: 'real-storage' });
     let bodyFailed = false;
     try {
       const exit = await waitForExit(child, 30_000);
@@ -734,7 +763,7 @@ export const routeWorkflowIntent = __dhv10RouterBundle.routeWorkflowIntent;
           : 'STANDARD_USER';
       const issuer = spawnSync(
         process.execPath,
-        ['--experimental-transform-types', 'apps/control-api/scripts/issue-registry-currentness.ts'],
+        [PINNED_TSX_CLI, 'apps/control-api/scripts/issue-registry-currentness.ts'],
         {
           cwd: repoRoot,
           encoding: 'utf8',
@@ -857,6 +886,9 @@ export const routeWorkflowIntent = __dhv10RouterBundle.routeWorkflowIntent;
         expect(exit, `boot must refuse and exit; output:\n${text}`).not.toBe('TIMEOUT');
         if (exit !== 'TIMEOUT') expect(exit.code).not.toBe(0);
         expect(text).not.toContain('ERR_UNSUPPORTED_TYPESCRIPT_SYNTAX');
+        // G11: the refusal must come from the trust gate, not from a dev
+        // runner regression (Node 26 removed --experimental-transform-types).
+        expect(text).not.toContain('--experimental-transform-types');
         expect(text).toMatch(/GUIDED_TRUST_PIN_UNTRUSTED|GUIDED_TRUST_|GUIDED_PROVENANCE_/);
         // No listener, no REAL banner, no DEMO fallback, no Guided database:
         // the trust gate fires before service construction and before the
