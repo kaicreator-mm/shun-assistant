@@ -764,6 +764,59 @@ describe('R02-B Host Guided SQLite durability and replay fence', () => {
     }
   });
 
+  it('advances only the durable accepted opaque select-root answer to INSPECT', () => {
+    const dir = mkdtempSync(join(tmpdir(), 'shun-r04-folder-stage-'));
+    const file = join(dir, 'guided.sqlite');
+    let service = new HostGuidedService(file, () => NOW);
+    try {
+      const staged = service.stageTrustedSelection({ observation, semanticSelection: semantic, scope });
+      expect(staged.status).toBe('CURRENT');
+      if (staged.status !== 'CURRENT') return;
+      expect(staged.step.templateRef.artifactId).toBe('shun.guided.select-root');
+      const selectionRef = 'host:folder:' + 'b'.repeat(64);
+      const outcome = submitOutcome(
+        staged.step, 'ui:shun-r04-desktop', NOW,
+        [{ fieldId: 'selectedRoot', value: selectionRef }],
+      );
+      expect(service.decide(relayFor(staged.step, 'ANSWER', outcome)))
+        .toMatchObject({ status: 'RECORDED', humanGrantIssued: false, effectSent: false });
+      expect(service.stageTrustedSelectedRoot({
+        selectionRef: 'host:folder:' + 'c'.repeat(64), expiresAtUnixMs: NOW + 60_000,
+      })).toMatchObject({ status: 'REFUSED', code: 'GUIDED_FOLDER_ANSWER_NOT_RECORDED' });
+      expect(service.stageTrustedSelectedRoot({
+        selectionRef, expiresAtUnixMs: NOW,
+      })).toMatchObject({ status: 'REFUSED', code: 'GUIDED_FOLDER_SELECTION_INVALID' });
+      expect(service.stageTrustedSelectedRoot({
+        selectionRef, expiresAtUnixMs: NOW + 60_000,
+      })).toMatchObject({
+        status: 'CURRENT',
+        step: { kind: 'INSPECT', templateRef: { artifactId: 'shun.guided.inspect-scope' } },
+      });
+      const context = service.readTrustedContext();
+      expect(context).toMatchObject({
+        state: 'CURRENT',
+        observation: { selectedRootRef: selectionRef },
+      });
+      expect(service.stageTrustedSelectedRoot({
+        selectionRef, expiresAtUnixMs: NOW + 60_000,
+      })).toMatchObject({ status: 'CURRENT', step: { kind: 'INSPECT' } });
+      const receipt = service.recordHostObservationReceipt();
+      expect(receipt).toMatchObject({ status: 'RECORDED', humanGrantIssued: false, effectSent: false });
+      expect(service.state().history).toMatchObject([
+        { stepId: staged.step.stepId, status: 'ACCEPTED' },
+        { status: 'OBSERVATION_RECEIPT' },
+      ]);
+      expect(service.state().currentStep).toBeUndefined();
+      service.close();
+      service = new HostGuidedService(file, () => NOW);
+      expect(service.state().history).toHaveLength(2);
+      expect(service.readTrustedContext()?.state).toBe('CONSUMED');
+    } finally {
+      service.close();
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
   it('records an INSPECT Host receipt as OBSERVATION_RECEIPT, never as REFUSED', () => {
     const dir = mkdtempSync(join(tmpdir(), 'shun-r02-b-inspect-receipt-'));
     const service = new HostGuidedService(join(dir, 'guided.sqlite'), () => NOW);
@@ -784,7 +837,9 @@ describe('R02-B Host Guided SQLite durability and replay fence', () => {
         sourceRef: 'host:obs:r02', answers: [], evidenceRefs: ['host:scope:r02'],
         occurredAtUnixMs: NOW,
       };
-      const receipt = service.decide(relayFor(step, 'REFUSE', hostReceipt));
+      expect(service.decide(relayFor(step, 'REFUSE', hostReceipt)))
+        .toMatchObject({ status: 'REFUSED', code: 'GUIDED_DECISION_MATRIX_REFUSED' });
+      const receipt = service.recordHostObservationReceipt();
       expect(receipt).toMatchObject({ status: 'RECORDED', humanGrantIssued: false, effectSent: false });
       expect(service.state().history)
         .toMatchObject([{ stepId: step.stepId, status: 'OBSERVATION_RECEIPT' }]);
