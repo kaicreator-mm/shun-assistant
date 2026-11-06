@@ -300,6 +300,100 @@ export class HostGuidedService {
     };
   }
 
+  /** Host-only defensive readback; HTTP state() never exposes these inputs. */
+  readTrustedContext(): {
+    readonly state: StoredCase['state'];
+    readonly step: StepSpec;
+    readonly observation: unknown;
+    readonly semanticSelection: unknown;
+    readonly scope: unknown;
+  } | undefined {
+    const stored = this.#read();
+    if (!stored) return undefined;
+    return {
+      state: stored.state,
+      step: JSON.parse(JSON.stringify(stored.step)) as StepSpec,
+      observation: JSON.parse(JSON.stringify(stored.observation)) as unknown,
+      semanticSelection: JSON.parse(JSON.stringify(stored.semanticSelection)) as unknown,
+      scope: JSON.parse(JSON.stringify(stored.scope)) as unknown,
+    };
+  }
+
+  /**
+   * Advance only the exact accepted select-root answer. The caller must
+   * validate the opaque reference against its private native-selection ledger.
+   */
+  stageTrustedSelectedRoot(input: {
+    readonly selectionRef: string;
+    readonly expiresAtUnixMs: number;
+  }): { readonly status: 'CURRENT'; readonly step: StepSpec } | { readonly status: 'REFUSED'; readonly code: string } {
+    if (this.#ledgerUnavailable) return { status: 'REFUSED', code: this.#ledgerUnavailable };
+    const now = this.#clock();
+    if (
+      !input ||
+      typeof input.selectionRef !== 'string' ||
+      !/^host:folder:[a-f0-9]{64}$/.test(input.selectionRef) ||
+      !Number.isSafeInteger(input.expiresAtUnixMs) ||
+      input.expiresAtUnixMs <= now ||
+      input.expiresAtUnixMs > now + 5 * 60_000
+    ) return { status: 'REFUSED', code: 'GUIDED_FOLDER_SELECTION_INVALID' };
+
+    const stored = this.#read();
+    if (!stored) return { status: 'REFUSED', code: 'GUIDED_STEP_NOT_CURRENT' };
+    if (
+      stored.state === 'CURRENT' &&
+      stored.step.templateRef.artifactId === 'shun.guided.inspect-scope' &&
+      isRecord(stored.observation) &&
+      stored.observation.selectedRootRef === input.selectionRef
+    ) return { status: 'CURRENT', step: stored.step };
+    if (
+      stored.state !== 'CONSUMED' ||
+      stored.step.templateRef.artifactId !== 'shun.guided.select-root'
+    ) return { status: 'REFUSED', code: 'GUIDED_SELECT_ROOT_NOT_CONSUMED' };
+
+    const answer = this.readRecordedAnswer(stored.step.stepId);
+    if (
+      !isRecord(answer) ||
+      answer.event !== 'USER_SUBMIT' ||
+      answer.source !== 'USER' ||
+      !Array.isArray(answer.answers) ||
+      answer.answers.length !== 1 ||
+      !isRecord(answer.answers[0]) ||
+      answer.answers[0].fieldId !== 'selectedRoot' ||
+      answer.answers[0].value !== input.selectionRef
+    ) return { status: 'REFUSED', code: 'GUIDED_FOLDER_ANSWER_NOT_RECORDED' };
+
+    if (!isRecord(stored.semanticSelection) || stored.semanticSelection.status !== 'SELECTED') {
+      return { status: 'REFUSED', code: 'GUIDED_SEMANTIC_RESELECTION_REQUIRED' };
+    }
+    if (!isRecord(stored.observation) || !Array.isArray(stored.observation.evidenceRefs)) {
+      return { status: 'REFUSED', code: 'GUIDED_HOST_OBSERVATION_INVALID' };
+    }
+    const digest = createHash('sha256').update(input.selectionRef, 'utf8').digest('hex');
+    const sourceRef = `host:folder-selection:${digest.slice(0, 32)}`;
+    const evidenceRefs = [...stored.observation.evidenceRefs, sourceRef];
+    if (evidenceRefs.length > 24 || new Set(evidenceRefs).size !== evidenceRefs.length) {
+      return { status: 'REFUSED', code: 'GUIDED_EVIDENCE_REF_LIMIT' };
+    }
+    const observation = {
+      ...stored.observation,
+      sourceRef,
+      revision: `folder-${digest.slice(0, 32)}`,
+      observedAtUnixMs: now,
+      validUntilUnixMs: Math.min(input.expiresAtUnixMs, now + 5 * 60_000),
+      evidenceRefs,
+      selectedRootRef: input.selectionRef,
+    };
+    const scope = isRecord(stored.scope)
+      ? { ...stored.scope, selectedRootRef: input.selectionRef }
+      : stored.scope;
+    return this.stageTrustedSelection({
+      observation,
+      semanticSelection: stored.semanticSelection,
+      scope,
+    });
+  }
+
   /** Same-call atomic compare-and-consume. No auto-grant or Kernel send. */
   decide(raw: unknown): GuidedDecisionReceipt {
     if (this.#ledgerUnavailable) {
