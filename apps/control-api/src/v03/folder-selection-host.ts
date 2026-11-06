@@ -813,7 +813,10 @@ export function folderSelectionDatabaseRefusal(databaseFile: unknown): string | 
   const programData = process.env.ProgramData;
   // Case-folded, trailing-separator-free lexical Windows comparison.
   const fold = (value: string): string =>
-    win32.normalize(value).replace(/[\\]+$/g, '').toLowerCase();
+    win32
+      .normalize(value)
+      .replace(/[\\]+$/g, '')
+      .toLowerCase();
   const within = (root: string, value: string): boolean => {
     const rootFolded = fold(root);
     const valueFolded = fold(value);
