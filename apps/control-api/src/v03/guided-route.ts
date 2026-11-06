@@ -13,6 +13,10 @@ import type { V03FolderSelectionRoutePort } from './folder-selection-route.ts';
 
 export type V03GuidedPort = Pick<HostGuidedService, 'state' | 'decide'>;
 
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return value !== null && typeof value === 'object' && !Array.isArray(value);
+}
+
 export interface V03GuidedRoute {
   state(): ReturnType<V03GuidedPort['state']>;
   decide(raw: unknown): GuidedDecisionReceipt;
@@ -32,7 +36,24 @@ export function createV03GuidedRoute(
   const decide = port.decide.bind(port);
   return Object.freeze({
     state,
-    decide,
+    decide(raw: unknown) {
+      const step = state().currentStep;
+      if (
+        step?.templateRef.artifactId === 'shun.guided.select-root' &&
+        isRecord(raw) && raw.decision === 'ANSWER' &&
+        isRecord(raw.outcome) && raw.outcome.event === 'USER_SUBMIT'
+      ) {
+        if (!folderSelection) return { status: 'REFUSED', code: 'FOLDER_SELECTION_UNAVAILABLE' };
+        const validation = folderSelection.validateSelectionAnswer(raw, step);
+        if (validation) return validation;
+        const receipt = decide(raw);
+        if (receipt.status === 'RECORDED') {
+          return folderSelection.afterSelectionRecorded(raw, step, receipt);
+        }
+        return receipt;
+      }
+      return decide(raw);
+    },
     async selectRoot() {
       if (!folderSelection) return { status: 'REFUSED', code: 'FOLDER_SELECTION_UNAVAILABLE' };
       return folderSelection.selectRoot();
