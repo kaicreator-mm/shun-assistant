@@ -4,4 +4,4 @@
 // The loader refuses any on-disk shun_folder_picker.node whose SHA-256
 // differs from this pin.
 export const FOLDER_PICKER_ADDON_SHA256 =
-  '7ebdfa7b61a1f76b37a646fc1f8d23c0a763d13077ea69cb9bf3f09bd3729c7a';
+  '40b240a0691e2a595eb6dfb151961ef15300d37be826d2fdd7f13b6112116b00';

@@ -21,7 +21,11 @@ import type {
   GuidedDecisionReceipt,
   HostGuidedService,
 } from '../../../../packages/domain-host/src/guided/host-guided-service.ts';
-import { type FolderPickerNativePort, loadFolderPicker } from '../../native/folder-picker/index.ts';
+import {
+  type FolderPickerNativePort,
+  loadFolderPicker,
+  type NativeFolderSelection,
+} from '../../native/folder-picker/index.ts';
 
 const SELECTION_REF = /^host:folder:[a-f0-9]{64}$/;
 const SID = /^S-1-[0-9-]+$/;
@@ -88,6 +92,11 @@ export type FolderSelectionResult =
       readonly expiresAtUnixMs: number;
     }
   | { readonly status: 'CANCELLED' }
+  | { readonly status: 'STALE' | 'REFUSED'; readonly code: string };
+
+export type FolderSelectionRecoveryResult =
+  | { readonly status: 'RECOVERED'; readonly selectionRef: string; readonly stagedStepId: string }
+  | { readonly status: 'NOT_APPLICABLE' }
   | { readonly status: 'STALE' | 'REFUSED'; readonly code: string };
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -195,6 +204,26 @@ function extractSelectionAnswer(raw: unknown): string | null {
     : null;
 }
 
+/** Same binding rules as `extractSelectionAnswer`, for the durable accepted
+ * answer envelope read back through the guided service's trusted readback. */
+function selectionRefFromRecordedAnswer(answer: unknown): string | null {
+  if (
+    !isRecord(answer) ||
+    answer.event !== 'USER_SUBMIT' ||
+    answer.source !== 'USER' ||
+    !Array.isArray(answer.answers) ||
+    answer.answers.length !== 1
+  )
+    return null;
+  const answerItem = answer.answers[0];
+  return isRecord(answerItem) &&
+    answerItem.fieldId === 'selectedRoot' &&
+    typeof answerItem.value === 'string' &&
+    SELECTION_REF.test(answerItem.value)
+    ? answerItem.value
+    : null;
+}
+
 export class FolderSelectionHost {
   readonly #guided: HostGuidedService;
   readonly #native: FolderPickerNativePort;
@@ -202,6 +231,8 @@ export class FolderSelectionHost {
   readonly #clock: () => number;
   readonly #storage: FolderSelectionStoragePort;
   readonly #observationAdapter: ReturnType<typeof createComputerFolderObservationAdapter>;
+  /** One modal picker at a time: the async dialog must not overlap itself. */
+  #pickInFlight = false;
 
   constructor(input: {
     readonly guided: HostGuidedService;
@@ -216,9 +247,9 @@ export class FolderSelectionHost {
       input.databaseFile === ':memory:' ||
       (!win32.isAbsolute(input.databaseFile) && !input.databaseFile.startsWith('/')) ||
       !input.native ||
-      typeof input.native.selectFolder !== 'function' ||
+      typeof input.native.pickFolder !== 'function' ||
       typeof input.native.currentIdentity !== 'function' ||
-      typeof input.native.inspectDirectory !== 'function'
+      typeof input.native.inspectFolder !== 'function'
     ) {
       throw new TypeError('FOLDER_SELECTION_HOST_CONFIG_REQUIRED');
     }
@@ -247,11 +278,22 @@ export class FolderSelectionHost {
     ) {
       return { status: 'STALE', code: 'GUIDED_SELECT_ROOT_NOT_CURRENT' };
     }
-    let picked: ReturnType<FolderPickerNativePort['selectFolder']>;
+    if (this.#pickInFlight) {
+      return { status: 'REFUSED', code: 'FOLDER_SELECTION_PICK_IN_PROGRESS' };
+    }
+    this.#pickInFlight = true;
+    let picked: NativeFolderSelection;
     try {
-      picked = this.#native.selectFolder();
-    } catch {
-      return { status: 'REFUSED', code: 'FOLDER_PICKER_UNAVAILABLE' };
+      // The frozen async contract: the modal Shell dialog runs on a dedicated
+      // COM STA worker. The Node main event loop stays free while it is open,
+      // so concurrent route calls must be refused instead of stacked.
+      try {
+        picked = await this.#native.pickFolder();
+      } catch {
+        return { status: 'REFUSED', code: 'FOLDER_PICKER_UNAVAILABLE' };
+      }
+    } finally {
+      this.#pickInFlight = false;
     }
     if (picked.status === 'CANCELLED') return { status: 'CANCELLED' };
     if (
@@ -266,10 +308,10 @@ export class FolderSelectionHost {
       };
     }
     let currentUser: ReturnType<FolderPickerNativePort['currentIdentity']>;
-    let directory: ReturnType<FolderPickerNativePort['inspectDirectory']>;
+    let directory: ReturnType<FolderPickerNativePort['inspectFolder']>;
     try {
       currentUser = this.#native.currentIdentity();
-      directory = this.#native.inspectDirectory(picked.path);
+      directory = this.#native.inspectFolder(picked.path);
     } catch {
       return { status: 'REFUSED', code: 'FOLDER_SELECTION_IDENTITY_UNAVAILABLE' };
     }
@@ -414,6 +456,62 @@ export class FolderSelectionHost {
       : { status: 'UNKNOWN', code: `GUIDED_SELECTED_ROOT_STAGE_FAILED:${staged.code}` };
   }
 
+  /**
+   * P1-02 explicit startup recovery for the crash window in which the
+   * durable select-root USER_SUBMIT answer is committed (guided state is
+   * CONSUMED on the select-root step) but the next INSPECT step was never
+   * staged. Host-only: this method is never exposed through any route.
+   *
+   * It re-reads the exact accepted answer from the guided ledger and the
+   * exact selection row, then verifies expiry, task/journey/Case/origin
+   * step/template-digest binding, the current user/logon/session identity
+   * and the native root identity before re-invoking the existing Host-only
+   * `stageTrustedSelectedRoot()`. Stale, expired or mismatched rows remain
+   * refused/stale — recovery never extends a TTL, restages a consumed
+   * answer silently or issues any authority.
+   */
+  recoverInterruptedSelection(): FolderSelectionRecoveryResult {
+    const context = this.#guided.readTrustedContext();
+    if (
+      !context ||
+      context.state !== 'CONSUMED' ||
+      context.step.templateRef.artifactId !== 'shun.guided.select-root'
+    ) {
+      return { status: 'NOT_APPLICABLE' };
+    }
+    const step = context.step;
+    const answer = this.#guided.readRecordedAnswer(step.stepId);
+    const selectionRef = selectionRefFromRecordedAnswer(answer);
+    if (!selectionRef) {
+      return { status: 'REFUSED', code: 'FOLDER_SELECTION_RECOVERY_ANSWER_UNPROVEN' };
+    }
+    const row = this.#selectionRow(selectionRef);
+    if (!row) return { status: 'REFUSED', code: 'FOLDER_SELECTION_UNKNOWN' };
+    if (row.expires_at_unix_ms <= this.#clock()) {
+      return { status: 'STALE', code: 'FOLDER_SELECTION_EXPIRED' };
+    }
+    if (
+      row.task_id !== step.taskId ||
+      row.journey_id !== step.journeyId ||
+      row.case_ref_json !== stableJson(step.caseRef) ||
+      row.origin_step_id !== step.stepId ||
+      row.template_digest !== step.templateRef.digest
+    ) {
+      return { status: 'STALE', code: 'FOLDER_SELECTION_STEP_BINDING_MISMATCH' };
+    }
+    if (!this.#verifySelectionIdentity(row)) {
+      return { status: 'STALE', code: 'FOLDER_SELECTION_IDENTITY_DRIFT' };
+    }
+    const staged = this.#guided.stageTrustedSelectedRoot({
+      selectionRef,
+      expiresAtUnixMs: row.expires_at_unix_ms,
+    });
+    if (staged.status !== 'CURRENT') {
+      return { status: 'REFUSED', code: `GUIDED_SELECTED_ROOT_RECOVERY_REFUSED:${staged.code}` };
+    }
+    return { status: 'RECOVERED', selectionRef, stagedStepId: staged.step.stepId };
+  }
+
   async observeCurrentSelectedFolder(): Promise<ComputerFolderObservationResult> {
     const binding = this.#captureObservationBinding();
     if (!binding) return { ok: false, code: 'FOLDER_NOT_SELECTED' };
@@ -456,7 +554,7 @@ export class FolderSelectionHost {
     if (row.expires_at_unix_ms <= this.#clock()) return false;
     try {
       const user = this.#native.currentIdentity();
-      const directory = this.#native.inspectDirectory(row.path);
+      const directory = this.#native.inspectFolder(row.path);
       return (
         validUserIdentity(user) &&
         isRecord(directory) &&
@@ -690,11 +788,64 @@ export class FolderSelectionHost {
   }
 }
 
+/**
+ * P2-02: the folder-selection SQLite ledger is per-user private state. The
+ * production database path must resolve strictly inside the current user's
+ * LOCALAPPDATA; shared, machine-wide (ProgramData), network/device or
+ * out-of-profile locations are refused at startup with a typed code. The
+ * check is lexical and fail-closed (no guessed fallbacks, no silent
+ * rewriting): an unset LOCALAPPDATA or a non-Windows host refuses.
+ */
+export function folderSelectionDatabaseRefusal(databaseFile: unknown): string | null {
+  if (process.platform !== 'win32') return 'FOLDER_SELECTION_DATABASE_NOT_WINDOWS';
+  if (typeof databaseFile !== 'string' || databaseFile.length === 0) {
+    return 'FOLDER_SELECTION_DATABASE_PATH_REQUIRED';
+  }
+  const localAppData = process.env.LOCALAPPDATA;
+  if (typeof localAppData !== 'string' || localAppData.length === 0) {
+    return 'FOLDER_SELECTION_DATABASE_LOCALAPPDATA_REQUIRED';
+  }
+  if (databaseFile.startsWith('\\\\') || localAppData.startsWith('\\\\')) {
+    return 'FOLDER_SELECTION_DATABASE_PATH_INVALID';
+  }
+  const base = resolve(localAppData);
+  const target = resolve(databaseFile);
+  const programData = process.env.ProgramData;
+  // Case-folded, trailing-separator-free lexical comparison (Windows path
+  // semantics). `within` = equal or deeper; `strictlyInside` = strictly deeper.
+  const fold = (value: string): string =>
+    win32
+      .normalize(value)
+      .replace(/[\\]+$/g, '')
+      .toLowerCase();
+  const within = (root: string, value: string): boolean => {
+    const rootFolded = fold(root);
+    const valueFolded = fold(value);
+    return valueFolded === rootFolded || valueFolded.startsWith(rootFolded + '\\');
+  };
+  const strictlyInside = (root: string, value: string): boolean =>
+    fold(value).startsWith(fold(root) + '\\');
+  // A base redirected into the machine-wide shared store is a misconfigured
+  // per-user profile, not a per-user LOCALAPPDATA.
+  if (typeof programData === 'string' && programData.length > 0) {
+    const programDataRoot = resolve(programData);
+    if (within(programDataRoot, base) || within(programDataRoot, target)) {
+      return 'FOLDER_SELECTION_DATABASE_PROGRAMDATA_REFUSED';
+    }
+  }
+  if (!strictlyInside(base, target)) {
+    return 'FOLDER_SELECTION_DATABASE_OUTSIDE_LOCALAPPDATA';
+  }
+  return null;
+}
+
 export function createProductionFolderSelectionHost(input: {
   readonly guided: HostGuidedService;
   readonly databaseFile: string;
   readonly clock?: () => number;
 }): FolderSelectionHost {
+  const refusal = folderSelectionDatabaseRefusal(input.databaseFile);
+  if (refusal) throw new Error(refusal);
   return new FolderSelectionHost({
     ...input,
     native: loadFolderPicker(),

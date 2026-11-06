@@ -9,6 +9,7 @@ use std::ffi::c_void;
 use std::slice;
 
 use napi::bindgen_prelude::*;
+use napi::Task;
 use napi_derive::napi;
 use windows::core::PCWSTR;
 use windows::Win32::Foundation::{CloseHandle, LocalFree, ERROR_CANCELLED, HANDLE, HLOCAL};
@@ -272,11 +273,27 @@ fn file_information(path: &str) -> Option<BY_HANDLE_FILE_INFORMATION> {
     Some(info)
 }
 
-fn inspect_directory_inner(path: &str) -> Option<FolderDirectoryIdentity> {
+/// Drive-shaped, identity-free traversal facts for one absolute path.
+/// Independent of the interactive session so unit tests can prove the
+/// traversal contract on any host.
+struct DirectoryFacts {
+    info: BY_HANDLE_FILE_INFORMATION,
+    is_directory: bool,
+    is_reparse_point: bool,
+    is_network_path: bool,
+    is_volume_root: bool,
+}
+
+/// Walks the path component by component, opening each with
+/// FILE_FLAG_OPEN_REPARSE_POINT. A reparse point on ANY component
+/// terminates the traversal immediately: the loop never opens a descendant
+/// below a junction/symlink, so the link target's subpaths are never
+/// touched by this process (P1-01). A successful result therefore always
+/// describes a reparse-free path.
+fn directory_facts(path: &str) -> Option<DirectoryFacts> {
     if !is_plain_drive_path(path) {
         return None;
     }
-    let identity = current_identity_inner()?;
     let drive_root = format!("{}\\", &path[..2]);
     let drive_wide = to_wide(&drive_root);
     let drive_type = unsafe { GetDriveTypeW(PCWSTR(drive_wide.as_ptr())) };
@@ -292,14 +309,18 @@ fn inspect_directory_inner(path: &str) -> Option<FolderDirectoryIdentity> {
         .collect();
     let mut current = drive_root;
     let mut final_info = None;
-    let mut any_reparse_point = false;
     for (index, component) in components.iter().enumerate() {
         current.push_str(component);
         let info = file_information(&current)?;
         let attributes = info.dwFileAttributes;
-        let is_reparse = attributes & 0x0000_0400 != 0; // FILE_ATTRIBUTE_REPARSE_POINT
+        // FILE_ATTRIBUTE_REPARSE_POINT: terminate the traversal right here.
+        // This covers intermediate junction/symlink components (the next
+        // component would otherwise be opened THROUGH the link target) and
+        // the final component itself in one uniform fail-closed rule.
+        if attributes & 0x0000_0400 != 0 {
+            return None;
+        }
         let is_directory = attributes & 0x0000_0010 != 0; // FILE_ATTRIBUTE_DIRECTORY
-        any_reparse_point |= is_reparse;
         if index + 1 < components.len() && !is_directory {
             return None;
         }
@@ -310,18 +331,33 @@ fn inspect_directory_inner(path: &str) -> Option<FolderDirectoryIdentity> {
     }
     let info = final_info?;
     let attributes = info.dwFileAttributes;
-    let is_directory = attributes & 0x0000_0010 != 0;
-    let is_reparse_point = any_reparse_point || attributes & 0x0000_0400 != 0;
+    Some(DirectoryFacts {
+        is_directory: attributes & 0x0000_0010 != 0,
+        // Defensive only: the loop above already refused every reparse
+        // component, so a resolved path can never carry this flag as true.
+        is_reparse_point: attributes & 0x0000_0400 != 0,
+        is_network_path,
+        is_volume_root,
+        info,
+    })
+}
+
+fn inspect_folder_inner(path: &str) -> Option<FolderDirectoryIdentity> {
+    let identity = current_identity_inner()?;
+    let facts = directory_facts(path)?;
     Some(FolderDirectoryIdentity {
         user_sid: identity.user_sid,
         logon_sid: identity.logon_sid,
         session_id: identity.session_id,
-        volume_serial: format!("{:08x}", info.dwVolumeSerialNumber),
-        file_id: format!("{:08x}{:08x}", info.nFileIndexHigh, info.nFileIndexLow),
-        is_directory,
-        is_reparse_point,
-        is_network_path,
-        is_volume_root,
+        volume_serial: format!("{:08x}", facts.info.dwVolumeSerialNumber),
+        file_id: format!(
+            "{:08x}{:08x}",
+            facts.info.nFileIndexHigh, facts.info.nFileIndexLow
+        ),
+        is_directory: facts.is_directory,
+        is_reparse_point: facts.is_reparse_point,
+        is_network_path: facts.is_network_path,
+        is_volume_root: facts.is_volume_root,
     })
 }
 
@@ -336,8 +372,8 @@ pub fn current_identity() -> Result<FolderUserIdentity> {
 }
 
 #[napi]
-pub fn inspect_directory(path: String) -> Result<FolderDirectoryIdentity> {
-    inspect_directory_inner(&path).ok_or_else(|| {
+pub fn inspect_folder(path: String) -> Result<FolderDirectoryIdentity> {
+    inspect_folder_inner(&path).ok_or_else(|| {
         Error::new(
             Status::GenericFailure,
             "FOLDER_PICKER_DIRECTORY_IDENTITY_UNAVAILABLE",
@@ -345,8 +381,33 @@ pub fn inspect_directory(path: String) -> Result<FolderDirectoryIdentity> {
     })
 }
 
+/// The frozen asynchronous picker contract. The modal Shell dialog runs on a
+/// dedicated COM STA worker thread from the libuv thread pool
+/// (`CoInitializeEx(COINIT_APARTMENTTHREADED)` inside [`PickFolderTask`]),
+/// so the Node main event loop is never blocked while the dialog is open.
+/// The returned promise settles with the same typed result shape the
+/// synchronous contract would have produced (SELECTED / CANCELLED / REFUSED).
+pub struct PickFolderTask;
+
+impl Task for PickFolderTask {
+    type Output = FolderSelectionResult;
+    type JsValue = FolderSelectionResult;
+
+    fn compute(&mut self) -> Result<Self::Output> {
+        Ok(select_folder_inner())
+    }
+
+    fn resolve(&mut self, _env: Env, output: Self::Output) -> Result<Self::JsValue> {
+        Ok(output)
+    }
+}
+
 #[napi]
-pub fn select_folder() -> FolderSelectionResult {
+pub fn pick_folder() -> AsyncTask<PickFolderTask> {
+    AsyncTask::new(PickFolderTask)
+}
+
+fn select_folder_inner() -> FolderSelectionResult {
     let identity = match current_identity_inner() {
         Some(value) => value,
         None => return refused("FOLDER_PICKER_INTERACTIVE_IDENTITY_UNAVAILABLE"),
@@ -394,7 +455,7 @@ pub fn select_folder() -> FolderSelectionResult {
         return refused("FOLDER_PICKER_FILESYSTEM_PATH_INVALID");
     };
 
-    let directory = match inspect_directory_inner(&path) {
+    let directory = match inspect_folder_inner(&path) {
         Some(value) => value,
         None => return refused("FOLDER_PICKER_DIRECTORY_IDENTITY_UNAVAILABLE"),
     };
@@ -424,5 +485,121 @@ pub fn select_folder() -> FolderSelectionResult {
             volume_serial: directory.volume_serial,
             file_id: directory.file_id,
         }),
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::directory_facts;
+    use std::fs;
+    use std::path::{Path, PathBuf};
+    use std::process::Command;
+    use std::time::{SystemTime, UNIX_EPOCH};
+
+    /// Session-independent traversal tests run against `directory_facts`
+    /// (no interactive identity is required, so the assertions stay
+    /// meaningful in service and CI contexts too).
+    fn scratch(label: &str) -> PathBuf {
+        let nanos = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .expect("system clock")
+            .as_nanos();
+        let dir = std::env::temp_dir().join(format!(
+            "shun-folder-picker-{}-{}-{}",
+            label,
+            std::process::id(),
+            nanos
+        ));
+        let _ = fs::remove_dir_all(&dir);
+        fs::create_dir_all(&dir).expect("create scratch root");
+        dir
+    }
+
+    /// Junctions need no elevation, unlike symlinks (`mklink /J`).
+    fn create_junction(link: &Path, target: &Path) {
+        let status = Command::new("cmd")
+            .arg("/c")
+            .arg("mklink")
+            .arg("/J")
+            .arg(link)
+            .arg(target)
+            .status()
+            .expect("spawn mklink");
+        assert!(status.success(), "mklink /J failed for {link:?}");
+    }
+
+    /// Junctions are removed as links; remove them before the tree so the
+    /// cleanup never walks into the link target.
+    fn remove_junction(link: &Path) {
+        fs::remove_dir(link).expect("remove junction");
+    }
+
+    #[test]
+    fn reparse_component_terminates_traversal_and_never_opens_descendants() {
+        let root = scratch("junction-descendant");
+        let real = root.join("real-target");
+        fs::create_dir_all(real.join("child").join("deeper")).expect("real target tree");
+        let link = root.join("link");
+        create_junction(&link, &real);
+
+        // The junction itself: traversal terminates at the reparse point.
+        assert!(directory_facts(link.to_str().expect("utf8 link")).is_none());
+        // The P1-01 regression: a descendant THROUGH the junction is never
+        // opened — the old loop continued into the link target's child.
+        assert!(directory_facts(link.join("child").to_str().expect("utf8 descendant")).is_none());
+        // A deeper descendant behind the same link stays refused as well.
+        assert!(directory_facts(
+            link.join("child")
+                .join("deeper")
+                .to_str()
+                .expect("utf8 deeper")
+        )
+        .is_none());
+        // Control: the identical descendant reached without the link
+        // resolves cleanly, so the refusals above came from the reparse
+        // rule and not from an unrelated environment failure.
+        let control = directory_facts(real.join("child").to_str().expect("utf8 real child"))
+            .expect("direct path resolves");
+        assert!(control.is_directory);
+        assert!(!control.is_reparse_point);
+        assert!(!control.is_network_path);
+        assert!(!control.is_volume_root);
+
+        remove_junction(&link);
+        fs::remove_dir_all(&root).expect("cleanup");
+    }
+
+    #[test]
+    fn junction_between_normal_components_refuses_the_whole_path() {
+        let root = scratch("junction-intermediate");
+        let real = root.join("real-target");
+        fs::create_dir_all(&real).expect("real target");
+        let prefix = root.join("prefix");
+        fs::create_dir_all(&prefix).expect("prefix");
+        let link = prefix.join("link");
+        create_junction(&link, &real);
+
+        let poisoned = prefix.join("link").join("anything");
+        assert!(directory_facts(poisoned.to_str().expect("utf8 poisoned")).is_none());
+        // A sibling path under the same prefix still resolves: the refusal
+        // is bound to the reparse component, not to the prefix directory.
+        let sibling = prefix.join("plain");
+        fs::create_dir_all(&sibling).expect("sibling");
+        let facts = directory_facts(sibling.to_str().expect("utf8 sibling")).expect("sibling ok");
+        assert!(facts.is_directory);
+        assert!(!facts.is_reparse_point);
+
+        remove_junction(&link);
+        fs::remove_dir_all(&root).expect("cleanup");
+    }
+
+    #[test]
+    fn malformed_and_device_paths_refuse_without_opening_anything() {
+        assert!(directory_facts("").is_none());
+        assert!(directory_facts("relative\\path").is_none());
+        assert!(directory_facts("\\\\server\\share\\folder").is_none());
+        assert!(directory_facts("\\\\.\\device\\folder").is_none());
+        assert!(directory_facts("C:\\..\\..\\outside").is_none());
+        assert!(directory_facts("C:\\").is_none());
     }
 }

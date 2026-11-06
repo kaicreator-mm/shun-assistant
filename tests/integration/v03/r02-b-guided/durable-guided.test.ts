@@ -1,9 +1,13 @@
 import { createHash } from 'node:crypto';
-import { mkdtempSync, readdirSync, rmSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { DatabaseSync } from 'node:sqlite';
 import { describe, expect, it } from 'vitest';
+import {
+  FolderSelectionHost,
+  type FolderSelectionStoragePort,
+} from '../../../../apps/control-api/src/v03/folder-selection-host.ts';
 import { HostGuidedService } from '../../../../packages/domain-host/src/guided/host-guided-service.ts';
 import type { GuidedProvenanceAuthority } from '../../../../packages/domain-host/src/guided/guided-provenance-authority.ts';
 
@@ -173,6 +177,69 @@ function tableCount(file: string, table: string): number {
   } finally {
     db.close();
   }
+}
+
+// ---------- U05-A: Host startup recovery for the select-root crash window ----------
+
+// Mock native picker identity; the native addon itself is exercised by the
+// Rust unit tests and the interactive desktop smoke, not by this file.
+const folderIdentity = {
+  userSid: 'S-1-5-21-9-8-7-1001',
+  logonSid: 'S-1-5-5-0-4321',
+  sessionId: 1,
+  volumeSerial: '9a8b7c6d',
+  fileId: '0fedcba987654321',
+};
+
+function folderPickerNative(root: string) {
+  return {
+    pickFolder: async () => ({
+      status: 'SELECTED' as const,
+      path: root,
+      displayName: 'Documents',
+      identity: folderIdentity,
+    }),
+    currentIdentity: () => ({
+      userSid: folderIdentity.userSid,
+      logonSid: folderIdentity.logonSid,
+      sessionId: folderIdentity.sessionId,
+    }),
+    inspectFolder: () => ({
+      ...folderIdentity,
+      isDirectory: true,
+      isReparsePoint: false,
+      isNetworkPath: false,
+      isVolumeRoot: false,
+    }),
+  };
+}
+
+function folderFakeStorage(): FolderSelectionStoragePort {
+  return {
+    resolveScope: async (_volume, declared) => ({ roots: [...declared.roots] }),
+    observeStorage: async (scope) => ({
+      observedAt: '2026-11-06T12:00:00.000Z',
+      roots: [...scope.roots],
+      directories: [],
+      rootFiles: [],
+      totalBytes: 0,
+    }),
+  };
+}
+
+function openFolderSelectionHost(
+  guided: HostGuidedService,
+  selectionFile: string,
+  root: string,
+  now: () => number,
+): FolderSelectionHost {
+  return new FolderSelectionHost({
+    guided,
+    databaseFile: selectionFile,
+    native: folderPickerNative(root),
+    clock: now,
+    storage: folderFakeStorage(),
+  });
 }
 
 describe('R02-B Host Guided SQLite durability and replay fence', () => {
@@ -814,6 +881,231 @@ describe('R02-B Host Guided SQLite durability and replay fence', () => {
     } finally {
       service.close();
       rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  it('U05-A: startup recovery restages the consumed select-root answer across a restart', async () => {
+    const dir = mkdtempSync(join(tmpdir(), 'shun-u05-recovery-'));
+    const guidedFile = join(dir, 'guided.sqlite');
+    const selectionFile = join(dir, 'folder-selection.sqlite');
+    const root = join(dir, 'selected-root');
+    mkdirSync(join(root, 'Documents'), { recursive: true });
+    writeFileSync(join(root, 'root.txt'), 'x');
+    let now = NOW;
+    let guided = new HostGuidedService(guidedFile, () => now);
+    let host = openFolderSelectionHost(guided, selectionFile, root, () => now);
+    try {
+      const staged = guided.stageTrustedSelection({ observation, semanticSelection: semantic, scope });
+      expect(staged.status).toBe('CURRENT');
+      if (staged.status !== 'CURRENT') return;
+      const selected = await host.selectRoot();
+      expect(selected.status).toBe('SELECTED');
+      if (selected.status !== 'SELECTED') return;
+      // The crash window: the USER_SUBMIT answer is durably recorded while
+      // the next INSPECT step was never staged.
+      const outcome = submitOutcome(
+        staged.step,
+        'ui:shun-u05-desktop',
+        now,
+        [{ fieldId: 'selectedRoot', value: selected.selectionRef }],
+      );
+      expect(guided.decide(relayFor(staged.step, 'ANSWER', outcome)))
+        .toMatchObject({ status: 'RECORDED', humanGrantIssued: false, effectSent: false });
+      guided.close();
+      host.close();
+
+      // Restart on the same durable files, inside the selection TTL.
+      now = NOW + 1_000;
+      guided = new HostGuidedService(guidedFile, () => now);
+      host = openFolderSelectionHost(guided, selectionFile, root, () => now);
+      expect(guided.readTrustedContext()).toMatchObject({ state: 'CONSUMED' });
+      const recovery = host.recoverInterruptedSelection();
+      expect(recovery.status).toBe('RECOVERED');
+      if (recovery.status !== 'RECOVERED') return;
+      expect(recovery.selectionRef).toBe(selected.selectionRef);
+      expect(guided.state().currentStep?.stepId).toBe(recovery.stagedStepId);
+      expect(guided.state().currentStep).toMatchObject({
+        kind: 'INSPECT',
+        templateRef: { artifactId: 'shun.guided.inspect-scope' },
+      });
+      expect(guided.readTrustedContext()).toMatchObject({
+        state: 'CURRENT',
+        observation: { selectedRootRef: selected.selectionRef },
+      });
+      // The recovered INSPECT step immediately supports the trusted
+      // observation receipt flow.
+      const observed = await host.observeCurrentSelectedFolder();
+      expect(observed).toMatchObject({ ok: true });
+      expect(guided.state().history).toMatchObject([
+        { stepId: staged.step.stepId, status: 'ACCEPTED' },
+        { status: 'OBSERVATION_RECEIPT' },
+      ]);
+    } finally {
+      try { host.close(); } catch { /* already closed */ }
+      try { guided.close(); } catch { /* already closed */ }
+      cleanup(dir);
+    }
+  });
+
+  it('U05-A: startup recovery keeps an expired crash-window selection refused across restart', async () => {
+    const dir = mkdtempSync(join(tmpdir(), 'shun-u05-recovery-expired-'));
+    const guidedFile = join(dir, 'guided.sqlite');
+    const selectionFile = join(dir, 'folder-selection.sqlite');
+    const root = join(dir, 'selected-root');
+    mkdirSync(root, { recursive: true });
+    let now = NOW;
+    let guided = new HostGuidedService(guidedFile, () => now);
+    let host = openFolderSelectionHost(guided, selectionFile, root, () => now);
+    try {
+      const staged = guided.stageTrustedSelection({ observation, semanticSelection: semantic, scope });
+      expect(staged.status).toBe('CURRENT');
+      if (staged.status !== 'CURRENT') return;
+      const selected = await host.selectRoot();
+      expect(selected.status).toBe('SELECTED');
+      if (selected.status !== 'SELECTED') return;
+      const outcome = submitOutcome(
+        staged.step,
+        'ui:shun-u05-desktop',
+        now,
+        [{ fieldId: 'selectedRoot', value: selected.selectionRef }],
+      );
+      expect(guided.decide(relayFor(staged.step, 'ANSWER', outcome)))
+        .toMatchObject({ status: 'RECORDED' });
+      guided.close();
+      host.close();
+
+      // Restart far beyond the 5-minute selection TTL.
+      now = NOW + 400_000;
+      guided = new HostGuidedService(guidedFile, () => now);
+      host = openFolderSelectionHost(guided, selectionFile, root, () => now);
+      expect(host.recoverInterruptedSelection()).toEqual({
+        status: 'STALE',
+        code: 'FOLDER_SELECTION_EXPIRED',
+      });
+      // Nothing was staged, nothing deleted, and no automatic re-selection
+      // is offered: a new selection is required.
+      expect(guided.readTrustedContext()).toMatchObject({ state: 'CONSUMED' });
+      expect(guided.state().currentStep).toBeUndefined();
+      expect(guided.readRecordedAnswer(staged.step.stepId)).toBeDefined();
+      expect(await host.selectRoot()).toEqual({
+        status: 'STALE',
+        code: 'GUIDED_SELECT_ROOT_NOT_CURRENT',
+      });
+    } finally {
+      try { host.close(); } catch { /* already closed */ }
+      try { guided.close(); } catch { /* already closed */ }
+      cleanup(dir);
+    }
+  });
+
+  it('U05-A: startup recovery refuses a selection row whose binding was tampered', async () => {
+    const dir = mkdtempSync(join(tmpdir(), 'shun-u05-recovery-tamper-'));
+    const guidedFile = join(dir, 'guided.sqlite');
+    const selectionFile = join(dir, 'folder-selection.sqlite');
+    const root = join(dir, 'selected-root');
+    mkdirSync(root, { recursive: true });
+    let now = NOW;
+    let guided = new HostGuidedService(guidedFile, () => now);
+    let host = openFolderSelectionHost(guided, selectionFile, root, () => now);
+    try {
+      const staged = guided.stageTrustedSelection({ observation, semanticSelection: semantic, scope });
+      expect(staged.status).toBe('CURRENT');
+      if (staged.status !== 'CURRENT') return;
+      const selected = await host.selectRoot();
+      expect(selected.status).toBe('SELECTED');
+      if (selected.status !== 'SELECTED') return;
+      const outcome = submitOutcome(
+        staged.step,
+        'ui:shun-u05-desktop',
+        now,
+        [{ fieldId: 'selectedRoot', value: selected.selectionRef }],
+      );
+      expect(guided.decide(relayFor(staged.step, 'ANSWER', outcome)))
+        .toMatchObject({ status: 'RECORDED' });
+      guided.close();
+      host.close();
+      // Tamper the private ledger row before the restart: the durable
+      // answer no longer matches the row's task binding.
+      const ledger = new DatabaseSync(selectionFile);
+      try {
+        ledger.exec("UPDATE folder_selection_records SET task_id='task-tampered'");
+      } finally {
+        ledger.close();
+      }
+      now = NOW + 1_000;
+      guided = new HostGuidedService(guidedFile, () => now);
+      host = openFolderSelectionHost(guided, selectionFile, root, () => now);
+      expect(host.recoverInterruptedSelection()).toEqual({
+        status: 'STALE',
+        code: 'FOLDER_SELECTION_STEP_BINDING_MISMATCH',
+      });
+      expect(guided.state().currentStep).toBeUndefined();
+      expect(guided.readTrustedContext()).toMatchObject({ state: 'CONSUMED' });
+    } finally {
+      try { host.close(); } catch { /* already closed */ }
+      try { guided.close(); } catch { /* already closed */ }
+      cleanup(dir);
+    }
+  });
+
+  it('U05-A: startup recovery refuses a root directory identity that was replaced', async () => {
+    const dir = mkdtempSync(join(tmpdir(), 'shun-u05-recovery-replaced-'));
+    const guidedFile = join(dir, 'guided.sqlite');
+    const selectionFile = join(dir, 'folder-selection.sqlite');
+    const root = join(dir, 'selected-root');
+    mkdirSync(root, { recursive: true });
+    let now = NOW;
+    let guided = new HostGuidedService(guidedFile, () => now);
+    let host = openFolderSelectionHost(guided, selectionFile, root, () => now);
+    try {
+      const staged = guided.stageTrustedSelection({ observation, semanticSelection: semantic, scope });
+      expect(staged.status).toBe('CURRENT');
+      if (staged.status !== 'CURRENT') return;
+      const selected = await host.selectRoot();
+      expect(selected.status).toBe('SELECTED');
+      if (selected.status !== 'SELECTED') return;
+      const outcome = submitOutcome(
+        staged.step,
+        'ui:shun-u05-desktop',
+        now,
+        [{ fieldId: 'selectedRoot', value: selected.selectionRef }],
+      );
+      expect(guided.decide(relayFor(staged.step, 'ANSWER', outcome)))
+        .toMatchObject({ status: 'RECORDED' });
+      guided.close();
+      host.close();
+
+      // The native root identity no longer matches the recorded row on the
+      // restarted host (root replaced/moved between crash and restart).
+      now = NOW + 1_000;
+      guided = new HostGuidedService(guidedFile, () => now);
+      const replacedNative = {
+        ...folderPickerNative(root),
+        inspectFolder: () => ({
+          ...folderIdentity,
+          fileId: 'deadbeefdeadbeef',
+          isDirectory: true,
+          isReparsePoint: false,
+          isNetworkPath: false,
+          isVolumeRoot: false,
+        }),
+      };
+      host = new FolderSelectionHost({
+        guided,
+        databaseFile: selectionFile,
+        native: replacedNative,
+        clock: () => now,
+        storage: folderFakeStorage(),
+      });
+      expect(host.recoverInterruptedSelection()).toEqual({
+        status: 'STALE',
+        code: 'FOLDER_SELECTION_IDENTITY_DRIFT',
+      });
+      expect(guided.state().currentStep).toBeUndefined();
+    } finally {
+      try { host.close(); } catch { /* already closed */ }
+      try { guided.close(); } catch { /* already closed */ }
+      cleanup(dir);
     }
   });
 

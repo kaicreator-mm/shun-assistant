@@ -132,6 +132,15 @@ the consent-broker addon. The Host fails closed when the native addon is
 missing, non-Windows, or does not match the SHA-256 pin in
 `folder-picker/artifacts.ts`.
 
+Frozen N-API surface: `pickFolder()` (async — the modal Shell dialog runs on
+a dedicated COM STA worker from the libuv thread pool, so the Node main event
+loop is never blocked; the promise settles with the same typed SELECTED /
+CANCELLED / REFUSED result), `inspectFolder(path)` (synchronous directory
+identity) and `currentIdentity()`. Directory-identity traversal terminates
+immediately at the first reparse-point component: no descendant of a
+junction/symlink is ever opened, so a successful identity always describes a
+reparse-free path (unit-tested in `src/lib.rs`).
+
 ### Build and pin (Windows x64 Build Host, Node 24.21.0)
 
 Use the same pinned Rust GNU toolchain and Node import library described in

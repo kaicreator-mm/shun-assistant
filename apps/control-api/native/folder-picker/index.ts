@@ -40,9 +40,11 @@ export type NativeFolderSelection =
     }>;
 
 export interface FolderPickerNativePort {
-  selectFolder(): NativeFolderSelection;
+  /** Frozen contract: the modal Shell dialog runs on a dedicated COM STA
+   * async worker; the Node main event loop is never blocked. */
+  pickFolder(): Promise<NativeFolderSelection>;
   currentIdentity(): FolderUserIdentity;
-  inspectDirectory(path: string): FolderDirectoryIdentity;
+  inspectFolder(path: string): FolderDirectoryIdentity;
 }
 
 const nativeDirectory = dirname(fileURLToPath(import.meta.url));
@@ -72,26 +74,28 @@ export function verifyFolderPickerArtifact(): Readonly<{
   return { ok: true, sha256: actual };
 }
 
-type RawAddon = {
-  selectFolder(): {
-    status: string;
-    code?: string;
-    path?: string;
-    displayName?: string;
-    identity?: {
-      userSid?: string;
-      logonSid?: string;
-      sessionId?: number;
-      volumeSerial?: string;
-      fileId?: string;
-    };
+type RawSelectionResult = {
+  status: string;
+  code?: string;
+  path?: string;
+  displayName?: string;
+  identity?: {
+    userSid?: string;
+    logonSid?: string;
+    sessionId?: number;
+    volumeSerial?: string;
+    fileId?: string;
   };
+};
+
+type RawAddon = {
+  pickFolder(): Promise<RawSelectionResult>;
   currentIdentity(): {
     userSid?: string;
     logonSid?: string;
     sessionId?: number;
   };
-  inspectDirectory(path: string): {
+  inspectFolder(path: string): {
     userSid?: string;
     logonSid?: string;
     sessionId?: number;
@@ -104,9 +108,7 @@ type RawAddon = {
   };
 };
 
-function mapIdentity(
-  raw: NonNullable<ReturnType<RawAddon['selectFolder']>['identity']>,
-): FolderIdentity {
+function mapIdentity(raw: NonNullable<RawSelectionResult['identity']>): FolderIdentity {
   if (
     typeof raw.userSid !== 'string' ||
     typeof raw.logonSid !== 'string' ||
@@ -131,15 +133,20 @@ export function loadFolderPicker(): FolderPickerNativePort {
   const addon = require(folderPickerAddonPath) as RawAddon;
   if (
     !addon ||
-    typeof addon.selectFolder !== 'function' ||
+    typeof addon.pickFolder !== 'function' ||
     typeof addon.currentIdentity !== 'function' ||
-    typeof addon.inspectDirectory !== 'function'
+    typeof addon.inspectFolder !== 'function'
   ) {
     throw new Error('FOLDER_PICKER_ADDON_API_INVALID');
   }
   return Object.freeze({
-    selectFolder(): NativeFolderSelection {
-      const raw = addon.selectFolder();
+    async pickFolder(): Promise<NativeFolderSelection> {
+      let raw: RawSelectionResult;
+      try {
+        raw = await addon.pickFolder();
+      } catch {
+        return { status: 'REFUSED', code: 'FOLDER_PICKER_ASYNC_TASK_FAILED' };
+      }
       if (raw?.status === 'CANCELLED') return { status: 'CANCELLED' };
       if (raw?.status === 'REFUSED') {
         return {
@@ -180,8 +187,8 @@ export function loadFolderPicker(): FolderPickerNativePort {
         sessionId: raw.sessionId as number,
       };
     },
-    inspectDirectory(path: string): FolderDirectoryIdentity {
-      const raw = addon.inspectDirectory(path);
+    inspectFolder(path: string): FolderDirectoryIdentity {
+      const raw = addon.inspectFolder(path);
       const identity = mapIdentity(raw);
       if (
         typeof raw.isDirectory !== 'boolean' ||

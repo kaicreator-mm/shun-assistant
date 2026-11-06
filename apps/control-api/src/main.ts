@@ -91,6 +91,19 @@ const folderSelectionRoute = folderSelectionHost
   ? createV03FolderSelectionRoute(folderSelectionHost)
   : undefined;
 
+// P1-02 crash-window recovery, host-only and never a route. Runs after the
+// trusted Guided ledger is admitted and before operator case-file
+// provisioning: a durable select-root USER_SUBMIT whose next INSPECT step
+// was never staged is re-verified against expiry, task/journey/Case/step/
+// digest binding, the current user/session and the native root identity,
+// and only then restaged through the existing Host-only capability. Stale,
+// expired or mismatched rows stay refused; a fresh flow is a no-op.
+if (folderSelectionHost) {
+  const recovery = folderSelectionHost.recoverInterruptedSelection();
+  const detail = 'code' in recovery ? ` (${recovery.code})` : '';
+  console.log(`v0.3 folder-selection startup recovery: ${recovery.status}${detail}`);
+}
+
 // Restore or stage only operator-pinned Host observations. A browser cannot
 // supply an authority-bearing semantic selection or a selected root.
 if (guided && process.env.SHUN_V03_GUIDED_CASE_FILE) {
