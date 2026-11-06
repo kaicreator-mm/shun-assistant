@@ -121,3 +121,45 @@ no test doubles claim OS proof):
   host cannot provide. The same-principal positive and the token-identity
   equality logic are proven live above; the enforcement code path for a
   mismatching token is the same comparison the evidence exercises.
+
+
+## R04 U05-A Windows Shell folder picker (v0.3)
+
+The dedicated `folder-picker/` crate is a separate N-API addon. It uses the
+Windows Shell `IFileOpenDialog` with folder-only and filesystem-only options;
+it does not use browser directory inputs, PowerShell, cmd, shell scripts or
+the consent-broker addon. The Host fails closed when the native addon is
+missing, non-Windows, or does not match the SHA-256 pin in
+`folder-picker/artifacts.ts`.
+
+### Build and pin (Windows x64 Build Host, Node 24.21.0)
+
+Use the same pinned Rust GNU toolchain and Node import library described in
+the T04 host build section above. From the repository root:
+
+```bash
+cd apps/control-api/native
+export CARGO_TARGET_DIR=<repo-root>/.target CARGO_INCREMENTAL=0
+export LIBNODE_PATH=/c/xDev/runtimes/libnode-import/v24.21.0
+rustup run stable-x86_64-pc-windows-gnu cargo fmt --check
+rustup run stable-x86_64-pc-windows-gnu cargo build --release --locked --target x86_64-pc-windows-gnu -p shun-folder-picker
+cp "$CARGO_TARGET_DIR/x86_64-pc-windows-gnu/release/shun_folder_picker.dll" folder-picker/shun_folder_picker.node
+sha256sum folder-picker/shun_folder_picker.node
+```
+
+Commit the produced `folder-picker/shun_folder_picker.node` and replace the
+zero SHA-256 placeholder in `folder-picker/artifacts.ts` with the exact
+lowercase digest from that build. The runtime loader hashes the artifact
+before loading it and refuses any missing or mismatched binary.
+
+### Required Windows smoke
+
+Under the logged-in standard-user desktop session and Node 24.21.0, run the
+focused Host tests and one interactive smoke that selects a benign existing
+folder, verifies only the safe display name/opaque reference is returned,
+then opens the picker again and cancels. Do not create, modify, rename, move
+or delete any filesystem content. Record OS/session, target triple, Node and
+Rust versions, command exit codes, artifact SHA-256 and the select/cancel
+outcomes in the Issue #381 LOCAL_BUILDER receipt. A headless/service session,
+COM error or unavailable desktop must remain a typed refusal, never a
+browser or shell fallback.

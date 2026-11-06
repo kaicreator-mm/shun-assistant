@@ -4,7 +4,7 @@
  */
 import { createHash, randomBytes } from 'node:crypto';
 import { DatabaseSync } from 'node:sqlite';
-import { basename, resolve, win32 } from 'node:path';
+import { resolve, win32 } from 'node:path';
 import { readdir } from 'node:fs/promises';
 import {
   HOST_FOLDER_OBSERVATION_SCHEMA,
@@ -179,8 +179,14 @@ export class FolderSelectionHost {
         !safeDisplayName(picked.displayName) || !validIdentity(picked.identity)) {
       return { status: 'REFUSED', code: picked.status === 'REFUSED' ? picked.code : 'FOLDER_PICKER_RESULT_INVALID' };
     }
-    const currentUser = this.#native.currentIdentity();
-    const directory = this.#native.inspectDirectory(picked.path);
+    let currentUser: ReturnType<FolderPickerNativePort['currentIdentity']>;
+    let directory: ReturnType<FolderPickerNativePort['inspectDirectory']>;
+    try {
+      currentUser = this.#native.currentIdentity();
+      directory = this.#native.inspectDirectory(picked.path);
+    } catch {
+      return { status: 'REFUSED', code: 'FOLDER_SELECTION_IDENTITY_UNAVAILABLE' };
+    }
     if (!validUserIdentity(currentUser) || !isRecord(directory) ||
         !sameIdentity({
           user_sid: picked.identity.userSid,
@@ -275,8 +281,22 @@ export class FolderSelectionHost {
 
 
   async observeCurrentSelectedFolder(): Promise<ComputerFolderObservationResult> {
+    const binding = this.#captureObservationBinding();
+    if (!binding) return { ok: false, code: 'FOLDER_NOT_SELECTED' };
+
     const result = await this.#observationAdapter.observeCurrentSelectedFolder();
     if (!result.ok) return result;
+
+    // The metadata scan is asynchronous. Re-read the exact live INSPECT
+    // binding and native directory identity immediately before the Host-owned
+    // OBSERVATION_RECEIPT transition. A stale scan can never consume a newer
+    // Case/step or a replaced directory.
+    const row = this.#selectionRow(binding.selectionRef);
+    if (!this.#sameObservationBinding(binding) || !row ||
+        !this.#rowMatchesObservationBinding(row, binding) ||
+        !this.#verifySelectionIdentity(row)) {
+      return { ok: false, code: 'FOLDER_OBSERVATION_UNAVAILABLE' };
+    }
     const receipt = this.#guided.recordHostObservationReceipt();
     if (receipt.status !== 'RECORDED') {
       return { ok: false, code: 'FOLDER_OBSERVATION_UNAVAILABLE' };
@@ -306,22 +326,10 @@ export class FolderSelectionHost {
   }
 
   async #observeRaw(): Promise<unknown> {
-    const context = this.#guided.readTrustedContext();
-    const current = this.#guided.state().currentStep;
-    if (!context || context.state !== 'CURRENT' || !current ||
-        current.stepId !== context.step.stepId ||
-        context.step.templateRef.artifactId !== 'shun.guided.inspect-scope' ||
-        !isRecord(context.observation) ||
-        typeof context.observation.selectedRootRef !== 'string') {
-      return { schema: HOST_FOLDER_OBSERVATION_SCHEMA, status: 'NOT_SELECTED' };
-    }
-    const selectionRef = context.observation.selectedRootRef;
-    if (!SELECTION_REF.test(selectionRef)) return null;
-    const row = this.#selectionRow(selectionRef);
-    if (!row || row.task_id !== context.step.taskId ||
-        row.journey_id !== context.step.journeyId ||
-        row.case_ref_json !== stableJson(context.step.caseRef) ||
-        row.expires_at_unix_ms <= this.#clock() ||
+    const binding = this.#captureObservationBinding();
+    if (!binding) return { schema: HOST_FOLDER_OBSERVATION_SCHEMA, status: 'NOT_SELECTED' };
+    const row = this.#selectionRow(binding.selectionRef);
+    if (!row || !this.#rowMatchesObservationBinding(row, binding) ||
         !this.#verifySelectionIdentity(row)) {
       throw new Error('FOLDER_SELECTION_IDENTITY_DRIFT');
     }
@@ -343,26 +351,105 @@ export class FolderSelectionHost {
     if (!Number.isSafeInteger(rootBytes) || !Number.isSafeInteger(evidence.totalBytes)) {
       throw new Error('FOLDER_OBSERVATION_INVALID');
     }
+
+    // Revalidate after the complete async walk as well as immediately before
+    // recording its receipt. This rejects a step/Case switch, expiry or root
+    // replacement that occurred while resolveScope/observeStorage was pending.
+    const latestRow = this.#selectionRow(binding.selectionRef);
+    if (!this.#sameObservationBinding(binding) || !latestRow ||
+        !this.#rowMatchesObservationBinding(latestRow, binding) ||
+        !this.#verifySelectionIdentity(latestRow)) {
+      throw new Error('FOLDER_OBSERVATION_BINDING_CHANGED');
+    }
+
     const observedAt = evidence.observedAt;
+    const directories = evidence.directories.map((directory) => ({
+      relativePath: win32.basename(directory.path),
+      bytes: directory.bytes,
+      files: directory.files,
+      lastModifiedMs: directory.lastModifiedMs,
+      inaccessibleCount: directory.inaccessibleEntries.length,
+    })).sort((a, b) =>
+      a.relativePath.toLocaleLowerCase('en-US').localeCompare(
+        b.relativePath.toLocaleLowerCase('en-US'), 'en-US',
+      ) || a.relativePath.localeCompare(b.relativePath, 'en-US'));
+    const rootFileMetadata = evidence.rootFiles.map((item) => ({
+      name: win32.basename(item.path),
+      bytes: item.bytes,
+    })).sort((a, b) =>
+      a.name.toLocaleLowerCase('en-US').localeCompare(b.name.toLocaleLowerCase('en-US'), 'en-US') ||
+      a.name.localeCompare(b.name, 'en-US'));
     const revisionDigest = createHash('sha256')
-      .update(`${selectionRef}|${observedAt}|${evidence.totalBytes}`, 'utf8')
+      .update(stableJson({
+        selectionRef: binding.selectionRef,
+        observedAt,
+        totalBytes: evidence.totalBytes,
+        directories,
+        rootFiles: rootFileMetadata,
+      }), 'utf8')
       .digest('hex');
     return {
       schema: HOST_FOLDER_OBSERVATION_SCHEMA,
       status: 'OBSERVED_ONLY',
-      rootRef: selectionRef,
+      rootRef: binding.selectionRef,
       scopeRevision: `folder-scope-${revisionDigest.slice(0, 32)}`,
       observedAt,
       totalBytes: evidence.totalBytes,
-      directories: evidence.directories.map((directory) => ({
-        relativePath: basename(directory.path),
-        bytes: directory.bytes,
-        files: directory.files,
-        lastModifiedMs: directory.lastModifiedMs,
-        inaccessibleCount: directory.inaccessibleEntries.length,
-      })),
+      directories,
       rootFiles: { count: evidence.rootFiles.length, bytes: rootBytes },
     };
+  }
+
+  #captureObservationBinding(): Readonly<{
+    stepId: string; taskId: string; journeyId: string; caseRefJson: string;
+    templateDigest: string; selectionRef: string;
+  }> | null {
+    const context = this.#guided.readTrustedContext();
+    const current = this.#guided.state().currentStep;
+    if (!context || context.state !== 'CURRENT' || !current ||
+        current.stepId !== context.step.stepId ||
+        context.step.templateRef.artifactId !== 'shun.guided.inspect-scope' ||
+        !isRecord(context.observation) ||
+        typeof context.observation.selectedRootRef !== 'string' ||
+        !SELECTION_REF.test(context.observation.selectedRootRef)) return null;
+    return {
+      stepId: context.step.stepId,
+      taskId: context.step.taskId,
+      journeyId: context.step.journeyId,
+      caseRefJson: stableJson(context.step.caseRef),
+      templateDigest: context.step.templateRef.digest,
+      selectionRef: context.observation.selectedRootRef,
+    };
+  }
+
+  #sameObservationBinding(binding: Readonly<{
+    stepId: string; taskId: string; journeyId: string; caseRefJson: string;
+    templateDigest: string; selectionRef: string;
+  }>): boolean {
+    const context = this.#guided.readTrustedContext();
+    const current = this.#guided.state().currentStep;
+    return !!context && context.state === 'CURRENT' && !!current &&
+      context.step.templateRef.artifactId === 'shun.guided.inspect-scope' &&
+      context.step.stepId === binding.stepId && current.stepId === binding.stepId &&
+      context.step.taskId === binding.taskId && current.taskId === binding.taskId &&
+      context.step.journeyId === binding.journeyId && current.journeyId === binding.journeyId &&
+      stableJson(context.step.caseRef) === binding.caseRefJson &&
+      stableJson(current.caseRef) === binding.caseRefJson &&
+      context.step.templateRef.digest === binding.templateDigest &&
+      current.templateRef.digest === binding.templateDigest &&
+      isRecord(context.observation) &&
+      context.observation.selectedRootRef === binding.selectionRef;
+  }
+
+  #rowMatchesObservationBinding(
+    row: SelectionRow,
+    binding: Readonly<{ taskId: string; journeyId: string; caseRefJson: string; selectionRef: string }>,
+  ): boolean {
+    return row.selection_ref === binding.selectionRef &&
+      row.task_id === binding.taskId &&
+      row.journey_id === binding.journeyId &&
+      row.case_ref_json === binding.caseRefJson &&
+      row.expires_at_unix_ms > this.#clock();
   }
 
   close(): void {
