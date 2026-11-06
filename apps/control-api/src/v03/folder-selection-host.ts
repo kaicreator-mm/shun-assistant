@@ -825,17 +825,23 @@ export function folderSelectionDatabaseRefusal(databaseFile: unknown): string | 
     return 'FOLDER_SELECTION_DATABASE_OUTSIDE_LOCALAPPDATA';
   }
 
-  // Resolve the actual filesystem target, not just its spelling. This
-  // catches a LOCALAPPDATA root or descendant redirected through an existing
-  // junction/symlink into ProgramData or another profile. The DB file may
-  // not exist yet, but its parent must already exist (SQLite cannot create
-  // missing parent directories).
+  // Resolve the actual filesystem target, not just its spelling. The parent
+  // must exist because SQLite cannot create missing parent directories.
   let realBase: string;
+  let realParent: string;
   let realTarget: string;
   try {
     realBase = realpathSync.native(base);
   } catch {
     return 'FOLDER_SELECTION_DATABASE_LOCALAPPDATA_UNRESOLVED';
+  }
+  try {
+    realParent = realpathSync.native(dirname(target));
+  } catch {
+    return 'FOLDER_SELECTION_DATABASE_PARENT_UNAVAILABLE';
+  }
+  if (!within(realBase, realParent)) {
+    return 'FOLDER_SELECTION_DATABASE_OUTSIDE_LOCALAPPDATA';
   }
   try {
     lstatSync(target);
@@ -852,12 +858,7 @@ export function folderSelectionDatabaseRefusal(databaseFile: unknown): string | 
         ? (error as { code?: unknown }).code
         : undefined;
     if (code !== 'ENOENT') return 'FOLDER_SELECTION_DATABASE_PATH_UNVERIFIABLE';
-    try {
-      const realParent = realpathSync.native(dirname(target));
-      realTarget = win32.join(realParent, basename(target));
-    } catch {
-      return 'FOLDER_SELECTION_DATABASE_PARENT_UNAVAILABLE';
-    }
+    realTarget = win32.join(realParent, basename(target));
   }
 
   if (typeof programData === 'string' && programData.length > 0) {
@@ -865,14 +866,18 @@ export function folderSelectionDatabaseRefusal(databaseFile: unknown): string | 
     if (within(programDataRoot, base) || within(programDataRoot, target)) {
       return 'FOLDER_SELECTION_DATABASE_PROGRAMDATA_REFUSED';
     }
+    let realProgramData: string;
     try {
-      const realProgramData = realpathSync.native(programDataRoot);
-      if (within(realProgramData, realBase) || within(realProgramData, realTarget)) {
-        return 'FOLDER_SELECTION_DATABASE_PROGRAMDATA_REFUSED';
-      }
+      realProgramData = realpathSync.native(programDataRoot);
     } catch {
-      // The lexical ProgramData boundary above remains enforced when the
-      // optional environment path is absent or cannot be resolved.
+      return 'FOLDER_SELECTION_DATABASE_PROGRAMDATA_UNVERIFIABLE';
+    }
+    if (
+      within(realProgramData, realBase) ||
+      within(realProgramData, realParent) ||
+      within(realProgramData, realTarget)
+    ) {
+      return 'FOLDER_SELECTION_DATABASE_PROGRAMDATA_REFUSED';
     }
   }
   if (!strictlyInside(realBase, realTarget)) {
