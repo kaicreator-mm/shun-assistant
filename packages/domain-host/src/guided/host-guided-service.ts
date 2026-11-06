@@ -160,6 +160,8 @@ export class HostGuidedService {
    * silently, never deletes data.
    */
   #ledgerUnavailable: string | null = null;
+  /** Capability token for in-process Host-generated INSPECT receipts. */
+  readonly #trustedHostObservationRelays = new WeakSet<object>();
 
   constructor(
     file: string,
