@@ -3,8 +3,9 @@
  * Absolute paths and OS identity remain inside this Host module and SQLite.
  */
 import { createHash, randomBytes } from 'node:crypto';
+import { lstatSync, realpathSync } from 'node:fs';
 import { readdir } from 'node:fs/promises';
-import { resolve, win32 } from 'node:path';
+import { basename, dirname, resolve, win32 } from 'node:path';
 import { DatabaseSync } from 'node:sqlite';
 import {
   type ObservationEvidence,
@@ -789,12 +790,11 @@ export class FolderSelectionHost {
 }
 
 /**
- * P2-02: the folder-selection SQLite ledger is per-user private state. The
- * production database path must resolve strictly inside the current user's
- * LOCALAPPDATA; shared, machine-wide (ProgramData), network/device or
- * out-of-profile locations are refused at startup with a typed code. The
- * check is lexical and fail-closed (no guessed fallbacks, no silent
- * rewriting): an unset LOCALAPPDATA or a non-Windows host refuses.
+ * The folder-selection SQLite ledger is per-user private state. Refuse
+ * lexical escapes, pre-existing junction/symlink escapes and paths whose
+ * actual filesystem target cannot be resolved. This is a startup path check;
+ * native folder observation still requires a separate handle lease to close
+ * post-check replacement races.
  */
 export function folderSelectionDatabaseRefusal(databaseFile: unknown): string | null {
   if (process.platform !== 'win32') return 'FOLDER_SELECTION_DATABASE_NOT_WINDOWS';
@@ -811,13 +811,9 @@ export function folderSelectionDatabaseRefusal(databaseFile: unknown): string | 
   const base = resolve(localAppData);
   const target = resolve(databaseFile);
   const programData = process.env.ProgramData;
-  // Case-folded, trailing-separator-free lexical comparison (Windows path
-  // semantics). `within` = equal or deeper; `strictlyInside` = strictly deeper.
+  // Case-folded, trailing-separator-free lexical Windows comparison.
   const fold = (value: string): string =>
-    win32
-      .normalize(value)
-      .replace(/[\\]+$/g, '')
-      .toLowerCase();
+    win32.normalize(value).replace(/[\\]+$/g, '').toLowerCase();
   const within = (root: string, value: string): boolean => {
     const rootFolded = fold(root);
     const valueFolded = fold(value);
@@ -825,15 +821,61 @@ export function folderSelectionDatabaseRefusal(databaseFile: unknown): string | 
   };
   const strictlyInside = (root: string, value: string): boolean =>
     fold(value).startsWith(fold(root) + '\\');
-  // A base redirected into the machine-wide shared store is a misconfigured
-  // per-user profile, not a per-user LOCALAPPDATA.
+  if (!strictlyInside(base, target)) {
+    return 'FOLDER_SELECTION_DATABASE_OUTSIDE_LOCALAPPDATA';
+  }
+
+  // Resolve the actual filesystem target, not just its spelling. This
+  // catches a LOCALAPPDATA root or descendant redirected through an existing
+  // junction/symlink into ProgramData or another profile. The DB file may
+  // not exist yet, but its parent must already exist (SQLite cannot create
+  // missing parent directories).
+  let realBase: string;
+  let realTarget: string;
+  try {
+    realBase = realpathSync.native(base);
+  } catch {
+    return 'FOLDER_SELECTION_DATABASE_LOCALAPPDATA_UNRESOLVED';
+  }
+  try {
+    lstatSync(target);
+    try {
+      realTarget = realpathSync.native(target);
+    } catch {
+      // A dangling link or inaccessible existing target is not equivalent
+      // to a new database file; do not fall back to the lexical path.
+      return 'FOLDER_SELECTION_DATABASE_PATH_UNVERIFIABLE';
+    }
+  } catch (error) {
+    const code =
+      typeof error === 'object' && error !== null && 'code' in error
+        ? (error as { code?: unknown }).code
+        : undefined;
+    if (code !== 'ENOENT') return 'FOLDER_SELECTION_DATABASE_PATH_UNVERIFIABLE';
+    try {
+      const realParent = realpathSync.native(dirname(target));
+      realTarget = win32.join(realParent, basename(target));
+    } catch {
+      return 'FOLDER_SELECTION_DATABASE_PARENT_UNAVAILABLE';
+    }
+  }
+
   if (typeof programData === 'string' && programData.length > 0) {
     const programDataRoot = resolve(programData);
     if (within(programDataRoot, base) || within(programDataRoot, target)) {
       return 'FOLDER_SELECTION_DATABASE_PROGRAMDATA_REFUSED';
     }
+    try {
+      const realProgramData = realpathSync.native(programDataRoot);
+      if (within(realProgramData, realBase) || within(realProgramData, realTarget)) {
+        return 'FOLDER_SELECTION_DATABASE_PROGRAMDATA_REFUSED';
+      }
+    } catch {
+      // The lexical ProgramData boundary above remains enforced when the
+      // optional environment path is absent or cannot be resolved.
+    }
   }
-  if (!strictlyInside(base, target)) {
+  if (!strictlyInside(realBase, realTarget)) {
     return 'FOLDER_SELECTION_DATABASE_OUTSIDE_LOCALAPPDATA';
   }
   return null;
