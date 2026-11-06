@@ -159,8 +159,11 @@ function validIdentity(value: unknown): value is FolderIdentity {
 }
 function validDirectoryIdentity(value: unknown): value is DirectoryIdentity {
   return (
-    validIdentity(value) &&
     isRecord(value) &&
+    typeof value.volumeSerial === 'string' &&
+    HEX_ID.test(value.volumeSerial) &&
+    typeof value.fileId === 'string' &&
+    HEX_ID.test(value.fileId) &&
     typeof value.isDirectory === 'boolean' &&
     typeof value.isReparsePoint === 'boolean' &&
     typeof value.isNetworkPath === 'boolean' &&
