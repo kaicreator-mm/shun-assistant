@@ -511,9 +511,7 @@ describe.skipIf(process.platform !== 'win32')(
 
     it('accepts a database strictly inside the current user LOCALAPPDATA', () => {
       expect(
-        folderSelectionDatabaseRefusal(
-          join(localAppDataRoot, 'Shun', 'folder-selection.sqlite'),
-        ),
+        folderSelectionDatabaseRefusal(join(localAppDataRoot, 'Shun', 'folder-selection.sqlite')),
       ).toBe(null);
     });
 
@@ -534,9 +532,7 @@ describe.skipIf(process.platform !== 'win32')(
         'FOLDER_SELECTION_DATABASE_OUTSIDE_LOCALAPPDATA',
       );
       expect(
-        folderSelectionDatabaseRefusal(
-          join(localAppDataRoot, '..', 'elsewhere', 'shun.sqlite'),
-        ),
+        folderSelectionDatabaseRefusal(join(localAppDataRoot, '..', 'elsewhere', 'shun.sqlite')),
       ).toBe('FOLDER_SELECTION_DATABASE_OUTSIDE_LOCALAPPDATA');
     });
 
