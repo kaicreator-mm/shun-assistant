@@ -157,8 +157,10 @@ describe('R04 real desktop.js task-list interactions (controlled DOM)', () => {
       await ui.refresh();
       const notice = node('step-container').children[0];
       expect(notice.textContent).toBe(locale.startsWith('zh')
-        ? '这里只记录你输入的文件夹路径，不代表已选中该文件夹，也不会因此访问其中的文件。'
-        : 'This only records the folder path you entered. It does not select the folder or allow file access.');
+        ? '请使用 Windows 文件夹选择器。本界面不接受手动输入路径。'
+        : 'Use the Windows folder picker. A typed path is not accepted by this screen.');
+      expect(node('folder-select').hidden).toBe(false);
+      expect(node('field-selectedRoot').value).toBe('');
       expect(node('dynamic-form').hidden).toBe(false);
       expect(requests.every((item) => item.method === 'GET')).toBe(true);
     });

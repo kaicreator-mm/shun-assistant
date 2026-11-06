@@ -63,7 +63,9 @@ describe('R04 source contract: the shipped desktop surface replaces technical op
     expect(app).toContain('/api/cloud/disclosure-preview');
     expect(app).toContain('projectRoutineExecution');
     expect(app).toContain('projectDisclosurePreview');
-    expect(app).toContain('summarizeBrowserFolder');
+    expect(app).toContain('projectFolderSelection');
+    expect(app).toContain('projectFolderObservation');
+    expect(app).not.toContain('summarizeBrowserFolder');
     expect(app).toContain('guidedReceiptStatus');
     expect(app).toContain("async function loadHomeRecentTasks()");
     expect(app).toContain('translate();loadHomeRecentTasks().catch(showError);refresh().catch(showError);');
