@@ -1,0 +1,91 @@
+pack_id: shun-v030-r04-u05-a-host-selection-r1
+task_id: U05-A-HOST-SELECTION-OBSERVATION
+issue: '#381'
+parent_issue: '#380'
+repository: kaicreator-mm/shun-assistant
+version: v0.3.0
+standard_revision: 326aaf5b0188b53cb0ed5c38752a9e299e3f9efd
+delivery_principle: ADS_1359_DELIVERY_FIRST_CONSOLIDATED_REPAIR
+admission_mode: SINGLE_WRITER_ADMISSION
+pack_revision: 2
+claim_generation: 2
+supersedes:
+  pack_pr: '#383'
+  prior_claim_generation: 1
+owner_authorization:
+  product_l2: '#380 comment 6685260212'
+  device_scope_amendment: '#388 comment 6696666312'
+protected_claim_key: 'kaicreator-mm/shun-assistant#381:builder:__default__'
+dependencies:
+  product_contract: '#380 DEVICE_SCOPE_AMENDED'
+  completed_runtime_prerequisites: ['#269', '#270', '#281/#282']
+  separate_support_task: '#387'
+pack_base:
+  branch: wip/v0.3.0-r02-owner-repairs
+  sha: 47ecf345c4b96befd20db5c6d5673bbeaf027e49
+  tree: 8aff803fc2f80e9b683be3d5e8abea747c6677ea
+  contract: 'One manifest path and one commit directly parented to this exact WIP SHA.'
+source_candidate:
+  branch: JIT_only_task/v0.3.0-r04-u05-a-host-selection
+  head: 9f11858c45829cf87edc4682ee1135845d4d032d
+  tree: 68a69015235e238c66404214170e4b1c676dc2ed
+  base: 47ecf345c4b96befd20db5c6d5673bbeaf027e49
+execution:
+  profile: WEB_BUILDER_WITH_CONDITIONAL_LOCAL_BUILDER
+  environment: WEB_SOURCE_THEN_WINDOWS_BUILD_HOST
+  primary_builder: WEB_CONTROLLER
+  independent_reviewer: WEB_VERIFIER
+  conditional_local_builder: 'Only for final Windows x64 Rust/N-API rebuild, pinned .node artifact and interactive picker select/cancel smoke. It owns repair as well as validation.'
+  standalone_local_validation: false
+authoring_write_set:
+  - .agent/execution/R04-U05-A-HOST-SELECTION-R1/MANIFEST.yaml
+allowed_write_set:
+  - apps/control-api/native/Cargo.toml
+  - apps/control-api/native/Cargo.lock
+  - apps/control-api/native/README.md
+  - apps/control-api/native/folder-picker/Cargo.toml
+  - apps/control-api/native/folder-picker/src/lib.rs
+  - apps/control-api/native/folder-picker/shun_folder_picker.node
+  - apps/control-api/native/folder-picker/index.ts
+  - apps/control-api/native/folder-picker/artifacts.ts
+  - apps/control-api/src/v03/folder-selection-host.ts
+  - apps/control-api/src/v03/folder-selection-route.ts
+  - apps/control-api/src/v03/guided-route.ts
+  - apps/control-api/src/main.ts
+  - apps/control-api/src/server.ts
+  - packages/domain-host/src/guided/host-guided-service.ts
+  - tests/integration/v03/r02-b-guided/durable-guided.test.ts
+  - apps/control-api/test/folder-selection-host.test.ts
+  - apps/control-api/test/folder-selection-route.test.ts
+  - apps/control-api/test/folder-selection-server.test.ts
+acceptance:
+  - 'Device-scoped content model: no application-level cross-user isolation; same-device local accounts may observe the same folder metadata when their current Windows token ACL permits access.'
+  - 'Same-user and other-local-user malicious processes are outside v0.3.0 threat scope. Windows ACLs remain authoritative; no impersonation, elevation or ACL bypass.'
+  - 'Remove persisted or authorization-relevant user SID, logon SID and session ID binding from selection records, identity equality checks and restart recovery. The picker still requires an interactive desktop solely to display the native dialog.'
+  - 'Preserve the 256-bit CSPRNG opaque selectionRef, TTL <= 5 minutes, exact task/journey/CaseRef/origin step/template digest binding and Host-only receipt authority.'
+  - 'Preserve canonical path validation; refuse UNC/network/device/mapped-drive paths, volume roots, non-directories, inaccessible paths and reparse points/symlinks.'
+  - 'Preserve volume serial and directory file ID checks/revalidation; do not claim path-based metadata walking or SQLite path open is atomic.'
+  - 'Explicitly document Owner-accepted residual risks: transient namespace replacement during path-based metadata enumeration and LocalAppData path-validation-to-SQLite-open race. No vertical-storage handle port or SQLite VFS is required for v0.3.0.'
+  - 'Fix the P2 native partial-chain handle leak using RAII for every acquired handle and deterministic failure-path tests (missing child, reparse child, non-directory child).'
+  - 'Correct the stale Rust/README claim that leases prevent rename/delete and correct the prior Builder receipt wording about Cargo.lock.'
+  - 'The folder-selection SQLite ledger remains in configured per-account LocalAppData for this pack; this is persistence locality only, not application-level content isolation. Each account may select the same OS-accessible directory and observe the same metadata. A shared saved selection/Guided Case is explicitly out of scope.'
+  - 'Reuse vertical-storage resolveScope/observeStorage and the existing Host observation adapter; do not create a second walker.'
+  - 'Keep metadata-only bounded projection, <=256 direct child directories and <=4096 root files; no file content, absolute path or external disclosure.'
+  - 'Preserve Host-owned OBSERVATION_RECEIPT; caller-forged REFUSE + OBSERVATION_RECEIPT remains refused and #387 stays in its one-path write set.'
+  - 'No plan approval, Permit, grant, Kernel Journal, K effect or filesystem mutation.'
+test_contract:
+  - 'Before CI: Node 24 syntax preflight, formatting, affected-package typecheck, focused Host/route/server tests and durable-guided tests.'
+  - 'Rust: cargo fmt, build and failure-path handle-drop tests; conditional Windows x64 Build Host rebuild and artifact SHA256 pin.'
+  - 'Prove a selection record can be observed by a different local identity when the OS token has ACL access, while task/Case/step/expiry/root identity mismatches still refuse.'
+  - 'Prove interactive picker refuses noninteractive desktop without relying on SID/session as a persisted authorization condition.'
+  - 'Woodpecker Push/PR and GitHub Actions contracts/executor-windows must be terminal SUCCESS on the final source SHA after #387 is separately integrated.'
+  - 'Fresh independent Exact-SHA review; reviewer may repair in-scope findings under generation-2 CAS, then a separate verifier reviews the repaired SHA.'
+forbidden:
+  - 'No source paths outside the original 18-path write set; no second writer.'
+  - 'No ProgramData/ACL mutation, UAC, provider installation, paid request, external disclosure or real filesystem effect.'
+  - 'No standalone LOCAL_VALIDATION task.'
+  - 'No main/version merge, tag, release or deployment.'
+source_write_authorized: false
+merge_authorized: false
+release_authorized: false
+deployment_authorized: false
