@@ -95,9 +95,11 @@ const folderSelectionRoute = folderSelectionHost
 // trusted Guided ledger is admitted and before operator case-file
 // provisioning: a durable select-root USER_SUBMIT whose next INSPECT step
 // was never staged is re-verified against expiry, task/journey/Case/step/
-// digest binding, the current user/session and the native root identity,
-// and only then restaged through the existing Host-only capability. Stale,
-// expired or mismatched rows stay refused; a fresh flow is a no-op.
+// digest binding and native root identity. Under the device-scoped Owner
+// decision, no SID/logon-SID/session identity is persisted or compared as an
+// authorization boundary; only then is the answer restaged through the
+// existing Host-only capability. Stale, expired or mismatched rows stay
+// refused; a fresh flow is a no-op.
 if (folderSelectionHost) {
   const recovery = folderSelectionHost.recoverInterruptedSelection();
   const detail = 'code' in recovery ? ` (${recovery.code})` : '';
