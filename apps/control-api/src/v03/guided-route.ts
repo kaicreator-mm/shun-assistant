@@ -7,12 +7,17 @@ import type {
   GuidedDecisionReceipt,
   HostGuidedService,
 } from '../../../../packages/domain-host/src/guided/host-guided-service.ts';
+import type { ComputerFolderObservationResult } from '../../../../packages/domain-computer/src/computer/folder-observation.ts';
+import type { FolderSelectionResult } from './folder-selection-host.ts';
+import type { V03FolderSelectionRoutePort } from './folder-selection-route.ts';
 
 export type V03GuidedPort = Pick<HostGuidedService, 'state' | 'decide'>;
 
 export interface V03GuidedRoute {
   state(): ReturnType<V03GuidedPort['state']>;
   decide(raw: unknown): GuidedDecisionReceipt;
+  selectRoot(): Promise<FolderSelectionResult>;
+  folderObservation(): Promise<ComputerFolderObservationResult>;
   httpStatus(result: GuidedDecisionReceipt): number;
 }
 
