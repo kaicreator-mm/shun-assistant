@@ -199,7 +199,7 @@ export function loadFolderPicker(): FolderPickerNativePort {
         return { status: 'REFUSED', code: 'FOLDER_PICKER_IDENTITY_INVALID' };
       }
     },
-    inspectFolder(path: string): FolderDirectoryIdentity {    inspectFolder(path: string): FolderDirectoryIdentity {
+    inspectFolder(path: string): FolderDirectoryIdentity {
       return mapDirectoryIdentity(addon.inspectFolder(path));
     },
     acquireDirectoryLease(path: string): NativeDirectoryLease {

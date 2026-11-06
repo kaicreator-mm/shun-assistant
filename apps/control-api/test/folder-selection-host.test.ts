@@ -116,7 +116,7 @@ function nativePort(root: string, overrides: Record<string, unknown> = {}) {
       displayName: 'Documents',
       identity,
     }),
-    inspectFolder: () => ({    inspectFolder: () => ({
+    inspectFolder: () => ({
       ...identity,
       isDirectory: true,
       isReparsePoint: false,

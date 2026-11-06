@@ -464,6 +464,16 @@ fn directory_identity_from_handle(
     }
 }
 
+#[napi]
+pub fn inspect_folder(path: String) -> Result<FolderDirectoryIdentity> {
+    inspect_folder_inner(&path).ok_or_else(|| {
+        Error::new(
+            Status::GenericFailure,
+            "FOLDER_PICKER_DIRECTORY_IDENTITY_UNAVAILABLE",
+        )
+    })
+}
+
 static LEASES: OnceLock<Mutex<HashMap<String, DirectoryChain>>> = OnceLock::new();
 
 fn lease_registry() -> &'static Mutex<HashMap<String, DirectoryChain>> {
@@ -646,6 +656,7 @@ mod tests {
         let (child_handle, child_info) =
             open_pinning_directory(link.to_str().expect("junction path")).expect("junction handle");
         let child_raw = child_handle.0;
+        let mut child = Some((child_handle, child_info));
         let mut opens = 0;
         let reparse = build_directory_chain(
             root_handle,
@@ -654,7 +665,7 @@ mod tests {
             &["link", "child"],
             |_parent, _name| {
                 opens += 1;
-                Some((child_handle, child_info))
+                child.take()
             },
         );
         assert!(reparse.is_none());
@@ -672,12 +683,13 @@ mod tests {
         let (child_handle, child_info) =
             open_pinning_directory(file.to_str().expect("file path")).expect("file handle");
         let child_raw = child_handle.0;
+        let mut child = Some((child_handle, child_info));
         let non_directory = build_directory_chain(
             root_handle,
             root_info,
             false,
             &["plain-file.txt"],
-            |_parent, _name| Some((child_handle, child_info)),
+            |_parent, _name| child.take(),
         );
         assert!(non_directory.is_none());
         assert!(!handle_is_open(root_raw), "non-directory refusal leaked the root handle");

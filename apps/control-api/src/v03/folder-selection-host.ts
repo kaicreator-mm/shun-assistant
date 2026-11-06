@@ -234,7 +234,7 @@ export class FolderSelectionHost {
    * metadata walk remains path-based and can race with namespace changes;
    * this lease is defense-in-depth, not an atomic scan guarantee.
    */
-  #observationLease: NativeDirectoryLease | null = null;  #observationLease: NativeDirectoryLease | null = null;
+  #observationLease: NativeDirectoryLease | null = null;
 
   constructor(input: {
     readonly guided: HostGuidedService;
