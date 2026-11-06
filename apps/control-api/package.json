@@ -10,7 +10,7 @@
     "lint": "biome check . --max-diagnostics=200",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
-    "dev": "node src/main.ts"
+    "dev": "tsx src/main.ts"
   },
   "dependencies": {
     "@shun/contracts": "workspace:*",
@@ -26,6 +26,7 @@
     "@biomejs/biome": "^2.3.8",
     "@types/node": "^24.7.0",
     "typescript": "^5.9.3",
-    "vitest": "^3.2.4"
+    "vitest": "^3.2.4",
+    "tsx": "4.23.15"
   }
 }
