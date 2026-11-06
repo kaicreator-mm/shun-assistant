@@ -273,6 +273,102 @@ export class FolderSelectionHost {
   }
 
 
+
+  async observeCurrentSelectedFolder(): Promise<ComputerFolderObservationResult> {
+    const result = await this.#observationAdapter.observeCurrentSelectedFolder();
+    if (!result.ok) return result;
+    const receipt = this.#guided.recordHostObservationReceipt();
+    if (receipt.status !== 'RECORDED') {
+      return { ok: false, code: 'FOLDER_OBSERVATION_UNAVAILABLE' };
+    }
+    return result;
+  }
+
+  #selectionRow(selectionRef: string): SelectionRow | undefined {
+    return this.#db.prepare(
+      `SELECT selection_ref,path,display_name,task_id,journey_id,case_ref_json,
+        origin_step_id,template_digest,user_sid,logon_sid,session_id,volume,
+        volume_serial,file_id,expires_at_unix_ms,created_at_unix_ms
+       FROM folder_selection_records WHERE selection_ref=?`,
+    ).get(selectionRef) as SelectionRow | undefined;
+  }
+
+  #verifySelectionIdentity(row: SelectionRow): boolean {
+    if (row.expires_at_unix_ms <= this.#clock()) return false;
+    try {
+      const user = this.#native.currentIdentity();
+      const directory = this.#native.inspectDirectory(row.path);
+      return validUserIdentity(user) && isRecord(directory) &&
+        sameIdentity(row, user, directory as DirectoryIdentity);
+    } catch {
+      return false;
+    }
+  }
+
+  async #observeRaw(): Promise<unknown> {
+    const context = this.#guided.readTrustedContext();
+    const current = this.#guided.state().currentStep;
+    if (!context || context.state !== 'CURRENT' || !current ||
+        current.stepId !== context.step.stepId ||
+        context.step.templateRef.artifactId !== 'shun.guided.inspect-scope' ||
+        !isRecord(context.observation) ||
+        typeof context.observation.selectedRootRef !== 'string') {
+      return { schema: HOST_FOLDER_OBSERVATION_SCHEMA, status: 'NOT_SELECTED' };
+    }
+    const selectionRef = context.observation.selectedRootRef;
+    if (!SELECTION_REF.test(selectionRef)) return null;
+    const row = this.#selectionRow(selectionRef);
+    if (!row || row.task_id !== context.step.taskId ||
+        row.journey_id !== context.step.journeyId ||
+        row.case_ref_json !== stableJson(context.step.caseRef) ||
+        row.expires_at_unix_ms <= this.#clock() ||
+        !this.#verifySelectionIdentity(row)) {
+      throw new Error('FOLDER_SELECTION_IDENTITY_DRIFT');
+    }
+    const rootEntries = await readdir(row.path, { withFileTypes: true });
+    const rootDirectories = rootEntries.filter((entry) => entry.isDirectory()).length;
+    const rootFiles = rootEntries.length - rootDirectories;
+    if (rootDirectories > MAX_DIRECTORIES || rootFiles > MAX_ROOT_FILES) {
+      throw new Error('FOLDER_OBSERVATION_OVERFLOW');
+    }
+    const scope = await this.#storage.resolveScope(row.volume, { roots: [row.path] });
+    const evidence = await this.#storage.observeStorage(
+      scope,
+      () => new Date(this.#clock()).toISOString(),
+    );
+    if (evidence.directories.length > MAX_DIRECTORIES || evidence.rootFiles.length > MAX_ROOT_FILES) {
+      throw new Error('FOLDER_OBSERVATION_OVERFLOW');
+    }
+    const rootBytes = evidence.rootFiles.reduce((sum, item) => sum + item.bytes, 0);
+    if (!Number.isSafeInteger(rootBytes) || !Number.isSafeInteger(evidence.totalBytes)) {
+      throw new Error('FOLDER_OBSERVATION_INVALID');
+    }
+    const observedAt = evidence.observedAt;
+    const revisionDigest = createHash('sha256')
+      .update(`${selectionRef}|${observedAt}|${evidence.totalBytes}`, 'utf8')
+      .digest('hex');
+    return {
+      schema: HOST_FOLDER_OBSERVATION_SCHEMA,
+      status: 'OBSERVED_ONLY',
+      rootRef: selectionRef,
+      scopeRevision: `folder-scope-${revisionDigest.slice(0, 32)}`,
+      observedAt,
+      totalBytes: evidence.totalBytes,
+      directories: evidence.directories.map((directory) => ({
+        relativePath: basename(directory.path),
+        bytes: directory.bytes,
+        files: directory.files,
+        lastModifiedMs: directory.lastModifiedMs,
+        inaccessibleCount: directory.inaccessibleEntries.length,
+      })),
+      rootFiles: { count: evidence.rootFiles.length, bytes: rootBytes },
+    };
+  }
+
+  close(): void {
+    this.#db.close();
+  }
+
   #initializeLedger(): void {
     const objects = this.#db.prepare(
       "SELECT name, type FROM sqlite_master WHERE name NOT LIKE 'sqlite_%' ORDER BY name",
@@ -294,3 +390,19 @@ export class FolderSelectionHost {
       throw new Error('FOLDER_SELECTION_LEDGER_SCHEMA_REFUSED');
     }
   }
+
+export function createProductionFolderSelectionHost(input: {
+  readonly guided: HostGuidedService;
+  readonly databaseFile: string;
+  readonly clock?: () => number;
+}): FolderSelectionHost {
+  return new FolderSelectionHost({
+    ...input,
+    native: loadFolderPicker(),
+  });
+}
+
+export type FolderSelectionHostPort = Pick<
+  FolderSelectionHost,
+  'selectRoot' | 'validateSelectionAnswer' | 'afterSelectionRecorded' | 'observeCurrentSelectedFolder'
+>;
