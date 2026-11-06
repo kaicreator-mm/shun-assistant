@@ -1,0 +1,72 @@
+pack_id: shun-v030-r02e-node26-runner-amendment-g11
+task_id: R02-E-NODE26-RUNNER-371
+issue: "#371"
+parent_issue: "#269"
+repository: kaicreator-mm/shun-assistant
+version: v0.3.0
+standard_revision: 2c395c55569fe2edf3f4135f12d3d069e526d0b7
+delivery_principle: ADS_1359_DELIVERY_FIRST_CONSOLIDATED_REPAIR
+admission_mode: SINGLE_WRITER_ADMISSION
+admission_generation: 11
+pack_revision: 2
+supersedes_pack_pr: "#372 (pack_revision 1 @ 4e3dec7e3398dd668636dea5c3cbbe81a1bf5c4a)"
+pack_revision_2_reason: "Revision-1 three-path write set is internally unsatisfiable: frozen tests/integration/v03/r02-e-production/production-startup.test.ts asserts scripts.dev == 'node --experimental-transform-types src/main.ts', contradicting the required pinned-runner dev-script change; discovered during G11 implementation preflight. This revision admits that path for a minimal intent-preserving assertion rebind only."
+supersedes_source_claim: "#269 comment 6665944992 (G10-R2, terminal SUPERSEDED_BY_G11_AMENDMENT_PACK); #269 comment 6675863865 (G11 pack_revision 1, superseded by this pack revision before any source write)"
+protected_claim_key: "kaicreator-mm/shun-assistant#269:builder:__default__"
+pack_base:
+  branch: wip/v0.3.0-r02-owner-repairs
+  sha: 39e4f85f3fa01d9f4b20ba73adcf79cbc42707f5
+  tree: cb8b14856f223622a80f85a0317026f455198983
+  contract: "Manifest-only PR must be exactly one commit, one path, and direct-parented to pack_base SHA."
+source_candidate:
+  branch: JIT_only_task/v0.3.0-r02e-production-integrator-g10-r2
+  pr: 370
+  head: ff57dbe46ce899c463a8e7d73d644c5e4bdf25a2
+  tree: 04e9ee9bc1fea35cac0ec06ee1be8f97777e2819
+  base: 39e4f85f3fa01d9f4b20ba73adcf79cbc42707f5
+  review: "Fresh Exact-SHA R1 BLOCK, P0=0 P1=1 P2=0, PR review 5791421659"
+  ci: "Woodpecker Push 476 PASS / PR 477 PASS; supplementary Actions PASS"
+  frozen_unchanged_paths:
+    - apps/control-api/src/main.ts
+    - apps/control-api/src/v03/composition-guided-provenance.ts
+    - apps/control-api/src/real-storage/guided-provenance-issuance.ts
+    - apps/control-api/scripts/issue-guided-provenance.ts
+    - apps/control-api/test/guided-provenance-issuance.test.ts
+failure_evidence:
+  node24: "Native Node 24.21.0 exact operator command PASS in DEMO and real-storage fixture modes"
+  node26: "Native Node 26.13.0 exact operator command FAIL exit 9: --experimental-transform-types removed"
+  plain_node: "TypeScript parameter-property import graph fails ERR_UNSUPPORTED_TYPESCRIPT_SYNTAX"
+  node_reference: https://nodejs.org/download/release/v26.13.0/docs/api/typescript.html
+  issue: "#371"
+  scope_change_reason: "G10-R2 forbids lockfile/dependency edits; Node26 native support requires a pinned TS-aware runner"
+authoring_write_set:
+  - apps/control-api/package.json
+  - pnpm-lock.yaml
+  - tests/integration/v03/r02-e-production/startup-runner.test.ts
+  - tests/integration/v03/r02-e-production/production-startup.test.ts
+design_contract:
+  - "One-pass repair of exact production operator command on both Node 24.21.0 and Node 26.13.0; no fallback to DEMO or direct-node test invocation."
+  - "Add exact pinned TypeScript-capable development runner, using previously evaluated tsx 4.23.15 unless dependency resolution reveals a concrete incompatibility; require lockfile resolution and frozen install. No floating pnpm dlx, network-time resolution, or global/transitive loader."
+  - "Preserve production Guided external verify-only authority and fail-closed startup when operator trust pin/receipt is absent. No material changes to current production composition."
+  - "Preserve Node24 compatibility while fixing Node26. Change only the exact four-path authoring write set; no native/index.ts edits."
+  - "production-startup.test.ts is admitted solely for the minimal intent-preserving rebind of its exact-operator-entrypoint assertion (dev script to the pinned-runner command plus the exact tsx devDependency pin); every trust, ACL, receipt, refusal and composition assertion in that file must remain byte-identical. The stale transform-flag usage comment in frozen main.ts is accepted under the byte-identity constraint and must not be edited."
+  - "The source branch must be derived from exact PR #370 candidate HEAD. A source PR may target the #370 source branch to show only this amendment delta; integrate in dependency order, never run two writers on overlapping paths."
+  - "Existing three reviewed Guided-Authority imported blobs from #363 must remain byte-identical; do not reimplement or modify unrelated code."
+test_contract:
+  - "Before source write, obtain a fresh independently reviewed and CI-qualified pack; record G10 Claim terminal/supersession event and fresh G11 Claim bound to exact candidate/base/tree, write set, session/operator and dependency state."
+  - "Before first source push or CI, syntax/parse + Biome formatting + package typecheck must PASS on Node 24.21.0 and 26.13.0; do not send trivial format failures to CI."
+  - "Test exact pnpm --filter @shun/control-api dev command in DEMO and real-storage fixture modes for both runtimes; same no-listener refusal and zero unauthorized effect guarantees on missing trust; test no direct node fallback."
+  - "Run focused production-startup and startup-runner suites on both runtimes, then necessary workspace typecheck/task-check and exact final-SHA Woodpecker Push/PR; record the first failure step and CI IDs."
+  - "Rebound entrypoint assertion must pin the exact dev script 'tsx src/main.ts' and the exact '4.23.15' tsx devDependency pin; a floating range or a direct-node transform-mode assertion is a review BLOCK."
+  - "One complete Builder implementation/self-test, then one consolidated independent Exact-SHA review; reviewer repairs all in-scope findings together and re-verifies the final SHA. Do not multiply generations for ordinary in-scope findings."
+  - "Keep previously PASS, unchanged-file and untouched-path evidence as qualified only where the exact source identity and affected dependency graph allow reuse; perform targeted downstream R02-V qualification after R02-E integration."
+  - "Document final head/tree/base, four-path diff, lock resolution, Node versions and exits, production command output, no-listener result and CI run IDs on #371 and #269."
+integration_constraints:
+  - "No source changes before pack PASS + fresh G11 Claim; one active writer per overlapping path."
+  - "Do not modify current PR #370 as G10-only source evidence without a legal scoped transition. New candidate must be explicitly traceable to exact PR #370 HEAD."
+  - "Do not edit apps/control-api/native/index.ts, unrelated CI, R02-V/R, authority files, or system ProgramData."
+  - "No UAC, production key/receipt issuance, paid DeepSeek calls, physical effect, main/version/v0.2 merge, tag/release or deployment."
+source_write_authorized: false
+merge_authorized: false
+release_authorized: false
+deployment_authorized: false
