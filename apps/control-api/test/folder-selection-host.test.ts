@@ -688,22 +688,23 @@ describe.skipIf(process.platform !== 'win32')(
       legacy
         .prepare('INSERT INTO folder_selection_records VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)')
         .run(
-        'host:folder:' + 'f'.repeat(64),
-        join(directory, 'selected-root'),
-        'Documents',
-        'task-folder-r04',
-        'journey-folder-r04',
-        '{"digest":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","snapshotId":"case-folder-r04"}',
-        'step-select-root',
-        'b'.repeat(64),
-        'S-1-5-21-1-2-3-1001',
-        'S-1-5-5-0-1234',
-        1,
-        'C:',
-        '1a2b3c4d',
-        '0123456789abcdef',
-        NOW + SELECTION_TTL_MS,
-        NOW,
+          'host:folder:' + 'f'.repeat(64),
+          join(directory, 'selected-root'),
+          'Documents',
+          'task-folder-r04',
+          'journey-folder-r04',
+          '{"digest":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","snapshotId":"case-folder-r04"}',
+          'step-select-root',
+          'b'.repeat(64),
+          'S-1-5-21-1-2-3-1001',
+          'S-1-5-5-0-1234',
+          1,
+          'C:',
+          '1a2b3c4d',
+          '0123456789abcdef',
+          NOW + SELECTION_TTL_MS,
+          NOW,
+        );
       );
       legacy.close();
       const root = join(directory, 'selected-root');
@@ -716,13 +717,23 @@ describe.skipIf(process.platform !== 'win32')(
       });
       const migrated = new DatabaseSync(databaseFile);
       try {
-        const columns = migrated
-          .prepare('PRAGMA table_info(folder_selection_records)')
-          .all() as { name: string }[];
+        const columns = migrated.prepare('PRAGMA table_info(folder_selection_records)').all() as {
+          name: string;
+        }[];
         expect(columns.map((column) => column.name)).toEqual([
-          'selection_ref', 'path', 'display_name', 'task_id', 'journey_id',
-          'case_ref_json', 'origin_step_id', 'template_digest', 'volume',
-          'volume_serial', 'file_id', 'expires_at_unix_ms', 'created_at_unix_ms',
+          'selection_ref',
+          'path',
+          'display_name',
+          'task_id',
+          'journey_id',
+          'case_ref_json',
+          'origin_step_id',
+          'template_digest',
+          'volume',
+          'volume_serial',
+          'file_id',
+          'expires_at_unix_ms',
+          'created_at_unix_ms',
         ]);
         expect(
           migrated.prepare('SELECT selection_ref FROM folder_selection_records').get(),
