@@ -33,13 +33,13 @@ import {
 import type { ControlBackend } from './ports.ts';
 import type { AuthorizedInventoryRecipeResult } from './recipe-inventory-run.ts';
 import type { JourneySubmits } from './v03/composition-journeys.ts';
+import type { V03FolderSelectionRoutePort } from './v03/folder-selection-route.ts';
 import { createV03GatewayRoute, type V03GatewayRoute } from './v03/gateway-route.ts';
 import {
   createV03GuidedRoute,
   type V03GuidedPort,
   type V03GuidedRoute,
 } from './v03/guided-route.ts';
-import type { V03FolderSelectionRoutePort } from './v03/folder-selection-route.ts';
 
 export const CONTROL_API_REVISION = 'shun.control-api/0.1';
 
@@ -179,7 +179,9 @@ export function createControlServer(options: ControlServerOptions): ControlServe
   };
 
   const v03GuidedRoute: V03GuidedRoute | undefined =
-    options.v03Guided === undefined ? undefined : createV03GuidedRoute(options.v03Guided, options.v03FolderSelection);
+    options.v03Guided === undefined
+      ? undefined
+      : createV03GuidedRoute(options.v03Guided, options.v03FolderSelection);
 
   const server = createServer((req, res) => {
     handle(options.backend, req, res, {
@@ -523,8 +525,16 @@ async function handle(
       return respondJson(res, 503, { ok: false, code: 'V03_GUIDED_UNAVAILABLE' });
     }
     const body = await readJsonBody(req, ctx.maxBodyBytes);
-    if (!body || typeof body !== 'object' || Array.isArray(body) || Object.keys(body).length !== 0) {
-      return respondJson(res, 422, { status: 'REFUSED', code: 'FOLDER_PICKER_ACCEPTS_NO_CALLER_INPUT' });
+    if (
+      !body ||
+      typeof body !== 'object' ||
+      Array.isArray(body) ||
+      Object.keys(body).length !== 0
+    ) {
+      return respondJson(res, 422, {
+        status: 'REFUSED',
+        code: 'FOLDER_PICKER_ACCEPTS_NO_CALLER_INPUT',
+      });
     }
     const result = await ctx.v03GuidedRoute.selectRoot();
     const status = result.status === 'STALE' ? 409 : result.status === 'REFUSED' ? 422 : 200;

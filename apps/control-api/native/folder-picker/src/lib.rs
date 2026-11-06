@@ -11,14 +11,12 @@ use std::slice;
 use napi::bindgen_prelude::*;
 use napi_derive::napi;
 use windows::core::PCWSTR;
-use windows::Win32::Foundation::{
-    CloseHandle, ERROR_CANCELLED, HANDLE, HLOCAL, LocalFree,
-};
-use windows::Win32::Security::{
-    GetTokenInformation, OpenProcessToken, TokenGroups, TokenSessionId, TokenUser,
-    TOKEN_GROUPS, TOKEN_QUERY, TOKEN_USER,
-};
+use windows::Win32::Foundation::{CloseHandle, LocalFree, ERROR_CANCELLED, HANDLE, HLOCAL};
 use windows::Win32::Security::Authorization::ConvertSidToStringSidW;
+use windows::Win32::Security::{
+    GetTokenInformation, TokenGroups, TokenSessionId, TokenUser, TOKEN_GROUPS, TOKEN_QUERY,
+    TOKEN_USER,
+};
 use windows::Win32::Storage::FileSystem::{
     CreateFileW, GetDriveTypeW, GetFileInformationByHandle, BY_HANDLE_FILE_INFORMATION,
     FILE_READ_ATTRIBUTES, FILE_SHARE_MODE, OPEN_EXISTING,
@@ -28,9 +26,9 @@ use windows::Win32::System::Com::{
     COINIT_APARTMENTTHREADED, COINIT_DISABLE_OLE1DDE,
 };
 use windows::Win32::System::StationsAndDesktops::{
-    CloseDesktop, OpenInputDesktop, DESKTOP_READOBJECTS,
+    CloseDesktop, OpenInputDesktop, DESKTOP_CONTROL_FLAGS, DESKTOP_READOBJECTS,
 };
-use windows::Win32::System::Threading::GetCurrentProcess;
+use windows::Win32::System::Threading::{GetCurrentProcess, OpenProcessToken};
 use windows::Win32::UI::Shell::{
     FileOpenDialog, IFileOpenDialog, FOS_FORCEFILESYSTEM, FOS_PATHMUSTEXIST, FOS_PICKFOLDERS,
     SIGDN_FILESYSPATH,
@@ -90,6 +88,7 @@ impl ComApartment {
     fn initialize() -> std::result::Result<Self, ()> {
         unsafe {
             CoInitializeEx(None, COINIT_APARTMENTTHREADED | COINIT_DISABLE_OLE1DDE)
+                .ok()
                 .map_err(|_| ())?;
         }
         Ok(Self)
@@ -137,14 +136,16 @@ unsafe fn wide_ptr_to_string(pointer: *const u16) -> Option<String> {
     if length == 0 || length >= 32_768 {
         return None;
     }
-    Some(String::from_utf16_lossy(unsafe { slice::from_raw_parts(pointer, length) }))
+    Some(String::from_utf16_lossy(unsafe {
+        slice::from_raw_parts(pointer, length)
+    }))
 }
 
 fn sid_to_string(sid: windows::Win32::Security::PSID) -> Option<String> {
     let mut value = windows::core::PWSTR::null();
     unsafe { ConvertSidToStringSidW(sid, &mut value) }.ok()?;
     let text = unsafe { wide_ptr_to_string(value.0) };
-    let _ = unsafe { LocalFree(HLOCAL(value.0 as *mut c_void)) };
+    let _ = unsafe { LocalFree(Some(HLOCAL(value.0 as *mut c_void))) };
     text
 }
 
@@ -188,9 +189,8 @@ fn token_logon_sid(token: HANDLE) -> Option<String> {
     .ok()?;
     let groups = unsafe { &*(buffer.as_ptr() as *const TOKEN_GROUPS) };
     const SE_GROUP_LOGON_ID: u32 = 0xC000_0000;
-    let entries = unsafe {
-        slice::from_raw_parts(groups.Groups.as_ptr(), groups.GroupCount as usize)
-    };
+    let entries =
+        unsafe { slice::from_raw_parts(groups.Groups.as_ptr(), groups.GroupCount as usize) };
     entries
         .iter()
         .find(|entry| entry.Attributes & SE_GROUP_LOGON_ID == SE_GROUP_LOGON_ID)
@@ -243,20 +243,21 @@ fn is_plain_drive_path(path: &str) -> bool {
     if path.starts_with("\\\\") || path.starts_with("\\\\?\\") || path.starts_with("\\\\.\\") {
         return false;
     }
-    !path[3..].split('\\').any(|part| part == "." || part == "..")
+    !path[3..]
+        .split('\\')
+        .any(|part| part == "." || part == "..")
 }
 
 fn file_information(path: &str) -> Option<BY_HANDLE_FILE_INFORMATION> {
     let wide = to_wide(path);
     // FILE_FLAG_BACKUP_SEMANTICS | FILE_FLAG_OPEN_REPARSE_POINT. The handle
     // is opened for FILE_READ_ATTRIBUTES only; no file content is requested.
-    let flags = windows::Win32::Storage::FileSystem::FILE_FLAGS_AND_ATTRIBUTES(
-        0x0200_0000 | 0x0020_0000,
-    );
+    let flags =
+        windows::Win32::Storage::FileSystem::FILE_FLAGS_AND_ATTRIBUTES(0x0200_0000 | 0x0020_0000);
     let handle = unsafe {
         CreateFileW(
             PCWSTR(wide.as_ptr()),
-            FILE_READ_ATTRIBUTES,
+            FILE_READ_ATTRIBUTES.0,
             FILE_SHARE_MODE(0x0000_0001 | 0x0000_0002 | 0x0000_0004),
             None,
             OPEN_EXISTING,
@@ -285,7 +286,10 @@ fn inspect_directory_inner(path: &str) -> Option<FolderDirectoryIdentity> {
     }
     let is_volume_root = path.trim_end_matches('\\').eq_ignore_ascii_case(&path[..2]);
 
-    let components: Vec<&str> = path[3..].split('\\').filter(|part| !part.is_empty()).collect();
+    let components: Vec<&str> = path[3..]
+        .split('\\')
+        .filter(|part| !part.is_empty())
+        .collect();
     let mut current = drive_root;
     let mut final_info = None;
     let mut any_reparse_point = false;
@@ -323,14 +327,22 @@ fn inspect_directory_inner(path: &str) -> Option<FolderDirectoryIdentity> {
 
 #[napi]
 pub fn current_identity() -> Result<FolderUserIdentity> {
-    current_identity_inner()
-        .ok_or_else(|| Error::new(Status::GenericFailure, "FOLDER_PICKER_USER_IDENTITY_UNAVAILABLE"))
+    current_identity_inner().ok_or_else(|| {
+        Error::new(
+            Status::GenericFailure,
+            "FOLDER_PICKER_USER_IDENTITY_UNAVAILABLE",
+        )
+    })
 }
 
 #[napi]
 pub fn inspect_directory(path: String) -> Result<FolderDirectoryIdentity> {
-    inspect_directory_inner(&path)
-        .ok_or_else(|| Error::new(Status::GenericFailure, "FOLDER_PICKER_DIRECTORY_IDENTITY_UNAVAILABLE"))
+    inspect_directory_inner(&path).ok_or_else(|| {
+        Error::new(
+            Status::GenericFailure,
+            "FOLDER_PICKER_DIRECTORY_IDENTITY_UNAVAILABLE",
+        )
+    })
 }
 
 #[napi]
@@ -340,10 +352,11 @@ pub fn select_folder() -> FolderSelectionResult {
         None => return refused("FOLDER_PICKER_INTERACTIVE_IDENTITY_UNAVAILABLE"),
     };
 
-    let desktop = match unsafe { OpenInputDesktop(0, false, DESKTOP_READOBJECTS) } {
-        Ok(value) => value,
-        Err(_) => return refused("FOLDER_PICKER_NONINTERACTIVE_DESKTOP"),
-    };
+    let desktop =
+        match unsafe { OpenInputDesktop(DESKTOP_CONTROL_FLAGS(0), false, DESKTOP_READOBJECTS) } {
+            Ok(value) => value,
+            Err(_) => return refused("FOLDER_PICKER_NONINTERACTIVE_DESKTOP"),
+        };
     let _ = unsafe { CloseDesktop(desktop) };
 
     let _apartment = match ComApartment::initialize() {
@@ -351,16 +364,13 @@ pub fn select_folder() -> FolderSelectionResult {
         Err(_) => return refused("FOLDER_PICKER_COM_UNAVAILABLE"),
     };
 
-    let dialog: IFileOpenDialog = match unsafe {
-        CoCreateInstance(&FileOpenDialog, None, CLSCTX_INPROC_SERVER)
-    } {
-        Ok(value) => value,
-        Err(_) => return refused("FOLDER_PICKER_DIALOG_UNAVAILABLE"),
-    };
-    if unsafe {
-        dialog.SetOptions(FOS_PICKFOLDERS | FOS_FORCEFILESYSTEM | FOS_PATHMUSTEXIST)
-    }
-    .is_err()
+    let dialog: IFileOpenDialog =
+        match unsafe { CoCreateInstance(&FileOpenDialog, None, CLSCTX_INPROC_SERVER) } {
+            Ok(value) => value,
+            Err(_) => return refused("FOLDER_PICKER_DIALOG_UNAVAILABLE"),
+        };
+    if unsafe { dialog.SetOptions(FOS_PICKFOLDERS | FOS_FORCEFILESYSTEM | FOS_PATHMUSTEXIST) }
+        .is_err()
     {
         return refused("FOLDER_PICKER_OPTIONS_UNAVAILABLE");
     }
@@ -379,7 +389,7 @@ pub fn select_folder() -> FolderSelectionResult {
         Err(_) => return refused("FOLDER_PICKER_FILESYSTEM_PATH_UNAVAILABLE"),
     };
     let path = unsafe { wide_ptr_to_string(path_pointer.0) };
-    CoTaskMemFree(path_pointer.0 as _);
+    unsafe { CoTaskMemFree(Some(path_pointer.0 as *const c_void)) };
     let Some(path) = path else {
         return refused("FOLDER_PICKER_FILESYSTEM_PATH_INVALID");
     };
@@ -388,11 +398,14 @@ pub fn select_folder() -> FolderSelectionResult {
         Some(value) => value,
         None => return refused("FOLDER_PICKER_DIRECTORY_IDENTITY_UNAVAILABLE"),
     };
-    if !directory.is_directory || directory.is_reparse_point ||
-        directory.is_network_path || directory.is_volume_root ||
-        directory.user_sid != identity.user_sid ||
-        directory.logon_sid != identity.logon_sid ||
-        directory.session_id != identity.session_id {
+    if !directory.is_directory
+        || directory.is_reparse_point
+        || directory.is_network_path
+        || directory.is_volume_root
+        || directory.user_sid != identity.user_sid
+        || directory.logon_sid != identity.logon_sid
+        || directory.session_id != identity.session_id
+    {
         return refused("FOLDER_PICKER_DIRECTORY_REFUSED");
     }
     let display_name = path.rsplit('\\').next().unwrap_or_default().to_string();

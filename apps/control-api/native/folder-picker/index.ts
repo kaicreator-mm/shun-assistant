@@ -15,17 +15,19 @@ export type FolderUserIdentity = Readonly<{
   sessionId: number;
 }>;
 
-export type FolderIdentity = FolderUserIdentity & Readonly<{
-  volumeSerial: string;
-  fileId: string;
-}>;
+export type FolderIdentity = FolderUserIdentity &
+  Readonly<{
+    volumeSerial: string;
+    fileId: string;
+  }>;
 
-export type FolderDirectoryIdentity = FolderIdentity & Readonly<{
-  isDirectory: boolean;
-  isReparsePoint: boolean;
-  isNetworkPath: boolean;
-  isVolumeRoot: boolean;
-}>;
+export type FolderDirectoryIdentity = FolderIdentity &
+  Readonly<{
+    isDirectory: boolean;
+    isReparsePoint: boolean;
+    isNetworkPath: boolean;
+    isVolumeRoot: boolean;
+  }>;
 
 export type NativeFolderSelection =
   | Readonly<{ status: 'CANCELLED' }>
@@ -55,12 +57,16 @@ function artifactDigest(): string | null {
   }
 }
 
-export function verifyFolderPickerArtifact(): Readonly<{ ok: boolean; code?: string; sha256?: string }> {
-  if (process.platform !== 'win32') return { ok: false, code: 'FOLDER_PICKER_PLATFORM_NOT_WINDOWS' };
+export function verifyFolderPickerArtifact(): Readonly<{
+  ok: boolean;
+  code?: string;
+  sha256?: string;
+}> {
+  if (process.platform !== 'win32')
+    return { ok: false, code: 'FOLDER_PICKER_PLATFORM_NOT_WINDOWS' };
   const actual = artifactDigest();
   if (actual === null) return { ok: false, code: 'FOLDER_PICKER_ADDON_MISSING' };
-  if (!/^[a-f0-9]{64}$/.test(FOLDER_PICKER_ADDON_SHA256) ||
-      actual !== FOLDER_PICKER_ADDON_SHA256) {
+  if (!/^[a-f0-9]{64}$/.test(FOLDER_PICKER_ADDON_SHA256) || actual !== FOLDER_PICKER_ADDON_SHA256) {
     return { ok: false, code: 'FOLDER_PICKER_ADDON_SHA_MISMATCH', sha256: actual };
   }
   return { ok: true, sha256: actual };
@@ -98,10 +104,17 @@ type RawAddon = {
   };
 };
 
-function mapIdentity(raw: NonNullable<ReturnType<RawAddon['selectFolder']>['identity']>): FolderIdentity {
-  if (typeof raw.userSid !== 'string' || typeof raw.logonSid !== 'string' ||
-      !Number.isSafeInteger(raw.sessionId) || typeof raw.volumeSerial !== 'string' ||
-      typeof raw.fileId !== 'string') throw new Error('FOLDER_PICKER_IDENTITY_INVALID');
+function mapIdentity(
+  raw: NonNullable<ReturnType<RawAddon['selectFolder']>['identity']>,
+): FolderIdentity {
+  if (
+    typeof raw.userSid !== 'string' ||
+    typeof raw.logonSid !== 'string' ||
+    !Number.isSafeInteger(raw.sessionId) ||
+    typeof raw.volumeSerial !== 'string' ||
+    typeof raw.fileId !== 'string'
+  )
+    throw new Error('FOLDER_PICKER_IDENTITY_INVALID');
   return {
     userSid: raw.userSid,
     logonSid: raw.logonSid,
@@ -116,9 +129,12 @@ export function loadFolderPicker(): FolderPickerNativePort {
   if (!check.ok) throw new Error(check.code ?? 'FOLDER_PICKER_ARTIFACT_REFUSED');
   const require = createRequire(import.meta.url);
   const addon = require(folderPickerAddonPath) as RawAddon;
-  if (!addon || typeof addon.selectFolder !== 'function' ||
-      typeof addon.currentIdentity !== 'function' ||
-      typeof addon.inspectDirectory !== 'function') {
+  if (
+    !addon ||
+    typeof addon.selectFolder !== 'function' ||
+    typeof addon.currentIdentity !== 'function' ||
+    typeof addon.inspectDirectory !== 'function'
+  ) {
     throw new Error('FOLDER_PICKER_ADDON_API_INVALID');
   }
   return Object.freeze({
@@ -126,10 +142,17 @@ export function loadFolderPicker(): FolderPickerNativePort {
       const raw = addon.selectFolder();
       if (raw?.status === 'CANCELLED') return { status: 'CANCELLED' };
       if (raw?.status === 'REFUSED') {
-        return { status: 'REFUSED', code: typeof raw.code === 'string' ? raw.code : 'FOLDER_PICKER_REFUSED' };
+        return {
+          status: 'REFUSED',
+          code: typeof raw.code === 'string' ? raw.code : 'FOLDER_PICKER_REFUSED',
+        };
       }
-      if (raw?.status !== 'SELECTED' || typeof raw.path !== 'string' ||
-          typeof raw.displayName !== 'string' || !raw.identity) {
+      if (
+        raw?.status !== 'SELECTED' ||
+        typeof raw.path !== 'string' ||
+        typeof raw.displayName !== 'string' ||
+        !raw.identity
+      ) {
         return { status: 'REFUSED', code: 'FOLDER_PICKER_RESULT_INVALID' };
       }
       try {
@@ -145,8 +168,12 @@ export function loadFolderPicker(): FolderPickerNativePort {
     },
     currentIdentity(): FolderUserIdentity {
       const raw = addon.currentIdentity();
-      if (typeof raw.userSid !== 'string' || typeof raw.logonSid !== 'string' ||
-          !Number.isSafeInteger(raw.sessionId)) throw new Error('FOLDER_PICKER_USER_IDENTITY_UNAVAILABLE');
+      if (
+        typeof raw.userSid !== 'string' ||
+        typeof raw.logonSid !== 'string' ||
+        !Number.isSafeInteger(raw.sessionId)
+      )
+        throw new Error('FOLDER_PICKER_USER_IDENTITY_UNAVAILABLE');
       return {
         userSid: raw.userSid,
         logonSid: raw.logonSid,
@@ -156,10 +183,12 @@ export function loadFolderPicker(): FolderPickerNativePort {
     inspectDirectory(path: string): FolderDirectoryIdentity {
       const raw = addon.inspectDirectory(path);
       const identity = mapIdentity(raw);
-      if (typeof raw.isDirectory !== 'boolean' ||
-          typeof raw.isReparsePoint !== 'boolean' ||
-          typeof raw.isNetworkPath !== 'boolean' ||
-          typeof raw.isVolumeRoot !== 'boolean') {
+      if (
+        typeof raw.isDirectory !== 'boolean' ||
+        typeof raw.isReparsePoint !== 'boolean' ||
+        typeof raw.isNetworkPath !== 'boolean' ||
+        typeof raw.isVolumeRoot !== 'boolean'
+      ) {
         throw new Error('FOLDER_PICKER_DIRECTORY_IDENTITY_INVALID');
       }
       return {

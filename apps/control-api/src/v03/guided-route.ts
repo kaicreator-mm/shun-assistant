@@ -3,11 +3,12 @@
  * creates the port; untrusted HTTP can only read state or relay an answer.
  * No route can mint a grant, consent, Kernel Permit or effect command.
  */
+
+import type { ComputerFolderObservationResult } from '../../../../packages/domain-computer/src/computer/folder-observation.ts';
 import type {
   GuidedDecisionReceipt,
   HostGuidedService,
 } from '../../../../packages/domain-host/src/guided/host-guided-service.ts';
-import type { ComputerFolderObservationResult } from '../../../../packages/domain-computer/src/computer/folder-observation.ts';
 import type { FolderSelectionResult } from './folder-selection-host.ts';
 import type { V03FolderSelectionRoutePort } from './folder-selection-route.ts';
 
@@ -36,12 +37,14 @@ export function createV03GuidedRoute(
   const decide = port.decide.bind(port);
   return Object.freeze({
     state,
-    decide(raw: unknown) {
+    decide(raw: unknown): GuidedDecisionReceipt {
       const step = state().currentStep;
       if (
         step?.templateRef.artifactId === 'shun.guided.select-root' &&
-        isRecord(raw) && raw.decision === 'ANSWER' &&
-        isRecord(raw.outcome) && raw.outcome.event === 'USER_SUBMIT'
+        isRecord(raw) &&
+        raw.decision === 'ANSWER' &&
+        isRecord(raw.outcome) &&
+        raw.outcome.event === 'USER_SUBMIT'
       ) {
         if (!folderSelection) return { status: 'REFUSED', code: 'FOLDER_SELECTION_UNAVAILABLE' };
         const validation = folderSelection.validateSelectionAnswer(raw, step);
@@ -54,11 +57,11 @@ export function createV03GuidedRoute(
       }
       return decide(raw);
     },
-    async selectRoot() {
+    async selectRoot(): Promise<FolderSelectionResult> {
       if (!folderSelection) return { status: 'REFUSED', code: 'FOLDER_SELECTION_UNAVAILABLE' };
       return folderSelection.selectRoot();
     },
-    async folderObservation() {
+    async folderObservation(): Promise<ComputerFolderObservationResult> {
       if (!folderSelection) return { ok: false, code: 'FOLDER_OBSERVATION_UNAVAILABLE' };
       return folderSelection.observeCurrentSelectedFolder();
     },

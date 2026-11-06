@@ -2,8 +2,14 @@ import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
-import { FolderSelectionHost, type FolderSelectionStoragePort } from '../src/v03/folder-selection-host.ts';
-import type { HostGuidedService, GuidedDecisionReceipt } from '../../../packages/domain-host/src/guided/host-guided-service.ts';
+import type {
+  GuidedDecisionReceipt,
+  HostGuidedService,
+} from '../../../packages/domain-host/src/guided/host-guided-service.ts';
+import {
+  FolderSelectionHost,
+  type FolderSelectionStoragePort,
+} from '../src/v03/folder-selection-host.ts';
 
 const NOW = 1_800_000_000_000;
 const identity = {
@@ -14,7 +20,10 @@ const identity = {
   fileId: '0123456789abcdef',
 };
 const recorded: GuidedDecisionReceipt = {
-  status: 'RECORDED', humanGrantIssued: false, effectSent: false, history: [],
+  status: 'RECORDED',
+  humanGrantIssued: false,
+  effectSent: false,
+  history: [],
 };
 
 function step(stepId: string, artifactId: string) {
@@ -40,7 +49,8 @@ function createGuided() {
     stageTrustedSelectedRoot: ({ selectionRef }: { selectionRef: string }) => {
       currentStep = inspectStep;
       context = {
-        state: 'CURRENT', step: inspectStep,
+        state: 'CURRENT',
+        step: inspectStep,
         observation: { selectedRootRef: selectionRef },
       };
       return { status: 'CURRENT', step: inspectStep };
@@ -52,7 +62,10 @@ function createGuided() {
   };
   return {
     service: guided as unknown as HostGuidedService,
-    setStep(next: any, observation: unknown = { selectedRootRef: 'host:folder:' + 'f'.repeat(64) }) {
+    setStep(
+      next: any,
+      observation: unknown = { selectedRootRef: 'host:folder:' + 'f'.repeat(64) },
+    ) {
       currentStep = next;
       context = { state: 'CURRENT', step: next, observation };
     },
@@ -63,14 +76,22 @@ function createGuided() {
 function nativePort(root: string, overrides: Record<string, unknown> = {}) {
   return {
     selectFolder: () => ({
-      status: 'SELECTED' as const, path: root, displayName: 'Documents', identity,
+      status: 'SELECTED' as const,
+      path: root,
+      displayName: 'Documents',
+      identity,
     }),
     currentIdentity: () => ({
-      userSid: identity.userSid, logonSid: identity.logonSid, sessionId: identity.sessionId,
+      userSid: identity.userSid,
+      logonSid: identity.logonSid,
+      sessionId: identity.sessionId,
     }),
     inspectDirectory: () => ({
-      ...identity, isDirectory: true, isReparsePoint: false,
-      isNetworkPath: false, isVolumeRoot: false,
+      ...identity,
+      isDirectory: true,
+      isReparsePoint: false,
+      isNetworkPath: false,
+      isVolumeRoot: false,
     }),
     ...overrides,
   };
@@ -80,16 +101,24 @@ function evidence(root: string, rootFileName = 'root.txt', directoryName = 'Docu
   return {
     observedAt: '2026-11-06T12:00:00.000Z',
     roots: [root],
-    directories: [{
-      path: join(root, directoryName), bytes: 10, files: 1,
-      lastModifiedMs: 1_700_000_000_000, inaccessibleEntries: [],
-    }],
+    directories: [
+      {
+        path: join(root, directoryName),
+        bytes: 10,
+        files: 1,
+        lastModifiedMs: 1_700_000_000_000,
+        inaccessibleEntries: [],
+      },
+    ],
     rootFiles: [{ path: join(root, rootFileName), bytes: 5 }],
     totalBytes: 15,
   };
 }
 
-function createEnvironment(storage?: FolderSelectionStoragePort, nativeOverrides: Record<string, unknown> = {}) {
+function createEnvironment(
+  storage?: FolderSelectionStoragePort,
+  nativeOverrides: Record<string, unknown> = {},
+) {
   const directory = mkdtempSync(join(tmpdir(), 'shun-r04-folder-host-'));
   const root = join(directory, 'selected-root');
   mkdirSync(root);
@@ -108,7 +137,10 @@ function createEnvironment(storage?: FolderSelectionStoragePort, nativeOverrides
     storage: storage ?? defaultStorage,
   });
   return {
-    directory, root, guided, host,
+    directory,
+    root,
+    guided,
+    host,
     cleanup() {
       host.close();
       rmSync(directory, { recursive: true, force: true });
@@ -120,100 +152,108 @@ function acceptedAnswer(selectionRef: string) {
   return {
     decision: 'ANSWER',
     outcome: {
-      event: 'USER_SUBMIT', source: 'USER',
+      event: 'USER_SUBMIT',
+      source: 'USER',
       answers: [{ fieldId: 'selectedRoot', value: selectionRef }],
     },
   };
 }
 
-describe.skipIf(process.platform !== 'win32')('R04 U05-A Host folder selection and observation', () => {
-  const cleanups: Array<() => void> = [];
-  afterEach(() => {
-    for (const cleanup of cleanups.splice(0)) cleanup();
-  });
-
-  it('turns native identity exceptions into redacted typed refusal', async () => {
-    const env = createEnvironment(undefined, {
-      currentIdentity: () => { throw new Error('raw token detail must not escape'); },
+describe.skipIf(process.platform !== 'win32')(
+  'R04 U05-A Host folder selection and observation',
+  () => {
+    const cleanups: Array<() => void> = [];
+    afterEach(() => {
+      for (const cleanup of cleanups.splice(0)) cleanup();
     });
-    cleanups.push(env.cleanup);
-    const result = await env.host.selectRoot();
-    expect(result).toEqual({ status: 'REFUSED', code: 'FOLDER_SELECTION_IDENTITY_UNAVAILABLE' });
-    expect(JSON.stringify(result)).not.toContain('raw token detail');
-  });
 
-  it('refuses an inspectDirectory exception without leaking its OS detail', async () => {
-    const env = createEnvironment(undefined, {
-      inspectDirectory: () => { throw new Error('private native detail'); },
+    it('turns native identity exceptions into redacted typed refusal', async () => {
+      const env = createEnvironment(undefined, {
+        currentIdentity: () => {
+          throw new Error('raw token detail must not escape');
+        },
+      });
+      cleanups.push(env.cleanup);
+      const result = await env.host.selectRoot();
+      expect(result).toEqual({ status: 'REFUSED', code: 'FOLDER_SELECTION_IDENTITY_UNAVAILABLE' });
+      expect(JSON.stringify(result)).not.toContain('raw token detail');
     });
-    cleanups.push(env.cleanup);
-    const result = await env.host.selectRoot();
-    expect(result).toEqual({ status: 'REFUSED', code: 'FOLDER_SELECTION_IDENTITY_UNAVAILABLE' });
-    expect(JSON.stringify(result)).not.toContain('private native detail');
-  });
 
-  it('does not record a Host receipt when the exact INSPECT step changes during the async scan', async () => {
-    let started!: () => void;
-    let release!: () => void;
-    const scanStarted = new Promise<void>((resolve) => { started = resolve; });
-    const scanGate = new Promise<void>((resolve) => { release = resolve; });
-    const storage: FolderSelectionStoragePort = {
-      resolveScope: async (_volume, declared) => ({ roots: [...declared.roots] }),
-      observeStorage: async (scope, clock) => {
-        started();
-        await scanGate;
-        return { ...evidence(scope.roots[0]!), observedAt: clock() };
-      },
-    };
-    const env = createEnvironment(storage);
-    cleanups.push(env.cleanup);
-    const selected = await env.host.selectRoot();
-    expect(selected.status).toBe('SELECTED');
-    if (selected.status !== 'SELECTED') return;
-    env.host.afterSelectionRecorded(
-      acceptedAnswer(selected.selectionRef), selectStep, recorded,
-    );
+    it('refuses an inspectDirectory exception without leaking its OS detail', async () => {
+      const env = createEnvironment(undefined, {
+        inspectDirectory: () => {
+          throw new Error('private native detail');
+        },
+      });
+      cleanups.push(env.cleanup);
+      const result = await env.host.selectRoot();
+      expect(result).toEqual({ status: 'REFUSED', code: 'FOLDER_SELECTION_IDENTITY_UNAVAILABLE' });
+      expect(JSON.stringify(result)).not.toContain('private native detail');
+    });
 
-    const pending = env.host.observeCurrentSelectedFolder();
-    await scanStarted;
-    env.guided.setStep(replacementStep);
-    release();
-    const result = await pending;
-    expect(result).toEqual({ ok: false, code: 'FOLDER_OBSERVATION_UNAVAILABLE' });
-    expect(env.guided.receiptCount()).toBe(0);
-  });
+    it('does not record a Host receipt when the exact INSPECT step changes during the async scan', async () => {
+      let started!: () => void;
+      let release!: () => void;
+      const scanStarted = new Promise<void>((resolve) => {
+        started = resolve;
+      });
+      const scanGate = new Promise<void>((resolve) => {
+        release = resolve;
+      });
+      const storage: FolderSelectionStoragePort = {
+        resolveScope: async (_volume, declared) => ({ roots: [...declared.roots] }),
+        observeStorage: async (scope, clock) => {
+          started();
+          await scanGate;
+          return { ...evidence(scope.roots[0]!), observedAt: clock() };
+        },
+      };
+      const env = createEnvironment(storage);
+      cleanups.push(env.cleanup);
+      const selected = await env.host.selectRoot();
+      expect(selected.status).toBe('SELECTED');
+      if (selected.status !== 'SELECTED') return;
+      env.host.afterSelectionRecorded(acceptedAnswer(selected.selectionRef), selectStep, recorded);
 
-  it('binds scopeRevision to canonical directory and root-file metadata, not only total bytes', async () => {
-    let currentRootFile = 'alpha.txt';
-    let currentDirectory = 'Documents';
-    const storage: FolderSelectionStoragePort = {
-      resolveScope: async (_volume, declared) => ({ roots: [...declared.roots] }),
-      observeStorage: async (scope, clock) => ({
-        ...evidence(scope.roots[0]!, currentRootFile, currentDirectory),
-        observedAt: clock(),
-      }),
-    };
-    const env = createEnvironment(storage);
-    cleanups.push(env.cleanup);
-    mkdirSync(join(env.root, 'Pictures'));
-    writeFileSync(join(env.root, 'alpha.txt'), 'x');
-    writeFileSync(join(env.root, 'beta.txt'), 'x');
-    const selected = await env.host.selectRoot();
-    expect(selected.status).toBe('SELECTED');
-    if (selected.status !== 'SELECTED') return;
-    env.host.afterSelectionRecorded(
-      acceptedAnswer(selected.selectionRef), selectStep, recorded,
-    );
-    const first = await env.host.observeCurrentSelectedFolder();
-    expect(first.ok).toBe(true);
+      const pending = env.host.observeCurrentSelectedFolder();
+      await scanStarted;
+      env.guided.setStep(replacementStep);
+      release();
+      const result = await pending;
+      expect(result).toEqual({ ok: false, code: 'FOLDER_OBSERVATION_UNAVAILABLE' });
+      expect(env.guided.receiptCount()).toBe(0);
+    });
 
-    currentRootFile = 'beta.txt';
-    currentDirectory = 'Pictures';
-    const second = await env.host.observeCurrentSelectedFolder();
-    expect(second.ok).toBe(true);
-    if (!first.ok || !second.ok) return;
-    expect(first.observation.totalBytes).toBe(second.observation.totalBytes);
-    expect(first.observation.observedAt).toBe(second.observation.observedAt);
-    expect(first.observation.scopeRevision).not.toBe(second.observation.scopeRevision);
-  });
-});
+    it('binds scopeRevision to canonical directory and root-file metadata, not only total bytes', async () => {
+      let currentRootFile = 'alpha.txt';
+      let currentDirectory = 'Documents';
+      const storage: FolderSelectionStoragePort = {
+        resolveScope: async (_volume, declared) => ({ roots: [...declared.roots] }),
+        observeStorage: async (scope, clock) => ({
+          ...evidence(scope.roots[0]!, currentRootFile, currentDirectory),
+          observedAt: clock(),
+        }),
+      };
+      const env = createEnvironment(storage);
+      cleanups.push(env.cleanup);
+      mkdirSync(join(env.root, 'Pictures'));
+      writeFileSync(join(env.root, 'alpha.txt'), 'x');
+      writeFileSync(join(env.root, 'beta.txt'), 'x');
+      const selected = await env.host.selectRoot();
+      expect(selected.status).toBe('SELECTED');
+      if (selected.status !== 'SELECTED') return;
+      env.host.afterSelectionRecorded(acceptedAnswer(selected.selectionRef), selectStep, recorded);
+      const first = await env.host.observeCurrentSelectedFolder();
+      expect(first.ok).toBe(true);
+
+      currentRootFile = 'beta.txt';
+      currentDirectory = 'Pictures';
+      const second = await env.host.observeCurrentSelectedFolder();
+      expect(second.ok).toBe(true);
+      if (!first.ok || !second.ok) return;
+      expect(first.observation.totalBytes).toBe(second.observation.totalBytes);
+      expect(first.observation.observedAt).toBe(second.observation.observedAt);
+      expect(first.observation.scopeRevision).not.toBe(second.observation.scopeRevision);
+    });
+  },
+);

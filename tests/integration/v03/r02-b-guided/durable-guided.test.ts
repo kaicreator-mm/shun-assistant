@@ -991,7 +991,12 @@ describe('R02-B Host Guided SQLite durability and replay fence', () => {
         sourceRef: 'host:obs:r02', answers: [], evidenceRefs: ['host:scope:r02'],
         occurredAtUnixMs: now,
       };
-      const receipt = service.decide(relayFor(stepB, 'REFUSE', hostReceipt));
+      // A forged HTTP REFUSE relay can no longer record an INSPECT receipt
+      // (U05-A trusted-relay hardening); it must be refused, and only the
+      // trusted in-process Host capability records the receipt.
+      expect(service.decide(relayFor(stepB, 'REFUSE', hostReceipt)))
+        .toMatchObject({ status: 'REFUSED', code: 'GUIDED_DECISION_MATRIX_REFUSED' });
+      const receipt = service.recordHostObservationReceipt();
       expect(receipt).toMatchObject({ status: 'RECORDED', humanGrantIssued: false, effectSent: false });
       expect(service.state().history)
         .toMatchObject([{ stepId: stepB.stepId, status: 'OBSERVATION_RECEIPT' }]);
