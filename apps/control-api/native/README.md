@@ -121,3 +121,98 @@ no test doubles claim OS proof):
   host cannot provide. The same-principal positive and the token-identity
   equality logic are proven live above; the enforcement code path for a
   mismatching token is the same comparison the evidence exercises.
+
+
+## R04 U05-A Windows Shell folder picker (v0.3)
+
+The dedicated `folder-picker/` crate is a separate N-API addon. It uses the
+Windows Shell `IFileOpenDialog` with folder-only and filesystem-only options;
+it does not use browser directory inputs, PowerShell, cmd, shell scripts or
+the consent-broker addon. The Host fails closed when the native addon is
+missing, non-Windows, or does not match the SHA-256 pin in
+`folder-picker/artifacts.ts`.
+
+Frozen N-API surface: `pickFolder()` (async — the modal Shell dialog runs on
+a dedicated COM STA worker from the libuv thread pool, so the Node main event
+loop is never blocked; the promise settles with the same typed SELECTED /
+CANCELLED / REFUSED result), `inspectFolder(path)` (synchronous directory
+identity), and the directory-lease set:
+`acquireDirectoryLease(path)` / `verifyDirectoryLease(lease)` /
+`releaseDirectoryLease(lease)` / `directoryLeasePath(lease)`.
+Directory-identity traversal terminates immediately at the first reparse-point
+component: no descendant of a junction/symlink is ever opened, so a successful
+identity always describes a reparse-free path (unit-tested in `src/lib.rs`).
+
+### Directory lease — defense-in-depth, not TOCTOU closure
+
+The native lease walks path components handle-relatively and refuses the first
+reparse point or non-directory component. It retains handles so the Host can
+recheck the selected directory's volume/file identity and obtain a canonical
+path from the held target handle.
+
+This does **not** make the metadata walk atomic. The existing
+readdir/resolveScope/observeStorage APIs still accept path strings; a namespace
+replacement can occur between the canonical-path lookup and a descendant
+open, or during the asynchronous walk. The lease also does not prevent
+directory rename/delete on the tested Windows family. The Host performs
+before/after identity checks and withholds the receipt when a mismatch is
+observed, but a transient replacement that is changed back may not be
+detected. This is an explicitly Owner-accepted v0.3.0 residual risk, not a
+technically closed race.
+
+The LocalAppData parent lease is likewise defense-in-depth only. The
+LocalAppData/path containment and reparse checks run before opening SQLite,
+but DatabaseSync opens by path; the validation-to-open interval is not atomic
+and remains an accepted residual risk.
+
+Rust tests cover reparse-component refusal without descending, handle identity
+rechecks, canonical path reporting, volume-root/file/missing-target shapes,
+and RAII cleanup of all handles acquired before missing-child, reparse-child,
+and non-directory-child failures. These tests do not claim an atomic
+path-based scan.
+
+### Device-scoped content and persistence
+
+Application-level SID/logon-SID/session isolation is not part of v0.3.0.
+Same-user and other-local-user malicious processes are outside the threat
+model. The native picker checks only that an interactive desktop is available
+to display the Shell dialog; it does not persist or compare a Windows user or
+session identity. Windows ACLs remain authoritative and are never bypassed.
+
+The folder-selection SQLite ledger remains under each Windows account's
+LocalAppData. Accounts independently select the same OS-accessible directory
+to observe the same metadata. Saved selections and Guided Cases are not
+shared across accounts. No device-wide database, ProgramData migration, UAC,
+or ACL provisioning is included.
+
+### Build and pin (Windows x64 Build Host, Node 24.21.0)
+
+Use the same pinned Rust GNU toolchain and Node import library described in
+the T04 host build section above. From the repository root:
+
+```bash
+cd apps/control-api/native
+export CARGO_TARGET_DIR=<repo-root>/.target CARGO_INCREMENTAL=0
+export LIBNODE_PATH=/c/xDev/runtimes/libnode-import/v24.21.0
+rustup run stable-x86_64-pc-windows-gnu cargo fmt --check
+rustup run stable-x86_64-pc-windows-gnu cargo build --release --locked --target x86_64-pc-windows-gnu -p shun-folder-picker
+cp "$CARGO_TARGET_DIR/x86_64-pc-windows-gnu/release/shun_folder_picker.dll" folder-picker/shun_folder_picker.node
+sha256sum folder-picker/shun_folder_picker.node
+```
+
+Commit the produced `folder-picker/shun_folder_picker.node` and replace the
+zero SHA-256 placeholder in `folder-picker/artifacts.ts` with the exact
+lowercase digest from that build. The runtime loader hashes the artifact
+before loading it and refuses any missing or mismatched binary.
+
+### Required Windows smoke
+
+Under the logged-in standard-user desktop session and Node 24.21.0, run the
+focused Host tests and one interactive smoke that selects a benign existing
+folder, verifies only the safe display name/opaque reference is returned,
+then opens the picker again and cancels. Do not create, modify, rename, move
+or delete any filesystem content. Record OS/session, target triple, Node and
+Rust versions, command exit codes, artifact SHA-256 and the select/cancel
+outcomes in the Issue #381 LOCAL_BUILDER receipt. A headless/service session,
+COM error or unavailable desktop must remain a typed refusal, never a
+browser or shell fallback.

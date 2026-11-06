@@ -160,6 +160,8 @@ export class HostGuidedService {
    * silently, never deletes data.
    */
   #ledgerUnavailable: string | null = null;
+  /** Capability token for in-process Host-generated INSPECT receipts. */
+  readonly #trustedHostObservationRelays = new WeakSet<object>();
 
   constructor(
     file: string,
@@ -298,17 +300,113 @@ export class HostGuidedService {
     };
   }
 
+  /** Host-only defensive readback; HTTP state() never exposes these inputs. */
+  readTrustedContext(): {
+    readonly state: StoredCase['state'];
+    readonly step: StepSpec;
+    readonly observation: unknown;
+    readonly semanticSelection: unknown;
+    readonly scope: unknown;
+  } | undefined {
+    const stored = this.#read();
+    if (!stored) return undefined;
+    return {
+      state: stored.state,
+      step: JSON.parse(JSON.stringify(stored.step)) as StepSpec,
+      observation: JSON.parse(JSON.stringify(stored.observation)) as unknown,
+      semanticSelection: JSON.parse(JSON.stringify(stored.semanticSelection)) as unknown,
+      scope: JSON.parse(JSON.stringify(stored.scope)) as unknown,
+    };
+  }
+
+  /**
+   * Advance only the exact accepted select-root answer. The caller must
+   * validate the opaque reference against its private native-selection ledger.
+   */
+  stageTrustedSelectedRoot(input: {
+    readonly selectionRef: string;
+    readonly expiresAtUnixMs: number;
+  }): { readonly status: 'CURRENT'; readonly step: StepSpec } | { readonly status: 'REFUSED'; readonly code: string } {
+    if (this.#ledgerUnavailable) return { status: 'REFUSED', code: this.#ledgerUnavailable };
+    const now = this.#clock();
+    if (
+      !input ||
+      typeof input.selectionRef !== 'string' ||
+      !/^host:folder:[a-f0-9]{64}$/.test(input.selectionRef) ||
+      !Number.isSafeInteger(input.expiresAtUnixMs) ||
+      input.expiresAtUnixMs <= now ||
+      input.expiresAtUnixMs > now + 5 * 60_000
+    ) return { status: 'REFUSED', code: 'GUIDED_FOLDER_SELECTION_INVALID' };
+
+    const stored = this.#read();
+    if (!stored) return { status: 'REFUSED', code: 'GUIDED_STEP_NOT_CURRENT' };
+    if (
+      stored.state === 'CURRENT' &&
+      stored.step.templateRef.artifactId === 'shun.guided.inspect-scope' &&
+      isRecord(stored.observation) &&
+      stored.observation.selectedRootRef === input.selectionRef
+    ) return { status: 'CURRENT', step: stored.step };
+    if (
+      stored.state !== 'CONSUMED' ||
+      stored.step.templateRef.artifactId !== 'shun.guided.select-root'
+    ) return { status: 'REFUSED', code: 'GUIDED_SELECT_ROOT_NOT_CONSUMED' };
+
+    const answer = this.readRecordedAnswer(stored.step.stepId);
+    if (
+      !isRecord(answer) ||
+      answer.event !== 'USER_SUBMIT' ||
+      answer.source !== 'USER' ||
+      !Array.isArray(answer.answers) ||
+      answer.answers.length !== 1 ||
+      !isRecord(answer.answers[0]) ||
+      answer.answers[0].fieldId !== 'selectedRoot' ||
+      answer.answers[0].value !== input.selectionRef
+    ) return { status: 'REFUSED', code: 'GUIDED_FOLDER_ANSWER_NOT_RECORDED' };
+
+    if (!isRecord(stored.semanticSelection) || stored.semanticSelection.status !== 'SELECTED') {
+      return { status: 'REFUSED', code: 'GUIDED_SEMANTIC_RESELECTION_REQUIRED' };
+    }
+    if (!isRecord(stored.observation) || !Array.isArray(stored.observation.evidenceRefs)) {
+      return { status: 'REFUSED', code: 'GUIDED_HOST_OBSERVATION_INVALID' };
+    }
+    const digest = createHash('sha256').update(input.selectionRef, 'utf8').digest('hex');
+    const sourceRef = `host:folder-selection:${digest.slice(0, 32)}`;
+    const evidenceRefs = [...stored.observation.evidenceRefs, sourceRef];
+    if (evidenceRefs.length > 24 || new Set(evidenceRefs).size !== evidenceRefs.length) {
+      return { status: 'REFUSED', code: 'GUIDED_EVIDENCE_REF_LIMIT' };
+    }
+    const observation = {
+      ...stored.observation,
+      sourceRef,
+      revision: `folder-${digest.slice(0, 32)}`,
+      observedAtUnixMs: now,
+      validUntilUnixMs: Math.min(input.expiresAtUnixMs, now + 5 * 60_000),
+      evidenceRefs,
+      selectedRootRef: input.selectionRef,
+    };
+    const scope = isRecord(stored.scope)
+      ? { ...stored.scope, selectedRootRef: input.selectionRef }
+      : stored.scope;
+    return this.stageTrustedSelection({
+      observation,
+      semanticSelection: stored.semanticSelection,
+      scope,
+    });
+  }
+
   /** Same-call atomic compare-and-consume. No auto-grant or Kernel send. */
   decide(raw: unknown): GuidedDecisionReceipt {
     if (this.#ledgerUnavailable) {
       return { status: 'UNKNOWN', code: this.#ledgerUnavailable };
     }
+    const trustedObservationRelay = isRecord(raw) && this.#trustedHostObservationRelays.has(raw);
     if (!isRecord(raw) || Object.keys(raw).sort().join('|') !==
       ['authorityClaimed','caseRef','decision','humanApproval','kind','outcome','relayedVia','stepDigest','stepId'].sort().join('|') ||
       raw.kind !== 'USER_DECISION_RELAY' ||
       raw.authorityClaimed !== false || raw.relayedVia !== '/api' ||
       !((raw.decision === 'ANSWER' && raw.humanApproval === false) ||
-        ((raw.decision === 'APPROVE' || raw.decision === 'REFUSE') && raw.humanApproval === true))) {
+        ((raw.decision === 'APPROVE' || raw.decision === 'REFUSE') && raw.humanApproval === true) ||
+        (trustedObservationRelay && raw.decision === 'OBSERVED' && raw.humanApproval === false))) {
       return { status: 'REFUSED', code: 'RELAY_SCHEMA_REFUSED' };
     }
     const now = this.#clock();
@@ -344,10 +442,13 @@ export class HostGuidedService {
         matrixValid = stored.step.kind === 'ASK' && submission;
       } else if (raw.decision === 'APPROVE') {
         matrixValid = stored.step.kind === 'REVIEW_EFFECT' && submission;
+      } else if (raw.decision === 'OBSERVED') {
+        matrixValid = trustedObservationRelay &&
+          outcomeEvent === 'OBSERVATION_RECEIPT' && stored.step.kind === 'INSPECT';
       } else {
         matrixValid = (submission &&
             (stored.step.kind === 'REVIEW_EFFECT' || stored.step.kind === 'ASK')) ||
-          (outcomeEvent === 'OBSERVATION_RECEIPT' && stored.step.kind === 'INSPECT');
+          (trustedObservationRelay && outcomeEvent === 'OBSERVATION_RECEIPT' && stored.step.kind === 'INSPECT');
       }
       if (!matrixValid) {
         this.#db.exec('ROLLBACK');
@@ -433,9 +534,9 @@ export class HostGuidedService {
         // A REFUSE is a refusal, but a trusted Host observation receipt is
         // recorded as what it is — an observation receipt — never mislabeled
         // REFUSED and never implying human refusal, grant or effect.
-        status: raw.decision === 'REFUSE'
-          ? (outcomeEvent === 'OBSERVATION_RECEIPT' ? 'OBSERVATION_RECEIPT' : 'REFUSED')
-          : 'ACCEPTED',
+        status: outcomeEvent === 'OBSERVATION_RECEIPT'
+          ? 'OBSERVATION_RECEIPT'
+          : raw.decision === 'REFUSE' ? 'REFUSED' : 'ACCEPTED',
       }];
       // The durable ledger binds every terminal outcome; check it BEFORE any
       // payload write so a pre-existing row (the step was already consumed)
@@ -558,6 +659,54 @@ export class HostGuidedService {
     } catch {
       this.#rollback();
       return { status: 'UNKNOWN', code: 'GUIDED_DURABILITY_UNKNOWN' };
+    }
+  }
+
+  /**
+   * Record the exact current INSPECT step after a successful Host-only
+   * observation. This capability never crosses the HTTP boundary.
+   */
+  recordHostObservationReceipt(): GuidedDecisionReceipt {
+    if (this.#ledgerUnavailable) return { status: 'UNKNOWN', code: this.#ledgerUnavailable };
+    const stored = this.#read();
+    if (
+      !stored ||
+      stored.state !== 'CURRENT' ||
+      stored.step.kind !== 'INSPECT' ||
+      !isRecord(stored.observation) ||
+      typeof stored.observation.selectedRootRef !== 'string' ||
+      stored.step.evidenceRefs.length === 0
+    ) return { status: 'REFUSED', code: 'GUIDED_INSPECT_NOT_CURRENT' };
+    const now = this.#clock();
+    const outcome = {
+      schema: 'shun.guided.step-outcome.v1',
+      journeyId: stored.step.journeyId,
+      taskId: stored.step.taskId,
+      stepId: stored.step.stepId,
+      caseRef: stored.step.caseRef,
+      event: 'OBSERVATION_RECEIPT',
+      source: 'HOST',
+      sourceRef: stored.observation.sourceRef,
+      answers: [],
+      evidenceRefs: [...stored.step.evidenceRefs],
+      occurredAtUnixMs: now,
+    };
+    const relay = {
+      kind: 'USER_DECISION_RELAY',
+      humanApproval: false,
+      authorityClaimed: false,
+      decision: 'OBSERVED',
+      relayedVia: '/api',
+      stepId: stored.step.stepId,
+      stepDigest: stored.step.templateRef.digest,
+      caseRef: stored.step.caseRef,
+      outcome,
+    };
+    this.#trustedHostObservationRelays.add(relay);
+    try {
+      return this.decide(relay);
+    } finally {
+      this.#trustedHostObservationRelays.delete(relay);
     }
   }
 
