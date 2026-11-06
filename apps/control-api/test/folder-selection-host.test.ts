@@ -1,7 +1,7 @@
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { afterEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import type {
   GuidedDecisionReceipt,
   HostGuidedService,
@@ -484,26 +484,42 @@ describe.skipIf(process.platform !== 'win32')(
   () => {
     const savedLocalAppData = process.env.LOCALAPPDATA;
     const savedProgramData = process.env.ProgramData;
+    let temporaryRoot: string;
+    let localAppDataRoot: string;
+    let programDataRoot: string;
+
+    beforeEach(() => {
+      // All filesystem fixtures stay inside an isolated temporary directory;
+      // never create test data in the operator's real LocalAppData profile.
+      temporaryRoot = mkdtempSync(join(tmpdir(), 'shun-folder-selection-db-'));
+      localAppDataRoot = join(temporaryRoot, 'LocalAppData');
+      programDataRoot = join(temporaryRoot, 'ProgramData');
+      mkdirSync(localAppDataRoot, { recursive: true });
+      mkdirSync(programDataRoot, { recursive: true });
+      mkdirSync(join(localAppDataRoot, 'Shun'), { recursive: true });
+      process.env.LOCALAPPDATA = localAppDataRoot;
+      process.env.ProgramData = programDataRoot;
+    });
+
     afterEach(() => {
       if (savedLocalAppData === undefined) delete process.env.LOCALAPPDATA;
       else process.env.LOCALAPPDATA = savedLocalAppData;
       if (savedProgramData === undefined) delete process.env.ProgramData;
       else process.env.ProgramData = savedProgramData;
+      if (temporaryRoot) rmSync(temporaryRoot, { recursive: true, force: true });
     });
 
     it('accepts a database strictly inside the current user LOCALAPPDATA', () => {
-      const base = process.env.LOCALAPPDATA;
-      expect(typeof base).toBe('string');
-      expect(folderSelectionDatabaseRefusal(join(base!, 'Shun', 'folder-selection.sqlite'))).toBe(
-        null,
-      );
+      expect(
+        folderSelectionDatabaseRefusal(
+          join(localAppDataRoot, 'Shun', 'folder-selection.sqlite'),
+        ),
+      ).toBe(null);
     });
 
     it('refuses ProgramData, UNC/device paths and out-of-profile locations', () => {
-      const base = process.env.LOCALAPPDATA!;
-      const programData = process.env.ProgramData ?? 'C:\\ProgramData';
       expect(
-        folderSelectionDatabaseRefusal(join(programData, 'Shun', 'folder-selection.sqlite')),
+        folderSelectionDatabaseRefusal(join(programDataRoot, 'Shun', 'folder-selection.sqlite')),
       ).toBe('FOLDER_SELECTION_DATABASE_PROGRAMDATA_REFUSED');
       expect(folderSelectionDatabaseRefusal('\\\\server\\share\\shun.sqlite')).toBe(
         'FOLDER_SELECTION_DATABASE_PATH_INVALID',
@@ -514,35 +530,52 @@ describe.skipIf(process.platform !== 'win32')(
       expect(folderSelectionDatabaseRefusal('C:\\shun\\folder-selection.sqlite')).toBe(
         'FOLDER_SELECTION_DATABASE_OUTSIDE_LOCALAPPDATA',
       );
-      // The LOCALAPPDATA root itself and a sibling traversal are not valid.
-      expect(folderSelectionDatabaseRefusal(base)).toBe(
+      expect(folderSelectionDatabaseRefusal(localAppDataRoot)).toBe(
         'FOLDER_SELECTION_DATABASE_OUTSIDE_LOCALAPPDATA',
       );
-      expect(folderSelectionDatabaseRefusal(join(base, '..', 'elsewhere', 'shun.sqlite'))).toBe(
-        'FOLDER_SELECTION_DATABASE_OUTSIDE_LOCALAPPDATA',
-      );
+      expect(
+        folderSelectionDatabaseRefusal(
+          join(localAppDataRoot, '..', 'elsewhere', 'shun.sqlite'),
+        ),
+      ).toBe('FOLDER_SELECTION_DATABASE_OUTSIDE_LOCALAPPDATA');
     });
 
-    it('refuses a LOCALAPPDATA redirected into ProgramData and a missing LOCALAPPDATA', () => {
-      const programData = process.env.ProgramData ?? 'C:\\ProgramData';
-      process.env.LOCALAPPDATA = programData;
-      expect(folderSelectionDatabaseRefusal(join(programData, 'shun.sqlite'))).toBe(
-        'FOLDER_SELECTION_DATABASE_PROGRAMDATA_REFUSED',
-      );
+    it('refuses a LOCALAPPDATA root redirected into ProgramData and a missing LOCALAPPDATA', () => {
+      process.env.LOCALAPPDATA = programDataRoot;
+      expect(
+        folderSelectionDatabaseRefusal(join(programDataRoot, 'Shun', 'folder-selection.sqlite')),
+      ).toBe('FOLDER_SELECTION_DATABASE_PROGRAMDATA_REFUSED');
       delete process.env.LOCALAPPDATA;
-      expect(folderSelectionDatabaseRefusal(join(programData, 'shun.sqlite'))).toBe(
-        'FOLDER_SELECTION_DATABASE_LOCALAPPDATA_REQUIRED',
-      );
+      expect(
+        folderSelectionDatabaseRefusal(join(programDataRoot, 'Shun', 'folder-selection.sqlite')),
+      ).toBe('FOLDER_SELECTION_DATABASE_LOCALAPPDATA_REQUIRED');
+    });
+
+    it('refuses existing Junction redirects for both the database parent and LOCALAPPDATA root', () => {
+      const outside = join(temporaryRoot, 'outside');
+      const redirectedLocalAppData = join(temporaryRoot, 'LocalAppDataRedirected');
+      mkdirSync(outside, { recursive: true });
+      symlinkSync(outside, join(localAppDataRoot, 'Redirected'), 'junction');
+      expect(
+        folderSelectionDatabaseRefusal(
+          join(localAppDataRoot, 'Redirected', 'folder-selection.sqlite'),
+        ),
+      ).toBe('FOLDER_SELECTION_DATABASE_OUTSIDE_LOCALAPPDATA');
+
+      symlinkSync(programDataRoot, redirectedLocalAppData, 'junction');
+      process.env.LOCALAPPDATA = redirectedLocalAppData;
+      expect(
+        folderSelectionDatabaseRefusal(
+          join(redirectedLocalAppData, 'Shun', 'folder-selection.sqlite'),
+        ),
+      ).toBe('FOLDER_SELECTION_DATABASE_PROGRAMDATA_REFUSED');
     });
 
     it('the production factory refuses an out-of-boundary path before any native load', () => {
       expect(() =>
         createProductionFolderSelectionHost({
           guided: createGuided().service,
-          databaseFile: join(
-            process.env.ProgramData ?? 'C:\\ProgramData',
-            'folder-selection.sqlite',
-          ),
+          databaseFile: join(programDataRoot, 'folder-selection.sqlite'),
         }),
       ).toThrow('FOLDER_SELECTION_DATABASE_PROGRAMDATA_REFUSED');
     });
