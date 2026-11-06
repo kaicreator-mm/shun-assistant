@@ -5,7 +5,7 @@
 import { createHash, randomBytes } from 'node:crypto';
 import { lstatSync, realpathSync } from 'node:fs';
 import { readdir } from 'node:fs/promises';
-import { basename, dirname, resolve, win32 } from 'node:path';
+import { basename, dirname, posix, resolve, win32 } from 'node:path';
 import { DatabaseSync } from 'node:sqlite';
 import {
   type ObservationEvidence,
@@ -132,6 +132,17 @@ function safeDisplayName(value: unknown): value is string {
 }
 function safeLocalDirectoryPath(value: unknown): value is string {
   if (typeof value !== 'string' || value.length < 4 || value.length > 32767) return false;
+  // The production factory and native loader both refuse non-Windows hosts.
+  // Allow an absolute POSIX path only for the lower-level mocked Host tests
+  // that exercise Guided restart semantics in Linux CI.
+  if (process.platform !== 'win32') {
+    return (
+      value.startsWith('/') &&
+      posix.isAbsolute(value) &&
+      posix.normalize(value) === value &&
+      !value.split('/').includes('..')
+    );
+  }
   if (value.startsWith('\\\\') || value.startsWith('\\\\?\\') || value.startsWith('\\\\.\\'))
     return false;
   if (!/^[A-Za-z]:\\/.test(value) || !win32.isAbsolute(value)) return false;
@@ -343,7 +354,8 @@ export class FolderSelectionHost {
     const now = this.#clock();
     const expiresAtUnixMs = now + MAX_TTL_MS;
     const selectionRef = `host:folder:${randomBytes(32).toString('hex')}`;
-    const volume = win32.parse(picked.path).root.slice(0, 2);
+    const volume =
+      process.platform === 'win32' ? win32.parse(picked.path).root.slice(0, 2) : posix.parse(picked.path).root;
     this.#db.exec('BEGIN IMMEDIATE');
     try {
       this.#db
