@@ -567,10 +567,7 @@ export class FolderSelectionHost {
   }
 
   #leaseMatchesRow(lease: NativeDirectoryLease, row: SelectionRow): boolean {
-    return (
-      validDirectoryIdentity(lease.directory) &&
-      sameDirectoryIdentity(row, lease.directory)
-    );
+    return validDirectoryIdentity(lease.directory) && sameDirectoryIdentity(row, lease.directory);
   }
 
   #verifyLeaseAgainstRow(lease: NativeDirectoryLease, row: SelectionRow): boolean {
@@ -815,17 +812,39 @@ export class FolderSelectionHost {
       .all() as unknown as { name: string }[];
     const actual = columns.map((column) => column.name);
     const current = [
-      'selection_ref', 'path', 'display_name', 'task_id', 'journey_id',
-      'case_ref_json', 'origin_step_id', 'template_digest', 'volume',
-      'volume_serial', 'file_id', 'expires_at_unix_ms', 'created_at_unix_ms',
+      'selection_ref',
+      'path',
+      'display_name',
+      'task_id',
+      'journey_id',
+      'case_ref_json',
+      'origin_step_id',
+      'template_digest',
+      'volume',
+      'volume_serial',
+      'file_id',
+      'expires_at_unix_ms',
+      'created_at_unix_ms',
     ];
     if (actual.join('|') === current.join('|')) return;
 
     const legacy = [
-      'selection_ref', 'path', 'display_name', 'task_id', 'journey_id',
-      'case_ref_json', 'origin_step_id', 'template_digest', 'user_sid',
-      'logon_sid', 'session_id', 'volume', 'volume_serial', 'file_id',
-      'expires_at_unix_ms', 'created_at_unix_ms',
+      'selection_ref',
+      'path',
+      'display_name',
+      'task_id',
+      'journey_id',
+      'case_ref_json',
+      'origin_step_id',
+      'template_digest',
+      'user_sid',
+      'logon_sid',
+      'session_id',
+      'volume',
+      'volume_serial',
+      'file_id',
+      'expires_at_unix_ms',
+      'created_at_unix_ms',
     ];
     if (actual.join('|') !== legacy.join('|')) {
       throw new Error('FOLDER_SELECTION_LEDGER_SCHEMA_REFUSED');
@@ -836,13 +855,23 @@ export class FolderSelectionHost {
     // fields are deliberately not copied into the device-scoped schema.
     this.#db.exec('BEGIN IMMEDIATE');
     try {
-      this.#db.exec('ALTER TABLE folder_selection_records RENAME TO folder_selection_records_legacy');
+      this.#db.exec(
+        'ALTER TABLE folder_selection_records RENAME TO folder_selection_records_legacy',
+      );
       this.#db.exec(SELECTION_DDL);
-      this.#db.prepare('INSERT INTO folder_selection_records (selection_ref,path,display_name,task_id,journey_id,case_ref_json,origin_step_id,template_digest,volume,volume_serial,file_id,expires_at_unix_ms,created_at_unix_ms) SELECT selection_ref,path,display_name,task_id,journey_id,case_ref_json,origin_step_id,template_digest,volume,volume_serial,file_id,expires_at_unix_ms,created_at_unix_ms FROM folder_selection_records_legacy').run();
+      this.#db
+        .prepare(
+          'INSERT INTO folder_selection_records (selection_ref,path,display_name,task_id,journey_id,case_ref_json,origin_step_id,template_digest,volume,volume_serial,file_id,expires_at_unix_ms,created_at_unix_ms) SELECT selection_ref,path,display_name,task_id,journey_id,case_ref_json,origin_step_id,template_digest,volume,volume_serial,file_id,expires_at_unix_ms,created_at_unix_ms FROM folder_selection_records_legacy',
+        )
+        .run();
       this.#db.exec('DROP TABLE folder_selection_records_legacy');
       this.#db.exec('COMMIT');
     } catch {
-      try { this.#db.exec('ROLLBACK'); } catch { /* retain the original failure */ }
+      try {
+        this.#db.exec('ROLLBACK');
+      } catch {
+        /* retain the original failure */
+      }
       throw new Error('FOLDER_SELECTION_LEDGER_MIGRATION_REFUSED');
     }
   }

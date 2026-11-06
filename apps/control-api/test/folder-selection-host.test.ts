@@ -664,15 +664,26 @@ describe.skipIf(process.platform !== 'win32')(
       const databaseFile = join(directory, 'folder-selection.sqlite');
       const legacy = new DatabaseSync(databaseFile);
       legacy.exec(
-        [
-          'CREATE TABLE folder_selection_records (',
-          'selection_ref TEXT PRIMARY KEY, path TEXT NOT NULL, display_name TEXT NOT NULL,',
-          'task_id TEXT NOT NULL, journey_id TEXT NOT NULL, case_ref_json TEXT NOT NULL,',
-          'origin_step_id TEXT NOT NULL, template_digest TEXT NOT NULL, user_sid TEXT NOT NULL,',
-          'logon_sid TEXT NOT NULL, session_id INTEGER NOT NULL, volume TEXT NOT NULL,',
-          'volume_serial TEXT NOT NULL, file_id TEXT NOT NULL, expires_at_unix_ms INTEGER NOT NULL,',
-          'created_at_unix_ms INTEGER NOT NULL)',
-        ].join(' '),
+        `
+          CREATE TABLE folder_selection_records (
+            selection_ref TEXT PRIMARY KEY,
+            path TEXT NOT NULL,
+            display_name TEXT NOT NULL,
+            task_id TEXT NOT NULL,
+            journey_id TEXT NOT NULL,
+            case_ref_json TEXT NOT NULL,
+            origin_step_id TEXT NOT NULL,
+            template_digest TEXT NOT NULL,
+            user_sid TEXT NOT NULL,
+            logon_sid TEXT NOT NULL,
+            session_id INTEGER NOT NULL,
+            volume TEXT NOT NULL,
+            volume_serial TEXT NOT NULL,
+            file_id TEXT NOT NULL,
+            expires_at_unix_ms INTEGER NOT NULL,
+            created_at_unix_ms INTEGER NOT NULL
+          )
+        `,
       );
       legacy
         .prepare('INSERT INTO folder_selection_records VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)')
