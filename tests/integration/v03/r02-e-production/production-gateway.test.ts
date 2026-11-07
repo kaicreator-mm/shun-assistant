@@ -435,13 +435,14 @@ describe('R02-E shipping production gateway over the real SDK consumer', () => {
     const t04 = interpreter.calls.length;
     // The control positive at the end must reach the trusted proposal path.
     interpreter.nextResult = 'proposal';
-    // Consume the live step (trusted Host observation receipt, REFUSE), then
-    // stage a genuinely NEW Case B — the attacker presents Case A's still
-    // CURRENT issued references under Case B's live submit.
+    // A caller-forged Host receipt relay (REFUSE + OBSERVATION_RECEIPT) is
+    // refused with the typed matrix refusal: receipt authority is
+    // Host-private, so a caller cannot consume an INSPECT step by relaying a
+    // Host-shaped outcome (#381 Host-only receipt hardening).
     const step = guided.state().currentStep;
     expect(step).toBeTruthy();
     if (!step) return;
-    const consumed = guided.decide({
+    const forged = guided.decide({
       kind: 'USER_DECISION_RELAY',
       humanApproval: true,
       authorityClaimed: false,
@@ -464,6 +465,12 @@ describe('R02-E shipping production gateway over the real SDK consumer', () => {
         occurredAtUnixMs: Date.now(),
       },
     });
+    expect(forged).toMatchObject({ status: 'REFUSED', code: 'GUIDED_DECISION_MATRIX_REFUSED' });
+    // The trusted Host consumes the still-CURRENT INSPECT step through its
+    // own private capability, then a genuinely NEW Case B is staged — the
+    // attacker presents Case A's issued references under Case B's live
+    // submit.
+    const consumed = guided.recordHostObservationReceipt();
     expect(consumed.status).toBe('RECORDED');
     const stagedB = guided.stageTrustedSelection({
       observation: {
