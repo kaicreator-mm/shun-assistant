@@ -18,6 +18,8 @@ import {
   provisionMetaFromHostFile,
 } from './v03/composition-journeys.ts';
 import { createProductionV03Gateway } from './v03/composition-production.ts';
+import { createProductionFolderSelectionHost } from './v03/folder-selection-host.ts';
+import { createV03FolderSelectionRoute } from './v03/folder-selection-route.ts';
 
 const here = dirname(fileURLToPath(import.meta.url));
 const port = Number.parseInt(process.env.SHUN_CONTROL_PORT ?? '7788', 10);
@@ -71,6 +73,38 @@ const guided =
   guidedDb && mode === 'real-storage'
     ? createProductionGuidedService(resolve(guidedDb))
     : undefined;
+
+// R04 U05-A folder picker is opt-in trusted local configuration. Its native
+// artifact is hash-pinned and fails closed; no browser input selects the DB.
+const folderSelectionDb = process.env.SHUN_V03_FOLDER_SELECTION_DATABASE;
+if (folderSelectionDb && (!guided || mode !== 'real-storage')) {
+  throw new Error('V03_FOLDER_SELECTION_REQUIRES_GUIDED_REAL_STORAGE');
+}
+const folderSelectionHost =
+  folderSelectionDb && guided
+    ? createProductionFolderSelectionHost({
+        guided,
+        databaseFile: resolve(folderSelectionDb),
+      })
+    : undefined;
+const folderSelectionRoute = folderSelectionHost
+  ? createV03FolderSelectionRoute(folderSelectionHost)
+  : undefined;
+
+// P1-02 crash-window recovery, host-only and never a route. Runs after the
+// trusted Guided ledger is admitted and before operator case-file
+// provisioning: a durable select-root USER_SUBMIT whose next INSPECT step
+// was never staged is re-verified against expiry, task/journey/Case/step/
+// digest binding and native root identity. Under the device-scoped Owner
+// decision, no SID/logon-SID/session identity is persisted or compared as an
+// authorization boundary; only then is the answer restaged through the
+// existing Host-only capability. Stale, expired or mismatched rows stay
+// refused; a fresh flow is a no-op.
+if (folderSelectionHost) {
+  const recovery = folderSelectionHost.recoverInterruptedSelection();
+  const detail = 'code' in recovery ? ` (${recovery.code})` : '';
+  console.log(`v0.3 folder-selection startup recovery: ${recovery.status}${detail}`);
+}
 
 // Restore or stage only operator-pinned Host observations. A browser cannot
 // supply an authority-bearing semantic selection or a selected root.
@@ -190,6 +224,7 @@ const handle = createControlServer({
   executeBuiltinInventoryRecipe,
   cloud,
   v03Guided: guided,
+  v03FolderSelection: folderSelectionRoute,
   v03Gateway: production?.gateway,
   v03Journeys: production?.journeys,
   v03ProviderGlobal: production?.providerGlobal,

@@ -33,6 +33,7 @@ import {
 import type { ControlBackend } from './ports.ts';
 import type { AuthorizedInventoryRecipeResult } from './recipe-inventory-run.ts';
 import type { JourneySubmits } from './v03/composition-journeys.ts';
+import type { V03FolderSelectionRoutePort } from './v03/folder-selection-route.ts';
 import { createV03GatewayRoute, type V03GatewayRoute } from './v03/gateway-route.ts';
 import {
   createV03GuidedRoute,
@@ -125,6 +126,8 @@ export interface ControlServerOptions {
   };
   /** Trusted process-side selected Guided Host state, never created from HTTP. */
   v03Guided?: V03GuidedPort;
+  /** Trusted native folder picker/observation port; never configured by HTTP. */
+  v03FolderSelection?: V03FolderSelectionRoutePort;
   /** Directory with the static control-ui app; omitted = API only. */
   uiDir?: string;
   /** Loopback host only; anything else is a construction-time refusal. */
@@ -176,7 +179,9 @@ export function createControlServer(options: ControlServerOptions): ControlServe
   };
 
   const v03GuidedRoute: V03GuidedRoute | undefined =
-    options.v03Guided === undefined ? undefined : createV03GuidedRoute(options.v03Guided);
+    options.v03Guided === undefined
+      ? undefined
+      : createV03GuidedRoute(options.v03Guided, options.v03FolderSelection);
 
   const server = createServer((req, res) => {
     handle(options.backend, req, res, {
@@ -514,6 +519,34 @@ async function handle(
       return respondJson(res, 503, { ok: false, code: 'V03_GUIDED_UNAVAILABLE' });
     }
     return respondJson(res, 200, ctx.v03GuidedRoute.state());
+  }
+  if (method === 'POST' && url.pathname === '/api/v03/guided/select-root') {
+    if (!ctx.v03GuidedRoute) {
+      return respondJson(res, 503, { ok: false, code: 'V03_GUIDED_UNAVAILABLE' });
+    }
+    const body = await readJsonBody(req, ctx.maxBodyBytes);
+    if (
+      !body ||
+      typeof body !== 'object' ||
+      Array.isArray(body) ||
+      Object.keys(body).length !== 0
+    ) {
+      return respondJson(res, 422, {
+        status: 'REFUSED',
+        code: 'FOLDER_PICKER_ACCEPTS_NO_CALLER_INPUT',
+      });
+    }
+    const result = await ctx.v03GuidedRoute.selectRoot();
+    const status = result.status === 'STALE' ? 409 : result.status === 'REFUSED' ? 422 : 200;
+    return respondJson(res, status, result);
+  }
+  if (method === 'GET' && url.pathname === '/api/v03/guided/folder-observation') {
+    if (!ctx.v03GuidedRoute) {
+      return respondJson(res, 503, { ok: false, code: 'V03_GUIDED_UNAVAILABLE' });
+    }
+    const result = await ctx.v03GuidedRoute.folderObservation();
+    const status = result.ok ? 200 : result.code === 'FOLDER_NOT_SELECTED' ? 409 : 422;
+    return respondJson(res, status, result);
   }
   if (method === 'POST' && url.pathname === '/api/v03/guided/decision') {
     if (!ctx.v03GuidedRoute) {
