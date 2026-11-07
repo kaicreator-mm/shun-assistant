@@ -1,0 +1,54 @@
+pack_id: shun-v030-u05a-support-inspect-receipt-r0
+task_id: U05-A-SUPPORT-R02E-INSPECT-RECEIPT-MIGRATION
+issue: '#387'
+parent_issue: '#381'
+repository: kaicreator-mm/shun-assistant
+version: v0.3.0
+standard_revision: 326aaf5b0188b53cb0ed5c38752a9e299e3f9efd
+task_pack_ref: 'issue:#387'
+delivery_principle: ADS_1359_DELIVERY_FIRST_SUPPORT_TASK_21_2G
+admission_mode: SINGLE_WRITER_ADMISSION
+claim_generation: 1
+pack_revision: 1
+owner_authorization: '#387 comment 6693745300 OWNER_APPROVAL_SUPPORT_TASK_387'
+protected_claim_key: 'kaicreator-mm/shun-assistant#387:builder:__default__'
+dependencies:
+  parent_outcome: '#381 FINAL_EXACT_SHA_VERIFICATION PASS_SOURCE_SCOPE at 006ac149c46de986d01d048b1422ce4ce648f824 (#381 comment 6710785135)'
+  source_contract: 'Host-only OBSERVATION_RECEIPT authority (host-guided-service trustedHostObservationRelays) is frozen in #381; this Task only migrates the obsolete R02-E regression fixture.'
+  no_native_dag_edge: true
+  separate_from: '#381 original 18-path write set (no shared path may be modified by this Task)'
+pack_base:
+  branch: JIT_only_task/v0.3.0-r04-u05-a-host-selection
+  sha: 006ac149c46de986d01d048b1422ce4ce648f824
+  tree: aaf5ddc7f3488dd9ca8e36d306ed3929666d4dd3
+  contract: 'Pack PR is exactly one manifest path and one commit directly parented to this exact final U05-A SHA; the source branch must start from this exact SHA.'
+execution:
+  profile: WEB_BUILDER
+  environment: WEB_SOURCE
+  source_branch: JIT_only_task/v0.3.0-u05a-support-inspect-receipt-g1
+  integration_target: JIT_only_task/v0.3.0-r04-u05-a-host-selection
+  primary_builder: WEB_CONTROLLER
+  independent_reviewer: WEB_VERIFIER
+  local_builder_required: false
+  standalone_local_validation: false
+authoring_write_set:
+  - .agent/execution/U05-A-SUPPORT-INSPECT-RECEIPT-R0/MANIFEST.yaml
+allowed_write_set:
+  - tests/integration/v03/r02-e-production/production-gateway.test.ts
+acceptance:
+  - 'Replace the obsolete positive INSPECT receipt fixture (caller-shaped REFUSE + humanApproval relay expecting RECORDED) with the Host-owned guided.recordHostObservationReceipt() call on the existing exact current INSPECT fixture, keeping the recorded receipt assertion.'
+  - 'Add/retain a negative assertion proving a caller-forged REFUSE + OBSERVATION_RECEIPT relay is refused with the typed refusal and never RECORDED.'
+  - 'Preserve the CROSS-CASE reference rejection and the fresh Case-B positive control; do not weaken any pre-Kernel refusal assertion or any other test.'
+  - 'No production source, Host implementation, native artifact or any path outside the sole allowed write set may change; the #381 Host-only receipt capability stays intact.'
+test_contract:
+  - 'Node 24.21.0 syntax preflight before CI; run the focused R02-E production-gateway suite locally on Windows.'
+  - 'Exact-SHA Actions contracts/executor-windows plus Woodpecker Push/PR on the final support SHA; contracts must be terminal SUCCESS at that repaired SHA.'
+  - 'Pack CI disposition at this pack SHA: CI runs on the exact manifest-only SHA parented to the U05-A base; the only permitted failure is the known #387-owned CROSS-CASE fixture in its pre-repair state (the defect this Task exists to repair); executor-windows must be SUCCESS; any other failing assertion blocks claim admission.'
+  - 'Fresh independent Exact-SHA review by an executor other than the repairer before integration disposition.'
+forbidden:
+  - merge_main_or_version_branches
+  - release_or_deployment
+  - production_source_changes
+  - host_receipt_capability_weakening
+  - cross_case_or_prekernel_refusal_weakening
+  - paid_request_or_real_filesystem_effect
