@@ -111,11 +111,14 @@ function createGuided() {
       context = { state: 'CURRENT', step: next, observation, semanticSelection, scope: {} };
     },
     markInspectReceiptConsumed() {
-      history = [...history, {
-        at: new Date(NOW).toISOString(),
-        stepId: context.step.stepId,
-        status: 'OBSERVATION_RECEIPT',
-      }];
+      history = [
+        ...history,
+        {
+          at: new Date(NOW).toISOString(),
+          stepId: context.step.stepId,
+          status: 'OBSERVATION_RECEIPT',
+        },
+      ];
       currentStep = undefined;
       context = { ...context, state: 'CONSUMED' };
     },
@@ -646,7 +649,6 @@ describe.skipIf(process.platform !== 'win32')(
   },
 );
 
-
 describe.skipIf(process.platform !== 'win32')(
   'R04 U05-B1 Host-only read-only preview, durability and refusal',
   () => {
@@ -710,7 +712,8 @@ describe.skipIf(process.platform !== 'win32')(
       expect(current.preview.expectedChange).toBe('NO_FILESYSTEM_CHANGE');
       expect(current.preview.relativeTargets).toEqual(['Documents']);
       expect(env.host.stageReadOnlyPlanPreview()).toEqual({
-        status: 'REFUSED', code: 'PLAN_PREVIEW_HOST_RECEIPT_REQUIRED',
+        status: 'REFUSED',
+        code: 'PLAN_PREVIEW_HOST_RECEIPT_REQUIRED',
       });
       const reopened = new FolderSelectionHost({
         guided: env.guided.service,
@@ -746,7 +749,8 @@ describe.skipIf(process.platform !== 'win32')(
       await observeWithTrustedContext(env);
       drift = true;
       expect(env.host.stageReadOnlyPlanPreview()).toEqual({
-        status: 'STALE', code: 'PLAN_PREVIEW_ROOT_IDENTITY_STALE',
+        status: 'STALE',
+        code: 'PLAN_PREVIEW_ROOT_IDENTITY_STALE',
       });
 
       drift = false;
@@ -757,13 +761,16 @@ describe.skipIf(process.platform !== 'win32')(
       if (staged.status !== 'STAGED') return;
       const db = new DatabaseSync(join(second.directory, 'folder-selection.sqlite'));
       try {
-        db.prepare('UPDATE folder_plan_previews SET plan_digest=? WHERE preview_ref=?')
-          .run('0'.repeat(64), staged.actionPreviewRef);
+        db.prepare('UPDATE folder_plan_previews SET plan_digest=? WHERE preview_ref=?').run(
+          '0'.repeat(64),
+          staged.actionPreviewRef,
+        );
       } finally {
         db.close();
       }
       expect(second.host.readCurrentPlanPreview()).toEqual({
-        status: 'UNKNOWN', code: 'PLAN_PREVIEW_INTEGRITY_UNKNOWN',
+        status: 'UNKNOWN',
+        code: 'PLAN_PREVIEW_INTEGRITY_UNKNOWN',
       });
     });
   },

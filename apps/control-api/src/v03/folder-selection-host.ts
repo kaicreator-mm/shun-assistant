@@ -68,8 +68,15 @@ const PREVIEW_DDL = `CREATE TABLE folder_plan_previews (
   expires_at_unix_ms INTEGER NOT NULL
 )`;
 const PREVIEW_COLUMNS = [
-  'preview_ref', 'selection_ref', 'task_id', 'journey_id', 'case_ref_json',
-  'origin_step_id', 'plan_json', 'plan_digest', 'expires_at_unix_ms',
+  'preview_ref',
+  'selection_ref',
+  'task_id',
+  'journey_id',
+  'case_ref_json',
+  'origin_step_id',
+  'plan_json',
+  'plan_digest',
+  'expires_at_unix_ms',
 ];
 
 type FolderIdentity = Readonly<{ volumeSerial: string; fileId: string }>;
@@ -608,15 +615,18 @@ export class FolderSelectionHost {
     }
   }
 
-
   /**
    * B1 Host-only continuation after a real, durable INSPECT receipt.
    * This deliberately does not issue human approval, a Kernel Permit or an
    * ActionController grant. No UI/HTTP endpoint is wired to this method.
    */
   stageReadOnlyPlanPreview():
-    | { readonly status: 'STAGED'; readonly actionPreviewRef: string;
-        readonly stepId: string; readonly expiresAtUnixMs: number }
+    | {
+        readonly status: 'STAGED';
+        readonly actionPreviewRef: string;
+        readonly stepId: string;
+        readonly expiresAtUnixMs: number;
+      }
     | { readonly status: 'REFUSED' | 'STALE' | 'UNKNOWN'; readonly code: string } {
     const pending = this.#pendingPreview;
     this.#pendingPreview = null; // One-shot, including failure paths.
@@ -625,35 +635,44 @@ export class FolderSelectionHost {
       const context = this.#guided.readTrustedContext();
       const state = this.#guided.state();
       const binding = pending.binding;
-      if (!context || context.state !== 'CONSUMED' ||
-          context.step.kind !== 'INSPECT' ||
-          context.step.templateRef.artifactId !== 'shun.guided.inspect-scope' ||
-          context.step.stepId !== binding.stepId ||
-          context.step.taskId !== binding.taskId ||
-          context.step.journeyId !== binding.journeyId ||
-          context.step.templateRef.digest !== binding.templateDigest ||
-          stableJson(context.step.caseRef) !== binding.caseRefJson ||
-          state.history.at(-1)?.stepId !== binding.stepId ||
-          state.history.at(-1)?.status !== 'OBSERVATION_RECEIPT' ||
-          !isRecord(context.observation) ||
-          context.observation.selectedRootRef !== binding.selectionRef ||
-          !isRecord(context.semanticSelection) ||
-          context.semanticSelection.status !== 'SELECTED') {
+      if (
+        !context ||
+        context.state !== 'CONSUMED' ||
+        context.step.kind !== 'INSPECT' ||
+        context.step.templateRef.artifactId !== 'shun.guided.inspect-scope' ||
+        context.step.stepId !== binding.stepId ||
+        context.step.taskId !== binding.taskId ||
+        context.step.journeyId !== binding.journeyId ||
+        context.step.templateRef.digest !== binding.templateDigest ||
+        stableJson(context.step.caseRef) !== binding.caseRefJson ||
+        state.history.at(-1)?.stepId !== binding.stepId ||
+        state.history.at(-1)?.status !== 'OBSERVATION_RECEIPT' ||
+        !isRecord(context.observation) ||
+        context.observation.selectedRootRef !== binding.selectionRef ||
+        !isRecord(context.semanticSelection) ||
+        context.semanticSelection.status !== 'SELECTED'
+      ) {
         return { status: 'STALE', code: 'PLAN_PREVIEW_INSPECT_RECEIPT_STALE' };
       }
       const row = this.#selectionRow(binding.selectionRef);
-      if (!row || !this.#rowMatchesObservationBinding(row, binding) ||
-          !this.#verifySelectionIdentity(row)) {
+      if (
+        !row ||
+        !this.#rowMatchesObservationBinding(row, binding) ||
+        !this.#verifySelectionIdentity(row)
+      ) {
         return { status: 'STALE', code: 'PLAN_PREVIEW_ROOT_IDENTITY_STALE' };
       }
       const now = this.#clock();
       const previous = context.observation;
-      if (typeof previous.observedAtUnixMs !== 'number' ||
-          !Number.isSafeInteger(now) || now <= previous.observedAtUnixMs ||
-          typeof previous.validUntilUnixMs !== 'number' ||
-          previous.validUntilUnixMs <= now ||
-          !Array.isArray(previous.evidenceRefs) ||
-          previous.evidenceRefs.length >= 24) {
+      if (
+        typeof previous.observedAtUnixMs !== 'number' ||
+        !Number.isSafeInteger(now) ||
+        now <= previous.observedAtUnixMs ||
+        typeof previous.validUntilUnixMs !== 'number' ||
+        previous.validUntilUnixMs <= now ||
+        !Array.isArray(previous.evidenceRefs) ||
+        previous.evidenceRefs.length >= 24
+      ) {
         return { status: 'STALE', code: 'PLAN_PREVIEW_EVIDENCE_STALE' };
       }
       const result = createReadOnlySelectedRootPlanPreview({
@@ -670,9 +689,7 @@ export class FolderSelectionHost {
       });
       if (!result.ok) return { status: 'REFUSED', code: result.code };
       const preview = result.preview;
-      const expiresAtUnixMs = Math.min(
-        preview.expiresAtUnixMs, previous.validUntilUnixMs,
-      );
+      const expiresAtUnixMs = Math.min(preview.expiresAtUnixMs, previous.validUntilUnixMs);
       if (expiresAtUnixMs <= now) {
         return { status: 'STALE', code: 'PLAN_PREVIEW_EXPIRED' };
       }
@@ -692,26 +709,36 @@ export class FolderSelectionHost {
       }
       // The preview row is durable before publishing a REVIEW_EFFECT StepSpec.
       // A crash here may leave an orphan row, never a grant or an accepted step.
-      this.#db.prepare('DELETE FROM folder_plan_previews WHERE expires_at_unix_ms <= ?')
-        .run(now);
-      this.#db.prepare(
-        'INSERT INTO folder_plan_previews (preview_ref, selection_ref, task_id, journey_id, case_ref_json, origin_step_id, plan_json, plan_digest, expires_at_unix_ms) VALUES (?,?,?,?,?,?,?,?,?)',
-      ).run(
-        preview.actionPreviewRef, binding.selectionRef, binding.taskId,
-        binding.journeyId, binding.caseRefJson, binding.stepId,
-        planJson, preview.planDigest, expiresAtUnixMs,
-      );
+      this.#db.prepare('DELETE FROM folder_plan_previews WHERE expires_at_unix_ms <= ?').run(now);
+      this.#db
+        .prepare(
+          'INSERT INTO folder_plan_previews (preview_ref, selection_ref, task_id, journey_id, case_ref_json, origin_step_id, plan_json, plan_digest, expires_at_unix_ms) VALUES (?,?,?,?,?,?,?,?,?)',
+        )
+        .run(
+          preview.actionPreviewRef,
+          binding.selectionRef,
+          binding.taskId,
+          binding.journeyId,
+          binding.caseRefJson,
+          binding.stepId,
+          planJson,
+          preview.planDigest,
+          expiresAtUnixMs,
+        );
       const staged = this.#guided.stageTrustedSelection({
         observation,
         semanticSelection: context.semanticSelection,
         scope: context.scope,
       });
-      if (staged.status !== 'CURRENT' ||
-          staged.step.templateRef.artifactId !== 'shun.guided.review-plan' ||
-          staged.step.actionPreviewRef !== preview.actionPreviewRef) {
+      if (
+        staged.status !== 'CURRENT' ||
+        staged.step.templateRef.artifactId !== 'shun.guided.review-plan' ||
+        staged.step.actionPreviewRef !== preview.actionPreviewRef
+      ) {
         // Best effort cleanup. The orphan row is inert without the exact
         // Host-current REVIEW_EFFECT step and never authorizes execution.
-        this.#db.prepare('DELETE FROM folder_plan_previews WHERE preview_ref=?')
+        this.#db
+          .prepare('DELETE FROM folder_plan_previews WHERE preview_ref=?')
           .run(preview.actionPreviewRef);
         return { status: 'UNKNOWN', code: 'PLAN_PREVIEW_GUIDED_STAGE_FAILED' };
       }
@@ -732,48 +759,68 @@ export class FolderSelectionHost {
     | { readonly status: 'REFUSED' | 'STALE' | 'UNKNOWN'; readonly code: string } {
     try {
       const context = this.#guided.readTrustedContext();
-      if (!context || context.state !== 'CURRENT' ||
-          context.step.kind !== 'REVIEW_EFFECT' ||
-          context.step.templateRef.artifactId !== 'shun.guided.review-plan' ||
-          !isRecord(context.observation) ||
-          typeof context.observation.actionPreviewRef !== 'string' ||
-          context.step.actionPreviewRef !== context.observation.actionPreviewRef) {
+      if (
+        !context ||
+        context.state !== 'CURRENT' ||
+        context.step.kind !== 'REVIEW_EFFECT' ||
+        context.step.templateRef.artifactId !== 'shun.guided.review-plan' ||
+        !isRecord(context.observation) ||
+        typeof context.observation.actionPreviewRef !== 'string' ||
+        context.step.actionPreviewRef !== context.observation.actionPreviewRef
+      ) {
         return { status: 'REFUSED', code: 'PLAN_PREVIEW_NOT_CURRENT' };
       }
       const ref = context.observation.actionPreviewRef;
-      const row = this.#db.prepare(
-        'SELECT selection_ref, task_id, journey_id, case_ref_json, origin_step_id, plan_json, plan_digest, expires_at_unix_ms FROM folder_plan_previews WHERE preview_ref=?',
-      ).get(ref) as Readonly<{
-        selection_ref: string; task_id: string; journey_id: string;
-        case_ref_json: string; origin_step_id: string; plan_json: string;
-        plan_digest: string; expires_at_unix_ms: number;
-      }> | undefined;
-      if (!row || row.expires_at_unix_ms <= this.#clock() ||
-          row.task_id !== context.step.taskId ||
-          row.journey_id !== context.step.journeyId ||
-          row.case_ref_json !== stableJson(context.step.caseRef) ||
-          row.selection_ref !== context.observation.selectedRootRef) {
+      const row = this.#db
+        .prepare(
+          'SELECT selection_ref, task_id, journey_id, case_ref_json, origin_step_id, plan_json, plan_digest, expires_at_unix_ms FROM folder_plan_previews WHERE preview_ref=?',
+        )
+        .get(ref) as
+        | Readonly<{
+            selection_ref: string;
+            task_id: string;
+            journey_id: string;
+            case_ref_json: string;
+            origin_step_id: string;
+            plan_json: string;
+            plan_digest: string;
+            expires_at_unix_ms: number;
+          }>
+        | undefined;
+      if (
+        !row ||
+        row.expires_at_unix_ms <= this.#clock() ||
+        row.task_id !== context.step.taskId ||
+        row.journey_id !== context.step.journeyId ||
+        row.case_ref_json !== stableJson(context.step.caseRef) ||
+        row.selection_ref !== context.observation.selectedRootRef
+      ) {
         return { status: 'STALE', code: 'PLAN_PREVIEW_BINDING_STALE' };
       }
       const selected = this.#selectionRow(row.selection_ref);
-      if (!selected || selected.task_id !== row.task_id ||
-          selected.journey_id !== row.journey_id ||
-          selected.case_ref_json !== row.case_ref_json ||
-          !this.#verifySelectionIdentity(selected)) {
+      if (
+        !selected ||
+        selected.task_id !== row.task_id ||
+        selected.journey_id !== row.journey_id ||
+        selected.case_ref_json !== row.case_ref_json ||
+        !this.#verifySelectionIdentity(selected)
+      ) {
         return { status: 'STALE', code: 'PLAN_PREVIEW_ROOT_IDENTITY_STALE' };
       }
       const plan = JSON.parse(row.plan_json) as unknown;
-      if (!verifyReadOnlySelectedRootPlanPreview(plan) ||
-          plan.planDigest !== row.plan_digest ||
-          plan.actionPreviewRef !== ref ||
-          plan.selectedRootRef !== row.selection_ref ||
-          plan.originStepId !== row.origin_step_id ||
-          plan.taskId !== row.task_id ||
-          plan.journeyId !== row.journey_id ||
-          stableJson(plan.caseRef) !== row.case_ref_json ||
-          plan.volumeSerial.toLowerCase() !== selected.volume_serial.toLowerCase() ||
-          plan.fileId.toLowerCase() !== selected.file_id.toLowerCase() ||
-          plan.expiresAtUnixMs < row.expires_at_unix_ms) {
+      if (
+        !verifyReadOnlySelectedRootPlanPreview(plan) ||
+        plan.planDigest !== row.plan_digest ||
+        plan.actionPreviewRef !== ref ||
+        plan.selectedRootRef !== row.selection_ref ||
+        plan.originStepId !== row.origin_step_id ||
+        plan.taskId !== row.task_id ||
+        plan.journeyId !== row.journey_id ||
+        stableJson(plan.caseRef) !== row.case_ref_json ||
+        plan.volumeSerial.toLowerCase() !== selected.volume_serial.toLowerCase() ||
+        plan.fileId.toLowerCase() !== selected.file_id.toLowerCase() ||
+        plan.expiresAtUnixMs < row.expires_at_unix_ms
+      ) {
         return { status: 'UNKNOWN', code: 'PLAN_PREVIEW_INTEGRITY_UNKNOWN' };
       }
       Object.freeze(plan.relativeTargets);
@@ -1013,9 +1060,9 @@ export class FolderSelectionHost {
   }
 
   #initializePreviewLedger(): void {
-    const existing = this.#db.prepare(
-      "SELECT name,type FROM sqlite_master WHERE name='folder_plan_previews'",
-    ).get() as { name: string; type: string } | undefined;
+    const existing = this.#db
+      .prepare("SELECT name,type FROM sqlite_master WHERE name='folder_plan_previews'")
+      .get() as { name: string; type: string } | undefined;
     if (!existing) {
       this.#db.exec(PREVIEW_DDL);
       return;
@@ -1023,8 +1070,9 @@ export class FolderSelectionHost {
     if (existing.type !== 'table') {
       throw new Error('FOLDER_PREVIEW_LEDGER_SCHEMA_REFUSED');
     }
-    const actual = (this.#db.prepare('PRAGMA table_info(folder_plan_previews)')
-      .all() as { name: string }[]).map((column) => column.name);
+    const actual = (
+      this.#db.prepare('PRAGMA table_info(folder_plan_previews)').all() as { name: string }[]
+    ).map((column) => column.name);
     if (actual.join('|') !== PREVIEW_COLUMNS.join('|')) {
       throw new Error('FOLDER_PREVIEW_LEDGER_SCHEMA_REFUSED');
     }

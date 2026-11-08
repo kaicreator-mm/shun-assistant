@@ -57,7 +57,8 @@ export type ReadOnlyPlanPreviewResult =
   | Readonly<{ ok: false; code: string }>;
 
 function safeRelativeChild(value: unknown): value is string {
-  return typeof value === 'string' &&
+  return (
+    typeof value === 'string' &&
     value.length > 0 &&
     value.length <= 255 &&
     value !== '.' &&
@@ -65,7 +66,8 @@ function safeRelativeChild(value: unknown): value is string {
     !value.endsWith(' ') &&
     !value.endsWith('.') &&
     !FORBIDDEN_NAME.test(value) &&
-    !/^(con|prn|aux|nul|com[1-9]|lpt[1-9])(?:\.|$)/i.test(value);
+    !/^(con|prn|aux|nul|com[1-9]|lpt[1-9])(?:\.|$)/i.test(value)
+  );
 }
 
 /**
@@ -82,16 +84,22 @@ export function createReadOnlySelectedRootPlanPreview(
   const o = input.observation;
   const now = input.nowUnixMs;
   if (
-    !o || o.schema !== 'shun.computer.folder-observation.v03' ||
-    o.status !== 'OBSERVED_ONLY' || o.source !== 'TRUSTED_HOST_PORT' ||
-    o.localOnly !== true || o.executionAuthorized !== false ||
+    !o ||
+    o.schema !== 'shun.computer.folder-observation.v03' ||
+    o.status !== 'OBSERVED_ONLY' ||
+    o.source !== 'TRUSTED_HOST_PORT' ||
+    o.localOnly !== true ||
+    o.executionAuthorized !== false ||
     o.limitation !== 'METADATA_ONLY_NO_CONTENT_OR_CAUSE' ||
-    !Array.isArray(o.externalDisclosures) || o.externalDisclosures.length !== 0 ||
-    !o.rootFiles || !Number.isSafeInteger(o.rootFiles.bytes) ||
+    !Array.isArray(o.externalDisclosures) ||
+    o.externalDisclosures.length !== 0 ||
+    !o.rootFiles ||
+    !Number.isSafeInteger(o.rootFiles.bytes) ||
     o.rootFiles.bytes < 0 ||
     !Array.isArray(o.directories) ||
     o.directories.length > MAX_DIRECTORIES ||
-    !Number.isSafeInteger(now) || now <= 0 ||
+    !Number.isSafeInteger(now) ||
+    now <= 0 ||
     !Number.isSafeInteger(input.selectedRootExpiresAtUnixMs) ||
     input.selectedRootExpiresAtUnixMs <= now ||
     input.selectedRootExpiresAtUnixMs > now + 5 * 60_000 ||
@@ -101,32 +109,48 @@ export function createReadOnlySelectedRootPlanPreview(
     !SAFE_REF.test(o.scopeRevision) ||
     !SAFE_HEX.test(input.volumeSerial) ||
     !SAFE_HEX.test(input.fileId) ||
-    typeof input.taskId !== 'string' || !SAFE_REF.test(input.taskId) ||
-    typeof input.journeyId !== 'string' || !SAFE_REF.test(input.journeyId) ||
-    typeof input.originStepId !== 'string' || !SAFE_REF.test(input.originStepId)
-  ) return { ok: false, code: 'PLAN_PREVIEW_BINDING_REFUSED' };
+    typeof input.taskId !== 'string' ||
+    !SAFE_REF.test(input.taskId) ||
+    typeof input.journeyId !== 'string' ||
+    !SAFE_REF.test(input.journeyId) ||
+    typeof input.originStepId !== 'string' ||
+    !SAFE_REF.test(input.originStepId)
+  )
+    return { ok: false, code: 'PLAN_PREVIEW_BINDING_REFUSED' };
 
   const observedAt = Date.parse(o.observedAt);
   if (
     !Number.isSafeInteger(observedAt) ||
     observedAt > now ||
     now - observedAt > MAX_TTL_MS ||
-    !Number.isSafeInteger(o.totalBytes) || o.totalBytes < 0 ||
-    !Number.isSafeInteger(o.rootFiles.count) || o.rootFiles.count < 0 ||
+    !Number.isSafeInteger(o.totalBytes) ||
+    o.totalBytes < 0 ||
+    !Number.isSafeInteger(o.rootFiles.count) ||
+    o.rootFiles.count < 0 ||
     o.rootFiles.count > 4096
-  ) return { ok: false, code: 'PLAN_PREVIEW_EVIDENCE_STALE' };
+  )
+    return { ok: false, code: 'PLAN_PREVIEW_EVIDENCE_STALE' };
 
   let caseJson: string;
-  try { caseJson = JSON.stringify(input.caseRef); }
-  catch { return { ok: false, code: 'PLAN_PREVIEW_CASE_INVALID' }; }
+  try {
+    caseJson = JSON.stringify(input.caseRef);
+  } catch {
+    return { ok: false, code: 'PLAN_PREVIEW_CASE_INVALID' };
+  }
   if (typeof caseJson !== 'string' || caseJson.length < 4 || caseJson.length > 2048) {
     return { ok: false, code: 'PLAN_PREVIEW_CASE_INVALID' };
   }
   const caseRef = JSON.parse(caseJson) as Record<string, unknown>;
-  if (!caseRef || typeof caseRef !== 'object' || Array.isArray(caseRef) ||
-      Object.keys(caseRef).sort().join('|') !== 'digest|snapshotId' ||
-      typeof caseRef.snapshotId !== 'string' || !SAFE_REF.test(caseRef.snapshotId) ||
-      typeof caseRef.digest !== 'string' || !/^[a-f0-9]{64}$/.test(caseRef.digest)) {
+  if (
+    !caseRef ||
+    typeof caseRef !== 'object' ||
+    Array.isArray(caseRef) ||
+    Object.keys(caseRef).sort().join('|') !== 'digest|snapshotId' ||
+    typeof caseRef.snapshotId !== 'string' ||
+    !SAFE_REF.test(caseRef.snapshotId) ||
+    typeof caseRef.digest !== 'string' ||
+    !/^[a-f0-9]{64}$/.test(caseRef.digest)
+  ) {
     return { ok: false, code: 'PLAN_PREVIEW_CASE_INVALID' };
   }
   const targets: string[] = [];
@@ -134,11 +158,16 @@ export function createReadOnlySelectedRootPlanPreview(
   const seen = new Set<string>();
   for (const entry of o.directories) {
     if (
-      !entry || !safeRelativeChild(entry.relativePath) ||
-      !Number.isSafeInteger(entry.bytes) || entry.bytes < 0 ||
-      !Number.isSafeInteger(entry.files) || entry.files < 0 ||
-      !Number.isSafeInteger(entry.inaccessibleCount) || entry.inaccessibleCount !== 0
-    ) return { ok: false, code: 'PLAN_PREVIEW_SCOPE_REFUSED' };
+      !entry ||
+      !safeRelativeChild(entry.relativePath) ||
+      !Number.isSafeInteger(entry.bytes) ||
+      entry.bytes < 0 ||
+      !Number.isSafeInteger(entry.files) ||
+      entry.files < 0 ||
+      !Number.isSafeInteger(entry.inaccessibleCount) ||
+      entry.inaccessibleCount !== 0
+    )
+      return { ok: false, code: 'PLAN_PREVIEW_SCOPE_REFUSED' };
     const key = entry.relativePath.toLocaleLowerCase('en-US');
     if (seen.has(key)) return { ok: false, code: 'PLAN_PREVIEW_SCOPE_REFUSED' };
     seen.add(key);
@@ -177,9 +206,7 @@ export function createReadOnlySelectedRootPlanPreview(
     totalBytes: o.totalBytes,
     executionAuthorized: false as const,
   };
-  const planDigest = createHash('sha256')
-    .update(JSON.stringify(body), 'utf8')
-    .digest('hex');
+  const planDigest = createHash('sha256').update(JSON.stringify(body), 'utf8').digest('hex');
   return {
     ok: true,
     preview: Object.freeze({
@@ -204,7 +231,8 @@ export function verifyReadOnlySelectedRootPlanPreview(raw: unknown): raw is Read
     !/^host:preview:[a-f0-9]{64}$/.test(value.actionPreviewRef) ||
     typeof value.planDigest !== 'string' ||
     !/^[a-f0-9]{64}$/.test(value.planDigest)
-  ) return false;
+  )
+    return false;
   const { actionPreviewRef: _ref, planDigest, ...body } = value;
   return createHash('sha256').update(JSON.stringify(body), 'utf8').digest('hex') === planDigest;
 }
