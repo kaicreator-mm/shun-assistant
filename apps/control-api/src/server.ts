@@ -33,6 +33,10 @@ import {
 import type { ControlBackend } from './ports.ts';
 import type { AuthorizedInventoryRecipeResult } from './recipe-inventory-run.ts';
 import type { JourneySubmits } from './v03/composition-journeys.ts';
+import type { FolderPlanPreviewStaging } from './v03/folder-selection-host.ts';
+
+/** The durable Host staging outcome that alone may mint live submit references. */
+type FolderPlanPreviewStaged = Extract<FolderPlanPreviewStaging, { readonly status: 'STAGED' }>;
 import type { V03FolderSelectionRoutePort } from './v03/folder-selection-route.ts';
 import { createV03GatewayRoute, type V03GatewayRoute } from './v03/gateway-route.ts';
 import {
@@ -133,6 +137,14 @@ export interface ControlServerOptions {
   /** Trusted native folder picker/observation port; never configured by HTTP. */
   v03FolderSelection?: V03FolderSelectionRoutePort;
   /**
+   * U05-B2 (P1-LIVE-REFS) — trusted process-side notification fired ONLY
+   * after the Host's one-shot plan-preview staging returned STAGED, so the
+   * composition root can mint the live REVIEW_EFFECT submit reference pair
+   * for the operator console. Never HTTP input; a callback failure is
+   * logged and never fabricates a staging outcome.
+   */
+  onPlanPreviewStaged?: (staging: FolderPlanPreviewStaged) => void;
+  /**
    * U05-B2 — trusted one-shot selected-root effect admission over the REAL
    * ActionController R2 stack and the selected K. Composition root injection
    * only; the route accepts reference STRINGS only (the Host derives every
@@ -217,6 +229,7 @@ export function createControlServer(options: ControlServerOptions): ControlServe
       v03ProviderGlobal: options.v03ProviderGlobal,
       v03SelectedRootEffect: options.v03SelectedRootEffect,
       v03SelectedRootEffectProposal: options.v03SelectedRootEffectProposal,
+      onPlanPreviewStaged: options.onPlanPreviewStaged,
     }).catch((error: unknown) => {
       respondError(res, error);
     });
@@ -265,6 +278,8 @@ interface RouteContext {
   v03SelectedRootEffectProposal?: () =>
     | { readonly ok: true; readonly descriptor: SelectedRootEffectDescriptor }
     | { readonly ok: false; readonly code: string };
+  /** U05-B2 (P1-LIVE-REFS): fired only on a STAGED plan-preview outcome. */
+  onPlanPreviewStaged?: (staging: FolderPlanPreviewStaged) => void;
   v03ProviderGlobal?: {
     prepare(): Promise<
       | {
@@ -594,6 +609,21 @@ async function handle(
       });
     }
     const result = ctx.v03GuidedRoute.planPreview();
+    // U05-B2 (P1-LIVE-REFS): only a durable Host STAGED outcome mints the
+    // live REVIEW_EFFECT submit reference pair (trusted process side; the
+    // pair goes to the operator console, never into this HTTP response). A
+    // callback failure is logged without fabricating a staging outcome.
+    if (result.status === 'STAGED' && ctx.onPlanPreviewStaged) {
+      try {
+        ctx.onPlanPreviewStaged(result);
+      } catch (error: unknown) {
+        console.error(
+          `v0.3 plan-preview staged but live submit reference issuance failed: ${
+            error instanceof Error ? error.message : String(error)
+          }`,
+        );
+      }
+    }
     const status =
       result.status === 'STAGED'
         ? 200

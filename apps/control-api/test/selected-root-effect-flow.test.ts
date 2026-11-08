@@ -53,8 +53,12 @@ import {
   writeGrantRecord,
   writePlanRecord,
 } from '../../../packages/executor-windows/src/trusted-store.ts';
-import { SqliteHostSubmitReferenceLedger } from '../src/v03/composition-approval.ts';
+import {
+  type HostSubmitReferenceIssueReceipt,
+  SqliteHostSubmitReferenceLedger,
+} from '../src/v03/composition-approval.ts';
 import { classifyJourneyKernelResult } from '../src/v03/composition-journeys.ts';
+import { issueLiveStepSubmitReferences } from '../src/v03/composition-production.ts';
 import {
   createProductionFolderSelectionHost,
   FolderSelectionHost,
@@ -108,6 +112,16 @@ interface Fixture {
   };
   readonly hasPlanRecord: (planHash: string) => boolean;
   readonly reviewStepId: () => string;
+  readonly selectStepId: () => string;
+  /** The boot-time pair issued while the select-root step was live, if any. */
+  readonly initialReferences: HostSubmitReferenceIssueReceipt | undefined;
+  /**
+   * The REAL production issuance seam: mints (or idempotently restores) the
+   * pair for the CURRENT live Guided step through the trusted Host ledger.
+   */
+  readonly issueLiveReferences: () => HostSubmitReferenceIssueReceipt;
+  /** Records the durable human APPROVE for the staged review step. */
+  readonly approveReview: () => void;
   readonly setRootDrift: (enabled: boolean) => void;
   readonly advanceClock: (deltaMs: number) => void;
   readonly now: () => number;
@@ -120,7 +134,12 @@ interface Fixture {
  * before the human decision (approval-required negatives).
  */
 async function createFixture(
-  options: { approved?: boolean; respond?: (sendCount: number) => unknown } = {},
+  options: {
+    approved?: boolean;
+    respond?: (sendCount: number) => unknown;
+    /** 'select-root' issues the boot-time pair for the live select-root step only. */
+    initialReference?: 'select-root' | 'review-step';
+  } = {},
 ): Promise<Fixture> {
   const directory = mkdtempSync(join(tmpdir(), 'shun-b2-effect-'));
   const root = join(directory, 'selected-root');
@@ -174,6 +193,12 @@ async function createFixture(
       observeStorage: async (scope) => evidence(scope.roots[0] as string, clock()),
     },
   });
+  // The durable submit-reference ledger exists for the whole journey so the
+  // boot-time pair and the later review-step pair share one authority.
+  const references = new SqliteHostSubmitReferenceLedger(
+    join(directory, 'submit-references.sqlite'),
+    clock,
+  );
   // The REAL guided journey: select-root ASK → INSPECT → preview → REVIEW_EFFECT.
   const staged = guided.stageTrustedSelection({
     observation: {
@@ -208,6 +233,21 @@ async function createFixture(
   now += 1_000;
   const selectStep = guided.state().currentStep;
   if (!selectStep) throw new Error('fixture select step missing');
+  const selectStepId = selectStep.stepId;
+  // P1-LIVE-REFS precondition: the boot-time issuance (what main.ts does at
+  // startup) mints a pair for the step that is live AT THAT INSTANT.
+  let initialReferences: HostSubmitReferenceIssueReceipt | undefined;
+  if (options.initialReference === 'select-root') {
+    const bootPair = issueLiveStepSubmitReferences({
+      state: () => guided.state(),
+      references,
+      now: clock,
+    });
+    if (bootPair.status !== 'ISSUED') {
+      throw new Error(`fixture boot references refused: ${bootPair.code}`);
+    }
+    initialReferences = bootPair;
+  }
   const outcome = {
     schema: 'shun.guided.step-outcome.v1',
     journeyId: selectStep.journeyId,
@@ -249,7 +289,7 @@ async function createFixture(
   }
   now += 1_000;
   const reviewStepId = previewStaged.stepId;
-  if (options.approved !== false) {
+  const approveReview = (): void => {
     const reviewStep = guided.state().currentStep;
     if (!reviewStep) throw new Error('fixture review step missing');
     const approveOutcome = {
@@ -279,6 +319,18 @@ async function createFixture(
     const approved = guided.decide(approveRelay);
     if (approved.status !== 'RECORDED')
       throw new Error(`fixture approval refused: ${approved.code}`);
+  };
+  const issueLiveReferences = (): HostSubmitReferenceIssueReceipt =>
+    issueLiveStepSubmitReferences({ state: () => guided.state(), references, now: clock });
+  if (options.initialReference !== 'select-root') {
+    // Default: the review-step pair is minted right after the STAGED preview
+    // (production order: staging → trusted issuance → human APPROVE), so the
+    // pair's step is the live REVIEW_EFFECT step.
+    const issued = issueLiveReferences();
+    if (issued.status !== 'ISSUED') throw new Error(`fixture references refused: ${issued.code}`);
+  }
+  if (options.approved !== false) {
+    approveReview();
   }
   // The REAL R2 authority stack (same assembly as the production composition).
   const authorityDir = join(directory, 'authority');
@@ -319,16 +371,6 @@ async function createFixture(
     null,
   );
   writeGrantHmacKey(authorityDir, Buffer.from(INTEGRITY_SECRET, 'utf8').toString('base64'));
-  const references = new SqliteHostSubmitReferenceLedger(
-    join(directory, 'submit-references.sqlite'),
-    clock,
-  );
-  const issued = references.issue({
-    caseId: TASK,
-    stepId: reviewStepId,
-    validUntilUnixMs: clock() + 270_000,
-  });
-  if (issued.status !== 'ISSUED') throw new Error(`fixture references refused: ${issued.code}`);
   const plansDir = join(authorityDir, 'plans');
   const grantsDir = join(authorityDir, 'grants');
   let sendCount = 0;
@@ -426,6 +468,10 @@ async function createFixture(
     facade,
     hasPlanRecord: (planHash) => existsSync(join(plansDir, `${planHash}.json`)),
     reviewStepId: () => reviewStepId,
+    selectStepId: () => selectStepId,
+    initialReferences,
+    issueLiveReferences,
+    approveReview,
     setRootDrift: (enabled: boolean) => {
       rootDrift = enabled;
     },
@@ -598,6 +644,51 @@ describe('U05-B2 selected-root effect vertical slice', () => {
       code: 'SELECTED_ROOT_EFFECT_APPROVAL_REQUIRED',
       sendCalls: 0,
     });
+  });
+
+  it('P1-LIVE-REFS: the boot-time SELECT_ROOT pair never authorizes the later REVIEW_EFFECT step; the post-staging live pair does', async () => {
+    // Boot issuance happened while the select-root step was live; INSPECT,
+    // plan-preview staging and the review-step issuance happen AFTER it —
+    // exactly the production lifecycle main.ts now implements.
+    const fixture = await createFixture({
+      approved: false,
+      initialReference: 'select-root',
+    });
+    cleanups.push(fixture.cleanup);
+    const bootPair = fixture.initialReferences;
+    if (bootPair?.status !== 'ISSUED') throw new Error('fixture boot pair missing');
+    expect(bootPair.stepId).toBe(fixture.selectStepId());
+    expect(bootPair.stepId).not.toBe(fixture.reviewStepId());
+
+    // After the Host staged the plan preview, the trusted issuance seam
+    // mints the pair for the NOW-current REVIEW_EFFECT step.
+    const livePair = fixture.issueLiveReferences();
+    if (livePair.status !== 'ISSUED') throw new Error(`live pair refused: ${livePair.code}`);
+    expect(livePair.stepId).toBe(fixture.reviewStepId());
+    // Idempotent per live step: one STAGED transition gives at most one pair.
+    expect(fixture.issueLiveReferences()).toEqual(livePair);
+
+    // The human APPROVE follows the staging (production order), then the
+    // operator submits with the LIVE pair: accepted over the injected fake K
+    // with zero physical effects.
+    fixture.approveReview();
+    const completed = await fixture.submit({
+      caseId: livePair.caseId,
+      currentnessRef: livePair.currentnessRef,
+      approvalRef: livePair.approvalRef,
+    });
+    expect(completed.status).toBe('COMPLETED');
+    expect(completed.sendCalls).toBe(1);
+
+    // The superseded select-root pair refuses with zero sends — never a
+    // second admission, never a retry.
+    const superseded = await fixture.submit({
+      caseId: bootPair.caseId,
+      currentnessRef: bootPair.currentnessRef,
+      approvalRef: bootPair.approvalRef,
+    });
+    expect(superseded).toMatchObject({ status: 'REFUSED', sendCalls: 0 });
+    expect((superseded as { code?: string }).code).toMatch(/^HOST_REFERENCES_/);
   });
 
   it('rejects every malformed or unauthenticated submission with zero sends', async () => {

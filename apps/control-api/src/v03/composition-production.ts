@@ -218,6 +218,40 @@ export class SqliteCloudRequestJournal {
  */
 const SUBMIT_REFERENCE_MAX_TTL_MS = 270_000;
 
+/**
+ * U05-B2 (P1-LIVE-REFS): issue (or idempotently restore) the submit
+ * reference pair for the CURRENT live Guided step. The production
+ * composition calls this at boot for restart/recovery AND after the Host
+ * stages the REVIEW_EFFECT plan-preview step — references minted for an
+ * earlier step (SELECT_ROOT/INSPECT) can never authorize the later review
+ * step because the ledger verifies the exact live stepId and supersedes the
+ * superseded pair. Trusted process-side only; never an HTTP route.
+ */
+export function issueLiveStepSubmitReferences(input: {
+  readonly state: () => {
+    readonly currentStep?: {
+      readonly stepId: string;
+      readonly taskId: string;
+      readonly validUntilUnixMs: number;
+    };
+  };
+  readonly references: SqliteHostSubmitReferenceLedger;
+  readonly now: () => number;
+}): HostSubmitReferenceIssueReceipt {
+  const liveStep = input.state().currentStep;
+  if (!liveStep) return { status: 'REFUSED', code: 'HOST_CASE_NOT_CURRENT' };
+  const issuedAt = input.now();
+  const validUntil = Math.min(liveStep.validUntilUnixMs, issuedAt + SUBMIT_REFERENCE_MAX_TTL_MS);
+  if (validUntil <= issuedAt) {
+    return { status: 'REFUSED', code: 'HOST_CASE_NOT_CURRENT' };
+  }
+  return input.references.issue({
+    caseId: liveStep.taskId,
+    stepId: liveStep.stepId,
+    validUntilUnixMs: validUntil,
+  });
+}
+
 function hash(value: string | Uint8Array): string {
   return createHash('sha256').update(value).digest('hex');
 }
@@ -634,21 +668,14 @@ export async function createProductionV03Gateway(config: ProductionV03Config): P
       issueSubmitReferences(): HostSubmitReferenceIssueReceipt {
         // Issuance reads only the trusted Host-staged live step; references
         // never outlive the Case selection (validity capped at both the step
-        // window and a bounded reference TTL).
-        const liveStep = config.selectedCase.state().currentStep;
-        if (!liveStep) return { status: 'REFUSED', code: 'HOST_CASE_NOT_CURRENT' };
-        const issuedAt = now();
-        const validUntil = Math.min(
-          liveStep.validUntilUnixMs,
-          issuedAt + SUBMIT_REFERENCE_MAX_TTL_MS,
-        );
-        if (validUntil <= issuedAt) {
-          return { status: 'REFUSED', code: 'HOST_CASE_NOT_CURRENT' };
-        }
-        return references.issue({
-          caseId: liveStep.taskId,
-          stepId: liveStep.stepId,
-          validUntilUnixMs: validUntil,
+        // window and a bounded reference TTL). U05-B2: the same trusted seam
+        // is re-invoked after a STAGED plan-preview so the live REVIEW_EFFECT
+        // step gets its own pair (idempotent per step; supersedes the older
+        // step's pair).
+        return issueLiveStepSubmitReferences({
+          state: () => config.selectedCase.state(),
+          references,
+          now,
         });
       },
       gateway: createControlApiGateway({

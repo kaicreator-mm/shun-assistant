@@ -287,6 +287,30 @@ const handle = createControlServer({
   v03ProviderGlobal: production?.providerGlobal,
   v03SelectedRootEffect: production?.selectedRootEffect,
   v03SelectedRootEffectProposal: selectedRootEffectProposal,
+  // U05-B2 (P1-LIVE-REFS): the real UI stages the REVIEW_EFFECT step at
+  // runtime, long after boot. Only after the Host's one-shot plan-preview
+  // staging durably returned STAGED does the trusted process re-run the
+  // issuance seam for the NOW-current review step and print the pair to
+  // this operator console. The pair is never exposed over HTTP; an earlier
+  // step's pair is superseded by the ledger and can no longer authorize.
+  onPlanPreviewStaged: production
+    ? (staging) => {
+        const issued = production.issueSubmitReferences();
+        if (issued.status === 'ISSUED') {
+          console.log(
+            `v0.3 live REVIEW_EFFECT submit references issued after plan preview staged ` +
+              `(case ${issued.caseId}, step ${issued.stepId} [staged preview step ${staging.stepId}], ` +
+              `valid until ${new Date(issued.validUntilUnixMs).toISOString()}): ` +
+              `currentnessRef=${issued.currentnessRef} approvalRef=${issued.approvalRef}`,
+          );
+        } else {
+          console.log(
+            `v0.3 live submit references NOT issued after plan preview staged (${issued.code}); ` +
+              '/api/v03/effect/selected-root will refuse every send until the review step pair exists.',
+          );
+        }
+      }
+    : undefined,
 });
 const bound = await handle.start();
 console.log(
