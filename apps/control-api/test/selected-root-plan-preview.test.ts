@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { createReadOnlySelectedRootPlanPreview } from '../src/v03/selected-root-plan-preview.ts';
+import { createReadOnlySelectedRootPlanPreview, verifyReadOnlySelectedRootPlanPreview } from '../src/v03/selected-root-plan-preview.ts';
 import type { ReadOnlyPlanPreviewInput } from '../src/v03/selected-root-plan-preview.ts';
 
 const NOW = 1_800_000_000_000;
@@ -54,6 +54,13 @@ describe('U05-B1 selected-root proposal-only projection', () => {
     expect(a.preview.executionAuthorized).toBe(false);
     expect(JSON.stringify(a.preview)).not.toContain('C:\\');
     expect(Object.isFrozen(a.preview)).toBe(true);
+    expect(verifyReadOnlySelectedRootPlanPreview(a.preview)).toBe(true);
+    expect(verifyReadOnlySelectedRootPlanPreview({
+      ...a.preview, executionAuthorized: true,
+    })).toBe(false);
+    expect(verifyReadOnlySelectedRootPlanPreview({
+      ...a.preview, totalBytes: 999999,
+    })).toBe(false);
   });
 
   it('refuses a mismatched root ref and any absolute or traversal-like target', () => {

@@ -67,10 +67,11 @@ function recordedAnswerEnvelope(
 function createGuided() {
   let context: any = { state: 'CURRENT', step: selectStep, observation: {} };
   let currentStep: any = selectStep;
+  let history: Array<{ at: string; stepId: string; status: string }> = [];
   const recordedAnswers = new Map<string, unknown>();
   let receipts = 0;
   const guided = {
-    state: () => ({ currentStep }),
+    state: () => ({ currentStep, history }),
     readTrustedContext: () => context,
     readRecordedAnswer: (stepId: string) => recordedAnswers.get(stepId),
     stageTrustedSelectedRoot: ({ selectionRef }: { selectionRef: string }) => {
@@ -86,15 +87,37 @@ function createGuided() {
       receipts += 1;
       return recorded;
     },
+    stageTrustedSelection: ({ observation, semanticSelection, scope }: any) => {
+      const reviewStep = {
+        ...inspectStep,
+        stepId: 'step-review-plan-b1',
+        kind: 'REVIEW_EFFECT',
+        templateRef: { digest: 'c'.repeat(64), artifactId: 'shun.guided.review-plan' },
+        actionPreviewRef: observation.actionPreviewRef,
+      };
+      currentStep = reviewStep;
+      context = { state: 'CURRENT', step: reviewStep, observation, semanticSelection, scope };
+      return { status: 'CURRENT' as const, step: reviewStep };
+    },
   };
   return {
     service: guided as unknown as HostGuidedService,
     setStep(
       next: any,
       observation: unknown = { selectedRootRef: 'host:folder:' + 'f'.repeat(64) },
+      semanticSelection?: unknown,
     ) {
       currentStep = next;
-      context = { state: 'CURRENT', step: next, observation };
+      context = { state: 'CURRENT', step: next, observation, semanticSelection, scope: {} };
+    },
+    markInspectReceiptConsumed() {
+      history = [...history, {
+        at: new Date(NOW).toISOString(),
+        stepId: context.step.stepId,
+        status: 'OBSERVATION_RECEIPT',
+      }];
+      currentStep = undefined;
+      context = { ...context, state: 'CONSUMED' };
     },
     /** Simulates the crash window: the select-root answer is durably
      * recorded (CONSUMED) while the next INSPECT step was never staged. */
@@ -618,6 +641,129 @@ describe.skipIf(process.platform !== 'win32')(
       expect(env.host.recoverInterruptedSelection()).toEqual({
         status: 'STALE',
         code: 'FOLDER_SELECTION_IDENTITY_DRIFT',
+      });
+    });
+  },
+);
+
+
+describe.skipIf(process.platform !== 'win32')(
+  'R04 U05-B1 Host-only read-only preview, durability and refusal',
+  () => {
+    const cleanups: Array<() => void> = [];
+    afterEach(() => {
+      for (const cleanup of cleanups.splice(0)) cleanup();
+    });
+
+    function previewEnvironment(nativeOverrides: Record<string, unknown> = {}) {
+      const storage: FolderSelectionStoragePort = {
+        resolveScope: async (_volume, declared) => ({ roots: [...declared.roots] }),
+        observeStorage: async (scope) => ({
+          ...evidence(scope.roots[0]!),
+          observedAt: new Date(NOW - 1_000).toISOString(),
+        }),
+      };
+      const env = createEnvironment(storage, nativeOverrides);
+      cleanups.push(env.cleanup);
+      return env;
+    }
+
+    async function observeWithTrustedContext(env: ReturnType<typeof createEnvironment>) {
+      const selected = await env.host.selectRoot();
+      if (selected.status !== 'SELECTED') throw new Error('selection fixture failed');
+      env.host.afterSelectionRecorded(acceptedAnswer(selected.selectionRef), selectStep, recorded);
+      env.guided.setStep(
+        { ...inspectStep, kind: 'INSPECT' },
+        {
+          schema: 'shun.guided.host-observation.v1',
+          taskId: inspectStep.taskId,
+          journeyId: inspectStep.journeyId,
+          caseRef: inspectStep.caseRef,
+          sourceRef: 'host:folder-observation-b1',
+          revision: 'scope-b1-r0',
+          observedAtUnixMs: NOW - 1_000,
+          validUntilUnixMs: NOW + 120_000,
+          evidenceRefs: ['host:source-inspect-b1'],
+          selectedRootRef: selected.selectionRef,
+        },
+        { status: 'SELECTED' },
+      );
+      const result = await env.host.observeCurrentSelectedFolder();
+      expect(result.ok).toBe(true);
+      env.guided.markInspectReceiptConsumed();
+      env.advanceClock(1_000);
+      return selected.selectionRef;
+    }
+
+    it('stages an evidence-bound no-effect REVIEW_EFFECT preview and recovers its readback', async () => {
+      const env = previewEnvironment();
+      await observeWithTrustedContext(env);
+      const staged = env.host.stageReadOnlyPlanPreview();
+      expect(staged.status).toBe('STAGED');
+      if (staged.status !== 'STAGED') return;
+      expect(staged.actionPreviewRef).toMatch(/^host:preview:[a-f0-9]{64}$/);
+      const current = env.host.readCurrentPlanPreview();
+      expect(current.status).toBe('CURRENT');
+      if (current.status !== 'CURRENT') return;
+      expect(current.preview.planDigest).toMatch(/^[a-f0-9]{64}$/);
+      expect(current.preview.executionAuthorized).toBe(false);
+      expect(current.preview.expectedChange).toBe('NO_FILESYSTEM_CHANGE');
+      expect(current.preview.relativeTargets).toEqual(['Documents']);
+      expect(env.host.stageReadOnlyPlanPreview()).toEqual({
+        status: 'REFUSED', code: 'PLAN_PREVIEW_HOST_RECEIPT_REQUIRED',
+      });
+      const reopened = new FolderSelectionHost({
+        guided: env.guided.service,
+        databaseFile: join(env.directory, 'folder-selection.sqlite'),
+        native: nativePort(env.root),
+        clock: () => NOW + 1_000,
+      });
+      try {
+        expect(reopened.readCurrentPlanPreview()).toMatchObject({
+          status: 'CURRENT',
+          preview: { actionPreviewRef: staged.actionPreviewRef },
+        });
+      } finally {
+        reopened.close();
+      }
+    });
+
+    it('refuses missing Host receipt, drifted root, or tampered preview ledger', async () => {
+      let drift = false;
+      const env = previewEnvironment({
+        inspectFolder: () => ({
+          ...identity,
+          fileId: drift ? 'deadbeefdeadbeef' : identity.fileId,
+          isDirectory: true,
+          isReparsePoint: false,
+          isNetworkPath: false,
+          isVolumeRoot: false,
+        }),
+      });
+      expect(env.host.stageReadOnlyPlanPreview()).toMatchObject({
+        status: 'REFUSED',
+      });
+      await observeWithTrustedContext(env);
+      drift = true;
+      expect(env.host.stageReadOnlyPlanPreview()).toEqual({
+        status: 'STALE', code: 'PLAN_PREVIEW_ROOT_IDENTITY_STALE',
+      });
+
+      drift = false;
+      const second = previewEnvironment();
+      await observeWithTrustedContext(second);
+      const staged = second.host.stageReadOnlyPlanPreview();
+      expect(staged.status).toBe('STAGED');
+      if (staged.status !== 'STAGED') return;
+      const db = new DatabaseSync(join(second.directory, 'folder-selection.sqlite'));
+      try {
+        db.prepare('UPDATE folder_plan_previews SET plan_digest=? WHERE preview_ref=?')
+          .run('0'.repeat(64), staged.actionPreviewRef);
+      } finally {
+        db.close();
+      }
+      expect(second.host.readCurrentPlanPreview()).toEqual({
+        status: 'UNKNOWN', code: 'PLAN_PREVIEW_INTEGRITY_UNKNOWN',
       });
     });
   },

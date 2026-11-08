@@ -189,3 +189,22 @@ export function createReadOnlySelectedRootPlanPreview(
     }),
   };
 }
+
+/** Integrity readback for the persisted Host-only proposal. Does not authorize execution. */
+export function verifyReadOnlySelectedRootPlanPreview(raw: unknown): raw is ReadOnlyPlanPreview {
+  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return false;
+  const value = raw as Record<string, unknown>;
+  if (
+    value.schema !== 'shun.host.selected-root-plan-preview.v1' ||
+    value.status !== 'PROPOSAL_ONLY' ||
+    value.operation !== 'REVIEW_METADATA_ONLY' ||
+    value.executionAuthorized !== false ||
+    !Array.isArray(value.relativeTargets) ||
+    typeof value.actionPreviewRef !== 'string' ||
+    !/^host:preview:[a-f0-9]{64}$/.test(value.actionPreviewRef) ||
+    typeof value.planDigest !== 'string' ||
+    !/^[a-f0-9]{64}$/.test(value.planDigest)
+  ) return false;
+  const { actionPreviewRef: _ref, planDigest, ...body } = value;
+  return createHash('sha256').update(JSON.stringify(body), 'utf8').digest('hex') === planDigest;
+}
