@@ -20,6 +20,10 @@ import {
 import { createProductionV03Gateway } from './v03/composition-production.ts';
 import { createProductionFolderSelectionHost } from './v03/folder-selection-host.ts';
 import { createV03FolderSelectionRoute } from './v03/folder-selection-route.ts';
+import {
+  deriveSelectedRootEffect,
+  type SelectedRootEffectDescriptor,
+} from './v03/selected-root-effect-flow.ts';
 
 const here = dirname(fileURLToPath(import.meta.url));
 const port = Number.parseInt(process.env.SHUN_CONTROL_PORT ?? '7788', 10);
@@ -119,11 +123,37 @@ if (guided && process.env.SHUN_V03_GUIDED_CASE_FILE) {
 // R03-INT journey bindings (all optional; a manifest declaring the matching
 // routes makes them mandatory — the composition refuses to boot otherwise).
 // Every value is trusted operator-local configuration, never HTTP input.
+// U05-B2: the windows binding closes the trusted selected-root recheck over
+// the FolderSelectionHost so the effect-time osAuthority.recheck re-verifies
+// the private root identity and the exact admitted plan before any effect.
 const windowsJourney =
   process.env.SHUN_V03_WINDOWS_EFFECT_AUTHORITY_DIR && process.env.SHUN_V03_WINDOWS_EFFECT_WORKSPACE
     ? {
         authorityDir: requiredEnv('SHUN_V03_WINDOWS_EFFECT_AUTHORITY_DIR'),
         workspaceRoot: requiredEnv('SHUN_V03_WINDOWS_EFFECT_WORKSPACE'),
+        ...(folderSelectionHost
+          ? {
+              selectedRoot: {
+                recheck: async (input: { readonly effectId: string; readonly action: unknown }) => {
+                  const action = input.action as
+                    | {
+                        readonly taskId?: unknown;
+                        readonly planHash?: unknown;
+                        readonly action?: { readonly parameters?: { readonly path?: unknown } };
+                      }
+                    | undefined;
+                  const verdict = folderSelectionHost.verifyEffectTimeRootIdentity({
+                    taskId: typeof action?.taskId === 'string' ? action.taskId : '',
+                    planHash: typeof action?.planHash === 'string' ? action.planHash : '',
+                    path: action?.action?.parameters?.path,
+                  });
+                  return verdict.ok
+                    ? { ok: true as const }
+                    : { ok: false as const, code: verdict.code };
+                },
+              },
+            }
+          : {}),
       }
     : undefined;
 const providerJourney = process.env.SHUN_V03_PROVIDER_CONFIG
@@ -171,6 +201,20 @@ const disabledCloudInterpreter = {
   }),
   interpretGoal: async () => ({ ok: false, code: 'CLOUD_UNAVAILABLE' }),
 };
+// U05-B2: the selected-root effect authority stack is an explicit,
+// operator-pinned configuration (executor authority store + durable policy
+// database + separated secrets). All four values or none; missing pieces
+// fail closed before any HTTP listener opens.
+const selectedRootEffectConfig =
+  process.env.SHUN_V03_SELECTED_ROOT_EFFECT_AUTHORITY_DIR &&
+  process.env.SHUN_V03_SELECTED_ROOT_EFFECT_POLICY_DATABASE
+    ? {
+        authorityDir: requiredEnv('SHUN_V03_SELECTED_ROOT_EFFECT_AUTHORITY_DIR'),
+        policyDatabaseFile: requiredEnv('SHUN_V03_SELECTED_ROOT_EFFECT_POLICY_DATABASE'),
+        issuanceSecret: requiredEnv('SHUN_V03_SELECTED_ROOT_EFFECT_ISSUANCE_SECRET'),
+        integritySecret: requiredEnv('SHUN_V03_SELECTED_ROOT_EFFECT_INTEGRITY_SECRET'),
+      }
+    : undefined;
 const production =
   productionBuild && guided
     ? await createProductionV03Gateway({
@@ -195,8 +239,21 @@ const production =
         // unauthenticated browser-controlled string. Boot fails closed.
         approvalLedgerFile: requiredEnv('SHUN_V03_APPROVAL_LEDGER'),
         journeys,
+        folderSelection: folderSelectionHost,
+        selectedRootEffect: selectedRootEffectConfig,
       })
     : undefined;
+// Bounded read-only proposal projection for the CURRENT review step. The
+// Host derives the descriptor; the UI/HTTP surface never sees a private path.
+const selectedRootEffectProposal = folderSelectionHost
+  ? (): { ok: true; descriptor: SelectedRootEffectDescriptor } | { ok: false; code: string } => {
+      const facts = folderSelectionHost.readSelectedRootEffectFacts();
+      if (facts.status !== 'CURRENT') return { ok: false, code: facts.code };
+      const derived = deriveSelectedRootEffect({ facts: facts.facts });
+      if (!derived.ok) return { ok: false, code: derived.code };
+      return { ok: true, descriptor: derived.descriptor };
+    }
+  : undefined;
 // Issuance is trusted-process-only (never an HTTP route). The operator reads
 // the issued pair from this local console to submit; without a live staged
 // Case no references exist and every gateway submit refuses pre-Kernel.
@@ -228,6 +285,32 @@ const handle = createControlServer({
   v03Gateway: production?.gateway,
   v03Journeys: production?.journeys,
   v03ProviderGlobal: production?.providerGlobal,
+  v03SelectedRootEffect: production?.selectedRootEffect,
+  v03SelectedRootEffectProposal: selectedRootEffectProposal,
+  // U05-B2 (P1-LIVE-REFS): the real UI stages the REVIEW_EFFECT step at
+  // runtime, long after boot. Only after the Host's one-shot plan-preview
+  // staging durably returned STAGED does the trusted process re-run the
+  // issuance seam for the NOW-current review step and print the pair to
+  // this operator console. The pair is never exposed over HTTP; an earlier
+  // step's pair is superseded by the ledger and can no longer authorize.
+  onPlanPreviewStaged: production
+    ? (staging) => {
+        const issued = production.issueSubmitReferences();
+        if (issued.status === 'ISSUED') {
+          console.log(
+            `v0.3 live REVIEW_EFFECT submit references issued after plan preview staged ` +
+              `(case ${issued.caseId}, step ${issued.stepId} [staged preview step ${staging.stepId}], ` +
+              `valid until ${new Date(issued.validUntilUnixMs).toISOString()}): ` +
+              `currentnessRef=${issued.currentnessRef} approvalRef=${issued.approvalRef}`,
+          );
+        } else {
+          console.log(
+            `v0.3 live submit references NOT issued after plan preview staged (${issued.code}); ` +
+              '/api/v03/effect/selected-root will refuse every send until the review step pair exists.',
+          );
+        }
+      }
+    : undefined,
 });
 const bound = await handle.start();
 console.log(

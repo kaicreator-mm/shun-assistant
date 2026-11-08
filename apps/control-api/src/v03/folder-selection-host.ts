@@ -37,6 +37,7 @@ import {
 
 const SELECTION_REF = /^host:folder:[a-f0-9]{64}$/;
 const HEX_ID = /^[a-f0-9]{1,32}$/i;
+const TASK_ID_SAFE = /^[A-Za-z][A-Za-z0-9._-]{0,127}$/;
 const MAX_TTL_MS = 5 * 60_000;
 const MAX_DIRECTORIES = 256;
 const MAX_ROOT_FILES = 4096;
@@ -78,6 +79,62 @@ const PREVIEW_COLUMNS = [
   'plan_digest',
   'expires_at_unix_ms',
 ];
+
+/**
+ * U05-B2 — durable binding of ONE admitted effect plan to the private
+ * selected-root identity. Written only by the trusted Host effect flow after
+ * the real R2 admission; read by the effect-time recheck so the Windows Host
+ * can re-verify the exact admitted plan/root pair immediately before any
+ * effect. Absolute paths stay in the selection row; this table stores the
+ * plan/preview identity and the bounded relative target only.
+ */
+const EFFECT_ADMISSION_DDL = `CREATE TABLE folder_effect_admissions (
+  task_id TEXT NOT NULL,
+  plan_hash TEXT NOT NULL,
+  selection_ref TEXT NOT NULL,
+  origin_step_id TEXT NOT NULL,
+  journey_id TEXT NOT NULL,
+  case_ref_json TEXT NOT NULL,
+  action_preview_ref TEXT NOT NULL,
+  preview_plan_digest TEXT NOT NULL,
+  relative_target TEXT NOT NULL,
+  expires_at_unix_ms INTEGER NOT NULL,
+  created_at_unix_ms INTEGER NOT NULL,
+  PRIMARY KEY (task_id, plan_hash)
+)`;
+const EFFECT_ADMISSION_COLUMNS = [
+  'task_id',
+  'plan_hash',
+  'selection_ref',
+  'origin_step_id',
+  'journey_id',
+  'case_ref_json',
+  'action_preview_ref',
+  'preview_plan_digest',
+  'relative_target',
+  'expires_at_unix_ms',
+  'created_at_unix_ms',
+];
+const KNOWN_SELECTION_OBJECTS = new Set([
+  'folder_selection_records',
+  'folder_plan_previews',
+  'folder_effect_admissions',
+]);
+
+/** Host-internal effect facts: NEVER projected to HTTP/UI (rootPath inside). */
+export interface SelectedRootEffectFacts {
+  readonly taskId: string;
+  readonly journeyId: string;
+  readonly caseRefJson: string;
+  readonly originStepId: string;
+  readonly selectionRef: string;
+  readonly actionPreviewRef: string;
+  readonly preview: ReadOnlyPlanPreview;
+  readonly rootPath: string;
+  readonly volumeSerial: string;
+  readonly fileId: string;
+  readonly expiresAtUnixMs: number;
+}
 
 type FolderIdentity = Readonly<{ volumeSerial: string; fileId: string }>;
 type DirectoryIdentity = FolderIdentity &
@@ -121,6 +178,20 @@ export type FolderSelectionRecoveryResult =
   | { readonly status: 'RECOVERED'; readonly selectionRef: string; readonly stagedStepId: string }
   | { readonly status: 'NOT_APPLICABLE' }
   | { readonly status: 'STALE' | 'REFUSED'; readonly code: string };
+
+/**
+ * P1-02 — the explicit, bounded INSPECT → REVIEW_EFFECT continuation receipt.
+ * `STAGED` names the durable review step; every other outcome is terminal for
+ * that one-shot proof and never stages any authority.
+ */
+export type FolderPlanPreviewStaging =
+  | {
+      readonly status: 'STAGED';
+      readonly actionPreviewRef: string;
+      readonly stepId: string;
+      readonly expiresAtUnixMs: number;
+    }
+  | { readonly status: 'REFUSED' | 'STALE' | 'UNKNOWN'; readonly code: string };
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return value !== null && typeof value === 'object' && !Array.isArray(value);
@@ -618,16 +689,11 @@ export class FolderSelectionHost {
   /**
    * B1 Host-only continuation after a real, durable INSPECT receipt.
    * This deliberately does not issue human approval, a Kernel Permit or an
-   * ActionController grant. No UI/HTTP endpoint is wired to this method.
+   * ActionController grant. P1-02: reached from untrusted HTTP ONLY through
+   * the explicit bounded `POST /api/v03/guided/plan-preview` continuation
+   * (empty request body; the observation GET stays strictly non-mutating).
    */
-  stageReadOnlyPlanPreview():
-    | {
-        readonly status: 'STAGED';
-        readonly actionPreviewRef: string;
-        readonly stepId: string;
-        readonly expiresAtUnixMs: number;
-      }
-    | { readonly status: 'REFUSED' | 'STALE' | 'UNKNOWN'; readonly code: string } {
+  stageReadOnlyPlanPreview(): FolderPlanPreviewStaging {
     const pending = this.#pendingPreview;
     this.#pendingPreview = null; // One-shot, including failure paths.
     if (!pending) return { status: 'REFUSED', code: 'PLAN_PREVIEW_HOST_RECEIPT_REQUIRED' };
@@ -829,6 +895,290 @@ export class FolderSelectionHost {
     } catch {
       return { status: 'UNKNOWN', code: 'PLAN_PREVIEW_DURABILITY_UNKNOWN' };
     }
+  }
+
+  /**
+   * U05-B2 pre-approval readback for the CURRENT review step: the trusted
+   * Host-only facts the effect proposal descriptor is derived from. The
+   * returned facts stay process-private (rootPath inside); routes project
+   * only the bounded descriptor. Requires the live CURRENT REVIEW_EFFECT
+   * step, the durable preview integrity and the fresh native root identity.
+   */
+  readSelectedRootEffectFacts():
+    | { readonly status: 'CURRENT'; readonly facts: SelectedRootEffectFacts }
+    | { readonly status: 'REFUSED' | 'STALE' | 'UNKNOWN'; readonly code: string } {
+    const current = this.readCurrentPlanPreview();
+    if (current.status !== 'CURRENT') return current;
+    const context = this.#guided.readTrustedContext();
+    const state = this.#guided.state();
+    if (
+      !context ||
+      context.state !== 'CURRENT' ||
+      context.step.kind !== 'REVIEW_EFFECT' ||
+      context.step.templateRef.artifactId !== 'shun.guided.review-plan' ||
+      state.currentStep?.stepId !== context.step.stepId
+    ) {
+      return { status: 'STALE', code: 'SELECTED_ROOT_EFFECT_STEP_NOT_CURRENT' };
+    }
+    const row = this.#selectionRow(current.preview.selectedRootRef);
+    if (!row) return { status: 'STALE', code: 'PLAN_PREVIEW_ROOT_IDENTITY_STALE' };
+    return {
+      status: 'CURRENT',
+      facts: {
+        taskId: context.step.taskId,
+        journeyId: context.step.journeyId,
+        caseRefJson: stableJson(context.step.caseRef),
+        originStepId: context.step.stepId,
+        selectionRef: current.preview.selectedRootRef,
+        actionPreviewRef: current.preview.actionPreviewRef,
+        preview: current.preview,
+        rootPath: row.path,
+        volumeSerial: row.volume_serial,
+        fileId: row.file_id,
+        expiresAtUnixMs: current.preview.expiresAtUnixMs,
+      },
+    };
+  }
+
+  /**
+   * U05-B2 post-approval Host-only preparation: verifies the durable human
+   * APPROVE terminal for the exact review step, re-reads the preview row
+   * with full integrity checks and re-verifies the fresh native root
+   * identity. No authority, grant or permit is minted here.
+   */
+  prepareSelectedRootEffect(): Promise<
+    | { readonly ok: true; readonly facts: SelectedRootEffectFacts }
+    | { readonly ok: false; readonly code: string }
+  > {
+    try {
+      const context = this.#guided.readTrustedContext();
+      const terminal = this.#guided.state().history.at(-1);
+      if (
+        !context ||
+        context.state !== 'CONSUMED' ||
+        context.step.kind !== 'REVIEW_EFFECT' ||
+        context.step.templateRef.artifactId !== 'shun.guided.review-plan' ||
+        typeof context.step.actionPreviewRef !== 'string' ||
+        terminal?.stepId !== context.step.stepId ||
+        terminal?.status !== 'ACCEPTED'
+      ) {
+        return Promise.resolve({
+          ok: false as const,
+          code: 'SELECTED_ROOT_EFFECT_APPROVAL_REQUIRED',
+        });
+      }
+      const ref = context.step.actionPreviewRef;
+      const row = this.#db
+        .prepare(
+          'SELECT selection_ref, task_id, journey_id, case_ref_json, origin_step_id, plan_json, plan_digest, expires_at_unix_ms FROM folder_plan_previews WHERE preview_ref=?',
+        )
+        .get(ref) as
+        | Readonly<{
+            selection_ref: string;
+            task_id: string;
+            journey_id: string;
+            case_ref_json: string;
+            origin_step_id: string;
+            plan_json: string;
+            plan_digest: string;
+            expires_at_unix_ms: number;
+          }>
+        | undefined;
+      // NOTE: row.origin_step_id is the INSPECT step that originated the
+      // evidence (B1 semantics), never the REVIEW_EFFECT step — the preview
+      // binds to this approval through its actionPreviewRef + Case identity.
+      const now = this.#clock();
+      if (
+        !row ||
+        row.expires_at_unix_ms <= now ||
+        row.task_id !== context.step.taskId ||
+        row.journey_id !== context.step.journeyId ||
+        row.case_ref_json !== stableJson(context.step.caseRef)
+      ) {
+        return Promise.resolve({ ok: false as const, code: 'SELECTED_ROOT_EFFECT_PREVIEW_STALE' });
+      }
+      const selected = this.#selectionRow(row.selection_ref);
+      if (
+        !selected ||
+        selected.task_id !== row.task_id ||
+        selected.journey_id !== row.journey_id ||
+        selected.case_ref_json !== row.case_ref_json ||
+        !this.#verifySelectionIdentity(selected)
+      ) {
+        return Promise.resolve({
+          ok: false as const,
+          code: 'SELECTED_ROOT_EFFECT_ROOT_IDENTITY_STALE',
+        });
+      }
+      const plan = JSON.parse(row.plan_json) as unknown;
+      if (
+        !verifyReadOnlySelectedRootPlanPreview(plan) ||
+        plan.planDigest !== row.plan_digest ||
+        plan.actionPreviewRef !== ref ||
+        plan.selectedRootRef !== row.selection_ref ||
+        plan.originStepId !== row.origin_step_id ||
+        plan.taskId !== row.task_id ||
+        plan.journeyId !== row.journey_id ||
+        stableJson(plan.caseRef) !== row.case_ref_json ||
+        plan.volumeSerial.toLowerCase() !== selected.volume_serial.toLowerCase() ||
+        plan.fileId.toLowerCase() !== selected.file_id.toLowerCase()
+      ) {
+        return Promise.resolve({
+          ok: false as const,
+          code: 'SELECTED_ROOT_EFFECT_PREVIEW_INTEGRITY_UNKNOWN',
+        });
+      }
+      Object.freeze(plan.relativeTargets);
+      if (isRecord(plan.caseRef)) Object.freeze(plan.caseRef);
+      return Promise.resolve({
+        ok: true as const,
+        facts: {
+          taskId: context.step.taskId,
+          journeyId: context.step.journeyId,
+          caseRefJson: row.case_ref_json,
+          originStepId: context.step.stepId,
+          selectionRef: row.selection_ref,
+          actionPreviewRef: ref,
+          preview: Object.freeze(plan),
+          rootPath: selected.path,
+          volumeSerial: selected.volume_serial,
+          fileId: selected.file_id,
+          expiresAtUnixMs: row.expires_at_unix_ms,
+        },
+      });
+    } catch {
+      return Promise.resolve({
+        ok: false as const,
+        code: 'SELECTED_ROOT_EFFECT_PREPARATION_UNKNOWN',
+      });
+    }
+  }
+
+  /**
+   * Durable binding of the admitted plan to the private root identity.
+   * Trusted process-side only (the effect flow), never a route. A conflicting
+   * (task, plan) row throws so the caller records durability-unknown instead
+   * of silently replacing an admission.
+   */
+  recordSelectedRootEffectAdmission(input: {
+    readonly taskId: string;
+    readonly journeyId: string;
+    readonly caseRefJson: string;
+    readonly originStepId: string;
+    readonly selectionRef: string;
+    readonly actionPreviewRef: string;
+    readonly previewPlanDigest: string;
+    readonly planHash: string;
+    readonly relativeTarget: string;
+    readonly expiresAtUnixMs: number;
+  }): void {
+    this.#db
+      .prepare(
+        'INSERT INTO folder_effect_admissions (task_id,plan_hash,selection_ref,origin_step_id,journey_id,case_ref_json,action_preview_ref,preview_plan_digest,relative_target,expires_at_unix_ms,created_at_unix_ms) VALUES (?,?,?,?,?,?,?,?,?,?,?)',
+      )
+      .run(
+        input.taskId,
+        input.planHash,
+        input.selectionRef,
+        input.originStepId,
+        input.journeyId,
+        input.caseRefJson,
+        input.actionPreviewRef,
+        input.previewPlanDigest,
+        input.relativeTarget,
+        input.expiresAtUnixMs,
+        this.#clock(),
+      );
+  }
+
+  /**
+   * The Windows Host effect-time recheck: the private selected-root volume/
+   * file identity AND the exact admitted plan binding, re-verified natively
+   * immediately before the effect. Installed by the composition as the
+   * selected-root port of the existing osAuthority.recheck — never a route.
+   */
+  verifyEffectTimeRootIdentity(input: {
+    readonly taskId: string;
+    readonly planHash: string;
+    readonly path: unknown;
+  }): { readonly ok: true } | { readonly ok: false; readonly code: string } {
+    if (
+      typeof input?.taskId !== 'string' ||
+      !TASK_ID_SAFE.test(input.taskId) ||
+      typeof input?.planHash !== 'string' ||
+      !/^[a-f0-9]{64}$/.test(input.planHash)
+    ) {
+      return { ok: false, code: 'SELECTED_ROOT_RECHECK_INPUT_REFUSED' };
+    }
+    const admission = this.#db
+      .prepare(
+        'SELECT task_id,plan_hash,selection_ref,origin_step_id,journey_id,case_ref_json,relative_target,expires_at_unix_ms FROM folder_effect_admissions WHERE task_id=? AND plan_hash=?',
+      )
+      .get(input.taskId, input.planHash) as
+      | Readonly<{
+          task_id: string;
+          plan_hash: string;
+          selection_ref: string;
+          origin_step_id: string;
+          journey_id: string;
+          case_ref_json: string;
+          relative_target: string;
+          expires_at_unix_ms: number;
+        }>
+      | undefined;
+    if (!admission || admission.expires_at_unix_ms <= this.#clock()) {
+      return { ok: false, code: 'SELECTED_ROOT_ADMISSION_UNKNOWN' };
+    }
+    const row = this.#selectionRow(admission.selection_ref);
+    if (
+      !row ||
+      row.task_id !== admission.task_id ||
+      row.journey_id !== admission.journey_id ||
+      row.case_ref_json !== admission.case_ref_json ||
+      !this.#verifySelectionIdentity(row)
+    ) {
+      return { ok: false, code: 'SELECTED_ROOT_IDENTITY_DRIFT' };
+    }
+    // The executed target must be EXACTLY the admitted one inside the still-
+    // verified root: any lexical drift, traversal or replacement refuses.
+    if (typeof input.path !== 'string') {
+      return { ok: false, code: 'SELECTED_ROOT_TARGET_REFUSED' };
+    }
+    const expected = win32.normalize(win32.join(row.path, admission.relative_target));
+    if (win32.normalize(input.path).toLowerCase() !== expected.toLowerCase()) {
+      return { ok: false, code: 'SELECTED_ROOT_TARGET_MISMATCH' };
+    }
+    // P1-03 create-only collision refusal: this effect may CREATE the journal
+    // file, never overwrite one. An existing target of any kind — regular
+    // file, directory or reparse point — fails closed before any effect, and
+    // a stat that cannot prove absence (any error besides ENOENT) fails
+    // closed too. The check is path-based; a single-user local replacement
+    // between this recheck and the executor's own open remains an
+    // Owner-accepted v0.3.0 residual risk (no atomic no-clobber executor
+    // mode exists in this scope).
+    try {
+      lstatSync(input.path);
+      return { ok: false, code: 'SELECTED_ROOT_TARGET_COLLISION_REFUSED' };
+    } catch (error) {
+      const statCode =
+        typeof error === 'object' && error !== null && 'code' in error
+          ? (error as { code?: unknown }).code
+          : undefined;
+      if (statCode !== 'ENOENT') {
+        return { ok: false, code: 'SELECTED_ROOT_TARGET_STAT_UNKNOWN' };
+      }
+    }
+    // The human approval terminal must still be a durable guided fact for
+    // the admitted step (the ledger never reopens a consumed step).
+    const terminal = this.#guided
+      .state()
+      .history.find(
+        (entry) => entry.stepId === admission.origin_step_id && entry.status === 'ACCEPTED',
+      );
+    if (!terminal) {
+      return { ok: false, code: 'SELECTED_ROOT_APPROVAL_BINDING_LOST' };
+    }
+    return { ok: true };
   }
 
   #leaseMatchesRow(lease: NativeDirectoryLease, row: SelectionRow): boolean {
@@ -1084,14 +1434,18 @@ export class FolderSelectionHost {
       .all() as unknown as { name: string; type: string }[];
     if (objects.length === 0) {
       this.#db.exec(SELECTION_DDL);
+      this.#db.exec(EFFECT_ADMISSION_DDL);
       return;
     }
-    const selectionObjects = objects.filter((entry) => entry.name !== 'folder_plan_previews');
-    if (
-      selectionObjects.length !== 1 ||
-      selectionObjects[0]?.name !== 'folder_selection_records' ||
-      selectionObjects[0]?.type !== 'table'
-    )
+    for (const entry of objects) {
+      if (!KNOWN_SELECTION_OBJECTS.has(entry.name) || entry.type !== 'table') {
+        throw new Error('FOLDER_SELECTION_LEDGER_SCHEMA_REFUSED');
+      }
+    }
+    const selectionObjects = objects.filter(
+      (entry) => entry.name !== 'folder_plan_previews' && entry.name !== 'folder_effect_admissions',
+    );
+    if (selectionObjects.length !== 1 || selectionObjects[0]?.name !== 'folder_selection_records')
       throw new Error('FOLDER_SELECTION_LEDGER_SCHEMA_REFUSED');
     const columns = this.#db
       .prepare('PRAGMA table_info(folder_selection_records)')
@@ -1112,7 +1466,10 @@ export class FolderSelectionHost {
       'expires_at_unix_ms',
       'created_at_unix_ms',
     ];
-    if (actual.join('|') === current.join('|')) return;
+    if (actual.join('|') === current.join('|')) {
+      this.#ensureEffectAdmissionTable();
+      return;
+    }
 
     const legacy = [
       'selection_ref',
@@ -1152,6 +1509,7 @@ export class FolderSelectionHost {
         .run();
       this.#db.exec('DROP TABLE folder_selection_records_legacy');
       this.#db.exec('COMMIT');
+      this.#ensureEffectAdmissionTable();
     } catch {
       try {
         this.#db.exec('ROLLBACK');
@@ -1159,6 +1517,26 @@ export class FolderSelectionHost {
         /* retain the original failure */
       }
       throw new Error('FOLDER_SELECTION_LEDGER_MIGRATION_REFUSED');
+    }
+  }
+
+  /** Create (or column-verify) the U05-B2 effect admission table. */
+  #ensureEffectAdmissionTable(): void {
+    const existing = this.#db
+      .prepare("SELECT name,type FROM sqlite_master WHERE name='folder_effect_admissions'")
+      .get() as { name: string; type: string } | undefined;
+    if (!existing) {
+      this.#db.exec(EFFECT_ADMISSION_DDL);
+      return;
+    }
+    if (existing.type !== 'table') {
+      throw new Error('FOLDER_SELECTION_LEDGER_SCHEMA_REFUSED');
+    }
+    const actual = (
+      this.#db.prepare('PRAGMA table_info(folder_effect_admissions)').all() as { name: string }[]
+    ).map((column) => column.name);
+    if (actual.join('|') !== EFFECT_ADMISSION_COLUMNS.join('|')) {
+      throw new Error('FOLDER_SELECTION_LEDGER_SCHEMA_REFUSED');
     }
   }
 }
@@ -1313,4 +1691,18 @@ export type FolderSelectionHostPort = Pick<
   | 'validateSelectionAnswer'
   | 'afterSelectionRecorded'
   | 'observeCurrentSelectedFolder'
+  | 'stageReadOnlyPlanPreview'
+>;
+
+/**
+ * U05-B2 trusted process-side surface of the selection Host consumed by the
+ * effect flow and the effect-time recheck. Never a route: the facts carry
+ * the private root path and the verify/record methods mint no authority.
+ */
+export type SelectedRootEffectHostPort = Pick<
+  FolderSelectionHost,
+  | 'readSelectedRootEffectFacts'
+  | 'prepareSelectedRootEffect'
+  | 'recordSelectedRootEffectAdmission'
+  | 'verifyEffectTimeRootIdentity'
 >;

@@ -38,6 +38,22 @@ export interface TrustedWindowsEffectBindingConfig {
   readonly authorityDir: string;
   /** Bounded effect workspace root (absolute); every effect lands inside it. */
   readonly workspaceRoot: string;
+  /**
+   * U05-B2 — trusted Host-private selected-root recheck port. When installed,
+   * the effect-time osAuthority.recheck ALSO re-verifies the private
+   * selected-root volume/file identity and the exact admitted plan binding
+   * before any effect. The composition closes this over the trusted
+   * FolderSelectionHost; no caller JSON ever reaches it.
+   */
+  readonly selectedRoot?: WindowsSelectedRootRecheckPort;
+}
+
+/** The Host-private selected-root identity recheck contract (U05-B2). */
+export interface WindowsSelectedRootRecheckPort {
+  recheck(input: {
+    readonly effectId: string;
+    readonly action: unknown;
+  }): Promise<{ readonly ok: true } | { readonly ok: false; readonly code: string }>;
 }
 
 interface InstalledBinding {
@@ -162,6 +178,36 @@ function instanceKeyFromTurn(rawContext: unknown): string | null {
 
 let installed: InstalledBinding | undefined;
 
+/**
+ * The effect-time OS authority port: the durable current-authority read must
+ * resolve CURRENT/ACTIVE, and — when the trusted selected-root port is
+ * installed (U05-B2) — the private root identity and exact admitted plan
+ * binding must re-verify natively immediately before the effect. Exported so
+ * the composition and deterministic tests exercise the REAL extended
+ * recheck, not a parallel copy of it.
+ */
+export function createWindowsOsAuthorityPort(input: {
+  readonly currentness: FileCurrentnessSource;
+  readonly selectedRoot?: WindowsSelectedRootRecheckPort;
+}): {
+  recheck(input: { readonly effectId: string; readonly action: unknown }): Promise<{ ok: boolean }>;
+} {
+  const recheckRoot = input.selectedRoot?.recheck.bind(input.selectedRoot);
+  return {
+    async recheck(recheckInput: { readonly effectId: string; readonly action: unknown }) {
+      const state = input.currentness.read();
+      if (!(state.kind === 'CURRENT' && state.policyStatus === 'ACTIVE')) {
+        return { ok: false };
+      }
+      if (recheckRoot) {
+        const verdict = await recheckRoot(recheckInput);
+        if (verdict.ok !== true) return { ok: false };
+      }
+      return { ok: true };
+    },
+  };
+}
+
 export function installTrustedWindowsEffectBinding(
   config: TrustedWindowsEffectBindingConfig,
 ): void {
@@ -170,7 +216,10 @@ export function installTrustedWindowsEffectBinding(
     typeof config?.authorityDir !== 'string' ||
     typeof config?.workspaceRoot !== 'string' ||
     !config.authorityDir ||
-    !config.workspaceRoot
+    !config.workspaceRoot ||
+    (config.selectedRoot !== undefined &&
+      (typeof config.selectedRoot !== 'object' ||
+        typeof config.selectedRoot.recheck !== 'function'))
   ) {
     throw new Error('WINDOWS_HOST_CONFIGURATION_REFUSED');
   }
@@ -234,14 +283,10 @@ export function installTrustedWindowsEffectBinding(
         return verdict;
       },
     },
-    osAuthority: {
-      async recheck() {
-        const state = currentness.read();
-        return state.kind === 'CURRENT' && state.policyStatus === 'ACTIVE'
-          ? { ok: true }
-          : { ok: false };
-      },
-    },
+    osAuthority: createWindowsOsAuthorityPort({
+      currentness,
+      ...(config.selectedRoot ? { selectedRoot: config.selectedRoot } : {}),
+    }),
     windows: {
       async execute(input: { readonly effectId: string; readonly action: unknown }) {
         return backend.execute(input.action as never);

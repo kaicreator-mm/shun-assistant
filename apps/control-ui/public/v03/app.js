@@ -23,6 +23,8 @@ import {
 const STATE_ENDPOINT = '/api/v03/guided/state';
 const DECISION_ENDPOINT = '/api/v03/guided/decision';
 const EFFECT_ENDPOINT = '/api/v03/effect/submit';
+const SELECTED_ROOT_EFFECT_ENDPOINT = '/api/v03/effect/selected-root';
+const SELECTED_ROOT_PROPOSAL_ENDPOINT = '/api/v03/effect/proposal';
 const PROVIDER_ENDPOINT = '/api/v03/provider/first-use';
 const META_ENDPOINT = '/api/v03/meta/feedback';
 
@@ -382,6 +384,61 @@ async function runEffectJourney() {
   }
 }
 
+/**
+ * U05-B2 selected-root effect: the UI relays REFERENCE STRINGS ONLY. Every
+ * authority-bearing value (plan, grant, Permit, path) is derived by the
+ * trusted Host from the durably approved review step; the browser can never
+ * construct a private OS path, approval grant, plan authority or Permit.
+ * Only the bounded metadata projection renders (relative target, expected
+ * change, post-state verification), never a private path or grant material.
+ */
+async function runSelectedRootEffect() {
+  const statusNode = el('v03-j-selected-root-effect-status');
+  if (!statusNode) return;
+  try {
+    const refs = journeyRefsAndCase(statusNode);
+    if (!refs) return;
+    const receipt = await journeyReceipt(SELECTED_ROOT_EFFECT_ENDPOINT, {
+      caseId: refs.caseId,
+      currentnessRef: refs.currentnessRef,
+      approvalRef: refs.approvalRef,
+    });
+    const effect = receipt?.effect;
+    renderJourneyStatus(statusNode, receipt, [
+      typeof effect?.relativeTarget === 'string' ? effect.relativeTarget : '',
+      typeof effect?.expectedChange === 'string' ? effect.expectedChange : '',
+      effect?.postStateVerified === true ? 'post-state verified' : '',
+    ]);
+  } catch (error) {
+    journeyUnknown(statusNode, error);
+  }
+}
+
+/**
+ * U05-B2 bounded proposal readback for the CURRENT review step: metadata
+ * only (relative target/operation/expected change/undo/expiry). Any refusal
+ * or absence renders as an explicit non-available state, never as authority.
+ */
+async function refreshSelectedRootEffectProposal() {
+  const node = el('v03-j-selected-root-effect-proposal');
+  if (!node) return;
+  try {
+    const descriptor = await api(SELECTED_ROOT_PROPOSAL_ENDPOINT);
+    if (!descriptor || descriptor.executionAuthorized !== false) {
+      node.textContent = '';
+      node.hidden = true;
+      return;
+    }
+    node.hidden = false;
+    node.textContent = `${descriptor.operation} → ${descriptor.relativeTarget} — ${
+      descriptor.expectedChange
+    } (undo: ${descriptor.undo}; risk ${descriptor.risk})`;
+  } catch {
+    node.textContent = '';
+    node.hidden = true;
+  }
+}
+
 /** Provider journey: relay the operator's taskId as-is; show the stdout head. */
 async function runProviderJourney() {
   const statusNode = el('v03-j-provider-status');
@@ -585,6 +642,7 @@ async function refresh() {
     if (model.status === 'CURRENT') renderForm(model);
     renderHistory(Array.isArray(state?.history) ? state.history : []);
     renderAdvisory(state?.advisory);
+    void refreshSelectedRootEffectProposal();
   } catch (error) {
     renderUnknownState(error instanceof Error ? error.message : String(error));
   }
@@ -638,6 +696,7 @@ try {
   populateJourneySelect('v03-j-meta-category', JOURNEY_CATEGORY_OPTIONS);
   populateJourneySelect('v03-j-meta-correction', JOURNEY_CORRECTION_OPTIONS);
   wireJourneyRun('v03-j-effect-run', 'journeys.effect.run', runEffectJourney);
+  wireJourneyRun('v03-j-selected-root-effect-run', 'journeys.effect.run', runSelectedRootEffect);
   wireJourneyRun('v03-j-provider-run', 'journeys.provider.run', runProviderJourney);
   wireJourneyRun('v03-j-meta-run', 'journeys.meta.run', runMetaJourney);
 } catch (error) {
