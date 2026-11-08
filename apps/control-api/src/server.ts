@@ -34,9 +34,6 @@ import type { ControlBackend } from './ports.ts';
 import type { AuthorizedInventoryRecipeResult } from './recipe-inventory-run.ts';
 import type { JourneySubmits } from './v03/composition-journeys.ts';
 import type { FolderPlanPreviewStaging } from './v03/folder-selection-host.ts';
-
-/** The durable Host staging outcome that alone may mint live submit references. */
-type FolderPlanPreviewStaged = Extract<FolderPlanPreviewStaging, { readonly status: 'STAGED' }>;
 import type { V03FolderSelectionRoutePort } from './v03/folder-selection-route.ts';
 import { createV03GatewayRoute, type V03GatewayRoute } from './v03/gateway-route.ts';
 import {
@@ -48,6 +45,9 @@ import type {
   SelectedRootEffectDescriptor,
   SelectedRootEffectSubmitReceipt,
 } from './v03/selected-root-effect-flow.ts';
+
+/** The durable Host staging outcome that alone may mint live submit references. */
+type FolderPlanPreviewStaged = Extract<FolderPlanPreviewStaging, { readonly status: 'STAGED' }>;
 
 export const CONTROL_API_REVISION = 'shun.control-api/0.1';
 
