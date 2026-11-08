@@ -9,7 +9,7 @@ import type {
   GuidedDecisionReceipt,
   HostGuidedService,
 } from '../../../../packages/domain-host/src/guided/host-guided-service.ts';
-import type { FolderSelectionResult } from './folder-selection-host.ts';
+import type { FolderPlanPreviewStaging, FolderSelectionResult } from './folder-selection-host.ts';
 import type { V03FolderSelectionRoutePort } from './folder-selection-route.ts';
 
 export type V03GuidedPort = Pick<HostGuidedService, 'state' | 'decide'>;
@@ -23,6 +23,7 @@ export interface V03GuidedRoute {
   decide(raw: unknown): GuidedDecisionReceipt;
   selectRoot(): Promise<FolderSelectionResult>;
   folderObservation(): Promise<ComputerFolderObservationResult>;
+  planPreview(): FolderPlanPreviewStaging;
   httpStatus(result: GuidedDecisionReceipt): number;
 }
 
@@ -64,6 +65,14 @@ export function createV03GuidedRoute(
     async folderObservation(): Promise<ComputerFolderObservationResult> {
       if (!folderSelection) return { ok: false, code: 'FOLDER_OBSERVATION_UNAVAILABLE' };
       return folderSelection.observeCurrentSelectedFolder();
+    },
+    // P1-02 — the explicit INSPECT → REVIEW_EFFECT continuation. The route is
+    // POST-only with an empty body; the folder-observation GET above never
+    // mutates. Staging stays the Host's one-shot capability: no planner,
+    // approval, grant or Permit is minted here.
+    planPreview(): FolderPlanPreviewStaging {
+      if (!folderSelection) return { status: 'REFUSED', code: 'PLAN_PREVIEW_UNAVAILABLE' };
+      return folderSelection.stageReadOnlyPlanPreview();
     },
     httpStatus(result: GuidedDecisionReceipt) {
       switch (result.status) {

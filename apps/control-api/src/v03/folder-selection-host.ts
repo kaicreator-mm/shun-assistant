@@ -179,6 +179,20 @@ export type FolderSelectionRecoveryResult =
   | { readonly status: 'NOT_APPLICABLE' }
   | { readonly status: 'STALE' | 'REFUSED'; readonly code: string };
 
+/**
+ * P1-02 — the explicit, bounded INSPECT → REVIEW_EFFECT continuation receipt.
+ * `STAGED` names the durable review step; every other outcome is terminal for
+ * that one-shot proof and never stages any authority.
+ */
+export type FolderPlanPreviewStaging =
+  | {
+      readonly status: 'STAGED';
+      readonly actionPreviewRef: string;
+      readonly stepId: string;
+      readonly expiresAtUnixMs: number;
+    }
+  | { readonly status: 'REFUSED' | 'STALE' | 'UNKNOWN'; readonly code: string };
+
 function isRecord(value: unknown): value is Record<string, unknown> {
   return value !== null && typeof value === 'object' && !Array.isArray(value);
 }
@@ -675,16 +689,11 @@ export class FolderSelectionHost {
   /**
    * B1 Host-only continuation after a real, durable INSPECT receipt.
    * This deliberately does not issue human approval, a Kernel Permit or an
-   * ActionController grant. No UI/HTTP endpoint is wired to this method.
+   * ActionController grant. P1-02: reached from untrusted HTTP ONLY through
+   * the explicit bounded `POST /api/v03/guided/plan-preview` continuation
+   * (empty request body; the observation GET stays strictly non-mutating).
    */
-  stageReadOnlyPlanPreview():
-    | {
-        readonly status: 'STAGED';
-        readonly actionPreviewRef: string;
-        readonly stepId: string;
-        readonly expiresAtUnixMs: number;
-      }
-    | { readonly status: 'REFUSED' | 'STALE' | 'UNKNOWN'; readonly code: string } {
+  stageReadOnlyPlanPreview(): FolderPlanPreviewStaging {
     const pending = this.#pendingPreview;
     this.#pendingPreview = null; // One-shot, including failure paths.
     if (!pending) return { status: 'REFUSED', code: 'PLAN_PREVIEW_HOST_RECEIPT_REQUIRED' };
@@ -1138,6 +1147,26 @@ export class FolderSelectionHost {
     const expected = win32.normalize(win32.join(row.path, admission.relative_target));
     if (win32.normalize(input.path).toLowerCase() !== expected.toLowerCase()) {
       return { ok: false, code: 'SELECTED_ROOT_TARGET_MISMATCH' };
+    }
+    // P1-03 create-only collision refusal: this effect may CREATE the journal
+    // file, never overwrite one. An existing target of any kind — regular
+    // file, directory or reparse point — fails closed before any effect, and
+    // a stat that cannot prove absence (any error besides ENOENT) fails
+    // closed too. The check is path-based; a single-user local replacement
+    // between this recheck and the executor's own open remains an
+    // Owner-accepted v0.3.0 residual risk (no atomic no-clobber executor
+    // mode exists in this scope).
+    try {
+      lstatSync(input.path);
+      return { ok: false, code: 'SELECTED_ROOT_TARGET_COLLISION_REFUSED' };
+    } catch (error) {
+      const statCode =
+        typeof error === 'object' && error !== null && 'code' in error
+          ? (error as { code?: unknown }).code
+          : undefined;
+      if (statCode !== 'ENOENT') {
+        return { ok: false, code: 'SELECTED_ROOT_TARGET_STAT_UNKNOWN' };
+      }
     }
     // The human approval terminal must still be a durable guided fact for
     // the admitted step (the ledger never reopens a consumed step).
@@ -1662,6 +1691,7 @@ export type FolderSelectionHostPort = Pick<
   | 'validateSelectionAnswer'
   | 'afterSelectionRecorded'
   | 'observeCurrentSelectedFolder'
+  | 'stageReadOnlyPlanPreview'
 >;
 
 /**

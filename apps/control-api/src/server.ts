@@ -573,6 +573,37 @@ async function handle(
     const status = result.ok ? 200 : result.code === 'FOLDER_NOT_SELECTED' ? 409 : 422;
     return respondJson(res, status, result);
   }
+  // P1-02 — the explicit, bounded INSPECT → REVIEW_EFFECT continuation. The
+  // real desktop user drives this after a successful INSPECT observation; the
+  // request body must be empty, the staging is the Host's one-shot capability
+  // and the folder-observation GET above stays strictly non-mutating.
+  if (method === 'POST' && url.pathname === '/api/v03/guided/plan-preview') {
+    if (!ctx.v03GuidedRoute) {
+      return respondJson(res, 503, { ok: false, code: 'V03_GUIDED_UNAVAILABLE' });
+    }
+    const body = await readJsonBody(req, ctx.maxBodyBytes);
+    if (
+      !body ||
+      typeof body !== 'object' ||
+      Array.isArray(body) ||
+      Object.keys(body).length !== 0
+    ) {
+      return respondJson(res, 422, {
+        status: 'REFUSED',
+        code: 'PLAN_PREVIEW_ACCEPTS_NO_CALLER_INPUT',
+      });
+    }
+    const result = ctx.v03GuidedRoute.planPreview();
+    const status =
+      result.status === 'STAGED'
+        ? 200
+        : result.status === 'STALE'
+          ? 409
+          : result.status === 'UNKNOWN'
+            ? 503
+            : 422;
+    return respondJson(res, status, result);
+  }
   if (method === 'POST' && url.pathname === '/api/v03/guided/decision') {
     if (!ctx.v03GuidedRoute) {
       return respondJson(res, 503, { ok: false, code: 'V03_GUIDED_UNAVAILABLE' });

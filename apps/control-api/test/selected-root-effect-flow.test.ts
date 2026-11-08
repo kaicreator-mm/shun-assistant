@@ -564,6 +564,30 @@ describe('U05-B2 selected-root effect vertical slice', () => {
     expect(again.ok && again.plan.planHash === derived.plan.planHash).toBe(true);
   });
 
+  it('P1-03: the proposal descriptor is create-only with an honest undo qualification', async () => {
+    const fixture = await createFixture();
+    cleanups.push(fixture.cleanup);
+    const facts = await fixture.host.prepareSelectedRootEffect();
+    expect(facts.ok).toBe(true);
+    if (!facts.ok) return;
+    const derived = deriveSelectedRootEffect({
+      facts: facts.facts,
+      policySnapshotRevision: POLICY,
+    });
+    expect(derived.ok).toBe(true);
+    if (!derived.ok) return;
+    const { expectedChange, undo } = derived.descriptor;
+    // Never "create or update": an existing file is refused, not replaced.
+    expect(expectedChange).toContain('create one new');
+    expect(expectedChange).not.toContain('create or update');
+    expect(expectedChange).toContain('create-only');
+    expect(expectedChange).toContain('never created, overwritten or modified');
+    // Undo is scoped to what the effect itself created; it never claims to
+    // restore content that was never touched.
+    expect(undo).toContain('only if this effect executes');
+    expect(undo).toContain('no pre-existing content is ever touched');
+  });
+
   it('refuses before any K send when the durable human approval is missing', async () => {
     const fixture = await createFixture({ approved: false });
     cleanups.push(fixture.cleanup);
@@ -1170,4 +1194,109 @@ describe('U05-B2 Windows Host effect-time selected-root recheck (real adapter ch
       }),
     ).toMatchObject({ ok: false });
   });
+
+  it('P1-03: refuses the effect when the journal target already exists (create-only, zero effects, pre-existing content untouched)', async () => {
+    const fixture = await createFixture();
+    cleanups.push(fixture.cleanup);
+    const payload = await admittedPayload(fixture);
+    const planHash = (fixture.facade.sends[0] as { input: { planRef: string } }).input.planRef;
+    // A pre-existing user file at the EXACT admitted target, using the plan's
+    // own canonical win32 spelling: the admitted plan (and therefore the
+    // rechecked path) is win32.join(root, journal) on every platform, so the
+    // collision file must exist at exactly that string for the stat to see it.
+    const target = win32.join(fixture.root, SELECTED_ROOT_JOURNAL_FILENAME);
+    writeFileSync(target, 'pre-existing user content', 'utf8');
+    expect(
+      fixture.host.verifyEffectTimeRootIdentity({ taskId: TASK, planHash, path: target }),
+    ).toEqual({ ok: false, code: 'SELECTED_ROOT_TARGET_COLLISION_REFUSED' });
+    // The full real adapter chain refuses at the OS authority: zero executor
+    // calls and the pre-existing file is byte-for-byte untouched.
+    const currentness = new FileCurrentnessSource(
+      join(fixture.authorityDir, 'current-authority.json'),
+    );
+    const verifyIntegrity = hmacGrantIntegrityVerifier(
+      resolveGrantHmacKeyFile(fixture.authorityDir),
+    );
+    const executions: { effectId: string; actionId: string }[] = [];
+    const host = createWindowsEffectHost({
+      binding: { capabilityId: 'windows', operationId: 'windows.execute' },
+      authorization: {
+        resolve: async (input) =>
+          resolveAuthorization(
+            new FilePlanSource(join(fixture.authorityDir, 'plans')),
+            new FileGrantSource(join(fixture.authorityDir, 'grants')),
+          )(input),
+      },
+      actionController: {
+        authorizeEffect: async (input) =>
+          authorizeEffectWith(currentness, verifyIntegrity, fixture.now)(input),
+      },
+      osAuthority: createWindowsOsAuthorityPort({
+        currentness,
+        selectedRoot: {
+          recheck: async (input: { effectId: string; action: unknown }) => {
+            const action = input.action as {
+              taskId: string;
+              planHash: string;
+              action: { parameters: { path: string } };
+            };
+            return fixture.host.verifyEffectTimeRootIdentity({
+              taskId: action.taskId,
+              planHash: action.planHash,
+              path: action.action.parameters.path,
+            });
+          },
+        },
+      }),
+      windows: {
+        execute: async (input: { effectId: string; action: { actionId: string } }) => {
+          executions.push({ effectId: input.effectId, actionId: input.action.actionId });
+          return {
+            actionId: input.action.actionId,
+            terminal: 'SUCCEEDED',
+            sideEffectEvidence: {
+              recoveryClassification: 'COMPLETED_VERIFIED',
+              postStateVerified: true,
+            },
+          };
+        },
+      },
+    });
+    const envelope = (await host.dispatch(payload, kernelContext())) as {
+      phase: string;
+      outcome: { ok: boolean; error?: { code: string } };
+    };
+    expect(envelope.phase).toBe('terminal');
+    expect(envelope.outcome.ok).toBe(false);
+    expect(envelope.outcome.error?.code).toBe('OS_AUTHORITY_REFUSED');
+    expect(executions).toHaveLength(0);
+    expect(readFileSync(target, 'utf8')).toBe('pre-existing user content');
+  });
+
+  // Windows libuv collapses a file-as-parent-component stat to ENOENT, so the
+  // non-ENOENT fail-closed branch below is only reachable deterministically
+  // on POSIX (where the authoritative CI runs). In production a replaced root
+  // is refused even earlier by the real native identity check; this fixture's
+  // mocked native port intentionally isolates the stat path alone.
+  it.skipIf(process.platform === 'win32')(
+    'P1-03: fails closed when the target stat cannot prove absence',
+    async () => {
+      const fixture = await createFixture();
+      cleanups.push(fixture.cleanup);
+      await admittedPayload(fixture);
+      const planHash = (fixture.facade.sends[0] as { input: { planRef: string } }).input.planRef;
+      // Replace the selected root directory with a regular file: the admitted
+      // target now stats as ENOTDIR — an outcome that neither proves absence
+      // nor a safe collision, so the recheck fails closed instead of proceeding.
+      rmSync(fixture.root, { recursive: true, force: true });
+      writeFileSync(fixture.root, 'no-longer-a-directory', 'utf8');
+      expect(
+        fixture.host.verifyEffectTimeRootIdentity({
+          taskId: TASK,
+          planHash,
+          path: join(fixture.root, SELECTED_ROOT_JOURNAL_FILENAME),
+        }),
+      ).toEqual({ ok: false, code: 'SELECTED_ROOT_TARGET_STAT_UNKNOWN' });
+    },
+  );
 });

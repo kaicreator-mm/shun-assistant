@@ -1,7 +1,11 @@
 /** Host-only R04 folder selection adapter for the Guided HTTP route. */
 import type { ComputerFolderObservationResult } from '../../../../packages/domain-computer/src/computer/folder-observation.ts';
 import type { GuidedDecisionReceipt } from '../../../../packages/domain-host/src/guided/host-guided-service.ts';
-import type { FolderSelectionHostPort, FolderSelectionResult } from './folder-selection-host.ts';
+import type {
+  FolderPlanPreviewStaging,
+  FolderSelectionHostPort,
+  FolderSelectionResult,
+} from './folder-selection-host.ts';
 
 export type V03FolderSelectionStep = Readonly<{
   stepId: string;
@@ -20,6 +24,7 @@ export interface V03FolderSelectionRoutePort {
     receipt: GuidedDecisionReceipt,
   ): GuidedDecisionReceipt;
   observeCurrentSelectedFolder(): Promise<ComputerFolderObservationResult>;
+  stageReadOnlyPlanPreview(): FolderPlanPreviewStaging;
 }
 
 export function createV03FolderSelectionRoute(
@@ -30,7 +35,8 @@ export function createV03FolderSelectionRoute(
     typeof host.selectRoot !== 'function' ||
     typeof host.validateSelectionAnswer !== 'function' ||
     typeof host.afterSelectionRecorded !== 'function' ||
-    typeof host.observeCurrentSelectedFolder !== 'function'
+    typeof host.observeCurrentSelectedFolder !== 'function' ||
+    typeof host.stageReadOnlyPlanPreview !== 'function'
   )
     throw new TypeError('V03_FOLDER_SELECTION_HOST_UNAVAILABLE');
   return Object.freeze({
@@ -38,5 +44,6 @@ export function createV03FolderSelectionRoute(
     validateSelectionAnswer: host.validateSelectionAnswer.bind(host),
     afterSelectionRecorded: host.afterSelectionRecorded.bind(host),
     observeCurrentSelectedFolder: host.observeCurrentSelectedFolder.bind(host),
+    stageReadOnlyPlanPreview: host.stageReadOnlyPlanPreview.bind(host),
   });
 }

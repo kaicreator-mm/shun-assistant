@@ -244,7 +244,7 @@ describe('U05-B2 selected-root effect route wiring', () => {
         actionRef: 'windows-fs-write-selected-root-journal',
         relativeTarget: 'shun-folder-journal.json',
         operation: 'windows.fs.write' as const,
-        expectedChange: 'create or update one metadata journal file (1 bytes) inside the selected root',
+        expectedChange: 'create one new metadata journal file (1 bytes) inside the selected root — create-only',
         terminal: 'SUCCEEDED',
         postStateVerified: true,
       },

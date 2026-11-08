@@ -26,7 +26,13 @@ const receipt = {
 };
 
 describe('R04 U05-A folder selection route adapter', () => {
-  it('forwards the no-input picker, decision validation, post-record stage and observation', async () => {
+  it('forwards the no-input picker, decision validation, post-record stage, observation and the P1-02 plan-preview continuation', async () => {
+    const staging = {
+      status: 'STAGED' as const,
+      actionPreviewRef: 'host:preview:' + 'b'.repeat(32),
+      stepId: 'step-review-plan',
+      expiresAtUnixMs: 1_800_000_120_000,
+    };
     const host = {
       selectRoot: vi.fn(async () => selected),
       validateSelectionAnswer: vi.fn(() => null),
@@ -35,6 +41,7 @@ describe('R04 U05-A folder selection route adapter', () => {
         ok: false as const,
         code: 'FOLDER_NOT_SELECTED' as const,
       })),
+      stageReadOnlyPlanPreview: vi.fn(() => staging),
     };
     const route: V03FolderSelectionRoutePort = createV03FolderSelectionRoute(
       host as unknown as FolderSelectionHostPort,
@@ -46,10 +53,12 @@ describe('R04 U05-A folder selection route adapter', () => {
       ok: false,
       code: 'FOLDER_NOT_SELECTED',
     });
+    expect(route.stageReadOnlyPlanPreview()).toEqual(staging);
     expect(host.selectRoot).toHaveBeenCalledTimes(1);
     expect(host.validateSelectionAnswer).toHaveBeenCalledWith({ answer: true }, step);
     expect(host.afterSelectionRecorded).toHaveBeenCalledWith({}, step, receipt);
     expect(host.observeCurrentSelectedFolder).toHaveBeenCalledTimes(1);
+    expect(host.stageReadOnlyPlanPreview).toHaveBeenCalledTimes(1);
   });
 
   it('fails closed when any Host capability is missing', () => {
