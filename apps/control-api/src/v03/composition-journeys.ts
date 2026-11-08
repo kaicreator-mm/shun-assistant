@@ -19,11 +19,21 @@ import type { SendReceipt } from '../../../../packages/domain-app/src/api/gatewa
 import type { HostGuidedService } from '../../../../packages/domain-host/src/guided/host-guided-service.ts';
 import type { HostMetaShadowStore } from '../../../../packages/domain-host/src/meta/host-meta-shadow-store.ts';
 import type { TrustedProviderBindingConfig } from '../../../../packages/domain-host/src/provider/provider-host-binding.ts';
+import type { WindowsSelectedRootRecheckPort } from '../../../../packages/domain-host/src/windows/effect-host-binding.ts';
 import type { SqliteHostSubmitReferenceLedger } from './composition-approval.ts';
 
 export interface JourneyBindingsConfig {
-  /** Real executor authority store + bounded effect workspace (J02 route). */
-  readonly windows?: { readonly authorityDir: string; readonly workspaceRoot: string };
+  /**
+   * Real executor authority store + bounded effect workspace (J02 route).
+   * U05-B2: the optional trusted selected-root recheck port closes over the
+   * composition's FolderSelectionHost so the effect-time osAuthority.recheck
+   * re-verifies the private root identity and the exact admitted plan.
+   */
+  readonly windows?: {
+    readonly authorityDir: string;
+    readonly workspaceRoot: string;
+    readonly selectedRoot?: WindowsSelectedRootRecheckPort;
+  };
   /** Real pinned CuratedProvider chain (J05 route). */
   readonly provider?: TrustedProviderBindingConfig;
   /** Real durable Shadow store (J09 route). */

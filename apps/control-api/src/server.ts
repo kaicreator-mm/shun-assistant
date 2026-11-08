@@ -40,6 +40,10 @@ import {
   type V03GuidedPort,
   type V03GuidedRoute,
 } from './v03/guided-route.ts';
+import type {
+  SelectedRootEffectDescriptor,
+  SelectedRootEffectSubmitReceipt,
+} from './v03/selected-root-effect-flow.ts';
 
 export const CONTROL_API_REVISION = 'shun.control-api/0.1';
 
@@ -128,6 +132,21 @@ export interface ControlServerOptions {
   v03Guided?: V03GuidedPort;
   /** Trusted native folder picker/observation port; never configured by HTTP. */
   v03FolderSelection?: V03FolderSelectionRoutePort;
+  /**
+   * U05-B2 — trusted one-shot selected-root effect admission over the REAL
+   * ActionController R2 stack and the selected K. Composition root injection
+   * only; the route accepts reference STRINGS only (the Host derives every
+   * authority-bearing value) and answers 503 when no authority was composed.
+   */
+  v03SelectedRootEffect?: (raw: unknown) => Promise<SelectedRootEffectSubmitReceipt>;
+  /**
+   * U05-B2 — bounded read-only projection of the concrete effect proposal for
+   * the CURRENT review step (metadata references only, never a private path).
+   * Composition root injection only.
+   */
+  v03SelectedRootEffectProposal?: () =>
+    | { readonly ok: true; readonly descriptor: SelectedRootEffectDescriptor }
+    | { readonly ok: false; readonly code: string };
   /** Directory with the static control-ui app; omitted = API only. */
   uiDir?: string;
   /** Loopback host only; anything else is a construction-time refusal. */
@@ -196,6 +215,8 @@ export function createControlServer(options: ControlServerOptions): ControlServe
       v03GuidedRoute,
       v03Journeys: options.v03Journeys,
       v03ProviderGlobal: options.v03ProviderGlobal,
+      v03SelectedRootEffect: options.v03SelectedRootEffect,
+      v03SelectedRootEffectProposal: options.v03SelectedRootEffectProposal,
     }).catch((error: unknown) => {
       respondError(res, error);
     });
@@ -240,6 +261,10 @@ interface RouteContext {
   v03RouteFor: () => V03GatewayRoute | undefined;
   v03GuidedRoute?: V03GuidedRoute;
   v03Journeys?: JourneySubmits;
+  v03SelectedRootEffect?: (raw: unknown) => Promise<SelectedRootEffectSubmitReceipt>;
+  v03SelectedRootEffectProposal?: () =>
+    | { readonly ok: true; readonly descriptor: SelectedRootEffectDescriptor }
+    | { readonly ok: false; readonly code: string };
   v03ProviderGlobal?: {
     prepare(): Promise<
       | {
@@ -639,6 +664,48 @@ async function handle(
     }
     const body = await readJsonBody(req, ctx.maxBodyBytes);
     const receipt = await ops.confirm(body);
+    const status =
+      receipt.status === 'COMPLETED'
+        ? 200
+        : receipt.status === 'ADMITTED'
+          ? 202
+          : receipt.status === 'UNKNOWN'
+            ? 409
+            : 422;
+    return respondJson(res, status, receipt);
+  }
+
+  // U05-B2 — bounded read-only proposal projection for the CURRENT review
+  // step: metadata references only (relative target/operation/expected
+  // change/undo); the absolute root path and the plan/grant authority never
+  // leave the Host. 503 when no effect flow was composed.
+  if (method === 'GET' && url.pathname === '/api/v03/effect/proposal') {
+    const proposal = ctx.v03SelectedRootEffectProposal;
+    if (proposal === undefined) {
+      return respondJson(res, 503, { ok: false, code: 'V03_SELECTED_ROOT_EFFECT_UNAVAILABLE' });
+    }
+    const result = proposal();
+    if (!result.ok) {
+      return respondJson(res, result.code === 'SELECTED_ROOT_EFFECT_STEP_NOT_CURRENT' ? 409 : 422, {
+        ok: false,
+        code: result.code,
+      });
+    }
+    return respondJson(res, 200, result.descriptor);
+  }
+
+  // U05-B2 — the one-shot selected-root effect admission. The body is EXACTLY
+  // {caseId, currentnessRef, approvalRef}: reference strings whose durable
+  // pair must authenticate for the approved review step. Every
+  // authority-bearing value (plan, grant, Permit) is derived Host-side; no
+  // path, plan, grant or permit input is accepted from any caller.
+  if (method === 'POST' && url.pathname === '/api/v03/effect/selected-root') {
+    const submit = ctx.v03SelectedRootEffect;
+    if (submit === undefined) {
+      return respondJson(res, 503, { ok: false, code: 'V03_SELECTED_ROOT_EFFECT_UNAVAILABLE' });
+    }
+    const body = await readJsonBody(req, ctx.maxBodyBytes);
+    const receipt = await submit(body);
     const status =
       receipt.status === 'COMPLETED'
         ? 200

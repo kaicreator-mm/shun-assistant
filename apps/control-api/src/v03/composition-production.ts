@@ -1,9 +1,11 @@
 /** R02-E trusted production composition. No SDK-private import or fake K. */
-import { createHash } from 'node:crypto';
+import { createHash, randomUUID } from 'node:crypto';
 import { existsSync, lstatSync, readFileSync, realpathSync } from 'node:fs';
 import { isAbsolute, join, resolve } from 'node:path';
 import { DatabaseSync } from 'node:sqlite';
 import { pathToFileURL } from 'node:url';
+import { ActionController, AuthorizationAuthority } from '@shun/authorization';
+import { ShunStore, ShunStoreAuthorizationAdapter } from '@shun/store';
 import { activatePublicShunDomainApp } from '../../../../packages/domain-app/src/activation/public-sdk.ts';
 import {
   composeTrustedRuntimeBuild,
@@ -18,6 +20,12 @@ import { buildNeutralGoalRequest } from '../../../../packages/domain-computer/sr
 import type { HostGuidedService } from '../../../../packages/domain-host/src/guided/host-guided-service.ts';
 import { SqliteKernelDocStore } from '../../../../packages/domain-host/src/state/kernel-doc-store.ts';
 import {
+  resolveGrantHmacKeyFile,
+  writeCurrentAuthority,
+  writeGrantRecord,
+  writePlanRecord,
+} from '../../../../packages/executor-windows/src/trusted-store.ts';
+import {
   type HostSubmitReferenceIssueReceipt,
   SqliteHostSubmitReferenceLedger,
 } from './composition-approval.ts';
@@ -29,6 +37,12 @@ import {
   type JourneySubmits,
   loadStagedBindingModule,
 } from './composition-journeys.ts';
+import type { SelectedRootEffectHostPort } from './folder-selection-host.ts';
+import {
+  createGuidedReviewApprovalPort,
+  createSelectedRootEffectSubmit,
+  type SelectedRootEffectSubmitReceipt,
+} from './selected-root-effect-flow.ts';
 
 /** The frozen T04 interpreter port the trusted binding consumes. */
 export interface TrustedLlmInterpreterPort {
@@ -53,7 +67,7 @@ export interface ProductionV03Config {
   readonly deploymentRoot: string;
   readonly tenantId: string;
   readonly deployedAppId: string;
-  readonly selectedCase: Pick<HostGuidedService, 'state'>;
+  readonly selectedCase: Pick<HostGuidedService, 'state' | 'readTrustedContext'>;
   readonly llm: ProductionLlmConfig;
   /**
    * Durable SQLite file of the Host-issued submit-reference ledger. The
@@ -68,6 +82,23 @@ export interface ProductionV03Config {
    * real binding configuration here — the boot fails closed otherwise.
    */
   readonly journeys?: JourneyBindingsConfig;
+  /**
+   * U05-B2 — the trusted selected-root Host for the one-slice effect flow.
+   * Present only with the folder-selection composition; the flow is otherwise
+   * unavailable and its route answers 503, never a fabricated success.
+   */
+  readonly folderSelection?: SelectedRootEffectHostPort;
+  /**
+   * U05-B2 — operator-pinned executor authority store + durable ShunStore
+   * policy database + separated secrets for the REAL ActionController R2
+   * stack. Absent = no selected-root effect admission; never a fallback.
+   */
+  readonly selectedRootEffect?: {
+    readonly authorityDir: string;
+    readonly policyDatabaseFile: string;
+    readonly issuanceSecret: string;
+    readonly integritySecret: string;
+  };
   /** Trusted clock override (tests); admission decisions never use HTTP time. */
   readonly now?: () => number;
 }
@@ -292,6 +323,12 @@ export async function createProductionV03Gateway(config: ProductionV03Config): P
   };
   subjectDigest: string;
   /**
+   * U05-B2 — the trusted one-shot selected-root effect admission over the
+   * REAL ActionController R2 stack and the selected K. Present only with the
+   * explicit operator authority-store configuration; never HTTP-configurable.
+   */
+  selectedRootEffect?: (raw: unknown) => Promise<SelectedRootEffectSubmitReceipt>;
+  /**
    * Trusted process-side issuance of the submit-reference pair for the one
    * live Guided Case step. Never exposed through HTTP: an API client can
    * submit WITH issued references but can never mint one.
@@ -449,6 +486,9 @@ export async function createProductionV03Gateway(config: ProductionV03Config): P
   const references = new SqliteHostSubmitReferenceLedger(config.approvalLedgerFile, now);
   const store = new SqliteKernelDocStore(config.kDocDatabaseFile);
   let attemptCounter = 0;
+  // Declared before the try so both the dispose path and the activation
+  // failure path close the authority store deterministically.
+  let selectedRootEffect: SelectedRootEffectAdmission | undefined;
   try {
     const activated = await activatePublicShunDomainApp({
       sdk: { buildV10App: buildSdk.buildV10App, activateV10App: kernelSdk.activateV10App },
@@ -490,6 +530,16 @@ export async function createProductionV03Gateway(config: ProductionV03Config): P
         },
       },
     });
+    // U05-B2: the REAL ActionController R2 stack over the operator's durable
+    // ShunStore + executor authority store, built after activation so the K
+    // facade is the only send path. Configured only as an explicit operator
+    // decision; absent = the selected-root effect route answers 503.
+    selectedRootEffect = await buildSelectedRootEffectAdmission(
+      config,
+      now,
+      references,
+      (payload) => activated.facade.send(payload),
+    );
     return {
       subjectDigest: activated.subjectDigest,
       journeys: createJourneySubmits({
@@ -498,6 +548,7 @@ export async function createProductionV03Gateway(config: ProductionV03Config): P
         references,
         now,
       }),
+      selectedRootEffect: selectedRootEffect?.submit,
       providerGlobal: needsProvider
         ? await (async () => {
             // The SAME staged consumer module instance the sealed capability
@@ -669,11 +720,178 @@ export async function createProductionV03Gateway(config: ProductionV03Config): P
         activated.dispose();
         store.close();
         references.close();
+        selectedRootEffect?.close();
       },
     };
   } catch {
     store.close();
     references.close();
+    selectedRootEffect?.close();
     throw new Error('V03_PRODUCTION_ACTIVATION_REFUSED');
   }
+}
+
+/** U05-B2 policy identity of the selected-root R2 authority stack. */
+const SELECTED_ROOT_EFFECT_POLICY = 'shun.selected-root-effect.policy-v1';
+const SELECTED_ROOT_EFFECT_AUTHORITY_ID = 'shun.local.selected-root-effect';
+
+interface SelectedRootEffectAdmission {
+  readonly submit: (raw: unknown) => Promise<SelectedRootEffectSubmitReceipt>;
+  close(): void;
+}
+
+/**
+ * Assemble the REAL independent R2 stack for the selected-root effect flow:
+ * the existing ShunStore-backed AuthorizationAuthority + ActionController
+ * (bootstrap idempotently mirrors RealStorageControlBackend), the existing
+ * executor-windows trusted-store writers for the FilePlanSource /
+ * FileGrantSource / FileCurrentnessSource records the Windows effect Host
+ * binding reads at effect time, and the durable Guided approval adapter.
+ * The HMAC coherence check fails closed BEFORE any admission: the executor
+ * store's grant key must be the exact secret this stack signs with, so a
+ * mismatched/foreign authority store can never validate the issued grant.
+ */
+async function buildSelectedRootEffectAdmission(
+  config: ProductionV03Config,
+  now: () => number,
+  references: SqliteHostSubmitReferenceLedger,
+  facadeSend: (payload: unknown) => Promise<unknown>,
+): Promise<SelectedRootEffectAdmission | undefined> {
+  const effect = config.selectedRootEffect;
+  if (effect === undefined) return undefined;
+  if (
+    !config.folderSelection ||
+    !isAbsolute(effect.authorityDir) ||
+    !isAbsolute(effect.policyDatabaseFile) ||
+    !effect.issuanceSecret ||
+    !effect.integritySecret ||
+    effect.issuanceSecret === effect.integritySecret
+  ) {
+    throw new Error('V03_SELECTED_ROOT_EFFECT_CONFIG_REFUSED');
+  }
+  const clock = (): string => new Date(now()).toISOString();
+  const store = new ShunStore({ file: effect.policyDatabaseFile });
+  const adapter = new ShunStoreAuthorizationAdapter(store);
+  const authority = new AuthorizationAuthority({
+    state: adapter,
+    grants: adapter,
+    integritySecret: effect.integritySecret,
+    issuanceSecret: effect.issuanceSecret,
+    clock,
+    // The frozen K→C effect payload grammar (t11/effect-host SAFE_ID) and
+    // the executor FileGrantSource lookup both require a letter-first
+    // bounded grant identity; the authority's default randomUUID() can
+    // start with a digit and would be structurally refused at the effect
+    // boundary. Mint grammar-coherent grant ids here.
+    newGrantId: () => `grant-${randomUUID()}`,
+  });
+  try {
+    const oldAuthority = await adapter.loadAuthorityRecord();
+    const oldPolicy = await adapter.loadCurrentPolicy();
+    if (oldAuthority === null && oldPolicy === null && !(await adapter.hasAnyGrant())) {
+      const inserted = await adapter.compareAndSaveAuthorityRecord(
+        {
+          authorityId: SELECTED_ROOT_EFFECT_AUTHORITY_ID,
+          authorityRevision: 'r1',
+          updatedAt: clock(),
+          policyInitialized: true,
+          priorAuthorityRevisions: [],
+        },
+        null,
+      );
+      if (!inserted) throw new Error('SELECTED_ROOT_EFFECT_AUTHORITY_INIT_RACE');
+      const policyInserted = await adapter.compareAndSavePolicySnapshot(
+        {
+          policySnapshotRevision: SELECTED_ROOT_EFFECT_POLICY,
+          status: 'ACTIVE',
+          authorityId: SELECTED_ROOT_EFFECT_AUTHORITY_ID,
+          authorityRevision: 'r1',
+          revokedGrantIds: [],
+          priorRevisions: [],
+          rules: [],
+          riskGuards: [],
+          updatedAt: clock(),
+        },
+        null,
+      );
+      if (!policyInserted) throw new Error('SELECTED_ROOT_EFFECT_POLICY_INIT_RACE');
+    } else if (oldAuthority === null || oldPolicy === null) {
+      throw new Error('SELECTED_ROOT_EFFECT_PARTIAL_AUTHORITY_REFUSED');
+    }
+    const current = await authority.currentAuthority();
+    if (current.kind !== 'CURRENT' || current.policyStatus !== 'ACTIVE') {
+      throw new Error('SELECTED_ROOT_EFFECT_CURRENT_AUTHORITY_UNRESOLVABLE');
+    }
+  } catch (error) {
+    store.close();
+    throw error instanceof Error ? error : new Error('SELECTED_ROOT_EFFECT_AUTHORITY_REFUSED');
+  }
+  const plansDir = join(effect.authorityDir, 'plans');
+  const grantsDir = join(effect.authorityDir, 'grants');
+  const hmacKeyFile = resolveGrantHmacKeyFile(effect.authorityDir);
+  // The authority signs with the RAW integrity secret as the HMAC key; the
+  // executor store's verifier decodes the key file as BASE64 key material —
+  // so the provisioned file must be exactly base64(integritySecret). A
+  // foreign/rewritten/mismatched key file refuses every admission BEFORE any
+  // R2 route runs (the effect boundary would otherwise reject the grant).
+  const expectedKeyFileContent = Buffer.from(effect.integritySecret, 'utf8').toString('base64');
+  let hmacKeyCoherent = false;
+  try {
+    hmacKeyCoherent = readFileSync(hmacKeyFile, 'utf8').trim() === expectedKeyFileContent;
+  } catch {
+    hmacKeyCoherent = false;
+  }
+  const admission = createSelectedRootEffectSubmit({
+    host: config.folderSelection,
+    references,
+    facade: { send: facadeSend },
+    classifyJourneyKernelResult,
+    now,
+    authority: {
+      async authorizePlan({ plan, expect }) {
+        // The R2 approval adapter over the durable Guided ledger is bound
+        // per-admission to the exact Host-verified step facts; the
+        // ActionController itself remains the only R2 authority.
+        const controller = new ActionController({
+          authority,
+          policyState: adapter,
+          approvals: createGuidedReviewApprovalPort({
+            guided: config.selectedCase,
+            expect,
+          }),
+          issuanceSecret: effect.issuanceSecret,
+          clock,
+        });
+        const authorized = await controller.authorizePlan({ plan });
+        if (!authorized.ok) return authorized;
+        return {
+          ok: true,
+          plan: authorized.authorization.plan,
+          grants: authorized.authorization.grants,
+        };
+      },
+      async readCurrentAuthority() {
+        const state = await authority.currentAuthority();
+        if (state.kind !== 'CURRENT') {
+          throw new Error('SELECTED_ROOT_EFFECT_CURRENT_AUTHORITY_UNRESOLVABLE');
+        }
+        return state;
+      },
+      // Plans are formed under the bootstrapped ACTIVE policy revision; if
+      // the durable policy ever moves, the real controller refuses the
+      // admission (stale-policy re-plan) — never a silent downgrade.
+      policySnapshotRevision: () => SELECTED_ROOT_EFFECT_POLICY,
+      writePlanRecord: (plan) => writePlanRecord(plansDir, plan),
+      writeGrantRecord: (grant) => writeGrantRecord(grantsDir, grant),
+      writeCurrentAuthority: (state) => writeCurrentAuthority(effect.authorityDir, state),
+      hasPlanRecord: (planHash) =>
+        existsSync(join(plansDir, `${planHash}.json`)) &&
+        !lstatSync(join(plansDir, `${planHash}.json`)).isSymbolicLink(),
+      hmacKeyCoherent: () => hmacKeyCoherent,
+    },
+  });
+  return {
+    submit: admission,
+    close: () => store.close(),
+  };
 }
