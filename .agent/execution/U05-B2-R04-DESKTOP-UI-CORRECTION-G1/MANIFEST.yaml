@@ -1,0 +1,70 @@
+pack_id: shun-v030-u05-b2-r04-real-desktop-ui-g1
+task_id: U05-B2-R04-DESKTOP-UI-CORRECTION
+issue: '#398'
+parent_issue: '#390'
+product_issue: '#380'
+repo: kaicreator-mm/shun-assistant
+version: v0.3.0
+standard_revision: 326aaf5b0188b53cb0ed5c38752a9e299e3f9efd
+delivery_principle: ADS_1359_DELIVERY_FIRST_DISJOINT_UI_LANE
+pack_revision: 1
+claim_generation: 1
+owner_authorization: 'Owner conversational instruction continue v0.3.0, repair blockers; #398 is a mandatory P1 correction, not new feature'
+protected_claim_key: 'kaicreator-mm/shun-assistant#398:builder:__default__'
+dependencies:
+  product: '#380'
+  parent_u05b: '#390'
+  backend_source: 'PR #397 HEAD 7fcc5a9a815762e1bfd1df281dc868f63d0b9f39 BLOCK_P1, review 5818136974'
+  missing_transition: '#397 P1-02; backend adds explicit POST /api/v03/guided/plan-preview'
+  no_new_native_dag_outcome: true
+pack_base:
+  branch: wip/v0.3.0-r02-owner-repairs
+  sha: efa1c6fbf84c7b91284109b00a6a88b6a65e5e0d
+  tree: 85ecb3776c52f71677abfcfe66b90949cacdbf1f
+  contract: 'Single manifest commit directly parented to exact WIP; source JIT starts here if backend source remains disjoint; integrate only after #397 repaired and merged.'
+execution:
+  profile: WEB_PRIMARY_BUILDER_SINGLE_WRITER
+  source_branch: JIT_only_task/v0.3.0-u05-b2-r04-real-desktop-ui-g1
+  integration_target: wip/v0.3.0-r02-owner-repairs
+  source_write_gate: 'exact Pack CI terminal SUCCESS; independent Pack review; generation1 legitimate CAS DISPATCH_CLAIMED; disjoint writer inventory'
+  reviewer: DISTINCT_FROM_SOURCE_WRITER
+  local_builder_required: false
+  standalone_validation: forbidden
+authoring_write_set:
+  - .agent/execution/U05-B2-R04-DESKTOP-UI-CORRECTION-G1/MANIFEST.yaml
+allowed_write_set:
+  - apps/control-ui/public/v03/desktop.js
+  - apps/control-ui/public/v03/index.html
+  - apps/control-ui/test/selected-root-r04-desktop.test.ts
+write_set_exclusions:
+  - apps/control-ui/public/v03/app.js
+  - apps/control-api/src/server.ts
+  - apps/control-api/src/v03/guided-route.ts
+  - apps/control-api/src/v03/folder-selection-route.ts
+  - apps/control-api/src/v03/folder-selection-host.ts
+  - apps/control-api/src/v03/selected-root-effect-flow.ts
+  - tests/integration/v03/t11-runtime/server-v03-gateway.test.ts
+acceptance:
+  - 'Production v03/index.html script is desktop.js, NOT the unused app.js. Implement only in real R04 entrypoint.'
+  - 'After current INSPECT metadata GET succeeds, the desktop explicitly POSTs /api/v03/guided/plan-preview empty request to continue to existing REVIEW_EFFECT; GET remains non-mutating. No effect, grant or Permit minted.'
+  - 'On current REVIEW_EFFECT, display concrete selected-root effect descriptor from GET /api/v03/effect/proposal; operation, relativeTarget, expectedChange, collision/undo warning, risk, bytes. Output via textContent, never raw HTML. No private path or grant.'
+  - 'Enable Guided APPROVE only for exact current Case/step and a successfully fetched, nonexpired, complete concrete descriptor. Require explicit human consent; a B1 metadata-only review is not R2.'
+  - 'Approval and effect execution are distinct clicks. Exact Host-issued reference pair mandatory for POST /api/v03/effect/selected-root; no automatic action on refresh/approval. Browser never creates or derives canonical planHash/grant/Permit.'
+  - 'Only real COMPLETED outcome displays success; ADMITTED/REFUSED/UNKNOWN remain distinct. No blind retry on UNKNOWN.'
+  - 'Retain R04 existing navigation, bilingual text catalog, dynamic forms and flow; no new UI framework or second user journey.'
+negative_acceptance:
+  - 'Backend missing, stale/expired preview, Case/step switch, malformed descriptor, replay, no explicit checkbox, missing refs, approval denied, interrupted network all fail closed.'
+  - 'Never approve or execute based on the stale no-effect B1 preview alone.'
+test_contract:
+  - 'Focused tests assert real v03/index.html loads desktop.js and genuine desktop approval flow; regress current R04 folder picker/dynamic forms; no effect stubs may touch OS.'
+  - 'Node >=24 preflight syntax/Biome/TS before CI; focused Vitest and full affected workspace tests; exact SHA Woodpecker Push/PR and independent source review.'
+closeout:
+  - 'Issue #398 is mandatory P1 repair to #390 and carries NO additional core DAG progress. Close only after #397 backend is integrated and user-visible end-to-end test PASS. Parent U05 4/4 only after full independent audit and all blockers closed.'
+forbidden:
+  - create_second_planner_kernel_approval_ledger
+  - switch_index_to_legacy_app_js
+  - touch_original_b2_writer_paths
+  - new_unauthorized_source_claim_or_overlap
+  - real_windows_effect_paid_cloud_or_external_disclosure
+  - production_programdata_uac_acl_changes
+  - version_main_tag_release_or_deploy
