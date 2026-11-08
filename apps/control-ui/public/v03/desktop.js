@@ -109,11 +109,15 @@ function rootReviewReady(){
  rootProposal?.identity===rootIdentity(currentModel)&&rootDescriptorValid(rootProposal.value)&&
  unresolvedStepId!==currentModel.stepId;
 }
+/** The only eligible APPROVE intent: the answers this submit would carry must include the required continue CHOICE as the approval continuation — never blank, never the back-semantics option. */
+function rootApprovalIntentChosen(){
+ return formAnswers().some(a=>a.fieldId==='continue'&&a.value==='continue-to-independent-approval');
+}
 function syncRootReview(){
  if(currentModel?.templateId!=='shun.guided.review-plan')return;
  const checkbox=rootConfirmBox;
  if(checkbox)checkbox.disabled=!rootReviewReady();
- $('step-submit').disabled=!rootReviewReady()||!checkbox?.checked||busy;
+ $('step-submit').disabled=!rootReviewReady()||!rootApprovalIntentChosen()||!checkbox?.checked||busy;
 }
 async function fetchRootProposal(model){
  const identity=rootIdentity(model),generation=++rootEpoch;
@@ -322,6 +326,7 @@ function renderGuided() {
     if(!display){currentModel=null;fields.replaceChildren();alert.textContent=tr('formUnavailable');alert.hidden=false;return;}
     const el=document.createElement('option');el.value=option.id;el.textContent=display;select.append(el);
    }
+   select.addEventListener('change',syncRootReview);
    block.append(label,select);
   } else if (field.type==='CONFIRM') {
    const input=document.createElement('input');input.type='checkbox';input.id=label.htmlFor;input.name=field.id;
@@ -418,7 +423,7 @@ async function submitDecision(decision) {
  if (decision==='ANSWER' && currentModel.templateId==='shun.guided.select-root' && !folderSelectionFor(currentModel)) {
   notify(tr('folderNeedSelection'));return;
  }
- if(decision==='APPROVE'&&(!rootReviewReady()||!rootConfirmBox?.checked)){notify(rootWord('missing'));return;}
+ if(decision==='APPROVE'&&(!rootReviewReady()||!rootApprovalIntentChosen()||!rootConfirmBox?.checked)){notify(rootWord('missing'));return;}
  const form=$('dynamic-form');
  if (decision==='ANSWER' && !form.reportValidity())return;
  const built=buildStepOutcome({step:current,answers:formAnswers(),sourceRef:'ui:shun-r04-desktop',occurredAtUnixMs:Date.now()});

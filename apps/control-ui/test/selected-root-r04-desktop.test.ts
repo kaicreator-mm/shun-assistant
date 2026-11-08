@@ -26,6 +26,21 @@ describe('R04 real desktop selected-root effect', () => {
     expect(ui).toContain('rootConfirmBox=checkbox');
     expect(ui).toContain("checkbox.addEventListener('change',syncRootReview)");
   });
+  it('the APPROVE gate requires the approval continuation choice — never the blank or the back-semantics option', () => {
+    // Final-audit P1: a `return-to-edit` selection plus the checked
+    // confirmation used to still mint the APPROVE terminal (the backend
+    // accepts any eligible option id). The desktop gate now refuses to
+    // submit APPROVE unless the required continue CHOICE explicitly carries
+    // the approval continuation, and the submit button stays disabled until
+    // that intent is chosen.
+    expect(ui).toContain('function rootApprovalIntentChosen(){');
+    expect(ui).toContain("a.fieldId==='continue'&&a.value==='continue-to-independent-approval'");
+    expect(ui).toContain('!rootApprovalIntentChosen()||!rootConfirmBox?.checked');
+    expect(ui).toContain(
+      '!rootReviewReady()||!rootApprovalIntentChosen()||!checkbox?.checked||busy',
+    );
+    expect(ui).toContain("select.addEventListener('change',syncRootReview)");
+  });
 
   it('effect is a separate button, one attempt only, no fabricated completed outcome', () => {
     expect(html).toContain('id="root-effect-panel"');
