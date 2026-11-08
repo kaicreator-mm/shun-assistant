@@ -82,6 +82,90 @@ let clarificationBusy = false;
 let clarificationUnresolvedId = storage.read('shun-r04-clarification-uncertain') || null;
 let unresolvedStepId = null;
 const submitted = [];
+
+/** B2 R04: Host-proven proposal and separate explicit effect, never browser authority. */
+let rootProposal=null,rootEpoch=0,rootApproved=null,rootSent=false,rootSending=false;
+const rootWords={
+ en:{loading:'Reading exact folder change…',missing:'No verifiable exact plan; approval unavailable.',confirm:'I reviewed this exact file change, collision rule and undo limits.',approve:'Approve exact change',run:'Run approved change',hint:'Approval does not run the action. Paste the two Host-issued references to execute once.',currentness:'Currentness reference',approval:'Approval reference',complete:'Verified completed',admitted:'Admitted, not yet verified',refused:'Refused; no success',unknown:'Unknown outcome. Do not retry until reconciled.'},
+ zh:{loading:'正在读取文件夹具体修改计划…',missing:'无法核验操作计划，不能审批。',confirm:'我已核对具体文件、同名文件拒绝规则和撤销限制。',approve:'批准本次操作',run:'执行已批准操作',hint:'批准不会立即执行。输入 Host 提供的两项引用并单独点击一次执行。',currentness:'当前状态引用',approval:'审批引用',complete:'已核实完成',admitted:'已受理，尚未核实完成',refused:'已拒绝，不能视为成功',unknown:'结果未知，核对前不得重试。'}};
+const rootWord=k=>rootWords[locale]?.[k]??rootWords.en[k]??k;
+const rootRef=/^shun\.(currentness|approval)\.v1\/[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$/;
+const rootIdentity=m=>JSON.stringify([m?.taskId,m?.journeyId,m?.stepId,m?.caseRef]);
+function rootDescriptorValid(p){
+ return p&&typeof p==='object'&&!Array.isArray(p)&&
+ Object.keys(p).sort().join('|')===['schema','operation','relativeTarget','expectedChange','undo','risk','sizeBytes','evidenceRevision','expiresAtUnixMs','executionAuthorized'].sort().join('|')&&
+ p.schema==='shun.host.selected-root-effect-descriptor.v1'&&p.operation==='windows.fs.write'&&
+ p.relativeTarget==='shun-folder-journal.json'&&p.risk==='R2'&&p.executionAuthorized===false&&
+ typeof p.expectedChange==='string'&&p.expectedChange.length>0&&p.expectedChange.length<=500&&
+ typeof p.undo==='string'&&p.undo.length>0&&p.undo.length<=500&&
+ typeof p.evidenceRevision==='string'&&p.evidenceRevision.length>0&&p.evidenceRevision.length<=128&&
+ Number.isSafeInteger(p.sizeBytes)&&p.sizeBytes>=0&&p.sizeBytes<=65536&&
+ Number.isSafeInteger(p.expiresAtUnixMs)&&p.expiresAtUnixMs>Date.now();
+}
+function rootReviewReady(){
+ return currentModel?.kind==='REVIEW_EFFECT'&&currentModel.templateId==='shun.guided.review-plan'&&
+ rootProposal?.identity===rootIdentity(currentModel)&&rootDescriptorValid(rootProposal.value)&&
+ unresolvedStepId!==currentModel.stepId;
+}
+function syncRootReview(){
+ if(currentModel?.templateId!=='shun.guided.review-plan')return;
+ const checkbox=$('root-confirm');
+ if(checkbox)checkbox.disabled=!rootReviewReady();
+ $('step-submit').disabled=!rootReviewReady()||!checkbox?.checked||busy;
+}
+async function fetchRootProposal(model){
+ const identity=rootIdentity(model),generation=++rootEpoch;
+ try{
+  const descriptor=await request('/api/v03/effect/proposal');
+  if(generation!==rootEpoch||rootIdentity(currentModel)!==identity||!rootDescriptorValid(descriptor))return;
+  rootProposal={identity,value:descriptor};
+  set('root-detail',descriptor.operation+' → '+descriptor.relativeTarget+' · '+descriptor.expectedChange+
+   ' · R2 · '+descriptor.sizeBytes+' B · '+descriptor.undo);
+ }catch{
+  if(generation!==rootEpoch||rootIdentity(currentModel)!==identity)return;
+  rootProposal=null;set('root-detail',rootWord('missing'));
+ }
+ syncRootReview();
+}
+function drawRootReview(model,container){
+ if(rootProposal?.identity!==rootIdentity(model))rootProposal=null;
+ const detail=document.createElement('p');detail.id='root-detail';detail.textContent=rootWord('loading');
+ const label=document.createElement('label');label.className='choice';
+ const checkbox=document.createElement('input');checkbox.id='root-confirm';checkbox.type='checkbox';
+ checkbox.checked=false;checkbox.disabled=true;checkbox.addEventListener('change',syncRootReview);
+ label.append(checkbox,document.createTextNode(rootWord('confirm')));
+ container.append(detail,label);$('step-submit').textContent=rootWord('approve');
+ if(rootProposal?.value&&rootDescriptorValid(rootProposal.value)){
+  detail.textContent=rootProposal.value.operation+' → '+rootProposal.value.relativeTarget+
+  ' · '+rootProposal.value.expectedChange+' · '+rootProposal.value.undo;
+  syncRootReview();
+ }else void fetchRootProposal(model);
+}
+function syncRootEffect(){
+ const panel=$('root-effect-panel');if(!panel)return;
+ const accepted=!!rootApproved&&lastState?.history?.some(h=>h.stepId===rootApproved.stepId&&h.status==='ACCEPTED');
+ panel.hidden=!accepted;$('root-effect-run').disabled=!accepted||rootSent||rootSending;
+}
+async function sendRootEffect(){
+ if(!rootApproved||rootSent||rootSending)return;
+ const currentnessRef=$('root-currentness-ref').value.trim();
+ const approvalRef=$('root-approval-ref').value.trim();
+ if(!rootRef.test(currentnessRef)||!currentnessRef.startsWith('shun.currentness.v1/')||
+ !rootRef.test(approvalRef)||!approvalRef.startsWith('shun.approval.v1/')){
+  set('root-effect-status',rootWord('refused'));return;
+ }
+ rootSent=true;rootSending=true;syncRootEffect();
+ try{
+  const receipt=await request('/api/v03/effect/selected-root',{method:'POST',
+   headers:{'content-type':'application/json'},
+   body:JSON.stringify({caseId:rootApproved.caseId,currentnessRef,approvalRef})});
+  const status=receipt?.status;
+  set('root-effect-status',rootWord(status==='COMPLETED'?'complete':
+   status==='ADMITTED'?'admitted':status==='REFUSED'?'refused':'unknown'));
+ }catch(e){
+  set('root-effect-status',rootWord(e?.receipt?.status==='REFUSED'?'refused':'unknown'));
+ }finally{rootSending=false;syncRootEffect();}
+}
 const $ = id => document.getElementById(id);
 const tr = key => (words[locale] && words[locale][key]) || words.en[key] || key;
 function stepText(key) {
@@ -94,6 +178,9 @@ function translate() {
  for (const node of document.querySelectorAll('[data-i18n]')) node.textContent = tr(node.dataset.i18n);
  for (const node of document.querySelectorAll('[data-placeholder]')) node.placeholder = tr(node.dataset.placeholder);
  for (const node of document.querySelectorAll('[data-aria-label]')) node.setAttribute('aria-label',tr(node.dataset.ariaLabel));
+ set('root-effect-title',rootWord('run'));set('root-effect-note',rootWord('hint'));
+ set('root-currentness-label',rootWord('currentness'));
+ set('root-approval-label',rootWord('approval'));set('root-effect-run',rootWord('run'));
  $('language').value = locale;
  $('appearance').value = document.documentElement.dataset.theme || 'system';
  for (const label of document.querySelectorAll('[data-page]')) {
@@ -156,7 +243,7 @@ async function refresh() {
   current=state?.currentStep || null;
   if (current && unresolvedStepId!==current.stepId) unresolvedStepId=null;
   if (!connected) notify(tr('unavailable'));
-  translate();
+  translate();syncRootEffect();
  } catch (error) {
   if(generation!==guidedRefreshGeneration)return;
   connected=false; current=null; lastState=null; showError(error);translate();
@@ -202,7 +289,7 @@ function renderGuided() {
  currentModel=model;updateFolderContext(model);
  set('home-task-summary',trustedTitle);
  set('step-title',trustedTitle);
- set('step-description',model.requiresExplicitApproval?tr('previewMissing'):tr('notAnApproval'));
+ set('step-description',model.requiresExplicitApproval&&model.templateId!=='shun.guided.review-plan'?tr('previewMissing'):tr('notAnApproval'));
  set('step-status',tr('ready'));
  set('scope-summary',lastState?.scope?.status==='KNOWN'?tr('scopeReady'):tr('scopeUnknown'));
  if(model.templateId==='shun.guided.select-root'){
@@ -251,14 +338,16 @@ function renderGuided() {
   }
  }
  const isReview=model.kind==='REVIEW_EFFECT';
+ const rootReview=isReview&&model.templateId==='shun.guided.review-plan';
  $('step-submit').hidden=model.kind==='INSPECT';
  $('step-submit').disabled=model.kind!=='ASK'||!progressReady||unresolvedStepId===model.stepId||
   (model.templateId==='shun.guided.select-root'&&!folderSelectionFor(model));
  $('step-submit').textContent=tr('continue');
  if(model.templateId==='shun.guided.inspect-scope')loadFolderObservation(model).catch(showError);
  $('step-refuse').disabled=false;
- set('approval-hint',isReview?tr('previewMissing'):tr('formUnavailable'));
- if (isReview) { alert.textContent=tr('previewMissing');alert.hidden=false; }
+ set('approval-hint',rootReview?rootWord('confirm'):isReview?tr('previewMissing'):tr('formUnavailable'));
+ if(rootReview)drawRootReview(model,container);
+ else if(isReview){alert.textContent=tr('previewMissing');alert.hidden=false;}
  if(!progressReady){alert.textContent=tr('progressNotActionable');alert.hidden=false;}
  if (unresolvedStepId===model.stepId) {alert.textContent=tr('unknownHold');alert.hidden=false;}
 }
@@ -326,7 +415,7 @@ async function submitDecision(decision) {
  if (decision==='ANSWER' && currentModel.templateId==='shun.guided.select-root' && !folderSelectionFor(currentModel)) {
   notify(tr('folderNeedSelection'));return;
  }
- if (decision==='APPROVE') {notify(tr('previewMissing'));return;}
+ if(decision==='APPROVE'&&(!rootReviewReady()||!$('root-confirm')?.checked)){notify(rootWord('missing'));return;}
  const form=$('dynamic-form');
  if (decision==='ANSWER' && !form.reportValidity())return;
  const built=buildStepOutcome({step:current,answers:formAnswers(),sourceRef:'ui:shun-r04-desktop',occurredAtUnixMs:Date.now()});
@@ -343,7 +432,11 @@ async function submitDecision(decision) {
  try{
   const receipt=await request('/api/v03/guided/decision',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify(relay.relay)});
   if(guidedReceiptStatus(200,receipt)!=='RECORDED')throw Error('GUIDED_OUTCOME_UNKNOWN');
-  submitted.push(replay.key);unresolvedStepId=null;selectedFolderSelection=null;folderStatusMessage=null;folderStatusStepId=null;notify(tr('recorded'));await refresh();
+  submitted.push(replay.key);unresolvedStepId=null;selectedFolderSelection=null;folderStatusMessage=null;
+  if(decision==='APPROVE'){
+   rootApproved={caseId:currentModel.taskId,stepId:submittedStepId};rootSent=false;rootSending=false;
+  }
+  notify(tr('recorded'));await refresh();
  }catch(error){
   const outcome=guidedReceiptStatus(error?.status,error?.receipt);
   if(outcome==='REFUSED')notify(tr('refused'));
@@ -425,8 +518,17 @@ async function loadFolderObservation(model,force=false){
   if(generation!==folderObservationGeneration||currentModel?.stepId!==model.stepId)return;
   if(projected.status==='OBSERVED'){
    renderFolderObservation(target,projected);folderStatusMessage=tr('folderReadOnly');updateFolderContext(model);
-   const after=await request('/api/v03/guided/state');
-   if(after?.currentStep?.stepId!==model.stepId){lastState=after;current=after?.currentStep||null;renderGuided();}
+   if(generation!==folderObservationGeneration||currentModel?.stepId!==model.stepId)return;
+   // Metadata GET is read-only; stage the reviewed plan by an explicit POST.
+   try{
+    const staged=await request('/api/v03/guided/plan-preview',{method:'POST',headers:{'content-type':'application/json'},body:'{}'});
+    if(staged?.status!=='STAGED')throw Error('ROOT_REVIEW_STAGE_UNKNOWN');
+    if(generation===folderObservationGeneration)await refresh();
+   }catch{
+    if(generation!==folderObservationGeneration)return;
+    await refresh(); // uncertain POST: read state rather than blind retry
+    if(currentModel?.templateId==='shun.guided.inspect-scope')notify(rootWord('missing'));
+   }
   }else if(projected.status==='NOT_SELECTED'){
    folderStatusMessage=tr('folderNotSelected');set('folder-summary',folderStatusMessage);
   }else{
@@ -979,7 +1081,10 @@ $('folder-select').addEventListener('click',()=>selectFolderForCurrentStep().cat
 $('folder-observation-refresh').addEventListener('click',()=>{
  if(currentModel?.templateId==='shun.guided.inspect-scope')loadFolderObservation(currentModel,true).catch(showError);
 });
-$('dynamic-form').addEventListener('submit',event=>{event.preventDefault();submitDecision('ANSWER').catch(showError);});
+$('dynamic-form').addEventListener('submit',event=>{
+ event.preventDefault();submitDecision(currentModel?.templateId==='shun.guided.review-plan'?'APPROVE':'ANSWER').catch(showError);
+});
+$('root-effect-run').addEventListener('click',()=>sendRootEffect().catch(showError));
 // Back is local navigation; it neither refuses a Host case nor grants execution.
 $('step-refuse').addEventListener('click',()=>page('home'));
 function filterActions(){
