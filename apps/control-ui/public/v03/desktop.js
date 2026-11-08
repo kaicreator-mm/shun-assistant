@@ -85,9 +85,11 @@ const submitted = [];
 
 /** B2 R04: Host-proven proposal and separate explicit effect, never browser authority. */
 let rootProposal=null,rootEpoch=0,rootApproved=null,rootSent=false,rootSending=false;
+/** The review-step confirmation checkbox is created per render inside #step-container; the module keeps the live reference so no literal DOM lookup is needed for it. */
+let rootConfirmBox=null;
 const rootWords={
- en:{loading:'Reading exact folder change…',missing:'No verifiable exact plan; approval unavailable.',confirm:'I reviewed this exact file change, collision rule and undo limits.',approve:'Approve exact change',run:'Run approved change',hint:'Approval does not run the action. Paste the two Host-issued references to execute once.',currentness:'Currentness reference',approval:'Approval reference',complete:'Verified completed',admitted:'Admitted, not yet verified',refused:'Refused; no success',unknown:'Unknown outcome. Do not retry until reconciled.'},
- zh:{loading:'正在读取文件夹具体修改计划…',missing:'无法核验操作计划，不能审批。',confirm:'我已核对具体文件、同名文件拒绝规则和撤销限制。',approve:'批准本次操作',run:'执行已批准操作',hint:'批准不会立即执行。输入 Host 提供的两项引用并单独点击一次执行。',currentness:'当前状态引用',approval:'审批引用',complete:'已核实完成',admitted:'已受理，尚未核实完成',refused:'已拒绝，不能视为成功',unknown:'结果未知，核对前不得重试。'}};
+ en:{loading:'Reading exact folder change…',missing:'No verifiable exact plan; approval unavailable.',confirm:'I reviewed this exact file change, collision rule and undo limits.',approve:'Approve exact change',run:'Run approved change',hint:'Approval does not run the action. Paste the two references printed by the local service console to execute once.',currentness:'Currentness reference',approval:'Approval reference',complete:'Verified completed',admitted:'Admitted, not yet verified',refused:'Refused; no success',unknown:'Unknown outcome. Do not retry until reconciled.'},
+ zh:{loading:'正在读取文件夹具体修改计划…',missing:'无法核验操作计划，不能审批。',confirm:'我已核对具体文件、同名文件拒绝规则和撤销限制。',approve:'批准本次操作',run:'执行已批准操作',hint:'批准不会立即执行。输入本机服务控制台提供的两项引用，并单独点击一次执行。',currentness:'当前状态引用',approval:'审批引用',complete:'已核实完成',admitted:'已受理，尚未核实完成',refused:'已拒绝，不能视为成功',unknown:'结果未知，核对前不得重试。'}};
 const rootWord=k=>rootWords[locale]?.[k]??rootWords.en[k]??k;
 const rootRef=/^shun\.(currentness|approval)\.v1\/[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$/;
 const rootIdentity=m=>JSON.stringify([m?.taskId,m?.journeyId,m?.stepId,m?.caseRef]);
@@ -109,7 +111,7 @@ function rootReviewReady(){
 }
 function syncRootReview(){
  if(currentModel?.templateId!=='shun.guided.review-plan')return;
- const checkbox=$('root-confirm');
+ const checkbox=rootConfirmBox;
  if(checkbox)checkbox.disabled=!rootReviewReady();
  $('step-submit').disabled=!rootReviewReady()||!checkbox?.checked||busy;
 }
@@ -133,6 +135,7 @@ function drawRootReview(model,container){
  const label=document.createElement('label');label.className='choice';
  const checkbox=document.createElement('input');checkbox.id='root-confirm';checkbox.type='checkbox';
  checkbox.checked=false;checkbox.disabled=true;checkbox.addEventListener('change',syncRootReview);
+ rootConfirmBox=checkbox;
  label.append(checkbox,document.createTextNode(rootWord('confirm')));
  container.append(detail,label);$('step-submit').textContent=rootWord('approve');
  if(rootProposal?.value&&rootDescriptorValid(rootProposal.value)){
@@ -260,7 +263,7 @@ function renderGuided() {
  const previousModel=currentModel;
  const previousAnswers=previousModel?formAnswers():[];
  const form=$('dynamic-form'), fields=$('form-fields'), container=$('step-container'), alert=$('step-alert');
- form.hidden=true; fields.replaceChildren(); container.replaceChildren();alert.hidden=true;currentModel=null;
+ form.hidden=true; fields.replaceChildren(); container.replaceChildren();alert.hidden=true;currentModel=null;rootConfirmBox=null;
  const progress=progressModel(lastState?.journey,locale);
  const progressReady=progress.ok&&progress.status==='RUNNING';
  set('step-progress',current&&progress.ok?
@@ -415,7 +418,7 @@ async function submitDecision(decision) {
  if (decision==='ANSWER' && currentModel.templateId==='shun.guided.select-root' && !folderSelectionFor(currentModel)) {
   notify(tr('folderNeedSelection'));return;
  }
- if(decision==='APPROVE'&&(!rootReviewReady()||!$('root-confirm')?.checked)){notify(rootWord('missing'));return;}
+ if(decision==='APPROVE'&&(!rootReviewReady()||!rootConfirmBox?.checked)){notify(rootWord('missing'));return;}
  const form=$('dynamic-form');
  if (decision==='ANSWER' && !form.reportValidity())return;
  const built=buildStepOutcome({step:current,answers:formAnswers(),sourceRef:'ui:shun-r04-desktop',occurredAtUnixMs:Date.now()});

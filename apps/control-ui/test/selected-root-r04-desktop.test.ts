@@ -19,7 +19,11 @@ describe('R04 real desktop selected-root effect', () => {
   it('requires current exact Host proposal and explicit checked approval', () => {
     expect(ui).toContain("request('/api/v03/effect/proposal')");
     expect(ui).toContain('rootProposal?.identity===rootIdentity(currentModel)');
-    expect(ui).toContain("!$('root-confirm')?.checked");
+    // The confirmation checkbox is rendered per review step; the module-held
+    // live reference keeps the explicit checked-approval gate without a
+    // literal DOM lookup that the shipped HTML contract cannot satisfy.
+    expect(ui).toContain('!rootConfirmBox?.checked');
+    expect(ui).toContain('rootConfirmBox=checkbox');
     expect(ui).toContain("checkbox.addEventListener('change',syncRootReview)");
   });
 
@@ -43,5 +47,16 @@ describe('R04 real desktop selected-root effect', () => {
     expect(flow).not.toContain('planHash');
     expect(flow).not.toContain('permit');
     expect(flow).not.toContain('absolutePath');
+  });
+
+  it('every literal DOM lookup matches a shipped HTML element (CI #664/#665 regression fence)', () => {
+    const ids = [...html.matchAll(/\bid="([^"]+)"/g)].map((match) => match[1]);
+    expect(new Set(ids).size).toBe(ids.length);
+    const lookups = [...ui.matchAll(/\$\('([^']+)'\)/g)].map((match) => match[1]);
+    for (const id of lookups) expect(ids).toContain(id);
+  });
+
+  it('user-visible string values never contain the technical term Host (CI #664/#665 regression fence)', () => {
+    expect(ui).not.toMatch(/:\s*'[^']*\bHost\b[^']*'/i);
   });
 });
