@@ -88,10 +88,9 @@ let rootProposal=null,rootEpoch=0,rootApproved=null,rootSent=false,rootSending=f
 /** The review-step confirmation checkbox is created per render inside #step-container; the module keeps the live reference so no literal DOM lookup is needed for it. */
 let rootConfirmBox=null;
 const rootWords={
- en:{loading:'Reading exact folder change…',missing:'No verifiable exact plan; approval unavailable.',confirm:'I reviewed this exact file change, collision rule and undo limits.',approve:'Approve exact change',run:'Run approved change',hint:'Approval does not run the action. Paste the two references printed by the local service console to execute once.',currentness:'Currentness reference',approval:'Approval reference',complete:'Verified completed',admitted:'Admitted, not yet verified',refused:'Refused; no success',unknown:'Unknown outcome. Do not retry until reconciled.'},
- zh:{loading:'正在读取文件夹具体修改计划…',missing:'无法核验操作计划，不能审批。',confirm:'我已核对具体文件、同名文件拒绝规则和撤销限制。',approve:'批准本次操作',run:'执行已批准操作',hint:'批准不会立即执行。输入本机服务控制台提供的两项引用，并单独点击一次执行。',currentness:'当前状态引用',approval:'审批引用',complete:'已核实完成',admitted:'已受理，尚未核实完成',refused:'已拒绝，不能视为成功',unknown:'结果未知，核对前不得重试。'}};
+ en:{loading:'Reading exact folder change…',missing:'No verifiable exact plan; approval unavailable.',confirm:'I reviewed this exact file change, collision rule and undo limits.',approve:'Approve exact change',run:'Run approved change',hint:'Approval does not run the action. To run it, click Run once — the service verifies your approval itself.',complete:'Verified completed',admitted:'Admitted, not yet verified',refused:'Refused; no success',unknown:'Unknown outcome. Do not retry until reconciled.'},
+ zh:{loading:'正在读取文件夹具体修改计划…',missing:'无法核验操作计划，不能审批。',confirm:'我已核对具体文件、同名文件拒绝规则和撤销限制。',approve:'批准本次操作',run:'执行已批准操作',hint:'批准不会立即执行。确认执行请单独点击一次“执行”，服务会自行核验你的批准。',complete:'已核实完成',admitted:'已受理，尚未核实完成',refused:'已拒绝，不能视为成功',unknown:'结果未知，核对前不得重试。'}};
 const rootWord=k=>rootWords[locale]?.[k]??rootWords.en[k]??k;
-const rootRef=/^shun\.(currentness|approval)\.v1\/[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$/;
 const rootIdentity=m=>JSON.stringify([m?.taskId,m?.journeyId,m?.stepId,m?.caseRef]);
 function rootDescriptorValid(p){
  return p&&typeof p==='object'&&!Array.isArray(p)&&
@@ -155,17 +154,14 @@ function syncRootEffect(){
 }
 async function sendRootEffect(){
  if(!rootApproved||rootSent||rootSending)return;
- const currentnessRef=$('root-currentness-ref').value.trim();
- const approvalRef=$('root-approval-ref').value.trim();
- if(!rootRef.test(currentnessRef)||!currentnessRef.startsWith('shun.currentness.v1/')||
- !rootRef.test(approvalRef)||!approvalRef.startsWith('shun.approval.v1/')){
-  set('root-effect-status',rootWord('refused'));return;
- }
+ // U06 (#401): the second explicit click carries ONLY the approved Case
+ // identity — never reference strings, paths, plan hashes or authority
+ // material; the trusted Host resolves and verifies the pair it issued.
  rootSent=true;rootSending=true;syncRootEffect();
  try{
   const receipt=await request('/api/v03/effect/selected-root',{method:'POST',
    headers:{'content-type':'application/json'},
-   body:JSON.stringify({caseId:rootApproved.caseId,currentnessRef,approvalRef})});
+   body:JSON.stringify({caseId:rootApproved.caseId})});
   const status=receipt?.status;
   set('root-effect-status',rootWord(status==='COMPLETED'?'complete':
    status==='ADMITTED'?'admitted':status==='REFUSED'?'refused':'unknown'));
@@ -186,8 +182,7 @@ function translate() {
  for (const node of document.querySelectorAll('[data-placeholder]')) node.placeholder = tr(node.dataset.placeholder);
  for (const node of document.querySelectorAll('[data-aria-label]')) node.setAttribute('aria-label',tr(node.dataset.ariaLabel));
  set('root-effect-title',rootWord('run'));set('root-effect-note',rootWord('hint'));
- set('root-currentness-label',rootWord('currentness'));
- set('root-approval-label',rootWord('approval'));set('root-effect-run',rootWord('run'));
+ set('root-effect-run',rootWord('run'));
  $('language').value = locale;
  $('appearance').value = document.documentElement.dataset.theme || 'system';
  for (const label of document.querySelectorAll('[data-page]')) {

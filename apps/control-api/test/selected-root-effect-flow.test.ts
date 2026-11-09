@@ -28,7 +28,6 @@ import {
 } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, win32 } from 'node:path';
-import { DatabaseSync } from 'node:sqlite';
 import { ActionController, AuthorizationAuthority } from '@shun/authorization';
 import {
   ActionPlanSchema,
@@ -137,8 +136,12 @@ async function createFixture(
   options: {
     approved?: boolean;
     respond?: (sendCount: number) => unknown;
-    /** 'select-root' issues the boot-time pair for the live select-root step only. */
-    initialReference?: 'select-root' | 'review-step';
+    /**
+     * 'select-root' issues the boot-time pair for the live select-root step
+     * only; 'none' stages the review step with NO durable pair at all
+     * (pre-existing-issuance negative).
+     */
+    initialReference?: 'select-root' | 'review-step' | 'none';
   } = {},
 ): Promise<Fixture> {
   const directory = mkdtempSync(join(tmpdir(), 'shun-b2-effect-'));
@@ -322,7 +325,7 @@ async function createFixture(
   };
   const issueLiveReferences = (): HostSubmitReferenceIssueReceipt =>
     issueLiveStepSubmitReferences({ state: () => guided.state(), references, now: clock });
-  if (options.initialReference !== 'select-root') {
+  if (options.initialReference !== 'select-root' && options.initialReference !== 'none') {
     // Default: the review-step pair is minted right after the STAGED preview
     // (production order: staging → trusted issuance → human APPROVE), so the
     // pair's step is the live REVIEW_EFFECT step.
@@ -489,42 +492,19 @@ async function createFixture(
   };
 }
 
-function issuedRefs(fixture: Fixture): {
-  caseId: string;
-  currentnessRef: string;
-  approvalRef: string;
-} {
-  // Re-read the durable pair for the approved step from the ledger.
-  const db = new DatabaseSync(join(fixture.directory, 'submit-references.sqlite'), {
-    readOnly: true,
-  });
-  try {
-    const row = db
-      .prepare(
-        "SELECT case_id, currentness_ref, approval_ref FROM host_submit_references WHERE case_id=? AND state='CURRENT'",
-      )
-      .get(TASK) as { case_id: string; currentness_ref: string; approval_ref: string };
-    return {
-      caseId: row.case_id,
-      currentnessRef: row.currentness_ref,
-      approvalRef: row.approval_ref,
-    };
-  } finally {
-    db.close();
-  }
-}
-
 describe('U05-B2 selected-root effect vertical slice', () => {
   const cleanups: Array<() => void> = [];
   afterEach(() => {
     for (const cleanup of cleanups.splice(0)) cleanup();
   });
+  // U06 (#401): the ordinary journey body — Case identity only. The Host
+  // resolves the issued pair for the approved step inside the request scope.
+  const body = (): { caseId: string } => ({ caseId: TASK });
 
   it('completes the approved plan through the real R2 stack with a truthful COMPLETED projection', async () => {
     const fixture = await createFixture();
     cleanups.push(fixture.cleanup);
-    const refs = issuedRefs(fixture);
-    const receipt = await fixture.submit(refs);
+    const receipt = await fixture.submit(body());
     expect(receipt.status).toBe('COMPLETED');
     expect(receipt.sendCalls).toBe(1);
     expect(receipt.effect).toMatchObject({
@@ -637,8 +617,7 @@ describe('U05-B2 selected-root effect vertical slice', () => {
   it('refuses before any K send when the durable human approval is missing', async () => {
     const fixture = await createFixture({ approved: false });
     cleanups.push(fixture.cleanup);
-    const refs = issuedRefs(fixture);
-    const receipt = await fixture.submit(refs);
+    const receipt = await fixture.submit(body());
     expect(receipt).toMatchObject({
       status: 'REFUSED',
       code: 'SELECTED_ROOT_EFFECT_APPROVAL_REQUIRED',
@@ -646,10 +625,10 @@ describe('U05-B2 selected-root effect vertical slice', () => {
     });
   });
 
-  it('P1-LIVE-REFS: the boot-time SELECT_ROOT pair never authorizes the later REVIEW_EFFECT step; the post-staging live pair does', async () => {
+  it('U06: production order — the staging-time live pair for the REVIEW_EFFECT step carries the second click to COMPLETED, then replay refuses', async () => {
     // Boot issuance happened while the select-root step was live; INSPECT,
     // plan-preview staging and the review-step issuance happen AFTER it —
-    // exactly the production lifecycle main.ts now implements.
+    // exactly the production lifecycle main.ts implements.
     const fixture = await createFixture({
       approved: false,
       initialReference: 'select-root',
@@ -668,44 +647,94 @@ describe('U05-B2 selected-root effect vertical slice', () => {
     // Idempotent per live step: one STAGED transition gives at most one pair.
     expect(fixture.issueLiveReferences()).toEqual(livePair);
 
-    // The human APPROVE follows the staging (production order), then the
-    // operator submits with the LIVE pair: accepted over the injected fake K
-    // with zero physical effects.
+    // The human APPROVE follows the staging (production order); the second
+    // explicit click then carries ONLY the Case identity: the Host resolves
+    // the live pair internally and the admission completes over the
+    // injected fake K with zero physical effects.
     fixture.approveReview();
-    const completed = await fixture.submit({
-      caseId: livePair.caseId,
-      currentnessRef: livePair.currentnessRef,
-      approvalRef: livePair.approvalRef,
-    });
+    const completed = await fixture.submit({ caseId: TASK });
     expect(completed.status).toBe('COMPLETED');
     expect(completed.sendCalls).toBe(1);
 
-    // The superseded select-root pair refuses with zero sends — never a
-    // second admission, never a retry.
-    const superseded = await fixture.submit({
-      caseId: bootPair.caseId,
-      currentnessRef: bootPair.currentnessRef,
-      approvalRef: bootPair.approvalRef,
+    // Replay of the same approved step refuses — never a second admission,
+    // never a retry.
+    const replay = await fixture.submit({ caseId: TASK });
+    expect(replay).toMatchObject({
+      status: 'REFUSED',
+      code: 'SELECTED_ROOT_EFFECT_REPLAY_REFUSED',
+      sendCalls: 0,
     });
-    expect(superseded).toMatchObject({ status: 'REFUSED', sendCalls: 0 });
-    expect((superseded as { code?: string }).code).toMatch(/^HOST_REFERENCES_/);
+  });
+
+  it('U06: when only the superseded select-root pair is CURRENT, Host-side resolution refuses the approved review step (zero sends)', async () => {
+    // Boot pair issued for the live select-root step; the review step was
+    // staged and approved WITHOUT a staging-time re-issuance: the durable
+    // CURRENT pair belongs to a superseded step, so resolution must refuse
+    // before any authority work.
+    const fixture = await createFixture({ initialReference: 'select-root' });
+    cleanups.push(fixture.cleanup);
+    const bootPair = fixture.initialReferences;
+    if (bootPair?.status !== 'ISSUED') throw new Error('fixture boot pair missing');
+    expect(bootPair.stepId).not.toBe(fixture.reviewStepId());
+    const superseded = await fixture.submit({ caseId: TASK });
+    expect(superseded).toMatchObject({
+      status: 'REFUSED',
+      code: 'HOST_REFERENCES_STEP_MISMATCH',
+      sendCalls: 0,
+    });
+    expect(fixture.facade.sends).toHaveLength(0);
+  });
+
+  it('U06: no pre-existing issuance refuses before any authority work (pre-existing issuance is a hard precondition)', async () => {
+    const fixture = await createFixture({ initialReference: 'none' });
+    cleanups.push(fixture.cleanup);
+    const receipt = await fixture.submit({ caseId: TASK });
+    expect(receipt).toMatchObject({
+      status: 'REFUSED',
+      code: 'HOST_REFERENCES_NOT_ISSUED',
+      sendCalls: 0,
+    });
+    expect(fixture.facade.sends).toHaveLength(0);
+  });
+
+  it('U06: a cross-Case body refuses typed — the approved Case is the only admissible identity', async () => {
+    const fixture = await createFixture();
+    cleanups.push(fixture.cleanup);
+    const receipt = await fixture.submit({ caseId: 'task-other-case' });
+    expect(receipt).toMatchObject({
+      status: 'REFUSED',
+      code: 'HOST_CASE_NOT_CURRENT',
+      sendCalls: 0,
+    });
+    expect(fixture.facade.sends).toHaveLength(0);
   });
 
   it('rejects every malformed or unauthenticated submission with zero sends', async () => {
     const fixture = await createFixture();
     cleanups.push(fixture.cleanup);
-    const refs = issuedRefs(fixture);
-    for (const body of [
-      { ...refs, extra: 1 },
-      { caseId: refs.caseId, currentnessRef: refs.currentnessRef },
-      { ...refs, currentnessRef: 'shun.currentness.v1/forged' },
-      { ...refs, caseId: 'task-other-case' },
-      { ...refs, approvalRef: refs.currentnessRef },
+    for (const malformed of [
+      { caseId: TASK, extra: 1 },
+      // Caller-supplied reference strings are no longer part of the body
+      // contract at all: even a syntactically valid pair is refused as
+      // GATEWAY_INPUT_INVALID — the browser never carries references.
+      {
+        caseId: TASK,
+        currentnessRef: 'shun.currentness.v1/forged',
+        approvalRef: 'shun.approval.v1/forged',
+      },
+      { caseId: TASK, currentnessRef: 'shun.currentness.v1/forged' },
+      { caseId: TASK, approvalRef: 'shun.approval.v1/forged' },
+      {},
+      { caseId: '' },
+      { caseId: 7 },
       'not-an-object',
-      { ...refs, path: 'C:\\evil\\path.txt' },
+      ['array-not-object'],
+      { caseId: TASK, path: 'C:\\evil\\path.txt' },
+      { caseId: TASK, planHash: 'a'.repeat(64) },
     ]) {
-      const receipt = await fixture.submit(body);
+      const receipt = await fixture.submit(malformed);
       expect(receipt.status).toBe('REFUSED');
+      expect(receipt.code).toBe('GATEWAY_INPUT_INVALID');
       expect(receipt.sendCalls).toBe(0);
     }
     expect(fixture.facade.sends).toHaveLength(0);
@@ -714,11 +743,10 @@ describe('U05-B2 selected-root effect vertical slice', () => {
   it('refuses admission when the selected root identity drifted before preparation', async () => {
     const fixture = await createFixture();
     cleanups.push(fixture.cleanup);
-    const refs = issuedRefs(fixture);
     // The native identity now reports a different file ID for the same path:
     // the root the human approved is not the root still on disk.
     fixture.setRootDrift(true);
-    const receipt = await fixture.submit(refs);
+    const receipt = await fixture.submit(body());
     expect(receipt).toMatchObject({
       status: 'REFUSED',
       code: 'SELECTED_ROOT_EFFECT_ROOT_IDENTITY_STALE',
@@ -743,14 +771,13 @@ describe('U05-B2 selected-root effect vertical slice', () => {
       }),
     });
     cleanups.push(fixture.cleanup);
-    const refs = issuedRefs(fixture);
-    const receipt = await fixture.submit(refs);
+    const receipt = await fixture.submit(body());
     expect(receipt).toMatchObject({
       status: 'UNKNOWN',
       code: 'EFFECT_RESULT_UNKNOWN',
       sendCalls: 1,
     });
-    const replay = await fixture.submit(refs);
+    const replay = await fixture.submit(body());
     expect(replay).toMatchObject({
       status: 'REFUSED',
       code: 'SELECTED_ROOT_EFFECT_REPLAY_REFUSED',
@@ -762,7 +789,7 @@ describe('U05-B2 selected-root effect vertical slice', () => {
   it('maps a K refusal and an effect refusal to REFUSED without retry', async () => {
     const refusedFixture = await createFixture({ respond: () => ({ status: 'refused' }) });
     cleanups.push(refusedFixture.cleanup);
-    expect(await refusedFixture.submit(issuedRefs(refusedFixture))).toMatchObject({
+    expect(await refusedFixture.submit({ caseId: TASK })).toMatchObject({
       status: 'REFUSED',
       code: 'KERNEL_REFUSED',
       sendCalls: 1,
@@ -786,7 +813,7 @@ describe('U05-B2 selected-root effect vertical slice', () => {
       }),
     });
     cleanups.push(effectRefused.cleanup);
-    expect(await effectRefused.submit(issuedRefs(effectRefused))).toMatchObject({
+    expect(await effectRefused.submit({ caseId: TASK })).toMatchObject({
       status: 'REFUSED',
       code: 'KERNEL_REFUSED',
       sendCalls: 1,
@@ -798,7 +825,7 @@ describe('U05-B2 selected-root effect vertical slice', () => {
       respond: () => ({ status: 'admitted', admitted: { effects: [] } }),
     });
     cleanups.push(fixture.cleanup);
-    expect(await fixture.submit(issuedRefs(fixture))).toMatchObject({
+    expect(await fixture.submit(body())).toMatchObject({
       status: 'ADMITTED',
       sendCalls: 1,
     });
@@ -811,8 +838,7 @@ describe('U05-B2 selected-root effect vertical slice', () => {
     // production composition: a foreign/rewritten key refuses BEFORE any R2
     // admission or K send.
     writeFileSync(resolveGrantHmacKeyFile(fixture.authorityDir), 'wrong-key', 'utf8');
-    const refs = issuedRefs(fixture);
-    const receipt = await fixture.submit(refs);
+    const receipt = await fixture.submit(body());
     expect(receipt).toMatchObject({
       status: 'REFUSED',
       code: 'SELECTED_ROOT_EFFECT_AUTHORITY_UNAVAILABLE',
@@ -825,8 +851,7 @@ describe('U05-B2 selected-root effect vertical slice', () => {
     const fixture = await createFixture();
     cleanups.push(fixture.cleanup);
     fixture.advanceClock(120_000);
-    const refs = issuedRefs(fixture);
-    const receipt = await fixture.submit(refs);
+    const receipt = await fixture.submit(body());
     expect(receipt.status).toBe('REFUSED');
     expect(receipt.sendCalls).toBe(0);
     expect(fixture.facade.sends).toHaveLength(0);
@@ -835,9 +860,8 @@ describe('U05-B2 selected-root effect vertical slice', () => {
   it('replays are refused by the durable plan-identity fence after success', async () => {
     const fixture = await createFixture();
     cleanups.push(fixture.cleanup);
-    const refs = issuedRefs(fixture);
-    expect((await fixture.submit(refs)).status).toBe('COMPLETED');
-    expect(await fixture.submit(refs)).toMatchObject({
+    expect((await fixture.submit(body())).status).toBe('COMPLETED');
+    expect(await fixture.submit(body())).toMatchObject({
       status: 'REFUSED',
       code: 'SELECTED_ROOT_EFFECT_REPLAY_REFUSED',
       sendCalls: 0,
@@ -856,7 +880,6 @@ describe('U05-B2 selected-root effect vertical slice', () => {
   it('refuses a controller rejection mapping through the flow untouched', async () => {
     const fixture = await createFixture();
     cleanups.push(fixture.cleanup);
-    const refs = issuedRefs(fixture);
     // Swap the authority for one whose real-controller route refuses.
     const refusing: SelectedRootEffectAuthority = {
       authorizePlan: async () => ({ ok: false, code: 'POLICY_BLOCKED', detail: 'stale policy' }),
@@ -883,7 +906,7 @@ describe('U05-B2 selected-root effect vertical slice', () => {
       now: fixture.now,
       authority: refusing,
     });
-    expect(await submit(refs)).toMatchObject({
+    expect(await submit(body())).toMatchObject({
       status: 'REFUSED',
       code: 'POLICY_BLOCKED',
       sendCalls: 0,
@@ -993,8 +1016,7 @@ describe('U05-B2 Windows Host effect-time selected-root recheck (real adapter ch
   async function admittedPayload(
     fixture: Fixture,
   ): Promise<{ actionRef: string; planRef: string; grantRef: string }> {
-    const issued = issuedRefs(fixture);
-    const receipt = await fixture.submit(issued);
+    const receipt = await fixture.submit({ caseId: TASK });
     expect(receipt.status).toBe('COMPLETED');
     const send = fixture.facade.sends[0] as {
       input: { actionRef: string; planRef: string; grantRef: string; taskId: string };

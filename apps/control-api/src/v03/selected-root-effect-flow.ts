@@ -19,21 +19,24 @@
  *      (FilePlanSource/FileGrantSource shapes) — the same store the Windows
  *      effect Host binding reads at effect time;
  *   4. the selected public K receives the frozen `submitWindowsAction` intent
- *      (reference strings only, pair verified first) and mints the ONE effect
- *      Permit; the Windows Host effect-time recheck re-verifies the private
- *      selected-root identity and the exact admitted plan before any effect;
+ *      (reference strings only, pair resolved+verified Host-side first) and
+ *      mints the ONE effect Permit; the Windows Host effect-time recheck
+ *      re-verifies the private selected-root identity and the exact admitted
+ *      plan before any effect;
  *   5. the outcome is classified truthfully — only an explicitly terminal,
  *      executed, verified K effect is COMPLETED; refusals stay REFUSED;
  *      everything unresolved stays UNKNOWN. Uncertainty never triggers a
  *      blind retry: the deterministic plan identity makes any second
  *      admission an explicit REFUSED.
  *
- * The bounded HTTP/UI projection carries metadata references only. Absolute
- * root paths, volume/file identity, grant material and plan authority remain
- * Host-private: no caller can construct the OS path, the approval grant, the
- * canonical plan authority or the execution Permit from anything returned
- * here. This module performs no OS effect itself; every physical callback is
- * injected and dry-run in tests.
+ * The bounded HTTP/UI projection carries the Case identity only (U06 #401):
+ * the ordinary user's second explicit click never transports reference
+ * strings. Absolute root paths, volume/file identity, the issued reference
+ * pair, grant material and plan authority remain Host-private: no caller can
+ * construct the OS path, the approval grant, the canonical plan authority or
+ * the execution Permit from anything accepted or returned here. This module
+ * performs no OS effect itself; every physical callback is injected and
+ * dry-run in tests.
  */
 import { createHash } from 'node:crypto';
 import { win32 } from 'node:path';
@@ -311,7 +314,7 @@ export type SelectedRootEffectSubmitReceipt = Readonly<{
 
 export interface SelectedRootEffectSubmitDeps {
   readonly host: SelectedRootEffectHostPort;
-  readonly references: Pick<SqliteHostSubmitReferenceLedger, 'verify'>;
+  readonly references: Pick<SqliteHostSubmitReferenceLedger, 'verify' | 'resolveCurrent'>;
   readonly facade: { readonly send: (payload: unknown) => Promise<unknown> };
   readonly authority: SelectedRootEffectAuthority;
   readonly classifyJourneyKernelResult: (result: unknown) => {
@@ -323,14 +326,16 @@ export interface SelectedRootEffectSubmitDeps {
   readonly now: () => number;
 }
 
-const REFS_BODY_KEYS = ['approvalRef', 'caseId', 'currentnessRef'];
+const BODY_KEYS = ['caseId'];
 const CASE_ID = /^[A-Za-z][A-Za-z0-9._-]{0,127}$/;
-const REF = /^shun\.(currentness|approval)\.v1\/[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$/;
 
 /**
- * The composition-owned one-shot effect admission. The caller supplies
- * reference strings only; every authority-bearing value (plan, grant,
- * permit) is derived Host-side from the durably approved preview.
+ * The composition-owned one-shot effect admission. U06 (#401): the caller
+ * supplies ONLY the Case identity of the approved review step; the trusted
+ * Host resolves the reference pair it already issued for that exact step
+ * from the durable ledger (request scope, never the browser) and every
+ * authority-bearing value (references, plan, grant, permit) stays
+ * Host-side, derived from the durably approved preview.
  */
 export function createSelectedRootEffectSubmit(
   deps: SelectedRootEffectSubmitDeps,
@@ -352,30 +357,18 @@ export function createSelectedRootEffectSubmit(
       typeof raw !== 'object' ||
       raw === null ||
       Array.isArray(raw) ||
-      Object.keys(raw).sort().join('|') !== REFS_BODY_KEYS.join('|')
+      Object.keys(raw).sort().join('|') !== BODY_KEYS.join('|')
     ) {
       return refused(
         'GATEWAY_INPUT_INVALID',
-        'submission must be exactly {caseId, currentnessRef, approvalRef} — no path, plan, grant or permit input is accepted',
+        'submission must be exactly {caseId} — no path, plan, grant, permit or reference input is accepted',
       );
     }
     const value = raw as Record<string, unknown>;
-    if (
-      typeof value.caseId !== 'string' ||
-      !CASE_ID.test(value.caseId) ||
-      typeof value.currentnessRef !== 'string' ||
-      !REF.test(value.currentnessRef) ||
-      !value.currentnessRef.startsWith('shun.currentness.v1/') ||
-      typeof value.approvalRef !== 'string' ||
-      !REF.test(value.approvalRef) ||
-      !value.approvalRef.startsWith('shun.approval.v1/') ||
-      value.currentnessRef === value.approvalRef
-    ) {
-      return refused('GATEWAY_INPUT_INVALID', 'caseId/reference pair is not well formed');
+    if (typeof value.caseId !== 'string' || !CASE_ID.test(value.caseId)) {
+      return refused('GATEWAY_INPUT_INVALID', 'caseId is not well formed');
     }
     const caseId = value.caseId;
-    const currentnessRef = value.currentnessRef;
-    const approvalRef = value.approvalRef;
     // Post-approval Host readback: the durable APPROVE terminal + preview
     // integrity + fresh native root identity, all verified inside the Host.
     const prepared = await deps.host.prepareSelectedRootEffect();
@@ -385,11 +378,22 @@ export function createSelectedRootEffectSubmit(
     if (prepared.facts.taskId !== caseId) {
       return refused('HOST_CASE_NOT_CURRENT', 'no approved Case for this caseId');
     }
+    // Resolve the CURRENT pair the Host durably issued for this exact
+    // approved step — never a caller string — then authenticate it through
+    // the same verify path (pre-existing issuance, exact step binding,
+    // CURRENT state, expiry/currentness all re-checked).
+    const resolved = deps.references.resolveCurrent({
+      caseId,
+      stepId: prepared.facts.originStepId,
+    });
+    if (resolved.status !== 'RESOLVED') {
+      return refused(resolved.code, 'no live Host-issued reference pair for this approved step');
+    }
     const verified = deps.references.verify({
       caseId,
       stepId: prepared.facts.originStepId,
-      currentnessRef,
-      approvalRef,
+      currentnessRef: resolved.currentnessRef,
+      approvalRef: resolved.approvalRef,
     });
     if (verified.status !== 'VALID') {
       return refused(verified.code, 'Host-issued reference pair rejected');

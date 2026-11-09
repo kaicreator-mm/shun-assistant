@@ -7,11 +7,15 @@
  *
  * References are issued exclusively from trusted process-side composition
  * (never an HTTP route), bound durably to (caseId, stepId, validity window),
- * and every production submit must present the exact issued pair before the
- * Kernel facade is entered. This is not an approval object, consent issuer,
- * grant or second dispatcher: the T04 consent broker and the Kernel Permit
- * remain the only effect authorities — a verified reference proves only that
- * the trusted Host issued it for this live Case step, nothing more.
+ * and every production submit must be bound to the exact issued pair before
+ * the Kernel facade is entered. U06 (#401): the ordinary desktop journey
+ * carries no reference strings at all — the trusted flow resolves the
+ * CURRENT issued pair for the approved step Host-side (`resolveCurrent`,
+ * process-only) and authenticates it through `verify` internally. This is
+ * not an approval object, consent issuer, grant or second dispatcher: the
+ * T04 consent broker and the Kernel Permit remain the only effect
+ * authorities — a verified reference proves only that the trusted Host
+ * issued it for this live Case step, nothing more.
  */
 import { randomBytes } from 'node:crypto';
 import { isAbsolute } from 'node:path';
@@ -37,6 +41,25 @@ export type HostSubmitReferenceIssueReceipt =
 
 export type HostSubmitReferenceVerdict =
   | Readonly<{ readonly status: 'VALID' }>
+  | Readonly<{ readonly status: 'REFUSED'; readonly code: HostSubmitReferenceRefusalCode }>;
+
+/**
+ * Trusted process-side resolution of the CURRENT issued pair for one exact
+ * live (caseId, stepId). U06 (#401): the ordinary desktop journey must never
+ * require the user to carry reference strings, so the Host resolves the pair
+ * it issued for the approved step itself. This method is composition-only —
+ * never an HTTP route — and the resolved values never leave the trusted
+ * process: they are re-fed straight into `verify`, not returned to callers.
+ */
+export type HostSubmitReferenceResolution =
+  | Readonly<{
+      readonly status: 'RESOLVED';
+      readonly caseId: string;
+      readonly stepId: string;
+      readonly currentnessRef: string;
+      readonly approvalRef: string;
+      readonly validUntilUnixMs: number;
+    }>
   | Readonly<{ readonly status: 'REFUSED'; readonly code: HostSubmitReferenceRefusalCode }>;
 
 /** Same bounded grammar the T09 gateway enforces on submitted references. */
@@ -222,6 +245,61 @@ export class SqliteHostSubmitReferenceLedger {
       return { status: 'REFUSED', code: 'HOST_REFERENCES_EXPIRED' };
     }
     return { status: 'VALID' };
+  }
+
+  /**
+   * Resolve (not authenticate) the one CURRENT pair the Host durably issued
+   * for the exact live step of one Case. Trusted process-side calls only.
+   * Refusals carry the same typed vocabulary as `verify`: never issued,
+   * case mismatch, superseded-step mismatch, revoked or expired — a caller
+   * must treat any refusal as "do not enter the Kernel at all".
+   */
+  resolveCurrent(input: {
+    readonly caseId: string;
+    readonly stepId: string;
+  }): HostSubmitReferenceResolution {
+    if (
+      typeof input.caseId !== 'string' ||
+      !CASE_ID.test(input.caseId) ||
+      typeof input.stepId !== 'string' ||
+      !STEP_ID.test(input.stepId)
+    ) {
+      return { status: 'REFUSED', code: 'HOST_REFERENCES_NOT_ISSUED' };
+    }
+    let row: Row | undefined;
+    try {
+      row = this.#db
+        .prepare(
+          `SELECT case_id,step_id,currentness_ref,approval_ref,valid_until_unix_ms,state
+           FROM host_submit_references WHERE case_id=? ORDER BY rowid DESC LIMIT 1`,
+        )
+        .get(input.caseId) as Row | undefined;
+    } catch {
+      return { status: 'REFUSED', code: 'HOST_REFERENCES_NOT_ISSUED' };
+    }
+    // No durable issuance exists for this Case: pre-existing issuance is a
+    // hard precondition — the Host never resolves (or mints) on demand.
+    if (row === undefined) return { status: 'REFUSED', code: 'HOST_REFERENCES_NOT_ISSUED' };
+    if (row.case_id !== input.caseId) {
+      return { status: 'REFUSED', code: 'HOST_REFERENCES_CASE_MISMATCH' };
+    }
+    if (row.state !== 'CURRENT') return { status: 'REFUSED', code: 'HOST_REFERENCES_REVOKED' };
+    // The durable CURRENT pair belongs to a different (superseded or later)
+    // step than the one the trusted flow is admitting right now.
+    if (row.step_id !== input.stepId) {
+      return { status: 'REFUSED', code: 'HOST_REFERENCES_STEP_MISMATCH' };
+    }
+    if (row.valid_until_unix_ms <= this.#clock()) {
+      return { status: 'REFUSED', code: 'HOST_REFERENCES_EXPIRED' };
+    }
+    return {
+      status: 'RESOLVED',
+      caseId: row.case_id,
+      stepId: row.step_id,
+      currentnessRef: row.currentness_ref,
+      approvalRef: row.approval_ref,
+      validUntilUnixMs: row.valid_until_unix_ms,
+    };
   }
 
   close(): void {

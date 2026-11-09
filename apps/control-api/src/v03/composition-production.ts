@@ -364,8 +364,10 @@ export async function createProductionV03Gateway(config: ProductionV03Config): P
   selectedRootEffect?: (raw: unknown) => Promise<SelectedRootEffectSubmitReceipt>;
   /**
    * Trusted process-side issuance of the submit-reference pair for the one
-   * live Guided Case step. Never exposed through HTTP: an API client can
-   * submit WITH issued references but can never mint one.
+   * live Guided Case step. Never exposed through HTTP or any UI/console
+   * output (U06 #401): the pair's values stay Host-private and the effect
+   * admission resolves them from the durable ledger itself; no API client
+   * can ever read or mint one.
    */
   issueSubmitReferences(): HostSubmitReferenceIssueReceipt;
   dispose(): void;

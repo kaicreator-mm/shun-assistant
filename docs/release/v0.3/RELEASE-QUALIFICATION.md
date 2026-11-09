@@ -106,3 +106,27 @@ Conditions and explicit boundaries:
 2. **P2 items (4) are recorded, non-blocking**, with owners/surfaces named above; they should ship as release-notes known limitations (especially R01-P2-4) and follow-up fixes.
 3. **Optional post-release validation (not gating):** real paid CN/EN DeepSeek leg (requires owner authorization and `DEEPSEEK_API_KEY` provisioning) and real Windows physical effect journeys.
 4. **Evidence trail:** this record + `docs/validation/v0.3/VERSION-QUALIFICATION.md` + `tests/integration/v03/t12-qualification/qualification-results.json` + `docs/implementation/v0.3/release/` implementation log + `_tmp/r01-zcode/r01-*.log` spot-check logs.
+
+---
+
+## Addendum (2026-11-09, #401 P2 hygiene) — the R01 PASS binds ONLY the R01 candidate
+
+The `RELEASE_ELIGIBLE = YES` verdict above is a **historical R01 record for exactly
+`b2909a2141582dc2e9e083824f6a1dfd2c2f963e`** (branch `JIT_only_task/v0.3.0-r01`). It is
+not, and must never be reused as, qualification of any later source.
+
+Binding for every later WIP SHA on `wip/v0.3.0-r02-owner-repairs` — audited at
+`b51b638a9ef787b9780807042a0db8762fb90945` (PR #272 head, review 5820185592) and unchanged
+by the #401 Host-resolved-reference repair that follows it:
+
+```ini
+[RQ-BINDING]
+later_wip_head              = b51b638a9ef787b9780807042a0db8762fb90945 (PR #272)
+later_release_eligible      = NO / BLOCK
+reasons                     = ENV_UNPROVISIONED production Guided trust pin (C:\ProgramData\Shun\authority absent — positive provisioned production E2E NOT_RUN); version merge not authorized (#297); R04 native Windows production qualification pending; P1-UX-REF-01 end-user journey repair in flight (#401)
+prior_r01_pass_scope        = b2909a21… ONLY — not transferable
+```
+
+No tag, release, or main/version promotion may cite the R01 PASS for any SHA other
+than `b2909a21…`. A fresh whole-version RQ at a new exact SHA is required before any
+release-eligibility claim for later sources.

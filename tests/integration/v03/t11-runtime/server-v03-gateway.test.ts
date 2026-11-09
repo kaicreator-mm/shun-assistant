@@ -214,17 +214,15 @@ describe('T11 package public entries are side-effect-free controlled exits', () 
 });
 
 describe('U05-B2 selected-root effect route wiring', () => {
-  const refs = {
-    caseId: 'case-v03-01',
-    currentnessRef: 'shun.currentness.v1/registry-t11',
-    approvalRef: 'shun.approval.v1/operator-local-01',
-  };
+  // U06 (#401): the ordinary journey body is the Case identity ONLY — the
+  // trusted Host resolves the issued reference pair internally.
+  const body = { caseId: 'case-v03-01' };
 
   it('answers typed 503 when no effect admission was composed', async () => {
     const server = createControlServer({ backend: new DemoShunBackend() });
     const port = await server.start();
     try {
-      const absent = await post(port, '/api/v03/effect/selected-root', refs);
+      const absent = await post(port, '/api/v03/effect/selected-root', body);
       expect(absent.status).toBe(503);
       expect(absent.body).toEqual({ ok: false, code: 'V03_SELECTED_ROOT_EFFECT_UNAVAILABLE' });
       const proposal = await fetch(`http://127.0.0.1:${port}/api/v03/effect/proposal`);
@@ -235,7 +233,7 @@ describe('U05-B2 selected-root effect route wiring', () => {
     }
   });
 
-  it('forwards reference strings only and maps truthful statuses; never accepts path/plan/grant input', async () => {
+  it('forwards the Case identity only and maps truthful statuses; never accepts path/plan/grant/reference input', async () => {
     const submits: unknown[] = [];
     const receipt = {
       status: 'COMPLETED' as const,
@@ -253,7 +251,7 @@ describe('U05-B2 selected-root effect route wiring', () => {
       backend: new DemoShunBackend(),
       v03SelectedRootEffect: async (raw) => {
         submits.push(raw);
-        if (JSON.stringify(raw) === JSON.stringify(refs)) return receipt;
+        if (JSON.stringify(raw) === JSON.stringify(body)) return receipt;
         return { status: 'REFUSED', code: 'GATEWAY_INPUT_INVALID', detail: 'x', sendCalls: 0 };
       },
       v03SelectedRootEffectProposal: () => ({
@@ -274,26 +272,36 @@ describe('U05-B2 selected-root effect route wiring', () => {
     });
     const port = await server.start();
     try {
-      const ok = await post(port, '/api/v03/effect/selected-root', refs);
+      const ok = await post(port, '/api/v03/effect/selected-root', body);
       expect(ok.status).toBe(200);
       expect(ok.body).toMatchObject({ status: 'COMPLETED', sendCalls: 1 });
-      expect(submits[0]).toEqual(refs);
-      // Any extra caller input (path, plan, grant, permit) is refused 422
-      // with zero sends — the composition never sees it.
-      for (const body of [
-        { ...refs, path: 'C:\\evil\\x.txt' },
-        { ...refs, planRef: 'a'.repeat(64) },
-        { caseId: refs.caseId },
+      expect(submits[0]).toEqual(body);
+      // Any extra caller input (path, plan, grant, permit — or any caller
+      // reference strings, which are no longer part of the body contract)
+      // is refused 422 with zero sends — the composition never sees it.
+      for (const malformed of [
+        { ...body, path: 'C:\\evil\\x.txt' },
+        { ...body, planRef: 'a'.repeat(64) },
+        {
+          ...body,
+          currentnessRef: 'shun.currentness.v1/registry-t11',
+          approvalRef: 'shun.approval.v1/operator-local-01',
+        },
+        { currentnessRef: 'shun.currentness.v1/registry-t11' },
+        {},
       ]) {
-        const refused = await post(port, '/api/v03/effect/selected-root', body);
+        const refused = await post(port, '/api/v03/effect/selected-root', malformed);
         expect(refused.status).toBe(422);
       }
-      expect(submits).toHaveLength(4);
+      expect(submits).toHaveLength(6);
       const descriptor = await fetch(`http://127.0.0.1:${port}/api/v03/effect/proposal`);
       expect(descriptor.status).toBe(200);
-      const body = (await descriptor.json()) as Record<string, unknown>;
-      expect(body).toMatchObject({ operation: 'windows.fs.write', executionAuthorized: false });
-      expect(JSON.stringify(body)).not.toContain('C:\\');
+      const descriptorBody = (await descriptor.json()) as Record<string, unknown>;
+      expect(descriptorBody).toMatchObject({
+        operation: 'windows.fs.write',
+        executionAuthorized: false,
+      });
+      expect(JSON.stringify(descriptorBody)).not.toContain('C:\\');
     } finally {
       await server.close();
     }

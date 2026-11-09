@@ -137,18 +137,19 @@ export interface ControlServerOptions {
   /** Trusted native folder picker/observation port; never configured by HTTP. */
   v03FolderSelection?: V03FolderSelectionRoutePort;
   /**
-   * U05-B2 (P1-LIVE-REFS) — trusted process-side notification fired ONLY
-   * after the Host's one-shot plan-preview staging returned STAGED, so the
-   * composition root can mint the live REVIEW_EFFECT submit reference pair
-   * for the operator console. Never HTTP input; a callback failure is
-   * logged and never fabricates a staging outcome.
+   * U05-B2 — trusted process-side notification fired ONLY after the Host's
+   * one-shot plan-preview staging returned STAGED, so the composition root
+   * can mint the live REVIEW_EFFECT submit reference pair for the durable
+   * Host ledger. Never HTTP input; a callback failure is logged and never
+   * fabricates a staging outcome.
    */
   onPlanPreviewStaged?: (staging: FolderPlanPreviewStaged) => void;
   /**
    * U05-B2 — trusted one-shot selected-root effect admission over the REAL
    * ActionController R2 stack and the selected K. Composition root injection
-   * only; the route accepts reference STRINGS only (the Host derives every
-   * authority-bearing value) and answers 503 when no authority was composed.
+   * only; the route accepts the Case identity only (U06 #401: the Host
+   * resolves the issued reference pair and derives every authority-bearing
+   * value itself) and answers 503 when no authority was composed.
    */
   v03SelectedRootEffect?: (raw: unknown) => Promise<SelectedRootEffectSubmitReceipt>;
   /**
@@ -756,10 +757,11 @@ async function handle(
   }
 
   // U05-B2 — the one-shot selected-root effect admission. The body is EXACTLY
-  // {caseId, currentnessRef, approvalRef}: reference strings whose durable
-  // pair must authenticate for the approved review step. Every
-  // authority-bearing value (plan, grant, Permit) is derived Host-side; no
-  // path, plan, grant or permit input is accepted from any caller.
+  // {caseId} (U06 #401): the trusted Host resolves the reference pair it
+  // durably issued for that approved review step and authenticates it inside
+  // the request scope. Every authority-bearing value (references, plan,
+  // grant, Permit) is derived Host-side; no path, plan, grant, permit or
+  // reference input is accepted from any caller.
   if (method === 'POST' && url.pathname === '/api/v03/effect/selected-root') {
     const submit = ctx.v03SelectedRootEffect;
     if (submit === undefined) {
