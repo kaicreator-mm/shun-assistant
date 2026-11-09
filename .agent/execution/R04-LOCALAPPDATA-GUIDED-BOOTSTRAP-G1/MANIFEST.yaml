@@ -1,0 +1,77 @@
+pack_id: shun-v030-r04-localappdata-guided-bootstrap-g1
+task_id: R04-GUIDED-PER-USER-TRUST-BOOTSTRAP
+issue: '#404'
+parent_product_issue: '#273'
+whole_version_review: '#259'
+readiness: '#297'
+target_version: v0.3.0
+standard: ADS_1359_DELIVERY_FIRST
+owner_decision: '2026-11-09: adopt per-user LocalAppData trust bootstrap; UAC/admin allowed for install or first-run when required'
+source_writes_authorized: 'after exact Pack CI, lawful CAS claim and single-writer admission'
+pack_revision: 1
+claim_generation: 1
+protected_claim_key: 'kaicreator-mm/shun-assistant#404:builder:__default__'
+single_writer: true
+execution_profile: LOCAL_BUILDER_FULL_SLICE
+builder_selection: 'one local Windows-capable Builder: implementation, repair, Node24 checks, native no-effect E2E, Woodpecker receipts'
+source_branch: 'JIT_only_task/v0.3.0-r04-localappdata-guided-bootstrap-g1'
+integration_target: 'wip/v0.3.0-r02-owner-repairs'
+pack_base:
+  branch: 'wip/v0.3.0-r02-owner-repairs'
+  sha: '0764c8ff10914684a9d748e3dbbf9d3172ef72b0'
+  tree: '8ec69ee870631c808a411ba108460a55377d32fb'
+  version_pr: '#272'
+  upstream_ci: 'Woodpecker #684/#686 SUCCESS, unmodified-path evidence reusable'
+dependencies:
+  product_l2_owner_decision: '#404'
+  product_scope: '#273'
+  reviewed_u06_no_manual_ref: '#401 / PR #403 merged'
+allowed_write_set:
+  - apps/control-api/src/real-storage/guided-provenance-issuance.ts
+  - apps/control-api/src/v03/composition-guided-provenance.ts
+  - apps/control-api/scripts/issue-guided-provenance.ts
+  - apps/control-api/scripts/bootstrap-guided-localappdata.ts
+  - apps/control-api/src/main.ts
+  - apps/control-api/test/guided-provenance-issuance.test.ts
+  - apps/control-api/test/guided-localappdata-bootstrap.test.ts
+  - apps/control-api/test/real-storage-bootstrap.test.ts
+  - tests/integration/v03/r02-e-production/production-startup.test.ts
+  - tests/integration/v03/r02-e-production/startup-runner.test.ts
+  - docs/architecture/v0.3/R04-LOCALAPPDATA-GUIDED-TRUST.md
+  - docs/release/v0.3/RELEASE-QUALIFICATION.md
+excluded:
+  - packages/**
+  - apps/control-ui/public/v03/app.js
+  - apps/control-ui/public/v03/desktop.js
+  - apps/control-api/native/**
+  - .woodpecker.yml
+  - package.json
+  - pnpm-lock.yaml
+  - main
+  - version/v0.3.0
+implementation_principles:
+  - 'Production default trust root becomes per-interactive-user LocalAppData, never caller/HTTP/LLM/db-selected.'
+  - 'Bootstrap is a separate trusted installer/first-run action with explicit user consent, idempotent and restart-stable, not implicit HTTP or runtime minting.'
+  - 'Reuse existing Ed25519 signed external provenance, SPKI pin, schema digest and exact canonical DB/path identity; no fake development authority fallback.'
+  - 'Private signing key stored outside repo, DB and trust root; no secret/private refs in browser, network or logs.'
+  - 'Normal-use runtime remains verify-only and never requires admin; UAC permitted during actual install/first run when OS operation requires, not silently.'
+  - 'Elevated different-account token must not bootstrap wrong profile; target interactive user identity verified before any write.'
+  - 'Preserve no-reparse path and ancestor checks, per-user OS ACL hygiene and truthful residual same-SID risk; remove incompatible privileged-owner-only ProgramData policy.'
+  - 'Do not auto-import/overwrite previous ProgramData trust or mutate protected OS directories.'
+  - 'Keep R2, ActionController, currentness/approval checks, replay and selected K unchanged.'
+acceptance:
+  - 'Fresh per-user first-run setup from a trusted local flow with explicit confirmation; valid same-profile restart reuses unchanged anchor/pin/receipt.'
+  - 'No admin required for steady-state Guided run; optional installer/UAC never stores the user trust under a different elevation account.'
+  - 'Real Windows Node24 production real-storage startup with valid per-user trust, Guided StepSpec/state and real desktop (no-effect K/executor), plus invalid/missing bootstrap fail-closed.'
+  - 'Test missing/partial/corrupt/cross-profile/copied/different DB or schema, double bootstrap, key/anchor mismatch, reparse, legacy ProgramData fallback refusal, replay, UNKNOWN and no auto retry.'
+  - 'No actual Windows file effect, paid network/model calls or unapproved ProgramData/ACL/UAC mutation in this test delivery.'
+qualification:
+  - 'Source preflight syntax Node>=24, Biome, typecheck and impacted tests before Woodpecker; use Woodpecker-only terminal exact-SHA Push and PR checks.'
+  - 'Reuse #684/#686 for unaffected paths; reviewer audits full allowed set and current HEAD, fixes in original set if necessary.'
+  - 'Publish actual Windows and CI receipts into Issue #404 / PR source; no local-only file-path references as primary evidence.'
+  - 'WIP-only source integration after review and CI, then #272 whole-version release qualification (not automatic merge).'
+forbidden:
+  - 'Automatic ProgramData provisioning, silent admin escalation, wrong-account bootstrap, user-controlled runtime trust path.'
+  - 'Unapproved real OS user files mutation, paid requests, actual selected-root physical write or K effect.'
+  - 'New Kernel/SDK trust layer, second approval ledger, cross-user synchronization or scope creep.'
+  - 'main/version merge, tag, release, deployment.'
