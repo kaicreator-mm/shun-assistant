@@ -1,0 +1,73 @@
+pack_id: shun-v030-u06-host-resolved-effect-refs-g1
+task_id: U06-HOST-RESOLVED-EFFECT-REFS
+issue: '#401'
+parent_product_issue: '#273'
+review_source: 'PR #272 review 5820185592 P1-UX-REF-01 (+P2 qualification hygiene)'
+repo: kaicreator-mm/shun-assistant
+version: v0.3.0
+standard_revision: 326aaf5b0188b53cb0ed5c38752a9e299e3f9efd
+delivery_principle: ADS_1359_DELIVERY_FIRST_SINGLE_BUILDER_REVIEWER_REPAIR
+pack_revision: 1
+claim_generation: 1
+owner_authorization: 'Owner conversational instruction 2026-11-09: continue v0.3.0 per ADS #1359 Delivery-First, fix the final user flow (manual currentnessRef/approvalRef copy) under legal Pack/CAS and an exclusive write set; one continuous Builder owns repair + Node>=24 checks + tests + Woodpecker; receipts to GitHub; no main/version merge, no release'
+protected_claim_key: 'kaicreator-mm/shun-assistant#401:builder:__default__'
+dependencies:
+  product_amendment: '#273'
+  reconciliation: '#297'
+  integration_pr: '#272'
+  prior_ui_lane: '#398 / PR #400 (merged to WIP; introduced the operator-only reference-copy journey this pack removes)'
+  no_new_native_dag_outcome: true
+pack_base:
+  branch: wip/v0.3.0-r02-owner-repairs
+  sha: b51b638a9ef787b9780807042a0db8762fb90945
+  tree: b778d04ba08dc41107bedba1def3da05d7377ec4
+  contract: 'Single manifest commit directly parented to the exact WIP head; source JIT branch starts here; integrate back into the same WIP branch only after CI + receipts.'
+execution:
+  profile: SINGLE_CONTINUOUS_LOCAL_BUILDER_FULL_SLICE
+  source_branch: JIT_only_task/v0.3.0-u06-host-resolved-effect-refs-g1
+  integration_target: wip/v0.3.0-r02-owner-repairs
+  source_write_gate: 'exact Pack CI terminal SUCCESS; generation-1 legitimate CAS DISPATCH_CLAIMED; exclusive writer inventory (no overlapping active writer on these paths)'
+  builder_operator: zcode:local-builder-shun-i401
+  standalone_validation: forbidden
+authoring_write_set:
+  - .agent/execution/U06-HOST-RESOLVED-EFFECT-REFS-G1/MANIFEST.yaml
+allowed_write_set:
+  - apps/control-api/src/v03/composition-approval.ts
+  - apps/control-api/src/v03/selected-root-effect-flow.ts
+  - apps/control-api/src/v03/composition-production.ts
+  - apps/control-api/src/server.ts
+  - apps/control-api/src/main.ts
+  - apps/control-ui/public/v03/desktop.js
+  - apps/control-ui/public/v03/index.html
+  - apps/control-ui/test/selected-root-r04-desktop.test.ts
+  - apps/control-api/test/selected-root-effect-flow.test.ts
+  - apps/control-api/test/selected-root-desktop-e2e.test.ts
+  - tests/integration/v03/t11-runtime/server-v03-gateway.test.ts
+  - docs/release/v0.3/RELEASE-QUALIFICATION.md
+write_set_exclusions:
+  - packages/**
+  - apps/control-ui/public/v03/app.js
+  - .woodpecker.yml
+  - package.json
+  - pnpm-lock.yaml
+  - apps/control-api/native/**
+acceptance:
+  - 'The explicit second human click resolves the already-issued current Case/step reference pair INSIDE the trusted Host ledger and request scope; the HTTP body is exactly {caseId}; the browser supplies no reference strings, private path, plan hash or Permit.'
+  - 'Backend still proves durable human APPROVE, matching Case/step, expiry/currentness, pre-existing issuance, one-shot plan-identity replay fence, HMAC-coherent authority and effect-time identity recheck before the unchanged selected-K effect; typed REFUSED/UNKNOWN kept; no blind retry.'
+  - 'Host-private references never appear in HTTP responses, the normal UI, or the main.ts console output (trusted process-side issuance remains).'
+  - 'Existing R2/ActionController/AuthorizationAuthority/K Permit chain, policy and Kernel are reused unchanged — no second approval ledger, no new grant minting.'
+  - 'Positive no-effect E2E: real shipped desktop.js executing against a real loopback control server (real guided journey + real R2 stack + injected K facade) completes approval click then run click with zero manual console interaction; observed POST body is {caseId} only.'
+  - 'P2 hygiene: RELEASE-QUALIFICATION historical PASS stays bound to b2909a21; an explicit addendum binds b51b638 and later SHAs to RELEASE_ELIGIBLE = NO (BLOCK).'
+negative_acceptance:
+  - 'Forged/extra-field bodies (including any caller-supplied currentnessRef/approvalRef), unapproved step, cross-Case, superseded-step pair, expired pair and replay all fail closed with typed refusals and zero K sends.'
+  - 'ENV_UNPROVISIONED unchanged: no ProgramData/UAC/ACL provisioning, no real filesystem effect, no paid cloud call, no demo fallback mislabeled as production.'
+test_contract:
+  - 'Focused Vitest for the flow (updated + negatives), the desktop UI contract fence, the NEW desktop x real-server E2E, and the t11 route-wiring bodies; Node >=24 syntax preflight, Biome lint, tsc typecheck before CI; exact-SHA Woodpecker push+PR; no repeat of the U07 299-test scoped matrix beyond affected paths.'
+closeout:
+  - 'Receipts (final HEAD/TREE, CI, P0/P1/P2, repair summary) written back to PR #272 and #401; #297 reconciliation note; issue closes only after CI green and receipts posted.'
+forbidden:
+  - create_second_planner_kernel_approval_ledger_or_grant_path
+  - expose_references_grants_permits_over_http_or_ui
+  - provision_programdata_uac_acl_or_perform_real_effects
+  - merge_to_main_version_tag_or_release
+  - touch_paths_outside_the_frozen_write_set
