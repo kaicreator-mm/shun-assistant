@@ -3,18 +3,32 @@
 // must never mint it: this module contains NO signing path and NO private-key
 // import, and the returned authority adapter accepts no key material of any
 // kind. The Ed25519 private key lives only on the operator issuance side
-// (scripts/issue-guided-provenance.ts) under an elevated, operator-only
-// Windows identity, outside the repository, SQLite database, database
-// directory and every runtime environment.
+// (scripts/issue-guided-provenance.ts / scripts/bootstrap-guided-localappdata.ts)
+// in a distinct user-owned local secret directory, outside the repository,
+// SQLite database, database directory, trust directory and every runtime
+// environment.
+//
+// R04 (#404, Owner decision 2026-11-09): the trust root is PER-INTERACTIVE-
+// USER — `%LOCALAPPDATA%\Shun\authority\guided-provenance` under the target
+// user's own Windows profile — resolved from the OS-provided per-session
+// LocalAppData value with strict canonical/profile checks, never a caller-
+// controlled path from HTTP, model, DB row or CLI. ACL policy follows the
+// per-user profile model: the trust tree and its ancestors (up to the
+// LocalAppData root) must be owned by the machine-local authority identities
+// (SYSTEM/Administrators) OR the interactive user themself; no other SID may
+// hold write access; canonical/no-reparse path rules are unchanged.
+// Same-interactive-SID and other-local-user malicious processes remain
+// OUTSIDE the frozen v0.3 attack model (recorded residual risk in
+// docs/architecture/v0.3/R04-LOCALAPPDATA-GUIDED-TRUST.md).
 //
 // Trust derives from TWO independent anchors, never from the receipt or
 // trust-anchor contents, an environment variable, a DB marker, a
 // same-directory sidecar secret or an unpinned public key:
 //  1. an operator-pinned SPKI SHA-256 fingerprint (supplied by the #269
 //     production composition as an explicit constant), and
-//  2. a Windows owner/ACL policy scan requiring Administrators/SYSTEM
-//     ownership of the whole trust tree, verified before any receipt is
-//     accepted (probe failure fails closed).
+//  2. a Windows owner/ACL policy scan over the per-user trust tree (and its
+//     ancestor chain when the caller resolved the default per-user root),
+//     verified before any receipt is accepted (probe failure fails closed).
 import { execFileSync } from 'node:child_process';
 import { createHash, createPublicKey, timingSafeEqual, verify } from 'node:crypto';
 import {
@@ -32,7 +46,7 @@ import {
   writeFileSync,
 } from 'node:fs';
 import { homedir, tmpdir } from 'node:os';
-import { dirname, isAbsolute, resolve, sep } from 'node:path';
+import { dirname, isAbsolute, parse, resolve, sep } from 'node:path';
 import { canonicalJson } from '@shun/contracts';
 import {
   GUIDED_SCHEMA_VERSION,
@@ -50,12 +64,324 @@ export const GUIDED_PROVENANCE_SIGNATURE_PATTERN = /^[a-zA-Z0-9+/]{86}==$/;
 export const GUIDED_PROVENANCE_DIGEST_PATTERN = /^[0-9a-f]{64}$/;
 
 /**
- * Fixed default runtime trust directory, baked into source like the
- * executor authority store — never argv/env controlled. Production wiring
- * (#269) uses this default; tests inject a temp directory explicitly.
+ * R04 (#404): trust-tree location segments under the per-interactive-user
+ * LocalAppData Known Folder. Source-pinned like the previous ProgramData
+ * constant — the SEGMENTS are fixed; only the per-user base is resolved at
+ * runtime from the OS-provided session value with strict validation.
+ */
+export const GUIDED_TRUST_LOCALAPPDATA_SEGMENTS = ['Shun', 'authority', 'guided-provenance'];
+/**
+ * Distinct user-owned issuer secret location under the same profile, always
+ * OUTSIDE the trust tree: `<base>\Shun\secrets\guided-issuer`.
+ */
+export const GUIDED_ISSUER_SECRET_LOCALAPPDATA_SEGMENTS = ['Shun', 'secrets', 'guided-issuer'];
+/** Issuer secret file name inside the per-user secret directory. */
+export const GUIDED_ISSUER_SECRET_FILE = 'issuer-private.pem';
+
+/** OS scope roots the per-user LocalAppData base must never sit inside. */
+const FORBIDDEN_LOCALAPPDATA_SCOPE_ROOTS = [
+  'c:\\windows',
+  'c:\\program files',
+  'c:\\program files (x86)',
+  'c:\\programdata',
+];
+
+/**
+ * Per-user trust directory for one resolved LocalAppData base. Pure lexical
+ * composition over the pinned segments; the base itself comes only from
+ * resolveWindowsLocalAppDataBase (validated) or an explicit test fixture.
+ */
+export function perUserGuidedTrustDirectory(localAppDataBase: string): string {
+  const base = resolve(localAppDataBase);
+  if (!isAbsolute(base)) reject('LOCALAPPDATA_NOT_ABSOLUTE');
+  return resolve(base, ...GUIDED_TRUST_LOCALAPPDATA_SEGMENTS);
+}
+
+/**
+ * Per-user issuer secret directory (distinct from the trust tree) for one
+ * resolved LocalAppData base. The private key stored there is never inside
+ * the trust directory, database directory, workspace or repository.
+ */
+export function perUserIssuerSecretDirectory(localAppDataBase: string): string {
+  const base = resolve(localAppDataBase);
+  if (!isAbsolute(base)) reject('LOCALAPPDATA_NOT_ABSOLUTE');
+  return resolve(base, ...GUIDED_ISSUER_SECRET_LOCALAPPDATA_SEGMENTS);
+}
+
+/**
+ * Ancestor directories of the per-user trust root, from
+ * `<base>\Shun\authority` up to and INCLUDING the LocalAppData base — the
+ * policy boundary. Lexical over the resolved base only; if the chain cannot
+ * reach the base it fails closed (caller-controlled shortening impossible).
+ */
+export function perUserGuidedTrustAncestorChain(localAppDataBase: string): string[] {
+  const base = resolve(localAppDataBase).toLowerCase();
+  const chain: string[] = [];
+  let current = dirname(perUserGuidedTrustDirectory(localAppDataBase));
+  for (;;) {
+    chain.push(current);
+    if (resolve(current).toLowerCase() === base) return chain;
+    const parent = dirname(current);
+    if (parent.toLowerCase() === current.toLowerCase()) reject('TRUST_ANCESTOR_CHAIN_UNREACHABLE');
+    current = parent;
+  }
+}
+
+/** Cached OS Known Folder corroboration for the LocalAppData base. */
+let cachedKnownFolderLocalAppData: string | null | undefined;
+
+function queryWindowsKnownFolderLocalAppData(): string | null {
+  if (cachedKnownFolderLocalAppData !== undefined) return cachedKnownFolderLocalAppData;
+  if (process.platform !== 'win32') {
+    cachedKnownFolderLocalAppData = null;
+    return null;
+  }
+  const systemRoot = process.env.SystemRoot ?? 'C:\\Windows';
+  const powershell = resolve(systemRoot, 'System32', 'WindowsPowerShell', 'v1.0', 'powershell.exe');
+  try {
+    const out = execFileSync(
+      powershell,
+      [
+        '-NoProfile',
+        '-NonInteractive',
+        '-Command',
+        '[Environment]::GetFolderPath([Environment+SpecialFolder]::LocalApplicationData)',
+      ],
+      { encoding: 'utf8', windowsHide: true, timeout: 15_000 },
+    ).trim();
+    cachedKnownFolderLocalAppData = out && isAbsolute(out) ? out : null;
+  } catch {
+    cachedKnownFolderLocalAppData = null;
+  }
+  return cachedKnownFolderLocalAppData;
+}
+
+/**
+ * Resolve the actual per-interactive-user LocalAppData Known Folder base for
+ * THIS Windows session. The OS provides the value through the session
+ * environment; it is accepted only after strict validation:
+ *  - present, absolute, not the filesystem/drive root;
+ *  - equals `USERPROFILE\AppData\Local` (the documented OS relationship) or,
+ *    with USERPROFILE absent, the OS Known Folder API value verbatim;
+ *  - never inside Windows/Program Files/ProgramData (unexpected scope);
+ *  - a real canonical directory: exists, not a symlink/reparse point, and
+ *    realpath equals the resolved path (no alias).
+ * Any failure throws a coded GUIDED_PROVENANCE_LOCALAPPDATA_* error (fail
+ * closed). This is the ONLY trust-path root; nothing under HTTP, model, DB
+ * or CLI control can influence it.
+ */
+export function resolveWindowsLocalAppDataBase(env: NodeJS.ProcessEnv = process.env): string {
+  const raw = env.LOCALAPPDATA;
+  if (typeof raw !== 'string' || !raw) reject('LOCALAPPDATA_UNRESOLVED');
+  // Reject a RELATIVE value before resolve() silently absolutizes it against
+  // the process CWD — the base must be a fully qualified session location.
+  if (!isAbsolute(raw)) reject('LOCALAPPDATA_UNRESOLVED');
+  const candidate = resolve(raw);
+  if (candidate === parse(candidate).root) reject('LOCALAPPDATA_ROOT_ALIAS');
+  const lower = candidate.toLowerCase();
+  for (const forbidden of FORBIDDEN_LOCALAPPDATA_SCOPE_ROOTS) {
+    if (lower === forbidden || lower.startsWith(`${forbidden}\\`)) {
+      reject('LOCALAPPDATA_UNEXPECTED_SCOPE');
+    }
+  }
+  const userProfile = env.USERPROFILE;
+  if (typeof userProfile === 'string' && userProfile) {
+    const expected = resolve(userProfile, 'AppData', 'Local');
+    if (candidate.toLowerCase() !== expected.toLowerCase()) reject('LOCALAPPDATA_PROFILE_MISMATCH');
+  } else {
+    const knownFolder = queryWindowsKnownFolderLocalAppData();
+    if (knownFolder === null) reject('LOCALAPPDATA_PROFILE_MISMATCH');
+    if (candidate.toLowerCase() !== resolve(knownFolder).toLowerCase()) {
+      reject('LOCALAPPDATA_PROFILE_MISMATCH');
+    }
+  }
+  let info: ReturnType<typeof lstatSync>;
+  try {
+    info = lstatSync(candidate);
+  } catch {
+    reject('LOCALAPPDATA_MISSING');
+  }
+  if (!info.isDirectory() || info.isSymbolicLink()) reject('LOCALAPPDATA_UNTRUSTED');
+  try {
+    if (realpathSync(candidate).toLowerCase() !== lower) reject('LOCALAPPDATA_UNTRUSTED_ALIAS');
+  } catch {
+    reject('LOCALAPPDATA_UNTRUSTED');
+  }
+  return candidate;
+}
+
+/**
+ * Default runtime trust directory: the per-user LocalAppData trust tree for
+ * the resolved session base. Never argv/env-overridable through product
+ * code; tests inject trust directories explicitly instead.
  */
 export function defaultGuidedProvenanceTrustDirectory(): string {
-  return 'C:\\ProgramData\\Shun\\authority\\guided-provenance';
+  return perUserGuidedTrustDirectory(resolveWindowsLocalAppDataBase());
+}
+
+/** Cached process user SID (Windows only; undefined elsewhere or on failure). */
+let cachedProcessUserSid: string | null | undefined;
+
+/** Well-formed SID (machine-local user, domain user or AzureAD account). */
+const SID_PATTERN = /^S-1-\d+(-\d+)+$/;
+
+/**
+ * Absolute System32 whoami path — PATH may carry a non-Windows whoami
+ * (e.g. an MSYS one without /user or /groups), never trusted for probes.
+ */
+function windowsWhoamiPath(): string {
+  const systemRoot = process.env.SystemRoot ?? 'C:\\Windows';
+  return resolve(systemRoot, 'System32', 'whoami.exe');
+}
+
+/**
+ * Current process token's user SID via whoami — read-only observation, no
+ * elevation, no prompt. Returns undefined off Windows or when the probe
+ * fails; callers fail closed on that.
+ */
+export function queryWindowsProcessUserSid(): string | undefined {
+  if (cachedProcessUserSid !== undefined) return cachedProcessUserSid ?? undefined;
+  if (process.platform !== 'win32') return undefined;
+  try {
+    const out = execFileSync(windowsWhoamiPath(), ['/user', '/fo', 'csv', '/nh'], {
+      encoding: 'utf8',
+      windowsHide: true,
+      timeout: 15_000,
+    });
+    for (const line of out.split(/\r?\n/)) {
+      const fields = line
+        .trim()
+        .split(',')
+        .map((field) => field.replace(/^"|"$/g, '').trim());
+      const sid = fields[fields.length - 1] ?? '';
+      if (SID_PATTERN.test(sid)) {
+        cachedProcessUserSid = sid;
+        return sid;
+      }
+    }
+  } catch {
+    // fall through to undefined
+  }
+  cachedProcessUserSid = null;
+  return undefined;
+}
+
+/**
+ * Whether the current process token is elevated (High integrity level
+ * S-1-16-12288). Read-only observation via whoami /groups.
+ */
+export function queryWindowsProcessElevation(): boolean | undefined {
+  if (process.platform !== 'win32') return undefined;
+  try {
+    const out = execFileSync(windowsWhoamiPath(), ['/groups'], {
+      encoding: 'utf8',
+      windowsHide: true,
+      timeout: 15_000,
+    });
+    return out.includes('S-1-16-12288');
+  } catch {
+    return undefined;
+  }
+}
+
+/** Cached interactive console session owner SID. */
+let cachedConsoleUserSid: string | null | undefined;
+
+/**
+ * SID of the interactive console session's logged-on user
+ * (Win32_ComputerSystem.UserName translated to a SID). Returns null when no
+ * interactive console user is resolvable and undefined when the probe itself
+ * fails (fail closed).
+ */
+export function queryWindowsConsoleUserSid(): string | null | undefined {
+  if (cachedConsoleUserSid !== undefined) return cachedConsoleUserSid;
+  if (process.platform !== 'win32') {
+    cachedConsoleUserSid = null;
+    return null;
+  }
+  const systemRoot = process.env.SystemRoot ?? 'C:\\Windows';
+  const powershell = resolve(systemRoot, 'System32', 'WindowsPowerShell', 'v1.0', 'powershell.exe');
+  const script = [
+    '$ErrorActionPreference = "Stop"',
+    'try {',
+    '  $name = (Get-CimInstance Win32_ComputerSystem).UserName',
+    '  if (-not $name) { "NONE" } else {',
+    '    (New-Object System.Security.Principal.NTAccount($name)).Translate([System.Security.Principal.SecurityIdentifier]).Value',
+    '  }',
+    '} catch { "NONE" }',
+  ].join('\n');
+  try {
+    const out = execFileSync(powershell, ['-NoProfile', '-NonInteractive', '-Command', script], {
+      encoding: 'utf8',
+      windowsHide: true,
+      timeout: 20_000,
+    }).trim();
+    if (out === 'NONE' || out === '') {
+      cachedConsoleUserSid = null;
+    } else if (SID_PATTERN.test(out)) {
+      cachedConsoleUserSid = out;
+    } else {
+      cachedConsoleUserSid = null;
+    }
+  } catch {
+    cachedConsoleUserSid = null;
+  }
+  return cachedConsoleUserSid;
+}
+
+/** Test-injectable probes behind the bootstrap identity guard. */
+export interface GuidedIdentityProbeSource {
+  readonly processUserSid?: () => string | undefined;
+  readonly consoleUserSid?: () => string | null | undefined;
+  readonly elevated?: () => boolean | undefined;
+}
+
+/** Verified per-user identity context for issuance/bootstrap. */
+export interface GuidedBootstrapIdentityContext {
+  readonly processUserSid: string;
+  readonly elevated: boolean;
+}
+
+/**
+ * R04 identity guard: prove WHICH Windows account the bootstrap/issuance
+ * runs for. An elevated process whose token belongs to a DIFFERENT account
+ * than the interactive console session user (credential/UAC over-the-
+ * shoulder) must not plant authority in the administrator's LocalAppData
+ * profile — refuse with WRONG_ACCOUNT_ELEVATION and direct the operator to
+ * run the one-time setup as the target user. Unelevated same-user runs (the
+ * normal per-user path, no UAC) and same-account elevation both pass. All
+ * probes are read-only; none ever triggers a UAC prompt.
+ *
+ * The decision core is platform-independent (probe-injectable, testable
+ * everywhere); the exported wrapper additionally requires real Windows.
+ */
+export function assessGuidedBootstrapIdentity(
+  probes: GuidedIdentityProbeSource = {},
+): GuidedBootstrapIdentityContext {
+  const processUserSid = (probes.processUserSid ?? queryWindowsProcessUserSid)();
+  if (!processUserSid) throw new Error('GUIDED_BOOTSTRAP_IDENTITY_PROBE_FAILED');
+  const elevated = (probes.elevated ?? queryWindowsProcessElevation)();
+  if (elevated === undefined) throw new Error('GUIDED_BOOTSTRAP_IDENTITY_PROBE_FAILED');
+  if (elevated) {
+    const consoleUserSid = (probes.consoleUserSid ?? queryWindowsConsoleUserSid)();
+    if (consoleUserSid === undefined) {
+      throw new Error('GUIDED_BOOTSTRAP_IDENTITY_PROBE_FAILED');
+    }
+    if (consoleUserSid !== null && consoleUserSid !== processUserSid) {
+      throw new Error(
+        `GUIDED_BOOTSTRAP_WRONG_ACCOUNT_ELEVATION:console=${consoleUserSid}process=${processUserSid}`,
+      );
+    }
+  }
+  return { processUserSid, elevated };
+}
+
+/** Windows-gated production wrapper around the identity decision core. */
+export function assertGuidedBootstrapIdentityContext(
+  probes: GuidedIdentityProbeSource = {},
+): GuidedBootstrapIdentityContext {
+  if (process.platform !== 'win32') throw new Error('GUIDED_BOOTSTRAP_REAL_WINDOWS_ONLY');
+  return assessGuidedBootstrapIdentity(probes);
 }
 
 function reject(reason: string): never {
@@ -69,9 +395,12 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 /** Canonical lowercase absolute form every binding compares against. */
 export function canonicalGuidedDatabasePath(databasePath: string): string {
   if (typeof databasePath !== 'string' || !databasePath) reject('DATABASE_PATH_REQUIRED');
-  const canonical = resolve(databasePath).toLowerCase();
-  if (!isAbsolute(canonical)) reject('DATABASE_PATH_NOT_ABSOLUTE');
-  return canonical;
+  const resolved = resolve(databasePath);
+  if (!isAbsolute(resolved)) reject('DATABASE_PATH_NOT_ABSOLUTE');
+  // Windows paths are case-insensitive: the canonical binding form is
+  // lowercased there. Case-SENSITIVE platforms must preserve case exactly —
+  // a lowercased Linux/macOS path may simply not exist on disk.
+  return process.platform === 'win32' ? resolved.toLowerCase() : resolved;
 }
 
 /** Receipt file name for one canonical database path (content-addressed). */
@@ -262,13 +591,14 @@ export type GuidedAclInspector = (
 ) => GuidedTrustAclSnapshot | undefined;
 /**
  * Bounded ancestor-chain snapshot injector (tests only): receives exactly
- * the source-pinned default ancestor chain and nothing else. Production
- * omits it and the real non-recursive Windows PowerShell probe runs.
+ * the resolved per-user ancestor chain and nothing else. Production omits it
+ * and the real non-recursive Windows PowerShell probe runs.
  */
 export type GuidedAclAncestorInspector = (
   ancestorPaths: readonly string[],
 ) => GuidedTrustAclSnapshot | undefined;
-const PRIVILEGED_OWNER_SIDS = new Set(['S-1-5-18', 'S-1-5-32-544']);
+/** Machine-local authority identities that may own per-user trust objects. */
+const MACHINE_AUTHORITY_SIDS = new Set(['S-1-5-18', 'S-1-5-32-544']);
 // CREATOR OWNER / CREATOR GROUP are inheritance placeholders: they never
 // grant direct access to anyone and only take meaning on child objects.
 const PLACEHOLDER_INHERITANCE_SIDS = new Set(['S-1-3-0', 'S-1-3-1']);
@@ -284,13 +614,6 @@ const DANGEROUS_WRITE_MASK =
   0x00080000 |
   0x10000000 |
   0x40000000;
-// Ancestors are policy-bound, not content-bound: the OS-default ProgramData
-// ACL grants Users "create children" (0x116) on the folder itself, which
-// cannot rename, delete, swap or re-ACL an existing admin-owned entry. Only
-// delete/delete-child/ACL-control/take-ownership/generic-write grants enable
-// the ancestor swap attack and are refused there.
-const ANCESTOR_DANGEROUS_WRITE_MASK =
-  0x00000040 | 0x00010000 | 0x00040000 | 0x00080000 | 0x10000000 | 0x40000000;
 const RUNTIME_READ_ALLOW_SIDS = new Set(['S-1-5-11', 'S-1-5-32-545']);
 // Deny ACEs for ANY of these break runtime reads: every interactive local
 // token carries Everyone, Authenticated Users, Users, INTERACTIVE, LOCAL and
@@ -304,6 +627,15 @@ const RUNTIME_READ_DENY_SIDS = new Set([
   'S-1-2-1',
 ]);
 const REQUIRED_RUNTIME_READ_MASK = 0x00000001 | 0x00000008 | 0x00000020 | 0x00000080;
+
+/**
+ * Per-user allowed-identity set for one trust tree: the machine authority
+ * identities plus the interactive user's own SID (an admin profile's files
+ * may legitimately be owned by Administrators instead of the user SID).
+ */
+function perUserAllowedSids(ownerSid: string): Set<string> {
+  return new Set([...MACHINE_AUTHORITY_SIDS, ownerSid]);
+}
 
 /**
  * Read-only, terminating Get-Acl probe: no partial scan counts as success.
@@ -373,14 +705,17 @@ export function inspectWindowsGuidedTrustAcl(
 }
 
 /**
- * Owners AND effective writable DACL entries must meet the pinned policy.
- * Shared by the trust-tree and ancestor-chain assessments.
+ * Owners AND effective writable DACL entries must meet the pinned per-user
+ * policy: every object owned by the machine authority identities or the
+ * interactive user, and no OTHER SID holding write/modify/delete/ACL
+ * control. Shared by the trust-tree and ancestor-chain assessments.
  */
 function assessGuidedAclSnapshot(
   rows: readonly unknown[],
   required: readonly string[],
-  dangerousWriteMask: number,
+  ownerSid: string,
 ): string[] {
+  const allowedSids = perUserAllowedSids(ownerSid);
   const reasons: string[] = [];
   const norm = (path: string): string => resolve(path).toLowerCase();
   const seen = new Set<string>();
@@ -389,7 +724,7 @@ function assessGuidedAclSnapshot(
       !row ||
       typeof (row as { path?: unknown }).path !== 'string' ||
       typeof (row as { ownerSid?: unknown }).ownerSid !== 'string' ||
-      !PRIVILEGED_OWNER_SIDS.has((row as { ownerSid: string }).ownerSid) ||
+      !allowedSids.has((row as { ownerSid: string }).ownerSid) ||
       !Array.isArray((row as { accessRules?: unknown }).accessRules)
     ) {
       reasons.push('guided trust object has invalid owner or incomplete DACL snapshot');
@@ -421,17 +756,18 @@ function assessGuidedAclSnapshot(
       }
       if (
         rule.accessType === 'Allow' &&
-        !PRIVILEGED_OWNER_SIDS.has(rule.identitySid) &&
+        !allowedSids.has(rule.identitySid) &&
         !PLACEHOLDER_INHERITANCE_SIDS.has(rule.identitySid) &&
-        ((rule.rightsMask | 0) & dangerousWriteMask) !== 0
+        ((rule.rightsMask | 0) & DANGEROUS_WRITE_MASK) !== 0
       ) {
-        reasons.push('guided trust DACL grants non-privileged write/modify/delete/ACL-control');
+        reasons.push('guided trust DACL grants non-owner write/modify/delete/ACL-control');
       }
     }
     const runtimeReadAllowed = entry.accessRules.some(
       (rule) =>
         rule.accessType === 'Allow' &&
-        RUNTIME_READ_ALLOW_SIDS.has(rule.identitySid ?? '') &&
+        (allowedSids.has(rule.identitySid ?? '') ||
+          RUNTIME_READ_ALLOW_SIDS.has(rule.identitySid ?? '')) &&
         ((rule.rightsMask | 0) & REQUIRED_RUNTIME_READ_MASK) === REQUIRED_RUNTIME_READ_MASK,
     );
     const runtimeReadDenied = entry.accessRules.some(
@@ -453,20 +789,21 @@ function assessGuidedAclSnapshot(
 /**
  * Assess the trust tree itself: anchor, receipts dir and every receipt.
  *
- * This is the SHARED default-trust policy assessment: when `trustDir` is
- * the source-pinned default trust directory, the ancestor chain of the
- * trust root is assessed under the same ownership/DACL rules (narrower
- * write mask) as part of this one call, so the runtime adapter's `init()`
- * and the issuer's post-write verification enforce exactly one policy.
- * An absent injected `ancestorSnapshot` means the real non-recursive
- * Windows probe runs there (fail closed). Injected non-default test trust
- * directories remain tree-only and exempt from the ancestor policy.
+ * R04: callers that resolved the DEFAULT per-user trust root also pass the
+ * resolved ancestor chain; it is then assessed under the same ownership/
+ * DACL rules as part of this one call, so the runtime adapter's `init()`
+ * and the issuer's post-write verification enforce exactly one policy. An
+ * absent injected `ancestorSnapshot` means the real non-recursive Windows
+ * probe runs there (fail closed). Injected non-default test trust
+ * directories omit the chain and remain tree-only.
  */
 export function assessGuidedTrustProtection(
   trustDir: string,
   receiptPaths: readonly string[],
+  ownerSid: string,
   snapshot?: GuidedTrustAclSnapshot,
   ancestorSnapshot?: GuidedTrustAclSnapshot,
+  ancestorChain?: readonly string[],
 ): string[] {
   const rows = snapshot ?? inspectWindowsGuidedTrustAcl(trustDir, receiptPaths);
   if (!rows) return ['guided trust ACL/DACL probe failed (fail closed)'];
@@ -476,52 +813,29 @@ export function assessGuidedTrustProtection(
     resolve(trustDir, GUIDED_PROVENANCE_RECEIPTS_SUBDIR),
     ...receiptPaths,
   ].filter((path) => existsSync(path));
-  const reasons = assessGuidedAclSnapshot(rows, required, DANGEROUS_WRITE_MASK);
-  // Lexical comparison, identical to the issuer's default-root check: the
-  // combined ancestor policy binds only the source-pinned trust root. A
-  // tree-local DACL cannot prevent a rename/swap attack launched from a
+  const reasons = assessGuidedAclSnapshot(rows, required, ownerSid);
+  // A tree-local DACL cannot prevent a rename/swap attack launched from a
   // writable ancestor, so ancestor drift must fail the whole assessment.
-  if (trustDir.toLowerCase() === defaultGuidedProvenanceTrustDirectory().toLowerCase()) {
-    reasons.push(
-      ...assessGuidedTrustAncestorProtection(defaultGuidedTrustAncestorChain(), ancestorSnapshot),
-    );
+  // Per-user policy intentionally allows the USER's own write ACEs on the
+  // profile ancestors (the OS profile ACL shape); only identities outside
+  // the per-user allowed set are refused.
+  if (ancestorChain !== undefined && ancestorChain.length > 0) {
+    reasons.push(...assessGuidedTrustAncestorProtection(ancestorChain, ownerSid, ancestorSnapshot));
   }
   return reasons;
 }
 
 /**
- * Ancestor directories of the baked-in default trust root
- * (C:\ProgramData\Shun\authority, C:\ProgramData\Shun, C:\ProgramData).
- * Purely lexical over source-pinned constants (no fs, no platform path
- * semantics, NO process.env consultation) so the chain is identical on
- * every host. The walk terminates only at the source-pinned
- * C:\ProgramData — never at a caller-controlled location: an exported
- * ProgramData pointing inside the trust root must not be able to shorten
- * or redirect the policy boundary. If the constant chain can never reach
- * the pinned boundary it fails closed.
- */
-export function defaultGuidedTrustAncestorChain(): string[] {
-  const programData = 'C:\\ProgramData';
-  const rootSegments = defaultGuidedProvenanceTrustDirectory().split(/[\\/]+/);
-  const chain: string[] = [];
-  // Stop above the drive root (length >= 2 keeps at least 'C:' + one segment).
-  for (let length = rootSegments.length - 1; length >= 2; length -= 1) {
-    const candidate = rootSegments.slice(0, length).join('\\');
-    chain.push(candidate);
-    if (candidate.toLowerCase() === programData.toLowerCase()) return chain;
-  }
-  reject('TRUST_ANCESTOR_CHAIN_UNREACHABLE');
-}
-
-/**
- * Assess the ancestor chain of the default trust root: same ownership and
- * deny policy as the tree, but a narrower write mask (see
- * ANCESTOR_DANGEROUS_WRITE_MASK), probed non-recursively over the enumerated
- * directories only. A runtime-writable ancestor would allow rename/swap
- * attacks on the trust root that tree-local DACL cannot prevent.
+ * Assess the ancestor chain up to the LocalAppData policy boundary: same
+ * ownership and deny policy as the tree (per-user allowed identities),
+ * probed non-recursively over the enumerated directories only. The
+ * interactive user's own write access on their profile tree is legitimate;
+ * any OTHER writable identity would enable rename/swap attacks on the
+ * trust root that tree-local DACL cannot prevent.
  */
 export function assessGuidedTrustAncestorProtection(
   ancestorPaths: readonly string[],
+  ownerSid: string,
   snapshot?: GuidedTrustAclSnapshot,
 ): string[] {
   const first = ancestorPaths[0];
@@ -535,7 +849,7 @@ export function assessGuidedTrustAncestorProtection(
   // No existsSync filter: a real probe already fails closed on any missing
   // ancestor, and injected snapshots must deterministically cover every
   // enumerated path on every platform.
-  return assessGuidedAclSnapshot(rows, [...ancestorPaths], ANCESTOR_DANGEROUS_WRITE_MASK);
+  return assessGuidedAclSnapshot(rows, [...ancestorPaths], ownerSid);
 }
 
 /**
@@ -565,17 +879,30 @@ export function assertGuidedPathOutside(
   }
 }
 
-/** An issuer key must never live in scopes the runtime or repo can reach. */
+/**
+ * An issuer key must never live in scopes the runtime or repo can reach.
+ * The single bounded R04 exception is the DESIGNATED per-user secret
+ * location resolved from a validated LocalAppData base
+ * (`<base>\Shun\secrets\guided-issuer\issuer-private.pem`): that directory
+ * is by construction outside the workspace, database and trust tree, and is
+ * the documented user-owned home of the issuer secret.
+ */
 export function assertGuidedPrivateKeyScope(
   issuerKeyPath: string,
   workspaceRoot: string,
   databasePath?: string,
   trustDir?: string,
   testOnlyAllowTemporaryKey = false,
+  designatedPerUserKeyPath?: string,
 ): void {
+  if (
+    designatedPerUserKeyPath !== undefined &&
+    resolve(issuerKeyPath).toLowerCase() === resolve(designatedPerUserKeyPath).toLowerCase()
+  ) {
+    return;
+  }
   const forbiddenRoots = [
     workspaceRoot,
-    defaultGuidedProvenanceTrustDirectory(),
     resolve(homedir(), '.shun'),
     ...(databasePath ? [dirname(resolve(databasePath))] : []),
     ...(trustDir ? [trustDir] : []),
@@ -636,8 +963,8 @@ export function listGuidedReceiptPaths(trustDir: string): string[] {
 
 export interface ExternalGuidedAuthorityOptions {
   /**
-   * Fixed trust directory. Defaults to the baked-in ProgramData location;
-   * only tests pass an override.
+   * Fixed trust directory. Defaults to the resolved per-user LocalAppData
+   * location; only tests pass an override.
    */
   readonly trustDir?: string;
   /**
@@ -647,10 +974,23 @@ export interface ExternalGuidedAuthorityOptions {
    * the real constant.
    */
   readonly pinnedSpkiSha256: string;
+  /**
+   * Interactive user SID owning the per-user trust tree (required for the
+   * per-user owner/DACL policy). Production resolves it from the current
+   * session token; tests inject a fixture SID.
+   */
+  readonly ownerSid: string;
+  /**
+   * Ancestor chain of the resolved default per-user trust root. When
+   * provided (production and default-root tests), the combined policy also
+   * assesses the ancestors; omitted for injected non-default test trust
+   * directories (tree-only, as before).
+   */
+  readonly ancestorChain?: readonly string[];
   /** ACL snapshot injector (tests). Production uses the real Windows scan. */
   readonly inspectAcl?: GuidedAclInspector;
   /**
-   * Ancestor-chain ACL snapshot injector (tests, source-pinned default
+   * Ancestor-chain ACL snapshot injector (tests, resolved default per-user
    * trust root only). Production omits it: the combined default-trust
    * policy then probes the real ancestor chain non-recursively and fails
    * closed on any probe failure or policy drift.
@@ -670,18 +1010,21 @@ export interface ExternalGuidedAuthorityOptions {
 export function createExternalGuidedProvenanceAuthority(
   options: ExternalGuidedAuthorityOptions,
 ): GuidedProvenanceAuthority {
-  const { pinnedSpkiSha256, inspectAcl, inspectAclAncestors } = options;
+  const { pinnedSpkiSha256, inspectAcl, inspectAclAncestors, ownerSid, ancestorChain } = options;
   if (
     typeof pinnedSpkiSha256 !== 'string' ||
     !GUIDED_PROVENANCE_DIGEST_PATTERN.test(pinnedSpkiSha256)
   ) {
     reject('TRUST_PIN_REQUIRED');
   }
+  if (typeof ownerSid !== 'string' || !SID_PATTERN.test(ownerSid)) {
+    reject('TRUST_OWNER_SID_REQUIRED');
+  }
   const trustDir = options.trustDir ?? defaultGuidedProvenanceTrustDirectory();
 
   // Verified lazily once per adapter instance: trust anchor pin + ACL policy.
-  // The policy is the shared combined assessment — for the source-pinned
-  // default trust root it also covers the ancestor chain — so a runtime
+  // The policy is the shared combined assessment — for the resolved default
+  // per-user trust root it also covers the ancestor chain — so a runtime
   // verifier detects ancestor DACL drift exactly like operator issuance.
   let initialized: { publicKeyPem: string } | undefined;
   const init = (): { publicKeyPem: string } => {
@@ -695,8 +1038,10 @@ export function createExternalGuidedProvenanceAuthority(
     const reasons = assessGuidedTrustProtection(
       trustDir,
       receipts,
+      ownerSid,
       inspectAcl ? inspectAcl(trustDir, receipts) : undefined,
-      inspectAclAncestors ? inspectAclAncestors(defaultGuidedTrustAncestorChain()) : undefined,
+      inspectAclAncestors && ancestorChain ? inspectAclAncestors(ancestorChain) : undefined,
+      ancestorChain,
     );
     if (reasons.length > 0) reject(`TRUST_ACL_UNPROTECTED:${reasons.join(' | ')}`);
     initialized = { publicKeyPem: anchor.publicKeyPem };

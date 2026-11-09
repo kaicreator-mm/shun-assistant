@@ -1,16 +1,21 @@
-// R02-E (#348): trusted operator-side Guided provenance receipt issuer.
+// R02-E (#348): trusted operator-side Guided provenance receipt issuer,
+// R04 (#404): adapted to the per-user LocalAppData trust root.
 // NEVER imported or invoked by control-api's HTTP/candidate Goal path and
-// never by the runtime authority adapter. Requires an already-elevated
-// operator token on Windows; this script must NOT initiate UAC itself and
-// performs no physical Windows effect beyond writing the trust anchor and
-// receipt files it is explicitly asked to create.
+// never by the runtime authority adapter. Per-user bootstrap needs NO
+// elevation (the trust tree lives in the operator's own profile): the only
+// identity requirement is that an ELEVATED token belongs to the SAME account
+// as the interactive console session user — an over-the-shoulder elevation
+// must never plant authority in the administrator's profile. This script
+// must NOT initiate UAC itself and performs no physical Windows effect
+// beyond writing the trust anchor and receipt files it is explicitly asked
+// to create.
 //
 // The Ed25519 private key is supplied ONLY to this process via
-// SHUN_GUIDED_ISSUER_PRIVATE_KEY_FILE, must live outside the repository,
+// SHUN_GUIDED_ISSUER_PRIVATE_KEY_FILE (the per-user bootstrap keeps it in
+// the distinct per-user secret directory), must live outside the repository,
 // workspace, database directory, trust directory and OS temp directory, and
 // is never copied, logged, uploaded or read by any runtime code. The
 // matching public key is published into the protected trust anchor.
-import { execFileSync } from 'node:child_process';
 import { createPrivateKey, createPublicKey, randomBytes, sign } from 'node:crypto';
 import {
   closeSync,
@@ -28,6 +33,7 @@ import { dirname, resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { GUIDED_SCHEMA_VERSION } from '../../../packages/domain-host/src/guided/guided-provenance-authority.ts';
 import {
+  assertGuidedBootstrapIdentityContext,
   assertGuidedPathOutside,
   assertGuidedPrivateKeyScope,
   assertGuidedRegularCanonicalPath,
@@ -35,41 +41,23 @@ import {
   assessGuidedTrustProtection,
   buildGuidedReceiptSigningBytes,
   canonicalGuidedDatabasePath,
-  defaultGuidedProvenanceTrustDirectory,
-  defaultGuidedTrustAncestorChain,
   GUIDED_PROVENANCE_DIGEST_PATTERN,
   GUIDED_PROVENANCE_RECEIPT_SCHEMA,
   GUIDED_PROVENANCE_TRUST_ANCHOR_FILE,
   GUIDED_PROVENANCE_TRUST_ANCHOR_SCHEMA,
   type GuidedAclInspector,
+  type GuidedIdentityProbeSource,
   type GuidedReceiptBody,
   type GuidedReceiptEnvelope,
   guidedPublicKeySpkiSha256,
   listGuidedReceiptPaths,
+  perUserGuidedTrustAncestorChain,
+  perUserGuidedTrustDirectory,
   readGuidedTrustAnchor,
+  resolveWindowsLocalAppDataBase,
   verifyGuidedProvenanceEnvelope,
   writeGuidedReceiptAtomically,
 } from '../src/real-storage/guided-provenance-issuance.ts';
-
-/**
- * Fail closed unless the current token is already elevated (High Mandatory
- * Level S-1-16-12288). This only OBSERVES the token; it never triggers a
- * UAC elevation prompt.
- */
-export function assertGuidedIssuerElevated(): void {
-  if (process.platform !== 'win32') throw new Error('ISSUER_REAL_WINDOWS_ONLY');
-  let out: string;
-  try {
-    out = execFileSync('whoami.exe', ['/groups'], {
-      encoding: 'utf8',
-      windowsHide: true,
-      timeout: 15_000,
-    });
-  } catch {
-    throw new Error('ISSUER_ELEVATION_PROBE_FAILED');
-  }
-  if (!out.includes('S-1-16-12288')) throw new Error('ISSUER_NOT_ELEVATED');
-}
 
 /** Load the operator Ed25519 private key and prove it matches the public key. */
 export function loadGuidedIssuerPrivateKey(
@@ -116,12 +104,11 @@ export function assertGuidedIssuerDatabasePath(
     assertGuidedRegularCanonicalPath(canonical, 'ISSUER_DATABASE_PATH_UNTRUSTED');
   }
   const lower = canonical.toLowerCase();
-  for (const root of [workspaceRoot, defaultGuidedProvenanceTrustDirectory()]) {
-    const base = resolve(root).toLowerCase();
-    if (lower === base || lower.startsWith(`${base}\\`) || lower.startsWith(`${base}/`)) {
-      throw new Error('ISSUER_DATABASE_PATH_INSIDE_FORBIDDEN_SCOPE');
-    }
+  const base = resolve(workspaceRoot).toLowerCase();
+  if (lower === base || lower.startsWith(`${base}\\`) || lower.startsWith(`${base}/`)) {
+    throw new Error('ISSUER_DATABASE_PATH_INSIDE_FORBIDDEN_SCOPE');
   }
+  // Trust-directory overlap gets its own precise codes immediately after.
   return canonicalGuidedDatabasePath(canonical);
 }
 
@@ -130,9 +117,28 @@ export interface GuidedIssuanceInput {
   readonly schemaDigest: string;
   readonly privateKeyPath: string;
   readonly workspaceRoot: string;
+  /**
+   * R04 per-user policy: the interactive user SID that must own the trust
+   * tree (per-user owner/DACL policy). REQUIRED — there is no privileged-
+   * owner default anymore.
+   */
+  readonly ownerSid: string;
+  /**
+   * Ancestor chain of the resolved default per-user trust root, REQUIRED
+   * when provisioning the default root (CLI/bootstrap always provide it);
+   * injected non-default test trust directories omit it (tree-only).
+   */
+  readonly ancestorChain?: readonly string[];
   readonly trustDir?: string;
   readonly issuedAtUnixMs?: number;
   readonly databaseId?: string;
+  /**
+   * Designated per-user secret location (bootstrap passes the resolved
+   * `<base>\Shun\secrets\guided-issuer\issuer-private.pem`): the one
+   * bounded exception to the issuer-key scope rule (see
+   * assertGuidedPrivateKeyScope). The raw issuer CLI does not designate one.
+   */
+  readonly designatedPerUserKeyPath?: string;
   /** ACL snapshot injector (tests). Production uses the real Windows scan. */
   readonly inspectAcl?: GuidedAclInspector;
   /**
@@ -167,11 +173,30 @@ export function issueGuidedProvenanceReceipt(input: GuidedIssuanceInput): Guided
   if (input.testOnlyAllowTemporaryKey === true && process.env.VITEST === undefined) {
     throw new Error('ISSUER_TEST_ONLY_KEY_FLAG_OUTSIDE_TEST_CONTEXT');
   }
+  if (input.ancestorChain !== undefined && !input.ownerSid) {
+    throw new Error('ISSUER_OWNER_SID_REQUIRED_WITH_ANCESTORS');
+  }
   const workspaceRoot = resolve(input.workspaceRoot);
-  const trustDir =
-    input.trustDir === undefined
-      ? defaultGuidedProvenanceTrustDirectory()
-      : assertGuidedRegularCanonicalPath(input.trustDir, 'ISSUER_TRUST_DIR_UNTRUSTED');
+  // The trust tree itself must be alias-free and outside every forbidden
+  // scope before anything is written into it. First provisioning creates it
+  // (atomically verified against aliasing); an existing tree must already be
+  // canonical.
+  const resolveTrustDir = (): string => {
+    const dir = resolve(
+      input.trustDir ?? perUserGuidedTrustDirectory(resolveWindowsLocalAppDataBase()),
+    );
+    if (existsSync(dir)) {
+      return assertGuidedRegularCanonicalPath(dir, 'ISSUER_TRUST_DIR_UNTRUSTED');
+    }
+    mkdirSync(dir, { recursive: true });
+    const created = realpathSync(dir);
+    if (created.toLowerCase() !== dir.toLowerCase()) {
+      rmSync(dir, { recursive: true, force: true });
+      throw new Error('ISSUER_TRUST_DIR_ALIAS');
+    }
+    return dir;
+  };
+  const trustDir = resolveTrustDir();
   const canonicalDbPath = assertGuidedIssuerDatabasePath(input.databasePath, workspaceRoot);
   // Disjoint trust and database roots, even for a directly injected test path.
   assertGuidedPathOutside(canonicalDbPath, [trustDir], 'ISSUER_DATABASE_INSIDE_TRUST_DIR');
@@ -187,30 +212,19 @@ export function issueGuidedProvenanceReceipt(input: GuidedIssuanceInput): Guided
     canonicalDbPath,
     trustDir,
     input.testOnlyAllowTemporaryKey === true && input.inspectAcl !== undefined,
+    input.designatedPerUserKeyPath,
   );
 
-  // The trust tree itself must be alias-free and outside every forbidden
-  // scope before anything is written into it.
-  if (existsSync(trustDir)) {
-    assertGuidedRegularCanonicalPath(trustDir, 'ISSUER_TRUST_DIR_UNTRUSTED');
-  } else {
-    mkdirSync(trustDir, { recursive: true });
-    const created = realpathSync(trustDir);
-    if (created.toLowerCase() !== trustDir.toLowerCase()) {
-      rmSync(trustDir, { recursive: true, force: true });
-      throw new Error('ISSUER_TRUST_DIR_ALIAS');
-    }
-  }
-
-  // The baked-in production trust root must sit under an operator-protected
-  // ancestor chain; a runtime-writable ancestor would allow rename/swap of
-  // the whole trust root that tree-local DACL cannot prevent. Injected
-  // non-default test trust directories are exempt. Lexical comparison keeps
-  // this deterministic on every platform.
-  if (trustDir.toLowerCase() === defaultGuidedProvenanceTrustDirectory().toLowerCase()) {
-    const ancestors = defaultGuidedTrustAncestorChain();
+  // The resolved per-user default trust root must sit under a verified
+  // ancestor chain (up to the LocalAppData policy boundary) owned by the
+  // per-user allowed identities; a foreign-writable ancestor would allow
+  // rename/swap of the whole trust root that tree-local DACL cannot
+  // prevent. Injected non-default test trust directories are exempt.
+  if (input.ancestorChain !== undefined) {
+    const ancestors = input.ancestorChain;
     const ancestorReasons = assessGuidedTrustAncestorProtection(
       ancestors,
+      input.ownerSid ?? '',
       input.inspectAcl ? input.inspectAcl(ancestors[0] ?? '', ancestors.slice(1)) : undefined,
     );
     if (ancestorReasons.length > 0) {
@@ -265,12 +279,15 @@ export function issueGuidedProvenanceReceipt(input: GuidedIssuanceInput): Guided
   });
   const receiptPath = writeGuidedReceiptAtomically(trustDir, canonicalDbPath, envelope);
 
-  // The completed trust tree must satisfy the same policy the runtime will
-  // enforce; refuse to leave half-protected evidence behind.
+  // The completed trust tree must satisfy the same per-user policy the
+  // runtime will enforce; refuse to leave half-protected evidence behind.
+  // (Tree-only here: the ancestor chain was gated before any write.)
+  const receiptsAfterWrite = listGuidedReceiptPaths(trustDir);
   const reasons = assessGuidedTrustProtection(
     trustDir,
-    listGuidedReceiptPaths(trustDir),
-    input.inspectAcl ? input.inspectAcl(trustDir, listGuidedReceiptPaths(trustDir)) : undefined,
+    receiptsAfterWrite,
+    input.ownerSid,
+    input.inspectAcl ? input.inspectAcl(trustDir, receiptsAfterWrite) : undefined,
   );
   if (reasons.length > 0) {
     rmSync(receiptPath, { force: true });
@@ -303,16 +320,26 @@ function requiredFrom(env: NodeJS.ProcessEnv, name: string): string {
   return value;
 }
 
-export function runGuidedIssuerCli(env: NodeJS.ProcessEnv = process.env): GuidedIssuanceResult {
+export function runGuidedIssuerCli(
+  env: NodeJS.ProcessEnv = process.env,
+  identityProbes: GuidedIdentityProbeSource = {},
+): GuidedIssuanceResult {
   if (env.SHUN_GUIDED_TRUST_DIR !== undefined) {
     throw new Error('ISSUER_TRUST_DIR_OVERRIDE_FORBIDDEN');
   }
-  assertGuidedIssuerElevated();
+  // R04: per-user issuance runs unelevated by default. The only identity
+  // requirement is same-account context: an elevated token that belongs to
+  // a DIFFERENT account than the interactive console user must not plant
+  // trust in the administrator's profile.
+  const identity = assertGuidedBootstrapIdentityContext(identityProbes);
+  const localAppDataBase = resolveWindowsLocalAppDataBase(env);
   const result = issueGuidedProvenanceReceipt({
     databasePath: requiredFrom(env, 'SHUN_GUIDED_DATABASE_PATH'),
     schemaDigest: requiredFrom(env, 'SHUN_GUIDED_SCHEMA_DIGEST'),
     privateKeyPath: requiredFrom(env, 'SHUN_GUIDED_ISSUER_PRIVATE_KEY_FILE'),
     workspaceRoot: requiredFrom(env, 'SHUN_GUIDED_WORKSPACE_ROOT'),
+    ownerSid: identity.processUserSid,
+    ancestorChain: perUserGuidedTrustAncestorChain(localAppDataBase),
   });
   // Evidence lines only: identifiers, paths and fingerprints. NEVER key
   // material, key paths' contents, or anything derived from the secret half.
@@ -320,7 +347,7 @@ export function runGuidedIssuerCli(env: NodeJS.ProcessEnv = process.env): Guided
   console.log(`ISSUER_RECEIPT=${result.receiptPath}`);
   console.log(`ISSUER_TRUST_ANCHOR=${result.trustAnchorPath}`);
   console.log(`ISSUER_SPKI_SHA256=${result.spkiSha256}`);
-  console.log('ISSUER_REQUIRES_WINDOWS_DACL_AND_PROCESS_IDENTITY_VALIDATION=YES');
+  console.log('ISSUER_PER_USER_LOCALAPPDATA_IDENTITY_VALIDATED=YES');
   return result;
 }
 

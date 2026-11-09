@@ -1,7 +1,8 @@
-// R02-E (#348): deterministic test-key coverage for the externally signed
-// Guided provenance receipt. All Ed25519 keys here are ephemeral and
-// test-only, generated per run and never persisted to any location outside
-// the OS temp directory. No production key, credential or signed production
+// R02-E (#348) / R04 (#404): deterministic test-key coverage for the
+// externally signed Guided provenance receipt under the PER-USER
+// LocalAppData trust model. All Ed25519 keys here are ephemeral and
+// test-only, generated per run and never persisted anywhere outside the OS
+// temp directory. No production key, credential or signed production
 // receipt exists in this repository.
 import { generateKeyPairSync, sign } from 'node:crypto';
 import {
@@ -14,7 +15,7 @@ import {
   writeFileSync,
 } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { join } from 'node:path';
+import { join, parse, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
 import { GUIDED_SCHEMA_VERSION } from '../../../packages/domain-host/src/guided/guided-provenance-authority.ts';
@@ -25,15 +26,15 @@ import {
   runGuidedIssuerCli,
 } from '../scripts/issue-guided-provenance.ts';
 import {
+  assertGuidedBootstrapIdentityContext,
   assertGuidedPrivateKeyScope,
   assertGuidedRegularCanonicalPath,
+  assessGuidedBootstrapIdentity,
   assessGuidedTrustAncestorProtection,
   assessGuidedTrustProtection,
   buildGuidedReceiptSigningBytes,
   canonicalGuidedDatabasePath,
   createExternalGuidedProvenanceAuthority,
-  defaultGuidedProvenanceTrustDirectory,
-  defaultGuidedTrustAncestorChain,
   type ExternalGuidedAuthorityOptions,
   GUIDED_PROVENANCE_RECEIPT_SCHEMA,
   GUIDED_PROVENANCE_RECEIPTS_SUBDIR,
@@ -45,12 +46,20 @@ import {
   type GuidedTrustAclSnapshot,
   guidedPublicKeySpkiSha256,
   inspectWindowsGuidedTrustAcl,
+  perUserGuidedTrustAncestorChain,
+  perUserGuidedTrustDirectory,
+  perUserIssuerSecretDirectory,
+  queryWindowsProcessUserSid,
+  resolveWindowsLocalAppDataBase,
   writeGuidedReceiptAtomically,
 } from '../src/real-storage/guided-provenance-issuance.ts';
 
 const DIGEST_A = 'a'.repeat(64);
 const DIGEST_B = 'b'.repeat(64);
 const ISSUED_AT = 1_761_000_000_000;
+/** Fixture interactive-user SID for the per-user owner/DACL policy. */
+const TEST_USER_SID = 'S-1-5-21-11888-22222-33333-1001';
+const OTHER_USER_SID = 'S-1-5-21-11888-22222-33333-1002';
 
 interface Fixture {
   root: string;
@@ -106,9 +115,23 @@ function protectedAcl(trustDir: string, extraPaths: readonly string[]): GuidedTr
   ];
   return [...new Set(paths.filter(existsSync))].map((path) => ({
     path,
-    ownerSid: 'S-1-5-32-544',
+    ownerSid: TEST_USER_SID,
     accessRules: [
-      { identitySid: 'S-1-5-32-545', rightsMask: 0x200a9, accessType: 'Allow', isInherited: true },
+      // Per-user profile shape: the interactive user reads/executes (and
+      // would own writes), SYSTEM/Administrators keep full control.
+      {
+        identitySid: TEST_USER_SID,
+        rightsMask: 0x001200a9,
+        accessType: 'Allow',
+        isInherited: true,
+      },
+      { identitySid: 'S-1-5-18', rightsMask: 0x001f01ff, accessType: 'Allow', isInherited: true },
+      {
+        identitySid: 'S-1-5-32-544',
+        rightsMask: 0x001f01ff,
+        accessType: 'Allow',
+        isInherited: true,
+      },
     ] as GuidedTrustAccessRule[],
   }));
 }
@@ -116,45 +139,25 @@ function protectedAcl(trustDir: string, extraPaths: readonly string[]): GuidedTr
 const protectedInspector = (trustDir: string, extraPaths: readonly string[]) =>
   protectedAcl(trustDir, extraPaths);
 
-/** One healthy admin-owned ancestor row ( Administrators/SYSTEM-owned). */
+/** One healthy per-user ancestor row (user-owned, user-readable). */
 const protectedAncestorRow = (path: string) => ({
   path,
-  ownerSid: 'S-1-5-18',
+  ownerSid: TEST_USER_SID,
   accessRules: [
     {
-      identitySid: 'S-1-5-32-545',
-      rightsMask: 0x001200a9,
+      identitySid: TEST_USER_SID,
+      rightsMask: 0x001f01ff,
+      accessType: 'Allow',
+      isInherited: true,
+    },
+    {
+      identitySid: 'S-1-5-18',
+      rightsMask: 0x001f01ff,
       accessType: 'Allow',
       isInherited: true,
     },
   ] as GuidedTrustAccessRule[],
 });
-
-/**
- * Explicit default-trust tree snapshot: exactly the three required rows
- * (trust root, trust-anchor file, receipts directory), SYSTEM-owned with the
- * runtime read/execute allow ACE. Built without existsSync filtering so the
- * combined-policy tests never depend on whether this host actually has the
- * default trust directory on disk (an existsSync-filtered snapshot can come
- * back empty and let a positive case pass on the ancestor rows alone).
- */
-const protectedDefaultTrustTreeRows = (trustDir: string): GuidedTrustAclSnapshot =>
-  [
-    trustDir,
-    join(trustDir, GUIDED_PROVENANCE_TRUST_ANCHOR_FILE),
-    join(trustDir, GUIDED_PROVENANCE_RECEIPTS_SUBDIR),
-  ].map((path) => ({
-    path,
-    ownerSid: 'S-1-5-18',
-    accessRules: [
-      {
-        identitySid: 'S-1-5-32-545',
-        rightsMask: 0x001200a9,
-        accessType: 'Allow',
-        isInherited: true,
-      },
-    ] as GuidedTrustAccessRule[],
-  }));
 
 function envelopeBody(
   fixture: Fixture,
@@ -208,6 +211,7 @@ function authorityFor(fixture: Fixture, overrides: Partial<ExternalGuidedAuthori
   return createExternalGuidedProvenanceAuthority({
     trustDir: fixture.trustDir,
     pinnedSpkiSha256: fixture.pinnedSha256,
+    ownerSid: TEST_USER_SID,
     inspectAcl: protectedInspector,
     ...overrides,
   });
@@ -252,6 +256,7 @@ describe('external Guided provenance receipt issuance + verify-only runtime adap
         schemaDigest: DIGEST_A,
         privateKeyPath,
         workspaceRoot: fixture.workspaceRoot,
+        ownerSid: TEST_USER_SID,
         trustDir: fixture.trustDir,
         inspectAcl: protectedInspector,
         testOnlyAllowTemporaryKey: true,
@@ -500,16 +505,25 @@ describe('external Guided provenance receipt issuance + verify-only runtime adap
     }
   });
 
-  it('refuses to construct an authority without a well-formed operator pin', () => {
+  it('refuses to construct an authority without a well-formed operator pin or owner SID', () => {
     for (const pinnedSpkiSha256 of ['', 'not-hex', 'A'.repeat(63)]) {
       expect(() =>
         createExternalGuidedProvenanceAuthority({
           trustDir: join(tmpdir(), 'unused'),
+          ownerSid: TEST_USER_SID,
           pinnedSpkiSha256: pinnedSpkiSha256 as string,
           inspectAcl: protectedInspector,
         }),
       ).toThrow('GUIDED_PROVENANCE_TRUST_PIN_REQUIRED');
     }
+    expect(() =>
+      createExternalGuidedProvenanceAuthority({
+        trustDir: join(tmpdir(), 'unused'),
+        pinnedSpkiSha256: DIGEST_A,
+        ownerSid: '',
+        inspectAcl: protectedInspector,
+      }),
+    ).toThrow('GUIDED_PROVENANCE_TRUST_OWNER_SID_REQUIRED');
   });
 
   it('refuses receipt rows whose shape is not exactly the G6 contract', () => {
@@ -542,53 +556,60 @@ describe('external Guided provenance receipt issuance + verify-only runtime adap
   });
 });
 
-describe('Windows trust-tree ACL/owner policy (fail closed)', () => {
-  it('reports the real owner snapshot and refuses a trust tree the runtime cannot prove protected', () => {
+describe('per-user trust-tree ACL/owner policy (fail closed)', () => {
+  it('reports the real owner snapshot: the per-user identities own the tree', () => {
     const fixture = makeFixture();
     try {
-      // Real probe (no injection): a temp-dir trust tree is user-owned, so
-      // the adapter must refuse it — on Windows by policy, elsewhere because
-      // the probe cannot run. Both are fail-closed.
+      // Real probe (no injection). R04: per-user ownership means the process
+      // user SID (an admin-profile tree may record Administrators) or the
+      // machine authority identities — never a foreign user. The shared OS
+      // temp directory on some dev machines carries foreign inherited write
+      // ACEs (correctly refused by policy); ownership is the deterministic
+      // machine-independent fact asserted here.
       if (process.platform === 'win32') {
         const snapshot = inspectWindowsGuidedTrustAcl(fixture.trustDir, []);
         expect(snapshot).toBeDefined();
         const rows = snapshot ?? [];
         expect(rows.length).toBeGreaterThan(0);
+        const processUserSid = queryWindowsProcessUserSid();
+        expect(processUserSid).toBeDefined();
         for (const row of rows) {
-          expect(['S-1-5-18', 'S-1-5-32-544']).not.toContain(row.ownerSid);
+          expect([processUserSid, 'S-1-5-18', 'S-1-5-32-544']).toContain(row.ownerSid);
         }
       } else {
         expect(inspectWindowsGuidedTrustAcl(fixture.trustDir, [])).toBeUndefined();
+        const authority = createExternalGuidedProvenanceAuthority({
+          trustDir: fixture.trustDir,
+          pinnedSpkiSha256: fixture.pinnedSha256,
+          ownerSid: TEST_USER_SID,
+        });
+        expect(() =>
+          authority.issueFreshReceipt({
+            canonicalDatabasePath: fixture.dbPath,
+            schemaDigest: DIGEST_A,
+            issuedAtUnixMs: ISSUED_AT,
+          }),
+        ).toThrow(/GUIDED_PROVENANCE_TRUST_ACL_UNPROTECTED/);
       }
-      const authority = createExternalGuidedProvenanceAuthority({
-        trustDir: fixture.trustDir,
-        pinnedSpkiSha256: fixture.pinnedSha256,
-      });
-      expect(() =>
-        authority.issueFreshReceipt({
-          canonicalDatabasePath: fixture.dbPath,
-          schemaDigest: DIGEST_A,
-          issuedAtUnixMs: ISSUED_AT,
-        }),
-      ).toThrow(/GUIDED_PROVENANCE_TRUST_ACL_UNPROTECTED/);
     } finally {
       rmSync(fixture.root, { recursive: true, force: true });
     }
   });
 
-  it('refuses injected ACL snapshots with non-privileged owners or probe failure', () => {
+  it('refuses injected ACL snapshots with foreign owners or probe failure', () => {
     const fixture = makeFixture();
     try {
       provisionReceipt(fixture, signedEnvelope(fixture));
+      // Another local user's SID owning the tree: never a per-user trust owner.
       const unprotected = (trustDir: string, extraPaths: readonly string[]) => [
         {
           path: trustDir,
-          ownerSid: 'S-1-5-32-545',
+          ownerSid: OTHER_USER_SID,
           accessRules: [],
-        }, // Users — never a trust owner.
+        },
         ...extraPaths.map((path) => ({
           path,
-          ownerSid: 'S-1-5-32-545' as const,
+          ownerSid: OTHER_USER_SID,
           accessRules: [],
         })),
       ];
@@ -612,6 +633,203 @@ describe('Windows trust-tree ACL/owner policy (fail closed)', () => {
     } finally {
       rmSync(fixture.root, { recursive: true, force: true });
     }
+  });
+});
+
+describe('R04 per-user LocalAppData trust-root resolution (fail closed)', () => {
+  /** One disposable profile fixture: root = USERPROFILE, base = AppData/Local. */
+  function makeProfileFixture(): { root: string; base: string; env: NodeJS.ProcessEnv } {
+    const root = mkdtempSync(join(tmpdir(), 'shun-r04-profile-'));
+    const base = join(root, 'AppData', 'Local');
+    mkdirSync(base, { recursive: true });
+    return { root, base, env: { LOCALAPPDATA: base, USERPROFILE: root } };
+  }
+
+  it('accepts the documented USERPROFILE\\AppData\\Local relationship and returns it canonically', () => {
+    const fixture = makeProfileFixture();
+    try {
+      expect(resolveWindowsLocalAppDataBase(fixture.env)).toBe(resolve(fixture.base));
+    } finally {
+      rmSync(fixture.root, { recursive: true, force: true });
+    }
+  });
+
+  it('refuses absent, relative, root-aliased or missing-directory values', () => {
+    const fixture = makeProfileFixture();
+    try {
+      expect(() => resolveWindowsLocalAppDataBase({ ...fixture.env, LOCALAPPDATA: '' })).toThrow(
+        'GUIDED_PROVENANCE_LOCALAPPDATA_UNRESOLVED',
+      );
+      expect(() =>
+        resolveWindowsLocalAppDataBase({ ...fixture.env, LOCALAPPDATA: 'relative/dir' }),
+      ).toThrow('GUIDED_PROVENANCE_LOCALAPPDATA_UNRESOLVED');
+      expect(() =>
+        resolveWindowsLocalAppDataBase({
+          ...fixture.env,
+          LOCALAPPDATA: parse(fixture.root).root,
+        }),
+      ).toThrow('GUIDED_PROVENANCE_LOCALAPPDATA_ROOT_ALIAS');
+      expect(() =>
+        resolveWindowsLocalAppDataBase({
+          ...fixture.env,
+          LOCALAPPDATA: join(fixture.root, 'AppData', 'NotThere'),
+        }),
+      ).toThrow(/GUIDED_PROVENANCE_LOCALAPPDATA_(MISSING|PROFILE_MISMATCH)/);
+    } finally {
+      rmSync(fixture.root, { recursive: true, force: true });
+    }
+  });
+
+  it('refuses a LocalAppData value that breaks the documented profile relationship', () => {
+    const fixture = makeProfileFixture();
+    try {
+      const otherRoot = mkdtempSync(join(tmpdir(), 'shun-r04-otherprofile-'));
+      try {
+        mkdirSync(join(otherRoot, 'AppData', 'Local'), { recursive: true });
+        // A different profile's LocalAppData: mismatch with THIS session's
+        // USERPROFILE — must never silently issue trust for the wrong user.
+        expect(() =>
+          resolveWindowsLocalAppDataBase({
+            ...fixture.env,
+            LOCALAPPDATA: join(otherRoot, 'AppData', 'Local'),
+          }),
+        ).toThrow('GUIDED_PROVENANCE_LOCALAPPDATA_PROFILE_MISMATCH');
+      } finally {
+        rmSync(otherRoot, { recursive: true, force: true });
+      }
+    } finally {
+      rmSync(fixture.root, { recursive: true, force: true });
+    }
+  });
+
+  it('refuses an aliased (symlinked) LocalAppData base', () => {
+    if (process.platform === 'win32') return; // directory symlink needs elevation here
+    const fixture = makeProfileFixture();
+    try {
+      // The alias sits at the DOCUMENTED profile location of another profile
+      // root, so the profile-relationship check passes and the failure is
+      // isolated to the reparse/alias refusal itself.
+      const aliasedParent = mkdtempSync(join(tmpdir(), 'shun-r04-aliasparent-'));
+      const aliasBase = join(aliasedParent, 'AppData', 'Local');
+      mkdirSync(join(aliasedParent, 'AppData'), { recursive: true });
+      symlinkSync(fixture.base, aliasBase, 'dir');
+      try {
+        expect(() =>
+          resolveWindowsLocalAppDataBase({
+            LOCALAPPDATA: aliasBase,
+            USERPROFILE: aliasedParent,
+          }),
+        ).toThrow(/GUIDED_PROVENANCE_LOCALAPPDATA_UNTRUSTED/);
+      } finally {
+        rmSync(aliasedParent, { recursive: true, force: true });
+      }
+    } finally {
+      rmSync(fixture.root, { recursive: true, force: true });
+    }
+  });
+
+  it('refuses machine-scope Windows locations as LocalAppData', () => {
+    if (process.platform !== 'win32') return; // the scope roots are Windows literals
+    const fixture = makeProfileFixture();
+    try {
+      const systemRoot = process.env.SystemRoot ?? 'C:\\Windows';
+      expect(() =>
+        resolveWindowsLocalAppDataBase({ ...fixture.env, LOCALAPPDATA: systemRoot }),
+      ).toThrow('GUIDED_PROVENANCE_LOCALAPPDATA_UNEXPECTED_SCOPE');
+    } finally {
+      rmSync(fixture.root, { recursive: true, force: true });
+    }
+  });
+
+  it('derives the per-user trust tree, secret dir and ancestor chain from the resolved base', () => {
+    const fixture = makeProfileFixture();
+    try {
+      const base = resolve(fixture.base);
+      expect(perUserGuidedTrustDirectory(fixture.base)).toBe(
+        join(base, 'Shun', 'authority', 'guided-provenance'),
+      );
+      expect(perUserIssuerSecretDirectory(fixture.base)).toBe(
+        join(base, 'Shun', 'secrets', 'guided-issuer'),
+      );
+      // The ancestor chain terminates exactly at the LocalAppData policy
+      // boundary: authority -> Shun -> base, nothing above it.
+      expect(perUserGuidedTrustAncestorChain(fixture.base)).toEqual([
+        join(base, 'Shun', 'authority'),
+        join(base, 'Shun'),
+        base,
+      ]);
+    } finally {
+      rmSync(fixture.root, { recursive: true, force: true });
+    }
+  });
+});
+
+describe('R04 bootstrap identity guard (read-only, fail closed)', () => {
+  it('accepts an unelevated same-user run and a same-account elevation', () => {
+    expect(
+      assessGuidedBootstrapIdentity({
+        processUserSid: () => TEST_USER_SID,
+        elevated: () => false,
+      }),
+    ).toEqual({ processUserSid: TEST_USER_SID, elevated: false });
+    expect(
+      assessGuidedBootstrapIdentity({
+        processUserSid: () => TEST_USER_SID,
+        elevated: () => true,
+        consoleUserSid: () => TEST_USER_SID,
+      }),
+    ).toEqual({ processUserSid: TEST_USER_SID, elevated: true });
+    // No resolvable console session (e.g. disconnected) with elevation: the
+    // process account is the only account in evidence — accepted.
+    expect(
+      assessGuidedBootstrapIdentity({
+        processUserSid: () => TEST_USER_SID,
+        elevated: () => true,
+        consoleUserSid: () => null,
+      }),
+    ).toEqual({ processUserSid: TEST_USER_SID, elevated: true });
+  });
+
+  it('refuses an over-the-shoulder elevation that belongs to a different account', () => {
+    // Elevated as the ADMIN while the console session user is the TARGET
+    // user: planting trust now would write the admin's profile, not the
+    // target interactive user's.
+    expect(() =>
+      assessGuidedBootstrapIdentity({
+        processUserSid: () => 'S-1-5-21-9-9-9-500',
+        elevated: () => true,
+        consoleUserSid: () => TEST_USER_SID,
+      }),
+    ).toThrow(/GUIDED_BOOTSTRAP_WRONG_ACCOUNT_ELEVATION/);
+  });
+
+  it('fails closed when any identity probe fails', () => {
+    expect(() =>
+      assessGuidedBootstrapIdentity({
+        processUserSid: () => undefined,
+        elevated: () => false,
+      }),
+    ).toThrow('GUIDED_BOOTSTRAP_IDENTITY_PROBE_FAILED');
+    expect(() =>
+      assessGuidedBootstrapIdentity({
+        processUserSid: () => TEST_USER_SID,
+        elevated: () => undefined,
+      }),
+    ).toThrow('GUIDED_BOOTSTRAP_IDENTITY_PROBE_FAILED');
+    expect(() =>
+      assessGuidedBootstrapIdentity({
+        processUserSid: () => TEST_USER_SID,
+        elevated: () => true,
+        consoleUserSid: () => undefined,
+      }),
+    ).toThrow('GUIDED_BOOTSTRAP_IDENTITY_PROBE_FAILED');
+  });
+
+  it('the production wrapper requires real Windows', () => {
+    if (process.platform === 'win32') return;
+    expect(() => assertGuidedBootstrapIdentityContext()).toThrow(
+      'GUIDED_BOOTSTRAP_REAL_WINDOWS_ONLY',
+    );
   });
 });
 
@@ -649,6 +867,8 @@ describe('operator issuer guards (no elevation required for these checks)', () =
           fixture.workspaceRoot,
         ),
       ).toThrow('ISSUER_DATABASE_PATH_INSIDE_FORBIDDEN_SCOPE');
+      // Trust-directory overlap is refused with its own precise codes at the
+      // issuer level (covered by the overlapping-directories test below).
     } finally {
       rmSync(fixture.root, { recursive: true, force: true });
     }
@@ -699,6 +919,7 @@ describe('operator issuer guards (no elevation required for these checks)', () =
           schemaDigest: DIGEST_A,
           privateKeyPath,
           workspaceRoot: fixture.workspaceRoot,
+          ownerSid: TEST_USER_SID,
           trustDir: fixture.trustDir,
           inspectAcl: protectedInspector,
           testOnlyAllowTemporaryKey: true,
@@ -725,6 +946,7 @@ describe('operator issuer guards (no elevation required for these checks)', () =
           schemaDigest: DIGEST_A,
           privateKeyPath,
           workspaceRoot: fixture.workspaceRoot,
+          ownerSid: TEST_USER_SID,
           trustDir: fixture.trustDir,
           inspectAcl: () => undefined, // probe failure ⇒ refuse
           testOnlyAllowTemporaryKey: true,
@@ -746,13 +968,13 @@ describe('runtime adapter is verify-only (no signing reachability)', () => {
     expect(source).not.toMatch(/generateKeyPair/);
     expect(source).not.toMatch(/\bsign\s*\(/);
     expect(source).not.toMatch(/privateKey/);
-    // Trust never comes from the environment: the only env touch is the
-    // outward SystemRoot lookup that locates the system PowerShell binary
-    // for the read-only ACL probe (mirrors executor anchor-protection).
+    // Trust never comes from caller-controlled environment: the only env
+    // touches are the outward SystemRoot lookup (ACL/PowerShell probes) and
+    // the STRICTLY VALIDATED OS session LocalAppData/USERPROFILE values that
+    // must satisfy the documented profile relationship — never a raw
+    // caller-picked trust directory.
     expect(source).not.toMatch(/pinnedSpkiSha256\s*=\s*process\.env/);
     expect(source).not.toMatch(/trustDir\s*=\s*process\.env/);
-    // G4: the trust-root ancestor boundary is source-pinned; a caller
-    // exported ProgramData must never shorten or redirect the chain.
     expect(source).not.toMatch(/process\.env\.ProgramData/);
   });
 
@@ -777,8 +999,8 @@ describe('runtime adapter is verify-only (no signing reachability)', () => {
   });
 });
 
-describe('G2 DACL and issuer-key custody repairs', () => {
-  it('rejects inherited nonprivileged DACL write/DELETE/WRITE_DAC/WRITE_OWNER rights', () => {
+describe('G2 DACL and issuer-key custody repairs (per-user policy)', () => {
+  it('rejects foreign-identity DACL write/DELETE/WRITE_DAC/WRITE_OWNER rights', () => {
     const fixture = makeFixture();
     try {
       for (const mask of [2, 0x10000, 0x40000, 0x80000, 0x001f01ff]) {
@@ -794,8 +1016,8 @@ describe('G2 DACL and issuer-key custody repairs', () => {
             },
           ],
         }));
-        expect(assessGuidedTrustProtection(fixture.trustDir, [], rows)).toEqual(
-          expect.arrayContaining([expect.stringContaining('non-privileged write')]),
+        expect(assessGuidedTrustProtection(fixture.trustDir, [], TEST_USER_SID, rows)).toEqual(
+          expect.arrayContaining([expect.stringContaining('non-owner write')]),
         );
       }
     } finally {
@@ -803,13 +1025,28 @@ describe('G2 DACL and issuer-key custody repairs', () => {
     }
   });
 
-  it('allows read-only Users ACE and inherited deny ACE', () => {
+  it('allows the interactive user full control, SYSTEM/Administrators full control and read-only foreign ACEs', () => {
     const fixture = makeFixture();
     try {
+      // The default per-user profile ACL shape: user + SYSTEM +
+      // Administrators full control, plus a foreign read-only ACE, plus an
+      // inherited deny ACE for an unrelated SID — all legitimate.
       const rows = protectedAcl(fixture.trustDir, []).map((row) => ({
         ...row,
         accessRules: [
           ...row.accessRules,
+          {
+            identitySid: TEST_USER_SID,
+            rightsMask: 0x001f01ff,
+            accessType: 'Allow' as const,
+            isInherited: true,
+          },
+          {
+            identitySid: 'S-1-5-99',
+            rightsMask: 0x000200a9,
+            accessType: 'Allow' as const,
+            isInherited: true,
+          },
           {
             identitySid: 'S-1-5-99',
             rightsMask: 0x001f01ff,
@@ -818,20 +1055,20 @@ describe('G2 DACL and issuer-key custody repairs', () => {
           },
         ],
       }));
-      expect(assessGuidedTrustProtection(fixture.trustDir, [], rows)).toEqual([]);
+      expect(assessGuidedTrustProtection(fixture.trustDir, [], TEST_USER_SID, rows)).toEqual([]);
     } finally {
       rmSync(fixture.root, { recursive: true, force: true });
     }
   });
 
-  it('fails closed when Users/Authenticated Users cannot read or traverse the trust tree', () => {
+  it('fails closed when neither the owner nor any runtime group can read the trust tree', () => {
     const fixture = makeFixture();
     try {
       const noRead = protectedAcl(fixture.trustDir, []).map((row) => ({
         ...row,
         accessRules: [],
       }));
-      expect(assessGuidedTrustProtection(fixture.trustDir, [], noRead)).toEqual(
+      expect(assessGuidedTrustProtection(fixture.trustDir, [], TEST_USER_SID, noRead)).toEqual(
         expect.arrayContaining([expect.stringContaining('runtime read/execute')]),
       );
 
@@ -847,7 +1084,7 @@ describe('G2 DACL and issuer-key custody repairs', () => {
           },
         ],
       }));
-      expect(assessGuidedTrustProtection(fixture.trustDir, [], deniedRead)).toEqual(
+      expect(assessGuidedTrustProtection(fixture.trustDir, [], TEST_USER_SID, deniedRead)).toEqual(
         expect.arrayContaining([expect.stringContaining('runtime read/execute')]),
       );
     } finally {
@@ -859,23 +1096,21 @@ describe('G2 DACL and issuer-key custody repairs', () => {
     const fixture = makeFixture();
     try {
       const rows = protectedAcl(fixture.trustDir, []);
-      expect(assessGuidedTrustProtection(fixture.trustDir, [], rows.slice(0, 1))).not.toEqual([]);
+      expect(
+        assessGuidedTrustProtection(fixture.trustDir, [], TEST_USER_SID, rows.slice(0, 1)),
+      ).not.toEqual([]);
       const [firstRow, ...restRows] = rows;
       if (!firstRow) throw new Error('fixture produced no ACL rows');
       expect(
-        assessGuidedTrustProtection(
-          fixture.trustDir,
-          [],
-          [
-            {
-              ...firstRow,
-              accessRules: [
-                { identitySid: null, rightsMask: 2, accessType: 'Allow', isInherited: true },
-              ],
-            },
-            ...restRows,
-          ],
-        ),
+        assessGuidedTrustProtection(fixture.trustDir, [], TEST_USER_SID, [
+          {
+            ...firstRow,
+            accessRules: [
+              { identitySid: null, rightsMask: 2, accessType: 'Allow', isInherited: true },
+            ],
+          },
+          ...restRows,
+        ]),
       ).not.toEqual([]);
     } finally {
       rmSync(fixture.root, { recursive: true, force: true });
@@ -917,6 +1152,7 @@ describe('G2 DACL and issuer-key custody repairs', () => {
         schemaDigest: DIGEST_A,
         privateKeyPath: keyFile,
         workspaceRoot: fixture.workspaceRoot,
+        ownerSid: TEST_USER_SID,
         inspectAcl: protectedInspector,
         testOnlyAllowTemporaryKey: true,
       };
@@ -941,7 +1177,7 @@ describe('G2 DACL and issuer-key custody repairs', () => {
     }
   });
 
-  it('rejects production CLI trust-directory overrides before elevation check', () => {
+  it('rejects production CLI trust-directory overrides before identity checks', () => {
     expect(() =>
       runGuidedIssuerCli({
         SHUN_GUIDED_TRUST_DIR: 'C:\\wrong\\user-writable',
@@ -965,7 +1201,7 @@ describe('G2 DACL and issuer-key custody repairs', () => {
             },
           ],
         }));
-        expect(assessGuidedTrustProtection(fixture.trustDir, [], rows)).toEqual(
+        expect(assessGuidedTrustProtection(fixture.trustDir, [], TEST_USER_SID, rows)).toEqual(
           expect.arrayContaining([expect.stringContaining('runtime read/execute')]),
         );
       }
@@ -990,45 +1226,46 @@ describe('G2 DACL and issuer-key custody repairs', () => {
             },
           ],
         }));
-        expect(assessGuidedTrustProtection(fixture.trustDir, [], rows)).toEqual([]);
+        expect(assessGuidedTrustProtection(fixture.trustDir, [], TEST_USER_SID, rows)).toEqual([]);
       }
     } finally {
       rmSync(fixture.root, { recursive: true, force: true });
     }
   });
 
-  it('assesses the default-trust ancestor chain and refuses non-privileged write on it', () => {
-    const chain = defaultGuidedTrustAncestorChain();
+  it('assesses the per-user ancestor chain and refuses foreign write on it', () => {
+    const base = resolve(join(mkdtempSync(join(tmpdir(), 'shun-r04-chain-')), 'AppData', 'Local'));
+    const chain = perUserGuidedTrustAncestorChain(base);
     expect(chain.map((path) => path.toLowerCase())).toEqual([
-      'c:\\programdata\\shun\\authority',
-      'c:\\programdata\\shun',
-      'c:\\programdata',
+      join(base, 'Shun', 'authority').toLowerCase(),
+      join(base, 'Shun').toLowerCase(),
+      base.toLowerCase(),
     ]);
     const ancestorRow = (path: string) => ({
       path,
-      ownerSid: 'S-1-5-18',
+      ownerSid: TEST_USER_SID,
       accessRules: [
         {
-          identitySid: 'S-1-5-32-545',
-          rightsMask: 0x001200a9,
+          identitySid: TEST_USER_SID,
+          rightsMask: 0x001f01ff,
           accessType: 'Allow',
           isInherited: true,
         },
       ] as GuidedTrustAccessRule[],
     });
     const healthy = chain.map(ancestorRow);
-    expect(assessGuidedTrustAncestorProtection(chain, healthy)).toEqual([]);
-    // OS-default ProgramData shape: Users "create children" (0x116) on the
-    // folder itself cannot rename/delete/re-ACL an existing admin-owned entry.
-    const defaultCreate = chain.map((path, index) =>
+    expect(assessGuidedTrustAncestorProtection(chain, TEST_USER_SID, healthy)).toEqual([]);
+    // The user's own FULL CONTROL on the profile ancestors is legitimate
+    // per-user profile semantics (unlike the retired privileged-only rule).
+    const userWritable = chain.map((path, index) =>
       index === 2
         ? {
             ...ancestorRow(path),
             accessRules: [
               ...ancestorRow(path).accessRules,
               {
-                identitySid: 'S-1-5-32-545',
-                rightsMask: 0x00000116,
+                identitySid: TEST_USER_SID,
+                rightsMask: 0x001f01ff,
                 accessType: 'Allow' as const,
                 isInherited: true,
               },
@@ -1036,8 +1273,8 @@ describe('G2 DACL and issuer-key custody repairs', () => {
           }
         : ancestorRow(path),
     );
-    expect(assessGuidedTrustAncestorProtection(chain, defaultCreate)).toEqual([]);
-    const deletable = chain.map((path, index) =>
+    expect(assessGuidedTrustAncestorProtection(chain, TEST_USER_SID, userWritable)).toEqual([]);
+    const foreignDeletable = chain.map((path, index) =>
       index === 1
         ? {
             ...ancestorRow(path),
@@ -1053,10 +1290,12 @@ describe('G2 DACL and issuer-key custody repairs', () => {
           }
         : ancestorRow(path),
     );
-    expect(assessGuidedTrustAncestorProtection(chain, deletable)).toEqual(
-      expect.arrayContaining([expect.stringContaining('non-privileged write')]),
+    expect(assessGuidedTrustAncestorProtection(chain, TEST_USER_SID, foreignDeletable)).toEqual(
+      expect.arrayContaining([expect.stringContaining('non-owner write')]),
     );
-    expect(assessGuidedTrustAncestorProtection(chain, healthy.slice(0, 2))).not.toEqual([]);
+    expect(
+      assessGuidedTrustAncestorProtection(chain, TEST_USER_SID, healthy.slice(0, 2)),
+    ).not.toEqual([]);
     const deniedTraverse = chain.map((path, index) =>
       index === 0
         ? {
@@ -1073,7 +1312,7 @@ describe('G2 DACL and issuer-key custody repairs', () => {
           }
         : ancestorRow(path),
     );
-    expect(assessGuidedTrustAncestorProtection(chain, deniedTraverse)).toEqual(
+    expect(assessGuidedTrustAncestorProtection(chain, TEST_USER_SID, deniedTraverse)).toEqual(
       expect.arrayContaining([expect.stringContaining('runtime read/execute')]),
     );
   });
@@ -1094,6 +1333,7 @@ describe('G2 DACL and issuer-key custody repairs', () => {
           databasePath: fixture.dbPath,
           privateKeyPath: keyFile,
           workspaceRoot: fixture.workspaceRoot,
+          ownerSid: TEST_USER_SID,
           trustDir: fixture.trustDir,
           inspectAcl: protectedInspector,
           testOnlyAllowTemporaryKey: true,
@@ -1106,124 +1346,148 @@ describe('G2 DACL and issuer-key custody repairs', () => {
   });
 });
 
-describe('G4 repairs: pinned ancestor boundary and combined default-trust policy', () => {
-  it('pins the ancestor chain to source C:\\ProgramData even when process.env.ProgramData points inside the trust root', () => {
-    const original = process.env.ProgramData;
-    process.env.ProgramData = 'C:\\ProgramData\\Shun\\authority';
+describe('R04 combined per-user default-trust policy', () => {
+  /**
+   * Real per-user layout under a disposable profile fixture: the trust tree
+   * exists on disk exactly where the resolver would put it, so the combined
+   * assessment exercises the same paths production would.
+   */
+  function makePerUserFixture(): {
+    root: string;
+    base: string;
+    trustDir: string;
+    cleanup: () => void;
+  } {
+    const root = mkdtempSync(join(tmpdir(), 'shun-r04-default-'));
+    const base = join(root, 'AppData', 'Local');
+    const trustDir = perUserGuidedTrustDirectory(base);
+    mkdirSync(join(trustDir, GUIDED_PROVENANCE_RECEIPTS_SUBDIR), { recursive: true });
+    writeFileSync(
+      join(trustDir, GUIDED_PROVENANCE_TRUST_ANCHOR_FILE),
+      `${JSON.stringify({
+        schema: GUIDED_PROVENANCE_TRUST_ANCHOR_SCHEMA,
+        publicKeyPem: 'placeholder-not-loaded-here',
+        spkiSha256: '0'.repeat(64),
+      })}\n`,
+      'utf8',
+    );
+    return { root, base, trustDir, cleanup: () => rmSync(root, { recursive: true, force: true }) };
+  }
+
+  /** Explicit three-row trust snapshot, existsSync-free (see G4 heritage). */
+  const treeRows = (trustDir: string): GuidedTrustAclSnapshot =>
+    [
+      trustDir,
+      join(trustDir, GUIDED_PROVENANCE_TRUST_ANCHOR_FILE),
+      join(trustDir, GUIDED_PROVENANCE_RECEIPTS_SUBDIR),
+    ].map((path) => ({
+      path,
+      ownerSid: TEST_USER_SID,
+      accessRules: [
+        {
+          identitySid: TEST_USER_SID,
+          rightsMask: 0x001200a9,
+          accessType: 'Allow',
+          isInherited: true,
+        },
+      ] as GuidedTrustAccessRule[],
+    }));
+
+  it('combined policy accepts the healthy per-user profile shape and the user-owned ancestor chain', () => {
+    const fixture = makePerUserFixture();
     try {
-      expect(defaultGuidedTrustAncestorChain()).toEqual([
-        'C:\\ProgramData\\Shun\\authority',
-        'C:\\ProgramData\\Shun',
-        'C:\\ProgramData',
-      ]);
+      const chain = perUserGuidedTrustAncestorChain(fixture.base);
+      const tree = treeRows(fixture.trustDir);
+      expect(tree).toHaveLength(3);
+      const healthy = chain.map((path) => protectedAncestorRow(path));
+      expect(
+        assessGuidedTrustProtection(fixture.trustDir, [], TEST_USER_SID, tree, healthy, chain),
+      ).toEqual([]);
     } finally {
-      if (original === undefined) delete process.env.ProgramData;
-      else process.env.ProgramData = original;
+      fixture.cleanup();
     }
   });
 
-  it('combined default-trust policy accepts healthy ancestors and the real ProgramData ACL shape', () => {
-    const trustDir = defaultGuidedProvenanceTrustDirectory();
-    const chain = defaultGuidedTrustAncestorChain();
-    // Explicit, existsSync-free snapshot of exactly the three required trust
-    // rows; the positive case must pass on real tree rows, not on an empty
-    // snapshot filtered down by host filesystem state.
-    const tree = protectedDefaultTrustTreeRows(trustDir);
-    expect(tree).toHaveLength(3);
-    const healthy = chain.map((path) => protectedAncestorRow(path));
-    expect(assessGuidedTrustProtection(trustDir, [], tree, healthy)).toEqual([]);
-    // The real OS-default ProgramData shape grants Users "create children"
-    // (0x116) on the folder itself; that cannot rename/delete/re-ACL an
-    // existing admin-owned entry and must stay accepted.
-    const realProgramDataShape = chain.map((path, index) =>
-      index === 2
-        ? {
-            ...protectedAncestorRow(path),
-            accessRules: [
-              ...protectedAncestorRow(path).accessRules,
-              {
-                identitySid: 'S-1-5-32-545',
-                rightsMask: 0x00000116,
-                accessType: 'Allow' as const,
-                isInherited: true,
-              },
-            ],
-          }
-        : protectedAncestorRow(path),
-    );
-    expect(assessGuidedTrustProtection(trustDir, [], tree, realProgramDataShape)).toEqual([]);
-  });
+  it('combined policy rejects foreign-writable, incomplete, read-denied or unprobed ancestors', () => {
+    const fixture = makePerUserFixture();
+    try {
+      const chain = perUserGuidedTrustAncestorChain(fixture.base);
+      const tree = treeRows(fixture.trustDir);
+      expect(tree).toHaveLength(3);
+      const healthy = chain.map((path) => protectedAncestorRow(path));
 
-  it('combined default-trust policy rejects writable, incomplete, read-denied or unprobed ancestors', () => {
-    const trustDir = defaultGuidedProvenanceTrustDirectory();
-    const chain = defaultGuidedTrustAncestorChain();
-    // Same explicit healthy tree snapshot as the positive case: the tree
-    // contributes no reasons, so every assertion below isolates its ancestor
-    // finding instead of possibly riding on an existsSync-emptied snapshot.
-    const tree = protectedDefaultTrustTreeRows(trustDir);
-    expect(tree).toHaveLength(3);
-    const healthy = chain.map((path) => protectedAncestorRow(path));
+      // Ancestor writable by a foreign identity (DELETE on one entry).
+      const writable = chain.map((path, index) =>
+        index === 1
+          ? {
+              ...protectedAncestorRow(path),
+              accessRules: [
+                ...protectedAncestorRow(path).accessRules,
+                {
+                  identitySid: 'S-1-5-11',
+                  rightsMask: 0x00010000,
+                  accessType: 'Allow' as const,
+                  isInherited: true,
+                },
+              ],
+            }
+          : protectedAncestorRow(path),
+      );
+      expect(
+        assessGuidedTrustProtection(fixture.trustDir, [], TEST_USER_SID, tree, writable, chain),
+      ).toEqual(expect.arrayContaining([expect.stringContaining('non-owner write')]));
 
-    // Ancestor writable by a non-privileged identity (DELETE on one entry).
-    const writable = chain.map((path, index) =>
-      index === 1
-        ? {
-            ...protectedAncestorRow(path),
-            accessRules: [
-              ...protectedAncestorRow(path).accessRules,
-              {
-                identitySid: 'S-1-5-11',
-                rightsMask: 0x00010000,
-                accessType: 'Allow' as const,
-                isInherited: true,
-              },
-            ],
-          }
-        : protectedAncestorRow(path),
-    );
-    expect(assessGuidedTrustProtection(trustDir, [], tree, writable)).toEqual(
-      expect.arrayContaining([expect.stringContaining('non-privileged write')]),
-    );
+      // Incomplete ancestor snapshot: one enumerated directory missing.
+      expect(
+        assessGuidedTrustProtection(
+          fixture.trustDir,
+          [],
+          TEST_USER_SID,
+          tree,
+          healthy.slice(0, 2),
+          chain,
+        ),
+      ).toEqual(expect.arrayContaining([expect.stringContaining('incomplete')]));
 
-    // Incomplete ancestor snapshot: one enumerated directory missing.
-    expect(assessGuidedTrustProtection(trustDir, [], tree, healthy.slice(0, 2))).toEqual(
-      expect.arrayContaining([expect.stringContaining('incomplete')]),
-    );
+      // Runtime read denied on the closest ancestor.
+      const readDenied = chain.map((path, index) =>
+        index === 0
+          ? {
+              ...protectedAncestorRow(path),
+              accessRules: [
+                ...protectedAncestorRow(path).accessRules,
+                {
+                  identitySid: 'S-1-5-4',
+                  rightsMask: 0x00000020,
+                  accessType: 'Deny' as const,
+                  isInherited: true,
+                },
+              ],
+            }
+          : protectedAncestorRow(path),
+      );
+      expect(
+        assessGuidedTrustProtection(fixture.trustDir, [], TEST_USER_SID, tree, readDenied, chain),
+      ).toEqual(expect.arrayContaining([expect.stringContaining('runtime read/execute')]));
 
-    // Runtime read denied on the closest ancestor.
-    const readDenied = chain.map((path, index) =>
-      index === 0
-        ? {
-            ...protectedAncestorRow(path),
-            accessRules: [
-              ...protectedAncestorRow(path).accessRules,
-              {
-                identitySid: 'S-1-5-4',
-                rightsMask: 0x00000020,
-                accessType: 'Deny' as const,
-                isInherited: true,
-              },
-            ],
-          }
-        : protectedAncestorRow(path),
-    );
-    expect(assessGuidedTrustProtection(trustDir, [], tree, readDenied)).toEqual(
-      expect.arrayContaining([expect.stringContaining('runtime read/execute')]),
-    );
+      // Malformed ancestor row (owner not resolvable to a SID string).
+      const malformed = [
+        { path: chain[0] ?? '', ownerSid: null, accessRules: [] },
+        ...healthy.slice(1),
+      ];
+      expect(
+        assessGuidedTrustProtection(fixture.trustDir, [], TEST_USER_SID, tree, malformed, chain),
+      ).toEqual(expect.arrayContaining([expect.stringContaining('invalid owner or incomplete')]));
 
-    // Malformed ancestor row (owner not resolvable to a SID string).
-    const malformed = [
-      { path: chain[0] ?? '', ownerSid: null, accessRules: [] },
-      ...healthy.slice(1),
-    ];
-    expect(assessGuidedTrustProtection(trustDir, [], tree, malformed)).toEqual(
-      expect.arrayContaining([expect.stringContaining('invalid owner or incomplete')]),
-    );
-
-    // No injected ancestor snapshot: production defaults to the real
-    // non-recursive probe, which cannot prove a protected chain in test
-    // environments — fail closed rather than skip the ancestor policy.
-    expect(assessGuidedTrustProtection(trustDir, [], tree)).not.toEqual([]);
+      // No injected ancestor snapshot: production defaults to the real
+      // non-recursive probe, which cannot prove a protected chain in test
+      // environments — fail closed rather than skip the ancestor policy.
+      expect(
+        assessGuidedTrustProtection(fixture.trustDir, [], TEST_USER_SID, tree, undefined, chain),
+      ).not.toEqual([]);
+    } finally {
+      fixture.cleanup();
+    }
   });
 
   it('exempts injected non-default test trust directories from the ancestor policy', () => {
@@ -1232,7 +1496,12 @@ describe('G4 repairs: pinned ancestor boundary and combined default-trust policy
       // Tree-only injected snapshot on a non-default trust dir: no ancestor
       // rows may be required and the real ancestor probe must not run.
       expect(
-        assessGuidedTrustProtection(fixture.trustDir, [], protectedAcl(fixture.trustDir, [])),
+        assessGuidedTrustProtection(
+          fixture.trustDir,
+          [],
+          TEST_USER_SID,
+          protectedAcl(fixture.trustDir, []),
+        ),
       ).toEqual([]);
       provisionReceipt(fixture, signedEnvelope(fixture));
       const authority = authorityFor(fixture);
@@ -1247,12 +1516,10 @@ describe('G4 repairs: pinned ancestor boundary and combined default-trust policy
     }
   });
 
-  it('runtime init wiring passes inspectAclAncestors(defaultGuidedTrustAncestorChain()) as the fourth combined-policy argument', () => {
+  it('runtime init wiring passes ownerSid and the resolved ancestor chain into the combined policy', () => {
     // Deterministic source-wiring assertion over the actual `const init =`
-    // body: a runtime attempt against the default trust root would fail
-    // early on TRUST_ANCHOR_MISSING on most hosts and never reach the ACL
-    // evaluation, so the wiring is pinned statically instead. Comments are
-    // stripped first so only executable code is matched.
+    // body (comments stripped): the per-user combined policy must receive
+    // the owner SID and the resolved ancestor chain.
     const modulePath = fileURLToPath(
       new URL('../src/real-storage/guided-provenance-issuance.ts', import.meta.url),
     );
@@ -1285,7 +1552,7 @@ describe('G4 repairs: pinned ancestor boundary and combined default-trust policy
     expect(closeParen).toBeGreaterThan(openParen);
 
     // Split the argument list on top-level commas only (nested calls keep
-    // their commas), and require exactly four arguments.
+    // their commas), and require the per-user policy arguments in place.
     const argText = initBody.slice(openParen + 1, closeParen);
     const args: string[] = [];
     let current = '';
@@ -1302,11 +1569,8 @@ describe('G4 repairs: pinned ancestor boundary and combined default-trust policy
     }
     args.push(current.trim());
     const filled = args.filter((arg) => arg.length > 0);
-    expect(filled).toHaveLength(4);
-    // Fourth argument must be sourced from the source-pinned ancestor chain
-    // through the bounded test injector — the combined default-trust policy.
-    expect(filled[3]).toMatch(
-      /inspectAclAncestors\s*\?\s*inspectAclAncestors\(defaultGuidedTrustAncestorChain\(\)\)\s*:\s*undefined/,
-    );
+    expect(filled).toHaveLength(6);
+    expect(filled[2]).toBe('ownerSid');
+    expect(filled[5]).toBe('ancestorChain');
   });
 });

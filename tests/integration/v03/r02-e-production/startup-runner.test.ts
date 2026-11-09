@@ -36,15 +36,20 @@
  * taskkill timeout and non-zero exit and exercises a wrapper/descendant
  * listener so an orphan can never survive silently.
  *
- * G10-R2 production trust gate (Issue #269, pack PR #367): the production
- * real-storage boot now constructs the Guided service exclusively through
- * the external verify-only provenance authority (fixed ProgramData trust
- * pin, anchor, exact database receipt, ACL/ancestor policy). Without
- * matching operator trust material the exact operator command must fail
- * closed BEFORE any listener exists — non-zero exit, the trust refusal in
- * the output, no REAL banner, no DEMO fallback and no Guided database
- * created. A DEMO banner or a 503-only Guided surface is never accepted as
- * production success.
+ * G10-R2 production trust gate (Issue #269, pack PR #367; R04 #404 per-user
+ * amendment): the production real-storage boot now constructs the Guided
+ * service exclusively through the external verify-only provenance authority
+ * (per-interactive-user LocalAppData trust pin, anchor, exact database
+ * receipt, per-user ACL/ancestor policy). Without matching per-user trust
+ * material the exact operator command must fail closed BEFORE any listener
+ * exists — non-zero exit, the truthful SETUP_REQUIRED refusal plus the
+ * one-time bootstrap guidance in the output, no REAL banner, no DEMO
+ * fallback and no Guided database created. A DEMO banner or a 503-only
+ * Guided surface is never accepted as production success. The R04 positive
+ * lane proves the full native chain inside a DISPOSABLE isolated profile:
+ * plan-only bootstrap (no writes) → one consented bootstrap → real
+ * production boot with positive Guided state, served desktop.js bytes and
+ * activated DomainHarness → re-run bootstrap is a byte-stable NO-OP.
  *
  * G11 pinned-runner amendment (Issue #371, pack PR #373): Node 26 removed
  * `--experimental-transform-types` entirely, and Node 26 strip-only mode
@@ -63,7 +68,7 @@
  * configured (every LLM effect fails closed CLOUD_UNAVAILABLE), no Provider
  * install, no UAC, no persistent Windows effect beyond temp fixture files.
  */
-import { spawn, spawnSync } from 'node:child_process';
+import { execFileSync, spawn, spawnSync } from 'node:child_process';
 import { createHash, generateKeyPairSync } from 'node:crypto';
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { get as httpGet } from 'node:http';
@@ -850,64 +855,251 @@ export const routeWorkflowIntent = __dhv10RouterBundle.routeWorkflowIntent;
       }
     });
 
-    it('fails closed with no listener when no matching operator trust pin/receipt exists', async () => {
-      // G4 P1: prove the cloud egress lane is disabled in the exact
-      // environment the production child will receive, BEFORE any boot step.
-      // A regression at the forged-reference seam can then never reach paid
-      // cloud egress even on the refusal path.
-      const childEnv = sanitizedEnv(env);
-      expect(childEnv.SHUN_CLOUD_ENABLED).toBe('0');
-      for (const key of STRIPPED_CLOUD_KEYS) expect(childEnv).not.toHaveProperty(key);
+    /** R04: one disposable isolated Windows profile under the OS temp dir. */
+    function isolatedProfile(): {
+      root: string;
+      localAppData: string;
+      env: NodeJS.ProcessEnv;
+    } {
+      const root = mkdtempSync(join(tmpdir(), 'shun-r04-win-profile-'));
+      const localAppData = join(root, 'AppData', 'Local');
+      mkdirSync(localAppData, { recursive: true });
+      // Harden to the REAL per-user profile ACL shape: explicit
+      // user/SYSTEM/Administrators full control, shared-temp inherited ACEs
+      // removed (a genuine %LOCALAPPDATA% tree carries no foreign write
+      // ACEs; the shared OS temp dir on some machines does).
+      if (process.platform === 'win32') {
+        const systemRoot = process.env.SystemRoot ?? 'C:\\Windows';
+        const icacls = resolve(systemRoot, 'System32', 'icacls.exe');
+        const grants = [
+          '*S-1-5-18:(OI)(CI)F',
+          '*S-1-5-32-544:(OI)(CI)F',
+          `*${whoamiUserSid() ?? 'S-1-5-18'}:(OI)(CI)F`,
+        ];
+        execFileSync(icacls, [root, '/grant', ...grants], {
+          windowsHide: true,
+          timeout: 30_000,
+        });
+        execFileSync(icacls, [root, '/inheritance:r'], { windowsHide: true, timeout: 30_000 });
+      }
+      return {
+        root,
+        localAppData,
+        env: { USERPROFILE: root, LOCALAPPDATA: localAppData },
+      };
+    }
 
-      // G4 P2: the EXACT operator command, not a direct node invocation.
-      // On Windows .cmd requires a shell. G10-R2: this child is a
-      // self-terminating boot refusal, not a killed live server tree — the
-      // trust gate exits the process before any listener or descendant
-      // exists. It is therefore NOT registered in wrapperProcessTrees:
-      // cleanup proves the honest outcome via the recorded exit code and
-      // eventual port refusal (the same direct-leaf exemption the G6
-      // cleanup contract grants self-exiting refusals).
-      const child = spawn(PNPM, ['--filter', '@shun/control-api', 'dev'], {
-        cwd: repoRoot,
-        env: { ...childEnv, SHUN_CONTROL_PORT: String(port) },
-        stdio: ['ignore', 'pipe', 'pipe'],
-        shell: isWindows,
-        detached: !isWindows,
-      });
-      let bodyFailed = false;
+    /** Current process user SID via the System32 whoami (PATH-independent). */
+    function whoamiUserSid(): string | undefined {
       try {
-        const output = collect(child);
-        // G10-R2: every other production input is valid (registry, BUILD,
-        // Guided Case, ledgers), so the first missing input is the fixed
-        // ProgramData operator trust material. The dev entry must refuse to
-        // start instead of opening a listener or degrading to DEMO.
-        const exit = await waitForExit(child, 60_000);
-        const text = output.text();
-        expect(exit, `boot must refuse and exit; output:\n${text}`).not.toBe('TIMEOUT');
-        if (exit !== 'TIMEOUT') expect(exit.code).not.toBe(0);
-        expect(text).not.toContain('ERR_UNSUPPORTED_TYPESCRIPT_SYNTAX');
-        // G11: the refusal must come from the trust gate, not from a dev
-        // runner regression (Node 26 removed --experimental-transform-types).
-        expect(text).not.toContain('--experimental-transform-types');
-        expect(text).toMatch(/GUIDED_TRUST_PIN_UNTRUSTED|GUIDED_TRUST_|GUIDED_PROVENANCE_/);
-        // No listener, no REAL banner, no DEMO fallback, no Guided database:
-        // the trust gate fires before service construction and before the
-        // HTTP surface exists, so neither a production nor a DEMO boot may
-        // be observable.
-        expect(text).not.toContain('Shun control surface (REAL bounded C-003)');
-        expect(text).not.toContain('T08 DEMO ONLY');
-        expect(await portRefusesConnectionEventually(port)).toBe(true);
-        expect(existsSync(env.SHUN_V03_GUIDED_DATABASE as string)).toBe(false);
-      } catch (error) {
-        bodyFailed = true;
-        throw error;
+        const systemRoot = process.env.SystemRoot ?? 'C:\\Windows';
+        const out = execFileSync(resolve(systemRoot, 'System32', 'whoami.exe'), [
+          '/user',
+          '/fo',
+          'csv',
+          '/nh',
+        ]);
+        for (const line of String(out).split(/\r?\n/)) {
+          const fields = line
+            .trim()
+            .split(',')
+            .map((field) => field.replace(/^"|"$/g, '').trim());
+          const sid = fields[fields.length - 1] ?? '';
+          if (/^S-1-\d+(-\d+)+$/.test(sid)) return sid;
+        }
+      } catch {
+        // fall through
+      }
+      return undefined;
+    }
+
+    it('fails closed with no listener when this Windows user has no per-user trust (first run)', async () => {
+      // R04: isolated disposable profile — the real per-user resolution finds
+      // NO trust material for that profile and the boot must refuse before
+      // any listener with the truthful SETUP_REQUIRED guidance. The REAL
+      // interactive profile of this machine is never touched.
+      const profile = isolatedProfile();
+      try {
+        // G4 P1: prove the cloud egress lane is disabled in the exact
+        // environment the production child will receive, BEFORE any boot step.
+        const childEnv = sanitizedEnv({ ...env, ...profile.env });
+        expect(childEnv.SHUN_CLOUD_ENABLED).toBe('0');
+        for (const key of STRIPPED_CLOUD_KEYS) expect(childEnv).not.toHaveProperty(key);
+
+        // G4 P2: the EXACT operator command, not a direct node invocation.
+        // On Windows .cmd requires a shell. G10-R2: this child is a
+        // self-terminating boot refusal, not a killed live server tree — the
+        // trust gate exits the process before any listener or descendant
+        // exists. It is therefore NOT registered in wrapperProcessTrees:
+        // cleanup proves the honest outcome via the recorded exit code and
+        // eventual port refusal (the same direct-leaf exemption the G6
+        // cleanup contract grants self-exiting refusals).
+        const child = spawn(PNPM, ['--filter', '@shun/control-api', 'dev'], {
+          cwd: repoRoot,
+          env: { ...childEnv, SHUN_CONTROL_PORT: String(port) },
+          stdio: ['ignore', 'pipe', 'pipe'],
+          shell: isWindows,
+          detached: !isWindows,
+        });
+        let bodyFailed = false;
+        try {
+          const output = collect(child);
+          // G10-R2 + R04: every other production input is valid (registry,
+          // BUILD, Guided Case, ledgers), so the first missing input is the
+          // per-user LocalAppData trust material. The dev entry must refuse
+          // to start instead of opening a listener or degrading to DEMO, and
+          // must print the one-time consented bootstrap path.
+          const exit = await waitForExit(child, 60_000);
+          const text = output.text();
+          expect(exit, `boot must refuse and exit; output:\n${text}`).not.toBe('TIMEOUT');
+          if (exit !== 'TIMEOUT') expect(exit.code).not.toBe(0);
+          expect(text).not.toContain('ERR_UNSUPPORTED_TYPESCRIPT_SYNTAX');
+          // G11: the refusal must come from the trust gate, not from a dev
+          // runner regression (Node 26 removed --experimental-transform-types).
+          expect(text).not.toContain('--experimental-transform-types');
+          expect(text).toMatch(
+            /GUIDED_TRUST_SETUP_REQUIRED|GUIDED_TRUST_PIN_UNTRUSTED|GUIDED_TRUST_|GUIDED_PROVENANCE_/,
+          );
+          // Truthful first-run guidance: the exact one-time bootstrap command.
+          expect(text).toContain('bootstrap-guided-localappdata.ts');
+          expect(text).toContain('--consent');
+          // No listener, no REAL banner, no DEMO fallback, no Guided database:
+          // the trust gate fires before service construction and before the
+          // HTTP surface exists, so neither a production nor a DEMO boot may
+          // be observable.
+          expect(text).not.toContain('Shun control surface (REAL bounded C-003)');
+          expect(text).not.toContain('T08 DEMO ONLY');
+          expect(await portRefusesConnectionEventually(port)).toBe(true);
+          expect(existsSync(env.SHUN_V03_GUIDED_DATABASE as string)).toBe(false);
+        } catch (error) {
+          bodyFailed = true;
+          throw error;
+        } finally {
+          // G6 P2: a failed production assertion must never leak the server
+          // child or its loopback listener; the bounded cleanup result is
+          // inspected and any cleanup failure is surfaced, never silent.
+          await guaranteeCleanup(child, port, bodyFailed);
+        }
       } finally {
-        // G6 P2: a failed production assertion must never leak the server
-        // child or its loopback listener; the bounded cleanup result is
-        // inspected and any cleanup failure is surfaced, never silent.
-        await guaranteeCleanup(child, port, bodyFailed);
+        rmSync(profile.root, { recursive: true, force: true });
       }
     }, 120_000);
+
+    it('R04 native no-effect E2E: plan-only → consented per-user bootstrap → positive real-storage boot → stable NO-OP restart', async () => {
+      const profile = isolatedProfile();
+      try {
+        const guidedDb = env.SHUN_V03_GUIDED_DATABASE as string;
+        const bootstrapEnv = () =>
+          sanitizedEnv({ ...env, ...profile.env, SHUN_CLOUD_ENABLED: '0' });
+        // 1. Plan-only bootstrap: explicit consent gate — prints the plan,
+        //    exits 3 and writes NOTHING into the isolated profile.
+        const plan = spawnSync(
+          process.execPath,
+          [
+            PINNED_TSX_CLI,
+            'apps/control-api/scripts/bootstrap-guided-localappdata.ts',
+            '--database',
+            guidedDb,
+          ],
+          { cwd: repoRoot, encoding: 'utf8', env: bootstrapEnv(), timeout: 120_000 },
+        );
+        expect(plan.status, `plan output:\n${plan.stdout}\n${plan.stderr}`).toBe(3);
+        expect(plan.stdout).toContain('BOOTSTRAP_PLAN_ONLY');
+        expect(plan.stdout).toContain('BOOTSTRAP_STATUS=FRESH');
+        expect(existsSync(join(profile.localAppData, 'Shun'))).toBe(false);
+
+        // 2. One consented bootstrap operation for this Windows user.
+        const created = spawnSync(
+          process.execPath,
+          [
+            PINNED_TSX_CLI,
+            'apps/control-api/scripts/bootstrap-guided-localappdata.ts',
+            '--database',
+            guidedDb,
+            '--consent',
+          ],
+          { cwd: repoRoot, encoding: 'utf8', env: bootstrapEnv(), timeout: 120_000 },
+        );
+        expect(created.status, `bootstrap output:\n${created.stdout}\n${created.stderr}`).toBe(0);
+        expect(created.stdout).toContain('BOOTSTRAP_RESULT=BOOTSTRAP_CREATED');
+        expect(created.stdout).not.toContain('PRIVATE KEY');
+        const trustDir = join(profile.localAppData, 'Shun', 'authority', 'guided-provenance');
+        const anchorPath = join(trustDir, 'trust-anchor.json');
+        const pinPath = join(profile.localAppData, 'Shun', 'authority', 'guided-provenance-trust-pin.json');
+        const receiptsDir = join(trustDir, 'receipts');
+        for (const path of [anchorPath, pinPath, receiptsDir]) expect(existsSync(path)).toBe(true);
+
+        // 3. Full production boot through the real main.ts composition with
+        //    the per-user trust: REAL banner, positive Guided state over
+        //    HTTP, the REAL desktop.js bytes, activated DomainHarness.
+        const bootPort = await freePort();
+        const { child, output } = startViaPinnedRunner(bootPort, { ...env, ...profile.env });
+        let bodyFailed = false;
+        try {
+          const up = await waitForHttp(bootPort, 90_000);
+          const text = output.text();
+          expect(up, `production boot output:\n${text}`).toBe(true);
+          expect(text).toContain('Shun control surface (REAL bounded C-003)');
+          expect(text).toContain('v0.3 public DomainHarness activated');
+
+          const guidedState = await rawGet(bootPort, '/api/v03/guided/state', {
+            host: `127.0.0.1:${bootPort}`,
+          });
+          expect(guidedState.status).toBe(200);
+          const state = JSON.parse(guidedState.body) as {
+            currentStep?: { templateRef?: { artifactId?: string } };
+            journey?: { paused?: boolean };
+          };
+          // Positive Guided StepSpec: the operator-pinned Case is staged and
+          // its live step is exposed (selected-K entrypoint ready, no-effect).
+          expect(state.currentStep?.templateRef?.artifactId).toBeTruthy();
+          expect(state.journey).toBeDefined();
+
+          // The REAL desktop.js is served byte-identical (not a fixture copy).
+          const desktop = await fetch(`http://127.0.0.1:${bootPort}/v03/desktop.js`);
+          expect(desktop.status).toBe(200);
+          const served = Buffer.from(await desktop.arrayBuffer());
+          const onDisk = readFileSync(join(repoRoot, 'apps/control-ui/public/v03/desktop.js'));
+          expect(served.equals(onDisk)).toBe(true);
+        } catch (error) {
+          bodyFailed = true;
+          throw error;
+        } finally {
+          await guaranteeCleanup(child, bootPort, bodyFailed);
+        }
+
+        // 4. Restart stability: a second bootstrap is a byte-stable NO-OP —
+        //    the anchor/pin/receipt/secret never rotate or re-sign.
+        const anchorBefore = readFileSync(anchorPath);
+        const pinBefore = readFileSync(pinPath);
+        const secretPath = join(
+          profile.localAppData,
+          'Shun',
+          'secrets',
+          'guided-issuer',
+          'issuer-private.pem',
+        );
+        const secretBefore = existsSync(secretPath) ? readFileSync(secretPath) : undefined;
+        const again = spawnSync(
+          process.execPath,
+          [
+            PINNED_TSX_CLI,
+            'apps/control-api/scripts/bootstrap-guided-localappdata.ts',
+            '--database',
+            guidedDb,
+            '--consent',
+          ],
+          { cwd: repoRoot, encoding: 'utf8', env: bootstrapEnv(), timeout: 120_000 },
+        );
+        expect(again.status, `re-run output:\n${again.stdout}\n${again.stderr}`).toBe(0);
+        expect(again.stdout).toContain('BOOTSTRAP_RESULT=ALREADY_COMPLETE');
+        expect(readFileSync(anchorPath).equals(anchorBefore)).toBe(true);
+        expect(readFileSync(pinPath).equals(pinBefore)).toBe(true);
+        if (secretBefore) expect(readFileSync(secretPath).equals(secretBefore)).toBe(true);
+      } finally {
+        rmSync(profile.root, { recursive: true, force: true });
+      }
+    }, 300_000);
   },
 );
 
