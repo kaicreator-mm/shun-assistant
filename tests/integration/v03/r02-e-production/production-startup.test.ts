@@ -35,6 +35,8 @@ import {
 const TRUST_PIN_SCHEMA = 'shun.guided.provenance-trust-pin.v1';
 const ISSUED_AT = Date.now();
 const roots: string[] = [];
+/** Fixture interactive-user SID for the R04 per-user owner/DACL policy. */
+const TEST_USER_SID = 'S-1-5-21-11888-22222-33333-1003';
 
 function safeAcl(trustDir: string, extraPaths: readonly string[]): GuidedTrustAclSnapshot {
   const paths = [
@@ -45,11 +47,17 @@ function safeAcl(trustDir: string, extraPaths: readonly string[]): GuidedTrustAc
   ];
   return [...new Set(paths.filter(existsSync).map((path) => resolve(path)))].map((path) => ({
     path,
-    ownerSid: 'S-1-5-32-544',
+    ownerSid: TEST_USER_SID,
     accessRules: [
       {
-        identitySid: 'S-1-5-32-545',
-        rightsMask: 0x000200a9,
+        identitySid: TEST_USER_SID,
+        rightsMask: 0x001200a9,
+        accessType: 'Allow' as const,
+        isInherited: true,
+      },
+      {
+        identitySid: 'S-1-5-18',
+        rightsMask: 0x001f01ff,
         accessType: 'Allow' as const,
         isInherited: true,
       },
@@ -60,7 +68,7 @@ function safeAcl(trustDir: string, extraPaths: readonly string[]): GuidedTrustAc
 const safeAncestorAcl: GuidedAclAncestorInspector = (paths) =>
   paths.map((path) => ({
     path,
-    ownerSid: 'S-1-5-18',
+    ownerSid: TEST_USER_SID,
     accessRules: [
       {
         identitySid: 'S-1-5-32-545',
@@ -126,6 +134,7 @@ function makeFixture(): Fixture {
     schemaDigest: schemaRow.schema_digest,
     privateKeyPath,
     workspaceRoot,
+    ownerSid: TEST_USER_SID,
     trustDir,
     issuedAtUnixMs: ISSUED_AT,
     inspectAcl: safeAcl,
@@ -146,6 +155,7 @@ function testOverrides(
   return {
     trustDir: fixture.trustDir,
     pinPath: fixture.pinPath,
+    ownerSid: TEST_USER_SID,
     inspectAcl,
     inspectAclAncestors: safeAncestorAcl,
   };
@@ -172,12 +182,13 @@ describe('R02-E production Guided composition', () => {
     }
   });
 
-  it('refuses a missing pin before opening the Guided database', () => {
+  it('refuses a never-provisioned pin with SETUP_REQUIRED before opening the Guided database', () => {
     const fixture = makeFixture();
     rmSync(fixture.pinPath);
-    // The manifest requires a KEY_NOT_PROVISIONED operator record when the
-    // fixed trust material was never provisioned, while startup stays
-    // fail-closed with the precise coded refusal.
+    // R04: first-run detection — a pin that was never provisioned for this
+    // Windows user is a truthful SETUP_REQUIRED refusal with the one-time
+    // bootstrap path in the operator record, while startup stays fail-closed
+    // (never a DEMO fallback, never misreading corruption as absence).
     const errors: string[] = [];
     const originalError = console.error;
     console.error = (...args: unknown[]) => {
@@ -186,11 +197,14 @@ describe('R02-E production Guided composition', () => {
     try {
       expect(() =>
         createProductionGuidedService(fixture.databasePath, testOverrides(fixture)),
-      ).toThrow('GUIDED_TRUST_PIN_UNTRUSTED');
+      ).toThrow('GUIDED_TRUST_SETUP_REQUIRED');
     } finally {
       console.error = originalError;
     }
     expect(errors.some((line) => line.startsWith('KEY_NOT_PROVISIONED'))).toBe(true);
+    expect(
+      errors.some((line) => line.startsWith('GUIDED_TRUST_SETUP_REQUIRED')),
+    ).toBe(true);
     expect(existsSync(fixture.databasePath)).toBe(false);
   });
 

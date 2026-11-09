@@ -69,14 +69,28 @@ const executeBuiltinInventoryRecipe =
 // Guided state is a real, operator-owned local SQLite store. A selected
 // StepSpec may be staged ONLY by trusted Host composition, not by the browser;
 // absence of that binding exposes UNKNOWN, not a fabricated seeded journey.
+// R04 (#404): trust material is per-interactive-user under LocalAppData. When
+// it was never provisioned for THIS Windows user the boot stays fail-closed
+// (never a DEMO fallback) and prints the one-time consented setup path; a
+// valid bootstrap then makes every later ordinary start UAC-free and stable.
 const guidedDb = process.env.SHUN_V03_GUIDED_DATABASE;
 if (guidedDb && mode !== 'real-storage') {
   throw new Error('V03_GUIDED_REQUIRES_REAL_STORAGE_MODE');
 }
-const guided =
-  guidedDb && mode === 'real-storage'
-    ? createProductionGuidedService(resolve(guidedDb))
-    : undefined;
+const guided = (() => {
+  if (!guidedDb || mode !== 'real-storage') return undefined;
+  try {
+    return createProductionGuidedService(resolve(guidedDb));
+  } catch (error) {
+    if (error instanceof Error && error.message.startsWith('GUIDED_TRUST_SETUP_REQUIRED')) {
+      console.error('Guided per-user trust is not provisioned for this Windows user (first run).');
+      console.error(
+        `Run the one-time consented bootstrap: node apps/control-api/scripts/bootstrap-guided-localappdata.ts --database "${resolve(guidedDb)}" --consent`,
+      );
+    }
+    throw error;
+  }
+})();
 
 // R04 U05-A folder picker is opt-in trusted local configuration. Its native
 // artifact is hash-pinned and fails closed; no browser input selects the DB.

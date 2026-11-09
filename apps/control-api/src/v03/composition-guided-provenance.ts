@@ -1,12 +1,16 @@
 /**
- * R02-E production Guided trust composition.
+ * R02-E production Guided trust composition (R04 #404: per-user LocalAppData).
  *
  * The only production trust pin is a public SPKI digest in the fixed sibling
- * file under the source-pinned ProgramData authority directory. The pin is
- * never accepted from environment, CLI, database or receipt input.
+ * file under the per-interactive-user LocalAppData authority directory of
+ * THIS Windows session. The trust root and pin are resolved from the
+ * OS-provided session values with strict canonical/profile validation —
+ * never from environment-controlled product paths, CLI, database or receipt
+ * input. Runtime stays verify-only; first-run bootstrap lives in
+ * scripts/bootstrap-guided-localappdata.ts, never here.
  */
 import { execFileSync } from 'node:child_process';
-import { lstatSync, readFileSync } from 'node:fs';
+import { existsSync, lstatSync, readFileSync } from 'node:fs';
 import { dirname, isAbsolute, resolve } from 'node:path';
 import type { HostGuidedService } from '../../../../packages/domain-host/src/guided/host-guided-service.ts';
 import { HostGuidedService as HostGuidedServiceImpl } from '../../../../packages/domain-host/src/guided/host-guided-service.ts';
@@ -15,8 +19,6 @@ import {
   assessGuidedTrustProtection,
   canonicalGuidedDatabasePath,
   createExternalGuidedProvenanceAuthority,
-  defaultGuidedProvenanceTrustDirectory,
-  defaultGuidedTrustAncestorChain,
   GUIDED_PROVENANCE_RECEIPTS_SUBDIR,
   GUIDED_PROVENANCE_TRUST_ANCHOR_FILE,
   type GuidedAclAncestorInspector,
@@ -26,7 +28,11 @@ import {
   guidedReceiptFileName,
   inspectWindowsGuidedTrustAcl,
   listGuidedReceiptPaths,
+  perUserGuidedTrustAncestorChain,
+  perUserGuidedTrustDirectory,
+  queryWindowsProcessUserSid,
   readGuidedTrustAnchor,
+  resolveWindowsLocalAppDataBase,
 } from '../real-storage/guided-provenance-issuance.ts';
 
 const TRUST_PIN_FILE = 'guided-provenance-trust-pin.json';
@@ -40,6 +46,8 @@ export interface GuidedServiceTestOverrides {
   readonly trustDir: string;
   /** Must be the fixed sibling pin filename under trustDir's parent. */
   readonly pinPath: string;
+  /** Fixture interactive-user SID for the per-user owner/DACL policy. */
+  readonly ownerSid: string;
   readonly inspectAcl: GuidedAclInspector;
   readonly inspectAclAncestors: GuidedAclAncestorInspector;
 }
@@ -74,16 +82,21 @@ function assertRegularFile(path: string, code: string, maxBytes: number): void {
 }
 
 /**
- * Operator trust material was never provisioned at this fixed path. Startup
- * still fails closed with the precise coded error; this console record only
- * distinguishes "not provisioned yet" from a corrupted or aliased trust file
- * in the operator's boot output. Never creates trust material.
+ * Trust material was never provisioned for THIS Windows user. Startup still
+ * fails closed with the precise coded error; this console record only
+ * distinguishes "first run — setup required" from corrupted or aliased trust
+ * files in the operator's boot output, and prints the one-time consented
+ * bootstrap path. Never creates trust material.
  */
-function refuseWithKeyNotProvisionedRecord(path: string, code: string): never {
+function refuseWithSetupRequiredRecord(path: string, code: string): never {
   try {
     lstatSync(path);
   } catch {
     console.error(`KEY_NOT_PROVISIONED ${path}`);
+    console.error(
+      'GUIDED_TRUST_SETUP_REQUIRED: run the one-time consented bootstrap ' +
+        '(apps/control-api/scripts/bootstrap-guided-localappdata.ts --consent) as this Windows user',
+    );
   }
   throw new Error(code);
 }
@@ -144,10 +157,14 @@ function readPinnedSpkiSha256(pinPath: string): string {
   return value.spkiSha256;
 }
 
-function resolveTrustPaths(overrides?: GuidedServiceTestOverrides): {
-  trustDir: string;
-  pinPath: string;
-} {
+interface ResolvedTrustPaths {
+  readonly trustDir: string;
+  readonly pinPath: string;
+  readonly ownerSid: string;
+  readonly ancestorChain?: readonly string[];
+}
+
+function resolveTrustPaths(overrides?: GuidedServiceTestOverrides): ResolvedTrustPaths {
   if (overrides !== undefined) {
     if (process.env.VITEST === undefined) {
       throw new Error('GUIDED_TRUST_TEST_OVERRIDES_DISABLED');
@@ -156,7 +173,9 @@ function resolveTrustPaths(overrides?: GuidedServiceTestOverrides): {
       !isAbsolute(overrides.trustDir) ||
       !isAbsolute(overrides.pinPath) ||
       typeof overrides.inspectAcl !== 'function' ||
-      typeof overrides.inspectAclAncestors !== 'function'
+      typeof overrides.inspectAclAncestors !== 'function' ||
+      typeof overrides.ownerSid !== 'string' ||
+      !overrides.ownerSid
     ) {
       throw new Error('GUIDED_TRUST_TEST_OVERRIDES_INVALID');
     }
@@ -166,10 +185,22 @@ function resolveTrustPaths(overrides?: GuidedServiceTestOverrides): {
     if (pinPath.toLowerCase() !== expectedPinPath.toLowerCase()) {
       throw new Error('GUIDED_TRUST_TEST_PIN_PATH_INVALID');
     }
-    return { trustDir, pinPath };
+    // Injected non-default test trust directories stay tree-only: the
+    // per-user ancestor policy binds only the resolved default root.
+    return { trustDir, pinPath, ownerSid: overrides.ownerSid };
   }
-  const trustDir = defaultGuidedProvenanceTrustDirectory();
-  return { trustDir, pinPath: resolve(dirname(trustDir), TRUST_PIN_FILE) };
+  const localAppDataBase = resolveWindowsLocalAppDataBase();
+  const trustDir = perUserGuidedTrustDirectory(localAppDataBase);
+  const ownerSid = queryWindowsProcessUserSid();
+  if (!ownerSid) {
+    throw new Error('GUIDED_TRUST_OWNER_SID_UNRESOLVED');
+  }
+  return {
+    trustDir,
+    pinPath: resolve(dirname(trustDir), TRUST_PIN_FILE),
+    ownerSid,
+    ancestorChain: perUserGuidedTrustAncestorChain(localAppDataBase),
+  };
 }
 
 function createAclInspectors(
@@ -203,13 +234,15 @@ function createAclInspectors(
 
 /**
  * Construct the durable Host service only after the external trust pin,
- * anchor, exact database receipt and ACL/ancestor policy are proven. The
- * Host constructor deliberately records provenance initialization failure
- * as UNKNOWN; a side-effect-free invalid relay probe distinguishes a healthy
- * service (REFUSED/RELAY_SCHEMA_REFUSED) from an unavailable ledger.
+ * anchor, exact database receipt and per-user ACL/ancestor policy are
+ * proven. The Host constructor deliberately records provenance
+ * initialization failure as UNKNOWN; a side-effect-free invalid relay probe
+ * distinguishes a healthy service (REFUSED/RELAY_SCHEMA_REFUSED) from an
+ * unavailable ledger.
  *
  * Test overrides are internal fixture injection only. Production callers
- * pass one argument and therefore use only the fixed ProgramData trust root.
+ * pass one argument and therefore use only the resolved per-user trust root
+ * of the current Windows session.
  */
 export function createProductionGuidedService(
   databaseFile: string,
@@ -218,23 +251,33 @@ export function createProductionGuidedService(
   if (typeof databaseFile !== 'string' || !databaseFile || databaseFile === ':memory:') {
     throw new Error('GUIDED_DATABASE_FILE_REQUIRED');
   }
-  const { trustDir, pinPath } = resolveTrustPaths(overrides);
+  const { trustDir, pinPath, ownerSid, ancestorChain } = resolveTrustPaths(overrides);
+  // First-run detection: a trust pin that was never provisioned for this
+  // Windows user is a truthful SETUP_REQUIRED refusal (with the one-time
+  // bootstrap path), never a silent DEMO fallback and never a misread of
+  // corrupted material as "absent".
+  if (!existsSync(pinPath)) {
+    refuseWithSetupRequiredRecord(pinPath, 'GUIDED_TRUST_SETUP_REQUIRED');
+  }
   try {
     assertRegularFile(pinPath, 'GUIDED_TRUST_PIN_UNTRUSTED', MAX_PIN_BYTES);
   } catch {
-    refuseWithKeyNotProvisionedRecord(pinPath, 'GUIDED_TRUST_PIN_UNTRUSTED');
+    refuseWithSetupRequiredRecord(pinPath, 'GUIDED_TRUST_PIN_UNTRUSTED');
   }
   assertNoWindowsReparsePoint(pinPath);
 
   const receipts = listGuidedReceiptPaths(trustDir);
   const { inspectAcl, inspectAclAncestors } = createAclInspectors(pinPath, overrides);
   const aclSnapshot = inspectAcl(trustDir, receipts);
-  const ancestorSnapshot = inspectAclAncestors(defaultGuidedTrustAncestorChain());
+  const ancestorSnapshot =
+    ancestorChain !== undefined ? inspectAclAncestors(ancestorChain) : undefined;
   const aclReasons = assessGuidedTrustProtection(
     trustDir,
     [...receipts, pinPath],
+    ownerSid,
     aclSnapshot,
     ancestorSnapshot,
+    ancestorChain,
   );
   if (aclReasons.length > 0) {
     throw new Error(`GUIDED_TRUST_ACL_UNPROTECTED:${aclReasons.join(' | ')}`);
@@ -245,7 +288,7 @@ export function createProductionGuidedService(
   try {
     assertRegularFile(anchorPath, 'GUIDED_TRUST_ANCHOR_UNTRUSTED', MAX_TRUST_FILE_BYTES);
   } catch {
-    refuseWithKeyNotProvisionedRecord(anchorPath, 'GUIDED_TRUST_ANCHOR_UNTRUSTED');
+    refuseWithSetupRequiredRecord(anchorPath, 'GUIDED_TRUST_ANCHOR_UNTRUSTED');
   }
   const anchor = readGuidedTrustAnchor(trustDir);
   if (
@@ -268,10 +311,7 @@ export function createProductionGuidedService(
       MAX_TRUST_FILE_BYTES,
     );
   } catch {
-    refuseWithKeyNotProvisionedRecord(
-      receiptPath,
-      'GUIDED_PROVENANCE_RECEIPT_MISSING_OR_UNTRUSTED',
-    );
+    refuseWithSetupRequiredRecord(receiptPath, 'GUIDED_PROVENANCE_RECEIPT_MISSING_OR_UNTRUSTED');
   }
   if (!receipts.some((path) => resolve(path).toLowerCase() === receiptPath.toLowerCase())) {
     throw new Error('GUIDED_PROVENANCE_RECEIPT_NOT_IN_TRUST_TREE');
@@ -280,6 +320,8 @@ export function createProductionGuidedService(
   const authority = createExternalGuidedProvenanceAuthority({
     trustDir,
     pinnedSpkiSha256,
+    ownerSid,
+    ancestorChain,
     inspectAcl,
     inspectAclAncestors,
   });
