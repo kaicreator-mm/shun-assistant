@@ -254,16 +254,16 @@ const selectedRootEffectProposal = folderSelectionHost
       return { ok: true, descriptor: derived.descriptor };
     }
   : undefined;
-// Issuance is trusted-process-only (never an HTTP route). The operator reads
-// the issued pair from this local console to submit; without a live staged
-// Case no references exist and every gateway submit refuses pre-Kernel.
+// Issuance is trusted-process-only (never an HTTP route). U06 (#401): the
+// reference pair is bound to the durable Host ledger and resolved by the
+// trusted flow at effect time — its VALUES are never displayed or requested
+// anywhere; the ordinary user journey never carries reference strings.
 if (production) {
   const issued = production.issueSubmitReferences();
   if (issued.status === 'ISSUED') {
     console.log(
-      `v0.3 submit references issued (case ${issued.caseId}, step ${issued.stepId}, ` +
-        `valid until ${new Date(issued.validUntilUnixMs).toISOString()}): ` +
-        `currentnessRef=${issued.currentnessRef} approvalRef=${issued.approvalRef}`,
+      `v0.3 submit references issued for the live Case step (case ${issued.caseId}, ` +
+        `valid until ${new Date(issued.validUntilUnixMs).toISOString()}); the pair stays Host-private.`,
     );
   } else {
     console.log(
@@ -287,21 +287,21 @@ const handle = createControlServer({
   v03ProviderGlobal: production?.providerGlobal,
   v03SelectedRootEffect: production?.selectedRootEffect,
   v03SelectedRootEffectProposal: selectedRootEffectProposal,
-  // U05-B2 (P1-LIVE-REFS): the real UI stages the REVIEW_EFFECT step at
-  // runtime, long after boot. Only after the Host's one-shot plan-preview
-  // staging durably returned STAGED does the trusted process re-run the
-  // issuance seam for the NOW-current review step and print the pair to
-  // this operator console. The pair is never exposed over HTTP; an earlier
-  // step's pair is superseded by the ledger and can no longer authorize.
+  // U05-B2 (U06 #401): the real UI stages the REVIEW_EFFECT step at runtime,
+  // long after boot. Only after the Host's one-shot plan-preview staging
+  // durably returned STAGED does the trusted process re-run the issuance
+  // seam for the NOW-current review step. The pair's VALUES are never
+  // printed or exposed over HTTP — the effect admission resolves them from
+  // the ledger Host-side; an earlier step's pair is superseded by the ledger
+  // and can no longer authorize.
   onPlanPreviewStaged: production
     ? (staging) => {
         const issued = production.issueSubmitReferences();
         if (issued.status === 'ISSUED') {
           console.log(
             `v0.3 live REVIEW_EFFECT submit references issued after plan preview staged ` +
-              `(case ${issued.caseId}, step ${issued.stepId} [staged preview step ${staging.stepId}], ` +
-              `valid until ${new Date(issued.validUntilUnixMs).toISOString()}): ` +
-              `currentnessRef=${issued.currentnessRef} approvalRef=${issued.approvalRef}`,
+              `(case ${issued.caseId} [staged preview step ${staging.stepId}], ` +
+              `valid until ${new Date(issued.validUntilUnixMs).toISOString()}); the pair stays Host-private.`,
           );
         } else {
           console.log(

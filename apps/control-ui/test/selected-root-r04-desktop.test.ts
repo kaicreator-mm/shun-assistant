@@ -51,13 +51,31 @@ describe('R04 real desktop selected-root effect', () => {
     expect(ui).toContain("rootWord(e?.receipt?.status==='REFUSED'?'refused':'unknown')");
   });
 
-  it('effect HTTP only receives Host-issued references, never plan/grant/permit', () => {
+  it('U06 (#401): no manual reference copy anywhere — the panel has no reference inputs and the locale catalogs carry no reference labels', () => {
+    expect(html).not.toContain('root-currentness-ref');
+    expect(html).not.toContain('root-approval-ref');
+    expect(html).not.toContain('root-currentness-label');
+    expect(html).not.toContain('root-approval-label');
+    // The shipped static copy must not direct the user to any console.
+    expect(html).not.toMatch(/\breference\b/i);
+    expect(ui).not.toContain('root-currentness-ref');
+    expect(ui).not.toContain('root-approval-ref');
+    expect(ui).not.toContain("currentness:'");
+    expect(ui).not.toContain("approval:'");
+    expect(ui).not.toMatch(/shun\.(currentness|approval)\.v1/);
+    expect(ui).not.toContain('local service console');
+    expect(ui).not.toContain('控制台');
+  });
+
+  it('effect HTTP carries the Case identity only — never references, plan/grant/permit or paths', () => {
     const i = ui.indexOf('async function sendRootEffect()');
-    const j = ui.indexOf('function renderGuided()', i);
+    const j = ui.indexOf('const $ = id =>', i);
     expect(i).toBeGreaterThan(0);
     expect(j).toBeGreaterThan(i);
     const flow = ui.slice(i, j);
-    expect(flow).toContain('caseId:rootApproved.caseId,currentnessRef,approvalRef');
+    expect(flow).toContain('caseId:rootApproved.caseId}');
+    expect(flow).not.toContain('currentnessRef');
+    expect(flow).not.toContain('approvalRef');
     expect(flow).not.toContain('grantRef');
     expect(flow).not.toContain('planHash');
     expect(flow).not.toContain('permit');
