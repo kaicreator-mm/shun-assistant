@@ -166,3 +166,48 @@ R04 evidence summary (see #404 closeout for exact exits):
 | Native E2E (Windows Node 24) | `startup-runner.test.ts` 11/11 incl. plan-only → consented bootstrap → REAL production boot (positive Guided StepSpec state, served desktop.js byte-equal, DomainHarness activated) → stable NO-OP restart; and no-trust boot refusal with no listener/DB |
 | Full local suites | `apps/control-api` 35 files / 241 passed EXIT=0; integration r02-e EXIT=0 ×2; typecheck EXIT=0; Biome lint EXIT=0 |
 | Exact-SHA CI | Woodpecker on the final source SHA (Push+PR) — see #404 closeout comment |
+
+## V030-WINDOWS-PORTABLE-G1 — signed Windows portable distribution (#407)
+
+```yaml
+task                        = V030-WINDOWS-PORTABLE-DISTRIBUTION (#407)
+standard                    = ADS_1359_DELIVERY_FIRST
+claim                       = CAS_CLAIM_ADMITTED generation 1 (#407 comment 6770578057)
+pack                        = '#408 head 705a2d9261c6e58eb96cb3d41f81a22764895e70 tree 097b1b471a7cd92f3e8fea8772519fa52be4748e'
+pack_ci                     = 'Woodpecker push #712 SUCCESS + PR #714 SUCCESS at exact 705a2d926 (prior #709/#710/#711 clone-stage network transient; agent git forced HTTP/1.1; #709 superseded by #710, not rerun)'
+version_base                = version/v0.3.0 @ da3a36eb91d39c6bac8cd6b72b27c4b588adda4d (tree 55fdafeedc3936518e58e6813ea0d4abe47eea9)
+reuse                       = 'v0.2 T09 PR #204 four packaging files present in version tree byte-identical (git diff vs 28db1877 empty); #202 manifest.mjs reused unmodified'
+builder_outputs             = stage EXIT=0; unit tests node --test packaging/v03/stage.test.mjs 6/6 EXIT=0; offline smoke packaging/v03/smoke.mjs SMOKE_RESULT=PASS 19/19 EXIT=0; tools/task-check.sh EXIT=0
+standard_user_pro           = PASS (13/13 steps EXIT=0, genuine standard account shun-qa, no Administrators group, real profile, Windows 11 Pro 10.0.26300 x64)
+standard_user_home          = NOT_RUN (no Windows Home environment available in the delivery workspace; recorded per #407 — not claimed as PASS)
+artifact                    = 'ShunAssistant-v0.3.0-windows-portable-x64.zip 38,011,868 bytes sha256 ed87e8c04d4667e5a2da823af2d8186982e71a1c7765b58f0370717e4c653f1d'
+signing                     = 'qualification authority for this gate (Ed25519 SPKI pin 0e32d03b7930359a314ff7d9271dac46ef76fadd1f3e386dcf7a01ee579d7370, 151 manifest entries verified); production operator key + public Tag/Release remain a separate explicit release decision'
+build_id                    = shun-v0.3.0-portable-g1
+digests                     = 'node ba4e6d110e8c1592a1ecd390f6b05f3da124b13871a5be62b341a07a853c6c32 | controlBundle 7285fb813d95687df9bd3109f7216602a1de0a934e2b4b1f3c2f451b96004001 | consentBroker c85420cabd60e264e806fdfc5025287feb2f8168ce84d766b49fb2c91732c567 | consentHost a616ff35c0da830f1d6a3bd9e0f4df18cc2ef4deb97e565f92bbd3b53fe05f75 | win32Impl 801bc1b6a073bf773fb02445b8abec8352388436d9ec58178c010a7809336b7c | buildFile a1eac31dc4de669a93b2ac3e9b79c0ff21345aa357791d1c4c5b1f39ca73ca3c | guidedCase f6554ef2df0253f3a758536ca3854aa726f554fb4bbcd8ed5123c81fdb6f06f1'
+```
+
+### Qualification matrix evidence (G1 builder receipts)
+
+| Gate | Evidence |
+| --- | --- |
+| Offline sign/verify | `manifest.mjs sign` → `verify` 151 entries, pin match; tampered file / extra file / wrong pin / wrong key / junction each refused (smoke + unit tests) |
+| Per-user install | `lifecycle.mjs install` INSTALL signed, LocalAppData fixed-drive guard, state outside Core (smoke + Pro standard user) |
+| Fail-closed first run | launcher without provisioning: `SETUP_REQUIRED` + visible `Shun-FirstRun.cmd` guidance, non-zero exit, no listener (smoke + Pro) |
+| Consented bootstrap | bundled #404 CLI: BOOTSTRAP_CREATED then byte-stable ALREADY_COMPLETE; trust anchor/pin/secret under `%LOCALAPPDATA%\Shun` (smoke + Pro) |
+| Provisioning | per-installation storage-registry pair + controller secrets + launch config; idempotent; never printed |
+| Real production boot | REAL bounded C-003 banner + `v0.3 public DomainHarness activated`; `/api/v03/guided/state` 200 with live Case step; `/v03/desktop.js` byte-identical to shipped R04 UI; loopback only; hostile Host header → 403 `LOCAL_ONLY_VIOLATION` (smoke + Pro) |
+| No paid calls | cloud lane forced off + DeepSeek credential stripped in every qualification child; no UAC at any step |
+| Upgrade | re-install → `UPGRADE`; anchor/pin/guided secret/registry private key/user canary byte-identical before/after (smoke + Pro) |
+| Uninstall | `UNINSTALL_CORE_ONLY`; core removed, `state` + `Shun\authority` + `Shun\secrets` retained, no listener remains (smoke + Pro) |
+| Node 24 preflight | builder + all qualification on Node v24.21.0 x64; `task-check` lint/typecheck/tests EXIT=0 |
+
+### Findings
+
+- **P0**: none.
+- **P1**: none.
+- **P2**: (1) Windows Home lane NOT_RUN — no Home environment available in the delivery workspace; must run before public release claims Home support. (2) The bundled CLI tools inherit the source tree's inlined `invokedDirectly` guard, so a harmless `ISSUER_FAIL ISSUER_MISSING_SHUN_GUIDED_DATABASE_PATH` line appears on stderr while the exit code stays correct; cosmetic only. (3) The bundled bootstrap must sit exactly three directories below Core (`app/native/tools/`) because its forbidden-scope rule derives `resolve(dir,'../../..')`; documented in packaging/v03/README.md and pinned by unit tests. (4) The storage-registry currentness (120 s, workspace-bound) is issued per launch by the trusted launcher from the per-user state key — an offline-coherent design under the audited issuer script; distribution-wide operator re-issuance remains a release-design question. (5) Public Tag/Release and the production operator signing key remain BLOCK pending the separate release decision.
+- **Residual risk**: same-interactive-user malicious processes remain outside the frozen v0.3 threat model (unchanged from R04/#404); the distribution zip and out-of-band public key/pin must travel through an authenticated channel — the signed manifest alone cannot attest a replaced verifier.
+
+### R1 P1 corrective checkpoint — source G2 in progress (2026-11-10)
+
+The G1 receipts above are retained as **historical, not current-release** proof. Fresh R1 review on PR #409 HEAD `47cce4dec849ed1ba26dce3167a0fd12fa1f2cf1` identified P1-PORTABLE-FOLDER-01 (PR comment 6772396458): shipped R04 UI requests the native `select-root` route, but the G1 launcher neither configured its per-user SQLite database nor shipped the SHA-pinned native picker. G2 repairs the existing 11-path scope and adds fail-closed digest and startup tests. **A new signed ZIP / digest, native Pro and Home matrix and exact G2 HEAD evidence are required before this correction is qualified.** Do not reuse the G1 ZIP digest as proof of G2. No public Tag/Release authorization.

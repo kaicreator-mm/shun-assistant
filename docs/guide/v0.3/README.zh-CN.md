@@ -44,3 +44,40 @@ node scripts/v03-ci/assemble-trusted-build.mjs C:\\ShunHost\\build-spec.json C:\
 ```
 
 记录命令输出的整体 SHA256，并由可信启动环境分别提供 `SHUN_V03_BUILD_FILE`、`SHUN_V03_BUILD_SHA256`、`SHUN_V03_SDK_CONSUMER_DIR`、`SHUN_V03_KERNEL_DOC_DATABASE`、`SHUN_V03_DEPLOYMENT_ROOT`、`SHUN_V03_TENANT_ID`、`SHUN_V03_DEPLOYED_APP_ID`，以及真实存储模式的安全配置。Guided 需要可信 SQLite 路径 `SHUN_V03_GUIDED_DATABASE`，可选的已签核 Host 选中 Case 文件由 `SHUN_V03_GUIDED_CASE_FILE` 及 `SHUN_V03_GUIDED_CASE_SHA256` 精确绑定。**这些配置不表示自动批准或自动允许物理效果**；未有真实权限与当前性证明时运行仍应拒绝。
+
+## v0.3.0 Windows 便携发行(最终用户安装,#407)
+
+v0.3.0 以签名便携包形式交付 Windows 用户:无需安装 Node.js、pnpm 或获取仓库,普通用户账户即可安装与使用,安装与日常启动不需要管理员权限。
+
+### 收到的材料
+
+- 签名发行目录(或 zip):内嵌 Node 24 x64 运行时、真实 v0.3 应用捆绑、DomainHarness 公共 SDK、固定哈希的原生 consent 组件与 R04 桌面界面。
+- 包外材料:`shun-portable-public.pem` 公钥与 64 位十六进制 SPKI 指纹(发布页公布)。**包内签名无法证明被替换的校验器**,因此只从认证发布页下载并核对 zip SHA-256 是信任链的一部分。
+
+### 安装(每用户一次)
+
+```bat
+cd /d C:\Shun
+Shun-Install.cmd shun-portable-public.pem <页面公布的指纹>
+```
+
+先做 Ed25519 全目录签名校验(篡改、多余文件、reparse/链接、指纹或公钥不符一律拒绝且不写入),然后原子装入 `%LOCALAPPDATA%\ShunAssistant\core`;个人数据在 `%LOCALAPPDATA%\ShunAssistant\state`,与可替换核心相互独立。安装要求本地固定磁盘(拒绝网络/映射盘)。
+
+### 首次运行(同意式引导,每用户一次)
+
+```bat
+%LOCALAPPDATA%\ShunAssistant\core\Shun-FirstRun.cmd
+```
+
+以你自己的身份在本机生成全部个人信任材料(Guided 信任锚、`%LOCALAPPDATA%\Shun\authority` 与 `%LOCALAPPDATA%\Shun\secrets` 下的密钥、本地存储注册密钥)。不上传数据、不需要 UAC;重复执行是无操作(`ALREADY_COMPLETE`)。
+
+### 启动、升级与卸载
+
+- 启动:`Shun-Run.cmd`,浏览器访问 `http://127.0.0.1:7788`(仅回环监听);未做首跑引导时明确拒绝并提示 `SETUP_REQUIRED`,绝不降级演示模式。
+- 升级:同一公钥与指纹下重复 `Shun-Install.cmd`;核心原子替换(`UPGRADE`),个人数据逐字节保留。
+- 卸载:`Shun-Uninstall.cmd` 仅删除 `core`;`state`、`Shun\authority`、`Shun\secrets` 全部保留,不残留监听进程。彻底清除请手动删除 `%LOCALAPPDATA%\ShunAssistant` 与 `%LOCALAPPDATA%\Shun`。
+
+### 隐私与安全要点
+
+- 默认配置不发起任何付费模型调用,云解释通道关闭。
+- 信任材料按 Windows 用户隔离,不跨账户分发;任意步骤签名校验失败即拒绝执行。

@@ -46,3 +46,64 @@ node scripts/v03-ci/assemble-trusted-build.mjs C:\\ShunHost\\build-spec.json C:\
 Pin the output SHA-256 separately as `SHUN_V03_BUILD_SHA256` and pass `SHUN_V03_BUILD_FILE`, `SHUN_V03_SDK_CONSUMER_DIR`, `SHUN_V03_KERNEL_DOC_DATABASE`, `SHUN_V03_DEPLOYMENT_ROOT`, `SHUN_V03_TENANT_ID`, `SHUN_V03_DEPLOYED_APP_ID` through the trusted Host bootstrap. Guided persistence uses `SHUN_V03_GUIDED_DATABASE`; an independently authenticated selected Host Case may be pinned with `SHUN_V03_GUIDED_CASE_FILE` and `SHUN_V03_GUIDED_CASE_SHA256`.
 
 These inputs do **not** manufacture disclosure consent, ActionController approval or a Kernel Effect Permit. Without a current trusted Host Case, real authorization and qualified module package source, the production journey must remain unavailable. Run exact Windows/CI qualification before claiming success.
+
+## v0.3.0 Windows Portable Distribution (end-user installation, #407)
+
+v0.3.0 ships to Windows users as a signed portable bundle: no Node.js, pnpm
+or repository checkout is required, and a standard user account can install
+and run it with no administrator rights for installation or ordinary launch.
+
+### What you receive
+
+- A signed distribution directory (or zip) embedding the Node 24 x64 runtime,
+  the real v0.3 application bundle, the public DomainHarness SDK, hash-pinned
+  native consent components and the R04 desktop UI.
+- Out-of-band material: `shun-portable-public.pem` and a 64-hex SPKI pin
+  published on the distribution page. A signature inside the bundle can never
+  attest a replaced verifier, so downloading only from the authenticated page
+  and checking the published zip SHA-256 are part of the trust chain.
+
+### Install (once per user)
+
+```bat
+cd /d C:\Shun
+Shun-Install.cmd shun-portable-public.pem <pin-from-the-page>
+```
+
+The Ed25519 full-directory signature is verified first — tampering, extra
+files, reparse points/links, or a wrong pin/key refuse without writing
+anything — then the app is atomically installed to
+`%LOCALAPPDATA%\ShunAssistant\core`; your personal data lives in
+`%LOCALAPPDATA%\ShunAssistant\state`, deliberately outside the replaceable
+core. A local fixed drive is required (network/mapped storage is refused).
+
+### First run (consented bootstrap, once per user)
+
+```bat
+%LOCALAPPDATA%\ShunAssistant\core\Shun-FirstRun.cmd
+```
+
+Generates, as yourself on this machine, all per-user trust material: the
+Guided trust anchor, the keys under `%LOCALAPPDATA%\Shun\authority` and
+`%LOCALAPPDATA%\Shun\secrets`, and the local storage-registry key. Nothing is
+uploaded, no UAC is needed, and re-running is a no-op (`ALREADY_COMPLETE`).
+
+### Launch, upgrade, uninstall
+
+- Launch: `Shun-Run.cmd`, then open `http://127.0.0.1:7788` (loopback only).
+  Without first-run provisioning the launch refuses visibly with
+  `SETUP_REQUIRED` — never a silent demo fallback.
+- Upgrade: re-run `Shun-Install.cmd` with the same key and pin; the core is
+  atomically replaced (`UPGRADE`) and your personal data is preserved
+  byte-for-byte.
+- Uninstall: `Shun-Uninstall.cmd` removes only `core`; `state`,
+  `Shun\authority` and `Shun\secrets` are fully retained and no listener
+  remains. To erase everything, manually delete `%LOCALAPPDATA%\ShunAssistant`
+  and `%LOCALAPPDATA%\Shun`.
+
+### Privacy and safety
+
+- The default configuration performs no paid model calls; the cloud
+  interpretation lane is disabled.
+- Trust material is isolated per Windows user and never distributed across
+  accounts; any signature-verification failure refuses execution.
