@@ -2,6 +2,12 @@
 
 > [devkit #5](https://github.com/kaicreator-mm/devkit/issues/5), 2026-11-11. **REVIEWABLE RESEARCH INPUT, NOT VERIFIED DOMAIN KNOWLEDGE, NOT OFFICIALLY ACCEPTED.** Research base pinned to `91420edca44009aa2c984c876104b40814a7c265`; corrected active version must be checked separately.
 
+## R11 live source-authority addendum (2026-11-11, author-side correction)
+
+- [PR #272](https://github.com/kaicreator-mm/shun-assistant/pull/272), formerly cited as an **active** source PR in R3/R4, is now **MERGED** into `version/v0.3.0` (merged 2026-11-10T13:41:49Z). Its frozen source HEAD is `5bb4e4b27e319d0104406c3389f8b8e6149b7f0b`; merge commit `da3a36eb91d39c6bac8cd6b72b27c4b588adda4d`. The `apps/control-api/src/main.ts` Git Blob was read at both exact commits: `b27e32917eccafb1433c0971b2b3413fd74f1be5` in both. This establishes identity of that **one source file**, not entire merge tree/source equivalence or current release eligibility.
+- Historical lines below calling #272 an *active* PR describe the R3 intake snapshot and are now outdated as live status. For new current-state reviews inspect the **live** `version/v0.3.0` branch and its tests/merged PRs separately; do not substitute old R2 `91420ed...` nor promote #272's merged flag to real Windows Host effect, per-user protection, R04/Gate validation, or G1–G5 independent acceptance.
+- This is a bounded **source-authority correction**, not an independent Source-first Review or native execution receipt. `INDEPENDENCE_NOT_ESTABLISHED`, `FORMAL_G1_G5=0/5`, `EXTRACTION_READY=false` until a separate reviewer and Owner disposition.
+
 ## G1 Project Intent / authoritative goal
 
 - **User/product outcome:** Windows Goal→Capability/Provider→approval→Kernel permit→trusted Host effect→receipt.
