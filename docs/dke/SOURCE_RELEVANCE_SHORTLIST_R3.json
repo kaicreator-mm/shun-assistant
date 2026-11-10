@@ -1,0 +1,597 @@
+{
+  "schema": "devkit/dke-relevant-source-shortlist-r3",
+  "date": "2026-11-11",
+  "project": "shun-assistant",
+  "reference_source_revision": "91420edca44009aa2c984c876104b40814a7c265",
+  "source_authority_warning": "VERSION_BRANCHED_BEHIND_ACTIVE_PR_272_REQUIRES_REPIN",
+  "product_doc": {
+    "path": "docs/product/PRODUCT_FREEZE-v0.3.md",
+    "blob": "0f8a67c2f06364d58a842502d3dee11bfeeedba4"
+  },
+  "r1_representative_source_test_anchors": [
+    {
+      "path": "apps/control-api/src/main.ts",
+      "blob": "b86f791d7823c206b438ef7c5b91cb57c6a30187"
+    },
+    {
+      "path": "apps/control-api/src/server.ts",
+      "blob": "b5f22ce4189eb851b78509a9ec7a34dee5bb728d"
+    },
+    {
+      "path": "tests/integration/v03/t11-runtime/real-kernel-permit.test.ts",
+      "blob": "d1f57bebf6a0896fea23938f277ce7e752f91498"
+    }
+  ],
+  "method": "Domain-related path keywords applied to pinned full Git tree; shortlist cap 36 per semantic context, with R1 anchored source/test validated by Blob",
+  "candidate_groups": [
+    {
+      "context_candidate": "GoalCapability",
+      "selector": "goal|capability|provider|resolver",
+      "matched_paths": 115,
+      "shortlist": [
+        {
+          "path": "docs/product/capability-contracts-v0.1.md",
+          "blob": "3ffba87815f9314f6e26820ea1a9cd78fe60f342",
+          "review": "NOT_READ_CONTENT_BY_THIS_CATALOG"
+        },
+        {
+          "path": "docs/product/mvp-capability-map.md",
+          "blob": "9d8d3987c94285aa7b60ed21448f2ec82983997e",
+          "review": "NOT_READ_CONTENT_BY_THIS_CATALOG"
+        },
+        {
+          "path": "docs/product/provider-resolver-v0.1.md",
+          "blob": "72e664be733fc7f4deb43d6a9f561651f4f24588",
+          "review": "NOT_READ_CONTENT_BY_THIS_CATALOG"
+        },
+        {
+          "path": "docs/research/v0.2/open-source-provider-candidates.md",
+          "blob": "fe1698306fb7e58285e8bd6fa2834db4ca7041f2",
+          "review": "NOT_READ_CONTENT_BY_THIS_CATALOG"
+        },
+        {
+          "path": "packages/contracts/fixtures/invalid/capability-definition-bad-risk.json",
+          "blob": "a6e5e8eca75e954ba584a86a0def94d65fa991ae",
+          "review": "NOT_READ_CONTENT_BY_THIS_CATALOG"
+        },
+        {
+          "path": "packages/contracts/fixtures/invalid/goal-contract-extra-key.json",
+          "blob": "7bdf0eed8b9a009a9ee4953cee9f989fe2ddda56",
+          "review": "NOT_READ_CONTENT_BY_THIS_CATALOG"
+        },
+        {
+          "path": "packages/contracts/fixtures/invalid/goal-contract-unknown-disposition.json",
+          "blob": "972cc851c5563a2f800f2e0432cce185d9f1ecc4",
+          "review": "NOT_READ_CONTENT_BY_THIS_CATALOG"
+        },
+        {
+          "path": "packages/contracts/fixtures/invalid/goal-request-empty-goal.json",
+          "blob": "f1d65ad0ed72e4d4b08d53858a9f68fd927a2ebe",
+          "review": "NOT_READ_CONTENT_BY_THIS_CATALOG"
+        },
+        {
+          "path": "packages/contracts/fixtures/invalid/provider-binding-unknown-interface.json",
+          "blob": "0767f234ee2ae023e6665ca8501718ba27ee4e0e",
+          "review": "NOT_READ_CONTENT_BY_THIS_CATALOG"
+        },
+        {
+          "path": "packages/contracts/fixtures/valid/capability-definition/c001-image-batch.json",
+          "blob": "478d223a72e395ca9ca740ba1e4be2b185fc849b",
+          "review": "NOT_READ_CONTENT_BY_THIS_CATALOG"
+        },
+        {
+          "path": "packages/contracts/fixtures/valid/goal-contract/needs-clarification.json",
+          "blob": "d19ec3c05a9a4bc6fd7bcadc6ea4e4188bd942d0",
+          "review": "NOT_READ_CONTENT_BY_THIS_CATALOG"
+        },
+        {
+          "path": "packages/contracts/fixtures/valid/goal-contract/ready.json",
+          "blob": "54ac075428c50e2dcb944bc0b4e60b9d4a9ef3db",
+          "review": "NOT_READ_CONTENT_BY_THIS_CATALOG"
+        },
+        {
+          "path": "packages/contracts/fixtures/valid/goal-request/basic.json",
+          "blob": "53e4ff1b2c2e069fc4da4fadcf881d901e5f3072",
+          "review": "NOT_READ_CONTENT_BY_THIS_CATALOG"
+        },
+        {
+          "path": "packages/contracts/fixtures/valid/provider-capability-binding/imagemagick.json",
+          "blob": "57a47f99a1bcc23fe9c3f564cb08494ad8469684",
+          "review": "NOT_READ_CONTENT_BY_THIS_CATALOG"
+        },
+        {
+          "path": "packages/contracts/fixtures/valid/provider-definition/imagemagick.json",
+          "blob": "0f419725c1d2e4213401762155197f382d7fb500",
+          "review": "NOT_READ_CONTENT_BY_THIS_CATALOG"
+        },
+        {
+          "path": "packages/contracts/fixtures/valid/provider-environment-binding/feasible.json",
+          "blob": "1f87b119eea6d32d3ab71132b144742a50daa7b9",
+          "review": "NOT_READ_CONTENT_BY_THIS_CATALOG"
+        },
+        {
+          "path": "packages/contracts/fixtures/valid/provider-environment-binding/infeasible.json",
+          "blob": "31e5e55d455afb56f2b5b8df8d4ef52b664265d8",
+          "review": "NOT_READ_CONTENT_BY_THIS_CATALOG"
+        },
+        {
+          "path": "packages/contracts/src/capability.ts",
+          "blob": "3c9619d4385a5c533fec3b99bd3ea5224108f18b",
+          "review": "NOT_READ_CONTENT_BY_THIS_CATALOG"
+        },
+        {
+          "path": "packages/contracts/src/goal.ts",
+          "blob": "ce509d6275a7246c11949258be042ea1400e399d",
+          "review": "NOT_READ_CONTENT_BY_THIS_CATALOG"
+        },
+        {
+          "path": "packages/contracts/src/provider.ts",
+          "blob": "a5d10285bb9158c12980c3d03b94603a5182c3cf",
+          "review": "NOT_READ_CONTENT_BY_THIS_CATALOG"
+        },
+        {
+          "path": "packages/contracts/src/schema/capability-definition.schema.json",
+          "blob": "ebc00967978276a09b2b6e052bceeb1004db01cf",
+          "review": "NOT_READ_CONTENT_BY_THIS_CATALOG"
+        },
+        {
+          "path": "packages/contracts/src/schema/goal-contract.schema.json",
+          "blob": "f010f7db6d4fec4fbcd1a750c22f4613e0f6db42",
+          "review": "NOT_READ_CONTENT_BY_THIS_CATALOG"
+        },
+        {
+          "path": "packages/contracts/src/schema/goal-request.schema.json",
+          "blob": "10002b4fc934ad19ae2ae2f2633f16306d4fc505",
+          "review": "NOT_READ_CONTENT_BY_THIS_CATALOG"
+        },
+        {
+          "path": "packages/contracts/src/schema/provider-capability-binding.schema.json",
+          "blob": "d9e23cb20c60ed7c9b2d6cd2c30976fa58fce0e6",
+          "review": "NOT_READ_CONTENT_BY_THIS_CATALOG"
+        },
+        {
+          "path": "packages/contracts/src/schema/provider-definition.schema.json",
+          "blob": "5073ef41118b402f2886d451a20228687b3ebc04",
+          "review": "NOT_READ_CONTENT_BY_THIS_CATALOG"
+        },
+        {
+          "path": "packages/contracts/src/schema/provider-environment-binding.schema.json",
+          "blob": "50821d190a121b07af93f47ddfe5aace54ecbce7",
+          "review": "NOT_READ_CONTENT_BY_THIS_CATALOG"
+        },
+        {
+          "path": "packages/contracts/src/schema/v02-provider-catalog-artifact.schema.json",
+          "blob": "1ea9342115c02a231dc6a65639ebfe4613b9d332",
+          "review": "NOT_READ_CONTENT_BY_THIS_CATALOG"
+        },
+        {
+          "path": "packages/domain-computer/src/cloud/goal-request.ts",
+          "blob": "a98b596d2ec29e60c2fdf4cd12e5aeba0f7560c0",
+          "review": "NOT_READ_CONTENT_BY_THIS_CATALOG"
+        },
+        {
+          "path": "packages/domain-computer/src/provider/provider-jit.ts",
+          "blob": "eb70c8d110a8c2dcab7cd5ce5c3bcdb1936cdcc7",
+          "review": "NOT_READ_CONTENT_BY_THIS_CATALOG"
+        },
+        {
+          "path": "packages/domain-computer/src/semantic/goal-semantic.ts",
+          "blob": "84af798a974a3ddb11ee7a0cd203a7abfed87a3a",
+          "review": "NOT_READ_CONTENT_BY_THIS_CATALOG"
+        },
+        {
+          "path": "packages/domain-host/src/provider/trusted-provider-host.ts",
+          "blob": "db72a723eddbc2d28c002ea0dc03e70f1ca052ea",
+          "review": "NOT_READ_CONTENT_BY_THIS_CATALOG"
+        },
+        {
+          "path": "packages/provider-loader/evidence/t05-native-2026-10-17T20-29-25/events.ndjson",
+          "blob": "791e9922a83d2ac685f6a78f2d9290b2e4f94306",
+          "review": "NOT_READ_CONTENT_BY_THIS_CATALOG"
+        },
+        {
+          "path": "packages/provider-loader/evidence/t05-native-2026-10-17T20-29-25/manifest.txt",
+          "blob": "d08494b241d0636f6fa087652be6b2296a27b388",
+          "review": "NOT_READ_CONTENT_BY_THIS_CATALOG"
+        },
+        {
+          "path": "packages/provider-loader/evidence/t05-native-2026-10-17T20-29-25/summary.md",
+          "blob": "646278bee5cf51535f070a86a6a291431e75f719",
+          "review": "NOT_READ_CONTENT_BY_THIS_CATALOG"
+        },
+        {
+          "path": "packages/provider-loader/evidence/t05-winhost-2026-10-17T12-47-10/events.ndjson",
+          "blob": "9ef3cd060edfc6c094a4939c658bd31026f83184",
+          "review": "NOT_READ_CONTENT_BY_THIS_CATALOG"
+        },
+        {
+          "path": "packages/provider-loader/evidence/t05-winhost-2026-10-17T12-47-10/manifest.txt",
+          "blob": "f5fc7b1d82dca992622dada883abbd29f8ead82c",
+          "review": "NOT_READ_CONTENT_BY_THIS_CATALOG"
+        }
+      ]
+    },
+    {
+      "context_candidate": "TrustAndGuided",
+      "selector": "guided|trust|authorization|permit",
+      "matched_paths": 39,
+      "shortlist": [
+        {
+          "path": "packages/authorization/package.json",
+          "blob": "43252621294841fe49ba9a1f36f37fe7c489b362",
+          "review": "NOT_READ_CONTENT_BY_THIS_CATALOG"
+        },
+        {
+          "path": "packages/authorization/src/authority.ts",
+          "blob": "a22c9b0a979edff668ec4747262d9878ef630838",
+          "review": "NOT_READ_CONTENT_BY_THIS_CATALOG"
+        },
+        {
+          "path": "packages/authorization/src/controller.ts",
+          "blob": "032fe68c28125d39f420cdbd2e9832e767f087ab",
+          "review": "NOT_READ_CONTENT_BY_THIS_CATALOG"
+        },
+        {
+          "path": "packages/authorization/src/failures.ts",
+          "blob": "f6e0a169695c42505e4beec72a4790cc4427fbdd",
+          "review": "NOT_READ_CONTENT_BY_THIS_CATALOG"
+        },
+        {
+          "path": "packages/authorization/src/index.ts",
+          "blob": "b66481c82e717afe3fe9cea97cf74f199c52937a",
+          "review": "NOT_READ_CONTENT_BY_THIS_CATALOG"
+        },
+        {
+          "path": "packages/authorization/src/integrity.ts",
+          "blob": "d09d804cf19351347b4074d07db9365ebb058567",
+          "review": "NOT_READ_CONTENT_BY_THIS_CATALOG"
+        },
+        {
+          "path": "packages/authorization/src/issuance-proof.ts",
+          "blob": "b1cf9d1f231cb6a03a58b107a2a7dc8e38c8717d",
+          "review": "NOT_READ_CONTENT_BY_THIS_CATALOG"
+        },
+        {
+          "path": "packages/authorization/src/policy.ts",
+          "blob": "a0d03af88a79bec3e075a1efdf5f95169ad1f27b",
+          "review": "NOT_READ_CONTENT_BY_THIS_CATALOG"
+        },
+        {
+          "path": "packages/authorization/test/adversarial-r1.test.ts",
+          "blob": "5cd30214a708ef1c72d864265f30f88b736d7098",
+          "review": "NOT_READ_CONTENT_BY_THIS_CATALOG"
+        },
+        {
+          "path": "packages/authorization/test/adversarial-r2.test.ts",
+          "blob": "fc459ec1f2c6ea4aa73f00a37f0151ebd7dd09ea",
+          "review": "NOT_READ_CONTENT_BY_THIS_CATALOG"
+        },
+        {
+          "path": "packages/authorization/test/authority.test.ts",
+          "blob": "e6d883dd6965bd4cc82724f396b61148c6101b1c",
+          "review": "NOT_READ_CONTENT_BY_THIS_CATALOG"
+        },
+        {
+          "path": "packages/authorization/test/boundary-negative.test.ts",
+          "blob": "5ee021ac9dc1bcfa8839eee3faab2f4b94882fa7",
+          "review": "NOT_READ_CONTENT_BY_THIS_CATALOG"
+        },
+        {
+          "path": "packages/authorization/test/controller.test.ts",
+          "blob": "eda8d19c20ab8a3e96ca0cb78b597c47c9823ddc",
+          "review": "NOT_READ_CONTENT_BY_THIS_CATALOG"
+        },
+        {
+          "path": "packages/authorization/test/helpers.ts",
+          "blob": "5981d134f95cbef46cbca99ebcc12056964f3243",
+          "review": "NOT_READ_CONTENT_BY_THIS_CATALOG"
+        },
+        {
+          "path": "packages/authorization/test/policy-change-between-effects.test.ts",
+          "blob": "2be034ee8379312eca17f037f93a6acdbf6e51b5",
+          "review": "NOT_READ_CONTENT_BY_THIS_CATALOG"
+        },
+        {
+          "path": "packages/authorization/tsconfig.json",
+          "blob": "919a9d0afe3d833aa90e0f00f775b79e44fcff54",
+          "review": "NOT_READ_CONTENT_BY_THIS_CATALOG"
+        },
+        {
+          "path": "packages/authorization/vitest.config.ts",
+          "blob": "a71174ddf688af5e944496a955ad1c92f790dfbd",
+          "review": "NOT_READ_CONTENT_BY_THIS_CATALOG"
+        },
+        {
+          "path": "packages/contracts/fixtures/valid/authorization-grant/automatic.json",
+          "blob": "7c541afcb6c3583b28654cb7dff1201b478359d9",
+          "review": "NOT_READ_CONTENT_BY_THIS_CATALOG"
+        },
+        {
+          "path": "packages/contracts/src/authorization.ts",
+          "blob": "1d2cdf0fba96980f473ec793f6a0c8811424a7fe",
+          "review": "NOT_READ_CONTENT_BY_THIS_CATALOG"
+        },
+        {
+          "path": "packages/contracts/src/schema/authorization-authority.schema.json",
+          "blob": "104ced6cc0de99bdb436f3dea35522972b58956d",
+          "review": "NOT_READ_CONTENT_BY_THIS_CATALOG"
+        },
+        {
+          "path": "packages/contracts/src/schema/authorization-grant.schema.json",
+          "blob": "f75f86746c86d9e7829f44286dac216dc8933120",
+          "review": "NOT_READ_CONTENT_BY_THIS_CATALOG"
+        },
+        {
+          "path": "packages/contracts/test/authorization-integrity.test.ts",
+          "blob": "d8378ebe38da220dbf521246d4a02be48a9ac063",
+          "review": "NOT_READ_CONTENT_BY_THIS_CATALOG"
+        },
+        {
+          "path": "packages/domain-computer/src/guided/guided-contract.ts",
+          "blob": "94a42ed87e12a68e0c109ac94b6b1c7754b0f0a0",
+          "review": "NOT_READ_CONTENT_BY_THIS_CATALOG"
+        },
+        {
+          "path": "packages/domain-computer/src/guided/guided-journey.ts",
+          "blob": "ff36ee1ae672f501808f50b6b23a381931c1778e",
+          "review": "NOT_READ_CONTENT_BY_THIS_CATALOG"
+        },
+        {
+          "path": "packages/domain-host/src/provider/trusted-provider-host.ts",
+          "blob": "db72a723eddbc2d28c002ea0dc03e70f1ca052ea",
+          "review": "NOT_READ_CONTENT_BY_THIS_CATALOG"
+        },
+        {
+          "path": "packages/executor-windows/src/trusted-store.ts",
+          "blob": "63091410c6b449fc68d0d8496fabddf15245a611",
+          "review": "NOT_READ_CONTENT_BY_THIS_CATALOG"
+        },
+        {
+          "path": "packages/executor-windows/test/trusted-store.test.ts",
+          "blob": "b5f82399d79a7e07c44e38c7f7487e8d98ae1cad",
+          "review": "NOT_READ_CONTENT_BY_THIS_CATALOG"
+        },
+        {
+          "path": "packages/recipe-runtime/src/trusted-windows-r0-effect.ts",
+          "blob": "bea2e20181918822da94c1b24dd0fd3681e1dc61",
+          "review": "NOT_READ_CONTENT_BY_THIS_CATALOG"
+        },
+        {
+          "path": "packages/recipe-runtime/test/trusted-windows-r0-effect.test.ts",
+          "blob": "ecce56de1c19a0c89ee5b51ff83ae38e794fb179",
+          "review": "NOT_READ_CONTENT_BY_THIS_CATALOG"
+        },
+        {
+          "path": "packages/resolver/src/trusted-recipe-host.ts",
+          "blob": "9f8827e10688b472b6bd6b00c3eca009b6e0a410",
+          "review": "NOT_READ_CONTENT_BY_THIS_CATALOG"
+        },
+        {
+          "path": "packages/resolver/test/trusted-recipe-host.test.ts",
+          "blob": "52c634216d7459172da326844e3301f43cfc6f3e",
+          "review": "NOT_READ_CONTENT_BY_THIS_CATALOG"
+        },
+        {
+          "path": "packages/store/src/authorization-adapter.ts",
+          "blob": "df299e218996ca72f245e3cbbef3d04fb6e17e44",
+          "review": "NOT_READ_CONTENT_BY_THIS_CATALOG"
+        },
+        {
+          "path": "packages/store/test/authorization-adapter.test.ts",
+          "blob": "47d12871588108d277b15d2e97d0478908e47b63",
+          "review": "NOT_READ_CONTENT_BY_THIS_CATALOG"
+        },
+        {
+          "path": "tests/integration/v03/t05-guided/guided-journey.test.ts",
+          "blob": "bce1093e5a0629d80380864af0cd702671c4989b",
+          "review": "NOT_READ_CONTENT_BY_THIS_CATALOG"
+        },
+        {
+          "path": "tests/integration/v03/t05-guided/tsconfig.json",
+          "blob": "a8bea379129b35d9b31858838851b499233f5003",
+          "review": "NOT_READ_CONTENT_BY_THIS_CATALOG"
+        },
+        {
+          "path": "tests/integration/v03/t05-guided/vitest.config.ts",
+          "blob": "71c96f5a2aa009cf1609e9a945cc9b7c652d6653",
+          "review": "NOT_READ_CONTENT_BY_THIS_CATALOG"
+        }
+      ]
+    },
+    {
+      "context_candidate": "EffectAndReceipt",
+      "selector": "effect|journal|receipt|recovery|control.api",
+      "matched_paths": 148,
+      "shortlist": [
+        {
+          "path": "apps/control-api/native/.gitignore",
+          "blob": "2f7896d1d1365eafb0da03d9fe456fac81408487",
+          "review": "NOT_READ_CONTENT_BY_THIS_CATALOG"
+        },
+        {
+          "path": "apps/control-api/native/Cargo.toml",
+          "blob": "f767d835fec2c9071b06bcef11f1a7c367d50d7f",
+          "review": "NOT_READ_CONTENT_BY_THIS_CATALOG"
+        },
+        {
+          "path": "apps/control-api/native/README.md",
+          "blob": "a8d52ebe834c94b203bc904fc4e305eafb564fa3",
+          "review": "NOT_READ_CONTENT_BY_THIS_CATALOG"
+        },
+        {
+          "path": "apps/control-api/native/artifacts.ts",
+          "blob": "e7cd6ba3ace8169c18cee3218af1e1a819bb0ba0",
+          "review": "NOT_READ_CONTENT_BY_THIS_CATALOG"
+        },
+        {
+          "path": "apps/control-api/native/broker/Cargo.toml",
+          "blob": "c6ac93bf13411a4f3487e64cf693ccdda8ca975a",
+          "review": "NOT_READ_CONTENT_BY_THIS_CATALOG"
+        },
+        {
+          "path": "apps/control-api/native/broker/shun-consent-broker.exe",
+          "blob": "6e52b3ba830c673d6561dd1061241dd468757d2f",
+          "review": "NOT_READ_CONTENT_BY_THIS_CATALOG"
+        },
+        {
+          "path": "apps/control-api/native/broker/src/consent.rs",
+          "blob": "b047abe9661b031f85031b1ea136b61528b63dcb",
+          "review": "NOT_READ_CONTENT_BY_THIS_CATALOG"
+        },
+        {
+          "path": "apps/control-api/native/broker/src/crypto.rs",
+          "blob": "64c9b1f3e2b8a4607f4fd9380ebc2a40ce5ecd45",
+          "review": "NOT_READ_CONTENT_BY_THIS_CATALOG"
+        },
+        {
+          "path": "apps/control-api/native/broker/src/dialog.rs",
+          "blob": "822876835bf089cf0a54ef460e63e3361082068b",
+          "review": "NOT_READ_CONTENT_BY_THIS_CATALOG"
+        },
+        {
+          "path": "apps/control-api/native/broker/src/main.rs",
+          "blob": "d70fb7b561e780a84f679471a7f2c8c6fd0491d9",
+          "review": "NOT_READ_CONTENT_BY_THIS_CATALOG"
+        },
+        {
+          "path": "apps/control-api/native/broker/src/proto.rs",
+          "blob": "369ff501102acc004f35bc324c626f16214bb6d2",
+          "review": "NOT_READ_CONTENT_BY_THIS_CATALOG"
+        },
+        {
+          "path": "apps/control-api/native/broker/src/timeutil.rs",
+          "blob": "84f8d49cbfc4c56ca6afee764c565c1857d80883",
+          "review": "NOT_READ_CONTENT_BY_THIS_CATALOG"
+        },
+        {
+          "path": "apps/control-api/native/broker/src/token.rs",
+          "blob": "499a52862c865d12fe179baacd4b5094c20944fb",
+          "review": "NOT_READ_CONTENT_BY_THIS_CATALOG"
+        },
+        {
+          "path": "apps/control-api/native/host/Cargo.toml",
+          "blob": "6cc44747200e2e1b90454d936b5a54827c856d85",
+          "review": "NOT_READ_CONTENT_BY_THIS_CATALOG"
+        },
+        {
+          "path": "apps/control-api/native/host/shun_consent_host.node",
+          "blob": "e90b365139128577d34eb24dc6d7704269d32f2c",
+          "review": "NOT_READ_CONTENT_BY_THIS_CATALOG"
+        },
+        {
+          "path": "apps/control-api/native/host/src/lib.rs",
+          "blob": "5200dce23a9c2a8dbd442fd028b5f7fe2df9891c",
+          "review": "NOT_READ_CONTENT_BY_THIS_CATALOG"
+        },
+        {
+          "path": "apps/control-api/native/index.ts",
+          "blob": "d851dd1193c75a1a82e2a0116b21d02ea460bfb5",
+          "review": "NOT_READ_CONTENT_BY_THIS_CATALOG"
+        },
+        {
+          "path": "apps/control-api/package.json",
+          "blob": "1eb294feefbc77f76e8d4089a3d09f0b0cdcaf1e",
+          "review": "NOT_READ_CONTENT_BY_THIS_CATALOG"
+        },
+        {
+          "path": "apps/control-api/scripts/issue-registry-currentness.ts",
+          "blob": "3c73a1fcde89f2c028ee9272867bf7a155e0a2fa",
+          "review": "NOT_READ_CONTENT_BY_THIS_CATALOG"
+        },
+        {
+          "path": "apps/control-api/src/cloud-authority.ts",
+          "blob": "cfb3682b5b3128f3646833a8decbd1d347705d91",
+          "review": "NOT_READ_CONTENT_BY_THIS_CATALOG"
+        },
+        {
+          "path": "apps/control-api/src/cloud-interpret.ts",
+          "blob": "743da0c46af049613618ecf48a21be2a3ea929a2",
+          "review": "NOT_READ_CONTENT_BY_THIS_CATALOG"
+        },
+        {
+          "path": "apps/control-api/src/demo/backend.ts",
+          "blob": "ac01c021dfca6b5ecceedcbc2ddc80686a558b1f",
+          "review": "NOT_READ_CONTENT_BY_THIS_CATALOG"
+        },
+        {
+          "path": "apps/control-api/src/demo/plans.ts",
+          "blob": "60156e0bb077d86e9012a56b4b22f2f5dc1714ba",
+          "review": "NOT_READ_CONTENT_BY_THIS_CATALOG"
+        },
+        {
+          "path": "apps/control-api/src/errors.ts",
+          "blob": "1573b155a7826c9360f38e83f349f58564b9ed93",
+          "review": "NOT_READ_CONTENT_BY_THIS_CATALOG"
+        },
+        {
+          "path": "apps/control-api/src/index.ts",
+          "blob": "c1921c6beb48c6426a9c07a67a90d124089bfa64",
+          "review": "NOT_READ_CONTENT_BY_THIS_CATALOG"
+        },
+        {
+          "path": "apps/control-api/src/inventory-recipe.ts",
+          "blob": "0d4923fa842243e13aa561563ce185da1821c07b",
+          "review": "NOT_READ_CONTENT_BY_THIS_CATALOG"
+        },
+        {
+          "path": "apps/control-api/src/main.ts",
+          "blob": "b86f791d7823c206b438ef7c5b91cb57c6a30187",
+          "review": "NOT_READ_CONTENT_BY_THIS_CATALOG"
+        },
+        {
+          "path": "apps/control-api/src/ports.ts",
+          "blob": "6da23ca6aa5092a9e12361af233ffcce5ed57d2d",
+          "review": "NOT_READ_CONTENT_BY_THIS_CATALOG"
+        },
+        {
+          "path": "apps/control-api/src/preview.ts",
+          "blob": "fd6b77e0237a40721cdac51a47dcb2391d76fc1c",
+          "review": "NOT_READ_CONTENT_BY_THIS_CATALOG"
+        },
+        {
+          "path": "apps/control-api/src/real-storage/backend.ts",
+          "blob": "324bf46429c73672240df5f8c501e334d24e522b",
+          "review": "NOT_READ_CONTENT_BY_THIS_CATALOG"
+        },
+        {
+          "path": "apps/control-api/src/real-storage/recovery.ts",
+          "blob": "494750db3e404cf404a3c28336ad1fb7db373cac",
+          "review": "NOT_READ_CONTENT_BY_THIS_CATALOG"
+        },
+        {
+          "path": "apps/control-api/src/real-storage/registry-host-facts.ts",
+          "blob": "a4f6ec53fd1f5b08148e9e68c89dca7d7da0ed47",
+          "review": "NOT_READ_CONTENT_BY_THIS_CATALOG"
+        },
+        {
+          "path": "apps/control-api/src/real-storage/registry-issuance.ts",
+          "blob": "c201f71858722be2085ed81dfa5933f714c4cac3",
+          "review": "NOT_READ_CONTENT_BY_THIS_CATALOG"
+        },
+        {
+          "path": "apps/control-api/src/real-storage/registry-key-pin.ts",
+          "blob": "16fa6f7ef932b5ffe7abe4b4eba9d20f051b2ef9",
+          "review": "NOT_READ_CONTENT_BY_THIS_CATALOG"
+        },
+        {
+          "path": "apps/control-api/src/real-storage/registry-snapshot.ts",
+          "blob": "5b66ccd4c85140345fab5cc058119c0ccb5141b6",
+          "review": "NOT_READ_CONTENT_BY_THIS_CATALOG"
+        },
+        {
+          "path": "apps/control-api/src/recipe-inventory-run.ts",
+          "blob": "fa4d8b73663cf60a1f692857b681935529fa7e76",
+          "review": "NOT_READ_CONTENT_BY_THIS_CATALOG"
+        }
+      ]
+    }
+  ],
+  "scope": "SC02_KNOWLEDGE_RELEVANCE_CANDIDATE",
+  "limitations": [
+    "Heuristic path matches are not content-reviewed",
+    "Some relevant business code may lack keywords",
+    "External domain sources/permission not yet admitted",
+    "Source version drift is reviewed separately"
+  ],
+  "qualification": "NOT_INDEPENDENTLY_ACCEPTED"
+}
