@@ -358,6 +358,7 @@ export async function bootLiveStack(options: {
     v03Guided: guided,
     v03Gateway: production.gateway,
     v03Journeys: production.journeys,
+    v03ProviderGlobal: production.providerGlobal,
   });
   const port = await server.start();
   return {

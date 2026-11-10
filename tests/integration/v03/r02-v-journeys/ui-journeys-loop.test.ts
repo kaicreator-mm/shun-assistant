@@ -354,11 +354,18 @@ describe.skipIf(!RUN_PHYSICAL)(
           expect(existsSync(target)).toBe(true);
           expect(readFileSync(target, 'utf8')).toBe(canary);
 
-          // --- provider family: real signed first-use through the UI
-          dom.byId('v03-j-provider-task')!.value = 'task-r03b-ui-provider';
+          // --- provider family: Host-global first use through the UI
+          // (R03C/#403 migration: one click runs prepare → confirm; the
+          // closed-world receipt surfaces outcome facts, never stdout.)
           dom.byId('v03-j-provider-run')!.click();
           await until(() => (dom.byId('v03-j-provider-status')?.textContent ?? '').length > 0);
-          expect(dom.byId('v03-j-provider-status')?.textContent).toContain('ripgrep 14.1.1');
+          expect(dom.byId('v03-j-provider-status')?.textContent).toContain(completed.text ?? '');
+          expect(dom.byId('v03-j-provider-status')?.textContent).toContain(
+            'PROVIDER_FIRST_USE_EXECUTED',
+          );
+          expect(dom.byId('v03-j-provider-status')?.textContent).toContain('canary MATCHED');
+          // Closed-world honesty: the artifact identity never surfaces here.
+          expect(dom.byId('v03-j-provider-status')?.textContent).not.toContain('ripgrep');
 
           // --- meta family: real durable Shadow candidate through the UI
           dom.byId('v03-j-meta-case')!.value = 'task-r03b-ui-src';

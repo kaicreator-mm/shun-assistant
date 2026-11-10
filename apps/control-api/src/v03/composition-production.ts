@@ -525,6 +525,10 @@ export async function createProductionV03Gateway(config: ProductionV03Config): P
   // Declared before the try so both the dispose path and the activation
   // failure path close the authority store deterministically.
   let selectedRootEffect: SelectedRootEffectAdmission | undefined;
+  // The staged provider binding singleton (and its durable ledger sqlite
+  // handle) outlives the per-composition objects: dispose() must close it
+  // or the held file handle blocks cleanup on Windows (EPERM).
+  let providerBindingClose: (() => void) | undefined;
   try {
     const activated = await activatePublicShunDomainApp({
       sdk: { buildV10App: buildSdk.buildV10App, activateV10App: kernelSdk.activateV10App },
@@ -591,6 +595,10 @@ export async function createProductionV03Gateway(config: ProductionV03Config): P
             // imports: the module-global installed binding is coherent for
             // the composition-side Host surfaces and the K→C callback.
             const providerHost = await loadStagedBindingModule(consumerRoot, 'shun-provider-host');
+            {
+              const close = providerHost.closeTrustedProviderBinding as (() => void) | undefined;
+              if (typeof close === 'function') providerBindingClose = close;
+            }
             const statusOf = (): { installed: boolean } => {
               const status = providerHost.trustedProviderBindingStatus as
                 | (() => { installed: boolean })
@@ -750,6 +758,7 @@ export async function createProductionV03Gateway(config: ProductionV03Config): P
         store.close();
         references.close();
         selectedRootEffect?.close();
+        providerBindingClose?.();
       },
     };
   } catch {

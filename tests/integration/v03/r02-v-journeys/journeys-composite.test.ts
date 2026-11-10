@@ -216,23 +216,32 @@ describe.skipIf(!RUN_PHYSICAL)(
     });
 
     it('family provider: one REAL signed first-use execution through the K', async () => {
-      const refs = stack.submitRefs();
-      const result = await json(stack.port, 'POST', '/api/v03/provider/first-use', {
-        caseId: stack.caseId,
-        taskId: 'task-r03b-comp-provider',
-        currentnessRef: refs.currentnessRef,
-        approvalRef: refs.approvalRef,
+      // R03C/#403 migration: provider first-use is Host-global — prepare
+      // (no Case, no references) then confirm with the one-time requestRef.
+      // The receipt is closed-world: outcome facts only, never stdout.
+      const prepared = await json(stack.port, 'POST', '/api/v03/provider/prepare');
+      expect(prepared.status).toBe(200);
+      expect((prepared.body as { status: string }).status).toBe('PREPARED');
+      const requestRef = (prepared.body as { requestRef: string }).requestRef;
+      expect(typeof requestRef).toBe('string');
+      const result = await json(stack.port, 'POST', '/api/v03/provider/confirm', {
+        requestRef,
       });
       expect(result.status).toBe(200);
       expect((result.body as { status: string }).status).toBe('COMPLETED');
       const output = (
         (
           (result.body as { result: { admitted?: { effects?: { output?: { outcome?: { output?: {
-            stdout?: string;
+            code?: string;
+            canaryResult?: string;
+            exitCode?: number;
           } } } }[] } } }).result ?? {}
         ).admitted?.effects?.[0]?.output?.outcome?.output ?? {}
       );
-      expect((output.stdout ?? '').toLowerCase()).toContain('ripgrep 14.1.1');
+      expect(output.code).toBe('PROVIDER_FIRST_USE_EXECUTED');
+      expect(output.canaryResult).toBe('MATCHED');
+      expect(output.exitCode).toBe(0);
+      expect(JSON.stringify(result.body)).not.toContain('ripgrep 14.1.1');
     });
 
     it('family meta: one REAL durable Shadow candidate through the K', async () => {

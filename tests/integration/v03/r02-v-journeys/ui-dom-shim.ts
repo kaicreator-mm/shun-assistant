@@ -149,7 +149,6 @@ export const PAGE_ELEMENT_IDS = [
   'v03-j-effect-run',
   'v03-j-effect-status',
   'v03-j-provider-panel',
-  'v03-j-provider-task',
   'v03-j-provider-run',
   'v03-j-provider-status',
   'v03-j-meta-panel',

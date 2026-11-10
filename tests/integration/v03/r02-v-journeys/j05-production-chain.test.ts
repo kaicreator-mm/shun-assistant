@@ -94,44 +94,66 @@ describe.skipIf(!RUN_PHYSICAL)(
       expect(stack.production.journeys).toBeTruthy();
     });
 
-    it('REAL chain: HTTP first-use → K permit → real signed rg.exe execution', async () => {
-      const refs = stack.submitRefs();
-      const result = await json(stack.port, 'POST', '/api/v03/provider/first-use', {
-        caseId: stack.caseId,
-        taskId: PROVIDER_TASK_ID,
-        currentnessRef: refs.currentnessRef,
-        approvalRef: refs.approvalRef,
+    it('REAL chain: Host-global prepare/confirm → K permit → real signed rg.exe execution', async () => {
+      // R03C/#403 migration: provider first-use is Host-global. prepare
+      // takes NO Case/reference/task input; confirm consumes the one-time
+      // Host requestRef; the K mints the permit and the trusted binding
+      // executes the genuine signed bytes from the operator-owned cache.
+      const prepared = await json(stack.port, 'POST', '/api/v03/provider/prepare');
+      expect(prepared.status).toBe(200);
+      expect((prepared.body as { status: string }).status).toBe('PREPARED');
+      const requestRef = (prepared.body as { requestRef: string }).requestRef;
+      expect(typeof requestRef).toBe('string');
+      const preview = (prepared.body as { preview?: Record<string, unknown> }).preview;
+      expect(preview?.privilegeScope).toBe('USER');
+      const result = await json(stack.port, 'POST', '/api/v03/provider/confirm', {
+        requestRef,
       });
       expect(result.status).toBe(200);
       expect((result.body as { status: string }).status).toBe('COMPLETED');
       const output = (
         (
           (result.body as { result: { admitted?: { effects?: { output?: { outcome?: { output?: {
+            code?: string;
+            canaryResult?: string;
             exitCode?: number;
             stdout?: string;
-            state?: string;
           } } } }[] } } }).result ?? {}
         ).admitted?.effects?.[0]?.output?.outcome?.output ?? {}
       );
-      expect(output.state).toBe('EXECUTED');
+      expect(output.code).toBe('PROVIDER_FIRST_USE_EXECUTED');
+      expect(output.canaryResult).toBe('MATCHED');
       expect(output.exitCode).toBe(0);
-      expect((output.stdout ?? '').toLowerCase()).toContain('ripgrep 14.1.1');
+      // Closed-world receipt: raw provider stdout never surfaces.
+      expect(output.stdout).toBeUndefined();
+      expect(JSON.stringify(result.body)).not.toContain('ripgrep 14.1.1');
       console.log(
         '[J05-production] real first-use receipt:',
-        JSON.stringify({ bindingId: BINDING_ID, exitCode: output.exitCode, stdoutHead: (output.stdout ?? '').split('\n')[0] }),
+        JSON.stringify({
+          bindingId: BINDING_ID,
+          exitCode: output.exitCode,
+          canaryResult: output.canaryResult,
+        }),
       );
     });
 
-    it('NEGATIVE: a wrong task identity refuses the first use (zero execution)', async () => {
-      const refs = stack.submitRefs();
-      const result = await json(stack.port, 'POST', '/api/v03/provider/first-use', {
-        caseId: stack.caseId,
-        taskId: 'task-not-the-pinned-one',
-        currentnessRef: refs.currentnessRef,
-        approvalRef: refs.approvalRef,
+    it('NEGATIVE: a replayed requestRef refuses with zero new executions', async () => {
+      // The old wrong-taskId falsifier is superseded by the frozen
+      // Host-global design (no caller task identity exists at all); the
+      // physical one-shot fence is the requestRef replay refusal.
+      const first = await json(stack.port, 'POST', '/api/v03/provider/prepare');
+      expect(first.status).toBe(200);
+      const requestRef = (first.body as { requestRef: string }).requestRef;
+      const consumed = await json(stack.port, 'POST', '/api/v03/provider/confirm', {
+        requestRef,
       });
-      expect(result.status).toBe(422);
-      expect((result.body as { status: string }).status).toBe('KERNEL_REFUSED');
+      expect(consumed.status).toBe(200);
+      expect((consumed.body as { status: string }).status).toBe('COMPLETED');
+      const replay = await json(stack.port, 'POST', '/api/v03/provider/confirm', {
+        requestRef,
+      });
+      expect(replay.status).toBe(422);
+      expect((replay.body as { status: string }).status).toBe('REFUSED');
     });
 
     it('fail-closed boot: provider routes without the trusted binding refuse activation', async () => {

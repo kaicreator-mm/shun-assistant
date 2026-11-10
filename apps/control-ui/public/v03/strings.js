@@ -313,10 +313,6 @@ export const STRINGS = {
       text: 'Send provider request',
       authorityRelevant: false,
     },
-    'journeys.provider.task': {
-      text: 'Provider task id',
-      authorityRelevant: false,
-    },
     'journeys.meta.title': {
       text: 'Meta feedback journey',
       authorityRelevant: false,
@@ -687,10 +683,6 @@ export const STRINGS = {
     },
     'journeys.provider.run': {
       text: '发送提供方请求',
-      authorityRelevant: false,
-    },
-    'journeys.provider.task': {
-      text: '提供方任务 ID',
       authorityRelevant: false,
     },
     'journeys.meta.title': {

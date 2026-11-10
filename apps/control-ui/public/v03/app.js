@@ -25,7 +25,8 @@ const DECISION_ENDPOINT = '/api/v03/guided/decision';
 const EFFECT_ENDPOINT = '/api/v03/effect/submit';
 const SELECTED_ROOT_EFFECT_ENDPOINT = '/api/v03/effect/selected-root';
 const SELECTED_ROOT_PROPOSAL_ENDPOINT = '/api/v03/effect/proposal';
-const PROVIDER_ENDPOINT = '/api/v03/provider/first-use';
+const PROVIDER_PREPARE_ENDPOINT = '/api/v03/provider/prepare';
+const PROVIDER_CONFIRM_ENDPOINT = '/api/v03/provider/confirm';
 const META_ENDPOINT = '/api/v03/meta/feedback';
 
 /** Replay ledger for this page session: keys of outcomes already relayed. */
@@ -266,14 +267,16 @@ function populateJourneySelect(selectId, options) {
  * on non-2xx responses: the server truthfully maps ADMITTED→202, UNKNOWN→409
  * and REFUSED/KERNEL_REFUSED→422 while still returning the full receipt, and
  * the status line must render that receipt instead of a bare HTTP code.
+ * A body of undefined sends no request body at all (the Host-global provider
+ * prepare step accepts — and the composition fixes — every value itself).
  * @param {string} path
- * @param {unknown} body
+ * @param {unknown} [body]
  */
 async function journeyReceipt(path, body) {
   const response = await fetch(path, {
     method: 'POST',
     headers: { 'content-type': 'application/json' },
-    body: JSON.stringify(body),
+    ...(body !== undefined ? { body: JSON.stringify(body) } : {}),
   });
   return response.json().catch(() => undefined);
 }
@@ -439,23 +442,30 @@ async function refreshSelectedRootEffectProposal() {
   }
 }
 
-/** Provider journey: relay the operator's taskId as-is; show the stdout head. */
+/**
+ * Provider journey: the Host-global first use is Case-free by design — one
+ * click runs the two fixed steps (prepare issues the Host requestRef, then
+ * confirm consumes it exactly once). The UI relays nothing but the click;
+ * the closed-world receipt surfaces only outcome/canary/exit facts, never
+ * raw provider stdout.
+ */
 async function runProviderJourney() {
   const statusNode = el('v03-j-provider-status');
   if (!statusNode) return;
   try {
-    const refs = journeyRefsAndCase(statusNode);
-    if (!refs) return;
-    const taskId = el('v03-j-provider-task')?.value ?? '';
-    const receipt = await journeyReceipt(PROVIDER_ENDPOINT, {
-      caseId: refs.caseId,
-      taskId,
-      currentnessRef: refs.currentnessRef,
-      approvalRef: refs.approvalRef,
+    const prepared = await journeyReceipt(PROVIDER_PREPARE_ENDPOINT);
+    if (prepared?.status !== 'PREPARED' || typeof prepared.requestRef !== 'string') {
+      renderJourneyStatus(statusNode, prepared, []);
+      return;
+    }
+    const receipt = await journeyReceipt(PROVIDER_CONFIRM_ENDPOINT, {
+      requestRef: prepared.requestRef,
     });
-    const stdout = receiptOutput(receipt)?.stdout;
+    const output = receiptOutput(receipt);
     renderJourneyStatus(statusNode, receipt, [
-      typeof stdout === 'string' ? stdout.split('\n')[0].trim() : '',
+      typeof output?.code === 'string' ? output.code : '',
+      typeof output?.canaryResult === 'string' ? `canary ${output.canaryResult}` : '',
+      typeof output?.exitCode === 'number' ? `exit ${output.exitCode}` : '',
     ]);
   } catch (error) {
     journeyUnknown(statusNode, error);
@@ -685,7 +695,6 @@ try {
   setText('v03-j-label-plan', text('journeys.effect.plan'));
   setText('v03-j-label-grant', text('journeys.effect.grant'));
   setText('v03-j-provider-title', text('journeys.provider.title'));
-  setText('v03-j-label-provider-task', text('journeys.provider.task'));
   setText('v03-j-meta-title', text('journeys.meta.title'));
   setText('v03-j-label-meta-case', text('journeys.meta.case'));
   setText('v03-j-label-meta-revision', text('journeys.meta.revision'));
