@@ -238,7 +238,14 @@ test('no-install-effects: Shun scaffold shape — zero-dep manifests, no entrypo
     assert.equal(manifest.dependencies, undefined, `${name} must have zero dependencies`);
     assert.equal(manifest.devDependencies, undefined, `${name} must have zero devDependencies`);
     assert.equal(manifest.scripts, undefined, `${name} must declare no scripts`);
-    assert.equal(manifest.exports, undefined, `${name} public exports are reserved to T11`);
+    // R02-C2 (#265) locked each public manifest to a single root export;
+    // deep imports (including the private Host observation issuer path)
+    // must stay refused by the exports map.
+    assert.deepEqual(
+      manifest.exports,
+      { '.': './src/index.ts' },
+      `${name} public exports must stay locked to the single root entry`,
+    );
     const tsconfig = JSON.parse(readFileSync(join(repoRoot, 'packages', name, 'tsconfig.json'), 'utf8'));
     assert.equal(tsconfig.extends, '../../tsconfig.base.json');
     // The shared strict base the three configs extend (typecheck behavior is exercised

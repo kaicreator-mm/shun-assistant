@@ -1,14 +1,29 @@
 // CLI entry: run the local control surface on loopback.
-//   node src/main.ts            → http://127.0.0.1:7788
+//   node --experimental-transform-types src/main.ts → http://127.0.0.1:7788
 // Env:
 //   SHUN_CONTROL_PORT           — port (default 7788)
 //   SHUN_CONTROL_UI_DIR         — static UI directory (default ../control-ui/public)
+import { readFileSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { HostMetaShadowStore } from '../../../packages/domain-host/src/meta/host-meta-shadow-store.ts';
 import { cloudInterpreterFromEnvironment } from './cloud-interpret.ts';
 import { DemoShunBackend } from './demo/backend.ts';
 import { RealStorageControlBackend } from './real-storage/backend.ts';
 import { createControlServer } from './server.ts';
+import { provisionGuidedCaseFromHostFile } from './v03/composition-guided.ts';
+import { createProductionGuidedService } from './v03/composition-guided-provenance.ts';
+import {
+  type JourneyBindingsConfig,
+  provisionMetaFromHostFile,
+} from './v03/composition-journeys.ts';
+import { createProductionV03Gateway } from './v03/composition-production.ts';
+import { createProductionFolderSelectionHost } from './v03/folder-selection-host.ts';
+import { createV03FolderSelectionRoute } from './v03/folder-selection-route.ts';
+import {
+  deriveSelectedRootEffect,
+  type SelectedRootEffectDescriptor,
+} from './v03/selected-root-effect-flow.ts';
 
 const here = dirname(fileURLToPath(import.meta.url));
 const port = Number.parseInt(process.env.SHUN_CONTROL_PORT ?? '7788', 10);
@@ -51,7 +66,226 @@ const executeBuiltinInventoryRecipe =
   backend instanceof RealStorageControlBackend
     ? () => backend.executeBuiltinInventoryRecipe()
     : undefined;
+// Guided state is a real, operator-owned local SQLite store. A selected
+// StepSpec may be staged ONLY by trusted Host composition, not by the browser;
+// absence of that binding exposes UNKNOWN, not a fabricated seeded journey.
+// R04 (#404): trust material is per-interactive-user under LocalAppData. When
+// it was never provisioned for THIS Windows user the boot stays fail-closed
+// (never a DEMO fallback) and prints the one-time consented setup path; a
+// valid bootstrap then makes every later ordinary start UAC-free and stable.
+const guidedDb = process.env.SHUN_V03_GUIDED_DATABASE;
+if (guidedDb && mode !== 'real-storage') {
+  throw new Error('V03_GUIDED_REQUIRES_REAL_STORAGE_MODE');
+}
+const guided = (() => {
+  if (!guidedDb || mode !== 'real-storage') return undefined;
+  try {
+    return createProductionGuidedService(resolve(guidedDb));
+  } catch (error) {
+    if (error instanceof Error && error.message.startsWith('GUIDED_TRUST_SETUP_REQUIRED')) {
+      console.error('Guided per-user trust is not provisioned for this Windows user (first run).');
+      console.error(
+        `Run the one-time consented bootstrap: node apps/control-api/scripts/bootstrap-guided-localappdata.ts --database "${resolve(guidedDb)}" --consent`,
+      );
+    }
+    throw error;
+  }
+})();
+
+// R04 U05-A folder picker is opt-in trusted local configuration. Its native
+// artifact is hash-pinned and fails closed; no browser input selects the DB.
+const folderSelectionDb = process.env.SHUN_V03_FOLDER_SELECTION_DATABASE;
+if (folderSelectionDb && (!guided || mode !== 'real-storage')) {
+  throw new Error('V03_FOLDER_SELECTION_REQUIRES_GUIDED_REAL_STORAGE');
+}
+const folderSelectionHost =
+  folderSelectionDb && guided
+    ? createProductionFolderSelectionHost({
+        guided,
+        databaseFile: resolve(folderSelectionDb),
+      })
+    : undefined;
+const folderSelectionRoute = folderSelectionHost
+  ? createV03FolderSelectionRoute(folderSelectionHost)
+  : undefined;
+
+// P1-02 crash-window recovery, host-only and never a route. Runs after the
+// trusted Guided ledger is admitted and before operator case-file
+// provisioning: a durable select-root USER_SUBMIT whose next INSPECT step
+// was never staged is re-verified against expiry, task/journey/Case/step/
+// digest binding and native root identity. Under the device-scoped Owner
+// decision, no SID/logon-SID/session identity is persisted or compared as an
+// authorization boundary; only then is the answer restaged through the
+// existing Host-only capability. Stale, expired or mismatched rows stay
+// refused; a fresh flow is a no-op.
+if (folderSelectionHost) {
+  const recovery = folderSelectionHost.recoverInterruptedSelection();
+  const detail = 'code' in recovery ? ` (${recovery.code})` : '';
+  console.log(`v0.3 folder-selection startup recovery: ${recovery.status}${detail}`);
+}
+
+// Restore or stage only operator-pinned Host observations. A browser cannot
+// supply an authority-bearing semantic selection or a selected root.
+if (guided && process.env.SHUN_V03_GUIDED_CASE_FILE) {
+  provisionGuidedCaseFromHostFile({
+    service: guided,
+    file: process.env.SHUN_V03_GUIDED_CASE_FILE,
+    sha256: requiredEnv('SHUN_V03_GUIDED_CASE_SHA256'),
+  });
+}
+
+// R03-INT journey bindings (all optional; a manifest declaring the matching
+// routes makes them mandatory — the composition refuses to boot otherwise).
+// Every value is trusted operator-local configuration, never HTTP input.
+// U05-B2: the windows binding closes the trusted selected-root recheck over
+// the FolderSelectionHost so the effect-time osAuthority.recheck re-verifies
+// the private root identity and the exact admitted plan before any effect.
+const windowsJourney =
+  process.env.SHUN_V03_WINDOWS_EFFECT_AUTHORITY_DIR && process.env.SHUN_V03_WINDOWS_EFFECT_WORKSPACE
+    ? {
+        authorityDir: requiredEnv('SHUN_V03_WINDOWS_EFFECT_AUTHORITY_DIR'),
+        workspaceRoot: requiredEnv('SHUN_V03_WINDOWS_EFFECT_WORKSPACE'),
+        ...(folderSelectionHost
+          ? {
+              selectedRoot: {
+                recheck: async (input: { readonly effectId: string; readonly action: unknown }) => {
+                  const action = input.action as
+                    | {
+                        readonly taskId?: unknown;
+                        readonly planHash?: unknown;
+                        readonly action?: { readonly parameters?: { readonly path?: unknown } };
+                      }
+                    | undefined;
+                  const verdict = folderSelectionHost.verifyEffectTimeRootIdentity({
+                    taskId: typeof action?.taskId === 'string' ? action.taskId : '',
+                    planHash: typeof action?.planHash === 'string' ? action.planHash : '',
+                    path: action?.action?.parameters?.path,
+                  });
+                  return verdict.ok
+                    ? { ok: true as const }
+                    : { ok: false as const, code: verdict.code };
+                },
+              },
+            }
+          : {}),
+      }
+    : undefined;
+const providerJourney = process.env.SHUN_V03_PROVIDER_CONFIG
+  ? loadProviderJourneyConfig(requiredEnv('SHUN_V03_PROVIDER_CONFIG'))
+  : undefined;
+const metaStore = process.env.SHUN_V03_META_DATABASE
+  ? new HostMetaShadowStore(resolve(requiredEnv('SHUN_V03_META_DATABASE')))
+  : undefined;
+if (metaStore && process.env.SHUN_V03_META_CASE_FILE) {
+  // Operator-pinned provisioning: one legacy single-record file or one
+  // bounded multi-Case batch file (R03C), hash-pinned, fail-closed.
+  provisionMetaFromHostFile({
+    store: metaStore,
+    file: process.env.SHUN_V03_META_CASE_FILE,
+    sha256: requiredEnv('SHUN_V03_META_CASE_SHA256'),
+  });
+}
+const journeys: JourneyBindingsConfig | undefined =
+  windowsJourney || providerJourney || metaStore
+    ? {
+        windows: windowsJourney,
+        provider: providerJourney,
+        meta: metaStore ? { store: metaStore } : undefined,
+      }
+    : undefined;
+
+// Production v0.3 is an explicit, operator-pinned mode. Missing genuine
+// SDK/BUILD/Host state fails before an HTTP listener is opened; no demo
+// fallback is ever mislabeled as a real v0.3 DomainApp.
+const productionBuild = process.env.SHUN_V03_BUILD_FILE;
+if (productionBuild && (!guided || mode !== 'real-storage')) {
+  throw new Error('V03_PRODUCTION_REQUIRES_GUIDED_TRUSTED_REAL_STORAGE');
+}
+// The T04 trusted cloud host binding is installed by the production
+// composition through the consumer's domain-harness-openai-host package.
+// Without a configured real interpreter the port stays disabled and every
+// LLM effect fails closed (CLOUD_UNAVAILABLE), never silently succeeds.
 const cloud = cloudInterpreterFromEnvironment();
+const disabledCloudInterpreter = {
+  status: () => ({
+    enabled: false,
+    provider: 'deepseek' as const,
+    model: 'deepseek-flash' as const,
+    osConsentRequired: true as const,
+  }),
+  interpretGoal: async () => ({ ok: false, code: 'CLOUD_UNAVAILABLE' }),
+};
+// U05-B2: the selected-root effect authority stack is an explicit,
+// operator-pinned configuration (executor authority store + durable policy
+// database + separated secrets). All four values or none; missing pieces
+// fail closed before any HTTP listener opens.
+const selectedRootEffectConfig =
+  process.env.SHUN_V03_SELECTED_ROOT_EFFECT_AUTHORITY_DIR &&
+  process.env.SHUN_V03_SELECTED_ROOT_EFFECT_POLICY_DATABASE
+    ? {
+        authorityDir: requiredEnv('SHUN_V03_SELECTED_ROOT_EFFECT_AUTHORITY_DIR'),
+        policyDatabaseFile: requiredEnv('SHUN_V03_SELECTED_ROOT_EFFECT_POLICY_DATABASE'),
+        issuanceSecret: requiredEnv('SHUN_V03_SELECTED_ROOT_EFFECT_ISSUANCE_SECRET'),
+        integritySecret: requiredEnv('SHUN_V03_SELECTED_ROOT_EFFECT_INTEGRITY_SECRET'),
+      }
+    : undefined;
+const production =
+  productionBuild && guided
+    ? await createProductionV03Gateway({
+        buildFile: productionBuild,
+        buildFileSha256: requiredEnv('SHUN_V03_BUILD_SHA256'),
+        sdkConsumerDir: requiredEnv('SHUN_V03_SDK_CONSUMER_DIR'),
+        kDocDatabaseFile: requiredEnv('SHUN_V03_KERNEL_DOC_DATABASE'),
+        deploymentRoot: requiredEnv('SHUN_V03_DEPLOYMENT_ROOT'),
+        tenantId: requiredEnv('SHUN_V03_TENANT_ID'),
+        deployedAppId: requiredEnv('SHUN_V03_DEPLOYED_APP_ID'),
+        selectedCase: guided,
+        llm: {
+          interpreter: cloud ?? disabledCloudInterpreter,
+          journalFile: requiredEnv('SHUN_V03_CLOUD_JOURNAL'),
+          configuredMaxOutputTokens: Number.parseInt(
+            process.env.SHUN_V03_LLM_MAX_OUTPUT_TOKENS ?? '256',
+            10,
+          ),
+        },
+        // The durable Host submit-reference ledger is mandatory: without a
+        // Host-issued record every gateway submit reference would be an
+        // unauthenticated browser-controlled string. Boot fails closed.
+        approvalLedgerFile: requiredEnv('SHUN_V03_APPROVAL_LEDGER'),
+        journeys,
+        folderSelection: folderSelectionHost,
+        selectedRootEffect: selectedRootEffectConfig,
+      })
+    : undefined;
+// Bounded read-only proposal projection for the CURRENT review step. The
+// Host derives the descriptor; the UI/HTTP surface never sees a private path.
+const selectedRootEffectProposal = folderSelectionHost
+  ? (): { ok: true; descriptor: SelectedRootEffectDescriptor } | { ok: false; code: string } => {
+      const facts = folderSelectionHost.readSelectedRootEffectFacts();
+      if (facts.status !== 'CURRENT') return { ok: false, code: facts.code };
+      const derived = deriveSelectedRootEffect({ facts: facts.facts });
+      if (!derived.ok) return { ok: false, code: derived.code };
+      return { ok: true, descriptor: derived.descriptor };
+    }
+  : undefined;
+// Issuance is trusted-process-only (never an HTTP route). U06 (#401): the
+// reference pair is bound to the durable Host ledger and resolved by the
+// trusted flow at effect time — its VALUES are never displayed or requested
+// anywhere; the ordinary user journey never carries reference strings.
+if (production) {
+  const issued = production.issueSubmitReferences();
+  if (issued.status === 'ISSUED') {
+    console.log(
+      `v0.3 submit references issued for the live Case step (case ${issued.caseId}, ` +
+        `valid until ${new Date(issued.validUntilUnixMs).toISOString()}); the pair stays Host-private.`,
+    );
+  } else {
+    console.log(
+      `v0.3 submit references NOT issued (${issued.code}); ` +
+        '/api/v03/gateway/submit will refuse every send until a Guided Case is staged.',
+    );
+  }
+}
 const handle = createControlServer({
   backend,
   uiDir,
@@ -60,15 +294,95 @@ const handle = createControlServer({
   readBuiltinInventoryCandidate,
   executeBuiltinInventoryRecipe,
   cloud,
+  v03Guided: guided,
+  v03FolderSelection: folderSelectionRoute,
+  v03Gateway: production?.gateway,
+  v03Journeys: production?.journeys,
+  v03ProviderGlobal: production?.providerGlobal,
+  v03SelectedRootEffect: production?.selectedRootEffect,
+  v03SelectedRootEffectProposal: selectedRootEffectProposal,
+  // U05-B2 (U06 #401): the real UI stages the REVIEW_EFFECT step at runtime,
+  // long after boot. Only after the Host's one-shot plan-preview staging
+  // durably returned STAGED does the trusted process re-run the issuance
+  // seam for the NOW-current review step. The pair's VALUES are never
+  // printed or exposed over HTTP — the effect admission resolves them from
+  // the ledger Host-side; an earlier step's pair is superseded by the ledger
+  // and can no longer authorize.
+  onPlanPreviewStaged: production
+    ? (staging) => {
+        const issued = production.issueSubmitReferences();
+        if (issued.status === 'ISSUED') {
+          console.log(
+            `v0.3 live REVIEW_EFFECT submit references issued after plan preview staged ` +
+              `(case ${issued.caseId} [staged preview step ${staging.stepId}], ` +
+              `valid until ${new Date(issued.validUntilUnixMs).toISOString()}); the pair stays Host-private.`,
+          );
+        } else {
+          console.log(
+            `v0.3 live submit references NOT issued after plan preview staged (${issued.code}); ` +
+              '/api/v03/effect/selected-root will refuse every send until the review step pair exists.',
+          );
+        }
+      }
+    : undefined,
 });
 const bound = await handle.start();
 console.log(
   `Shun control surface (${mode === 'demo' ? 'T08 DEMO ONLY' : 'REAL bounded C-003'}) on http://127.0.0.1:${bound}`,
 );
 console.log('Local only: the surface refuses non-loopback binds and non-loopback Host headers.');
+if (production) {
+  console.log(`v0.3 public DomainHarness activated: subjectDigest=${production.subjectDigest}`);
+} else {
+  console.log('v0.3 production BUILD inactive; /api/v03/gateway/submit remains unavailable.');
+}
+// Release trusted durable K/Host handles only when the server terminates.
+// This is cleanup, not an effect or a replacement authorization path.
+let closing = false;
+for (const signal of ['SIGINT', 'SIGTERM'] as const) {
+  process.once(signal, () => {
+    if (closing) return;
+    closing = true;
+    void handle.close().finally(() => {
+      try {
+        production?.dispose();
+      } finally {
+        try {
+          metaStore?.close();
+        } finally {
+          guided?.close();
+        }
+      }
+    });
+  });
+}
 
 function requiredEnv(key: string): string {
   const value = process.env[key];
   if (!value) throw new Error(`Missing trusted local configuration ${key}; refusing real mode`);
   return value;
+}
+
+/** Operator-pinned CuratedProvider journey config (trusted local file). */
+function loadProviderJourneyConfig(file: string): JourneyBindingsConfig['provider'] {
+  const raw = JSON.parse(readFileSync(resolve(file), 'utf8')) as Record<string, unknown>;
+  if (
+    typeof raw.cacheRoot !== 'string' ||
+    !Array.isArray(raw.roots) ||
+    !Array.isArray(raw.scopes) ||
+    typeof raw.descriptor !== 'object' ||
+    raw.descriptor === null ||
+    typeof raw.taskId !== 'string' ||
+    !Number.isSafeInteger(raw.revocationEpoch)
+  ) {
+    throw new Error('V03_PROVIDER_JOURNEY_CONFIG_INVALID');
+  }
+  return {
+    cacheRoot: raw.cacheRoot,
+    roots: raw.roots as { keyId: string; publicKeyPem: string }[],
+    scopes: raw.scopes as unknown[],
+    descriptor: raw.descriptor,
+    taskId: raw.taskId,
+    revocationEpoch: raw.revocationEpoch as number,
+  };
 }

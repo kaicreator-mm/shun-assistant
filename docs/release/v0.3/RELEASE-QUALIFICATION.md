@@ -106,3 +106,63 @@ Conditions and explicit boundaries:
 2. **P2 items (4) are recorded, non-blocking**, with owners/surfaces named above; they should ship as release-notes known limitations (especially R01-P2-4) and follow-up fixes.
 3. **Optional post-release validation (not gating):** real paid CN/EN DeepSeek leg (requires owner authorization and `DEEPSEEK_API_KEY` provisioning) and real Windows physical effect journeys.
 4. **Evidence trail:** this record + `docs/validation/v0.3/VERSION-QUALIFICATION.md` + `tests/integration/v03/t12-qualification/qualification-results.json` + `docs/implementation/v0.3/release/` implementation log + `_tmp/r01-zcode/r01-*.log` spot-check logs.
+
+---
+
+## Addendum (2026-11-09, #401 P2 hygiene) — the R01 PASS binds ONLY the R01 candidate
+
+The `RELEASE_ELIGIBLE = YES` verdict above is a **historical R01 record for exactly
+`b2909a2141582dc2e9e083824f6a1dfd2c2f963e`** (branch `JIT_only_task/v0.3.0-r01`). It is
+not, and must never be reused as, qualification of any later source.
+
+Binding for every later WIP SHA on `wip/v0.3.0-r02-owner-repairs` — audited at
+`b51b638a9ef787b9780807042a0db8762fb90945` (PR #272 head, review 5820185592) and unchanged
+by the #401 Host-resolved-reference repair that follows it:
+
+```ini
+[RQ-BINDING]
+later_wip_head              = b51b638a9ef787b9780807042a0db8762fb90945 (PR #272)
+later_release_eligible      = NO / BLOCK
+reasons                     = ENV_UNPROVISIONED production Guided trust pin (C:\ProgramData\Shun\authority absent — positive provisioned production E2E NOT_RUN); version merge not authorized (#297); R04 native Windows production qualification pending; P1-UX-REF-01 end-user journey repair in flight (#401)
+prior_r01_pass_scope        = b2909a21… ONLY — not transferable
+```
+
+No tag, release, or main/version promotion may cite the R01 PASS for any SHA other
+than `b2909a21…`. A fresh whole-version RQ at a new exact SHA is required before any
+release-eligibility claim for later sources.
+
+---
+
+# R04 addendum — per-user LocalAppData Guided trust bootstrap (2026-11-09, Issue #404)
+
+Owner-approved Product/L2 amendment (decision text in #404; L2 note
+`docs/architecture/v0.3/R04-LOCALAPPDATA-GUIDED-TRUST.md`). The v0.3.0-r02
+candidate remains **RELEASE BLOCK** for this lane until the R04 outcome gate
+closes; historical R01 record above is retained unchanged.
+
+```ini
+[R04]
+owner_decision              = 2026-11-09 per-user LocalAppData trust bootstrap; UAC allowed for install/first-run only
+pack_pr                     = #405 head 4d5545e0aabe9ff8fc7a256fe92746c57d38e3ac (tree ba4cce9f…, manifest blob 5f74ce85…)
+pack_ci                     = Woodpecker push #692 SUCCESS + PR #693 SUCCESS at exact 4d5545e
+pack_repair                 = 4d5545e = 01e5e1c + test-only time-bomb defusal (packages/authorization/test/adversarial-r1.test.ts; detonated 2026-11-09T11:55Z between #684 PASS and #688/#690 FAIL; full evidence #404 comment 6739815992)
+source_base                 = 4d5545e (Pack head; integration target wip/v0.3.0-r02-owner-repairs @ 0764c8ff…)
+single_writer               = DISPATCH_CLAIMED generation 1 (#404 comment 6740103567)
+frozen_write_set            = 12 files (manifest allowed_write_set; exactly respected)
+localappdata_bootstrap      = IMPLEMENTED (per-user root/pin/secret dir, consented CLI, idempotent, identity-guarded)
+native_no_effect_e2e        = tests/integration/v03/r02-e-production/startup-runner.test.ts "R04 native no-effect E2E" PASS on Windows Node 24 (isolated disposable profile; real main.ts composition, real desktop.js bytes, Guided state 200, DomainHarness activated, byte-stable NO-OP re-run)
+residual_risk               = same-SID and other-local-user attackers outside frozen v0.3 attack model (recorded in L2 note)
+RELEASE_ELIGIBLE            = BLOCK for v0.3.0 until R04 independent review + WIP integration + #272 whole-version qualification (unchanged)
+```
+
+R04 evidence summary (see #404 closeout for exact exits):
+
+| Gate | Evidence |
+| --- | --- |
+| Resolver fail-closed matrix | `guided-provenance-issuance.test.ts` "R04 per-user LocalAppData trust-root resolution" (absent/relative/root-alias/missing/profile-mismatch/symlink/machine-scope/chain derivation) |
+| Identity guard | same file "R04 bootstrap identity guard" (unelevated OK, same-account elevation OK, over-the-shoulder different-account refused, probe failures fail closed) |
+| Bootstrap lifecycle | `guided-localappdata-bootstrap.test.ts` (consent gate, FRESH/COMPLETE/PARTIAL/INVALID, repair-only-completes-missing, no overwrite of invalid bytes, second DB without rotation, secret-absent stays COMPLETE, workspace/trust/secret scope refusals, CLI plan-only exit 3 + consented exit 0 with no key bytes in output) |
+| Production composition | `production-startup.test.ts` 9/9 (SETUP_REQUIRED first-run refusal + guidance record; unchanged fail-closed vocabulary for malformed/aliased/ACL-violating material) |
+| Native E2E (Windows Node 24) | `startup-runner.test.ts` 11/11 incl. plan-only → consented bootstrap → REAL production boot (positive Guided StepSpec state, served desktop.js byte-equal, DomainHarness activated) → stable NO-OP restart; and no-trust boot refusal with no listener/DB |
+| Full local suites | `apps/control-api` 35 files / 241 passed EXIT=0; integration r02-e EXIT=0 ×2; typecheck EXIT=0; Biome lint EXIT=0 |
+| Exact-SHA CI | Woodpecker on the final source SHA (Push+PR) — see #404 closeout comment |

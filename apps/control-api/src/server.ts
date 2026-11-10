@@ -18,7 +18,10 @@ import {
   suggestReadonlyOptimizations,
 } from '@shun/vertical-system';
 import { z } from 'zod';
-import type { ControlApiGateway } from '../../../packages/domain-app/src/api/gateway.ts';
+import type {
+  ControlApiGateway,
+  SendReceipt,
+} from '../../../packages/domain-app/src/api/gateway.ts';
 import { MINIMUM_SENDER_DEADLINE_BUDGET_MS } from '../../../packages/domain-host/src/cloud/openai-host.ts';
 import type { CloudInterpretPort } from './cloud-interpret.ts';
 import {
@@ -29,7 +32,22 @@ import {
 } from './errors.ts';
 import type { ControlBackend } from './ports.ts';
 import type { AuthorizedInventoryRecipeResult } from './recipe-inventory-run.ts';
+import type { JourneySubmits } from './v03/composition-journeys.ts';
+import type { FolderPlanPreviewStaging } from './v03/folder-selection-host.ts';
+import type { V03FolderSelectionRoutePort } from './v03/folder-selection-route.ts';
 import { createV03GatewayRoute, type V03GatewayRoute } from './v03/gateway-route.ts';
+import {
+  createV03GuidedRoute,
+  type V03GuidedPort,
+  type V03GuidedRoute,
+} from './v03/guided-route.ts';
+import type {
+  SelectedRootEffectDescriptor,
+  SelectedRootEffectSubmitReceipt,
+} from './v03/selected-root-effect-flow.ts';
+
+/** The durable Host staging outcome that alone may mint live submit references. */
+type FolderPlanPreviewStaged = Extract<FolderPlanPreviewStaging, { readonly status: 'STAGED' }>;
 
 export const CONTROL_API_REVISION = 'shun.control-api/0.1';
 
@@ -87,6 +105,61 @@ export interface ControlServerOptions {
    * the T09 `ControlApiGateway.submit` admission surface — never a raw send.
    */
   v03Gateway?: ControlApiGateway | (() => ControlApiGateway);
+  /**
+   * R03-INT — trusted journey submission surfaces (windows effect / provider
+   * first use / meta feedback) over the SAME selected DomainApp. Composition
+   * root injection only; each route is reference-authenticated before any
+   * Kernel entry, exactly like the goal gateway.
+   */
+  v03Journeys?: JourneySubmits;
+  /**
+   * R03C (#288) — Host-global Provider first-use surface: prepare() issues
+   * the Host requestRef + exact preview (no Guided Case, no reference pair);
+   * confirm() consumes the one-time requestRef and submits the fixed
+   * provider-global Business Intent through the selected K. Composition root
+   * injection only; the route accepts no intent, instance, path, args or
+   * privilege input of any kind.
+   */
+  v03ProviderGlobal?: {
+    prepare(): Promise<
+      | {
+          readonly ok: true;
+          readonly requestRef: string;
+          readonly preview: unknown;
+          readonly expiresAtUnixMs: number;
+        }
+      | { readonly ok: false; readonly code: string }
+    >;
+    confirm(raw: unknown): Promise<SendReceipt>;
+  };
+  /** Trusted process-side selected Guided Host state, never created from HTTP. */
+  v03Guided?: V03GuidedPort;
+  /** Trusted native folder picker/observation port; never configured by HTTP. */
+  v03FolderSelection?: V03FolderSelectionRoutePort;
+  /**
+   * U05-B2 — trusted process-side notification fired ONLY after the Host's
+   * one-shot plan-preview staging returned STAGED, so the composition root
+   * can mint the live REVIEW_EFFECT submit reference pair for the durable
+   * Host ledger. Never HTTP input; a callback failure is logged and never
+   * fabricates a staging outcome.
+   */
+  onPlanPreviewStaged?: (staging: FolderPlanPreviewStaged) => void;
+  /**
+   * U05-B2 — trusted one-shot selected-root effect admission over the REAL
+   * ActionController R2 stack and the selected K. Composition root injection
+   * only; the route accepts the Case identity only (U06 #401: the Host
+   * resolves the issued reference pair and derives every authority-bearing
+   * value itself) and answers 503 when no authority was composed.
+   */
+  v03SelectedRootEffect?: (raw: unknown) => Promise<SelectedRootEffectSubmitReceipt>;
+  /**
+   * U05-B2 — bounded read-only projection of the concrete effect proposal for
+   * the CURRENT review step (metadata references only, never a private path).
+   * Composition root injection only.
+   */
+  v03SelectedRootEffectProposal?: () =>
+    | { readonly ok: true; readonly descriptor: SelectedRootEffectDescriptor }
+    | { readonly ok: false; readonly code: string };
   /** Directory with the static control-ui app; omitted = API only. */
   uiDir?: string;
   /** Loopback host only; anything else is a construction-time refusal. */
@@ -137,6 +210,11 @@ export function createControlServer(options: ControlServerOptions): ControlServe
     return v03Route;
   };
 
+  const v03GuidedRoute: V03GuidedRoute | undefined =
+    options.v03Guided === undefined
+      ? undefined
+      : createV03GuidedRoute(options.v03Guided, options.v03FolderSelection);
+
   const server = createServer((req, res) => {
     handle(options.backend, req, res, {
       host,
@@ -147,6 +225,12 @@ export function createControlServer(options: ControlServerOptions): ControlServe
       readBuiltinInventoryCandidate: options.readBuiltinInventoryCandidate,
       cloud: options.cloud,
       v03RouteFor,
+      v03GuidedRoute,
+      v03Journeys: options.v03Journeys,
+      v03ProviderGlobal: options.v03ProviderGlobal,
+      v03SelectedRootEffect: options.v03SelectedRootEffect,
+      v03SelectedRootEffectProposal: options.v03SelectedRootEffectProposal,
+      onPlanPreviewStaged: options.onPlanPreviewStaged,
     }).catch((error: unknown) => {
       respondError(res, error);
     });
@@ -189,6 +273,26 @@ interface RouteContext {
   executeBuiltinInventoryRecipe?: ControlServerOptions['executeBuiltinInventoryRecipe'];
   readBuiltinInventoryCandidate?: ControlServerOptions['readBuiltinInventoryCandidate'];
   v03RouteFor: () => V03GatewayRoute | undefined;
+  v03GuidedRoute?: V03GuidedRoute;
+  v03Journeys?: JourneySubmits;
+  v03SelectedRootEffect?: (raw: unknown) => Promise<SelectedRootEffectSubmitReceipt>;
+  v03SelectedRootEffectProposal?: () =>
+    | { readonly ok: true; readonly descriptor: SelectedRootEffectDescriptor }
+    | { readonly ok: false; readonly code: string };
+  /** U05-B2 (P1-LIVE-REFS): fired only on a STAGED plan-preview outcome. */
+  onPlanPreviewStaged?: (staging: FolderPlanPreviewStaged) => void;
+  v03ProviderGlobal?: {
+    prepare(): Promise<
+      | {
+          readonly ok: true;
+          readonly requestRef: string;
+          readonly preview: unknown;
+          readonly expiresAtUnixMs: number;
+        }
+      | { readonly ok: false; readonly code: string }
+    >;
+    confirm(raw: unknown): Promise<SendReceipt>;
+  };
 }
 
 /**
@@ -448,6 +552,97 @@ async function handle(
     return respondJson(res, 200, result);
   }
 
+  // R02 Guided routes operate solely on trusted Host-owned durable state.
+  // They never accept a grant, full approval payload or Kernel Permit from
+  // the caller. Decisions are atomic single-use acknowledgement records.
+  if (method === 'GET' && url.pathname === '/api/v03/guided/state') {
+    if (!ctx.v03GuidedRoute) {
+      return respondJson(res, 503, { ok: false, code: 'V03_GUIDED_UNAVAILABLE' });
+    }
+    return respondJson(res, 200, ctx.v03GuidedRoute.state());
+  }
+  if (method === 'POST' && url.pathname === '/api/v03/guided/select-root') {
+    if (!ctx.v03GuidedRoute) {
+      return respondJson(res, 503, { ok: false, code: 'V03_GUIDED_UNAVAILABLE' });
+    }
+    const body = await readJsonBody(req, ctx.maxBodyBytes);
+    if (
+      !body ||
+      typeof body !== 'object' ||
+      Array.isArray(body) ||
+      Object.keys(body).length !== 0
+    ) {
+      return respondJson(res, 422, {
+        status: 'REFUSED',
+        code: 'FOLDER_PICKER_ACCEPTS_NO_CALLER_INPUT',
+      });
+    }
+    const result = await ctx.v03GuidedRoute.selectRoot();
+    const status = result.status === 'STALE' ? 409 : result.status === 'REFUSED' ? 422 : 200;
+    return respondJson(res, status, result);
+  }
+  if (method === 'GET' && url.pathname === '/api/v03/guided/folder-observation') {
+    if (!ctx.v03GuidedRoute) {
+      return respondJson(res, 503, { ok: false, code: 'V03_GUIDED_UNAVAILABLE' });
+    }
+    const result = await ctx.v03GuidedRoute.folderObservation();
+    const status = result.ok ? 200 : result.code === 'FOLDER_NOT_SELECTED' ? 409 : 422;
+    return respondJson(res, status, result);
+  }
+  // P1-02 — the explicit, bounded INSPECT → REVIEW_EFFECT continuation. The
+  // real desktop user drives this after a successful INSPECT observation; the
+  // request body must be empty, the staging is the Host's one-shot capability
+  // and the folder-observation GET above stays strictly non-mutating.
+  if (method === 'POST' && url.pathname === '/api/v03/guided/plan-preview') {
+    if (!ctx.v03GuidedRoute) {
+      return respondJson(res, 503, { ok: false, code: 'V03_GUIDED_UNAVAILABLE' });
+    }
+    const body = await readJsonBody(req, ctx.maxBodyBytes);
+    if (
+      !body ||
+      typeof body !== 'object' ||
+      Array.isArray(body) ||
+      Object.keys(body).length !== 0
+    ) {
+      return respondJson(res, 422, {
+        status: 'REFUSED',
+        code: 'PLAN_PREVIEW_ACCEPTS_NO_CALLER_INPUT',
+      });
+    }
+    const result = ctx.v03GuidedRoute.planPreview();
+    // U05-B2 (P1-LIVE-REFS): only a durable Host STAGED outcome mints the
+    // live REVIEW_EFFECT submit reference pair (trusted process side; the
+    // pair goes to the operator console, never into this HTTP response). A
+    // callback failure is logged without fabricating a staging outcome.
+    if (result.status === 'STAGED' && ctx.onPlanPreviewStaged) {
+      try {
+        ctx.onPlanPreviewStaged(result);
+      } catch (error: unknown) {
+        console.error(
+          `v0.3 plan-preview staged but live submit reference issuance failed: ${
+            error instanceof Error ? error.message : String(error)
+          }`,
+        );
+      }
+    }
+    const status =
+      result.status === 'STAGED'
+        ? 200
+        : result.status === 'STALE'
+          ? 409
+          : result.status === 'UNKNOWN'
+            ? 503
+            : 422;
+    return respondJson(res, status, result);
+  }
+  if (method === 'POST' && url.pathname === '/api/v03/guided/decision') {
+    if (!ctx.v03GuidedRoute) {
+      return respondJson(res, 503, { ok: false, code: 'V03_GUIDED_UNAVAILABLE' });
+    }
+    const result = ctx.v03GuidedRoute.decide(await readJsonBody(req, ctx.maxBodyBytes));
+    return respondJson(res, ctx.v03GuidedRoute.httpStatus(result), result);
+  }
+
   // T11 — the single v0.3 submission surface. Bounded JSON in, one T09
   // ControlApiGateway admission out: the gateway fully validates the
   // submission BEFORE the selected DomainApp facade is ever touched, so a
@@ -462,6 +657,127 @@ async function handle(
     const body = await readJsonBody(req, ctx.maxBodyBytes);
     const receipt = await route.submit(body);
     return respondJson(res, route.httpStatus(receipt), receipt);
+  }
+
+  // R03-INT — the journey submission surfaces. Same truthful receipt→HTTP
+  // mapping as the goal gateway: COMPLETED 200 / ADMITTED 202 / UNKNOWN 409 /
+  // REFUSED·KERNEL_REFUSED 422; absent bindings answer 503, never fake success.
+  if (
+    method === 'POST' &&
+    (url.pathname === '/api/v03/effect/submit' ||
+      url.pathname === '/api/v03/effect/probe' ||
+      url.pathname === '/api/v03/provider/first-use' ||
+      url.pathname === '/api/v03/meta/feedback' ||
+      url.pathname === '/api/v03/meta/shared-query')
+  ) {
+    const journeys = ctx.v03Journeys;
+    if (journeys === undefined) {
+      return respondJson(res, 503, { ok: false, code: 'V03_JOURNEYS_UNAVAILABLE' });
+    }
+    const body = await readJsonBody(req, ctx.maxBodyBytes);
+    const submit =
+      url.pathname === '/api/v03/effect/submit'
+        ? journeys.effectSubmit
+        : url.pathname === '/api/v03/effect/probe'
+          ? journeys.effectProbeSubmit
+          : url.pathname === '/api/v03/provider/first-use'
+            ? journeys.providerFirstUse
+            : url.pathname === '/api/v03/meta/feedback'
+              ? journeys.metaFeedback
+              : journeys.metaSharedQuery;
+    const receipt = await submit.call(journeys, body);
+    const status =
+      receipt.status === 'COMPLETED'
+        ? 200
+        : receipt.status === 'ADMITTED'
+          ? 202
+          : receipt.status === 'UNKNOWN'
+            ? 409
+            : 422;
+    return respondJson(res, status, receipt);
+  }
+
+  // R03C (#288) — Host-global Provider first-use, two steps:
+  //   POST /api/v03/provider/prepare  → Host-issued requestRef + exact preview
+  //   POST /api/v03/provider/confirm  → one-time requestRef → fixed K send
+  // No Guided Case, Case ID, currentnessRef or approvalRef is required or
+  // accepted. prepare/confirm accept no intent, instance, path, args or
+  // privilege input: the composition owns every fixed value.
+  if (method === 'POST' && url.pathname === '/api/v03/provider/prepare') {
+    const ops = ctx.v03ProviderGlobal;
+    if (ops === undefined) {
+      return respondJson(res, 503, { ok: false, code: 'V03_PROVIDER_GLOBAL_UNAVAILABLE' });
+    }
+    const prepared = await ops.prepare();
+    if (!prepared.ok) {
+      return respondJson(res, 422, { status: 'REFUSED', code: prepared.code });
+    }
+    return respondJson(res, 200, {
+      status: 'PREPARED',
+      requestRef: prepared.requestRef,
+      preview: prepared.preview,
+      expiresAtUnixMs: prepared.expiresAtUnixMs,
+    });
+  }
+  if (method === 'POST' && url.pathname === '/api/v03/provider/confirm') {
+    const ops = ctx.v03ProviderGlobal;
+    if (ops === undefined) {
+      return respondJson(res, 503, { ok: false, code: 'V03_PROVIDER_GLOBAL_UNAVAILABLE' });
+    }
+    const body = await readJsonBody(req, ctx.maxBodyBytes);
+    const receipt = await ops.confirm(body);
+    const status =
+      receipt.status === 'COMPLETED'
+        ? 200
+        : receipt.status === 'ADMITTED'
+          ? 202
+          : receipt.status === 'UNKNOWN'
+            ? 409
+            : 422;
+    return respondJson(res, status, receipt);
+  }
+
+  // U05-B2 — bounded read-only proposal projection for the CURRENT review
+  // step: metadata references only (relative target/operation/expected
+  // change/undo); the absolute root path and the plan/grant authority never
+  // leave the Host. 503 when no effect flow was composed.
+  if (method === 'GET' && url.pathname === '/api/v03/effect/proposal') {
+    const proposal = ctx.v03SelectedRootEffectProposal;
+    if (proposal === undefined) {
+      return respondJson(res, 503, { ok: false, code: 'V03_SELECTED_ROOT_EFFECT_UNAVAILABLE' });
+    }
+    const result = proposal();
+    if (!result.ok) {
+      return respondJson(res, result.code === 'SELECTED_ROOT_EFFECT_STEP_NOT_CURRENT' ? 409 : 422, {
+        ok: false,
+        code: result.code,
+      });
+    }
+    return respondJson(res, 200, result.descriptor);
+  }
+
+  // U05-B2 — the one-shot selected-root effect admission. The body is EXACTLY
+  // {caseId} (U06 #401): the trusted Host resolves the reference pair it
+  // durably issued for that approved review step and authenticates it inside
+  // the request scope. Every authority-bearing value (references, plan,
+  // grant, Permit) is derived Host-side; no path, plan, grant, permit or
+  // reference input is accepted from any caller.
+  if (method === 'POST' && url.pathname === '/api/v03/effect/selected-root') {
+    const submit = ctx.v03SelectedRootEffect;
+    if (submit === undefined) {
+      return respondJson(res, 503, { ok: false, code: 'V03_SELECTED_ROOT_EFFECT_UNAVAILABLE' });
+    }
+    const body = await readJsonBody(req, ctx.maxBodyBytes);
+    const receipt = await submit(body);
+    const status =
+      receipt.status === 'COMPLETED'
+        ? 200
+        : receipt.status === 'ADMITTED'
+          ? 202
+          : receipt.status === 'UNKNOWN'
+            ? 409
+            : 422;
+    return respondJson(res, status, receipt);
   }
 
   if (resource === 'tasks') {
