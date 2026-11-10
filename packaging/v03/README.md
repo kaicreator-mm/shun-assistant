@@ -31,6 +31,7 @@ Layout produced (relative to the stage root):
 | `node.exe` | Node 24 x64 runtime (build-host `process.execPath`) |
 | `app/native/control.mjs` | esbuild bundle of `apps/control-api/src/main.ts` |
 | `app/native/{broker,host,impl}/` | pinned native consent broker exe, host addon, win32 impl |
+| `app/native/shun_folder_picker.node` | separately SHA-pinned Windows Shell folder picker; launcher enables the state/data SQLite-backed Host route |
 | `app/native/tools/` | bundled Guided trust bootstrap + registry issuer CLIs |
 | `sdk-consumer/` | installed public DomainHarness SDK + four trusted Host binding packages |
 | `operator/` | trusted BUILD envelope + receipt, Guided Case + build spec/sources |

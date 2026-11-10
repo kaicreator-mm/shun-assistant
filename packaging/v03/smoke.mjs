@@ -10,7 +10,7 @@
 //
 //   node packaging/v03/smoke.mjs <absolute-stage-dir>
 import { execFileSync, spawn, spawnSync } from 'node:child_process';
-import { generateKeyPairSync } from 'node:crypto';
+import { createHash, generateKeyPairSync } from 'node:crypto';
 import {
   cpSync,
   existsSync,
@@ -280,6 +280,7 @@ async function main(stageArg) {
     for (const required of [
       join(core, 'node.exe'),
       join(core, 'app/native/control.mjs'),
+      join(core, 'app/native/shun_folder_picker.node'),
       join(core, 'sdk-consumer/node_modules/@kaicreator/domain-harness-build'),
       join(core, 'operator/v03-build.json'),
       join(core, 'operator/guided-case.json'),
@@ -293,6 +294,11 @@ async function main(stageArg) {
       if (!existsSync(required)) step('installed-closure', false, `missing ${required}`);
     }
     step('installed-closure', true);
+    const id = JSON.parse(readFileSync(join(core, 'BUILD-ID.json'), 'utf8'));
+    const installedPickerDigest = createHash('sha256')
+      .update(readFileSync(join(core, 'app/native/shun_folder_picker.node')))
+      .digest('hex');
+    step('folder-picker-signed-closure', id.digests.folderPicker === installedPickerDigest);
 
     // 4. Before first-run provisioning the real launcher must fail closed
     //    with the visible setup-required guidance (no listener, no DEMO).
@@ -386,6 +392,7 @@ async function main(stageArg) {
     try {
       const up = await waitForHttp(bootPort, 120_000);
       const text = serverOut.text();
+      step('folder-selection-host-active', up && text.includes('v0.3 folder-selection startup recovery:'));
       step(
         'production-boot',
         up &&

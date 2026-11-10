@@ -54,6 +54,7 @@ export const STAGE_LAUNCH_ENV_KEYS = [
   'SHUN_CONTROLLER_ISSUANCE_SECRET',
   'SHUN_GRANT_INTEGRITY_SECRET',
   'SHUN_V03_GUIDED_DATABASE',
+  'SHUN_V03_FOLDER_SELECTION_DATABASE',
   'SHUN_V03_GUIDED_CASE_FILE',
   'SHUN_V03_GUIDED_CASE_SHA256',
   'SHUN_V03_BUILD_FILE',
@@ -86,11 +87,20 @@ export function sha256Text(text) {
   return createHash('sha256').update(text, 'utf8').digest('hex');
 }
 
-function pinnedDigest(name) {
-  const text = readFileSync(join(native, 'artifacts.ts'), 'utf8');
+function pinnedDigest(name, artifactsPath = join(native, 'artifacts.ts')) {
+  const text = readFileSync(artifactsPath, 'utf8');
   const match = text.match(new RegExp(`export const ${name}\\s*=\\s*['"]([0-9a-f]{64})['"]`));
   if (!match) fail('NATIVE_PIN_UNAVAILABLE');
   return match[1];
+}
+
+/** Enforce the existing native folder-picker pin BEFORE any byte enters a signed stage. */
+export function verifyFolderPickerSource(addonPath, artifactsPath) {
+  const addon = requireFile(addonPath);
+  if (sha256File(addon) !== pinnedDigest('FOLDER_PICKER_ADDON_SHA256', artifactsPath)) {
+    fail('FOLDER_PICKER_PIN_MISMATCH');
+  }
+  return addon;
 }
 
 /**
@@ -692,6 +702,7 @@ const env = {
   SHUN_CONTROLLER_ISSUANCE_SECRET: readFileSync(join(layout.state, 'secrets', 'controller', 'issuance.secret'), 'utf8').trim(),
   SHUN_GRANT_INTEGRITY_SECRET: readFileSync(join(layout.state, 'secrets', 'controller', 'integrity.secret'), 'utf8').trim(),
   SHUN_V03_GUIDED_DATABASE: join(layout.state, 'data', 'guided.sqlite'),
+  SHUN_V03_FOLDER_SELECTION_DATABASE: join(layout.state, 'data', 'folder-selection.sqlite'),
   SHUN_V03_GUIDED_CASE_FILE: caseFile,
   SHUN_V03_GUIDED_CASE_SHA256: receipt.guidedCaseSha256,
   SHUN_V03_BUILD_FILE: buildFile,
@@ -755,6 +766,10 @@ async function stage(target) {
   const hostAddon = requireFile(join(native, 'host/shun_consent_host.node'));
   const win32Impl = requireFile(
     join(repo, 'packages/recipe-runtime/native/impl/shun_win32_impl.node'),
+  );
+  const folderPicker = verifyFolderPickerSource(
+    join(native, 'folder-picker/shun_folder_picker.node'),
+    join(native, 'folder-picker/artifacts.ts'),
   );
   if (sha256File(broker) !== pinnedDigest('CONSENT_BROKER_EXE_SHA256')) fail('BROKER_PIN_MISMATCH');
   if (sha256File(hostAddon) !== pinnedDigest('CONSENT_HOST_ADDON_SHA256')) fail('ADDON_PIN_MISMATCH');
@@ -823,6 +838,7 @@ async function stage(target) {
     [broker, 'app/native/broker/shun-consent-broker.exe'],
     [hostAddon, 'app/native/host/shun_consent_host.node'],
     [win32Impl, 'app/native/impl/shun_win32_impl.node'],
+    [folderPicker, 'app/native/shun_folder_picker.node'],
   ]) {
     const dst = join(stageRoot, relativePath);
     mkdirSync(dirname(dst), { recursive: true });
@@ -865,6 +881,7 @@ async function stage(target) {
           consentBroker: sha256File(join(stageRoot, 'app/native/broker/shun-consent-broker.exe')),
           consentHost: sha256File(join(stageRoot, 'app/native/host/shun_consent_host.node')),
           win32Impl: sha256File(join(stageRoot, 'app/native/impl/shun_win32_impl.node')),
+          folderPicker: sha256File(join(stageRoot, 'app/native/shun_folder_picker.node')),
           buildFile: buildReceipt.buildFileSha256,
           guidedCase: sha256Text(caseBytes),
         },
@@ -892,6 +909,7 @@ async function stage(target) {
       consentBroker: sha256File(join(stageRoot, 'app/native/broker/shun-consent-broker.exe')),
       consentHost: sha256File(join(stageRoot, 'app/native/host/shun_consent_host.node')),
       win32Impl: sha256File(join(stageRoot, 'app/native/impl/shun_win32_impl.node')),
+      folderPicker: sha256File(join(stageRoot, 'app/native/shun_folder_picker.node')),
       appBundle: sha256File(appBundle),
     },
     sdkPackages,

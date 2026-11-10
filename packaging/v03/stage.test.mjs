@@ -7,7 +7,7 @@
 //   node --test packaging/v03/stage.test.mjs
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
-import { generateKeyPairSync } from 'node:crypto';
+import { createHash, generateKeyPairSync } from 'node:crypto';
 import {
   cpSync,
   existsSync,
@@ -28,6 +28,7 @@ import {
   sha256Text,
   standardBundleSource,
   STAGE_LAUNCH_ENV_KEYS,
+  verifyFolderPickerSource,
 } from './stage.mjs';
 
 const fixtures = [];
@@ -167,6 +168,7 @@ test('STAGE_LAUNCH_ENV_KEYS is exactly the real-storage production closure main.
     'SHUN_V03_CLOUD_JOURNAL',
     'SHUN_V03_DEPLOYED_APP_ID',
     'SHUN_V03_DEPLOYMENT_ROOT',
+    'SHUN_V03_FOLDER_SELECTION_DATABASE',
     'SHUN_V03_GUIDED_CASE_FILE',
     'SHUN_V03_GUIDED_CASE_SHA256',
     'SHUN_V03_GUIDED_DATABASE',
@@ -174,6 +176,21 @@ test('STAGE_LAUNCH_ENV_KEYS is exactly the real-storage production closure main.
     'SHUN_V03_SDK_CONSUMER_DIR',
     'SHUN_V03_TENANT_ID',
   ]);
+});
+
+test('native folder-picker binary is pinned independently: mismatch and missing source refuse', () => {
+  const dir = fixture();
+  const addon = join(dir, 'shun_folder_picker.node');
+  const artifactFile = join(dir, 'artifacts.ts');
+  const bytes = 'reviewed-folder-picker';
+  const digest = createHash('sha256').update(bytes).digest('hex');
+  writeFileSync(addon, bytes);
+  writeFileSync(artifactFile, "export const FOLDER_PICKER_ADDON_SHA256 = '" + digest + "';");
+  assert.equal(verifyFolderPickerSource(addon, artifactFile), addon);
+  writeFileSync(addon, 'tampered-folder-picker');
+  assert.ok(refuses(() => verifyFolderPickerSource(addon, artifactFile)));
+  rmSync(addon);
+  assert.ok(refuses(() => verifyFolderPickerSource(addon, artifactFile)));
 });
 
 test('v0.3-shaped bundle: verifier refuses tamper, extra file, wrong pin, wrong key and junctions', () => {
