@@ -413,6 +413,14 @@ async function main(stageArg) {
           parsed?.journey !== undefined,
         guidedBody.slice(0, 200),
       );
+      // G3: the delivered first-run case must open on shun.guided.select-root
+      // so the native folder-select journey (desktop pick button + route) is
+      // the user's actual entry step, not dead code behind a preselected root.
+      step(
+        'guided-first-step-select-root',
+        parsed?.currentStep?.templateRef?.artifactId === 'shun.guided.select-root',
+        `artifactId=${parsed?.currentStep?.templateRef?.artifactId}`,
+      );
       const desktop = await fetch(`http://127.0.0.1:${bootPort}/v03/desktop.js`);
       const served = Buffer.from(await desktop.arrayBuffer());
       const onDisk = readFileSync(join(core, 'control-ui/public/v03/desktop.js'));

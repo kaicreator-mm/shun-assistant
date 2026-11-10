@@ -131,7 +131,7 @@ test('real trusted-build assembler refuses a tampered source pin', () => {
   assert.equal(existsSync(outFile), false);
 });
 
-test('mintGuidedCaseBytes pins the audited observation shape and validity window', () => {
+test('mintGuidedCaseBytes pins the first-run observation shape: no root, select-root reachable', () => {
   const now = 1_700_000_000_000;
   const bytes = mintGuidedCaseBytes({ buildId: 'shun-v0.3.0-portable-g1', nowMs: now });
   const parsed = JSON.parse(bytes);
@@ -140,9 +140,15 @@ test('mintGuidedCaseBytes pins the audited observation shape and validity window
   assert.equal(parsed.observation.journeyId, 'journey-shun-v0.3.0-portable-g1');
   assert.equal(parsed.observation.observedAtUnixMs, now - 1_000);
   assert.equal(parsed.observation.validUntilUnixMs, now + Number(CASE_VALIDITY_MS));
+  // G3: the delivered case must model the first-run user state. With no
+  // selectedRootRef, chooseTemplate (SELECTED_ROOT_MISSING) opens the R04
+  // journey on shun.guided.select-root, where the shipped desktop pick
+  // button and the select-root route actually operate.
+  assert.equal('selectedRootRef' in parsed.observation, false);
   assert.equal(parsed.semanticSelection.status, 'SELECTED');
   assert.equal(parsed.semanticSelection.semantic.capabilityId, 'system.storage.diagnose_bounded_action');
-  assert.equal(parsed.scope.status, 'KNOWN');
+  assert.equal(parsed.scope.status, 'UNKNOWN');
+  assert.equal('selectedRootRef' in parsed.scope, false);
   // Stable bytes: identical inputs produce the identical signed-payload input.
   assert.equal(bytes, mintGuidedCaseBytes({ buildId: 'shun-v0.3.0-portable-g1', nowMs: now }));
   assert.ok(refuses(() => mintGuidedCaseBytes({ buildId: '../evil', nowMs: now })));

@@ -119,7 +119,16 @@ export const routeWorkflowIntent = __dhv10RouterBundle.routeWorkflowIntent;
 `;
 }
 
-/** Operator-pinned Guided Case bytes (host observation + selected semantic). */
+/**
+ * Operator-pinned Guided Case bytes (host observation + selected semantic).
+ * G3: the delivered case models the FIRST-RUN user state — the observation
+ * carries NO selectedRootRef and scope is UNKNOWN, so the R04 journey opens
+ * on shun.guided.select-root and the shipped desktop UI's native pick button
+ * and the /api/v03/guided/select-root route are actually reachable for the
+ * end user. A preselected build-time root made chooseTemplate skip straight
+ * to inspect-scope and left the folder-select journey dead code in the
+ * delivered bundle.
+ */
 export function mintGuidedCaseBytes({ buildId, nowMs, validityMs = CASE_VALIDITY_MS }) {
   if (!/^[A-Za-z][A-Za-z0-9._-]{0,127}$/.test(buildId ?? '')) fail('CASE_BUILD_ID_INVALID');
   if (!Number.isSafeInteger(nowMs) || nowMs <= 0) fail('CASE_NOW_INVALID');
@@ -135,7 +144,6 @@ export function mintGuidedCaseBytes({ buildId, nowMs, validityMs = CASE_VALIDITY
       observedAtUnixMs: nowMs - 1_000,
       validUntilUnixMs: nowMs + Number(validityMs),
       evidenceRefs: [`host:scope:${buildId}`],
-      selectedRootRef: `host:root:${buildId}`,
     },
     semanticSelection: {
       status: 'SELECTED',
@@ -148,7 +156,7 @@ export function mintGuidedCaseBytes({ buildId, nowMs, validityMs = CASE_VALIDITY
         provenance: { resolverRevision: 'resolver-v03' },
       },
     },
-    scope: { status: 'KNOWN', selectedRootRef: `host:root:${buildId}` },
+    scope: { status: 'UNKNOWN' },
   };
   return JSON.stringify(semantic, null, 2) + '\n';
 }
