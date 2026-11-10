@@ -1,0 +1,64 @@
+pack_id: shun-v030-windows-portable-g1
+task_id: V030-WINDOWS-PORTABLE-DISTRIBUTION
+issue: '#407'
+parent_rq: '#259'
+version: v0.3.0
+standard: ADS_1359_DELIVERY_FIRST
+owner_intent: 'complete v0.3.0; use already accepted per-user trust bootstrap and existing v0.2 portable mechanisms'
+pack_revision: 1
+cas_generation: 1
+protected_claim_key: 'kaicreator-mm/shun-assistant#407:builder:__default__'
+single_writer: true
+source_base:
+  branch: version/v0.3.0
+  sha: da3a36eb91d39c6bac8cd6b72b27c4b588adda4d
+  tree: 55fcdafeedc3936518e58e6813ea0d4abe47eea9
+  source_rq: '#259 comment 6767650147; PR #272 merged'
+  prior_ci: 'source #706/#707 SUCCESS; version #708 pending at freeze'
+reference_sources:
+  - 'v0.2 T09 Issue #111, PR #204 merged, packaging/windows-portable/{build.mjs,lifecycle.mjs,lifecycle.test.mjs,LIFECYCLE.md}'
+  - 'v0.2 T09 PR #202 Ed25519 scripts/package-v02/manifest.mjs and its tests, already in v0.3'
+  - 'v0.3 #404 per-user Guided LocalAppData consent bootstrap complete'
+source_branch: JIT_only_task/v0.3.0-windows-portable-g1
+source_target: version/v0.3.0
+builder_profile: WEB_FIRST_SINGLE_WRITER_WITH_LOCAL_WINDOWS_BUILD_REPAIR
+allowed_write_set:
+  - packaging/windows-portable/build.mjs
+  - packaging/windows-portable/lifecycle.mjs
+  - packaging/windows-portable/lifecycle.test.mjs
+  - packaging/windows-portable/LIFECYCLE.md
+  - packaging/v03/stage.mjs
+  - packaging/v03/stage.test.mjs
+  - packaging/v03/smoke.mjs
+  - packaging/v03/README.md
+  - docs/guide/v0.3/README.zh-CN.md
+  - docs/guide/v0.3/README.en.md
+  - docs/release/v0.3/RELEASE-QUALIFICATION.md
+exclusions:
+  - apps/control-api/src/main.ts
+  - apps/control-ui/public/v03/desktop.js
+  - apps/control-api/scripts/bootstrap-guided-localappdata.ts
+  - packages/**
+  - scripts/package-v02/manifest.mjs
+  - scripts/v03-ci/assemble-trusted-build.mjs
+  - .woodpecker.yml
+  - package.json
+  - pnpm-lock.yaml
+  - main
+implementation_contract:
+  - 'Reuse frozen v0.2 portable stage, sign/verify and state-preserving lifecycle; adapt actual v0.3 real-storage BUILD and selected K/Host with Node24 native binaries, no test-only secrets or paths.'
+  - 'One signed bundle with an externally authenticated verifier/public key SPKI pin; user need not install Node/pnpm; no auto paid requests or physical effects.'
+  - 'The real v0.3 installed runtime must fail closed on missing trusted BUILD or LocalAppData bootstrap; no DEMO fallback.'
+  - 'Install/upgrade/uninstall preserve user-owned SQLite WAL, Provider cache, LocalAppData/Shun/authority + secrets, effect journal and canary; local fixed disk; no UNC.'
+  - 'Optional UAC on install/first run only when strictly required; never bootstrap a different administrator profile; no SYSTEM service or machine-wide state authority.'
+  - 'No cross-user private trust distribution; same-interactive-user malicious process outside v0.3 threat model, truthful documented residual risk.'
+  - 'Scope source to portable distribution only; do not modify K/SDK/public app interfaces or open extra architecture lanes for packaging.'
+acceptance:
+  - 'Deterministic negative unit tests on bundled hashes/tamper/reparse and installation state preservation, Node >=24 syntax/lint/typecheck preflight before CI.'
+  - 'Real Windows x64 Node24 stage with trusted public K/S, selected B/C, native broker+addons, actual R04 desktop.js; no dependency on workspace checkout or pnpm at runtime.'
+  - 'Signed artifact verified by trusted external key/pin, native Standard User Home and Pro installer + first-run positive real-storage Guided and ready selected K.'
+  - 'Upgrade and uninstall preserve user state/secret and no orphan listener; effect/paid operations do not run in packaging qualification.'
+  - 'All source tests and Woodpecker exact-SHA CI green; actual native Windows receipts with exact final artifact SHA256, BUILD IDs, exits, P0/P1/P2 in GitHub Issue #407 and source PR.'
+release:
+  - 'Source integration only to version/v0.3.0 after review; no main, Tag, Release, deploy or OS/profile modification in Web task.'
+  - 'Public release decision after artifact and Windows Home+Pro qualifications and verified signing distribution only.'

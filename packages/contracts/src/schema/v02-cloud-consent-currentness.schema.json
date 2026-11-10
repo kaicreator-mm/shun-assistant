@@ -1,0 +1,82 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:shun:contracts:0.2:v02-cloud-consent-currentness",
+  "title": "v02-cloud-consent-currentness",
+  "x-contracts-revision": "shun.contracts/0.2",
+  "oneOf": [
+    {
+      "type": "object",
+      "properties": {
+        "kind": {
+          "type": "string",
+          "const": "CURRENT"
+        },
+        "taskId": {
+          "type": "string",
+          "minLength": 1
+        },
+        "principalId": {
+          "type": "string",
+          "minLength": 1
+        },
+        "sessionId": {
+          "type": "string",
+          "minLength": 1
+        },
+        "registryRevision": {
+          "type": "string",
+          "minLength": 1
+        },
+        "policyRevision": {
+          "type": "string",
+          "minLength": 1
+        },
+        "pricingRevision": {
+          "type": "string",
+          "minLength": 1
+        },
+        "scopeRevision": {
+          "type": "string",
+          "minLength": 1
+        },
+        "revocationEpoch": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 9007199254740991
+        },
+        "nonceIsUnused": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "kind",
+        "taskId",
+        "principalId",
+        "sessionId",
+        "registryRevision",
+        "policyRevision",
+        "pricingRevision",
+        "scopeRevision",
+        "revocationEpoch",
+        "nonceIsUnused"
+      ],
+      "additionalProperties": false
+    },
+    {
+      "type": "object",
+      "properties": {
+        "kind": {
+          "type": "string",
+          "const": "UNRESOLVABLE"
+        }
+      },
+      "required": [
+        "kind"
+      ],
+      "additionalProperties": false
+    }
+  ],
+  "x-semantic-validation": [
+    "validateCloudConsent"
+  ]
+}

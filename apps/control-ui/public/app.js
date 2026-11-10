@@ -374,7 +374,7 @@ async function refresh() {
   const health = el('health');
   api('/health')
     .then((info) => {
-      health.textContent = `Local only · policy ${info.policy?.kind ?? 'UNKNOWN'} · ${info.api ?? ''}`;
+      health.textContent = `${info.cloudMode === 'REMOTE_OPT_IN' && info.localOnly === false ? 'REMOTE DeepSeek opt-in (Windows consent required)' : 'Local-only (cloud disabled)'} · policy ${info.policy?.kind ?? 'UNKNOWN'} · ${info.api ?? ''}`;
       health.className = 'muted';
       const label = simulationBanner(info);
       banner.textContent = label.text;
@@ -419,6 +419,398 @@ function wireForm() {
   });
 }
 
+// First true user-operable T08 J0 slice: this button reads the already
+// reviewed T06 OS inventory in the local Windows backend. It does NOT run a
+// model, issue an authorization grant, or claim the scripted demo task states
+// are real. No automatic polling or external disclosure.
+function wireLiveSystem() {
+  const button = el('read-system-info');
+  button.addEventListener('click', async () => {
+    const status = el('system-status');
+    const facts = el('system-facts');
+    button.disabled = true;
+    status.textContent = 'Reading live Windows system information…';
+    facts.replaceChildren();
+    try {
+      const result = await api('/system/inventory');
+      if (
+        result.ok !== true ||
+        result.source !== 'LIVE_WINDOWS_LOCAL_READONLY' ||
+        result.snapshot?.schema !== 'shun.system-inventory.v02' ||
+        result.snapshot?.platform !== 'win32' ||
+        result.snapshot?.localOnly !== true
+      ) {
+        throw new Error('Unverified inventory response');
+      }
+      const snapshot = result.snapshot;
+      const numbers = [
+        ['Logical CPUs', snapshot.cpuLogicalCount],
+        ['Memory total (MiB)', snapshot.memoryTotalBytes / (1024 * 1024)],
+        ['Memory available (MiB)', snapshot.memoryFreeBytes / (1024 * 1024)],
+        ['Disk total (GiB)', snapshot.diskTotalBytes / (1024 * 1024 * 1024)],
+        ['Disk available (GiB)', snapshot.diskFreeBytes / (1024 * 1024 * 1024)],
+        ['Uptime (hours)', snapshot.uptimeSeconds / 3600],
+      ];
+      if (numbers.some(([, value]) => !Number.isFinite(value) || value < 0)) {
+        throw new Error('Invalid inventory facts');
+      }
+      for (const [label, value] of numbers) {
+        const item = document.createElement('li');
+        item.textContent = `${label}: ${value.toFixed(label === 'Logical CPUs' ? 0 : 1)}`;
+        facts.append(item);
+      }
+      status.textContent = 'Live local Windows facts read. No cloud call or file changes.';
+    } catch {
+      status.textContent = 'Live Windows information unavailable. Nothing was simulated.';
+      facts.replaceChildren();
+    } finally {
+      button.disabled = false;
+    }
+  });
+}
+
+// T08 C07: T06's deterministic, read-only diagnosis is a real Windows OS
+// observation. It is NOT a Recipe replay, not a semantic Task PASS and not
+// automatic cleanup or a cloud-generated recommendation.
+function wireReadonlyDiagnosis() {
+  const button = el('read-windows-diagnosis');
+  const status = el('diagnosis-status');
+  const facts = el('diagnosis-facts');
+  const limitation = el('diagnosis-limitation');
+  const add = (message) => {
+    const item = document.createElement('li');
+    item.textContent = message;
+    facts.append(item);
+  };
+  button.addEventListener('click', async () => {
+    button.disabled = true;
+    status.textContent = 'Collecting local read-only Windows diagnostics…';
+    facts.replaceChildren();
+    limitation.textContent = '';
+    try {
+      const result = await api('/system/diagnosis');
+      const report = result.report;
+      if (
+        result.ok !== true ||
+        result.source !== 'LIVE_WINDOWS_LOCAL_READONLY' ||
+        result.recipeExecuted !== false ||
+        result.cloudCalls !== 0 ||
+        report?.schema !== 'shun.windows-diagnostic-report.v02' ||
+        report.status !== 'OBSERVED_ONLY' ||
+        report.localOnly !== true ||
+        !Array.isArray(report.externalDisclosures) ||
+        report.externalDisclosures.length !== 0 ||
+        report.limitation !== 'SINGLE_SNAPSHOT_NO_ROOT_CAUSE_OR_SPEEDUP_CLAIM' ||
+        !Array.isArray(report.signals) ||
+        !Array.isArray(report.advice)
+      ) {
+        throw new Error('Unverified local report');
+      }
+      const evidence = report.evidence;
+      if (
+        !evidence ||
+        !Number.isSafeInteger(evidence.processCount) ||
+        evidence.processCount < 0 ||
+        !Number.isSafeInteger(evidence.startupEntryCount) ||
+        evidence.startupEntryCount < 0 ||
+        evidence.inventoryProvenance !== 'node:os+node:fs:statfs' ||
+        evidence.runtimeProvenance !== 'fixed-readonly-powershell' ||
+        report.signals.some((s) => !['LOW_DISK_SPACE', 'LOW_FREE_MEMORY'].includes(s)) ||
+        report.advice.some(
+          (a) => a.effect !== 'NONE' || !['REVIEW_STORAGE', 'REVIEW_APPLICATIONS'].includes(a.action),
+        )
+      ) {
+        throw new Error('Invalid diagnosis facts');
+      }
+      add(`Processes: ${evidence.processCount}`);
+      add(`Startup entries: ${evidence.startupEntryCount}`);
+      if (report.signals.length === 0) {
+        add('No low-space or low-memory signal in this snapshot.');
+      } else {
+        for (const signal of report.signals) {
+          add(signal === 'LOW_DISK_SPACE'
+            ? 'Low disk free space: review storage manually.'
+            : 'Low available memory: review running applications manually.');
+        }
+      }
+      status.textContent = 'Actual local diagnosis complete. Nothing was executed or sent to a model.';
+      limitation.textContent =
+        'One snapshot only. This is not a root-cause finding, speedup claim, or Recipe execution.';
+    } catch {
+      status.textContent = 'Local Windows diagnosis unavailable. No simulated result was shown.';
+      facts.replaceChildren();
+      limitation.textContent = '';
+    } finally {
+      button.disabled = false;
+    }
+  });
+}
+
+// T08 C01: a local, non-authoritative display of the exact T01 cloud
+// disclosure projection. Nothing in this browser can issue a broker assertion,
+// approve a model send, or change cloud budget/currentness.
+function wireCloudDisclosurePreview(onDisplayed) {
+  const button = el('cloud-preview-button');
+  const status = el('cloud-preview-status');
+  const hash = el('cloud-preview-hash');
+  const json = el('cloud-preview-json');
+  button.addEventListener('click', async () => {
+    onDisplayed(null);
+    status.textContent = 'Calculating local disclosure preview…';
+    hash.textContent = '';
+    json.textContent = '';
+    button.disabled = true;
+    try {
+      const goalText = el('cloud-preview-goal').value;
+      const result = await api('/cloud/disclosure-preview', { body: { goalText } });
+      if (goalText !== el('cloud-preview-goal').value) throw new Error('Goal changed');
+      if (
+        result.ok !== true ||
+        result.status !== 'LOCAL_PREVIEW_ONLY' ||
+        result.consentIssued !== false ||
+        result.cloudSendAllowed !== false ||
+        result.privateBrokerReady !== false ||
+        typeof result.projectionJson !== 'string' ||
+        !/^[a-f0-9]{64}$/.test(result.sha256)
+      ) {
+        throw new Error('The server did not confirm preview-only mode.');
+      }
+      json.textContent = result.projectionJson;
+      hash.textContent = `Disclosure SHA-256: ${result.sha256}`;
+      status.textContent = 'Local preview only. No cloud request was made. A separate Windows dialog is required to send.';
+      onDisplayed(goalText);
+    } catch {
+      onDisplayed(null);
+      status.textContent = 'Disclosure preview unavailable. No cloud request was made.';
+    } finally {
+      button.disabled = false;
+    }
+  });
+}
+
+// Only the trusted *real* backend can persist the fixed, immutable T04
+// candidate. An HTTP caller cannot choose source text, emit grants, promote
+// ACTIVE, or execute even an R0 effect from this UI path.
+function wireBuiltinRecipeSave() {
+  const button = el('save-inventory-recipe');
+  const status = el('recipe-save-status');
+  const identity = el('recipe-save-identity');
+  const readButton = el('read-inventory-recipe');
+  readButton.addEventListener('click', async () => {
+    readButton.disabled = true;
+    identity.textContent = '';
+    status.textContent = 'Reading saved Recipe revision from local SQLite…';
+    try {
+      const saved = await api('/recipes/builtin/system-inventory');
+      if (
+        saved.ok !== true ||
+        saved.executionAuthorized !== false ||
+        saved.modelCalls !== 0 ||
+        typeof saved.recipeId !== 'string' ||
+        typeof saved.saved !== 'boolean' ||
+        (saved.saved ? !/^[a-f0-9]{64}$/.test(saved.revisionSha256) : saved.revisionSha256 !== null) ||
+        (saved.state !== 'PERSISTED_CANDIDATE_ONLY' && saved.state !== 'NOT_SAVED')
+      ) {
+        throw new Error('Unverified Recipe library response');
+      }
+      identity.textContent = saved.saved
+        ? `Recipe: ${saved.recipeId} · SHA-256 revision: ${saved.revisionSha256}`
+        : `Recipe: ${saved.recipeId} · no saved revision`;
+      status.textContent = saved.saved && saved.state === 'PERSISTED_CANDIDATE_ONLY'
+        ? 'Verified saved candidate. Not active, no execution or model calls.'
+        : 'Built-in candidate not saved yet. No execution occurred.';
+    } catch {
+      status.textContent = 'Recipe library unavailable. No Recipe was executed.';
+    } finally {
+      readButton.disabled = false;
+    }
+  });
+  const runButton = el('run-inventory-recipe');
+  const runStatus = el('recipe-run-status');
+  const runFacts = el('recipe-run-facts');
+  runButton.addEventListener('click', async () => {
+    runButton.disabled = true;
+    runFacts.replaceChildren();
+    runStatus.textContent = 'Verifying saved Recipe, trusted R0 policy and effect grant…';
+    try {
+      const result = await api('/recipes/builtin/system-inventory/run', { body: {} });
+      const x = result.snapshot;
+      if (
+        result.ok !== true ||
+        result.status !== 'VERIFIED_READONLY_OBSERVATION' ||
+        result.recipeExecuted !== true ||
+        result.modelCalls !== 0 ||
+        !Array.isArray(result.externalDisclosures) ||
+        result.externalDisclosures.length !== 0 ||
+        !/^[a-f0-9]{64}$/.test(result.revisionSha256) ||
+        !/^[a-f0-9]{64}$/.test(result.planHash) ||
+        x?.schema !== 'shun.system-inventory.v02' ||
+        x.localOnly !== true ||
+        x.platform !== 'win32' ||
+        x.provenance !== 'node:os+node:fs:statfs' ||
+        !Number.isFinite(x.memoryTotalBytes) ||
+        !Number.isFinite(x.memoryFreeBytes) ||
+        !Number.isFinite(x.diskTotalBytes) ||
+        !Number.isFinite(x.diskFreeBytes)
+      ) {
+        throw new Error('Unverified Recipe result');
+      }
+      const facts = [
+        `Recipe revision: ${result.revisionSha256}`,
+        `Authorized plan hash: ${result.planHash}`,
+        `Available memory: ${Math.round(x.memoryFreeBytes / 1048576)} MiB`,
+        `Available disk: ${Math.round(x.diskFreeBytes / 1048576)} MiB`,
+      ];
+      for (const value of facts) {
+        const item = document.createElement('li');
+        item.textContent = value;
+        runFacts.append(item);
+      }
+      runStatus.textContent =
+        'Saved Recipe re-executed as a verified local read-only observation, under operator R0 policy. No LLM call.';
+    } catch {
+      runStatus.textContent =
+        'Recipe not executed or result not verified. Saved revision and trusted operator R0 rule are required.';
+      runFacts.replaceChildren();
+    } finally {
+      runButton.disabled = false;
+    }
+  });
+
+  button.addEventListener('click', async () => {
+    button.disabled = true;
+    status.textContent = 'Saving fixed local Recipe candidate…';
+    identity.textContent = '';
+    try {
+      const saved = await api('/recipes/builtin/system-inventory/save', { body: {} });
+      if (
+        saved.ok !== true ||
+        saved.state !== 'PERSISTED_CANDIDATE_ONLY' ||
+        saved.executionAuthorized !== false ||
+        saved.modelCalls !== 0 ||
+        typeof saved.recipeId !== 'string' ||
+        !/^[a-f0-9]{64}$/.test(saved.revisionSha256)
+      ) {
+        throw new Error('Unverified Recipe candidate save');
+      }
+      identity.textContent = `Recipe: ${saved.recipeId} · SHA-256 revision: ${saved.revisionSha256}`;
+      status.textContent = saved.inserted
+        ? 'Saved immutable candidate locally. Not active or authorized to execute.'
+        : 'Existing identical candidate found. No new model call or execution.';
+    } catch {
+      status.textContent =
+        'Recipe save unavailable (real local backend required). No Recipe was executed.';
+    } finally {
+      button.disabled = false;
+    }
+  });
+}
+
+// Trusted cloud planning is a DISTINCT real lane, not a promotion of Demo
+// task data into authoritative ActionController results. Every send still
+// requires an actual Win32 private broker Allow gesture in the local host.
+function wireTrustedCloudInterpretation() {
+  const button = el('cloud-send-button');
+  const status = el('cloud-send-status');
+  const resultText = el('cloud-result-text');
+  const goal = el('cloud-preview-goal');
+  let preflightGoal = null;
+  let available = false;
+
+  async function checkAvailability() {
+    try {
+      const state = await api('/cloud/status');
+      available =
+        state.enabled === true &&
+        state.provider === 'deepseek' &&
+        state.model === 'deepseek-flash' &&
+        state.osConsentRequired === true;
+    } catch {
+      available = false;
+    }
+    button.disabled = !available || preflightGoal !== goal.value;
+    if (!available) {
+      status.textContent = 'Trusted cloud send unavailable: Windows broker, key or host policy missing.';
+    } else {
+      status.textContent = 'Local cloud planner ready. Preview the exact goal, then confirm in Windows.';
+    }
+  }
+
+  goal.addEventListener('input', () => {
+    preflightGoal = null;
+    button.disabled = true;
+    resultText.textContent = '';
+    status.textContent = 'Goal changed. Review the disclosure again before sending.';
+  });
+  // Only the one actual rendered preview can unlock the send button.
+  // Never run a second racing preflight request that could complete before
+  // the JSON and digest are visible on screen.
+  function onDisplayed(displayedGoal) {
+    preflightGoal = displayedGoal !== null && displayedGoal === goal.value ? displayedGoal : null;
+    button.disabled = !available || preflightGoal === null;
+  }
+
+  button.addEventListener('click', async () => {
+    if (!available || preflightGoal === null || preflightGoal !== goal.value) {
+      status.textContent = 'The displayed goal changed. Preview before requesting consent.';
+      button.disabled = true;
+      return;
+    }
+    const goalText = preflightGoal;
+    preflightGoal = null;
+    button.disabled = true;
+    resultText.textContent = '';
+    status.textContent = 'Waiting for your separate Windows consent dialog…';
+    try {
+      const response = await api('/cloud/interpret', { body: { goalText } });
+      if (
+        response.ok !== true ||
+        response.status !== 'UNTRUSTED_REMOTE_PROPOSAL' ||
+        response.executed !== false ||
+        response.model !== 'deepseek-flash' ||
+        response.costState !== 'UNKNOWN_COST' ||
+        typeof response.proposalText !== 'string'
+      ) {
+        throw new Error('Unverified cloud response');
+      }
+      // Raw model text is UNTRUSTED, never use innerHTML or execute it.
+      resultText.textContent = response.proposalText;
+      status.textContent =
+        'Real DeepSeek response received. No action executed. Charges may be uncertain.';
+    } catch {
+      status.textContent = 'Cloud request refused or unavailable. No action was executed.';
+    } finally {
+      await checkAvailability();
+      button.disabled = true;
+    }
+  });
+  void checkAvailability();
+  return onDisplayed;
+}
+
+// T11: the bounded v0.3 control surface is one same-origin hop away. The
+// entry is injected here (the v0.2 index.html is not T11's to edit): a plain
+// relative link served by the same loopback control-api, carrying no
+// authority and never linking anywhere off-origin.
+function wireV03Entry() {
+  const header = document.querySelector('header');
+  if (!header || header.querySelector('nav.v03-entry')) return;
+  const nav = document.createElement('nav');
+  nav.className = 'v03-entry';
+  const link = document.createElement('a');
+  link.href = './v03/index.html';
+  link.rel = 'next';
+  link.textContent = 'Open the bounded v0.3 control surface';
+  nav.append(link);
+  header.append(nav);
+}
+
 wireForm();
+wireLiveSystem();
+wireReadonlyDiagnosis();
+wireBuiltinRecipeSave();
+const onCloudDisplayed = wireTrustedCloudInterpretation();
+wireCloudDisclosurePreview(onCloudDisplayed);
+wireV03Entry();
 refresh();
 setInterval(refresh, 2500);

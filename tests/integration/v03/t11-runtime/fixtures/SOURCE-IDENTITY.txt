@@ -1,0 +1,25 @@
+# t11-runtime real selected payload provenance
+
+The three payload bytes in this directory are the REAL selected
+DomainHarness domain-package payload sources, extracted byte-exact from the
+same SDK source tag the frozen t00 fixture tarballs were packed from:
+
+sdk_tag_commit=061376f4a023070f215f9feffad5c24d96d503cb
+sdk_tag=merge of PR #1453 (version/v0.10.3), identical to
+        tests/integration/v03/t00-scaffold/fixtures/SOURCE-IDENTITY.txt
+
+files:
+  kernel-mechanism-v1.mjs  <- domain-packages/kernel/basic/kernel-mechanism-v1.mjs
+  standard-sdk-v1.mjs      <- domain-packages/standard/basic/standard-sdk-v1.mjs
+  workflow-router.mjs      <- domain-packages/standard/basic/workflow-router.mjs
+                              (vendored BUILD-style into the standard-primary
+                              bundle exactly as the upstream T00/C01 assembly
+                              helpers do: sdk + router IIFE appending
+                              `export const routeWorkflowIntent`)
+
+business-windows-journey.mjs and capability-windows-effect.mjs are Shun-owned
+v0.3 fixtures (authored for this suite, NOT extracted); they are sealed into
+the BUILD input by the test itself and therefore carry their own moduleSha256
+pins computed at build time.
+
+Receipts: SHA256SUMS.txt (sha256 of the exact file bytes).

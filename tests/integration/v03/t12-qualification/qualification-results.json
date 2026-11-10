@@ -1,0 +1,305 @@
+{
+  "meta": {
+    "candidateSourceSha": "e93fac9bd400f222ea27cbea1fa36f4ecba1f414",
+    "candidateIsAncestorOfHead": true,
+    "qualificationHeadSha": "e93fac9bd400f222ea27cbea1fa36f4ecba1f414",
+    "nodeVersion": "v24.21.0",
+    "platform": "win32",
+    "zeroPaidScope": true,
+    "startedAtUnixMs": 1793425918821,
+    "finishedAtUnixMs": 1793425940524
+  },
+  "compositionSweep": [
+    {
+      "suite": "t00-scaffold",
+      "command": "node --test t00-scaffold.test.mjs",
+      "exitCode": 0,
+      "signal": null,
+      "timedOut": false,
+      "durationMs": 1810,
+      "counts": {
+        "passed": 6,
+        "failed": 0,
+        "total": 6
+      },
+      "tail": "✔ source-identity/public-sdk-pack: fixture tarballs match recorded SHA256 receipts (3.6338ms)\n✔ no-install-effects: installed SDK manifests carry no lifecycle hooks and exact source versions (827.0825ms)\n✔ isolated-consumer: real public imports resolve from the pinned local tarballs (108.9702ms)\n✔ package-boundary-negative: private SDK packages and unsupported deep imports are rejected (80.3249ms)\n✔ artifact-integrity-negative: tampered tarball bytes refuse against the recorded receipt (609.0558ms)\n✔ no-install-effects: Shun scaffold shape — zero-dep manifests, no entrypoints, no second-sender references (2.0403ms)\nℹ tests 6\nℹ suites 0\nℹ pass 6\nℹ fail 0\nℹ cancelled 0\nℹ skipped 0\nℹ todo 0\nℹ duration_ms 1732.5198\n\n"
+    },
+    {
+      "suite": "t01-host",
+      "command": "node vitest.mjs run",
+      "exitCode": 0,
+      "signal": null,
+      "timedOut": false,
+      "durationMs": 1203,
+      "counts": {
+        "passed": 11,
+        "failed": 0,
+        "total": 11
+      },
+      "tail": "\n RUN  v3.2.7 C:/xDev/kAiCreator/shun-assistant/shun-i240-v01-zcode/tests/integration/v03/t01-host\n\n ✓ windows-effect-host.test.ts (11 tests) 11ms\n\n Test Files  1 passed (1)\n      Tests  11 passed (11)\n   Start at  13:52:01\n   Duration  608ms (transform 52ms, setup 0ms, collect 66ms, tests 11ms, environment 0ms, prepare 136ms)\n\n\n"
+    },
+    {
+      "suite": "t02-computer",
+      "command": "node vitest.mjs run",
+      "exitCode": 0,
+      "signal": null,
+      "timedOut": false,
+      "durationMs": 1397,
+      "counts": {
+        "passed": 14,
+        "failed": 0,
+        "total": 14
+      },
+      "tail": "\n RUN  v3.2.7 C:/xDev/kAiCreator/shun-assistant/shun-i240-v01-zcode/tests/integration/v03/t02-computer\n\n ✓ folder-observation.test.ts (8 tests) 20ms\n ✓ support-context.test.ts (6 tests) 12ms\n\n Test Files  2 passed (2)\n      Tests  14 passed (14)\n   Start at  13:52:02\n   Duration  793ms (transform 128ms, setup 0ms, collect 246ms, tests 32ms, environment 0ms, prepare 308ms)\n\n\n"
+    },
+    {
+      "suite": "t03-semantic",
+      "command": "node vitest.mjs run",
+      "exitCode": 0,
+      "signal": null,
+      "timedOut": false,
+      "durationMs": 1559,
+      "counts": {
+        "passed": 11,
+        "failed": 0,
+        "total": 11
+      },
+      "tail": "\n RUN  v3.2.7 C:/xDev/kAiCreator/shun-assistant/shun-i240-v01-zcode/tests/integration/v03/t03-semantic\n\n ✓ goal-semantic.test.ts (11 tests) 19ms\n\n Test Files  1 passed (1)\n      Tests  11 passed (11)\n   Start at  13:52:03\n   Duration  988ms (transform 170ms, setup 0ms, collect 317ms, tests 19ms, environment 0ms, prepare 98ms)\n\n\n"
+    },
+    {
+      "suite": "t04-cloud",
+      "command": "node vitest.mjs run",
+      "exitCode": 0,
+      "signal": null,
+      "timedOut": false,
+      "durationMs": 1606,
+      "counts": {
+        "passed": 15,
+        "failed": 0,
+        "total": 15
+      },
+      "tail": "\n RUN  v3.2.7 C:/xDev/kAiCreator/shun-assistant/shun-i240-v01-zcode/tests/integration/v03/t04-cloud\n\n ✓ cloud-host.test.ts (15 tests) 25ms\n\n Test Files  1 passed (1)\n      Tests  15 passed (15)\n   Start at  13:52:05\n   Duration  946ms (transform 168ms, setup 0ms, collect 300ms, tests 25ms, environment 0ms, prepare 100ms)\n\n\n"
+    },
+    {
+      "suite": "t05-guided",
+      "command": "node vitest.mjs run",
+      "exitCode": 0,
+      "signal": null,
+      "timedOut": false,
+      "durationMs": 1161,
+      "counts": {
+        "passed": 12,
+        "failed": 0,
+        "total": 12
+      },
+      "tail": "\n RUN  v3.2.7 C:/xDev/kAiCreator/shun-assistant/shun-i240-v01-zcode/tests/integration/v03/t05-guided\n\n ✓ guided-journey.test.ts (12 tests) 9ms\n\n Test Files  1 passed (1)\n      Tests  12 passed (12)\n   Start at  13:52:06\n   Duration  548ms (transform 61ms, setup 0ms, collect 68ms, tests 9ms, environment 0ms, prepare 99ms)\n\n\n"
+    },
+    {
+      "suite": "t06-meta",
+      "command": "node vitest.mjs run",
+      "exitCode": 0,
+      "signal": null,
+      "timedOut": false,
+      "durationMs": 1191,
+      "counts": {
+        "passed": 9,
+        "failed": 0,
+        "total": 9
+      },
+      "tail": "\n RUN  v3.2.7 C:/xDev/kAiCreator/shun-assistant/shun-i240-v01-zcode/tests/integration/v03/t06-meta\n\n ✓ meta-feedback.test.ts (9 tests) 9ms\n\n Test Files  1 passed (1)\n      Tests  9 passed (9)\n   Start at  13:52:08\n   Duration  590ms (transform 44ms, setup 0ms, collect 46ms, tests 9ms, environment 0ms, prepare 114ms)\n\n\n"
+    },
+    {
+      "suite": "t07-recipes",
+      "command": "node vitest.mjs run",
+      "exitCode": 0,
+      "signal": null,
+      "timedOut": false,
+      "durationMs": 1422,
+      "counts": {
+        "passed": 8,
+        "failed": 0,
+        "total": 8
+      },
+      "tail": "\n RUN  v3.2.7 C:/xDev/kAiCreator/shun-assistant/shun-i240-v01-zcode/tests/integration/v03/t07-recipes\n\n ✓ recipe-replay.test.ts (8 tests) 16ms\n\n Test Files  1 passed (1)\n      Tests  8 passed (8)\n   Start at  13:52:09\n   Duration  841ms (transform 147ms, setup 0ms, collect 266ms, tests 16ms, environment 0ms, prepare 120ms)\n\n\n"
+    },
+    {
+      "suite": "t08-provider",
+      "command": "node vitest.mjs run",
+      "exitCode": 0,
+      "signal": null,
+      "timedOut": false,
+      "durationMs": 1646,
+      "counts": {
+        "passed": 21,
+        "failed": 0,
+        "total": 21
+      },
+      "tail": "\n RUN  v3.2.7 C:/xDev/kAiCreator/shun-assistant/shun-i240-v01-zcode/tests/integration/v03/t08-provider\n\n ✓ provider-jit.test.ts (11 tests) 34ms\n ✓ trusted-provider-host.test.ts (10 tests) 142ms\n\n Test Files  2 passed (2)\n      Tests  21 passed (21)\n   Start at  13:52:10\n   Duration  1.04s (transform 272ms, setup 0ms, collect 723ms, tests 176ms, environment 0ms, prepare 270ms)\n\n\n"
+    },
+    {
+      "suite": "t09-api",
+      "command": "node vitest.mjs run",
+      "exitCode": 0,
+      "signal": null,
+      "timedOut": false,
+      "durationMs": 2549,
+      "counts": {
+        "passed": 23,
+        "failed": 0,
+        "total": 23
+      },
+      "tail": "\n RUN  v3.2.7 C:/xDev/kAiCreator/shun-assistant/shun-i240-v01-zcode/tests/integration/v03/t09-api\n\n ✓ gateway.test.ts (15 tests) 12ms\n ✓ composition.test.ts (8 tests) 1167ms\n\n Test Files  2 passed (2)\n      Tests  23 passed (23)\n   Start at  13:52:12\n   Duration  1.85s (transform 123ms, setup 0ms, collect 248ms, tests 1.18s, environment 0ms, prepare 269ms)\n\n\n"
+    },
+    {
+      "suite": "t10-ui",
+      "command": "node vitest.mjs run",
+      "exitCode": 0,
+      "signal": null,
+      "timedOut": false,
+      "durationMs": 1497,
+      "counts": {
+        "passed": 35,
+        "failed": 0,
+        "total": 35
+      },
+      "tail": "\n RUN  v3.2.7 C:/xDev/kAiCreator/shun-assistant/shun-i240-v01-zcode/tests/integration/v03/t10-ui\n\n ✓ t10-control-ui.test.ts (35 tests) 18ms\n\n Test Files  1 passed (1)\n      Tests  35 passed (35)\n   Start at  13:52:14\n   Duration  843ms (transform 88ms, setup 0ms, collect 109ms, tests 18ms, environment 0ms, prepare 140ms)\n\n\n"
+    },
+    {
+      "suite": "t11-runtime",
+      "command": "node vitest.mjs run",
+      "exitCode": 0,
+      "signal": null,
+      "timedOut": false,
+      "durationMs": 2219,
+      "counts": {
+        "passed": 20,
+        "failed": 0,
+        "total": 20
+      },
+      "tail": "\n RUN  v3.2.7 C:/xDev/kAiCreator/shun-assistant/shun-i240-v01-zcode/tests/integration/v03/t11-runtime\n\n ✓ cloud-interpret-deadline.test.ts (4 tests) 25ms\n ✓ real-kernel-permit.test.ts (9 tests) 222ms\n ✓ server-v03-gateway.test.ts (7 tests) 405ms\n\n Test Files  3 passed (3)\n      Tests  20 passed (20)\n   Start at  13:52:16\n   Duration  1.55s (transform 684ms, setup 0ms, collect 1.55s, tests 653ms, environment 1ms, prepare 441ms)\n\n\n"
+    }
+  ],
+  "buildSurface": [
+    {
+      "package": "@shun/executor-windows",
+      "script": "build:anchor-writer",
+      "command": "node scripts/build-anchor-writer.ts",
+      "status": "BUILT",
+      "exitCode": 0,
+      "durationMs": 277,
+      "artifacts": [
+        {
+          "file": "anchor-writer.mjs",
+          "sha256": "8cd9df5d50a7ee662dfd0ad84c90309e370d8aeed73022aeeab3fa73c3600e32"
+        },
+        {
+          "file": "executor-helper.mjs",
+          "sha256": "949f037dca53957b3e276ab6844845f14e6e0c42290e55c6dd2e7e25b2675d1d"
+        }
+      ]
+    },
+    {
+      "package": "@shun/executor-windows",
+      "script": "build:helper",
+      "command": "node scripts/build-helper.ts",
+      "status": "BUILT",
+      "exitCode": 0,
+      "durationMs": 280,
+      "artifacts": [
+        {
+          "file": "anchor-writer.mjs",
+          "sha256": "8cd9df5d50a7ee662dfd0ad84c90309e370d8aeed73022aeeab3fa73c3600e32"
+        },
+        {
+          "file": "executor-helper.mjs",
+          "sha256": "949f037dca53957b3e276ab6844845f14e6e0c42290e55c6dd2e7e25b2675d1d"
+        }
+      ]
+    }
+  ],
+  "publicInterface": {
+    "anchoredPackages": [
+      {
+        "package": "@shun/domain-app",
+        "anchored": ["composeDomainBuild", "createControlApiGateway"]
+      },
+      {
+        "package": "@shun/domain-computer",
+        "anchored": ["13 merged task adapter factories"]
+      },
+      {
+        "package": "@shun/domain-host",
+        "anchored": ["T01/T04/T08 Host seams"]
+      },
+      {
+        "package": "@shun/vertical-support",
+        "anchored": ["B-040 minimize/collect/schema"]
+      }
+    ],
+    "consumerComposition": {
+      "appId": "shun-v03-qualification",
+      "moduleCount": 4,
+      "isV10AppFacade": true,
+      "facadeSurface": ["send", "subscribe", "queryScopedSnapshot", "isClosed", "dispose"],
+      "sdkTagCommit": "061376f4a023070f215f9feffad5c24d96d503cb",
+      "payloadReceiptsVerified": true,
+      "fullKJourneyProof": "T11 suite (re-run by the composition sweep)"
+    }
+  },
+  "windowsCompatibility": {
+    "win32": true,
+    "nodeVersion": "v24.21.0",
+    "nodeAtLeast24": true,
+    "b040": {
+      "source": "ACTUAL_WINDOWS_HOST",
+      "localOnly": true,
+      "externalDisclosures": 0,
+      "reportSchema": "shun.support-context.v1",
+      "osName": "Microsoft Windows 11 רҵ��",
+      "osBuild": "26300",
+      "canonicalReportSha256": "a4ca77244eeeb30e0e03f55cb14f53e0d0cd8a5b29044a02833ee2a765cd3aae"
+    }
+  },
+  "negativeMatrix": [
+    {
+      "id": "N1",
+      "name": "UNKNOWN-as-success: forged completed/unparseable outcomes stay unknown/refused",
+      "result": "PASS"
+    },
+    {
+      "id": "N2",
+      "name": "expired deadline: zero fetch, zero ledger (documented zero-send)",
+      "result": "PASS"
+    },
+    {
+      "id": "N3",
+      "name": "maxOutputTokens overrun: refused at binding and transport, zero fetch/reserve",
+      "result": "PASS"
+    },
+    {
+      "id": "N4",
+      "name": "duplicate requestId: journal REPLAY/CONFLICT + ledger IDEMPOTENCY_REPLAY/BUDGET_EXHAUSTED",
+      "result": "PASS"
+    },
+    {
+      "id": "N5",
+      "name": "refused/failed/unknown stay non-completed; UNKNOWN_COST has no refund path",
+      "result": "PASS"
+    },
+    {
+      "id": "N6",
+      "name": "invalid Case: zero send + zero journal, then valid same Case succeeds",
+      "result": "PASS"
+    },
+    {
+      "id": "N7",
+      "name": "no secret leak in refusal details, receipts or failure results",
+      "result": "PASS"
+    },
+    {
+      "id": "N8",
+      "name": "stale grant refused pre-effect; duplicate effect idempotently rejected",
+      "result": "PASS"
+    }
+  ]
+}
