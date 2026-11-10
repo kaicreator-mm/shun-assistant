@@ -779,15 +779,15 @@ describe('R04 bootstrap identity guard (read-only, fail closed)', () => {
         consoleUserSid: () => TEST_USER_SID,
       }),
     ).toEqual({ processUserSid: TEST_USER_SID, elevated: true });
-    // No resolvable console session (e.g. disconnected) with elevation: the
-    // process account is the only account in evidence — accepted.
+    // Unelevated runs never probe the console session: the normal per-user
+    // path (including a remote RDP target user) needs no elevation at all.
     expect(
       assessGuidedBootstrapIdentity({
         processUserSid: () => TEST_USER_SID,
-        elevated: () => true,
+        elevated: () => false,
         consoleUserSid: () => null,
       }),
-    ).toEqual({ processUserSid: TEST_USER_SID, elevated: true });
+    ).toEqual({ processUserSid: TEST_USER_SID, elevated: false });
   });
 
   it('refuses an over-the-shoulder elevation that belongs to a different account', () => {
@@ -801,6 +801,20 @@ describe('R04 bootstrap identity guard (read-only, fail closed)', () => {
         consoleUserSid: () => TEST_USER_SID,
       }),
     ).toThrow(/GUIDED_BOOTSTRAP_WRONG_ACCOUNT_ELEVATION/);
+  });
+
+  it('refuses an elevation whose console target cannot be resolved (unverifiable is not same-account)', () => {
+    // Whole-version RQ repair of review #5830194105 P2-IDENTITY-UNKNOWN:
+    // with NO resolvable interactive console session, an elevated token
+    // cannot be proven to belong to the target interactive user, so the
+    // privileged path fails closed — run unelevated as the target user.
+    expect(() =>
+      assessGuidedBootstrapIdentity({
+        processUserSid: () => TEST_USER_SID,
+        elevated: () => true,
+        consoleUserSid: () => null,
+      }),
+    ).toThrow('GUIDED_BOOTSTRAP_ELEVATED_TARGET_UNVERIFIABLE');
   });
 
   it('fails closed when any identity probe fails', () => {

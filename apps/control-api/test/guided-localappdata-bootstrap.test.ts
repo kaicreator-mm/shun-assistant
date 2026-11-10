@@ -342,6 +342,75 @@ describe('R04 per-user bootstrap: partial setups, repair and refusal', () => {
     }
   });
 
+  it('a repair that restores the anchor refuses present material from a different key (review #5830194105 P2-1)', () => {
+    // Fixture A: complete setup, then lose ONLY the anchor — the exact
+    // state where the plan optimistically classifies present pin/receipt as
+    // structurally valid without being able to verify their key binding.
+    const fixture = makeBootstrapFixture();
+    executeGuidedLocalAppDataBootstrap(executeInput(fixture), { consent: true });
+    const anchorPath = join(fixture.paths.trustDir, GUIDED_PROVENANCE_TRUST_ANCHOR_FILE);
+    rmSync(anchorPath);
+    // Fixture B: an independent setup under a DIFFERENT per-user key.
+    const other = makeBootstrapFixture();
+    executeGuidedLocalAppDataBootstrap(executeInput(other), { consent: true });
+    const plan = planGuidedLocalAppDataBootstrap({
+      databasePath: fixture.dbPath,
+      schemaDigest: deriveGuidedSchemaDigest(),
+      paths: fixture.paths,
+    });
+    expect(plan.status).toBe('PARTIAL');
+    expect(plan.notes.some((note) => note.includes('--repair re-verifies it'))).toBe(true);
+    // A pin from fixture B's key: repair restores A's anchor from A's secret
+    // and MUST refuse instead of reporting REPAIR_COMPLETED over material
+    // that the runtime would later reject. Refused bytes stay untouched.
+    const foreignPin = readFileSync(other.paths.pinPath, 'utf8');
+    writeFileSync(fixture.paths.pinPath, foreignPin);
+    expect(() =>
+      executeGuidedLocalAppDataBootstrap(executeInput(fixture), { consent: true, repair: true }),
+    ).toThrow(/GUIDED_BOOTSTRAP_REPAIR_INCONSISTENT/);
+    expect(readFileSync(fixture.paths.pinPath, 'utf8')).toBe(foreignPin);
+    // The refusal is side-effect-free: the restored anchor is written only
+    // after every present piece verifies.
+    expect(existsSync(anchorPath)).toBe(false);
+    // A genuine receipt issued for ANOTHER store (different key AND database
+    // binding) is equally refused once the anchor is restored.
+    rmSync(fixture.paths.pinPath);
+    const foreignReceipt = readFileSync(
+      join(
+        other.paths.trustDir,
+        GUIDED_PROVENANCE_RECEIPTS_SUBDIR,
+        guidedReceiptFileName(canonicalGuidedDatabasePath(other.dbPath)),
+      ),
+      'utf8',
+    );
+    const myReceiptPath = join(
+      fixture.paths.trustDir,
+      GUIDED_PROVENANCE_RECEIPTS_SUBDIR,
+      guidedReceiptFileName(canonicalGuidedDatabasePath(fixture.dbPath)),
+    );
+    rmSync(myReceiptPath);
+    writeFileSync(myReceiptPath, foreignReceipt);
+    expect(() =>
+      executeGuidedLocalAppDataBootstrap(executeInput(fixture), { consent: true, repair: true }),
+    ).toThrow(/GUIDED_BOOTSTRAP_REPAIR_INCONSISTENT/);
+    expect(readFileSync(myReceiptPath, 'utf8')).toBe(foreignReceipt);
+    expect(existsSync(anchorPath)).toBe(false);
+    // After the operator removes the foreign piece, ordinary repair completes
+    // and the production service verifies against the restored trust.
+    rmSync(myReceiptPath);
+    const repaired = executeGuidedLocalAppDataBootstrap(executeInput(fixture), {
+      consent: true,
+      repair: true,
+    });
+    expect(repaired.status).toBe('REPAIR_COMPLETED');
+    const service = createProductionGuidedService(fixture.dbPath, compositionOverrides(fixture));
+    try {
+      expect(service.decide(null)).toEqual({ status: 'REFUSED', code: 'RELAY_SCHEMA_REFUSED' });
+    } finally {
+      service.close();
+    }
+  });
+
   it('an absent secret with complete runtime trust stays COMPLETE (never re-keyed)', () => {
     const fixture = makeBootstrapFixture();
     executeGuidedLocalAppDataBootstrap(executeInput(fixture), { consent: true });

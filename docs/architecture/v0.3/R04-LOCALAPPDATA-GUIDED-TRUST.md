@@ -45,9 +45,14 @@ from no browser/LLM/HTTP surface:
 1. **Identity guard (read-only):** resolves the process user SID; an
    ELEVATED token belonging to a DIFFERENT account than the interactive
    console session user (credential/UAC over-the-shoulder) is refused
-   (`GUIDED_BOOTSTRAP_WRONG_ACCOUNT_ELEVATION`) so authority never lands in
-   the administrator's profile. Unelevated same-user runs — the normal
-   path — need no UAC at all; same-account elevation is accepted.
+   (`GUIDED_BOOTSTRAP_WRONG_ACCOUNT_ELEVATION`), and an elevated token with
+   NO resolvable console target is refused too
+   (`GUIDED_BOOTSTRAP_ELEVATED_TARGET_UNVERIFIABLE` — unverifiable is not
+   same-account; whole-version RQ repair of review #5830194105
+   P2-IDENTITY-UNKNOWN), so authority never lands in an unproven account's
+   profile. Unelevated same-user runs — the normal path, including a remote
+   RDP target user — need no UAC at all; PROVEN same-account elevation is
+   accepted.
 2. **Explicit consent:** without `--consent` the tool only prints the plan
    (identity, per-user paths, current state) and exits non-zero.
 3. **Provisioning:** generates the per-user Ed25519 key (the user never
@@ -61,9 +66,29 @@ from no browser/LLM/HTTP surface:
    Structural partials (missing anchor/pin) need an explicit `--repair`
    that completes ONLY missing pieces while every present piece verifies;
    present-but-INVALID material is refused outright (no overwrite, no
-   re-sign) and surfaced for an operator reset decision.
+   re-sign) and surfaced for an operator reset decision. When the missing
+   piece is the anchor itself, the pieces that stayed present were only
+   structurally classifiable at plan time — the repair re-verifies them
+   against the anchor restored from the secret and refuses
+   (`GUIDED_BOOTSTRAP_REPAIR_INCONSISTENT`) instead of reporting
+   `REPAIR_COMPLETED` over material the runtime would reject
+   (whole-version RQ repair of review #5830194105 P2-REPAIR-INTEGRITY).
 5. **No secrets in output:** only identifiers, paths and fingerprints are
    ever printed.
+
+## Known limitation — concurrent first-run (deferred, review #5830194105 P2-CONCURRENT-BOOTSTRAP)
+
+Two SIMULTANEOUS first runs of the consented bootstrap CLI are not
+serialized by a cross-process lock: the per-file atomic
+(temporary-then-rename) writes do not give the whole key→anchor→receipt→pin
+sequence exclusive ownership. An accidental double invocation can interleave
+and leave a partial or mismatched set; the runtime then fails closed exactly
+as designed and the state is resolved by `--repair` (or an operator reset
+for mismatched material). The first-run flow is a single manual consented
+command, so this is an availability edge, not an authority bypass. A bounded
+exclusive bootstrap guard plus a two-process negative test is required
+BEFORE any unattended first-run automation is introduced; do not add a new
+trust ledger for it.
 
 ## Runtime wiring
 

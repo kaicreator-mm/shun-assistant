@@ -348,9 +348,11 @@ export interface GuidedBootstrapIdentityContext {
  * than the interactive console session user (credential/UAC over-the-
  * shoulder) must not plant authority in the administrator's LocalAppData
  * profile — refuse with WRONG_ACCOUNT_ELEVATION and direct the operator to
- * run the one-time setup as the target user. Unelevated same-user runs (the
- * normal per-user path, no UAC) and same-account elevation both pass. All
- * probes are read-only; none ever triggers a UAC prompt.
+ * run the one-time setup as the target user. An elevated token with NO
+ * resolvable console target is refused with ELEVATED_TARGET_UNVERIFIABLE:
+ * unverifiable is not same-account. Unelevated same-user runs (the normal
+ * per-user path, no UAC — including RDP) and PROVEN same-account elevation
+ * pass. All probes are read-only; none ever triggers a UAC prompt.
  *
  * The decision core is platform-independent (probe-injectable, testable
  * everywhere); the exported wrapper additionally requires real Windows.
@@ -367,7 +369,16 @@ export function assessGuidedBootstrapIdentity(
     if (consoleUserSid === undefined) {
       throw new Error('GUIDED_BOOTSTRAP_IDENTITY_PROBE_FAILED');
     }
-    if (consoleUserSid !== null && consoleUserSid !== processUserSid) {
+    if (consoleUserSid === null) {
+      // No interactive console session is resolvable, so the elevated token
+      // cannot be PROVEN to belong to the target interactive user. The
+      // privileged path fails closed (whole-version RQ repair of review
+      // #5830194105 P2-IDENTITY-UNKNOWN): run the bootstrap unelevated as
+      // the target user — the per-user flow never needs elevation. A remote
+      // (RDP) target user also runs unelevated and is unaffected.
+      throw new Error('GUIDED_BOOTSTRAP_ELEVATED_TARGET_UNVERIFIABLE');
+    }
+    if (consoleUserSid !== processUserSid) {
       throw new Error(
         `GUIDED_BOOTSTRAP_WRONG_ACCOUNT_ELEVATION:console=${consoleUserSid}process=${processUserSid}`,
       );

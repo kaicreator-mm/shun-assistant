@@ -19,8 +19,9 @@
 //    bytes, no automatic reset — the operator decides manually);
 //  - identity-bound: runs unelevated as the target interactive user; an
 //    elevated token belonging to a DIFFERENT account (UAC over-the-
-//    shoulder) is refused so authority never lands in the administrator's
-//    profile. Daily runtime needs no UAC at all;
+//    shoulder) is refused, and so is an elevated token whose console
+//    target cannot be resolved at all — so authority never lands in an
+//    unproven account's profile. Daily runtime needs no UAC at all;
 //  - no key bytes are ever logged, echoed or derived into output.
 import { createPrivateKey, createPublicKey, generateKeyPairSync } from 'node:crypto';
 import {
@@ -213,8 +214,13 @@ export function planGuidedLocalAppDataBootstrap(input: {
       pinState = pinDigest === anchor.spkiSha256 ? 'PRESENT_VALID' : 'PRESENT_INVALID';
       if (pinState === 'PRESENT_INVALID') notes.push('pin does not match anchor SPKI');
     } else {
-      // Pin present without a valid anchor: cannot verify binding yet.
+      // Pin present without a valid anchor: cannot verify binding yet —
+      // repair re-verifies it against the restored anchor before any
+      // REPAIR_COMPLETED is reported.
       pinState = 'PRESENT_VALID';
+      notes.push(
+        'pin present but key binding unverifiable until the anchor exists; --repair re-verifies it',
+      );
     }
   }
 
@@ -239,8 +245,13 @@ export function planGuidedLocalAppDataBootstrap(input: {
         notes.push(`receipt invalid: ${(error as Error).message}`);
       }
     } else {
-      // Cannot verify the receipt without a valid anchor.
+      // Cannot verify the receipt without a valid anchor — repair
+      // re-verifies it against the restored anchor before any
+      // REPAIR_COMPLETED is reported.
       receiptState = 'PRESENT_VALID';
+      notes.push(
+        'receipt present but unverifiable until the anchor exists; --repair re-verifies it',
+      );
     }
   }
 
@@ -483,13 +494,42 @@ export function executeGuidedLocalAppDataBootstrap(
   };
 
   if (plan.anchor === 'ABSENT') {
-    const { publicKeyPem, spkiSha256 } = anchorFromSecret();
+    // Whole-version RQ repair of review #5830194105 P2-REPAIR-INTEGRITY:
+    // while the anchor was missing the plan could only classify a present
+    // pin/receipt as STRUCTURALLY valid — their binding to the key was not
+    // verifiable yet. Verify every present piece against the anchor DERIVED
+    // from the secret BEFORE anything is written, so a refusal leaves the
+    // on-disk state untouched and REPAIR_COMPLETED can never be reported
+    // over material the runtime would reject.
+    const derived = anchorFromSecret();
+    if (plan.pin === 'PRESENT_VALID') {
+      const presentPinDigest = pinDigestOf(paths.pinPath);
+      if (presentPinDigest !== derived.spkiSha256) {
+        throw new Error(
+          'GUIDED_BOOTSTRAP_REPAIR_INCONSISTENT:present pin does not verify against the anchor derived from the secret',
+        );
+      }
+    }
+    if (plan.receipt === 'PRESENT_VALID') {
+      try {
+        const rawReceipt = JSON.parse(readFileSync(receiptPath, 'utf8'));
+        verifyGuidedProvenanceEnvelope(rawReceipt, derived.publicKeyPem, {
+          canonicalDatabasePath: plan.databasePath,
+          schemaVersion: GUIDED_SCHEMA_VERSION,
+          schemaDigest: schemaDigest,
+        });
+      } catch (error) {
+        throw new Error(
+          `GUIDED_BOOTSTRAP_REPAIR_INCONSISTENT:present receipt does not verify against the anchor derived from the secret (${(error as Error).message})`,
+        );
+      }
+    }
     writeGuidedFileAtomic(
       anchorPath,
       `${JSON.stringify({
         schema: GUIDED_PROVENANCE_TRUST_ANCHOR_SCHEMA,
-        publicKeyPem,
-        spkiSha256,
+        publicKeyPem: derived.publicKeyPem,
+        spkiSha256: derived.spkiSha256,
       })}\n`,
     );
   }
