@@ -1972,7 +1972,8 @@
     "globalInvariants": 6,
     "competencyQuestions": 11,
     "sapProfiles": 2,
-    "sapObligations": 12
+    "sapObligations": 12,
+    "coverageMapAppend": 2
   },
   "qualification": {
     "independentReview": "NOT_RUN",
@@ -1983,5 +1984,356 @@
     "disFunctionQualification": "NOT_QUALIFIED",
     "aotProductionPackage": "NOT_CREATED",
     "runtimeDemo": "RESEARCH_HARNESS_ONLY_NOT_PRODUCT_FUNCTION"
-  }
+  },
+  "coverageMapAppend": [
+    {
+      "element": "CA-PERFORMANCE-OPTIMIZATION",
+      "kind": "CHILD",
+      "parent": "CA-ROOT",
+      "claimRefs": [
+        "CA-CLM-021",
+        "CA-CLM-024"
+      ],
+      "relationRefs": [
+        "CA-REL-018",
+        "CA-REL-019",
+        "CA-REL-020",
+        "CA-REL-021"
+      ],
+      "globalInvariantRefs": [
+        "CA-INV-001",
+        "CA-INV-002",
+        "CA-INV-003",
+        "CA-INV-004",
+        "CA-INV-014",
+        "CA-INV-016",
+        "CA-INV-017",
+        "CA-INV-018",
+        "CA-INV-019"
+      ],
+      "cqRefs": [
+        "CQ-CA-026",
+        "CQ-CA-027",
+        "CQ-CA-028"
+      ],
+      "sapProfileRef": "SAP-CA-PERFORMANCE-OPTIMIZATION",
+      "scopeContractRef": "CA-PERFORMANCE-OPTIMIZATION.scopeContract",
+      "semanticValidationState": "NOT_RUN"
+    },
+    {
+      "element": "CA-MEMORY-PERFORMANCE",
+      "kind": "CHILD",
+      "parent": "CA-PERFORMANCE-OPTIMIZATION",
+      "claimRefs": [
+        "CA-CLM-018",
+        "CA-CLM-019",
+        "CA-CLM-020",
+        "CA-CLM-022",
+        "CA-CLM-023"
+      ],
+      "relationRefs": [
+        "CA-REL-016",
+        "CA-REL-017",
+        "CA-REL-018",
+        "CA-REL-020",
+        "CA-REL-022"
+      ],
+      "globalInvariantRefs": [
+        "CA-INV-001",
+        "CA-INV-002",
+        "CA-INV-003",
+        "CA-INV-004",
+        "CA-INV-014",
+        "CA-INV-015",
+        "CA-INV-016",
+        "CA-INV-017",
+        "CA-INV-018",
+        "CA-INV-019"
+      ],
+      "cqRefs": [
+        "CQ-CA-021",
+        "CQ-CA-022",
+        "CQ-CA-023",
+        "CQ-CA-024",
+        "CQ-CA-025",
+        "CQ-CA-029",
+        "CQ-CA-030",
+        "CQ-CA-031"
+      ],
+      "sapProfileRef": "SAP-CA-MEMORY-PERFORMANCE",
+      "scopeContractRef": "CA-MEMORY-PERFORMANCE.scopeContract",
+      "semanticValidationState": "NOT_RUN"
+    }
+  ],
+  "coverageMapExtensions": [
+    {
+      "element": "CA-GLOBAL-AUTHORITY",
+      "appendClaimRefs": [
+        "CA-CLM-023"
+      ],
+      "appendRelationRefs": [
+        "CA-REL-021"
+      ],
+      "appendGlobalInvariantRefs": [
+        "CA-INV-018"
+      ],
+      "appendCqRefs": [
+        "CQ-CA-026"
+      ],
+      "semanticValidationState": "NOT_RUN"
+    },
+    {
+      "element": "CA-GLOBAL-VERIFICATION",
+      "appendClaimRefs": [
+        "CA-CLM-021"
+      ],
+      "appendRelationRefs": [
+        "CA-REL-020"
+      ],
+      "appendGlobalInvariantRefs": [
+        "CA-INV-014",
+        "CA-INV-015",
+        "CA-INV-016"
+      ],
+      "appendCqRefs": [
+        "CQ-CA-021",
+        "CQ-CA-022",
+        "CQ-CA-027"
+      ],
+      "semanticValidationState": "NOT_RUN"
+    },
+    {
+      "element": "CA-GLOBAL-PRIVACY",
+      "appendClaimRefs": [],
+      "appendRelationRefs": [
+        "CA-REL-017"
+      ],
+      "appendGlobalInvariantRefs": [
+        "CA-INV-017"
+      ],
+      "appendCqRefs": [
+        "CQ-CA-029"
+      ],
+      "semanticValidationState": "NOT_RUN"
+    },
+    {
+      "element": "CA-GLOBAL-CURRENTNESS",
+      "appendClaimRefs": [],
+      "appendRelationRefs": [],
+      "appendGlobalInvariantRefs": [
+        "CA-INV-019"
+      ],
+      "appendCqRefs": [
+        "CQ-CA-030",
+        "CQ-CA-031"
+      ],
+      "semanticValidationState": "NOT_RUN"
+    },
+    {
+      "element": "CA-AOT-KNOWLEDGE",
+      "appendClaimRefs": [],
+      "appendRelationRefs": [
+        "CA-REL-022"
+      ],
+      "appendGlobalInvariantRefs": [
+        "CA-INV-019"
+      ],
+      "appendCqRefs": [
+        "CQ-CA-031"
+      ],
+      "semanticValidationState": "NOT_RUN"
+    },
+    {
+      "element": "CA-SYSTEM-OBSERVATION",
+      "appendClaimRefs": [
+        "CA-CLM-018"
+      ],
+      "appendRelationRefs": [
+        "CA-REL-016"
+      ],
+      "appendGlobalInvariantRefs": [],
+      "appendCqRefs": [
+        "CQ-CA-021",
+        "CQ-CA-022"
+      ],
+      "semanticValidationState": "NOT_RUN"
+    },
+    {
+      "element": "CA-PROCESS-SERVICE",
+      "appendClaimRefs": [
+        "CA-CLM-018",
+        "CA-CLM-020",
+        "CA-CLM-023"
+      ],
+      "appendRelationRefs": [
+        "CA-REL-017"
+      ],
+      "appendGlobalInvariantRefs": [],
+      "appendCqRefs": [
+        "CQ-CA-023",
+        "CQ-CA-024"
+      ],
+      "semanticValidationState": "NOT_RUN"
+    },
+    {
+      "element": "CA-STORAGE",
+      "appendClaimRefs": [
+        "CA-CLM-024"
+      ],
+      "appendRelationRefs": [
+        "CA-REL-018"
+      ],
+      "appendGlobalInvariantRefs": [],
+      "appendCqRefs": [
+        "CQ-CA-022"
+      ],
+      "semanticValidationState": "NOT_RUN"
+    },
+    {
+      "element": "CA-HARDWARE-DEVICE",
+      "appendClaimRefs": [],
+      "appendRelationRefs": [
+        "CA-REL-019"
+      ],
+      "appendGlobalInvariantRefs": [],
+      "appendCqRefs": [
+        "CQ-CA-028"
+      ],
+      "semanticValidationState": "NOT_RUN"
+    }
+  ],
+  "semanticAssuranceProfileExtensions": [
+    {
+      "profileId": "SAP-CA-SYSTEM-OBSERVATION",
+      "appendClaimRefs": [
+        "CA-CLM-018"
+      ],
+      "appendRelationRefs": [
+        "CA-REL-016"
+      ],
+      "appendInvariantRefs": [
+        "CA-INV-015"
+      ],
+      "appendCqRefs": [
+        "CQ-CA-021",
+        "CQ-CA-022"
+      ]
+    },
+    {
+      "profileId": "SAP-CA-PROCESS-SERVICE",
+      "appendClaimRefs": [
+        "CA-CLM-018",
+        "CA-CLM-020",
+        "CA-CLM-023"
+      ],
+      "appendRelationRefs": [
+        "CA-REL-017"
+      ],
+      "appendInvariantRefs": [
+        "CA-INV-015",
+        "CA-INV-017",
+        "CA-INV-018"
+      ],
+      "appendCqRefs": [
+        "CQ-CA-023",
+        "CQ-CA-024",
+        "CQ-CA-029"
+      ]
+    },
+    {
+      "profileId": "SAP-CA-STORAGE",
+      "appendClaimRefs": [
+        "CA-CLM-024"
+      ],
+      "appendRelationRefs": [
+        "CA-REL-018"
+      ],
+      "appendInvariantRefs": [
+        "CA-INV-019"
+      ],
+      "appendCqRefs": [
+        "CQ-CA-022"
+      ]
+    },
+    {
+      "profileId": "SAP-CA-HARDWARE-DEVICE",
+      "appendRelationRefs": [
+        "CA-REL-019"
+      ],
+      "appendInvariantRefs": [
+        "CA-INV-019"
+      ],
+      "appendCqRefs": [
+        "CQ-CA-028"
+      ]
+    },
+    {
+      "profileId": "SAP-CA-GLOBAL-AUTHORITY",
+      "appendClaimRefs": [
+        "CA-CLM-023"
+      ],
+      "appendRelationRefs": [
+        "CA-REL-021"
+      ],
+      "appendInvariantRefs": [
+        "CA-INV-018"
+      ],
+      "appendCqRefs": [
+        "CQ-CA-026"
+      ]
+    },
+    {
+      "profileId": "SAP-CA-GLOBAL-VERIFICATION",
+      "appendClaimRefs": [
+        "CA-CLM-021"
+      ],
+      "appendRelationRefs": [
+        "CA-REL-020"
+      ],
+      "appendInvariantRefs": [
+        "CA-INV-014",
+        "CA-INV-015",
+        "CA-INV-016"
+      ],
+      "appendCqRefs": [
+        "CQ-CA-021",
+        "CQ-CA-022",
+        "CQ-CA-027"
+      ]
+    },
+    {
+      "profileId": "SAP-CA-GLOBAL-PRIVACY",
+      "appendRelationRefs": [
+        "CA-REL-017"
+      ],
+      "appendInvariantRefs": [
+        "CA-INV-017"
+      ],
+      "appendCqRefs": [
+        "CQ-CA-029"
+      ]
+    },
+    {
+      "profileId": "SAP-CA-GLOBAL-CURRENTNESS",
+      "appendInvariantRefs": [
+        "CA-INV-019"
+      ],
+      "appendCqRefs": [
+        "CQ-CA-030",
+        "CQ-CA-031"
+      ]
+    },
+    {
+      "profileId": "SAP-CA-AOT-KNOWLEDGE",
+      "appendRelationRefs": [
+        "CA-REL-022"
+      ],
+      "appendInvariantRefs": [
+        "CA-INV-019"
+      ],
+      "appendCqRefs": [
+        "CQ-CA-031"
+      ]
+    }
+  ]
 }
