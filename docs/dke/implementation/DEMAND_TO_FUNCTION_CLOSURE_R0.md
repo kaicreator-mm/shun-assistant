@@ -115,3 +115,14 @@ The matrix records for **every job**: original demand, Product admission, source
 - Demand frequency/value, implementation and maintenance cost, current native Environment evidence, real UI E2E, actual DIS Function schemas and Product decisions remain **UNKNOWN / NOT_RUN**.
 - The JSON `sourceRefs` use the existing frozen candidate #414 inventory and should be invalidated if its source registry, claims or SAP revision changes.
 - Source snapshot claims apply only to the inspected files/versions; no extrapolation to all supported Windows builds or current user machines.
+
+## 9. Standalone DKE validation runtime policy
+
+**No blanket Node version restriction.** The standalone matrix checker and its test suite are governed by the language/runtime features and built-in modules they actually use, not automatically by the repository's root `package.json` `engines.node` setting. The monorepo's normal build/test workflow may keep its existing separate engine policy; this DKE documentation change does not amend that policy.
+
+- Run `node docs/dke/implementation/verify-demand-function-closure-r0.mjs` and `node --test docs/dke/implementation/verify-demand-function-closure-r0.test.mjs` with an available Node runtime that supports the imports and syntax.
+- Record the exact Node version, command, runtime environment and actual exit codes.
+- If a specific imported API or syntax is missing, document which feature fails and identify the justified minimum version or a simple compatibility fallback. Do not invent a project-wide Node minimum.
+- For this JSON-only test fixture, `JSON.parse(JSON.stringify(matrix))` intentionally replaces `structuredClone` to avoid a needless feature dependency.
+- Never mistake a successful cross-version Node structural test for Windows native Host-effect execution, independent semantic review or SAP qualification.
+
