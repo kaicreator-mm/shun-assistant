@@ -20,7 +20,7 @@ The exact Product authority remains the v0.3.0 Product/L1 freeze:
 - Freeze checkpoint blob: `0f8a67c2f06364d58a842502d3dee11bfeeedba4`
 - Current observed implementation snapshot: `version/v0.3.0@1224fea4097799467e2c0c454885e680f1f28248`
 
-The frozen Product describes a goal-first assistant that resolves bounded registered capabilities, presents scope/cost/risk, obtains required approval, performs a permitted action and verifies the observable outcome. It explicitly excludes arbitrary LLM-generated scripts, autonomous general desktop operation, unknown Provider marketplaces and unrelated PC-management expansion.
+The frozen Product describes a goal-first assistant that resolves bounded registered capabilities, presents scope/cost/risk, obtains required approval, performs a permitted action and verifies the observable outcome. It explicitly excludes arbitrary LLM-generated scripts, autonomous general desktop operation, unknown Provider marketplaces and unrelated PC-management expansion. The same freeze checkpoint records IMPLEMENTATION_AUTHORIZED=NO, SOURCE_SCAFFOLD=NOT_AUTHORIZED, L2_FREEZE=NO, TASK_DAG_FREEZE=NO and RELEASE_READY=NO; therefore the inspected code branch is source evidence, not Product implementation authorization or release qualification.
 
 The user's current request authorizes this **knowledge-engineering scope** to study common disk, software and hardware management knowledge. It does not silently amend the frozen Product or make those future capabilities available in Shun. A Product amendment is required before admitting new feature scope.
 
@@ -127,6 +127,7 @@ Current status is deliberately conservative:
 - K3: recursive Element blueprint and CQs are an author candidate.
 - K4: independent review has **not** run.
 - Native Windows tests were **not** executed in this DKE turn; test source files are not execution receipts.
+- A mechanical author check now confirms unique IDs, resolved source/Element references and an acyclic parent-child hierarchy. This is not a semantic or independent review.
 - SAP is **not qualified**.
 - DIS handoff is **blocked**.
 - No runtime implementation or AOT Package was created.
