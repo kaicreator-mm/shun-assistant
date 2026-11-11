@@ -1,0 +1,248 @@
+{
+  "schema": "shun.dis.function-contract-candidate.memory-performance.r0",
+  "revision": "R0",
+  "status": "DIS_CONTRACT_CANDIDATE_NOT_QUALIFIED",
+  "owner": "DIS owns Functionization, ABI, ECP and Package production; DKE supplies semantic claims/CQs/SAP candidates.",
+  "productAdmission": "NOT_ADMITTED",
+  "functions": [
+    {
+      "functionId": "computer.memory.observe",
+      "contractVersion": "0.1",
+      "kind": "READ_ONLY_HOST_OBSERVATION",
+      "input": {
+        "schema": "shun.memory.observe.input.v1",
+        "fields": []
+      },
+      "output": {
+        "schema": "shun.memory.observe.output.v1",
+        "variants": [
+          "OBSERVED",
+          "UNKNOWN",
+          "REFUSED"
+        ],
+        "fields": [
+          "observedAt",
+          "systemMemory",
+          "topResidentProcesses",
+          "sourceRefs",
+          "metricLimitations",
+          "privacy"
+        ]
+      },
+      "preconditions": [
+        "Windows host",
+        "fixed trusted collector",
+        "no caller-supplied command/path/host runner"
+      ],
+      "postconditions": [
+        "bounded source-backed memory facts",
+        "localOnly=true",
+        "externalDisclosures=[]",
+        "no effect"
+      ],
+      "failureOutcomes": [
+        "WINDOWS_REQUIRED",
+        "OBSERVATION_UNAVAILABLE",
+        "OBSERVATION_INVALID",
+        "PROCESS_FACTS_UNAVAILABLE",
+        "PROCESS_FACTS_INVALID"
+      ],
+      "evidence": [
+        "system collector result",
+        "top-memory collector result",
+        "exact source commit",
+        "runtime host platform"
+      ],
+      "effect": "NONE"
+    },
+    {
+      "functionId": "computer.memory.assess",
+      "contractVersion": "0.1",
+      "kind": "PURE_DOMAIN_ASSESSMENT",
+      "input": {
+        "schema": "shun.memory.assess.input.v1",
+        "fields": [
+          "observation",
+          "aotPackageId",
+          "aotPackageRevision"
+        ]
+      },
+      "output": {
+        "schema": "shun.memory.assess.output.v1",
+        "variants": [
+          "POTENTIAL_PRESSURE",
+          "NO_LEGACY_SIGNAL",
+          "UNKNOWN"
+        ],
+        "fields": [
+          "pressureSignal",
+          "confidence",
+          "rootCause",
+          "missingMetrics",
+          "explanation"
+        ]
+      },
+      "preconditions": [
+        "observation schema valid",
+        "AOT candidate schema valid",
+        "metric provenance retained"
+      ],
+      "postconditions": [
+        "no metric conflation",
+        "rootCause=UNKNOWN unless independent multi-signal oracle qualifies"
+      ],
+      "failureOutcomes": [
+        "INVALID_EVIDENCE",
+        "AOT_SOURCE_MISMATCH",
+        "METRIC_UNAVAILABLE"
+      ],
+      "evidence": [
+        "input observation",
+        "AOT rule IDs applied",
+        "decision trace"
+      ],
+      "effect": "NONE"
+    },
+    {
+      "functionId": "computer.memory.plan",
+      "contractVersion": "0.1",
+      "kind": "PURE_ADVISORY_PLAN",
+      "input": {
+        "schema": "shun.memory.plan.input.v1",
+        "fields": [
+          "assessment",
+          "userGoal"
+        ]
+      },
+      "output": {
+        "schema": "shun.memory.plan.output.v1",
+        "variants": [
+          "ADVISORY_ONLY",
+          "UNKNOWN",
+          "REFUSED"
+        ],
+        "fields": [
+          "steps",
+          "risk",
+          "expectedBenefit",
+          "tradeoffs",
+          "reversibility",
+          "effectsAuthorized"
+        ]
+      },
+      "preconditions": [
+        "assessment valid",
+        "no unadmitted effect request"
+      ],
+      "postconditions": [
+        "effectsAuthorized=false",
+        "executed=false",
+        "no process/service/cache/pagefile/registry/hardware mutation"
+      ],
+      "failureOutcomes": [
+        "UNSUPPORTED_EFFECT_REQUEST",
+        "INSUFFICIENT_EVIDENCE"
+      ],
+      "evidence": [
+        "plan trace",
+        "no-effect runtime receipt"
+      ],
+      "effect": "NONE"
+    },
+    {
+      "functionId": "computer.memory.compare",
+      "contractVersion": "0.1",
+      "kind": "PURE_POSTSTATE_COMPARISON",
+      "input": {
+        "schema": "shun.memory.compare.input.v1",
+        "fields": [
+          "baselineObservation",
+          "postObservation",
+          "trustedWorkloadComparatorReceipt"
+        ]
+      },
+      "output": {
+        "schema": "shun.memory.compare.output.v1",
+        "variants": [
+          "IMPROVEMENT_CANDIDATE",
+          "REGRESSION_CANDIDATE",
+          "TRADEOFF",
+          "UNKNOWN"
+        ],
+        "fields": [
+          "memoryDelta",
+          "userOutcomeDelta",
+          "comparability",
+          "reason"
+        ]
+      },
+      "preconditions": [
+        "same host and comparable workload attested by trusted comparator",
+        "user-relevant latency or throughput metric present",
+        "before/after source provenance current"
+      ],
+      "postconditions": [
+        "memory-only delta never proves speedup",
+        "missing comparator => UNKNOWN"
+      ],
+      "failureOutcomes": [
+        "WORKLOAD_MISMATCH",
+        "HOST_MISMATCH",
+        "METRIC_MISSING",
+        "STALE_EVIDENCE"
+      ],
+      "evidence": [
+        "baseline",
+        "post observation",
+        "trusted comparator receipt",
+        "independent outcome metric"
+      ],
+      "effect": "NONE"
+    }
+  ],
+  "pipeline": {
+    "pipelineId": "computer.memory.performance-review",
+    "contractVersion": "0.1",
+    "steps": [
+      "computer.memory.observe",
+      "computer.memory.assess",
+      "computer.memory.plan"
+    ],
+    "optionalComparison": "computer.memory.compare",
+    "terminalOutcomes": [
+      "ADVISORY_ONLY",
+      "UNKNOWN",
+      "REFUSED"
+    ],
+    "successMeaning": "A truthful read-only observation and advisory plan were produced; NOT a completed OS optimization or verified speedup.",
+    "retry": "No effects exist in this demo; if a later effectful Function is admitted, it must use normal Task/Permit/Host journal and reconciliation rules."
+  },
+  "ecpCandidate": {
+    "ecpId": "ECP-MEMORY-PERFORMANCE-001",
+    "status": "NOT_QUALIFIED",
+    "inputs": "Strict typed schemas above",
+    "outputs": "Typed outcome unions above",
+    "preconditions": "Windows read-only host observation and AOT candidate integrity",
+    "postconditions": "No mutation; truthful report; source/evidence links retained",
+    "invariants": [
+      "CA-INV-001",
+      "CA-INV-002",
+      "CA-INV-014",
+      "CA-INV-015",
+      "CA-INV-017",
+      "CA-INV-018",
+      "CA-INV-019"
+    ],
+    "evidence": "Native Windows receipt still required"
+  },
+  "prohibitedFunctions": [
+    "process.kill",
+    "service.stop",
+    "service.disable",
+    "memory.clearStandbyList",
+    "memory.trimWorkingSet",
+    "memory.setPagefile",
+    "registry.tune",
+    "hardware.memoryOverclock"
+  ]
+}
