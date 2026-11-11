@@ -7,9 +7,9 @@
   "mainIssue": "https://github.com/kaicreator-mm/shun-assistant/issues/411",
   "evidenceBase": {
     "knowledgePr": "#414",
-    "candidateHead": "a18374a18c920d4975e09be649d0a98e5dc87b32",
+    "candidateHead": "a8f378a12b49ff1c335a129280f32c45a6ad2cd6",
     "candidateFile": "docs/dke/implementation/COMPUTER_ASSISTANT_KNOWLEDGE_R0.json",
-    "candidateBlob": "f05934349a76dde19687731c2e367de95b333700",
+    "candidateBlob": "87524bac881b84da626d2026392d99129baeb5a1",
     "productFreeze": {
       "path": "docs/product/PRODUCT_FREEZE-v0.3.md",
       "commit": "1224fea4097799467e2c0c454885e680f1f28248",
@@ -20,7 +20,13 @@
       "prdBlob": "f062b7f2c3dc3bf4aeeb7594ab5c2bc75b34d0ab",
       "l1Blob": "4c703c3f0c283f4d3918babef8f87f56869698e5"
     },
-    "sourceCodeSnapshot": "1224fea4097799467e2c0c454885e680f1f28248"
+    "sourceCodeSnapshot": "1224fea4097799467e2c0c454885e680f1f28248",
+    "sourceFirstRepair": {
+      "status": "AUTHOR_DOC_REPAIR_NOT_INDEPENDENT_QUALIFICATION",
+      "reviewedPreRepairHead": "a18374a18c920d4975e09be649d0a98e5dc87b32",
+      "knowledgeJsonBlob": "87524bac881b84da626d2026392d99129baeb5a1",
+      "downstreamResyncRequired": false
+    }
   },
   "governance": {
     "productScope": "FROZEN_PRODUCT_AND_L1_ONLY",
@@ -142,7 +148,19 @@
       "unresolvedDecisions": [
         "Product/L2/runtime qualification and current implementation parity must be demonstrated",
         "Fresh independent source-first Element/SAP review and applicable native/domain Oracle evidence"
-      ]
+      ],
+      "semanticTrace": {
+        "primaryElementId": "CA-GOAL-CAPABILITY",
+        "primaryElementClaimWitnessIds": [
+          "CA-CLM-001",
+          "CA-CLM-016"
+        ],
+        "status": "BOUNDED_SOURCE_CANDIDATE_NOT_FUNCTIONAL_CLOSURE",
+        "evidenceGap": "Demand/source/Claim/Element/CQ references are structurally linked, not independently demonstrated as functional or semantic truth.",
+        "verifiedFunctionReceipt": "NOT_RUN",
+        "postconditionOracleExecution": "NOT_RUN",
+        "qualifiedSourceFirstDecision": "PENDING"
+      }
     },
     {
       "id": "CA-JOB-02",
@@ -234,7 +252,20 @@
       "unresolvedDecisions": [
         "Product/L2/runtime qualification and current implementation parity must be demonstrated",
         "Fresh independent source-first Element/SAP review and applicable native/domain Oracle evidence"
-      ]
+      ],
+      "semanticTrace": {
+        "primaryElementId": "CA-SYSTEM-OBSERVATION",
+        "primaryElementClaimWitnessIds": [
+          "CA-CLM-003",
+          "CA-CLM-004",
+          "CA-CLM-005"
+        ],
+        "status": "BOUNDED_SOURCE_CANDIDATE_NOT_FUNCTIONAL_CLOSURE",
+        "evidenceGap": "Demand/source/Claim/Element/CQ references are structurally linked, not independently demonstrated as functional or semantic truth.",
+        "verifiedFunctionReceipt": "NOT_RUN",
+        "postconditionOracleExecution": "NOT_RUN",
+        "qualifiedSourceFirstDecision": "PENDING"
+      }
     },
     {
       "id": "CA-JOB-03",
@@ -333,7 +364,18 @@
       "unresolvedDecisions": [
         "Product/L2/runtime qualification and current implementation parity must be demonstrated",
         "Fresh independent source-first Element/SAP review and applicable native/domain Oracle evidence"
-      ]
+      ],
+      "semanticTrace": {
+        "primaryElementId": "CA-STORAGE",
+        "primaryElementClaimWitnessIds": [
+          "CA-CLM-006"
+        ],
+        "status": "BOUNDED_SOURCE_CANDIDATE_NOT_FUNCTIONAL_CLOSURE",
+        "evidenceGap": "Demand/source/Claim/Element/CQ references are structurally linked, not independently demonstrated as functional or semantic truth.",
+        "verifiedFunctionReceipt": "NOT_RUN",
+        "postconditionOracleExecution": "NOT_RUN",
+        "qualifiedSourceFirstDecision": "PENDING"
+      }
     },
     {
       "id": "CA-JOB-04",
@@ -421,7 +463,19 @@
       "unresolvedDecisions": [
         "Product/L2/runtime qualification and current implementation parity must be demonstrated",
         "Fresh independent source-first Element/SAP review and applicable native/domain Oracle evidence"
-      ]
+      ],
+      "semanticTrace": {
+        "primaryElementId": "CA-GOAL-CAPABILITY",
+        "primaryElementClaimWitnessIds": [
+          "CA-CLM-001",
+          "CA-CLM-016"
+        ],
+        "status": "BOUNDED_SOURCE_CANDIDATE_NOT_FUNCTIONAL_CLOSURE",
+        "evidenceGap": "Demand/source/Claim/Element/CQ references are structurally linked, not independently demonstrated as functional or semantic truth.",
+        "verifiedFunctionReceipt": "NOT_RUN",
+        "postconditionOracleExecution": "NOT_RUN",
+        "qualifiedSourceFirstDecision": "PENDING"
+      }
     },
     {
       "id": "CA-JOB-05",
@@ -510,7 +564,18 @@
       "unresolvedDecisions": [
         "Product/L2/runtime qualification and current implementation parity must be demonstrated",
         "Fresh independent source-first Element/SAP review and applicable native/domain Oracle evidence"
-      ]
+      ],
+      "semanticTrace": {
+        "primaryElementId": "CA-GOAL-CAPABILITY",
+        "primaryElementClaimWitnessIds": [
+          "CA-CLM-001"
+        ],
+        "status": "HOST_EFFECT_WITNESS_NOT_PINNED",
+        "evidenceGap": "Current sourceRefs include requirement and bounded domain cloud proposal, not source-specific private broker/cloud journal consent+cost+send receipt. Product J03/§2 item 5 cannot be certified by goal adapter.",
+        "verifiedFunctionReceipt": "NOT_RUN",
+        "postconditionOracleExecution": "NOT_RUN",
+        "qualifiedSourceFirstDecision": "PENDING"
+      }
     },
     {
       "id": "CA-JOB-06",
@@ -606,7 +671,19 @@
       "unresolvedDecisions": [
         "Product/L2/runtime qualification and current implementation parity must be demonstrated",
         "Fresh independent source-first Element/SAP review and applicable native/domain Oracle evidence"
-      ]
+      ],
+      "semanticTrace": {
+        "primaryElementId": "CA-SOFTWARE-LIFECYCLE",
+        "primaryElementClaimWitnessIds": [
+          "CA-CLM-008",
+          "CA-CLM-011"
+        ],
+        "status": "BOUNDED_SOURCE_CANDIDATE_NOT_FUNCTIONAL_CLOSURE",
+        "evidenceGap": "Demand/source/Claim/Element/CQ references are structurally linked, not independently demonstrated as functional or semantic truth.",
+        "verifiedFunctionReceipt": "NOT_RUN",
+        "postconditionOracleExecution": "NOT_RUN",
+        "qualifiedSourceFirstDecision": "PENDING"
+      }
     },
     {
       "id": "CA-JOB-07",
@@ -696,7 +773,20 @@
       "unresolvedDecisions": [
         "Product/L2/runtime qualification and current implementation parity must be demonstrated",
         "Fresh independent source-first Element/SAP review and applicable native/domain Oracle evidence"
-      ]
+      ],
+      "semanticTrace": {
+        "primaryElementId": "CA-TASK-LIFECYCLE",
+        "primaryElementClaimWitnessIds": [
+          "CA-CLM-001",
+          "CA-CLM-006",
+          "CA-CLM-014"
+        ],
+        "status": "KERNEL_JOURNAL_HOST_E2E_NOT_PINNED",
+        "evidenceGap": "Storage source tests are bounded; no selected K effect Journal, Shun authorization composition, lost ACK and post-state RQ referenced as executed.",
+        "verifiedFunctionReceipt": "NOT_RUN",
+        "postconditionOracleExecution": "NOT_RUN",
+        "qualifiedSourceFirstDecision": "PENDING"
+      }
     },
     {
       "id": "CA-JOB-08",
@@ -778,7 +868,18 @@
       "unresolvedDecisions": [
         "Product/L2/runtime qualification and current implementation parity must be demonstrated",
         "Fresh independent source-first Element/SAP review and applicable native/domain Oracle evidence"
-      ]
+      ],
+      "semanticTrace": {
+        "primaryElementId": "CA-GOAL-CAPABILITY",
+        "primaryElementClaimWitnessIds": [
+          "CA-CLM-001"
+        ],
+        "status": "PRODUCT_REQUIREMENT_ONLY_NO_UI_WITNESS",
+        "evidenceGap": "The cited refs are Product/L1/Freeze only; original CN/EN UI implementation and physical packaging receipts remain unproven.",
+        "verifiedFunctionReceipt": "NOT_RUN",
+        "postconditionOracleExecution": "NOT_RUN",
+        "qualifiedSourceFirstDecision": "PENDING"
+      }
     },
     {
       "id": "CA-JOB-09",
@@ -863,7 +964,19 @@
       "unresolvedDecisions": [
         "Product/L2/runtime qualification and current implementation parity must be demonstrated",
         "Fresh independent source-first Element/SAP review and applicable native/domain Oracle evidence"
-      ]
+      ],
+      "semanticTrace": {
+        "primaryElementId": "CA-GOAL-CAPABILITY",
+        "primaryElementClaimWitnessIds": [
+          "CA-CLM-001",
+          "CA-CLM-016"
+        ],
+        "status": "BOUNDED_SOURCE_CANDIDATE_NOT_FUNCTIONAL_CLOSURE",
+        "evidenceGap": "Demand/source/Claim/Element/CQ references are structurally linked, not independently demonstrated as functional or semantic truth.",
+        "verifiedFunctionReceipt": "NOT_RUN",
+        "postconditionOracleExecution": "NOT_RUN",
+        "qualifiedSourceFirstDecision": "PENDING"
+      }
     },
     {
       "id": "CA-JOB-10",
@@ -948,7 +1061,18 @@
       "unresolvedDecisions": [
         "Product/L2/runtime qualification and current implementation parity must be demonstrated",
         "Fresh independent source-first Element/SAP review and applicable native/domain Oracle evidence"
-      ]
+      ],
+      "semanticTrace": {
+        "primaryElementId": "CA-TASK-LIFECYCLE",
+        "primaryElementClaimWitnessIds": [
+          "CA-CLM-016"
+        ],
+        "status": "BOUNDED_SOURCE_CANDIDATE_NOT_FUNCTIONAL_CLOSURE",
+        "evidenceGap": "Demand/source/Claim/Element/CQ references are structurally linked, not independently demonstrated as functional or semantic truth.",
+        "verifiedFunctionReceipt": "NOT_RUN",
+        "postconditionOracleExecution": "NOT_RUN",
+        "qualifiedSourceFirstDecision": "PENDING"
+      }
     },
     {
       "id": "CA-JOB-11",
@@ -1038,7 +1162,20 @@
       "unresolvedDecisions": [
         "Explicit future Product admission and risk/authority decision",
         "Fresh independent source-first Element/SAP review and applicable native/domain Oracle evidence"
-      ]
+      ],
+      "semanticTrace": {
+        "primaryElementId": "CA-SOFTWARE-LIFECYCLE",
+        "primaryElementClaimWitnessIds": [
+          "CA-CLM-004",
+          "CA-CLM-008",
+          "CA-CLM-011"
+        ],
+        "status": "BOUNDED_SOURCE_CANDIDATE_NOT_FUNCTIONAL_CLOSURE",
+        "evidenceGap": "Demand/source/Claim/Element/CQ references are structurally linked, not independently demonstrated as functional or semantic truth.",
+        "verifiedFunctionReceipt": "NOT_RUN",
+        "postconditionOracleExecution": "NOT_RUN",
+        "qualifiedSourceFirstDecision": "PENDING"
+      }
     },
     {
       "id": "CA-JOB-12",
@@ -1126,7 +1263,18 @@
       "unresolvedDecisions": [
         "Explicit future Product admission and risk/authority decision",
         "Fresh independent source-first Element/SAP review and applicable native/domain Oracle evidence"
-      ]
+      ],
+      "semanticTrace": {
+        "primaryElementId": "CA-STORAGE",
+        "primaryElementClaimWitnessIds": [
+          "CA-CLM-010"
+        ],
+        "status": "BOUNDED_SOURCE_CANDIDATE_NOT_FUNCTIONAL_CLOSURE",
+        "evidenceGap": "Demand/source/Claim/Element/CQ references are structurally linked, not independently demonstrated as functional or semantic truth.",
+        "verifiedFunctionReceipt": "NOT_RUN",
+        "postconditionOracleExecution": "NOT_RUN",
+        "qualifiedSourceFirstDecision": "PENDING"
+      }
     },
     {
       "id": "CA-JOB-13",
@@ -1213,7 +1361,19 @@
       "unresolvedDecisions": [
         "Explicit future Product admission and risk/authority decision",
         "Fresh independent source-first Element/SAP review and applicable native/domain Oracle evidence"
-      ]
+      ],
+      "semanticTrace": {
+        "primaryElementId": "CA-HARDWARE-DEVICE",
+        "primaryElementClaimWitnessIds": [
+          "CA-CLM-009",
+          "CA-CLM-012"
+        ],
+        "status": "BOUNDED_SOURCE_CANDIDATE_NOT_FUNCTIONAL_CLOSURE",
+        "evidenceGap": "Demand/source/Claim/Element/CQ references are structurally linked, not independently demonstrated as functional or semantic truth.",
+        "verifiedFunctionReceipt": "NOT_RUN",
+        "postconditionOracleExecution": "NOT_RUN",
+        "qualifiedSourceFirstDecision": "PENDING"
+      }
     },
     {
       "id": "CA-JOB-14",
@@ -1302,7 +1462,19 @@
       "unresolvedDecisions": [
         "Explicit future Product admission and risk/authority decision",
         "Fresh independent source-first Element/SAP review and applicable native/domain Oracle evidence"
-      ]
+      ],
+      "semanticTrace": {
+        "primaryElementId": "CA-PROCESS-SERVICE",
+        "primaryElementClaimWitnessIds": [
+          "CA-CLM-004",
+          "CA-CLM-005"
+        ],
+        "status": "BOUNDED_SOURCE_CANDIDATE_NOT_FUNCTIONAL_CLOSURE",
+        "evidenceGap": "Demand/source/Claim/Element/CQ references are structurally linked, not independently demonstrated as functional or semantic truth.",
+        "verifiedFunctionReceipt": "NOT_RUN",
+        "postconditionOracleExecution": "NOT_RUN",
+        "qualifiedSourceFirstDecision": "PENDING"
+      }
     },
     {
       "id": "CA-JOB-15",
@@ -1385,7 +1557,16 @@
       "unresolvedDecisions": [
         "Explicit future Product admission and risk/authority decision",
         "Fresh independent source-first Element/SAP review and applicable native/domain Oracle evidence"
-      ]
+      ],
+      "semanticTrace": {
+        "primaryElementId": "CA-NETWORK",
+        "primaryElementClaimWitnessIds": [],
+        "status": "NETWORK_DOMAIN_SEMANTICS_UNSOURCED",
+        "evidenceGap": "The primary Element CA-NETWORK carries zero source Claim refs; CQ-CA-010 carries no original domain-source refs. Product exclusion and generic auth Claim cannot prove layered network semantics.",
+        "verifiedFunctionReceipt": "NOT_RUN",
+        "postconditionOracleExecution": "NOT_RUN",
+        "qualifiedSourceFirstDecision": "PENDING"
+      }
     }
   ]
 }
