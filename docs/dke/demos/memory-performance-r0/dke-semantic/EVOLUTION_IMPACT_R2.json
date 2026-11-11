@@ -86,7 +86,7 @@
       "id": "EVOL-MEM-03",
       "kind": "SOURCE_CHANGE",
       "sourceId": "EXT-MEM-WORKING-SET",
-      "why": "Microsoft Working Set meaning revised; Reference Set methodology also cites Working Set, so its performance SAP is legitimately impacted.",
+      "why": "Microsoft Working Set meaning revised; Reference Set methodology also cites Working Set, so its performance SAP is legitimately impacted. Shared metric-distinction invariant CA-INV-015 also reaches EX2 SAP and is a legitimate broader review obligation; do not pretend it is independent.",
       "mustInclude": {
         "claims": [
           "CA-CLM-018",
@@ -104,8 +104,8 @@
         "claims": [
           "CA-CLM-025"
         ],
-        "sapObligations": [
-          "SAP-CA-MEMORY-PERFORMANCE-09"
+        "aotRules": [
+          "MEM-AOT-004"
         ]
       }
     },
