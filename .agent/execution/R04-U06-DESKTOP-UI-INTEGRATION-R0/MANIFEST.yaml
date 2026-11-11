@@ -1,0 +1,80 @@
+pack_id: shun-v030-r04-u06-desktop-ui-integration-r0
+task_id: U06-R04-GUIDED-DESKTOP-UI-INTEGRATION
+issue: '#382'
+parent_issue: '#273'
+product_issue: '#380'
+repository: kaicreator-mm/shun-assistant
+version: v0.3.0
+standard_revision: 326aaf5b0188b53cb0ed5c38752a9e299e3f9efd
+task_pack_ref: 'issue:#382'
+delivery_principle: ADS_1359_DELIVERY_FIRST_CONSOLIDATED_REPAIR
+admission_mode: SINGLE_WRITER_ADMISSION
+claim_generation: 1
+pack_revision: 1
+owner_authorization: '#380 comment 6685260212 OWNER_SHUN_V030_R04_U05_L2_FREEZE_APPROVE'
+protected_claim_key: 'kaicreator-mm/shun-assistant#382:builder:__default__'
+dependencies:
+  product_contract: '#380 FROZEN'
+  host_api_contract: '#380 sections 1-3; implementation #381'
+  prior_ui_source: 'PR #274 source snapshot; stale base must not be merged'
+  blocked_by_planned: []
+pack_base:
+  branch: wip/v0.3.0-r02-owner-repairs
+  sha: 47ecf345c4b96befd20db5c6d5673bbeaf027e49
+  tree: 8aff803fc2f80e9b683be3d5e8abea747c6677ea
+  contract: 'Pack PR is exactly one manifest path and one commit directly parented to this exact WIP SHA; source branch must start from this exact WIP SHA.'
+execution:
+  profile: WEB_BUILDER
+  environment: WEB_SOURCE
+  source_branch: JIT_only_task/v0.3.0-r04-u06-ui-integration
+  integration_target: wip/v0.3.0-r02-owner-repairs
+  primary_builder: WEB_CONTROLLER
+  independent_reviewer: WEB_VERIFIER
+  standalone_local_validation: false
+authoring_write_set:
+  - .agent/execution/R04-U06-DESKTOP-UI-INTEGRATION-R0/MANIFEST.yaml
+allowed_write_set:
+  - apps/control-ui/public/v03/desktop-approvals.js
+  - apps/control-ui/public/v03/desktop-folder.js
+  - apps/control-ui/public/v03/desktop-history.js
+  - apps/control-ui/public/v03/desktop-observations.js
+  - apps/control-ui/public/v03/desktop.css
+  - apps/control-ui/public/v03/desktop.js
+  - apps/control-ui/public/v03/index.html
+  - package.json
+  - scripts/v03-ci/preflight-ui-syntax.mjs
+  - tests/integration/v03/r02-v-journeys/journeys.test.ts
+  - tests/integration/v03/t10-ui/desktop-approvals.test.ts
+  - tests/integration/v03/t10-ui/desktop-dom-contract.test.ts
+  - tests/integration/v03/t10-ui/desktop-folder.test.ts
+  - tests/integration/v03/t10-ui/desktop-history.test.ts
+  - tests/integration/v03/t10-ui/desktop-observations.test.ts
+  - tests/integration/v03/t10-ui/desktop-progress.test.ts
+  - tests/integration/v03/t10-ui/desktop-running-ui.test.ts
+  - tests/integration/v03/t10-ui/desktop-shell.test.ts
+  - .woodpecker.yml
+acceptance:
+  - 'Reconstruct the delivered U04 UI shell from PR #274 on the exact current WIP baseline; do not merge or build on its stale base branch.'
+  - 'Replace browser-only folder preview with POST /api/v03/guided/select-root; no webkitdirectory, File System Access API or client filesystem traversal.'
+  - 'Display only Host displayName and typed cancel/refusal/stale/expiry states; never display absolute path or opaque token as user-facing text.'
+  - 'Submit only Host-issued selectionRef as selectedRoot USER_SUBMIT answer; never send a raw path or authority field.'
+  - 'For inspect-scope, call GET /api/v03/guided/folder-observation and render bounded relative metadata with explicit read-only language; no file content.'
+  - 'Keep approvals as Host receipt projections; user buttons only relay existing decision contract and cannot mint grants/Permits/Claims/effects/Journal entries.'
+  - 'Render COMPLETED/ADMITTED/REFUSED/UNKNOWN distinctly; UNKNOWN never appears as success or triggers automatic retry.'
+  - 'Preserve ordinary bilingual Chinese/English UX, accessibility, cancellation, focus, loading, error, resume and stale states; no inert primary controls.'
+  - 'Wire persistent JS/TS syntax preflight before lint/typecheck/tests/fail-closed CI gate.'
+  - 'API-dependent end-to-end tests remain explicitly NOT_RUN until #381 is integrated; mocked UI contract tests do not claim native Windows qualification.'
+test_contract:
+  - 'Run node scripts/v03-ci/preflight-ui-syntax.mjs before CI.'
+  - 'Run focused T10 UI tests and R02-V journey regression tests; run typecheck/lint.'
+  - 'Woodpecker Push/PR and GitHub Actions contracts/executor-windows terminal SUCCESS on final source SHA.'
+  - 'Fresh independent Exact-SHA review; reviewer repairs within the same 19-path UI write set; separate verifier reviews repaired SHA.'
+forbidden:
+  - 'No Host/API/native/Kernel writes; no second UI framework or browser filesystem authority.'
+  - 'No ProgramData mutation, UAC, Provider installation, paid request, external disclosure or real filesystem effect.'
+  - 'No concurrent source writer with PR #274; close #274 as superseded before U06 source writes.'
+  - 'No writes outside allowed_write_set; no main/version merge, tag, release or deployment.'
+source_write_authorized: false
+merge_authorized: false
+release_authorized: false
+deployment_authorized: false
