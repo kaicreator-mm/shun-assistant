@@ -3,7 +3,10 @@
  * This validates a proposed demand→knowledge→function matrix against its
  * exact source dossier, not semantic truth or native execution.
  *
- * Usage (Node >=24):
+ * Usage (Node.js runtime providing the imported built-ins and syntax):
+ * No blanket minimum Node version is imposed by this standalone DKE checker.
+ * If a specific feature requires a minimum version, document and test that
+ * feature's actual compatibility rather than inheriting the monorepo engine.
  *   node docs/dke/implementation/verify-demand-function-closure-r0.mjs
  *   node --test docs/dke/implementation/verify-demand-function-closure-r0.test.mjs
  */
