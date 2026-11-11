@@ -1,0 +1,13 @@
+[package]
+name = "shun-folder-picker"
+version = "0.3.0"
+edition = "2021"
+publish = false
+
+[lib]
+crate-type = ["cdylib"]
+
+[dependencies]
+napi = { workspace = true }
+napi-derive = { workspace = true }
+windows = { workspace = true }

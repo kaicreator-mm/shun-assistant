@@ -5,19 +5,20 @@
 // Safety-invariant overlays: Zod `.superRefine` refinements do not survive JSON
 // Schema emission, so every safety invariant expressible in draft 2020-12 is
 // re-declared here as a declarative patch (if/then/const/enum/required). The
-// overlay is part of the emission, which keeps the drift test byte-exact while
-// making the committed artifacts themselves reject unsafe records — standalone
-// Ajv consumers get the same rejections as the Zod parsers. The few invariants
-// draft 2020-12 cannot express (array membership, cross-element identity) are
-// enforced by the shared semantic validators each artifact names in its
-// `x-semantic-validation` annotation.
+// overlay is part of the emission, which keeps the drift test byte-exact.
+// Only declarative JSON Schema constraints are enforced by standalone Ajv.
+// Cross-field digests, graph acyclicity and duplicate action IDs are NOT
+// enforced by Ajv or the `x-semantic-validation` annotation; the authoritative
+// public boundary is validateV02PublicContract(name, value, AjvValidator) from
+// the registry, which independently enforces the required Zod semantics.
+// Ajv-only success cannot grant consent, execute a Recipe or activate a Provider.
 import { mkdirSync, readdirSync, realpathSync, unlinkSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { z } from 'zod';
 import { NEVER_AUTO_DELETE_CLASSIFICATIONS } from '../src/capabilities/c002.ts';
 import { R2_GATE_PHASES } from '../src/plan.ts';
-import { CONTRACTS } from '../src/registry.ts';
+import { CONTRACTS, V02_CONTRACTS } from '../src/registry.ts';
 import { CONTRACTS_REVISION, schemaId } from '../src/version.ts';
 
 type EmittedSchema = Record<string, unknown>;
@@ -239,6 +240,97 @@ const SAFETY_INVARIANT_OVERLAYS: Record<string, (schema: EmittedSchema) => Emitt
   'c001-image-batch-process-output': overlayImageBatchProcessOutput,
   'c002-jit-lifecycle-output': overlayJitLifecycleOutput,
   'c003-storage-diagnose-output': overlayStorageDiagnoseOutput,
+  'v02-cloud-disclosure-scope': (schema) => ({
+    ...schema,
+    'x-semantic-validation': ['CloudDisclosureScopeSchema.safeParse'],
+  }),
+  'v02-cloud-consent-approval': (schema) => ({
+    ...schema,
+    'x-semantic-validation': ['CloudConsentApprovalSchema.safeParse', 'validateCloudConsent'],
+  }),
+  'v02-cloud-consent-currentness': (schema) => ({
+    ...schema,
+    'x-semantic-validation': ['validateCloudConsent'],
+  }),
+  'v02-cloud-call-reservation': (schema) => ({
+    ...schema,
+    'x-semantic-validation': ['CloudCallReservationSchema.safeParse'],
+  }),
+  'v02-cloud-call-receipt': (schema) => {
+    let result: EmittedSchema = {
+      ...schema,
+      'x-semantic-validation': ['CloudCallReceiptSchema.safeParse', 'mayRefundCloudAttempt'],
+    };
+    result = withRootAllOf(
+      result,
+      ifThen(
+        {
+          properties: { status: { const: 'NOT_SENT_PROVEN' } },
+          required: ['status'],
+        },
+        {
+          required: ['noSendProofRef'],
+          not: {
+            anyOf: [
+              { required: ['sentAt'] },
+              { required: ['observedCostMicros'] },
+              { required: ['inputTokens'] },
+              { required: ['outputTokens'] },
+              { required: ['observedModel'] },
+              { required: ['systemFingerprint'] },
+              { required: ['responseId'] },
+            ],
+          },
+        },
+      ),
+    );
+    result = withRootAllOf(
+      result,
+      ifThen(
+        {
+          properties: { status: { enum: ['SENT', 'SETTLED', 'UNKNOWN_COST'] } },
+          required: ['status'],
+        },
+        { not: { required: ['noSendProofRef'] } },
+      ),
+    );
+    return withRootAllOf(
+      result,
+      ifThen(
+        {
+          properties: { status: { const: 'UNKNOWN_COST' } },
+          required: ['status'],
+        },
+        { not: { required: ['observedCostMicros'] } },
+      ),
+    );
+  },
+  'v02-recipe-action-graph': (schema) => ({
+    ...schema,
+    'x-semantic-validation': ['RecipeActionGraphSchema.safeParse'],
+  }),
+  'v02-recipe-revision-identity': (schema) => ({
+    ...schema,
+    'x-semantic-validation': ['verifyRecipeRevision', 'RecipeRevisionIdentitySchema.safeParse'],
+  }),
+  'v02-provider-catalog-artifact': (schema) =>
+    withRootAllOf(
+      {
+        ...schema,
+        'x-semantic-validation': ['ProviderCatalogArtifactSchema.safeParse'],
+        properties: {
+          ...propertiesOf(schema),
+          origin: {
+            ...((propertiesOf(schema).origin ?? {}) as EmittedSchema),
+            pattern: '^https://(?![^/?#]*@)',
+          },
+        },
+      },
+      ifThen(
+        { properties: { artifactKind: { const: 'NATIVE_ADDON' } }, required: ['artifactKind'] },
+        { required: ['abiRevision'] },
+      ),
+    ),
 };
 
 /** The full public emission for one contract: identity header + Zod emission + safety overlay. */
@@ -247,11 +339,12 @@ export function emitPublicJsonSchema(name: string, schema: z.ZodType): EmittedSc
   const json = overlay
     ? overlay(z.toJSONSchema(schema) as EmittedSchema)
     : (z.toJSONSchema(schema) as EmittedSchema);
+  const v02 = name.startsWith('v02-');
   return {
     $schema: 'https://json-schema.org/draft/2020-12/schema',
-    $id: schemaId(name),
+    $id: v02 ? `urn:shun:contracts:0.2:${name}` : schemaId(name),
     title: name,
-    'x-contracts-revision': CONTRACTS_REVISION,
+    'x-contracts-revision': v02 ? 'shun.contracts/0.2' : CONTRACTS_REVISION,
     ...json,
   };
 }
@@ -261,7 +354,7 @@ function main(): void {
   mkdirSync(outDir, { recursive: true });
 
   const keep = new Set<string>();
-  for (const contract of CONTRACTS) {
+  for (const contract of [...CONTRACTS, ...V02_CONTRACTS]) {
     const json = emitPublicJsonSchema(contract.name, contract.schema);
     const file = join(outDir, `${contract.name}.schema.json`);
     writeFileSync(file, `${JSON.stringify(json, null, 2)}\n`, 'utf8');

@@ -15,9 +15,25 @@ import {
   GoalRequestSchema,
   type TaskState,
 } from '@shun/contracts';
-import { type RegistrySnapshot, resolveGoal, ShunRegistry } from '@shun/resolver';
-import { ShunStore, ShunStoreAuthorizationAdapter, ShunStoreUiApprovalBridge } from '@shun/store';
+import {
+  type RegistrySnapshot,
+  resolveGoal,
+  ShunRegistry,
+  TrustedRecipeReadService,
+} from '@shun/resolver';
+import {
+  ImmutableRecipeRepository,
+  ShunStore,
+  ShunStoreAuthorizationAdapter,
+  ShunStoreUiApprovalBridge,
+} from '@shun/store';
 import { runStorageDiagnose } from '@shun/vertical-storage';
+import { collectWindowsSystemInventory } from '@shun/vertical-system';
+import {
+  BUILTIN_INVENTORY_RECIPE_ID,
+  readBuiltinInventoryCandidate,
+  registerBuiltinInventoryCandidate,
+} from '../inventory-recipe.ts';
 import type {
   ControlBackend,
   DecisionOutcome,
@@ -30,11 +46,16 @@ import type {
   TaskSnapshot,
 } from '../ports.ts';
 import { previewForPlan } from '../preview.ts';
+import { runAuthorizedInventoryRecipe } from '../recipe-inventory-run.ts';
 import { assertFreshVerifiedTerminalCommit, restoreStorageTask } from './recovery.ts';
 import { assertSignedHostFactsCurrent } from './registry-host-facts.ts';
 import { verifyRegistryIssuance } from './registry-issuance.ts';
 import { verifyPinnedRegistryPublicKey } from './registry-key-pin.ts';
-import { createStorageRegistrySnapshot } from './registry-snapshot.ts';
+import {
+  createInventoryRegistrySnapshot,
+  createStorageRegistrySnapshot,
+  hasExactIssuedInventoryBinding,
+} from './registry-snapshot.ts';
 
 const execFileAsync = promisify(execFile);
 const CAPABILITY = 'system.storage.diagnose_bounded_action';
@@ -245,6 +266,89 @@ export class RealStorageControlBackend implements ControlBackend {
     }
   }
 
+  /**
+   * User-triggered persistence of ONE immutable built-in Recipe candidate.
+   * The trusted host owns both the database and the actual ActionController.
+   * Preview currentness is deliberately UNRESOLVABLE until T08 integrates a
+   * genuine registered `system.inventory` plan; this route never authorizes
+   * even an R0 effect, promotes ACTIVE, or runs code.
+   */
+  saveBuiltinInventoryCandidate() {
+    const repo = new ImmutableRecipeRepository(this.#store);
+    const controller = this.#controller;
+    const service = new TrustedRecipeReadService({
+      repository: {
+        append: (value) => repo.append(value),
+        get: (recipeId, sha) => repo.get(recipeId, sha),
+      },
+      currentness: () => ({ kind: 'UNRESOLVABLE' as const }),
+      loadExpectedPlan: () => {
+        throw new Error('RECIPE_NOT_ACTIVE_OR_APPROVED');
+      },
+      controller: {
+        authorizePlan: (input) =>
+          controller.authorizePlan(input as Parameters<ActionController['authorizePlan']>[0]),
+      },
+    });
+    return registerBuiltinInventoryCandidate(service);
+  }
+
+  /** Read the exact current built-in candidate from real durable SQLite.
+   * Existing T03 repository.get verifies payload digest and immutable identity.
+   * This route is READ-ONLY and never performs ActionController authorization.
+   */
+  readBuiltinInventoryCandidate() {
+    try {
+      const repository = new ImmutableRecipeRepository(this.#store);
+      const rows = this.#store.database
+        .prepare(
+          'SELECT revision_sha256 FROM recipe_revisions_v02 WHERE recipe_id = ? ORDER BY created_at DESC LIMIT 33',
+        )
+        .all(BUILTIN_INVENTORY_RECIPE_ID) as Array<{ revision_sha256: string }>;
+      return readBuiltinInventoryCandidate(
+        repository,
+        rows.map((row) => row.revision_sha256),
+      );
+    } catch {
+      return { ok: false as const, code: 'RECIPE_READ_UNAVAILABLE' as const };
+    }
+  }
+
+  /** Trusted RealStorage-only R0 read path. Default empty operator rules
+   * refuse at ActionController before the Windows collector ever runs.
+   */
+  async executeBuiltinInventoryRecipe() {
+    return runAuthorizedInventoryRecipe({
+      readCandidate: () => this.readBuiltinInventoryCandidate(),
+      controller: this.#controller,
+      current: async () => {
+        // The independent host registry signer and the T02 durable policy
+        // must both still be CURRENT. These facts cannot be supplied by HTTP.
+        const signed = await this.#loadRegistryIssuance();
+        const current = await this.#authority.currentAuthority();
+        if (current.kind !== 'CURRENT' || current.policyStatus !== 'ACTIVE') {
+          return { kind: 'UNRESOLVABLE' as const };
+        }
+        assertSignedHostFactsCurrent(
+          signed.snapshot.environment,
+          await this.#observeWindowsEnvironment(),
+        );
+        // P1-01: only the *independently signed* dual inventory catalog may
+        // authorize this Recipe. A valid storage-only issuer still protects
+        // C-003, but it cannot attest the inventory capability/binding.
+        if (!hasExactIssuedInventoryBinding(signed.snapshot)) {
+          return { kind: 'UNRESOLVABLE' as const };
+        }
+        return {
+          kind: 'CURRENT' as const,
+          policyRevision: current.policySnapshotRevision,
+          registryRevision: signed.currentRevision,
+        };
+      },
+      collect: collectWindowsSystemInventory,
+    });
+  }
+
   meta(): { policy: PolicyState; localOnly: true; simulated: false } {
     return { policy: this.#policy, localOnly: true, simulated: false };
   }
@@ -405,8 +509,17 @@ export class RealStorageControlBackend implements ControlBackend {
     const signed = await this.#loadRegistryIssuance();
     const environment = signed.snapshot.environment;
     assertSignedHostFactsCurrent(environment, observed);
-    const snapshot = createStorageRegistrySnapshot(environment);
-    if (canonicalJson(snapshot) !== canonicalJson(signed.snapshot)) {
+    const storageOnly = createStorageRegistrySnapshot(environment);
+    const withInventory = createInventoryRegistrySnapshot(environment);
+    // Preserve verified legacy C-003 issuances; the extended catalog must be
+    // separately operator-signed before it may also authorize the R0 Recipe.
+    const snapshot =
+      canonicalJson(storageOnly) === canonicalJson(signed.snapshot)
+        ? storageOnly
+        : canonicalJson(withInventory) === canonicalJson(signed.snapshot)
+          ? withInventory
+          : null;
+    if (!snapshot) {
       throw new Error('REAL_STORAGE_REGISTRY_SIGNED_FACT_CLASSES_MISMATCH');
     }
     const registry = await ShunRegistry.fromAttestedSnapshot(snapshot, {

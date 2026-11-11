@@ -1,0 +1,15 @@
+# T08 production provider material — source identity
+# Owner authorization: Issue #236, 2026-10-31, option 1 (offline Ed25519 Curator Trust Root +
+# signed production Provider Descriptor + committed artifact bytes).
+release_url=https://github.com/BurntSushi/ripgrep/releases/download/14.1.1/ripgrep-14.1.1-x86_64-pc-windows-msvc.zip
+release_zip_sha256=d0f534024c42afd6cb4d38907c25cd2b249b79bbe6cc1dbee8e3e37c2b6e25a1
+artifact_sha256=f162b54de2adfc72d78adb1dbada2dedda111ae0a5e2f6e9500f4f909664c5d2
+artifact_bytes=5407744
+artifact_version_banner=ripgrep 14.1.1 (rev 4649aa9700)
+curator_key_id=shun-v030-curator-root-1
+curator_public_key_spki_der_sha256=8c59f9c6bc9bc568cd131fa2e60aec98c56b919f0fdbcb4abcb6986e509d6d34
+curator_private_key_custody=C:/xDev/kAiCreator/_evidence-private/shun-v030-t08-curator/ (outside repositories; private key never committed)
+curator_private_key_pkcs8_der_sha256=8e5a453d04ecaae2c5963c308184bc1ee9a3055cda85e29606f92fe335d24fee
+signature_algorithm=ed25519 over canonicalJson(descriptor without curatorSignature), detached 64-byte signature, base64
+generated_at=2026-10-31T00:00:00.000Z
+generated_by=shun-v030-controller under explicit Owner authorization

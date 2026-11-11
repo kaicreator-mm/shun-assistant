@@ -362,7 +362,13 @@ describe('P1-C: issuance proofs are single-use, expiring capabilities', () => {
   it('an issuance proof presented after its validity window is refused (approval expired)', async () => {
     const { authority, grants, clock } = makeAuthority();
     const request = issueRequestFor(buildPlan());
-    const proof = computeIssuanceProof(ISSUANCE_SECRET, request);
+    // Mint at the authority's own pre-advance instant: the 30-day advance must
+    // deterministically stand for "the whole validity window elapsed". A mint
+    // at the REAL wall clock (no issuedAt option) is only expired by the fixed
+    // fake instant 2026-10-10+30d = 2026-11-09T12:00Z while real-now+5min is
+    // still before it — a time bomb that detonated 2026-11-09T11:55Z and fails
+    // every later run (#690/#691 exact Pack CI failures).
+    const proof = computeIssuanceProof(ISSUANCE_SECRET, request, { issuedAt: clock.now() });
     clock.advanceMs(30 * 24 * 60 * 60 * 1000); // far beyond any proof validity window
 
     await expect(authority.issue(request, proof)).rejects.toMatchObject({
