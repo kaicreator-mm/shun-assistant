@@ -1,0 +1,65 @@
+{"at":"2026-10-17T12:47:10.878Z","kind":"run.start","task":"T05 #106 real Windows Build Host — trusted ripgrep CLI activation","baseline":"version/v0.2.0@5e0bb2ba4b0f3409247e0f300950b84381d32661","evidenceDir":"C:\\xDev\\kAiCreator\\shun-assistant\\i106-t05-winhost\\packages\\provider-loader\\evidence\\t05-winhost-2026-10-17T12-47-10","rgVersion":"14.1.1","rgUrl":"https://github.com/BurntSushi/ripgrep/releases/download/14.1.1/ripgrep-14.1.1-x86_64-pc-windows-msvc.zip","node":"v24.21.0","modulesAbi":"137"}
+{"at":"2026-10-17T12:47:10.918Z","kind":"canary.baseline","files":["<HOME>\\AppData\\Local\\Temp\\shun-t05-canary\\user-canary-temp.txt","<HOME>\\shun-t05-canary-home.txt","C:\\xDev\\kAiCreator\\shun-assistant\\i106-t05-winhost\\packages\\provider-loader\\t05-canary-cwd.tmp"],"digests":["aeee662fd7f77a366bdfb868e458281af2eb4c2fafa989387fd7135c34ffba45","f163b70779253e4a067942c3d87639309e2ee2fe10cee2e6d46a93627c6a6841","ec043d845e1be88f06a87d31b7965180d1bc8276b9b895668029e05d7500389f"]}
+{"at":"2026-10-17T12:47:10.920Z","kind":"scenario.start","id":"HOST","title":"host facts (OS, integrity, symlink privilege, node)"}
+{"at":"2026-10-17T12:47:11.217Z","kind":"host.facts","os":"win32 10.0.26300 x64","node":"v24.21.0","modulesAbi":"137","user":"<HOST>\\<USER>","mandatoryLevel":"Mandatory Label\\Medium Mandatory Level    S-1-16-8192","symlinkPrivilege":false,"elevatedShell":false}
+{"at":"2026-10-17T12:47:11.218Z","kind":"scenario.end","id":"HOST","status":"PASS","detail":"os=win32 10.0.26300 x64 node=v24.21.0 symlinkPriv=false elevated=false"}
+{"at":"2026-10-17T12:47:11.223Z","kind":"scenario.start","id":"PREP","title":"download official ripgrep release and pin exact bytes"}
+{"at":"2026-10-17T12:47:14.519Z","kind":"prep.download","attempts":["attempt1(direct):exit=0,bytes=2058893"]}
+{"at":"2026-10-17T12:47:14.904Z","kind":"prep.ripgrep","url":"https://github.com/BurntSushi/ripgrep/releases/download/14.1.1/ripgrep-14.1.1-x86_64-pc-windows-msvc.zip","zipSha256":"d0f534024c42afd6cb4d38907c25cd2b249b79bbe6cc1dbee8e3e37c2b6e25a1","rgExeSha256":"f162b54de2adfc72d78adb1dbada2dedda111ae0a5e2f6e9500f4f909664c5d2","rgExeBytes":5407744,"zipContents":["CHANGELOG.md","COPYING","FAQ.md","GUIDE.md","LICENSE-MIT","README.md","UNLICENSE","_rg","_rg.ps1","rg.1","rg.bash","rg.exe","rg.fish"],"dllFiles":0}
+{"at":"2026-10-17T12:47:15.652Z","kind":"prep.wingetAnchor","available":false,"matchesZip":false,"note":"informational anchor only; trust anchor is the curator signature over the pinned digest"}
+{"at":"2026-10-17T12:47:15.653Z","kind":"scenario.end","id":"PREP","status":"PASS","detail":"zip=d0f534024c42afd6… rg.exe=f162b54de2adfc72… bytes=5407744 wingetAnchor=UNAVAILABLE"}
+{"at":"2026-10-17T12:47:15.687Z","kind":"fixture.origin","origin":"https://127.0.0.1:50289","endpoints":["/rg.exe","/rg-corrupt.exe","/redirect","/hang"]}
+{"at":"2026-10-17T12:47:15.702Z","kind":"scenario.start","id":"STAGE","title":"production stager fetches fixture origin and pins digest"}
+{"at":"2026-10-17T12:47:16.316Z","kind":"stage.ok","digest":"f162b54de2adfc72d78adb1dbada2dedda111ae0a5e2f6e9500f4f909664c5d2","byteLength":5407744,"state":"VERIFIED_BYTES_ONLY"}
+{"at":"2026-10-17T12:47:16.316Z","kind":"scenario.end","id":"STAGE","status":"PASS","detail":"digest=f162b54de2adfc72… bytes=5407744"}
+{"at":"2026-10-17T12:47:16.317Z","kind":"scenario.start","id":"PREFLIGHT","title":"merged CuratedProviderPreflight admits the staged artifact"}
+{"at":"2026-10-17T12:47:16.330Z","kind":"port.snapshot","taskId":"task-t05-winhost","bindingId":"rg-binding-winhost","snapshot":"{\"kind\":\"CURRENT\",\"taskId\":\"task-t05-winhost\",\"providerId\":\"rg\",\"capabilityId\":\"file.search\",\"bindingId\":\"rg-binding-winhost\",\"catalogRevision\":\"catalog-t05-winhost-r1\",\"artifactSha256\":\"f162b54de2adfc72d78adb1dbada2dedda111ae0a5e2f6e9500f4f909664c5d2\",\"revocationEpoch\":1,\"capability\":\"PREPARE_PROVIDER\"}","pinnedSha":"f162b54de2adfc72d78adb1dbada2dedda111ae0a5e2f6e9500f4f909664c5d2","grantRecorded":true}
+{"at":"2026-10-17T12:47:16.342Z","kind":"scenario.end","id":"PREFLIGHT","status":"PASS","detail":"state=PREFLIGHT_ONLY digest=f162b54de2adfc72…"}
+{"at":"2026-10-17T12:47:16.343Z","kind":"scenario.start","id":"ACTIVATE-VERSION","title":"activation executes pinned rg.exe --version"}
+{"at":"2026-10-17T12:47:17.098Z","kind":"activate.version","stdoutFirstLine":"ripgrep 14.1.1 (rev 4649aa9700)","executable":"<HOME>\\AppData\\Local\\Temp\\shun-t05-winhost-2026-10-17T12-47-10\\cache\\active\\rg-binding-winhost\\f162b54de2adfc72d78adb1dbada2dedda111ae0a5e2f6e9500f4f909664c5d2\\rg.exe","envKeys":["SystemDrive","SystemRoot"],"durationMs":753}
+{"at":"2026-10-17T12:47:17.099Z","kind":"scenario.end","id":"ACTIVATE-VERSION","status":"PASS","detail":"stdout=\"ripgrep 14.1.1 (rev 4649aa9700)\" exit=0"}
+{"at":"2026-10-17T12:47:17.099Z","kind":"scenario.start","id":"ACTIVATE-SEARCH","title":"activation runs a real ripgrep search in its sandbox"}
+{"at":"2026-10-17T12:47:17.865Z","kind":"activate.search","stdout":"2:the needle is here","exitCode":0}
+{"at":"2026-10-17T12:47:17.865Z","kind":"scenario.end","id":"ACTIVATE-SEARCH","status":"PASS","detail":"match=\"2:the needle is here\" exit=0"}
+{"at":"2026-10-17T12:47:17.866Z","kind":"scenario.start","id":"NEG-PATH-SUBSTITUTION","title":"hostile PATH entry cannot substitute the pinned provider"}
+{"at":"2026-10-17T12:47:18.579Z","kind":"scenario.end","id":"NEG-PATH-SUBSTITUTION","status":"PASS","detail":"pinned cache executable won; ambush rg.exe never spawned"}
+{"at":"2026-10-17T12:47:18.580Z","kind":"scenario.start","id":"OFFLINE-REPLAY","title":"offline cache replay: 0 downloads, activation still works"}
+{"at":"2026-10-17T12:47:19.278Z","kind":"scenario.end","id":"OFFLINE-REPLAY","status":"PASS","detail":"cache replay ok, downloads=0, exit=0"}
+{"at":"2026-10-17T12:47:19.278Z","kind":"scenario.start","id":"NEG-OFFLINE-EMPTY","title":"offline + empty cache refuses closed (no download attempt)"}
+{"at":"2026-10-17T12:47:19.287Z","kind":"scenario.end","id":"NEG-OFFLINE-EMPTY","status":"PASS","detail":"OFFLINE at stage; ARTIFACT_NOT_VERIFIED at activation; 0 spawns 0 fetches"}
+{"at":"2026-10-17T12:47:19.287Z","kind":"scenario.start","id":"RESTART","title":"fresh subprocess re-verifies from durable cache and executes"}
+{"at":"2026-10-17T12:47:20.581Z","kind":"restart.child","ok":true,"exitCode":0,"versionLine":"ripgrep 14.1.1 (rev 4649aa9700)","executableUnderCache":true,"envKeys":["SystemDrive","SystemRoot"],"refuseCode":""}
+{"at":"2026-10-17T12:47:20.583Z","kind":"scenario.end","id":"RESTART","status":"PASS","detail":"fresh process: ripgrep 14.1.1 (rev 4649aa9700) env=[SystemDrive,SystemRoot]"}
+{"at":"2026-10-17T12:47:20.583Z","kind":"scenario.start","id":"NEG-TAMPER-CACHE","title":"tampered cached bytes refuse closed, recovery after restore"}
+{"at":"2026-10-17T12:47:21.954Z","kind":"scenario.end","id":"NEG-TAMPER-CACHE","status":"PASS","detail":"tampered→ARTIFACT_NOT_VERIFIED zero spawn; restored→EXECUTED"}
+{"at":"2026-10-17T12:47:21.955Z","kind":"scenario.start","id":"NEG-CATALOG","title":"unsigned, forged-key and downgrade descriptors refuse before exec"}
+{"at":"2026-10-17T12:47:21.958Z","kind":"neg.catalog","unsigned":"CATALOG_SIGNATURE_INVALID","forged":"CATALOG_SIGNATURE_INVALID","downgrade":"CATALOG_SCOPE_DRIFT"}
+{"at":"2026-10-17T12:47:21.959Z","kind":"scenario.end","id":"NEG-CATALOG","status":"PASS","detail":"unsigned=CATALOG_SIGNATURE_INVALID forged=CATALOG_SIGNATURE_INVALID downgrade=CATALOG_SCOPE_DRIFT spawns=0"}
+{"at":"2026-10-17T12:47:21.959Z","kind":"scenario.start","id":"NEG-REDIRECT","title":"redirect origins refuse: fixture 302 and real github.com 302"}
+{"at":"2026-10-17T12:47:22.272Z","kind":"neg.redirect","fixture":"REDIRECT_REFUSED","github":"REDIRECT_REFUSED","url":"https://github.com/BurntSushi/ripgrep/releases/download/14.1.1/ripgrep-14.1.1-x86_64-pc-windows-msvc.zip"}
+{"at":"2026-10-17T12:47:22.273Z","kind":"scenario.end","id":"NEG-REDIRECT","status":"PASS","detail":"fixture 302 → REDIRECT_REFUSED; real github.com release 302 → REDIRECT_REFUSED"}
+{"at":"2026-10-17T12:47:22.274Z","kind":"scenario.start","id":"NEG-CORRUPT-DOWNLOAD","title":"corrupted bytes over the wire refuse with hash mismatch"}
+{"at":"2026-10-17T12:47:22.380Z","kind":"scenario.end","id":"NEG-CORRUPT-DOWNLOAD","status":"PASS","detail":"ARTIFACT_HASH_MISMATCH, cache stays empty, activation zero-spawn"}
+{"at":"2026-10-17T12:47:22.381Z","kind":"scenario.start","id":"NEG-REVOCATION-EPOCH","title":"host revocation-epoch bump voids activation before exec"}
+{"at":"2026-10-17T12:47:23.179Z","kind":"scenario.end","id":"NEG-REVOCATION-EPOCH","status":"PASS","detail":"epoch 1→2 → AUTHORITY_STALE zero spawn; restored → EXECUTED"}
+{"at":"2026-10-17T12:47:23.180Z","kind":"scenario.start","id":"NEG-POLICY-REVOKED","title":"revoked authorization policy voids activation (real grant substrate)"}
+{"at":"2026-10-17T12:47:23.182Z","kind":"authority.unhealthy","code":"GRANT_POLICY_REVOKED","detail":"current policy revision is revoked"}
+{"at":"2026-10-17T12:47:23.182Z","kind":"scenario.end","id":"NEG-POLICY-REVOKED","status":"PASS","detail":"revokePolicy() → AUTHORITY_STALE zero spawn"}
+{"at":"2026-10-17T12:47:23.183Z","kind":"scenario.start","id":"NEG-CONSENT-REFUSED","title":"unresolvable currentness refuses activation (consent denied)"}
+{"at":"2026-10-17T12:47:23.185Z","kind":"scenario.end","id":"NEG-CONSENT-REFUSED","status":"PASS","detail":"corruptCurrentness(consent refused) → AUTHORITY_STALE zero spawn"}
+{"at":"2026-10-17T12:47:23.186Z","kind":"scenario.start","id":"NEG-GRANT-REVOKED","title":"revoked grant refuses activation; fresh grant restores it"}
+{"at":"2026-10-17T12:47:23.852Z","kind":"scenario.end","id":"NEG-GRANT-REVOKED","status":"PASS","detail":"revokeGrant → AUTHORITY_STALE zero spawn; re-issue → EXECUTED"}
+{"at":"2026-10-17T12:47:23.854Z","kind":"scenario.start","id":"NEG-TOCTOU","title":"ActionController denial between admission and exec voids activation"}
+{"at":"2026-10-17T12:47:24.236Z","kind":"scenario.end","id":"NEG-TOCTOU","status":"PASS","detail":"reads=2 (admission + immediately-before-exec), second denial → zero spawn"}
+{"at":"2026-10-17T12:47:24.248Z","kind":"scenario.start","id":"NEG-INTERRUPT","title":"interrupted staging (socket destroyed) fails closed and recovers"}
+{"at":"2026-10-17T12:47:26.771Z","kind":"scenario.end","id":"NEG-INTERRUPT","status":"PASS","detail":"SOURCE_UNAVAILABLE, no artifact cached; main cache still EXECUTES"}
+{"at":"2026-10-17T12:47:26.772Z","kind":"scenario.start","id":"NEG-ENTRYPOINT","title":"path-traversal entrypoint refuses and materializes nothing"}
+{"at":"2026-10-17T12:47:26.788Z","kind":"scenario.end","id":"NEG-ENTRYPOINT","status":"PASS","detail":"ENTRYPOINT_INVALID; no evil.exe under cache (files before=1)"}
+{"at":"2026-10-17T12:47:26.789Z","kind":"scenario.start","id":"CANARY","title":"user-owned canary files unchanged across the entire run"}
+{"at":"2026-10-17T12:47:26.795Z","kind":"scenario.end","id":"CANARY","status":"PASS","detail":"3 canaries intact (temp + user profile + cwd)"}
+{"at":"2026-10-17T12:47:26.798Z","kind":"scenario.start","id":"SHARP","title":"native addon ABI probe: @img/sharp-win32-x64 real dlopen in isolated child"}
+{"at":"2026-10-17T12:47:42.501Z","kind":"sharp.metadata","version":"0.35.5","tarballUrl":"https://registry.npmmirror.com/@img/sharp-win32-x64/-/sharp-win32-x64-0.35.5.tgz","tarballBytes":8575353,"sha256":"16a804181ddd258ca6fe7079b2faa0c0356654c9db3d93ab0a80ec5e5161c3d4","registrySri":"sha512-x76eH0vEiHlcMQu8Y8IenntaACtddpT6W0wmXtWrnKcnKI7ME5DdgqhAD6SEWOEl1v2zDvkZDhFA9KnURwpfqg==","sriMatches":true}
+{"at":"2026-10-17T12:47:50.703Z","kind":"sharp.addon","addon":"sharp-win32-x64-0.35.5.node","sha256":"971048779f9c8598df14641dfc03c625885c93f473a788e65ca2deb50d0b083e","hostAbi":"137","node":"v24.21.0"}
+{"at":"2026-10-17T12:47:51.491Z","kind":"sharp.dlopen","exitCode":0,"stdout":"DLOADED 13 exports: _isUsingJemalloc,_isUsingX64V2,_maxColourDistance,block,cache,concurrency,counters,format,libvipsVersion,metadata,pipeline,simd,stats\nNAPI_ABI_OK node=v24.21.0 modules=137","stderr":""}
+{"at":"2026-10-17T12:47:51.492Z","kind":"scenario.end","id":"SHARP","status":"PASS","detail":"sharp-win32-x64@0.35.5 sha256=16a804181ddd258c… SRI-anchored+staged+ABI=137+dlopen OK; production native activation stays fail-closed (ACTIVATION_KIND_UNSUPPORTED)"}
+{"at":"2026-10-17T12:47:51.498Z","kind":"run.end","pass":23,"fail":0,"skipped":0,"runFailed":false,"summary":"C:\\xDev\\kAiCreator\\shun-assistant\\i106-t05-winhost\\packages\\provider-loader\\evidence\\t05-winhost-2026-10-17T12-47-10\\summary.md"}

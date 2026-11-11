@@ -1,0 +1,25 @@
+pack_id: shun-v030-r02-r-cedf9ce-execution-pack-g1
+task_id: R02-R
+issue: "#271"
+repository: kaicreator-mm/shun-assistant
+version: v0.3.0
+base_sha: cedf9ce30c5bd9640a325e2fa0a5981aa7bd73f1
+task_pack_ref: docs/planning/v0.3/R02-REPAIR-TASK-PACKS-R1.json@blob:93247874e37d492b49f241d294017fd2fa6cb431
+branch: wip/v0.3.0-r02-owner-repairs
+parent_issue: "#259"
+owner_authorization_ref: "#260 OWNER_SHUN_V030_R02_AMENDMENT_R1_APPROVE"
+pinned_standard_revision: 2c395c55569fe2edf3f4135f12d3d069e526d0b7
+generated_by: zcode:shun-v030-r02-repairs-zc
+generated_at: 2026-11-01
+admission_mode: SINGLE_WRITER_ADMISSION
+protected_claim_key: "kaicreator-mm/shun-assistant#271:builder:__default__"
+allowed_write_set:
+  - docs/implementation/v0.3/r02-closeout/**
+plan:
+  - step: R-1-index-and-readiness
+    deliverable: "Final repair index over all F/Q items with exact HEAD, evidence links, remaining UNKNOWNs; honest READY_FOR_UNIFIED_REVIEW verdict only if code+evidence complete"
+    capability: LOCAL
+    state: PLANNED
+forbidden:
+  - independent R03 review self-PASS; release/tag; closing Issue #259; main or version/v0.2.0
+notes: Blocked_by #270 native edge verified. This pack is NOT a review waiver.

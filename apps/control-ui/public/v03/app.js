@@ -1,0 +1,715 @@
+// Bounded v03 Control UI (T10, Issue #238).
+//
+// Same-origin only: every request goes to /api on the loopback origin that
+// served this page. The UI renders the current guided step, the selected-root
+// scope, progress/history and honest REFUSED/UNKNOWN states; it relays an
+// explicit human decision and never constructs a grant or approval itself.
+// All display decisions come from the pure view-model; this file only wires
+// the DOM to it.
+import { t } from './strings.js';
+import {
+  advisoryView,
+  buildStepOutcome,
+  consentView,
+  currentStepModel,
+  historyModel,
+  progressModel,
+  refusalView,
+  replayGuard,
+  scopeSummary,
+  userDecisionRelay,
+} from './view-model.js';
+
+const STATE_ENDPOINT = '/api/v03/guided/state';
+const DECISION_ENDPOINT = '/api/v03/guided/decision';
+const EFFECT_ENDPOINT = '/api/v03/effect/submit';
+const SELECTED_ROOT_EFFECT_ENDPOINT = '/api/v03/effect/selected-root';
+const SELECTED_ROOT_PROPOSAL_ENDPOINT = '/api/v03/effect/proposal';
+const PROVIDER_PREPARE_ENDPOINT = '/api/v03/provider/prepare';
+const PROVIDER_CONFIRM_ENDPOINT = '/api/v03/provider/confirm';
+const META_ENDPOINT = '/api/v03/meta/feedback';
+
+/** Replay ledger for this page session: keys of outcomes already relayed. */
+/** @type {string[]} */
+const relayedKeys = [];
+
+/** @type {any} */
+let currentStep = undefined;
+const locale = /** @type {'en'|'zh'} */ (
+  (navigator.language ?? 'en').toLowerCase().startsWith('zh') ? 'zh' : 'en'
+);
+
+function el(id) {
+  return document.getElementById(id);
+}
+
+function setText(id, text) {
+  const node = el(id);
+  if (node) node.textContent = text;
+}
+
+/**
+ * Loud-fail lookup: a missing or unbound key throws instead of rendering the
+ * raw key name. Callers catch and show the reason as an UNKNOWN/error state,
+ * so a future catalog gap can never silently degrade into machine text.
+ */
+function text(key) {
+  const line = t(locale, key);
+  if (!line.ok) throw new Error(`${line.code}: ${line.reason}`);
+  return line.text;
+}
+
+/**
+ * Same-origin API call. Any failure surfaces as an explicit unknown banner —
+ * the UI never invents state to cover an unreachable backend.
+ * @param {string} path
+ * @param {{ method?: string, body?: unknown }} [options]
+ */
+async function api(path, options) {
+  const response = await fetch(path, {
+    method: options?.method ?? (options?.body !== undefined ? 'POST' : 'GET'),
+    headers: options?.body === undefined ? undefined : { 'content-type': 'application/json' },
+    body: options?.body === undefined ? undefined : JSON.stringify(options.body),
+  });
+  const body = await response.json().catch(() => undefined);
+  if (!response.ok) {
+    throw new Error(
+      typeof body?.error?.detail === 'string' ? body.error.detail : `API responded ${response.status}`,
+    );
+  }
+  return body;
+}
+
+function renderScope(scope) {
+  const model = scopeSummary(scope, locale);
+  const box = el('v03-scope');
+  if (!box) return;
+  box.innerHTML = '';
+  const line = document.createElement('p');
+  if (model.status === 'REFUSED') {
+    throw new Error(model.reason);
+  } else if (model.status === 'NONE') {
+    line.className = 'muted';
+    line.textContent = model.label;
+  } else if (model.status === 'UNKNOWN') {
+    line.className = 'unknown';
+    line.textContent = `${text('state.unknown')} — ${model.label}`;
+  } else {
+    line.className = 'ok';
+    line.textContent = model.label;
+  }
+  box.append(line);
+}
+
+/**
+ * Journey progress / paused panel. Renders only what the guided state
+ * actually carries: a real position ("Step x of y") or an explicit UNKNOWN,
+ * plus the paused reason when the journey is paused.
+ */
+function renderProgress(journey) {
+  const box = el('v03-progress');
+  if (!box) return;
+  box.innerHTML = '';
+  const model = progressModel(journey, locale);
+  if (!model.ok) {
+    throw new Error(model.reason);
+  }
+  const positionLine = document.createElement('p');
+  positionLine.textContent = model.position.text;
+  positionLine.className = model.position.known ? 'muted' : 'unknown';
+  box.append(positionLine);
+  if (model.status === 'PAUSED') {
+    const pausedLine = document.createElement('p');
+    pausedLine.className = 'warn';
+    pausedLine.textContent = `${text('state.paused')} — ${model.pausedReason ?? ''}`;
+    box.append(pausedLine);
+  } else if (model.status === 'UNKNOWN') {
+    // The paused flag was not a clean true/false: say Unknown, never coerce.
+    const unknownLine = document.createElement('p');
+    unknownLine.className = 'unknown';
+    unknownLine.textContent = text('state.unknown');
+    box.append(unknownLine);
+  }
+}
+
+function renderStep(step) {
+  const box = el('v03-step');
+  if (!box) return;
+  box.innerHTML = '';
+  const model = currentStepModel(step, Date.now());
+  const heading = document.createElement('h3');
+  const detail = document.createElement('p');
+  if (model.status === 'REFUSED') {
+    const refusal = refusalView(model.code, locale);
+    if (!refusal.ok) throw new Error(refusal.reason);
+    heading.className = 'refused';
+    heading.textContent = text('state.refused');
+    detail.className = 'refused';
+    detail.textContent = refusal.text;
+  } else if (model.status === 'UNKNOWN') {
+    heading.className = 'unknown';
+    heading.textContent = text('state.unknown');
+    detail.className = 'unknown';
+    detail.textContent = model.reason;
+  } else {
+    heading.textContent = `${text('state.currentStep')} — ${text(model.titleKey)}`;
+    detail.className = 'muted';
+    detail.textContent =
+      `${model.templateId} · ${model.journeyId} · ${model.taskId} · ${model.stepId} · digest ${model.templateDigest.slice(0, 12)}…`;
+  }
+  box.append(heading, detail);
+}
+
+function renderHistory(entries) {
+  const box = el('v03-history');
+  if (!box) return;
+  box.innerHTML = '';
+  const model = historyModel(entries, locale);
+  if (!model.ok) {
+    throw new Error(model.reason);
+  }
+  if (model.lines.length === 0) {
+    const line = document.createElement('p');
+    line.className = 'muted';
+    line.textContent = text('history.empty');
+    box.append(line);
+    return;
+  }
+  for (const entry of model.lines) {
+    const item = document.createElement('li');
+    item.className = entry.success ? 'ok' : entry.tone === 'unknown' ? 'unknown' : 'refused';
+    item.textContent = `${entry.at} — ${entry.text}`;
+    box.append(item);
+  }
+}
+
+function renderAdvisory(advisory) {
+  const box = el('v03-advisory');
+  if (!box) return;
+  box.innerHTML = '';
+  const model = advisoryView(advisory);
+  const line = document.createElement('p');
+  if (model.status === 'REFUSED') {
+    line.className = 'refused';
+    line.textContent = `${text('state.refused')} — ${model.reason}`;
+  } else {
+    line.className = 'muted';
+    line.textContent = `${text('advisory.title')}: ${model.explanation} (${text('advisory.notAuthority')})`;
+  }
+  box.append(line);
+}
+
+function renderUnknownState(reason) {
+  const banner = el('v03-banner');
+  if (banner) {
+    banner.className = 'unknown';
+    banner.textContent = `${text('state.unknown')} — ${reason}`;
+  }
+  renderStep(undefined);
+  renderProgress(undefined);
+  renderHistory([]);
+}
+
+// --- R03B production journeys panel -----------------------------------------
+//
+// Three production journeys (effect / provider first-use / meta feedback)
+// driven by references the operator pastes from the local launch console.
+// Boundary: the UI only RELAYS what the operator typed — it never mints or
+// infers a reference, grant or approval, and the caseId always comes from the
+// current guided step, never from a free-text field.
+
+/** Rating options for the meta journey: value = API literal, label = catalog key. */
+const JOURNEY_RATING_OPTIONS = Object.freeze([
+  ['HELPFUL', 'journeys.rating.helpful'],
+  ['NOT_HELPFUL', 'journeys.rating.notHelpful'],
+]);
+
+/** Category options for the meta journey (closed taxonomy, API literals). */
+const JOURNEY_CATEGORY_OPTIONS = Object.freeze([
+  ['INCORRECT_RESULT', 'journeys.category.incorrectResult'],
+  ['MISSING_STEP', 'journeys.category.missingStep'],
+  ['WRONG_TARGET', 'journeys.category.wrongTarget'],
+  ['UNSAFE_SUGGESTION', 'journeys.category.unsafeSuggestion'],
+  ['TOO_COMPLEX', 'journeys.category.tooComplex'],
+  ['OTHER', 'journeys.category.other'],
+]);
+
+/** Correction options for the meta journey (closed taxonomy, API literals). */
+const JOURNEY_CORRECTION_OPTIONS = Object.freeze([
+  ['WRONG_OBJECT', 'journeys.correction.wrongObject'],
+  ['MISSING_CONSTRAINT', 'journeys.correction.missingConstraint'],
+  ['STALE_CONTEXT', 'journeys.correction.staleContext'],
+  ['POLICY_MISMATCH', 'journeys.correction.policyMismatch'],
+  ['NO_CORRECTION', 'journeys.correction.noCorrection'],
+]);
+
+/**
+ * Fill a journey select from the catalog. Option labels are localized; values
+ * stay the API literals. The first option becomes the selected default (the
+ * semantics a browser gives a freshly filled select).
+ * @param {string} selectId
+ * @param {readonly (readonly [string, string])[]} options
+ */
+function populateJourneySelect(selectId, options) {
+  const select = el(selectId);
+  if (!select) return;
+  for (const [value, labelKey] of options) {
+    const option = document.createElement('option');
+    option.value = value;
+    option.textContent = text(labelKey);
+    select.append(option);
+  }
+  select.value = options[0]?.[0] ?? '';
+}
+
+/**
+ * Same-origin journey submission. Unlike api(), the receipt body is read even
+ * on non-2xx responses: the server truthfully maps ADMITTED→202, UNKNOWN→409
+ * and REFUSED/KERNEL_REFUSED→422 while still returning the full receipt, and
+ * the status line must render that receipt instead of a bare HTTP code.
+ * A body of undefined sends no request body at all (the Host-global provider
+ * prepare step accepts — and the composition fixes — every value itself).
+ * @param {string} path
+ * @param {unknown} [body]
+ */
+async function journeyReceipt(path, body) {
+  const response = await fetch(path, {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    ...(body !== undefined ? { body: JSON.stringify(body) } : {}),
+  });
+  return response.json().catch(() => undefined);
+}
+
+/**
+ * The per-effect output envelope of a journey receipt, when present.
+ * @param {any} receipt
+ */
+function receiptOutput(receipt) {
+  return receipt?.result?.admitted?.effects?.[0]?.output?.outcome?.output;
+}
+
+/**
+ * Shared panel preconditions: a non-empty reference pair (the operator's
+ * pasted refs) and a caseId taken ONLY from the current guided step. When a
+ * precondition fails the status line explains it and no request is sent.
+ * @param {HTMLElement} statusNode
+ * @returns {{ caseId: string, currentnessRef: string, approvalRef: string } | undefined}
+ */
+function journeyRefsAndCase(statusNode) {
+  const currentnessRef = el('v03-j-currentness')?.value ?? '';
+  const approvalRef = el('v03-j-approval')?.value ?? '';
+  if (currentnessRef.length === 0 || approvalRef.length === 0) {
+    statusNode.className = 'refused';
+    statusNode.textContent = text('journeys.refsNeeded');
+    return undefined;
+  }
+  const caseId = currentStep?.taskId;
+  if (typeof caseId !== 'string' || caseId.length === 0) {
+    statusNode.className = 'unknown';
+    statusNode.textContent = text('journeys.noCase');
+    return undefined;
+  }
+  return { caseId, currentnessRef, approvalRef };
+}
+
+/**
+ * Truthful receipt → status line. Only the exact 'COMPLETED' status renders
+ * as success (with the panel's relayed evidence); REFUSED and KERNEL_REFUSED
+ * render the refusal with its code; everything else — ADMITTED, UNKNOWN, a
+ * missing or malformed receipt — renders as an explicit UNKNOWN and never as
+ * success.
+ * @param {HTMLElement} node
+ * @param {any} receipt
+ * @param {readonly string[]} evidence
+ */
+function renderJourneyStatus(node, receipt, evidence) {
+  const receiptStatus = receipt?.status;
+  if (receiptStatus === 'COMPLETED') {
+    node.className = 'ok';
+    let line = text('journeys.status.completed');
+    for (const item of evidence) {
+      if (item.length > 0) line += ` — ${item}`;
+    }
+    node.textContent = line;
+    return;
+  }
+  const code =
+    typeof receipt?.code === 'string' && receipt.code.length > 0
+      ? receipt.code
+      : typeof receiptStatus === 'string' && receiptStatus.length > 0
+        ? receiptStatus
+        : 'UNKNOWN';
+  if (receiptStatus === 'REFUSED' || receiptStatus === 'KERNEL_REFUSED') {
+    node.className = 'refused';
+    node.textContent = `${text('journeys.status.refused')} — ${code}`;
+    return;
+  }
+  node.className = 'unknown';
+  node.textContent = `${text('journeys.status.unknown')} — ${code}`;
+}
+
+/**
+ * Transport failure: an explicit UNKNOWN with the raw error message, the same
+ * catch contract as decide() — the UI never invents a completion.
+ * @param {HTMLElement} node
+ * @param {unknown} error
+ */
+function journeyUnknown(node, error) {
+  const unknown = t(locale, 'journeys.status.unknown');
+  node.className = 'unknown';
+  node.textContent = `${unknown.ok ? unknown.text : 'UNKNOWN'} — ${
+    error instanceof Error ? error.message : String(error)
+  }`;
+}
+
+/** Effect journey: relay the operator's action/plan/grant refs as-is. */
+async function runEffectJourney() {
+  const statusNode = el('v03-j-effect-status');
+  if (!statusNode) return;
+  try {
+    const refs = journeyRefsAndCase(statusNode);
+    if (!refs) return;
+    const actionRef = el('v03-j-action')?.value ?? '';
+    const planRef = el('v03-j-plan')?.value ?? '';
+    const grantRef = el('v03-j-grant')?.value ?? '';
+    const receipt = await journeyReceipt(EFFECT_ENDPOINT, {
+      caseId: refs.caseId,
+      actionRef,
+      planRef,
+      grantRef,
+      currentnessRef: refs.currentnessRef,
+      approvalRef: refs.approvalRef,
+    });
+    renderJourneyStatus(statusNode, receipt, [actionRef]);
+  } catch (error) {
+    journeyUnknown(statusNode, error);
+  }
+}
+
+/**
+ * U05-B2 selected-root effect: the UI relays REFERENCE STRINGS ONLY. Every
+ * authority-bearing value (plan, grant, Permit, path) is derived by the
+ * trusted Host from the durably approved review step; the browser can never
+ * construct a private OS path, approval grant, plan authority or Permit.
+ * Only the bounded metadata projection renders (relative target, expected
+ * change, post-state verification), never a private path or grant material.
+ */
+async function runSelectedRootEffect() {
+  const statusNode = el('v03-j-selected-root-effect-status');
+  if (!statusNode) return;
+  try {
+    const refs = journeyRefsAndCase(statusNode);
+    if (!refs) return;
+    const receipt = await journeyReceipt(SELECTED_ROOT_EFFECT_ENDPOINT, {
+      caseId: refs.caseId,
+      currentnessRef: refs.currentnessRef,
+      approvalRef: refs.approvalRef,
+    });
+    const effect = receipt?.effect;
+    renderJourneyStatus(statusNode, receipt, [
+      typeof effect?.relativeTarget === 'string' ? effect.relativeTarget : '',
+      typeof effect?.expectedChange === 'string' ? effect.expectedChange : '',
+      effect?.postStateVerified === true ? 'post-state verified' : '',
+    ]);
+  } catch (error) {
+    journeyUnknown(statusNode, error);
+  }
+}
+
+/**
+ * U05-B2 bounded proposal readback for the CURRENT review step: metadata
+ * only (relative target/operation/expected change/undo/expiry). Any refusal
+ * or absence renders as an explicit non-available state, never as authority.
+ */
+async function refreshSelectedRootEffectProposal() {
+  const node = el('v03-j-selected-root-effect-proposal');
+  if (!node) return;
+  try {
+    const descriptor = await api(SELECTED_ROOT_PROPOSAL_ENDPOINT);
+    if (!descriptor || descriptor.executionAuthorized !== false) {
+      node.textContent = '';
+      node.hidden = true;
+      return;
+    }
+    node.hidden = false;
+    node.textContent = `${descriptor.operation} → ${descriptor.relativeTarget} — ${
+      descriptor.expectedChange
+    } (undo: ${descriptor.undo}; risk ${descriptor.risk})`;
+  } catch {
+    node.textContent = '';
+    node.hidden = true;
+  }
+}
+
+/**
+ * Provider journey: the Host-global first use is Case-free by design — one
+ * click runs the two fixed steps (prepare issues the Host requestRef, then
+ * confirm consumes it exactly once). The UI relays nothing but the click;
+ * the closed-world receipt surfaces only outcome/canary/exit facts, never
+ * raw provider stdout.
+ */
+async function runProviderJourney() {
+  const statusNode = el('v03-j-provider-status');
+  if (!statusNode) return;
+  try {
+    const prepared = await journeyReceipt(PROVIDER_PREPARE_ENDPOINT);
+    if (prepared?.status !== 'PREPARED' || typeof prepared.requestRef !== 'string') {
+      renderJourneyStatus(statusNode, prepared, []);
+      return;
+    }
+    const receipt = await journeyReceipt(PROVIDER_CONFIRM_ENDPOINT, {
+      requestRef: prepared.requestRef,
+    });
+    const output = receiptOutput(receipt);
+    renderJourneyStatus(statusNode, receipt, [
+      typeof output?.code === 'string' ? output.code : '',
+      typeof output?.canaryResult === 'string' ? `canary ${output.canaryResult}` : '',
+      typeof output?.exitCode === 'number' ? `exit ${output.exitCode}` : '',
+    ]);
+  } catch (error) {
+    journeyUnknown(statusNode, error);
+  }
+}
+
+/** Meta journey: relay the operator's feedback taxonomy as-is. */
+async function runMetaJourney() {
+  const statusNode = el('v03-j-meta-status');
+  if (!statusNode) return;
+  try {
+    const refs = journeyRefsAndCase(statusNode);
+    if (!refs) return;
+    const receipt = await journeyReceipt(META_ENDPOINT, {
+      caseId: refs.caseId,
+      caseRef: el('v03-j-meta-case')?.value ?? '',
+      sourceRevision: el('v03-j-meta-revision')?.value ?? '',
+      rating: el('v03-j-meta-rating')?.value ?? '',
+      category: el('v03-j-meta-category')?.value ?? '',
+      correction: el('v03-j-meta-correction')?.value ?? '',
+      currentnessRef: refs.currentnessRef,
+      approvalRef: refs.approvalRef,
+    });
+    const candidateRef = receiptOutput(receipt)?.candidateRef;
+    renderJourneyStatus(statusNode, receipt, [
+      typeof candidateRef === 'string' ? candidateRef : '',
+    ]);
+  } catch (error) {
+    journeyUnknown(statusNode, error);
+  }
+}
+
+/**
+ * Wire one journey run button: localized label + the click→relay binding.
+ * Like decide(), the listener is the only caller; nothing sends without a
+ * human click.
+ * @param {string} buttonId
+ * @param {string} labelKey
+ * @param {() => Promise<void>} run
+ */
+function wireJourneyRun(buttonId, labelKey, run) {
+  const button = el(buttonId);
+  if (!button) return;
+  button.textContent = text(labelKey);
+  button.addEventListener('click', () => {
+    void run();
+  });
+}
+
+/**
+ * Relay an explicit decision. `confirmed` is true only when this call comes
+ * directly from a click on the approve/refuse button — there is no other
+ * caller, so nothing can be approved without a human click.
+ * @param {'APPROVE'|'REFUSE'} decision
+ */
+async function decide(decision) {
+  const feedback = el('v03-decision-feedback');
+  if (!feedback || !currentStep) return;
+  try {
+    const confirmed = true;
+    const built = buildStepOutcome({
+      step: currentStep,
+      answers: collectAnswers(),
+      sourceRef: 'ui:v03-session',
+      occurredAtUnixMs: Date.now(),
+    });
+    if (!built.ok) {
+      feedback.className = 'refused';
+      feedback.textContent = `${text('state.refused')} — ${built.reason}`;
+      return;
+    }
+    const relay = userDecisionRelay({
+      step: currentStep,
+      outcome: built.outcome,
+      decision,
+      confirmed,
+      nowUnixMs: Date.now(),
+    });
+    if (!relay.ok) {
+      const refusal = refusalView(relay.code, locale);
+      if (!refusal.ok) throw new Error(relay.reason);
+      feedback.className = 'refused';
+      feedback.textContent = `${text('state.refused')} — ${refusal.text}`;
+      return;
+    }
+    const replay = replayGuard(relayedKeys, built.outcome);
+    if (!replay.allowed) {
+      const refusal = refusalView(replay.code, locale);
+      if (!refusal.ok) throw new Error(refusal.reason);
+      feedback.className = 'refused';
+      feedback.textContent = refusal.text;
+      return;
+    }
+    feedback.className = 'muted';
+    feedback.textContent = text('step.relayPending');
+    // userDecisionRelay returns {ok,relay}; only the bounded relay payload is
+    // accepted by the server. Do not serialize UI-local status as authority.
+    const result = await api(DECISION_ENDPOINT, { body: relay.relay });
+    if (result?.status !== 'RECORDED' || result?.humanGrantIssued !== false ||
+        result?.effectSent !== false) {
+      throw new Error('GUIDED_DECISION_OUTCOME_UNKNOWN');
+    }
+    // Record the replay key only after the relay succeeded: a network failure
+    // must not permanently occupy the identity in this session (the Host's
+    // CONSUMED state remains the authoritative replay fence).
+    relayedKeys.push(replay.key);
+    renderHistory(Array.isArray(result?.history) ? result.history : []);
+    feedback.className = 'muted';
+    feedback.textContent = `${text('state.ok')} — ${text('consent.notGrant')}`;
+    await refresh();
+  } catch (error) {
+    const unknown = t(locale, 'state.unknown');
+    feedback.className = 'unknown';
+    feedback.textContent = `${unknown.ok ? unknown.text : 'UNKNOWN'} — ${
+      error instanceof Error ? error.message : String(error)
+    }`;
+  }
+}
+
+/** Read the current step's form inputs into view-model answers. */
+function collectAnswers() {
+  /** @type {{ fieldId: string, value: string | boolean }[]} */
+  const answers = [];
+  const form = el('v03-step-form');
+  if (!form) return answers;
+  for (const input of form.querySelectorAll('[data-field-id]')) {
+    const fieldId = input.getAttribute('data-field-id');
+    if (!fieldId) continue;
+    if (input instanceof HTMLInputElement && input.type === 'checkbox') {
+      answers.push({ fieldId, value: input.checked });
+    } else {
+      answers.push({ fieldId, value: input.value });
+    }
+  }
+  return answers;
+}
+
+function renderForm(model) {
+  const form = el('v03-step-form');
+  if (!form) return;
+  form.innerHTML = '';
+  for (const field of model.fields) {
+    const label = document.createElement('label');
+    label.textContent = text(field.labelKey);
+    label.className = 'muted';
+    /** @type {HTMLInputElement | HTMLSelectElement} */
+    let input;
+    if (field.type === 'CONFIRM') {
+      input = document.createElement('input');
+      /** @type {HTMLInputElement} */ (input).type = 'checkbox';
+    } else if (field.type === 'CHOICE') {
+      input = document.createElement('select');
+      for (const option of field.options ?? []) {
+        const choice = document.createElement('option');
+        choice.value = option.id;
+        choice.textContent = text(option.labelKey);
+        /** @type {HTMLSelectElement} */ (input).append(choice);
+      }
+    } else {
+      input = document.createElement('input');
+      /** @type {HTMLInputElement} */ (input).type = 'text';
+    }
+    input.setAttribute('data-field-id', field.id);
+    form.append(label, input);
+  }
+  const consent = consentView(locale);
+  if (!consent.ok) throw new Error(consent.reason);
+  const note = document.createElement('p');
+  note.className = model.requiresExplicitApproval ? 'warn' : 'muted';
+  note.textContent = model.requiresExplicitApproval ? consent.lines.join(' ') : '';
+  form.append(note);
+}
+
+async function refresh() {
+  try {
+    const state = await api(STATE_ENDPOINT);
+    currentStep = state?.currentStep;
+    const banner = el('v03-banner');
+    if (banner) banner.textContent = '';
+    renderScope(state?.scope);
+    renderProgress(state?.journey);
+    renderStep(currentStep);
+    const model = currentStepModel(currentStep, Date.now());
+    if (model.status === 'CURRENT') renderForm(model);
+    renderHistory(Array.isArray(state?.history) ? state.history : []);
+    renderAdvisory(state?.advisory);
+    void refreshSelectedRootEffectProposal();
+  } catch (error) {
+    renderUnknownState(error instanceof Error ? error.message : String(error));
+  }
+}
+
+const approveButton = el('v03-approve');
+if (approveButton) {
+  approveButton.textContent = text('step.approve');
+  approveButton.addEventListener('click', () => {
+    void decide('APPROVE');
+  });
+}
+const refuseButton = el('v03-refuse');
+if (refuseButton) {
+  refuseButton.textContent = text('step.refuse');
+  refuseButton.addEventListener('click', () => {
+    void decide('REFUSE');
+  });
+}
+
+try {
+  setText('v03-title', text('app.title'));
+  setText('v03-subtitle', text('app.subtitle'));
+  setText('v03-scope-title', text('state.selectedScope'));
+  setText('v03-progress-title', text('state.progress'));
+  setText('v03-history-title', text('state.history'));
+} catch (error) {
+  renderUnknownState(error instanceof Error ? error.message : String(error));
+}
+
+// Journeys panel: labels, selects and run buttons. Same loud-fail contract as
+// the titles above — a catalog gap shows the unknown banner, never machine text.
+try {
+  setText('v03-journeys-title', text('journeys.title'));
+  setText('v03-journeys-note', text('journeys.note'));
+  setText('v03-j-label-currentness', text('journeys.refs.currentness'));
+  setText('v03-j-label-approval', text('journeys.refs.approval'));
+  setText('v03-j-effect-title', text('journeys.effect.title'));
+  setText('v03-j-label-action', text('journeys.effect.action'));
+  setText('v03-j-label-plan', text('journeys.effect.plan'));
+  setText('v03-j-label-grant', text('journeys.effect.grant'));
+  setText('v03-j-provider-title', text('journeys.provider.title'));
+  setText('v03-j-meta-title', text('journeys.meta.title'));
+  setText('v03-j-label-meta-case', text('journeys.meta.case'));
+  setText('v03-j-label-meta-revision', text('journeys.meta.revision'));
+  setText('v03-j-label-meta-rating', text('journeys.meta.rating'));
+  setText('v03-j-label-meta-category', text('journeys.meta.category'));
+  setText('v03-j-label-meta-correction', text('journeys.meta.correction'));
+  populateJourneySelect('v03-j-meta-rating', JOURNEY_RATING_OPTIONS);
+  populateJourneySelect('v03-j-meta-category', JOURNEY_CATEGORY_OPTIONS);
+  populateJourneySelect('v03-j-meta-correction', JOURNEY_CORRECTION_OPTIONS);
+  wireJourneyRun('v03-j-effect-run', 'journeys.effect.run', runEffectJourney);
+  wireJourneyRun('v03-j-selected-root-effect-run', 'journeys.effect.run', runSelectedRootEffect);
+  wireJourneyRun('v03-j-provider-run', 'journeys.provider.run', runProviderJourney);
+  wireJourneyRun('v03-j-meta-run', 'journeys.meta.run', runMetaJourney);
+} catch (error) {
+  renderUnknownState(error instanceof Error ? error.message : String(error));
+}
+
+void refresh();

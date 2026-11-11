@@ -9,9 +9,21 @@
 import { createReadStream, existsSync, statSync } from 'node:fs';
 import { createServer, type IncomingMessage, type Server, type ServerResponse } from 'node:http';
 import { extname, normalize, resolve, sep } from 'node:path';
-import type { GoalRequest } from '@shun/contracts';
 import { GoalRequestSchema } from '@shun/contracts';
+import { buildDeepSeekGoalDisclosure } from '@shun/llm-remote';
+import type { RecipeRegistrationResult } from '@shun/resolver';
+import {
+  collectWindowsReadonlyDiagnosis,
+  collectWindowsSystemInventory,
+  suggestReadonlyOptimizations,
+} from '@shun/vertical-system';
 import { z } from 'zod';
+import type {
+  ControlApiGateway,
+  SendReceipt,
+} from '../../../packages/domain-app/src/api/gateway.ts';
+import { MINIMUM_SENDER_DEADLINE_BUDGET_MS } from '../../../packages/domain-host/src/cloud/openai-host.ts';
+import type { CloudInterpretPort } from './cloud-interpret.ts';
 import {
   CONTROL_ERROR_CODES,
   ControlError,
@@ -19,6 +31,23 @@ import {
   httpStatusForCode,
 } from './errors.ts';
 import type { ControlBackend } from './ports.ts';
+import type { AuthorizedInventoryRecipeResult } from './recipe-inventory-run.ts';
+import type { JourneySubmits } from './v03/composition-journeys.ts';
+import type { FolderPlanPreviewStaging } from './v03/folder-selection-host.ts';
+import type { V03FolderSelectionRoutePort } from './v03/folder-selection-route.ts';
+import { createV03GatewayRoute, type V03GatewayRoute } from './v03/gateway-route.ts';
+import {
+  createV03GuidedRoute,
+  type V03GuidedPort,
+  type V03GuidedRoute,
+} from './v03/guided-route.ts';
+import type {
+  SelectedRootEffectDescriptor,
+  SelectedRootEffectSubmitReceipt,
+} from './v03/selected-root-effect-flow.ts';
+
+/** The durable Host staging outcome that alone may mint live submit references. */
+type FolderPlanPreviewStaged = Extract<FolderPlanPreviewStaging, { readonly status: 'STAGED' }>;
 
 export const CONTROL_API_REVISION = 'shun.control-api/0.1';
 
@@ -28,6 +57,12 @@ const DecisionBodySchema = z.strictObject({
   approved: z.boolean(),
   planHash: z.string().regex(/^[0-9a-f]{64}$/, 'planHash must be a lowercase sha-256 hex digest'),
   reason: z.string().min(1).optional(),
+});
+
+// Preview only: browser JSON cannot mint trusted broker consent, approve a
+// cloud send, choose another provider endpoint or carry authorization material.
+const CloudDisclosurePreviewSchema = z.strictObject({
+  goalText: z.string().min(1).max(8192),
 });
 
 const ClarificationBodySchema = z.strictObject({
@@ -44,6 +79,87 @@ const MIME: Record<string, string> = {
 
 export interface ControlServerOptions {
   backend: ControlBackend;
+  /** Trusted backend-only candidate writer; browser never selects its source. */
+  saveBuiltinInventoryCandidate?: () => RecipeRegistrationResult;
+  /** Explicit RealStorage-only, never browser-supplied R0 authority. */
+  executeBuiltinInventoryRecipe?: () => Promise<AuthorizedInventoryRecipeResult>;
+  /** Trusted local SQLite reader; cannot be configured through HTTP. */
+  readBuiltinInventoryCandidate?: () =>
+    | {
+        ok: true;
+        saved: boolean;
+        state: 'PERSISTED_CANDIDATE_ONLY' | 'NOT_SAVED';
+        recipeId: string;
+        revisionSha256: string | null;
+        executionAuthorized: false;
+        modelCalls: 0;
+      }
+    | { ok: false; code: 'RECIPE_READ_UNAVAILABLE' };
+  /** Trusted process composition; never configured by an HTTP request. */
+  cloud?: CloudInterpretPort;
+  /**
+   * T11 — the trusted v0.3 single-domain gateway over the selected K-gated
+   * DomainApp facade. The composition root injects either the built gateway
+   * or a lazy factory (so importing this server module never pays for a
+   * DomainHarness activation); never an HTTP request. The server exposes ONLY
+   * the T09 `ControlApiGateway.submit` admission surface — never a raw send.
+   */
+  v03Gateway?: ControlApiGateway | (() => ControlApiGateway);
+  /**
+   * R03-INT — trusted journey submission surfaces (windows effect / provider
+   * first use / meta feedback) over the SAME selected DomainApp. Composition
+   * root injection only; each route is reference-authenticated before any
+   * Kernel entry, exactly like the goal gateway.
+   */
+  v03Journeys?: JourneySubmits;
+  /**
+   * R03C (#288) — Host-global Provider first-use surface: prepare() issues
+   * the Host requestRef + exact preview (no Guided Case, no reference pair);
+   * confirm() consumes the one-time requestRef and submits the fixed
+   * provider-global Business Intent through the selected K. Composition root
+   * injection only; the route accepts no intent, instance, path, args or
+   * privilege input of any kind.
+   */
+  v03ProviderGlobal?: {
+    prepare(): Promise<
+      | {
+          readonly ok: true;
+          readonly requestRef: string;
+          readonly preview: unknown;
+          readonly expiresAtUnixMs: number;
+        }
+      | { readonly ok: false; readonly code: string }
+    >;
+    confirm(raw: unknown): Promise<SendReceipt>;
+  };
+  /** Trusted process-side selected Guided Host state, never created from HTTP. */
+  v03Guided?: V03GuidedPort;
+  /** Trusted native folder picker/observation port; never configured by HTTP. */
+  v03FolderSelection?: V03FolderSelectionRoutePort;
+  /**
+   * U05-B2 — trusted process-side notification fired ONLY after the Host's
+   * one-shot plan-preview staging returned STAGED, so the composition root
+   * can mint the live REVIEW_EFFECT submit reference pair for the durable
+   * Host ledger. Never HTTP input; a callback failure is logged and never
+   * fabricates a staging outcome.
+   */
+  onPlanPreviewStaged?: (staging: FolderPlanPreviewStaged) => void;
+  /**
+   * U05-B2 — trusted one-shot selected-root effect admission over the REAL
+   * ActionController R2 stack and the selected K. Composition root injection
+   * only; the route accepts the Case identity only (U06 #401: the Host
+   * resolves the issued reference pair and derives every authority-bearing
+   * value itself) and answers 503 when no authority was composed.
+   */
+  v03SelectedRootEffect?: (raw: unknown) => Promise<SelectedRootEffectSubmitReceipt>;
+  /**
+   * U05-B2 — bounded read-only projection of the concrete effect proposal for
+   * the CURRENT review step (metadata references only, never a private path).
+   * Composition root injection only.
+   */
+  v03SelectedRootEffectProposal?: () =>
+    | { readonly ok: true; readonly descriptor: SelectedRootEffectDescriptor }
+    | { readonly ok: false; readonly code: string };
   /** Directory with the static control-ui app; omitted = API only. */
   uiDir?: string;
   /** Loopback host only; anything else is a construction-time refusal. */
@@ -74,8 +190,48 @@ export function createControlServer(options: ControlServerOptions): ControlServe
   const maxBodyBytes = options.maxBodyBytes ?? 1024 * 1024;
   const uiRoot = options.uiDir ? resolve(options.uiDir) : undefined;
 
+  // The v0.3 gateway route is resolved lazily and at most once: a lazy
+  // factory is invoked on the first v0.3 submission, so importing or starting
+  // the server never performs a DomainHarness activation. A factory that
+  // refuses configuration stays a typed 503 on the route (fail closed),
+  // never a crash of the whole surface.
+  let v03Route: V03GatewayRoute | undefined;
+  let v03RouteRefused = false;
+  const v03RouteFor = (): V03GatewayRoute | undefined => {
+    if (v03Route !== undefined || v03RouteRefused) return v03Route;
+    if (options.v03Gateway === undefined) return undefined;
+    try {
+      const gateway =
+        typeof options.v03Gateway === 'function' ? options.v03Gateway() : options.v03Gateway;
+      v03Route = createV03GatewayRoute({ gateway });
+    } catch {
+      v03RouteRefused = true;
+    }
+    return v03Route;
+  };
+
+  const v03GuidedRoute: V03GuidedRoute | undefined =
+    options.v03Guided === undefined
+      ? undefined
+      : createV03GuidedRoute(options.v03Guided, options.v03FolderSelection);
+
   const server = createServer((req, res) => {
-    handle(options.backend, req, res, { host, uiRoot, maxBodyBytes }).catch((error: unknown) => {
+    handle(options.backend, req, res, {
+      host,
+      uiRoot,
+      maxBodyBytes,
+      saveBuiltinInventoryCandidate: options.saveBuiltinInventoryCandidate,
+      executeBuiltinInventoryRecipe: options.executeBuiltinInventoryRecipe,
+      readBuiltinInventoryCandidate: options.readBuiltinInventoryCandidate,
+      cloud: options.cloud,
+      v03RouteFor,
+      v03GuidedRoute,
+      v03Journeys: options.v03Journeys,
+      v03ProviderGlobal: options.v03ProviderGlobal,
+      v03SelectedRootEffect: options.v03SelectedRootEffect,
+      v03SelectedRootEffectProposal: options.v03SelectedRootEffectProposal,
+      onPlanPreviewStaged: options.onPlanPreviewStaged,
+    }).catch((error: unknown) => {
       respondError(res, error);
     });
   });
@@ -110,8 +266,33 @@ export function createControlServer(options: ControlServerOptions): ControlServe
 
 interface RouteContext {
   host: string;
+  cloud?: CloudInterpretPort;
   uiRoot?: string;
   maxBodyBytes: number;
+  saveBuiltinInventoryCandidate?: ControlServerOptions['saveBuiltinInventoryCandidate'];
+  executeBuiltinInventoryRecipe?: ControlServerOptions['executeBuiltinInventoryRecipe'];
+  readBuiltinInventoryCandidate?: ControlServerOptions['readBuiltinInventoryCandidate'];
+  v03RouteFor: () => V03GatewayRoute | undefined;
+  v03GuidedRoute?: V03GuidedRoute;
+  v03Journeys?: JourneySubmits;
+  v03SelectedRootEffect?: (raw: unknown) => Promise<SelectedRootEffectSubmitReceipt>;
+  v03SelectedRootEffectProposal?: () =>
+    | { readonly ok: true; readonly descriptor: SelectedRootEffectDescriptor }
+    | { readonly ok: false; readonly code: string };
+  /** U05-B2 (P1-LIVE-REFS): fired only on a STAGED plan-preview outcome. */
+  onPlanPreviewStaged?: (staging: FolderPlanPreviewStaged) => void;
+  v03ProviderGlobal?: {
+    prepare(): Promise<
+      | {
+          readonly ok: true;
+          readonly requestRef: string;
+          readonly preview: unknown;
+          readonly expiresAtUnixMs: number;
+        }
+      | { readonly ok: false; readonly code: string }
+    >;
+    confirm(raw: unknown): Promise<SendReceipt>;
+  };
 }
 
 /**
@@ -193,13 +374,410 @@ async function handle(
     return respondJson(res, 200, {
       ok: true,
       api: CONTROL_API_REVISION,
-      localOnly: true,
+      // This is an actual model egress posture, not the loopback bind rule.
+      // A remote model can be enabled even while Goal task execution is demo.
+      localOnly: ctx.cloud?.status().enabled !== true,
+      loopbackOnly: true,
+      cloudMode: ctx.cloud?.status().enabled === true ? 'REMOTE_OPT_IN' : 'DISABLED',
       // Simulation disclosure (Issue #41, VC-P2-06): the UI renders a
       // prominent banner from this so the demo backend cannot pass as the
       // real Action Controller.
       simulated: meta.simulated,
       policy: meta.policy,
     });
+  }
+
+  // T08 J0: a genuine LOCAL read-only Windows OS observation, not the
+  // scripted ControlBackend demo and not a cloud/provider capability. The
+  // response contains aggregate memory/disk/CPU facts only; never names,
+  // file paths, credentials or arbitrary command output. No HTTP input is
+  // forwarded into the trusted T06 system-inventory collector.
+  if (method === 'GET' && url.pathname === '/api/system/inventory') {
+    const observed = collectWindowsSystemInventory();
+    if (!observed.ok) {
+      return respondJson(res, 503, {
+        ok: false,
+        code: 'LIVE_SYSTEM_INVENTORY_UNAVAILABLE',
+      });
+    }
+    return respondJson(res, 200, {
+      ok: true,
+      source: 'LIVE_WINDOWS_LOCAL_READONLY',
+      localOnly: true,
+      externalDisclosures: [],
+      snapshot: observed.snapshot,
+      suggestions: suggestReadonlyOptimizations(observed),
+    });
+  }
+
+  // T08 C07: existing T06 deterministic Windows diagnosis. Caller cannot
+  // select processes, commands, files or a script; no ActionController/Recipe
+  // execution is claimed. All observations stay local and no model is invoked.
+  if (method === 'GET' && url.pathname === '/api/system/diagnosis') {
+    if (url.search) {
+      return respondJson(res, 400, { ok: false, code: 'DIAGNOSIS_INPUT_REFUSED' });
+    }
+    const observed = collectWindowsReadonlyDiagnosis();
+    if (!observed.ok) {
+      return respondJson(res, 503, { ok: false, code: 'LIVE_DIAGNOSIS_UNAVAILABLE' });
+    }
+    return respondJson(res, 200, {
+      ok: true,
+      source: 'LIVE_WINDOWS_LOCAL_READONLY',
+      report: observed.report,
+      recipeExecuted: false,
+      cloudCalls: 0,
+    });
+  }
+
+  // T08 C01 — Actual T01 disclosure projection, shown locally BEFORE any
+  // trusted private IPC gesture. This route performs NO outbound I/O and has
+  // no access to consent issuer, credential, ledger or transport.
+  if (method === 'POST' && url.pathname === '/api/cloud/disclosure-preview') {
+    const parsed = CloudDisclosurePreviewSchema.safeParse(
+      await readJsonBody(req, ctx.maxBodyBytes),
+    );
+    if (!parsed.success) {
+      return respondJson(res, 400, { error: { code: 'DISCLOSURE_PREVIEW_INVALID' } });
+    }
+    const disclosure = buildDeepSeekGoalDisclosure(parsed.data.goalText);
+    if (!disclosure) {
+      return respondJson(res, 400, { error: { code: 'DISCLOSURE_PREVIEW_INVALID' } });
+    }
+    return respondJson(res, 200, {
+      ok: true,
+      status: 'LOCAL_PREVIEW_ONLY',
+      projectionJson: disclosure.projectionJson,
+      sha256: disclosure.sha256,
+      consentIssued: false,
+      cloudSendAllowed: false,
+      privateBrokerReady: false,
+    });
+  }
+
+  // T08 C06: bounded real SQLite lookup of the fixed built-in Recipe ONLY.
+  // Neither caller-provided hashes nor arbitrary source can be read or run.
+  if (method === 'GET' && url.pathname === '/api/recipes/builtin/system-inventory') {
+    if (!ctx.readBuiltinInventoryCandidate) {
+      return respondJson(res, 503, { ok: false, code: 'RECIPE_STORAGE_UNAVAILABLE' });
+    }
+    const result = ctx.readBuiltinInventoryCandidate();
+    if (!result.ok) {
+      return respondJson(res, 503, { ok: false, code: result.code });
+    }
+    return respondJson(res, 200, result);
+  }
+
+  // T08 C05: one fixed local candidate from #195, not arbitrary Recipe
+  // source, and not a browser-issued action grant. Refuse Demo/absent Host.
+  if (method === 'POST' && url.pathname === '/api/recipes/builtin/system-inventory/save') {
+    if (!ctx.saveBuiltinInventoryCandidate) {
+      return respondJson(res, 503, { ok: false, code: 'RECIPE_STORAGE_UNAVAILABLE' });
+    }
+    const body = await readJsonBody(req, ctx.maxBodyBytes);
+    if (
+      !body ||
+      typeof body !== 'object' ||
+      Array.isArray(body) ||
+      Object.keys(body).length !== 0
+    ) {
+      return respondJson(res, 400, { ok: false, code: 'RECIPE_INPUT_REFUSED' });
+    }
+    const saved = ctx.saveBuiltinInventoryCandidate();
+    if (!saved.ok) return respondJson(res, 503, { ok: false, code: saved.code });
+    return respondJson(res, 200, saved);
+  }
+
+  // T08 C07R: only the real host can execute a previously saved immutable
+  // fixed Recipe, and only after the REAL T02 R0 durable-policy + effect gate.
+  // Caller never supplies a SHA, plan, approval, grant, code or OS arguments.
+  if (method === 'POST' && url.pathname === '/api/recipes/builtin/system-inventory/run') {
+    if (!ctx.executeBuiltinInventoryRecipe) {
+      return respondJson(res, 503, { ok: false, code: 'RECIPE_EXECUTION_UNAVAILABLE' });
+    }
+    const body = await readJsonBody(req, ctx.maxBodyBytes);
+    if (
+      !body ||
+      typeof body !== 'object' ||
+      Array.isArray(body) ||
+      Object.keys(body).length !== 0
+    ) {
+      return respondJson(res, 400, { ok: false, code: 'RECIPE_INPUT_REFUSED' });
+    }
+    const outcome = await ctx.executeBuiltinInventoryRecipe();
+    if (!outcome.ok) {
+      return respondJson(res, 409, outcome);
+    }
+    return respondJson(res, 200, outcome);
+  }
+
+  // A true REMOTE model action is available only after trusted process
+  // composition. Neither this route nor its input can create cloud consent:
+  // C02's real native interactive dialog must approve each exact projection.
+  if (method === 'GET' && url.pathname === '/api/cloud/status') {
+    return respondJson(res, 200, {
+      ...(ctx.cloud?.status() ?? {
+        enabled: false,
+        provider: 'deepseek',
+        model: 'deepseek-flash',
+        osConsentRequired: true,
+      }),
+      tasksSimulated: backend.meta().simulated,
+    });
+  }
+
+  if (method === 'POST' && url.pathname === '/api/cloud/interpret') {
+    const parsed = CloudDisclosurePreviewSchema.safeParse(
+      await readJsonBody(req, ctx.maxBodyBytes),
+    );
+    if (!parsed.success) {
+      return respondJson(res, 400, { error: { code: 'CLOUD_GOAL_INVALID' } });
+    }
+    if (!ctx.cloud?.status().enabled) {
+      return respondJson(res, 503, { error: { code: 'CLOUD_UNAVAILABLE' } });
+    }
+    // T11 (Amendment R1): the absolute request deadline is computed on the
+    // trusted side — never from HTTP input — using the same window the T04
+    // Host binding requires for a fresh request (consent window + pre-send
+    // floor). The interpreter rechecks it at the final pre-send boundary.
+    const result = await ctx.cloud.interpretGoal({
+      goalText: parsed.data.goalText,
+      deadlineUnixMs: Date.now() + MINIMUM_SENDER_DEADLINE_BUDGET_MS,
+    });
+    if (!result.ok) {
+      return respondJson(res, result.code === 'CONSENT_DECLINED' ? 409 : 503, {
+        error: { code: result.code },
+      });
+    }
+    return respondJson(res, 200, result);
+  }
+
+  // R02 Guided routes operate solely on trusted Host-owned durable state.
+  // They never accept a grant, full approval payload or Kernel Permit from
+  // the caller. Decisions are atomic single-use acknowledgement records.
+  if (method === 'GET' && url.pathname === '/api/v03/guided/state') {
+    if (!ctx.v03GuidedRoute) {
+      return respondJson(res, 503, { ok: false, code: 'V03_GUIDED_UNAVAILABLE' });
+    }
+    return respondJson(res, 200, ctx.v03GuidedRoute.state());
+  }
+  if (method === 'POST' && url.pathname === '/api/v03/guided/select-root') {
+    if (!ctx.v03GuidedRoute) {
+      return respondJson(res, 503, { ok: false, code: 'V03_GUIDED_UNAVAILABLE' });
+    }
+    const body = await readJsonBody(req, ctx.maxBodyBytes);
+    if (
+      !body ||
+      typeof body !== 'object' ||
+      Array.isArray(body) ||
+      Object.keys(body).length !== 0
+    ) {
+      return respondJson(res, 422, {
+        status: 'REFUSED',
+        code: 'FOLDER_PICKER_ACCEPTS_NO_CALLER_INPUT',
+      });
+    }
+    const result = await ctx.v03GuidedRoute.selectRoot();
+    const status = result.status === 'STALE' ? 409 : result.status === 'REFUSED' ? 422 : 200;
+    return respondJson(res, status, result);
+  }
+  if (method === 'GET' && url.pathname === '/api/v03/guided/folder-observation') {
+    if (!ctx.v03GuidedRoute) {
+      return respondJson(res, 503, { ok: false, code: 'V03_GUIDED_UNAVAILABLE' });
+    }
+    const result = await ctx.v03GuidedRoute.folderObservation();
+    const status = result.ok ? 200 : result.code === 'FOLDER_NOT_SELECTED' ? 409 : 422;
+    return respondJson(res, status, result);
+  }
+  // P1-02 — the explicit, bounded INSPECT → REVIEW_EFFECT continuation. The
+  // real desktop user drives this after a successful INSPECT observation; the
+  // request body must be empty, the staging is the Host's one-shot capability
+  // and the folder-observation GET above stays strictly non-mutating.
+  if (method === 'POST' && url.pathname === '/api/v03/guided/plan-preview') {
+    if (!ctx.v03GuidedRoute) {
+      return respondJson(res, 503, { ok: false, code: 'V03_GUIDED_UNAVAILABLE' });
+    }
+    const body = await readJsonBody(req, ctx.maxBodyBytes);
+    if (
+      !body ||
+      typeof body !== 'object' ||
+      Array.isArray(body) ||
+      Object.keys(body).length !== 0
+    ) {
+      return respondJson(res, 422, {
+        status: 'REFUSED',
+        code: 'PLAN_PREVIEW_ACCEPTS_NO_CALLER_INPUT',
+      });
+    }
+    const result = ctx.v03GuidedRoute.planPreview();
+    // U05-B2 (P1-LIVE-REFS): only a durable Host STAGED outcome mints the
+    // live REVIEW_EFFECT submit reference pair (trusted process side; the
+    // pair goes to the operator console, never into this HTTP response). A
+    // callback failure is logged without fabricating a staging outcome.
+    if (result.status === 'STAGED' && ctx.onPlanPreviewStaged) {
+      try {
+        ctx.onPlanPreviewStaged(result);
+      } catch (error: unknown) {
+        console.error(
+          `v0.3 plan-preview staged but live submit reference issuance failed: ${
+            error instanceof Error ? error.message : String(error)
+          }`,
+        );
+      }
+    }
+    const status =
+      result.status === 'STAGED'
+        ? 200
+        : result.status === 'STALE'
+          ? 409
+          : result.status === 'UNKNOWN'
+            ? 503
+            : 422;
+    return respondJson(res, status, result);
+  }
+  if (method === 'POST' && url.pathname === '/api/v03/guided/decision') {
+    if (!ctx.v03GuidedRoute) {
+      return respondJson(res, 503, { ok: false, code: 'V03_GUIDED_UNAVAILABLE' });
+    }
+    const result = ctx.v03GuidedRoute.decide(await readJsonBody(req, ctx.maxBodyBytes));
+    return respondJson(res, ctx.v03GuidedRoute.httpStatus(result), result);
+  }
+
+  // T11 — the single v0.3 submission surface. Bounded JSON in, one T09
+  // ControlApiGateway admission out: the gateway fully validates the
+  // submission BEFORE the selected DomainApp facade is ever touched, so a
+  // refused submission performs zero `send` calls and can never reserve a K
+  // journal entry. The route never exposes a raw send and never accepts
+  // approval or grant object content (references only, enforced in-gateway).
+  if (method === 'POST' && url.pathname === '/api/v03/gateway/submit') {
+    const route = ctx.v03RouteFor();
+    if (route === undefined) {
+      return respondJson(res, 503, { ok: false, code: 'V03_GATEWAY_UNAVAILABLE' });
+    }
+    const body = await readJsonBody(req, ctx.maxBodyBytes);
+    const receipt = await route.submit(body);
+    return respondJson(res, route.httpStatus(receipt), receipt);
+  }
+
+  // R03-INT — the journey submission surfaces. Same truthful receipt→HTTP
+  // mapping as the goal gateway: COMPLETED 200 / ADMITTED 202 / UNKNOWN 409 /
+  // REFUSED·KERNEL_REFUSED 422; absent bindings answer 503, never fake success.
+  if (
+    method === 'POST' &&
+    (url.pathname === '/api/v03/effect/submit' ||
+      url.pathname === '/api/v03/effect/probe' ||
+      url.pathname === '/api/v03/provider/first-use' ||
+      url.pathname === '/api/v03/meta/feedback' ||
+      url.pathname === '/api/v03/meta/shared-query')
+  ) {
+    const journeys = ctx.v03Journeys;
+    if (journeys === undefined) {
+      return respondJson(res, 503, { ok: false, code: 'V03_JOURNEYS_UNAVAILABLE' });
+    }
+    const body = await readJsonBody(req, ctx.maxBodyBytes);
+    const submit =
+      url.pathname === '/api/v03/effect/submit'
+        ? journeys.effectSubmit
+        : url.pathname === '/api/v03/effect/probe'
+          ? journeys.effectProbeSubmit
+          : url.pathname === '/api/v03/provider/first-use'
+            ? journeys.providerFirstUse
+            : url.pathname === '/api/v03/meta/feedback'
+              ? journeys.metaFeedback
+              : journeys.metaSharedQuery;
+    const receipt = await submit.call(journeys, body);
+    const status =
+      receipt.status === 'COMPLETED'
+        ? 200
+        : receipt.status === 'ADMITTED'
+          ? 202
+          : receipt.status === 'UNKNOWN'
+            ? 409
+            : 422;
+    return respondJson(res, status, receipt);
+  }
+
+  // R03C (#288) — Host-global Provider first-use, two steps:
+  //   POST /api/v03/provider/prepare  → Host-issued requestRef + exact preview
+  //   POST /api/v03/provider/confirm  → one-time requestRef → fixed K send
+  // No Guided Case, Case ID, currentnessRef or approvalRef is required or
+  // accepted. prepare/confirm accept no intent, instance, path, args or
+  // privilege input: the composition owns every fixed value.
+  if (method === 'POST' && url.pathname === '/api/v03/provider/prepare') {
+    const ops = ctx.v03ProviderGlobal;
+    if (ops === undefined) {
+      return respondJson(res, 503, { ok: false, code: 'V03_PROVIDER_GLOBAL_UNAVAILABLE' });
+    }
+    const prepared = await ops.prepare();
+    if (!prepared.ok) {
+      return respondJson(res, 422, { status: 'REFUSED', code: prepared.code });
+    }
+    return respondJson(res, 200, {
+      status: 'PREPARED',
+      requestRef: prepared.requestRef,
+      preview: prepared.preview,
+      expiresAtUnixMs: prepared.expiresAtUnixMs,
+    });
+  }
+  if (method === 'POST' && url.pathname === '/api/v03/provider/confirm') {
+    const ops = ctx.v03ProviderGlobal;
+    if (ops === undefined) {
+      return respondJson(res, 503, { ok: false, code: 'V03_PROVIDER_GLOBAL_UNAVAILABLE' });
+    }
+    const body = await readJsonBody(req, ctx.maxBodyBytes);
+    const receipt = await ops.confirm(body);
+    const status =
+      receipt.status === 'COMPLETED'
+        ? 200
+        : receipt.status === 'ADMITTED'
+          ? 202
+          : receipt.status === 'UNKNOWN'
+            ? 409
+            : 422;
+    return respondJson(res, status, receipt);
+  }
+
+  // U05-B2 — bounded read-only proposal projection for the CURRENT review
+  // step: metadata references only (relative target/operation/expected
+  // change/undo); the absolute root path and the plan/grant authority never
+  // leave the Host. 503 when no effect flow was composed.
+  if (method === 'GET' && url.pathname === '/api/v03/effect/proposal') {
+    const proposal = ctx.v03SelectedRootEffectProposal;
+    if (proposal === undefined) {
+      return respondJson(res, 503, { ok: false, code: 'V03_SELECTED_ROOT_EFFECT_UNAVAILABLE' });
+    }
+    const result = proposal();
+    if (!result.ok) {
+      return respondJson(res, result.code === 'SELECTED_ROOT_EFFECT_STEP_NOT_CURRENT' ? 409 : 422, {
+        ok: false,
+        code: result.code,
+      });
+    }
+    return respondJson(res, 200, result.descriptor);
+  }
+
+  // U05-B2 — the one-shot selected-root effect admission. The body is EXACTLY
+  // {caseId} (U06 #401): the trusted Host resolves the reference pair it
+  // durably issued for that approved review step and authenticates it inside
+  // the request scope. Every authority-bearing value (references, plan,
+  // grant, Permit) is derived Host-side; no path, plan, grant, permit or
+  // reference input is accepted from any caller.
+  if (method === 'POST' && url.pathname === '/api/v03/effect/selected-root') {
+    const submit = ctx.v03SelectedRootEffect;
+    if (submit === undefined) {
+      return respondJson(res, 503, { ok: false, code: 'V03_SELECTED_ROOT_EFFECT_UNAVAILABLE' });
+    }
+    const body = await readJsonBody(req, ctx.maxBodyBytes);
+    const receipt = await submit(body);
+    const status =
+      receipt.status === 'COMPLETED'
+        ? 200
+        : receipt.status === 'ADMITTED'
+          ? 202
+          : receipt.status === 'UNKNOWN'
+            ? 409
+            : 422;
+    return respondJson(res, status, receipt);
   }
 
   if (resource === 'tasks') {

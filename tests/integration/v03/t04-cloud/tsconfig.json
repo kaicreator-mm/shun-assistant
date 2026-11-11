@@ -1,0 +1,21 @@
+{
+  "extends": "../../../../tsconfig.base.json",
+  "compilerOptions": {
+    "baseUrl": ".",
+    "types": ["node"],
+    "typeRoots": ["../../../../packages/llm-remote/node_modules/@types"],
+    "paths": {
+      "@shun/contracts": ["../../../../packages/contracts/src/index.ts"],
+      "domain-harness-openai-host": ["./host-binding-fixture.ts"],
+      "vitest": ["../../../../packages/llm-remote/node_modules/vitest/dist/index.d.ts"]
+    }
+  },
+  "include": [
+    "../../../../packages/domain-computer/src/cloud/**/*.ts",
+    "../../../../packages/domain-host/src/cloud/**/*.ts",
+    "../../../../packages/domain-computer/src/contracts/llm-generate-v1.ts",
+    "../../../../packages/llm-remote/src/deepseek-transport.ts",
+    "./**/*.ts",
+    "./**/*.d.mts"
+  ]
+}

@@ -7,12 +7,30 @@
 // and deterministic: hard gates precede ranking, risk is never a score
 // component, ambiguity and failure are typed, and planner output is untrusted
 // proposal data only.
+export {
+  BoundedActiveRecipeResolver,
+  type TrustedActiveRecipeAuthority,
+} from './active-recipe-resolver.ts';
 export * from './feasibility.ts';
 export * from './gates.ts';
+// T04 private host-only composition; no source execution, grant or effect port.
+// Sequential integrator owns this entrypoint after T01 source closure.
+export type { TrustedRecipeCompilerConfig } from './literal-recipe-compiler.ts';
 export * from './matchers.ts';
 export * from './normalize.ts';
 export * from './planner-seam.ts';
 export * from './ranking.ts';
+export {
+  type ReadonlyRecipeEffectOutcome,
+  type TrustedReadonlyEffectHost,
+  TrustedReadonlyRecipeEffectRunner,
+} from './recipe-effect-runner.ts';
 export * from './registry.ts';
 export * from './resolve.ts';
 export * from './revision.ts';
+export {
+  type RecipeRegistrationResult,
+  type TrustedRecipeHost,
+  type TrustedRecipeReadResult,
+  TrustedRecipeReadService,
+} from './trusted-recipe-host.ts';
