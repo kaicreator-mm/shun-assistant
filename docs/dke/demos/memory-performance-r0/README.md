@@ -22,6 +22,8 @@ node docs/dke/implementation/verify-performance-memory-extension-r0.mjs
 node docs/dke/demos/memory-performance-r0/run-windows-memory-demo.mjs
 ```
 
+The CLI is compatible only with a Node runtime/loader that actually supports the repository's TypeScript imports; **do not impose an arbitrary Node minimum version**. Test feature compatibility in the chosen environment and record the observed Node version.
+
 The runner does not write files, access the network, invoke arbitrary commands, kill processes, stop services, clear caches, change pagefiles or modify hardware. It calls only the existing fixed Windows collectors.
 
 By default process names are replaced with local aliases. `--show-local-process-names` is an explicit local-only opt-in; do not post raw process names to GitHub.
@@ -33,7 +35,7 @@ By default process names are replaced with local aliases. `--show-local-process-
 - Top-eight ranking is not causal attribution and does not establish a leak.
 - No legacy signal does not prove the system is healthy.
 - Memory available increase alone is not a performance improvement.
-- `computer.memory.compare` returns UNKNOWN unless a trusted same-host/same-workload comparator receipt and P95 response-time evidence exist. The unit-test fixture can only produce an `IMPROVEMENT_CANDIDATE`, never a verified speedup.
+- `computer.memory.compare` returns UNKNOWN unless a trusted same-host/same-workload comparator receipt and P95 response-time evidence exist. This R0 demo has **no independently trusted comparator issuer**. Even a caller-shaped `VERIFIED` receipt or unit-test fixture returns `UNKNOWN`; future DIS/Host integration must prove receipt origin, same-host/workload binding and an independent user-outcome oracle before any improvement candidate can be produced.
 
 ## Local validation receipt
 
