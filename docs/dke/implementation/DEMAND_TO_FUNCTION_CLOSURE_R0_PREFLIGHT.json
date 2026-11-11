@@ -1,0 +1,66 @@
+{
+  "schema": "shun.dke.closure-matrix-preflight-r0",
+  "outputLabel": "SHUN_ASSISTANT_DKE_D0_R0_HOSTED_STRUCTURAL_PREFLIGHT",
+  "asOf": "2026-11-11",
+  "scope": "AUTHOR_MECHANICAL_INTEGRITY_ONLY",
+  "status": "PASS_HOSTED_V8_REFERENCE_CHECK",
+  "authorContextIndependentReview": false,
+  "subject": {
+    "repository": "kaicreator-mm/shun-assistant",
+    "branch": "dke/demand-function-closure-r0",
+    "baseCandidatePr": 414,
+    "baseHead": "a18374a18c920d4975e09be649d0a98e5dc87b32",
+    "knowledgeCandidateFile": "docs/dke/implementation/COMPUTER_ASSISTANT_KNOWLEDGE_R0.json",
+    "knowledgeCandidateBlob": "f05934349a76dde19687731c2e367de95b333700"
+  },
+  "gitReadback": [
+    {
+      "path": "docs/dke/implementation/DEMAND_TO_FUNCTION_CLOSURE_R0.json",
+      "blob": "87a7b3b70640525d9bd60bf2f7fdf4f9160a5350"
+    },
+    {
+      "path": "docs/dke/implementation/DEMAND_TO_FUNCTION_CLOSURE_R0.md",
+      "blob": "3d0b70f7ca116b1ddf6b43ecb59c803452126c3f"
+    },
+    {
+      "path": "docs/dke/implementation/verify-demand-function-closure-r0.mjs",
+      "blob": "07f6b093cc1011b6a67c4a727895c309f1d20104"
+    },
+    {
+      "path": "docs/dke/implementation/verify-demand-function-closure-r0.test.mjs",
+      "blob": "eb89cf208a2619b82f112a880290623f9cac3786"
+    }
+  ],
+  "checks": {
+    "method": "in-tool JS reference evaluator applied to fetched GitHub JSON; not executed Node CLI verifier",
+    "matrixJsonParse": "PASS",
+    "sourceDossierJsonParse": "PASS",
+    "sourceDossierBlobMatch": "PASS",
+    "uniqueJobIds": "PASS",
+    "elementClaimCqSourceRefs": "PASS",
+    "globalSemanticReferences": "PASS",
+    "frozenProductStatusBoundaries": "PASS",
+    "futureCandidateExclusions": "PASS",
+    "aotRuntimeSplit": "PASS",
+    "mandatoryPostconditionNegativeUnknown": "PASS",
+    "noFakeNativeOrSapOrDis": "PASS",
+    "negativeMutationsBlocked": 17,
+    "negativeMutationsTotal": 17
+  },
+  "coverage": {
+    "jobs": 15,
+    "frozenProductParityJobs": 10,
+    "futureCandidateJobs": 5
+  },
+  "exclusions": {
+    "nodeCliVerifier": "NOT_RUN",
+    "nodeCliTestSuite": "NOT_RUN",
+    "windowsNativeTests": "NOT_RUN",
+    "independentSourceFirstReview": "NOT_RUN",
+    "independentSapReview": "NOT_RUN",
+    "productOwnerAdmission": "NOT_REQUESTED",
+    "disFunctionization": "NOT_RUN",
+    "runtimeClosure": "NOT_RUN"
+  },
+  "nextAction": "Run the versioned Node verifier and test file in an eligible Node >=24 environment; a genuinely separate Reviewer then compares the matrix to frozen Product and raw source at the exact PR SHA. Do not upgrade K4/K5 from this preflight."
+}
