@@ -12,7 +12,7 @@ export const PINS=Object.freeze({
  knowledge:'c877ec23dc59b0ae17681c7d8f7505b1521c8011',
  demand:'74c10245e88608d12ae716bd2bae1623a2f55dc5',
  extension:'8d0c1c0e732cb7e9183ca830a0384798946b43a6',
- aot:'e5bf93668066be5c76148c1a4cbdd930dcf55c29',
+ aot:'ccbb6b4d2f97e62cbecdade81405a73148ec29fb',
  delta:'fddd2d9cbe9a342683eefdcabe2277dac012568c',
  oracles:'7097a1891589b6970ecd99bf00d71ec3b36bcf1c',
  evolution:'7ba8bfddc6ef43c938028a1911af56dd8e838b24',
