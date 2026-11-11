@@ -62,5 +62,13 @@
     "disFunctionization": "NOT_RUN",
     "runtimeClosure": "NOT_RUN"
   },
-  "nextAction": "Run the versioned Node verifier and test file in an eligible Node >=24 environment; a genuinely separate Reviewer then compares the matrix to frozen Product and raw source at the exact PR SHA. Do not upgrade K4/K5 from this preflight."
+  "nextAction": "Run the versioned standalone DKE verifier and test using the available Node runtime when it supports the actual imports/syntax (including node:test); record observed Node version and real exit codes. Do not impose a blanket Node >=24 threshold. If a feature truly requires a minimum runtime version, justify that exact feature with compatibility evidence. A separate Reviewer then compares the matrix to frozen Product and raw source at the exact PR SHA; do not upgrade K4/K5 from this preflight.",
+  "executionRequirements": {
+    "policy": "NO_ARBITRARY_NODE_VERSION_FLOOR",
+    "requiresActualRuntimeFeatureCompatibility": true,
+    "blanketNodeMinVersion": null,
+    "observedNodeVersion": "NOT_RUN",
+    "cliVerifierExecution": "NOT_RUN",
+    "cliTestSuiteExecution": "NOT_RUN"
+  }
 }
