@@ -78,6 +78,12 @@ Global Semantic Elements
 
 This is not one Element per command or per Function. A child is split further only when it has an independently coherent semantic owner, boundary, CQ set and verification oracle. Semantic relations may cross child Elements; the parent/child ownership hierarchy itself must remain acyclic. The Root requires a dedicated cross-Element closure CQ; no Child or Global Semantic Element can independently establish Root SAP.
 
+
+
+### 3.1 Separate hierarchy and semantic relation graphs
+
+The ownership hierarchy is a separate 16-edge graph: 11 Child Elements and 5 Global Semantic Elements belong to `CA-ROOT`. These edges are recorded under `decomposition.hierarchyEdges`, not mixed into the cross-Element semantic `relations` array. The semantic relation graph contains 14 source-scoped assertions. Each Element now carries explicit `relationRefs`, `globalInvariantRefs` and `cqRefs`; each of the 13 Global Invariants lists its exact `appliesTo` Elements and CQ coverage. This is a structural closure map, not a semantic PASS.
+
 ## 4. AOT knowledge: what should be compiled
 
 AOT is useful for stable domain knowledge that would otherwise be repeatedly rediscovered by an LLM. Candidate content includes:
@@ -119,17 +125,17 @@ DKE defines the knowledge and SAP obligations. DIS must separately decide Functi
 
 ## 6. Competency Questions and SAP
 
-The repaired machine-readable dossier contains 18 CQs spanning goal resolution, provider/environment binding, system diagnosis, storage cleanup and health, disk topology, software lifecycle, residue preservation, hardware/driver management, process/service boundaries, network diagnosis, AOT/runtime separation, recovery, privacy, Root cross-Element closure, source-currentness invalidation and external-document non-entailment.
+The repaired machine-readable dossier contains 20 CQs spanning goal resolution, provider/environment binding, system diagnosis, storage cleanup and health, disk topology, software lifecycle, residue preservation, hardware/driver management, process/service boundaries, network diagnosis, AOT/runtime separation, recovery, privacy, Root cross-Element closure, source-currentness invalidation and external-document non-entailment.
 
 Current status is deliberately conservative:
 
-- K1: 70 internal source records (37 code, 28 test definitions, 5 Product/method records) and 12 Microsoft Learn external locators pinned by the author; exact original Code/Test Blobs are checked against the immutable source tree.
+- K1: 70 internal source records (37 code, 28 test definitions, 3 Product authority/evidence plus 2 related DKE/method context records) and 13 Microsoft Learn external locators pinned by the author; exact original Code/Test Blobs are checked against the immutable source tree.
 - K2: claims and relations are an author candidate.
-- K3: 17 Root/Child/Global-Semantic Elements, 13 global invariants and 18 CQs are an author candidate; all 17 Elements now have explicit SAP obligation records, including Root and every Global Semantic Element.
+- K3: 17 Root/Child/Global-Semantic Elements, 14 semantic relations, 13 global invariants and 20 CQs are an author candidate; all 17 Elements now have explicit structured SAP profiles. Each obligation has a stable ID, source/relation/invariant/CQ references, positive/negative/UNKNOWN cases, oracle classes and a NOT_RUN state.
 - K4: independent review has **not** run.
 - Native Windows tests were **not** executed in this DKE turn; test source files are not execution receipts.
 - A mechanical author check confirms unique IDs, resolved source/Element references, acyclic hierarchy, 17/17 SAP obligation coverage, maturity labels and external-source applicability fields. This is not a semantic or independent review.
-- SAP is **not qualified**: 17/17 obligation records are present, but every Element/Root remains unqualified pending independent review, CQs, applicable native/domain oracles and Owner acceptance.
+- SAP is **not qualified**: 17/17 profiles and their individual obligation contracts are present, but every Element/Root remains unqualified: all obligations are NOT_RUN/NOT_QUALIFIED pending fresh review of the repaired SHA, applicable native/domain oracles and Owner acceptance.
 - DIS handoff is **blocked**.
 - No runtime implementation or AOT Package was created.
 
@@ -140,6 +146,12 @@ Hardware/driver, provider-dependent storage health, network and broader disk-man
 No Product Owner decision is required to repair this documentation-only DKE candidate. An explicit Product amendment is required before partition/format, general software management, PnP/device/driver mutation, process/service mutation, network administration, WSL, remote, sandbox or cloud execution becomes a supported Shun feature. Hardware/driver semantics require an OEM or hardware-domain oracle; storage-health semantics require a Windows Storage Management Provider/storage specialist; network semantics require a network-domain oracle.
 
 Current execution scope remains local Windows-first. Linux/macOS are future knowledge targets only; WSL, remote administration, sandbox and cloud execution are not current Product targets. External Microsoft Learn pages are mutable link-only locators observed on 2026-11-11; the dossier records their documented OS/version applicability or an explicit UNKNOWN boundary, and they must be rechecked before runtime use.
+
+
+
+### Windows client servicing is separate from command compatibility
+
+As observed on 2026-11-11, Microsoft's supported-client table records Windows 10 Home/Pro 22H2 (build 19045) as end-of-updates on 2025-10-14; Windows 11 Home/Pro 24H2 (build 26100) ended updates on 2026-10-13; Windows 11 Home/Pro 25H2 (build 26200) and 26H2 (build 26300) remain within their published servicing windows. WinGet's Windows 10 1809+ statement is a client compatibility minimum, not a servicing-support guarantee. Every runtime binding must check exact edition, release, build, architecture and servicing/ESU status. This remains Microsoft platform knowledge only and does not admit any Shun feature.
 
 ## 8. Next gates
 
@@ -165,6 +177,7 @@ Official Microsoft Learn sources used as external knowledge locators (link-only;
 - [Enable-PnpDevice](https://learn.microsoft.com/en-us/powershell/module/pnpdevice/enable-pnpdevice?view=windowsserver2025-ps)
 - [Disable-PnpDevice](https://learn.microsoft.com/en-us/powershell/module/pnpdevice/disable-pnpdevice?view=windowsserver2025-ps)
 - [pnputil](https://learn.microsoft.com/en-us/windows-server/administration/windows-commands/pnputil)
+- [Supported versions of Windows client](https://learn.microsoft.com/en-us/windows/release-health/supported-versions-windows-client) — exact edition/release/build and end-of-updates dates; tool/API compatibility is not OS servicing support.
 
 
 ## 10. Repair reconciliation (R0 review repair)
@@ -175,3 +188,17 @@ Official Microsoft Learn sources used as external knowledge locators (link-only;
 - Added OS/version applicability or explicit UNKNOWN applicability to each Microsoft Learn locator.
 - Completed structural SAP obligations for all 17 Elements, added Root closure, source-currentness, storage-health and external-document non-entailment CQs, and moved the cross-domain protected-asset invariant to Global Authority.
 - These are documentation repairs only. No Product, runtime code, permission, implementation authorization, native test execution or SAP qualification is claimed.
+
+
+## 11. Fresh Source-First Review + documentation repair reconciliation (2026-11-11)
+
+OUTPUT_LABEL=`SHUN_ASSISTANT_DKE_R0_POST_REPAIR_FRESH_EXACT_SHA_REVIEW`
+
+- Stage-0 was rebuilt from the frozen Product Freeze/PRD/L1 and original `version/v0.3.0@1224fea4097799467e2c0c454885e680f1f28248` Code/Test sources before reading the final JSON/Markdown. All 37 Code and 28 Test Blob pins matched the immutable source tree exactly (65/65, zero mismatch).
+- **P1 hierarchy/semantic graph separation:** the old `CA-REL-001 HAS_SEMANTIC_CHILD` was a hierarchy edge and only represented Root→Goal while the ownership hierarchy contained 16 edges. It was removed from semantic relations; all 16 ownership edges are now recorded separately. A source-grounded FileAsset→GlobalAuthority semantic relation was added, preserving 14 semantic relations.
+- **P1 global-invariant closure:** each of 13 invariants now declares exact `appliesTo` Elements and CQ refs; each of 17 Elements carries relation/invariant/CQ cross-references. Root references all 13 global invariants.
+- **P1 SAP sufficiency:** all 17 SAP profiles now contain stable per-obligation IDs, source/relation/invariant/CQ refs, positive/negative/UNKNOWN cases, oracle classes and NOT_RUN/NOT_QUALIFIED states. Added CQ-019 for FileAsset, which previously had no dedicated CQ. Added CQ-020 for Windows client servicing currentness. This repairs contract structure, not SAP qualification.
+- **P2 stale K1 count:** corrected to 70 internal records, 13 external locators and 65 exact Code/Test Blob pins.
+- **P2 OS servicing:** added the Microsoft supported Windows client versions locator and separated command/API compatibility from servicing lifecycle. Exact target host version remains required.
+
+P0=0; P1=3 found/3 repaired; P2=2 found/2 repaired. All CQs remain OPEN or CONDITIONAL and NOT_RUN; Root and all SAP profiles remain NOT_QUALIFIED. Native Windows execution remains NOT_RUN. No Product, runtime code, permission, AOT Package, merge or release was changed or authorized. A fresh independent reviewer must review the post-repair exact SHA; this repairer's structural checks are not an independent PASS.

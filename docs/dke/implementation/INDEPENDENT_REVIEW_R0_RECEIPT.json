@@ -1,0 +1,98 @@
+{
+  "schema": "shun-assistant.dke.r0.independent-review-repair-receipt/1",
+  "outputLabel": "SHUN_ASSISTANT_DKE_R0_POST_REPAIR_FRESH_EXACT_SHA_REVIEW",
+  "reviewedCandidateHead": "211442d9d071953d548b66b1849f33033162b3ae",
+  "reviewedCandidateTree": "f66fa66da00441ebed5ffe732c5373303f86c488",
+  "branch": "dke/computer-assistant-knowledge-r0",
+  "stage0": {
+    "productFreezeBlob": "0f8a67c2f06364d58a842502d3dee11bfeeedba4",
+    "productBlob": "f062b7f2c3dc3bf4aeeb7594ab5c2bc75b34d0ab",
+    "productL1Blob": "4c703c3f0c283f4d3918babef8f87f56869698e5",
+    "originalSourceCommit": "1224fea4097799467e2c0c454885e680f1f28248",
+    "codeBlobsVerified": 37,
+    "testBlobsVerified": 28,
+    "exactMatches": 65,
+    "mismatches": 0,
+    "criteria": "G1 source identity/authority; G2 claim truth and limits; G3 element ownership/relations; G4 CQ/SAP positive-negative-UNKNOWN; G5 Root/AOT-runtime/platform boundaries"
+  },
+  "findings": [
+    {
+      "id": "P1-01-HIERARCHY-SEMANTIC-GRAPH-MIX",
+      "severity": "P1",
+      "status": "REPAIRED",
+      "detail": "The sole HAS_SEMANTIC_CHILD relation was a hierarchy edge and represented only Root->Goal while the hierarchy contained 16 ownership edges. Separated all 16 hierarchy edges from the semantic relation graph and replaced the misclassified relation with a source-grounded FileAsset->GlobalAuthority relation."
+    },
+    {
+      "id": "P1-02-GLOBAL-INVARIANT-APPLICABILITY-CLOSURE",
+      "severity": "P1",
+      "status": "REPAIRED",
+      "detail": "All 13 invariants now have explicit appliesTo and cqRefs; each of 17 Elements carries globalInvariantRefs, cqRefs and relationRefs; Root carries all invariant obligations."
+    },
+    {
+      "id": "P1-03-SAP-OBLIGATION-SEMANTIC-INSUFFICIENCY",
+      "severity": "P1",
+      "status": "REPAIRED_AS_CANDIDATE_CONTRACTS_NOT_QUALIFIED",
+      "detail": "All 17 SAP profiles now have stable per-obligation IDs, source/relation/invariant/CQ refs, positive/negative/UNKNOWN cases, oracle classes and NOT_RUN/NOT_QUALIFIED states. Added missing FileAsset CQ-019. No SAP PASS is claimed."
+    },
+    {
+      "id": "P2-01-K1_INVENTORY_COUNT_STALE",
+      "severity": "P2",
+      "status": "REPAIRED",
+      "detail": "Updated K1 from stale 33 locator count to 70 internal records, 13 external locators and 65 exact Code/Test blobs."
+    },
+    {
+      "id": "P2-02-WINDOWS_CLIENT_SERVICING_LIFECYCLE",
+      "severity": "P2",
+      "status": "REPAIRED_AS_CANDIDATE_KNOWLEDGE",
+      "detail": "Added current Microsoft Windows client servicing locator, exact release/build lifecycle observations and CQ-020. WinGet/API compatibility is explicitly distinct from OS servicing and Shun support."
+    }
+  ],
+  "repair": {
+    "changedArtifacts": [
+      "docs/dke/implementation/COMPUTER_ASSISTANT_KNOWLEDGE_R0.json",
+      "docs/dke/implementation/COMPUTER_ASSISTANT_KNOWLEDGE_R0.md",
+      "docs/dke/implementation/INDEPENDENT_REVIEW_R0_RECEIPT.json"
+    ],
+    "productFilesModified": false,
+    "runtimeCodeModified": false,
+    "permissionsCreated": false,
+    "aotPackageCreated": false,
+    "productScopeAmended": false,
+    "repairedJsonBlob": "ecc45fc70f1eecaaf59d2998e7a179c7fb2db970",
+    "repairedMarkdownBlob": "ed9af17100eb1c8bd4d869f328ded3b514402074",
+    "sourceExternalAdded": "EXT-WINDOWS-CLIENT-SERVICING",
+    "newCounts": {
+      "internalSources": 70,
+      "code": 37,
+      "tests": 28,
+      "externalSources": 13,
+      "claims": 17,
+      "elements": 17,
+      "relations": 14,
+      "invariants": 13,
+      "cqs": 20,
+      "sapElements": 17
+    }
+  },
+  "finalQualification": {
+    "P0": 0,
+    "P1Found": 3,
+    "P1Repaired": 3,
+    "P1Open": 0,
+    "P2Found": 2,
+    "P2Repaired": 2,
+    "P2Open": 0,
+    "G1": "PASS_SOURCE_PIN_INTEGRITY_65_OF_65",
+    "G2": "CONDITIONAL_SOURCE_GROUNDED_CANDIDATE",
+    "G3": "STRUCTURAL_CLOSURE_REPAIRED_FINAL_SHA_REVIEW_PENDING",
+    "G4": "SAP_STRUCTURED_17_OF_17_CQ_20_FINAL_REVIEW_AND_ORACLES_PENDING",
+    "G5": "AOT_RUNTIME_AND_PLATFORM_BOUNDARIES_DOCUMENTED_FINAL_REVIEW_PENDING",
+    "root": "NOT_QUALIFIED",
+    "sap": "NOT_QUALIFIED",
+    "nativeWindows": "NOT_RUN",
+    "finalExactShaIndependentReview": "PENDING",
+    "merge": false,
+    "release": false,
+    "aotPackage": false
+  }
+}
