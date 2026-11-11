@@ -3,6 +3,15 @@ import { createHash } from 'node:crypto';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 
+const EXPECTED_KNOWLEDGE_BLOB = 'c877ec23dc59b0ae17681c7d8f7505b1521c8011';
+const EXPECTED_DEMAND_BLOB = '74c10245e88608d12ae716bd2bae1623a2f55dc5';
+
+/**
+ * Source locks deliberately live in reviewer-readable validator source, NOT
+ * only in candidate JSON. Paired mutation of a dossier and its self-described
+ * candidateBlob must fail closed.
+ */
+
 function gitBlobSha(text) {
   const bytes = Buffer.from(text, 'utf8');
   return createHash('sha1').update(Buffer.from(`blob ${bytes.length}\0`)).update(bytes).digest('hex');
@@ -23,8 +32,8 @@ export function validateArtifacts(base, ext, demand, demo, contract, aot, baseTe
   const sapProfiles = new Set(base.semanticAssuranceProfile.elements.map((x) => x.profileId));
   const add = (condition, code) => { if (!condition) errors.push(code); };
 
-  add(gitBlobSha(baseText) === ext.stackedOn.knowledgeBlob, 'BASE_KNOWLEDGE_BLOB_MISMATCH');
-  add(gitBlobSha(demandText) === ext.stackedOn.demandBlob, 'BASE_DEMAND_BLOB_MISMATCH');
+  add(ext.stackedOn.knowledgeBlob === EXPECTED_KNOWLEDGE_BLOB && gitBlobSha(baseText) === EXPECTED_KNOWLEDGE_BLOB, 'BASE_KNOWLEDGE_BLOB_MISMATCH');
+  add(ext.stackedOn.demandBlob === EXPECTED_DEMAND_BLOB && gitBlobSha(demandText) === EXPECTED_DEMAND_BLOB, 'BASE_DEMAND_BLOB_MISMATCH');
   add(base.project === 'kaicreator-mm/shun-assistant', 'BASE_PROJECT_IDENTITY');
   add(unique(ext.claims.map((x) => x.id)) && ext.claims.every((x) => !base.claims.some((y) => y.id === x.id)), 'DUPLICATE_EXTENSION_CLAIM');
   add(unique(ext.elements.map((x) => x.id)) && ext.elements.every((x) => !base.elements.some((y) => y.id === x.id)), 'DUPLICATE_EXTENSION_ELEMENT');
