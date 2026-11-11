@@ -1,5 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import { createHash } from 'node:crypto';
 import { readFile } from 'node:fs/promises';
 import { validateArtifacts } from './verify-performance-memory-extension-r0.mjs';
 
@@ -58,4 +59,24 @@ test('effectful DIS Function is rejected from this read-only demo', async () => 
   f.contract.functions[0].effect = 'MUTATION';
   const r = validate(f);
   assert.ok(r.errors.includes('DIS_EFFECT_BOUNDARY'));
+});
+
+test('paired source dossier plus self-reported Git blob tamper cannot bypass independent lock', async () => {
+  const f = await fixtures();
+  f.baseText += '\n';
+  const bytes = Buffer.from(f.baseText, 'utf8');
+  f.ext.stackedOn.knowledgeBlob = createHash('sha1')
+    .update(Buffer.from(`blob ${bytes.length}\0`)).update(bytes).digest('hex');
+  const result = validate(f);
+  assert.ok(result.errors.includes('BASE_KNOWLEDGE_BLOB_MISMATCH'));
+});
+
+test('paired demand-matrix plus self-reported Git blob tamper cannot bypass independent lock', async () => {
+  const f = await fixtures();
+  f.demandText += '\n';
+  const bytes = Buffer.from(f.demandText, 'utf8');
+  f.ext.stackedOn.demandBlob = createHash('sha1')
+    .update(Buffer.from(`blob ${bytes.length}\0`)).update(bytes).digest('hex');
+  const result = validate(f);
+  assert.ok(result.errors.includes('BASE_DEMAND_BLOB_MISMATCH'));
 });
