@@ -202,3 +202,13 @@ OUTPUT_LABEL=`SHUN_ASSISTANT_DKE_R0_POST_REPAIR_FRESH_EXACT_SHA_REVIEW`
 - **P2 OS servicing:** added the Microsoft supported Windows client versions locator and separated command/API compatibility from servicing lifecycle. Exact target host version remains required.
 
 P0=0; P1=3 found/3 repaired; P2=4 found/4 repaired. All CQs remain OPEN or CONDITIONAL and NOT_RUN; Root and all SAP profiles remain NOT_QUALIFIED. Native Windows execution remains NOT_RUN. No Product, runtime code, permission, AOT Package, merge or release was changed or authorized. A fresh independent reviewer must review the post-repair exact SHA; this repairer's structural checks are not an independent PASS.
+
+
+## 12. D0 R0 source-first semantic repair — pending different Reviewer (2026-11-11)
+
+OUTPUT_LABEL=`SHUN_ASSISTANT_DKE_D0_R0_FRESH_SOURCE_FIRST_REVIEW_REPAIR`. Original Product/L1/Code/Test Stage-0 frozen in [Issue #411](https://github.com/kaicreator-mm/shun-assistant/issues/411#issuecomment-6798790192) **before** intake of the candidate knowledge and D0 PRs. Review identified two documentation-only source-model limitations at the previous exact HEAD `a18374a18c920d4975e09be649d0a98e5dc87b32`:
+
+- **K-D0-R0-01 / P2 — non-goal and applicability conflation.** All 17 `scopeContract.nonGoals` and `scopeContract.applicability` fields previously carried identical prose. Every Element now describes explicitly excluded effects/functions **separately** from applicable Product scope, Windows environment and source-observation evidence. A bounded future-network knowledge gap remains explicit: `CA-NETWORK` has no qualified source Claim and `CQ-CA-010` has no domain-source evidence; no software/network Function is inferred.
+- **K-D0-R0-02 / P1 — non-discriminating SAP falsification plans.** All obligations of an Element previously reused the same `positiveCase`/`negativeCase`/`unknownCase` regardless of requirement. The 17 SAP profiles / 58 separate obligations now have requirement-specific positive, falsifying negative and honest UNKNOWN cases. Each remains `validationState=NOT_RUN` and `qualification=NOT_QUALIFIED`; exact source/Oracle/real Windows evidence is **not** supplied by authoring cases. Any standalone SAP PASS claim remains prohibited.
+
+These are **author-side documentation repairs**, not independently qualified Source-First results. D0 consumer PR #415 must repin the revised knowledge Blob and itself receive review on its actual new Exact-SHA. The Product Freeze, native Host, DIS Function schema, AOT Package, independent review and runtime receipts remain unchanged and unauthorised/unqualified. No Product/runtime source changed; no native tests or GitHub Actions were run.
