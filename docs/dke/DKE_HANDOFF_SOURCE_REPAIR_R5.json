@@ -48,6 +48,16 @@
           "blob": "b27e32917eccafb1433c0971b2b3413fd74f1be5"
         },
         {
+          "path": "apps/control-api/scripts/bootstrap-guided-localappdata.ts",
+          "blob": "a8887a1e71d7c3e72bf06595642e3ea80b001ef1",
+          "role": "CONSENTED_FIRST_RUN_PROVISIONING_AND_IDENTITY_GUARD_CALLER"
+        },
+        {
+          "path": "apps/control-api/src/real-storage/guided-provenance-issuance.ts",
+          "blob": "82aa130d49647d00294bf4afe92131c29a419ba0",
+          "role": "OS_SID_RESOLUTION_UAC_OTHER_ACCOUNT_REFUSAL_AND_LOCALAPPDATA_AUTHORITY"
+        },
+        {
           "path": "apps/control-api/test/guided-localappdata-bootstrap.test.ts",
           "blob": "3bbb7ed84dbb75d46490c89e88ca9b1b37737ba6"
         }
@@ -62,9 +72,9 @@
       "positiveEvidencePlan": "Inspect the existing test definition and if required run it against the exact source revision; preserve terminal outcome; do not claim existing test executed",
       "negativeEvidencePlan": "Inject the named counterexample, retain observed tool output and independent reviewer verdict",
       "whenSourceChanges": "Invalidate only consumer claims that cite the modified source Blob and matching context; keep history immutable",
-      "source_coverage": "BOUNDED_SOURCE_OBSERVATION",
+      "source_coverage": "DIRECT_SOURCE_BOOTSTRAP_AND_IDENTITY_GUARD_READ_WITH_TEST_DEFINITION_NOT_EXECUTED",
       "claim_qualification": "UNQUALIFIED_SCOPE_CORRECTED",
-      "source_gaps": null,
+      "source_gaps": "Current main.ts is only the operator-owned startup/composition entrypoint, not the SID guard implementation. The real guard is in guided-provenance-issuance.ts and the one-time consented writer is bootstrap-guided-localappdata.ts. Synthetic ephemeral-profile/ACL test definitions do not attest live Windows native or different-account UAC execution.",
       "external_promotion_allowed": false
     },
     {
@@ -133,14 +143,31 @@
       "id": "CQ2",
       "question": "Within LOCALAPPDATA_TRUST, how does first-run per-interactive-user localappdata trust and identity-guarded provisioning hold, and what evidence blocks the counterexample?",
       "answerSource": {
-        "path": "apps/control-api/src/main.ts",
-        "blob": "b27e32917eccafb1433c0971b2b3413fd74f1be5"
+        "path": "apps/control-api/src/real-storage/guided-provenance-issuance.ts",
+        "blob": "82aa130d49647d00294bf4afe92131c29a419ba0"
       },
       "counterexample": "Different UAC administrator account cannot silently own other user's trust",
       "missingSourceVerdict": "UNKNOWN",
       "positiveFixture": "NOT_EXECUTED",
       "negativeFixture": "NOT_EXECUTED",
-      "independentReviewer": "NOT_ASSIGNED"
+      "independentReviewer": "NOT_ASSIGNED",
+      "answerSources": [
+        {
+          "path": "apps/control-api/src/real-storage/guided-provenance-issuance.ts",
+          "blob": "82aa130d49647d00294bf4afe92131c29a419ba0",
+          "role": "INTERACTIVE_SID_AND_CROSS_ACCOUNT_ELEVATION_GUARD"
+        },
+        {
+          "path": "apps/control-api/scripts/bootstrap-guided-localappdata.ts",
+          "blob": "a8887a1e71d7c3e72bf06595642e3ea80b001ef1",
+          "role": "CONSENTED_SETUP_AND_REFUSE_UNPROVISIONED"
+        },
+        {
+          "path": "apps/control-api/test/guided-localappdata-bootstrap.test.ts",
+          "blob": "3bbb7ed84dbb75d46490c89e88ca9b1b37737ba6",
+          "role": "SYNTHETIC_TEST_DEFINITIONS_NOT_NATIVE_EXECUTED"
+        }
+      ]
     },
     {
       "id": "CQ3",
@@ -167,5 +194,17 @@
   "formal_g1_g5_accepted": false,
   "review_status": "REPAIR_COMPLETED_INDEPENDENT_RECHECK_PENDING",
   "authority_chain": [],
-  "note": "This repair corrects old source evidence links and does not qualify professional/industry knowledge, product release or runtime effect."
+  "note": "This repair corrects old source evidence links and does not qualify professional/industry knowledge, product release or runtime effect.",
+  "r7_source_provenance_repair": {
+    "finding": "SH-B2-R7-01",
+    "severity": "P2",
+    "scope": "SH02_DIRECT_IDENTITY_GUARD_CODE_SOURCE_MISSING_FROM_CURRENT_HANDOFF",
+    "original_code_revision": "5bb4e4b27e319d0104406c3389f8b8e6149b7f0b",
+    "readback": "SOURCE_BLOBS_VERIFIED_ON_ORIGINAL_REVISION",
+    "native_test": "NOT_RUN",
+    "physical_windows": "UNKNOWN",
+    "owner_g1_g5": "NOT_SIGNED",
+    "reviewer_status": "REPAIRER_ONLY_PENDING_DIFFERENT_FRESH_EXACT_SHA_REVIEW",
+    "note": "No change to prior SH-B2-R6-01 or SH-B2-R18-01 repair; no runtime/source test modified."
+  }
 }
