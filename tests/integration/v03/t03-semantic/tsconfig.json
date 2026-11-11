@@ -1,0 +1,16 @@
+{
+  "extends": "../../../../tsconfig.base.json",
+  "compilerOptions": {
+    "baseUrl": ".",
+    "types": ["node"],
+    "typeRoots": ["../../../../packages/resolver/node_modules/@types"],
+    "paths": {
+      "vitest": ["../../../../packages/resolver/node_modules/vitest/dist/index.d.ts"]
+    }
+  },
+  "include": [
+    "../../../../packages/domain-computer/src/semantic/**/*.ts",
+    "../../../../packages/resolver/test/scenarios.ts",
+    "./**/*.test.ts"
+  ]
+}

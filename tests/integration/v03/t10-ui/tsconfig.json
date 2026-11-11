@@ -1,0 +1,19 @@
+{
+  "extends": "../../../../tsconfig.base.json",
+  "compilerOptions": {
+    "baseUrl": ".",
+    "types": ["node"],
+    "typeRoots": ["../../../../packages/vertical-support/node_modules/@types"],
+    "paths": {
+      "vitest": ["../../../../packages/vertical-support/node_modules/vitest/dist/index.d.ts"]
+    },
+    "allowJs": true,
+    "checkJs": true
+  },
+  "include": [
+    "../../../../packages/domain-computer/src/guided/**/*.ts",
+    "../../../../apps/control-ui/public/v03/strings.js",
+    "../../../../apps/control-ui/public/v03/view-model.js",
+    "./**/*.test.ts"
+  ]
+}

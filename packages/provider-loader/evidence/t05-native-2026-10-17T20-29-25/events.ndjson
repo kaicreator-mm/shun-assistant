@@ -1,0 +1,74 @@
+{"at":"2026-10-17T20:29:25.617Z","kind":"run.start","task":"T05 #106 real Windows Build Host — production native addon activation (Sharp)","baseline":"version/v0.2.0@e263f3dc133ca2b664e8a9de2ee6995ccbeacf72","evidenceDir":"C:\\xDev\\kAiCreator\\shun-assistant\\shun-assistant-i106-zcode\\packages\\provider-loader\\evidence\\t05-native-2026-10-17T20-29-25","pkg":"@img/sharp-win32-x64","node":"v24.21.0","modulesAbi":"137"}
+{"at":"2026-10-17T20:29:25.647Z","kind":"canary.baseline","files":["<HOME>\\AppData\\Local\\Temp\\shun-t05-native-canary\\user-canary-temp.txt","<HOME>\\shun-t05-native-canary-home.txt","C:\\xDev\\kAiCreator\\shun-assistant\\shun-assistant-i106-zcode\\packages\\provider-loader\\t05-native-canary-cwd.tmp"],"digests":["53242e9e72d7d35fdf5088eac576004749542e64380b238001d54ce194853a48","ae28b548c3dafeec733523dd7e874aa2dbec2a7366e287ca4f739787682290e4","55bce3feb8b4a838d7994136444766de43339b7d4fdc6569065ce18b1421700c"]}
+{"at":"2026-10-17T20:29:25.648Z","kind":"scenario.start","id":"HOST","title":"host facts (OS, integrity, symlink privilege, node)"}
+{"at":"2026-10-17T20:29:25.898Z","kind":"host.facts","os":"win32 10.0.26300 x64","node":"v24.21.0","modulesAbi":"137","user":"<HOST>\\<USER>","mandatoryLevel":"Mandatory Label\\Medium Mandatory Level    S-1-16-8192","symlinkPrivilege":false,"elevatedShell":false}
+{"at":"2026-10-17T20:29:25.899Z","kind":"scenario.end","id":"HOST","status":"PASS","detail":"os=win32 10.0.26300 x64 node=v24.21.0 symlinkPriv=false elevated=false"}
+{"at":"2026-10-17T20:29:25.904Z","kind":"scenario.start","id":"PREP","title":"anchor @img/sharp-win32-x64 via npm registry SRI, extract .node + DLL closure"}
+{"at":"2026-10-17T20:29:28.677Z","kind":"prep.tarball","version":"0.35.5","tarballUrl":"https://registry.npmmirror.com/@img/sharp-win32-x64/-/sharp-win32-x64-0.35.5.tgz","finalOrigin":"https://cdn.npmmirror.com/packages/%40img/sharp-win32-x64/0.35.5/sharp-win32-x64-0.35.5.tgz","tarballBytes":8575353,"sha256":"16a804181ddd258ca6fe7079b2faa0c0356654c9db3d93ab0a80ec5e5161c3d4","registrySri":"sha512-x76eH0vEiHlcMQu8Y8IenntaACtddpT6W0wmXtWrnKcnKI7ME5DdgqhAD6SEWOEl1v2zDvkZDhFA9KnURwpfqg==","sriMatches":true}
+{"at":"2026-10-17T20:29:29.483Z","kind":"prep.peImports","images":{"sharp-win32-x64-0.35.5.node":{"machine":"0x8664","pe32Plus":true,"imports":["KERNEL32.dll","libvips-42.dll","libvips-cpp-8.18.7.dll","node.exe"],"importsAllSystemOrEachOther":true},"libvips-42.dll":{"machine":"0x8664","pe32Plus":true,"imports":["KERNEL32.dll","api-ms-win-crt-stdio-l1-1-0.dll","api-ms-win-crt-heap-l1-1-0.dll","api-ms-win-crt-runtime-l1-1-0.dll","api-ms-win-crt-filesystem-l1-1-0.dll","api-ms-win-crt-private-l1-1-0.dll","api-ms-win-crt-string-l1-1-0.dll","api-ms-win-crt-time-l1-1-0.dll","api-ms-win-crt-math-l1-1-0.dll","api-ms-win-crt-convert-l1-1-0.dll","api-ms-win-crt-utility-l1-1-0.dll","api-ms-win-crt-locale-l1-1-0.dll","api-ms-win-core-synch-l1-2-0.dll","ADVAPI32.dll","SHELL32.dll","ole32.dll","api-ms-win-crt-environment-l1-1-0.dll","USER32.dll","WS2_32.dll","ntdll.dll","bcryptprimitives.dll","api-ms-win-crt-process-l1-1-0.dll","bcrypt.dll","api-ms-win-crt-multibyte-l1-1-0.dll","IPHLPAPI.DLL","SHLWAPI.dll","DNSAPI.dll"],"importsAllSystemOrEachOther":true},"libvips-cpp-8.18.7.dll":{"machine":"0x8664","pe32Plus":true,"imports":["KERNEL32.dll","libvips-42.dll"],"importsAllSystemOrEachOther":true}}}
+{"at":"2026-10-17T20:29:29.502Z","kind":"scenario.end","id":"PREP","status":"PASS","detail":"sharp@0.35.5 tarball=16a804181ddd258c… addon=971048779f9c8598… dlls=2"}
+{"at":"2026-10-17T20:29:30.151Z","kind":"fixture.origin","origin":"https://127.0.0.1:57644","files":["sharp-win32-x64-0.35.5.node","libvips-42.dll","libvips-cpp-8.18.7.dll"]}
+{"at":"2026-10-17T20:29:30.155Z","kind":"scenario.start","id":"DEPCACHE","title":"provision verified dependency bytes into the digest cache"}
+{"at":"2026-10-17T20:29:30.204Z","kind":"depCache.provisioned","provenance":"extracted from the SRI-anchored registry tarball (PREP)","entries":[{"name":"libvips-42.dll","sha256":"06dab07cc386748513337a31672b1d5269fbc770a14ff403080575665bf0813f","bytes":19018240},{"name":"libvips-cpp-8.18.7.dll","sha256":"25001dbd05305a0a29119ab49933622c70b4a20ea12ef1d5d20ca40181db53bf","bytes":333312}]}
+{"at":"2026-10-17T20:29:30.205Z","kind":"scenario.end","id":"DEPCACHE","status":"PASS","detail":"2 deps cached under digest names"}
+{"at":"2026-10-17T20:29:30.207Z","kind":"scenario.start","id":"STAGE","title":"production stager fetches the pinned .node bytes"}
+{"at":"2026-10-17T20:29:30.334Z","kind":"stage.ok","digest":"971048779f9c8598df14641dfc03c625885c93f473a788e65ca2deb50d0b083e","byteLength":443904}
+{"at":"2026-10-17T20:29:30.335Z","kind":"scenario.end","id":"STAGE","status":"PASS","detail":"digest=971048779f9c8598… bytes=443904"}
+{"at":"2026-10-17T20:29:30.336Z","kind":"scenario.start","id":"PREFLIGHT","title":"merged preflight admits the native artifact"}
+{"at":"2026-10-17T20:29:30.357Z","kind":"scenario.end","id":"PREFLIGHT","status":"PASS","detail":"state=PREFLIGHT_ONLY digest=971048779f9c8598…"}
+{"at":"2026-10-17T20:29:30.358Z","kind":"scenario.start","id":"ACTIVATE-METADATA","title":"runNativeAddon ADDON_METADATA: real child dlopens pinned sharp + libvips closure"}
+{"at":"2026-10-17T20:29:31.519Z","kind":"effect.authorized","leaseId":"a1af4610-452c-4ea7-9bae-f6fb45672082","op":"provider.native.addon-metadata"}
+{"at":"2026-10-17T20:29:31.736Z","kind":"activate.metadata","exportCount":13,"exports":["metadata","pipeline","cache","concurrency","counters","simd","libvipsVersion","format","block","_maxColourDistance","_isUsingJemalloc","_isUsingX64V2","stats"],"childNode":"v24.21.0","durationMs":1375}
+{"at":"2026-10-17T20:29:31.736Z","kind":"scenario.end","id":"ACTIVATE-METADATA","status":"PASS","detail":"exports=13 abi=137"}
+{"at":"2026-10-17T20:29:31.738Z","kind":"scenario.start","id":"ACTIVATE-IMAGE","title":"runNativeAddon IMAGE_METADATA: real sharp metadata over a seeded PNG"}
+{"at":"2026-10-17T20:29:32.428Z","kind":"effect.authorized","leaseId":"9b879b3e-f6a6-406e-85e7-3389a03c8f55","op":"provider.native.image-metadata"}
+{"at":"2026-10-17T20:29:32.652Z","kind":"activate.imageMetadata","metadata":{"format":"png","mediaType":"image/png","size":105,"width":8,"height":2,"space":"srgb","channels":3,"depth":"uchar","density":72,"isProgressive":false,"isPalette":false,"bitsPerSample":8,"hasProfile":false,"hasAlpha":false}}
+{"at":"2026-10-17T20:29:32.654Z","kind":"scenario.end","id":"ACTIVATE-IMAGE","status":"PASS","detail":"width=8 height=2 format=png"}
+{"at":"2026-10-17T20:29:32.654Z","kind":"scenario.start","id":"OFFLINE-REPLAY","title":"offline cache replay: 0 downloads, activation still works"}
+{"at":"2026-10-17T20:29:33.276Z","kind":"effect.authorized","leaseId":"c5142903-b8c4-4053-ab82-53dc501401c7","op":"provider.native.addon-metadata"}
+{"at":"2026-10-17T20:29:33.484Z","kind":"scenario.end","id":"OFFLINE-REPLAY","status":"PASS","detail":"cache replay ok, downloads=0, exports=13"}
+{"at":"2026-10-17T20:29:33.485Z","kind":"scenario.start","id":"RESTART","title":"fresh subprocess re-verifies from durable cache and activates"}
+{"at":"2026-10-17T20:29:34.915Z","kind":"restart.child","ok":true,"exitCode":0,"exportCount":13,"addonType":"object","childAbi":"137","refuseCode":""}
+{"at":"2026-10-17T20:29:34.916Z","kind":"scenario.end","id":"RESTART","status":"PASS","detail":"fresh process: exports=13 abi=137"}
+{"at":"2026-10-17T20:29:34.917Z","kind":"scenario.start","id":"NEG-TAMPER-MAIN","title":"tampered cached .node refuses closed, recovers after restore"}
+{"at":"2026-10-17T20:29:35.693Z","kind":"effect.authorized","leaseId":"9e1ce599-70ad-4b8b-b6f3-e77efdf2804a","op":"provider.native.addon-metadata"}
+{"at":"2026-10-17T20:29:35.898Z","kind":"scenario.end","id":"NEG-TAMPER-MAIN","status":"PASS","detail":"tampered→ARTIFACT_NOT_VERIFIED zero spawn; restored→EXECUTED (one fresh run)"}
+{"at":"2026-10-17T20:29:35.899Z","kind":"scenario.start","id":"NEG-CATALOG","title":"unsigned, forged-key and downgrade descriptors refuse before exec"}
+{"at":"2026-10-17T20:29:35.901Z","kind":"neg.catalog","unsigned":"CATALOG_SIGNATURE_INVALID","forged":"CATALOG_SIGNATURE_INVALID","downgrade":"CATALOG_SCOPE_DRIFT"}
+{"at":"2026-10-17T20:29:35.902Z","kind":"scenario.end","id":"NEG-CATALOG","status":"PASS","detail":"unsigned=CATALOG_SIGNATURE_INVALID forged=CATALOG_SIGNATURE_INVALID downgrade=CATALOG_SCOPE_DRIFT spawns=0"}
+{"at":"2026-10-17T20:29:35.902Z","kind":"scenario.start","id":"NEG-ABI","title":"host ABI drift refuses closed before any child"}
+{"at":"2026-10-17T20:29:35.904Z","kind":"scenario.end","id":"NEG-ABI","status":"PASS","detail":"hostAbi=999 vs artifact=137 → ABI_MISMATCH zero spawn"}
+{"at":"2026-10-17T20:29:35.905Z","kind":"scenario.start","id":"NEG-DEP","title":"missing and tampered dependency cache bytes refuse closed"}
+{"at":"2026-10-17T20:29:37.785Z","kind":"effect.authorized","leaseId":"9196e986-37a3-45d6-a03a-7297c4d88a54","op":"provider.native.addon-metadata"}
+{"at":"2026-10-17T20:29:37.992Z","kind":"scenario.end","id":"NEG-DEP","status":"PASS","detail":"missing/tampered dep → DEPENDENCIES_UNVERIFIED zero spawn; restored → EXECUTED (one fresh run)"}
+{"at":"2026-10-17T20:29:37.993Z","kind":"scenario.start","id":"NEG-IMPORT","title":"undeclared non-system import refuses (synthetic PE fixture)"}
+{"at":"2026-10-17T20:29:38.014Z","kind":"scenario.end","id":"NEG-IMPORT","status":"PASS","detail":"evil_overlay.dll undeclared → DEPENDENCIES_UNVERIFIED zero spawn"}
+{"at":"2026-10-17T20:29:38.015Z","kind":"scenario.start","id":"NEG-DEP-COLLISION","title":"dependency name colliding with a system DLL refuses"}
+{"at":"2026-10-17T20:29:38.021Z","kind":"scenario.end","id":"NEG-DEP-COLLISION","status":"PASS","detail":"KERNEL32.DLL as a curated dep name → DEPENDENCIES_UNVERIFIED zero spawn"}
+{"at":"2026-10-17T20:29:38.021Z","kind":"scenario.start","id":"NEG-OPERAND","title":"unseeded and absolute IMAGE_METADATA operands refuse pre-authority"}
+{"at":"2026-10-17T20:29:38.022Z","kind":"scenario.end","id":"NEG-OPERAND","status":"PASS","detail":"unseeded + absolute operands → RUN_REQUEST_INVALID, zero spawn"}
+{"at":"2026-10-17T20:29:38.023Z","kind":"scenario.start","id":"NEG-REVOCATION-EPOCH","title":"host revocation-epoch bump voids activation before exec"}
+{"at":"2026-10-17T20:29:38.723Z","kind":"effect.authorized","leaseId":"f76657be-a75f-4537-af8d-81c87453c883","op":"provider.native.addon-metadata"}
+{"at":"2026-10-17T20:29:38.927Z","kind":"scenario.end","id":"NEG-REVOCATION-EPOCH","status":"PASS","detail":"epoch 1→2 → AUTHORITY_STALE zero spawn; restored → EXECUTED"}
+{"at":"2026-10-17T20:29:38.927Z","kind":"scenario.start","id":"NEG-GRANT-REVOKED","title":"revoked grant refuses; re-issue restores"}
+{"at":"2026-10-17T20:29:39.579Z","kind":"effect.authorized","leaseId":"2c752392-f0b5-40fd-862f-533a058bd5c0","op":"provider.native.addon-metadata"}
+{"at":"2026-10-17T20:29:39.791Z","kind":"scenario.end","id":"NEG-GRANT-REVOKED","status":"PASS","detail":"revokeGrant → AUTHORITY_STALE zero spawn; re-issue → EXECUTED"}
+{"at":"2026-10-17T20:29:39.792Z","kind":"scenario.start","id":"NEG-TOCTOU","title":"ActionController denial between admission and exec voids activation"}
+{"at":"2026-10-17T20:29:40.431Z","kind":"scenario.end","id":"NEG-TOCTOU","status":"PASS","detail":"reads=2 (admission + immediately-before-exec), second denial → zero spawn"}
+{"at":"2026-10-17T20:29:40.440Z","kind":"scenario.start","id":"NEG-SWAP","title":"staged .node byte swap after verification refuses at the last boundary"}
+{"at":"2026-10-17T20:29:41.840Z","kind":"effect.authorized","leaseId":"a06ede3e-d0c1-4126-b52e-fce421f43e8f","op":"provider.native.addon-metadata"}
+{"at":"2026-10-17T20:29:42.059Z","kind":"scenario.end","id":"NEG-SWAP","status":"PASS","detail":"staged .node swapped post-verify → EXECUTABLE_IDENTITY_DRIFT zero spawn; fresh run → EXECUTED"}
+{"at":"2026-10-17T20:29:42.060Z","kind":"scenario.start","id":"NEG-INTERRUPT","title":"killed child surfaces honestly as timedOut; next run recovers"}
+{"at":"2026-10-17T20:29:42.715Z","kind":"effect.authorized","leaseId":"acffb50b-54f5-49e7-9bf9-731ef8ce09c5","op":"provider.native.addon-metadata"}
+{"at":"2026-10-17T20:29:42.871Z","kind":"neg.interrupt","exitCode":-1,"timedOut":true,"durationMs":810}
+{"at":"2026-10-17T20:29:43.559Z","kind":"effect.authorized","leaseId":"1ed6921b-c401-4130-b8c2-e294d9e6ff95","op":"provider.native.addon-metadata"}
+{"at":"2026-10-17T20:29:43.776Z","kind":"scenario.end","id":"NEG-INTERRUPT","status":"PASS","detail":"child killed at 1ms → EXECUTED timedOut=true exit=-1; recovery → exports=13"}
+{"at":"2026-10-17T20:29:43.777Z","kind":"scenario.start","id":"R1-F03-GRANT-BINDING","title":"effect grant bound to ADDON_METADATA refuses IMAGE_METADATA"}
+{"at":"2026-10-17T20:29:44.467Z","kind":"effect.refused","stage":"argv-shape","op":"provider.native.image-metadata"}
+{"at":"2026-10-17T20:29:44.479Z","kind":"scenario.end","id":"R1-F03-GRANT-BINDING","status":"PASS","detail":"ADDON_METADATA grant vs IMAGE_METADATA invocation → EFFECT_NOT_AUTHORIZED zero spawn"}
+{"at":"2026-10-17T20:29:44.480Z","kind":"scenario.start","id":"DACL","title":"private cache root DACL/owner: owner-only write surface"}
+{"at":"2026-10-17T20:29:45.493Z","kind":"dacl.inspect","owner":"<HOST>\\<USER>","ownerSid":"S-1-5-21-2839165489-1832998833-1574237796-1001","wideWriteCount":0,"ruleCount":5,"ownerMatchesCurrentUser":true}
+{"at":"2026-10-17T20:29:45.494Z","kind":"scenario.end","id":"DACL","status":"PASS","detail":"owner=<HOST>\\<USER> (current user), wide-write ACEs=0, rules=5"}
+{"at":"2026-10-17T20:29:45.494Z","kind":"scenario.start","id":"CANARY","title":"user-owned files unchanged across the whole run"}
+{"at":"2026-10-17T20:29:45.496Z","kind":"scenario.end","id":"CANARY","status":"PASS","detail":"3 canaries byte-identical"}
+{"at":"2026-10-17T20:29:45.501Z","kind":"run.end","pass":24,"fail":0,"blocked":0,"skipped":0,"runFailed":false,"summary":"C:\\xDev\\kAiCreator\\shun-assistant\\shun-assistant-i106-zcode\\packages\\provider-loader\\evidence\\t05-native-2026-10-17T20-29-25\\summary.md"}

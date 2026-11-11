@@ -1,0 +1,9 @@
+T05 winhost evidence manifest — 2026-10-17T16-55-48
+evidence_dir=C:\xDev\kAiCreator\shun-assistant\i106-t05-winhost\packages\provider-loader\evidence\t05-winhost-2026-10-17T16-55-48
+runtime_root=<HOME>\AppData\Local\Temp\shun-t05-winhost-2026-10-17T16-55-48 (NOT committed; heavy artifacts)
+rg_zip_sha256=d0f534024c42afd6cb4d38907c25cd2b249b79bbe6cc1dbee8e3e37c2b6e25a1
+rg_exe_sha256=f162b54de2adfc72d78adb1dbada2dedda111ae0a5e2f6e9500f4f909664c5d2
+curator_public_key_sha256=ec01f4631ae78c380cde4d75549a028bcafa439b005ae78f0915fd6724507b0d
+
+34ea0b6708c12337029f4aacc2676ca50f90f9902ecff24218ea4e24ae8158ab  C:\xDev\kAiCreator\shun-assistant\i106-t05-winhost\packages\provider-loader\evidence\t05-winhost-2026-10-17T16-55-48\events.ndjson
+909d3f05c7756105125c7727db4f0be74e7d708ada6b06d401614374ebc22810  C:\xDev\kAiCreator\shun-assistant\i106-t05-winhost\packages\provider-loader\evidence\t05-winhost-2026-10-17T16-55-48\summary.md

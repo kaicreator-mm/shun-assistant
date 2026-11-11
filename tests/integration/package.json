@@ -5,6 +5,7 @@
   "type": "module",
   "scripts": {
     "lint": "node --check run-tests.mjs",
-    "test": "node run-tests.mjs"
+    "test": "node run-tests.mjs",
+    "typecheck": "node ../../scripts/v03-ci/typecheck-r02.mjs"
   }
 }
