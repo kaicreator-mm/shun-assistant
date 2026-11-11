@@ -1,0 +1,58 @@
+pack_id: shun-v030-ci-privileged-relay-345-g1
+task_id: CI-RELIABILITY-345
+issue: "#345"
+parent_issue: "#259"
+repository: kaicreator-mm/shun-assistant
+version: v0.3.0
+standard_revision: 2c395c55569fe2edf3f4135f12d3d069e526d0b7
+admission_mode: SINGLE_WRITER_ADMISSION
+admission_generation: 1
+protected_claim_key: "kaicreator-mm/shun-assistant#345:builder:__default__"
+source_base:
+  branch: wip/v0.3.0-r02-owner-repairs
+  sha: 39e4f85f3fa01d9f4b20ba73adcf79cbc42707f5
+  tree: cb8b14856f223622a80f85a0317026f455198983
+failure_evidence:
+  observed_sha: 3763f658e7c81f6acf2dadb596a0d117d46773f7
+  actions_workflow_run: 42076555601
+  actions_job: 127418175093
+  failure_test: packages/executor-windows/test/privileged-env-sterilization.test.ts
+  failure_line: 161
+  expected: RAN
+  actual: TIMED_OUT
+  timeout_ms: 60000
+  issue_evidence_comment: 6665878423
+authoring_write_set:
+  - packages/executor-windows/src/privileged-backend.ts
+  - packages/executor-windows/src/safe-env.ts
+  - packages/executor-windows/test/privileged-env-sterilization.test.ts
+design_contract:
+  - "Preserve the real launcher-to-PowerShell relay spawn and the behavioral proof that hostile NODE_OPTIONS/NODE_PATH/NODE_* variables do not cross the privileged boundary."
+  - "Preserve the positive canary proving NODE_OPTIONS=--require really executes in a spawned Node process; the sterile-boundary test must remain meaningful."
+  - "Do not skip, mock away, suppress or weaken the relay execution assertion."
+  - "Do not blindly increase the 60-second timeout. Diagnose spawn/readiness/exit behavior first; any timeout change must be justified by measured startup bounds and remain bounded."
+  - "Do not add caller-controlled PSModulePath or arbitrary environment variables to the allowlist. Any environment change must be a narrowly justified inert OS configuration value with a regression test."
+  - "Timeout and spawn-error cleanup must be bounded, observable and leave no orphan PowerShell/taskkill child or helper process."
+  - "Do not add UAC prompts, privilege expansion, physical Windows effects, signing credentials or production key material."
+  - "No changes to R02-B Guided service/tests, Control API, Kernel/SDK, main, version/v0.2.0, or release/deployment refs."
+diagnostic_contract:
+  - "On native Windows, capture whether the PowerShell process actually spawns, PID, command line, first output/readiness, exit code, stdout/stderr tail, relay/probe file state and elapsed time."
+  - "Distinguish PowerShell startup delay, script/module initialization stall, argument parsing failure, relay script hang and child-process cleanup failure."
+  - "Observe the timeout taskkill process and verify the target process tree is gone; do not infer cleanup from wrapper exit alone."
+  - "Compare the exact privilegedSpawnEnv child environment with a normal PowerShell launch only for diagnosis; do not weaken the security boundary."
+test_contract:
+  - "Pack PR must be exactly one manifest-only path, directly parented to source_base.sha."
+  - "After exact pack Woodpecker Push and PR SUCCESS, record a fresh Generation-1 CAS Claim on Issue #345 before any source edit."
+  - "Run tracked-source syntax/Biome preflight before CI."
+  - "Run the isolated privileged-env-sterilization test repeatedly and the complete @shun/executor-windows suite on native Windows Node 24.21.0 and 26.13.0."
+  - "Add deterministic coverage for successful relay readiness, controlled startup delay, timeout, spawn error and bounded process-tree cleanup without orphan children."
+  - "Run package lint, typecheck, helper build, tools/task-check.sh and exact-SHA Woodpecker Push/PR; record supplementary GitHub Actions executor-windows result for this issue."
+  - "Record exact HEAD/tree/base, changed paths, command/exit codes, Node versions, process evidence, test counts and CI pipeline IDs on Issue #345."
+integration_constraints:
+  - "Only the three authoring paths listed above."
+  - "No CI-only timeout bypass, no no-op commit to disguise retry, no skipped tests."
+  - "A reviewer finding outside this write set requires a separate bounded task/pack; no implicit expansion."
+source_write_authorized: false
+merge_authorized: false
+release_authorized: false
+deployment_authorized: false
