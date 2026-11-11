@@ -1,0 +1,54 @@
+#!/usr/bin/env node
+import { readFile } from 'node:fs/promises';
+import { analyzeMemoryObservation } from './memory-analysis.mjs';
+
+const args = process.argv.slice(2);
+const includeLocalProcessNames = args.includes('--show-local-process-names');
+if (args.some((x) => x !== '--show-local-process-names')) {
+  process.stderr.write('Usage: node run-windows-memory-demo.mjs [--show-local-process-names]\n');
+  process.exitCode = 2;
+} else if (process.platform !== 'win32') {
+  process.stdout.write(JSON.stringify({
+    schema: 'shun.demo.memory-performance-runtime.v0',
+    outcome: 'UNKNOWN',
+    code: 'WINDOWS_REQUIRED',
+    effectsAuthorized: false,
+    externalDisclosures: [],
+  }, null, 2) + '\n');
+  process.exitCode = 2;
+} else {
+  try {
+    const aot = JSON.parse(await readFile(new URL('./AOT_MEMORY_KNOWLEDGE_CANDIDATE_R0.json', import.meta.url), 'utf8'));
+    const contract = JSON.parse(await readFile(new URL('./DIS_FUNCTION_CONTRACT_R0.json', import.meta.url), 'utf8'));
+    if (aot.status !== 'DEMO_ONLY_CANDIDATE_NOT_QUALIFIED' || aot.productionConsumable !== false ||
+        contract.status !== 'DIS_CONTRACT_CANDIDATE_NOT_QUALIFIED') {
+      throw new Error('DEMO_ARTIFACT_STATUS_MISMATCH');
+    }
+    const { collectWindowsReadonlyDiagnosis, collectWindowsTopMemoryProcesses } =
+      await import('../../../../packages/vertical-system/src/index.ts');
+    const diagnostic = collectWindowsReadonlyDiagnosis();
+    const topMemory = collectWindowsTopMemoryProcesses();
+    const report = analyzeMemoryObservation(diagnostic, topMemory, { includeLocalProcessNames });
+    process.stdout.write(JSON.stringify({
+      schema: 'shun.demo.memory-performance-runtime.v0',
+      demoOnly: true,
+      productFeature: false,
+      aotPackage: { packageId: aot.packageId, packageVersion: aot.packageVersion, status: aot.status, activation: aot.activation },
+      disPipeline: contract.pipeline.pipelineId,
+      runtime: { platform: process.platform, arch: process.arch, nodeVersion: process.version, sourceCommit: '1224fea4097799467e2c0c454885e680f1f28248' },
+      report,
+      effectsAuthorized: false,
+      externalDisclosures: [],
+    }, null, 2) + '\n');
+    if (report.outcome !== 'OBSERVED_ONLY') process.exitCode = 2;
+  } catch {
+    process.stdout.write(JSON.stringify({
+      schema: 'shun.demo.memory-performance-runtime.v0',
+      outcome: 'UNKNOWN',
+      code: 'RUNTIME_ADAPTER_OR_DEMO_ARTIFACT_UNAVAILABLE',
+      effectsAuthorized: false,
+      externalDisclosures: [],
+    }, null, 2) + '\n');
+    process.exitCode = 2;
+  }
+}
