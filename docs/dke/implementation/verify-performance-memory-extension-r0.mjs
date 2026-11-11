@@ -25,16 +25,16 @@ export function validateArtifacts(base, ext, demand, demo, contract, aot, baseTe
 
   add(gitBlobSha(baseText) === ext.stackedOn.knowledgeBlob, 'BASE_KNOWLEDGE_BLOB_MISMATCH');
   add(gitBlobSha(demandText) === ext.stackedOn.demandBlob, 'BASE_DEMAND_BLOB_MISMATCH');
-  add(base.project?.repository === 'kaicreator-mm/shun-assistant' || base.project?.name === 'shun-assistant', 'BASE_PROJECT_IDENTITY');
-  add(unique(ext.claims.map((x) => x.id)), 'DUPLICATE_EXTENSION_CLAIM');
-  add(unique(ext.elements.map((x) => x.id)), 'DUPLICATE_EXTENSION_ELEMENT');
-  add(unique(ext.relations.map((x) => x.id)), 'DUPLICATE_EXTENSION_RELATION');
-  add(unique(ext.invariants.map((x) => x.id)), 'DUPLICATE_EXTENSION_INVARIANT');
-  add(unique(ext.competencyQuestions.map((x) => x.id)), 'DUPLICATE_EXTENSION_CQ');
-  add(unique(ext.externalSources.map((x) => x.id)), 'DUPLICATE_EXTENSION_SOURCE');
+  add(base.project === 'kaicreator-mm/shun-assistant', 'BASE_PROJECT_IDENTITY');
+  add(unique(ext.claims.map((x) => x.id)) && ext.claims.every((x) => !base.claims.some((y) => y.id === x.id)), 'DUPLICATE_EXTENSION_CLAIM');
+  add(unique(ext.elements.map((x) => x.id)) && ext.elements.every((x) => !base.elements.some((y) => y.id === x.id)), 'DUPLICATE_EXTENSION_ELEMENT');
+  add(unique(ext.relations.map((x) => x.id)) && ext.relations.every((x) => !base.relations.some((y) => y.id === x.id)), 'DUPLICATE_EXTENSION_RELATION');
+  add(unique(ext.invariants.map((x) => x.id)) && ext.invariants.every((x) => !base.globalInvariants.some((y) => y.id === x.id)), 'DUPLICATE_EXTENSION_INVARIANT');
+  add(unique(ext.competencyQuestions.map((x) => x.id)) && ext.competencyQuestions.every((x) => !base.competencyQuestions.some((y) => y.id === x.id)), 'DUPLICATE_EXTENSION_CQ');
+  add(unique(ext.externalSources.map((x) => x.id)) && ext.externalSources.every((x) => !baseSourceIds.has(x.id)), 'DUPLICATE_EXTENSION_SOURCE');
   for (const pin of ext.sourceEvidencePins) {
     const original = base.sourceInventory.find((x) => x.id === pin.id);
-    add(Boolean(original) && original.blob === pin.blob && original.path === pin.path && original.commit === pin.commit, `SOURCE_PIN_MISMATCH:${pin.id}`);
+    add(Boolean(original) && original.blob === pin.blob && original.path === pin.path && original.commit === pin.commit && original.branch === pin.branch, `SOURCE_PIN_MISMATCH:${pin.id}`);
   }
   for (const source of ext.externalSources) {
     add(source.authority === 'MICROSOFT_LEARN' && source.url.startsWith('https://learn.microsoft.com/'), `EXTERNAL_SOURCE_AUTHORITY:${source.id}`);
