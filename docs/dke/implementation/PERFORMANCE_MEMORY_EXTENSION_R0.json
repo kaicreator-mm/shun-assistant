@@ -23,7 +23,7 @@
       "path": "packages/vertical-system/src/internal/windows-pressure.ts",
       "blob": "becb976b39ef6da760d451ca8ac7f9af474dc679",
       "kind": "CODE",
-      "status": "SOURCE_PINNED_READ_ONLY"
+      "status": "OBSERVED_BOUNDED_READ_ONLY"
     },
     {
       "id": "SRC-TEST-SYSTEM-PRESSURE",
@@ -32,7 +32,7 @@
       "path": "packages/vertical-system/test/windows-pressure.test.ts",
       "blob": "a103a959cecf7fe67f8a626ee6b1a25b9eeeb91b",
       "kind": "TEST_DEFINITION",
-      "status": "SOURCE_PINNED_READ_ONLY"
+      "status": "TEST_SOURCE_ONLY_EXECUTION_NOT_REPEATED"
     },
     {
       "id": "SRC-SYSTEM-DIAGNOSTICS",
@@ -41,7 +41,7 @@
       "path": "packages/vertical-system/src/diagnostics.ts",
       "blob": "79cd145dbcd212968846fad39f7e7f68e21923a2",
       "kind": "CODE",
-      "status": "SOURCE_PINNED_READ_ONLY"
+      "status": "OBSERVED"
     },
     {
       "id": "SRC-TEST-SYSTEM-DIAGNOSTICS",
@@ -50,7 +50,7 @@
       "path": "packages/vertical-system/test/diagnostics.test.ts",
       "blob": "b163404542bc73c1fedb9a56fd8b9edf39436896",
       "kind": "TEST_DEFINITION",
-      "status": "SOURCE_PINNED_READ_ONLY"
+      "status": "TEST_SOURCE_ONLY_EXECUTION_NOT_REPEATED"
     },
     {
       "id": "SRC-SYSTEM-RUNTIME",
@@ -59,7 +59,7 @@
       "path": "packages/vertical-system/src/windows-runtime.ts",
       "blob": "1f425854b688a1981b4f3c28cd4de39bb5cc6288",
       "kind": "CODE",
-      "status": "SOURCE_PINNED_READ_ONLY"
+      "status": "OBSERVED"
     },
     {
       "id": "SRC-TEST-SYSTEM-RUNTIME",
@@ -68,7 +68,7 @@
       "path": "packages/vertical-system/test/windows-runtime.test.ts",
       "blob": "23dfc1fcf3622c0b73decfc441b24a4cd1dc0c5e",
       "kind": "TEST_DEFINITION",
-      "status": "SOURCE_PINNED_READ_ONLY"
+      "status": "TEST_SOURCE_ONLY_EXECUTION_NOT_REPEATED"
     },
     {
       "id": "SRC-SYSTEM-INDEX",
@@ -77,34 +77,34 @@
       "path": "packages/vertical-system/src/index.ts",
       "blob": "7f687a10f216fc9c792cb689942da792ee8e8d88",
       "kind": "CODE",
-      "status": "SOURCE_PINNED_READ_ONLY"
+      "status": "OBSERVED"
     },
     {
       "id": "SRC-PRODUCT-FREEZE",
       "repository": "kaicreator-mm/shun-assistant",
-      "commit": "1224fea4097799467e2c0c454885e680f1f28248",
       "path": "docs/product/PRODUCT_FREEZE-v0.3.md",
       "blob": "0f8a67c2f06364d58a842502d3dee11bfeeedba4",
       "kind": "PRODUCT_AUTHORITY",
-      "status": "SOURCE_PINNED_READ_ONLY"
+      "status": "FROZEN_CHECKPOINT",
+      "branch": "version/v0.3.0"
     },
     {
       "id": "SRC-PRODUCT-PRD",
       "repository": "kaicreator-mm/shun-assistant",
-      "commit": "1224fea4097799467e2c0c454885e680f1f28248",
+      "commit": "4c2f8e84b6e6f3f5b526e52d01356159f2dce0e7",
       "path": "docs/product/PRD-v0.3-domain-harness-R0.md",
       "blob": "f062b7f2c3dc3bf4aeeb7594ab5c2bc75b34d0ab",
-      "kind": "PRODUCT_REQUIREMENT",
-      "status": "SOURCE_PINNED_READ_ONLY"
+      "kind": "PRODUCT",
+      "status": "FROZEN_BY_OWNER_CHECKPOINT"
     },
     {
       "id": "SRC-PRODUCT-L1",
       "repository": "kaicreator-mm/shun-assistant",
-      "commit": "1224fea4097799467e2c0c454885e680f1f28248",
+      "commit": "4c2f8e84b6e6f3f5b526e52d01356159f2dce0e7",
       "path": "docs/product/L1-v0.3-domain-harness-parity-R0.md",
-      "blob": "4c703c3f0c283f4d3919babef8f87f56869698e5",
-      "kind": "PRODUCT_REQUIREMENT",
-      "status": "SOURCE_PINNED_READ_ONLY"
+      "blob": "4c703c3f0c283f4d3918babef8f87f56869698e5",
+      "kind": "PRODUCT_EVIDENCE",
+      "status": "FROZEN_BY_OWNER_CHECKPOINT"
     }
   ],
   "externalSources": [
