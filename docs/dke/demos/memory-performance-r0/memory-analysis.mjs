@@ -12,11 +12,13 @@ const MISSING_METRICS = Object.freeze([
   'USER_RESPONSE_OR_THROUGHPUT_METRIC',
 ]);
 
-function unknown(code, observedAt = null) {
+function unknown(code, analyzedAt = new Date().toISOString()) {
   return {
     schema: 'shun.demo.memory-performance-report.v0',
     outcome: 'UNKNOWN',
-    observedAt,
+    observedAt: 'UNKNOWN',
+    sampledAt: 'UNKNOWN',
+    analyzedAt,
     code,
     diagnosis: { status: 'UNKNOWN', rootCause: 'UNKNOWN' },
     optimizationPlan: { status: 'NOT_PRODUCED', effectsAuthorized: false, executed: false },
@@ -35,13 +37,14 @@ function validBytes(total, available) {
  * collectors and never invokes a process/service/cache/pagefile effect.
  */
 export function analyzeMemoryObservation(diagnosticResult, processResult, options = {}) {
-  const observedAt = options.observedAt ?? new Date().toISOString();
+  // A caller-provided observedAt/sampledAt is not a trusted Host sampling receipt.
+  const analyzedAt = new Date().toISOString();
   const includeLocalProcessNames = options.includeLocalProcessNames === true;
   if (!diagnosticResult?.ok || !processResult?.ok) {
     const code = !diagnosticResult?.ok
       ? (diagnosticResult?.code ?? 'SYSTEM_OBSERVATION_UNAVAILABLE')
       : (processResult?.code ?? 'PROCESS_OBSERVATION_UNAVAILABLE');
-    return unknown(code, observedAt);
+    return unknown(code, analyzedAt);
   }
   const report = diagnosticResult.report;
   const facts = processResult.facts;
@@ -67,7 +70,7 @@ export function analyzeMemoryObservation(diagnosticResult, processResult, option
     !Array.isArray(facts.top) ||
     facts.top.length < 1 ||
     facts.top.length > 8
-  ) return unknown('INVALID_OR_INCOMPLETE_MEMORY_EVIDENCE', observedAt);
+  ) return unknown('INVALID_OR_INCOMPLETE_MEMORY_EVIDENCE', analyzedAt);
 
   let previous = Number.MAX_SAFE_INTEGER;
   const topResidentProcesses = [];
@@ -79,7 +82,7 @@ export function analyzeMemoryObservation(diagnosticResult, processResult, option
       !/^[\p{L}\p{N}_. ()-]+$/u.test(entry.name) ||
       !Number.isSafeInteger(entry.residentBytes) ||
       entry.residentBytes < 0 || entry.residentBytes > previous
-    ) return unknown('INVALID_PROCESS_MEMORY_FACT', observedAt);
+    ) return unknown('INVALID_PROCESS_MEMORY_FACT', analyzedAt);
     previous = entry.residentBytes;
     const row = { rank: i + 1, localAlias: `PROCESS_${String(i + 1).padStart(2, '0')}`, residentWorkingSetBytes: entry.residentBytes };
     if (includeLocalProcessNames) row.localName = entry.name;
@@ -90,13 +93,16 @@ export function analyzeMemoryObservation(diagnosticResult, processResult, option
   return {
     schema: 'shun.demo.memory-performance-report.v0',
     outcome: 'OBSERVED_ONLY',
-    observedAt,
+    observedAt: 'UNKNOWN',
+    sampledAt: 'UNKNOWN',
+    analyzedAt,
     source: {
       systemDiagnosisSchema: report.schema,
       processObservationSchema: facts.schema,
       processMetric: facts.metric,
       processInterpretation: facts.interpretation,
-      aotRuleIds: ['MEM-AOT-001','MEM-AOT-002','MEM-AOT-003','MEM-AOT-004','MEM-AOT-005','MEM-AOT-006','MEM-AOT-007','MEM-AOT-008'],
+      aotRuleIds: [],
+      aotRuleConsumption: 'NOT_APPLIED_BY_THIS_DEMO',
     },
     evidence: {
       memory: {
@@ -111,7 +117,7 @@ export function analyzeMemoryObservation(diagnosticResult, processResult, option
       signalSource: 'LEGACY_SINGLE_SNAPSHOT_DIAGNOSTIC',
     },
     diagnosis: {
-      status: lowFreeSignal ? 'POTENTIAL_LOW_AVAILABLE_MEMORY_SIGNAL' : 'NO_LEGACY_LOW_FREE_MEMORY_SIGNAL',
+      status: lowFreeSignal ? 'LOW_FREE_MEMORY_LEGACY_HEURISTIC' : 'NO_LEGACY_LOW_FREE_MEMORY_SIGNAL',
       confidence: 'SINGLE_SNAPSHOT_LIMITED',
       rootCause: 'UNKNOWN',
       leakStatus: 'NOT_ASSESSED_NO_TIME_SERIES_OR_STABLE_PROCESS_IDENTITY',
