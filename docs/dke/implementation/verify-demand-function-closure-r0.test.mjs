@@ -42,3 +42,31 @@ test('dossier bytes mismatch blocks validity',()=>{
  assert.ok(result.errors.some(e=>e.startsWith('KNOWLEDGE_DOSSIER_BLOB_MISMATCH')));
 });
 test('current Product checkpoint cannot grant implementation',()=>expectReject(x=>x.governance.implementationAuthorized=true,'ILLEGAL_PROMOTION_OR_AUTHORITY'));
+
+test('paired knowledge-plus-matrix repin cannot counterfeit reviewed Git Blob',()=>{
+ const tampered=JSON.parse(JSON.stringify(source));
+ tampered.claims[0].statement += ' counterfeit';
+ const forged=gitBlobSha(Buffer.from(JSON.stringify(tampered),'utf8'));
+ const x=clone(); x.evidenceBase.candidateBlob=forged;
+ const result=validate(x,tampered,{knowledgeBlob:forged});
+ assert.equal(result.ok,false);
+ assert.ok(result.errors.some(e=>e.startsWith('AUTHORITY_SOURCE_REPIN_NOT_REVIEWED')),JSON.stringify(result.errors));
+ assert.ok(result.errors.some(e=>e.startsWith('KNOWLEDGE_DOSSIER_BLOB_MISMATCH')),JSON.stringify(result.errors));
+});
+test('duplicate Product item cannot hide omitted frozen journey',()=>expectReject(x=>{
+ x.jobs[1].demandEvidence.locator=x.jobs[0].demandEvidence.locator;
+},'PRODUCT_JOURNEY_COVERAGE_DRIFT'));
+test('network source gap cannot masquerade as domain Claim closure',()=>expectReject(x=>{
+ x.jobs[14].semanticTrace.status='BOUNDED_SOURCE_CANDIDATE_NOT_FUNCTIONAL_CLOSURE';
+},'FALSE_SEMANTIC_TRACE_CLOSURE'));
+test('primary domain Claim witness is not any arbitrary registered Claim',()=>expectReject(x=>{
+ x.jobs[2].semanticTrace.primaryElementClaimWitnessIds=['CA-CLM-002'];
+},'PRIMARY_DOMAIN_CLAIM_TRACE_MISMATCH'));
+test('a source-only cloud/Host trace cannot be promoted to physical E2E closure',()=>expectReject(x=>{
+ x.jobs[4].semanticTrace.verifiedFunctionReceipt='PASS';
+},'FALSE_SEMANTIC_TRACE_CLOSURE'));
+test('a missing reviewed source-blob argument refuses rather than inferring currentness',()=>{
+ const result=validate(matrix,source);
+ assert.equal(result.ok,false);
+ assert.ok(result.errors.some(e=>e.startsWith('KNOWLEDGE_DOSSIER_BLOB_MISMATCH')),JSON.stringify(result.errors));
+});
