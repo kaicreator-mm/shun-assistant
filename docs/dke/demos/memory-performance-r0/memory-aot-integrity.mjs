@@ -2,7 +2,7 @@
 // evidence that semantic rules were actually executed by this demo.
 import {createHash} from 'node:crypto';
 
-export const REVIEWED_AOT_GIT_BLOB = 'e5bf93668066be5c76148c1a4cbdd930dcf55c29';
+export const REVIEWED_AOT_GIT_BLOB = 'ccbb6b4d2f97e62cbecdade81405a73148ec29fb';
 
 function gitBlob(raw) {
   const bytes = Buffer.from(raw, 'utf8');
