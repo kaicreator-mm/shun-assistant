@@ -7,7 +7,7 @@ import {dirname,resolve} from 'node:path';
 import {validateOraclePack,validateImpactBench,evaluateFixture,impactSource} from './memory-dke-evaluator-r2.mjs';
 
 const root=dirname(fileURLToPath(import.meta.url));
-const memoryRoot=resolve(root,'../..');
+const memoryRoot=resolve(root,'../../..');
 export const PINS=Object.freeze({
  knowledge:'c877ec23dc59b0ae17681c7d8f7505b1521c8011',
  demand:'74c10245e88608d12ae716bd2bae1623a2f55dc5',
