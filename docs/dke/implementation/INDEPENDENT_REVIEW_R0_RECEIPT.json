@@ -58,7 +58,7 @@
     "permissionsCreated": false,
     "aotPackageCreated": false,
     "productScopeAmended": false,
-    "repairedJsonBlob": "ecc45fc70f1eecaaf59d2998e7a179c7fb2db970",
+    "repairedJsonBlob": "7561fd85adb2feb356cde0e59baf57a0df420a59",
     "repairedMarkdownBlob": "ed9af17100eb1c8bd4d869f328ded3b514402074",
     "sourceExternalAdded": "EXT-WINDOWS-CLIENT-SERVICING",
     "newCounts": {
@@ -72,7 +72,14 @@
       "invariants": 13,
       "cqs": 20,
       "sapElements": 17
-    }
+    },
+    "ownerClosureCorrection": {
+      "status": "STRUCTURAL_CROSS_REFERENCE_REPAIRED",
+      "note": "The owning Global Semantic Element is now included in its own globalInvariantRefs, in addition to every explicitly applicable Element. SAP profile and obligation source/invariant refs were recomputed from the final closure map.",
+      "ownerRefsVerified": true,
+      "rootRefsAll": true
+    },
+    "repairBaseHead": "f499a5aaf0a669393d2489bb785d8858a5c4aa16"
   },
   "finalQualification": {
     "P0": 0,

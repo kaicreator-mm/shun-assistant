@@ -1657,13 +1657,13 @@
       "semanticBoundary": "Disk/partition/volume/filesystem and provider-dependent health semantics are knowledge candidates; current Shun evidence covers only fixed-volume capacity and bounded cleanup. No universal SMART-health or disk-management feature is implied.",
       "validationOracle": "Microsoft Storage documentation with explicit OS/provider applicability, exact disk/volume identity, native Windows Storage Management Provider oracle and independent storage-domain review.",
       "globalInvariantRefs": [
+        "CA-INV-008",
         "CA-INV-001",
         "CA-INV-002",
         "CA-INV-003",
         "CA-INV-004",
         "CA-INV-005",
         "CA-INV-007",
-        "CA-INV-008",
         "CA-INV-012",
         "CA-INV-013"
       ],
@@ -1818,13 +1818,13 @@
       "semanticBoundary": "Hardware/PnP/driver semantics as a future knowledge area; no current public Shun capability is admitted.",
       "validationOracle": "Microsoft and OEM documentation, real device/driver compatibility oracle and rollback tests.",
       "globalInvariantRefs": [
+        "CA-INV-009",
         "CA-INV-001",
         "CA-INV-002",
         "CA-INV-003",
         "CA-INV-004",
         "CA-INV-005",
         "CA-INV-006",
-        "CA-INV-009",
         "CA-INV-012",
         "CA-INV-013"
       ],
@@ -2041,9 +2041,9 @@
       "semanticBoundary": "Classification of reusable knowledge versus runtime facts; does not build or activate AOT Packages.",
       "validationOracle": "DKE SAP review followed by DIS ECP and exact selected-consumer Package proof.",
       "globalInvariantRefs": [
+        "CA-INV-011",
         "CA-INV-001",
         "CA-INV-002",
-        "CA-INV-011",
         "CA-INV-012",
         "CA-INV-013"
       ],
@@ -2075,8 +2075,9 @@
       "validationOracle": "Exact source/blob review and provider provenance negatives.",
       "maturity": "PARTIAL",
       "globalInvariantRefs": [
-        "CA-INV-012",
-        "CA-INV-013"
+        "CA-INV-006",
+        "CA-INV-013",
+        "CA-INV-012"
       ],
       "cqRefs": [
         "CQ-CA-018"
@@ -2104,6 +2105,10 @@
       "validationOracle": "Product/Host source review plus forged/stale/mismatched authority negatives.",
       "maturity": "FROZEN_PRODUCT",
       "globalInvariantRefs": [
+        "CA-INV-001",
+        "CA-INV-002",
+        "CA-INV-003",
+        "CA-INV-007",
         "CA-INV-012"
       ],
       "cqRefs": [
@@ -2133,6 +2138,8 @@
       "validationOracle": "Independent observable post-state and interruption/recovery tests.",
       "maturity": "PARTIAL",
       "globalInvariantRefs": [
+        "CA-INV-004",
+        "CA-INV-005",
         "CA-INV-012"
       ],
       "cqRefs": [
@@ -2432,13 +2439,13 @@
           "CA-REL-011"
         ],
         "globalInvariantRefs": [
+          "CA-INV-008",
           "CA-INV-001",
           "CA-INV-002",
           "CA-INV-003",
           "CA-INV-004",
           "CA-INV-005",
           "CA-INV-007",
-          "CA-INV-008",
           "CA-INV-012",
           "CA-INV-013"
         ],
@@ -2522,13 +2529,13 @@
           "CA-REL-012"
         ],
         "globalInvariantRefs": [
+          "CA-INV-009",
           "CA-INV-001",
           "CA-INV-002",
           "CA-INV-003",
           "CA-INV-004",
           "CA-INV-005",
           "CA-INV-006",
-          "CA-INV-009",
           "CA-INV-012",
           "CA-INV-013"
         ],
@@ -2655,9 +2662,9 @@
           "CA-REL-010"
         ],
         "globalInvariantRefs": [
+          "CA-INV-011",
           "CA-INV-001",
           "CA-INV-002",
-          "CA-INV-011",
           "CA-INV-012",
           "CA-INV-013"
         ],
@@ -2686,8 +2693,9 @@
           "CA-REL-009"
         ],
         "globalInvariantRefs": [
-          "CA-INV-012",
-          "CA-INV-013"
+          "CA-INV-006",
+          "CA-INV-013",
+          "CA-INV-012"
         ],
         "cqRefs": [
           "CQ-CA-018"
@@ -2713,6 +2721,10 @@
           "CA-REL-015"
         ],
         "globalInvariantRefs": [
+          "CA-INV-001",
+          "CA-INV-002",
+          "CA-INV-003",
+          "CA-INV-007",
           "CA-INV-012"
         ],
         "cqRefs": [
@@ -2738,6 +2750,8 @@
           "CA-REL-006"
         ],
         "globalInvariantRefs": [
+          "CA-INV-004",
+          "CA-INV-005",
           "CA-INV-012"
         ],
         "cqRefs": [
@@ -4337,7 +4351,14 @@
               "SRC-TEST-DOMAIN-COMPUTER-GUIDED",
               "SRC-TEST-DOMAIN-COMPUTER-META",
               "SRC-TEST-DOMAIN-COMPUTER-RECIPE",
-              "SRC-TEST-DOMAIN-COMPUTER-PROVIDER-JIT"
+              "SRC-TEST-DOMAIN-COMPUTER-PROVIDER-JIT",
+              "SRC-PRODUCT-L1",
+              "SRC-DKE-STANDARD",
+              "EXT-DISK-MGMT",
+              "EXT-WINGET-OVERVIEW",
+              "EXT-PNP-GET",
+              "EXT-PHYSICAL-DISK",
+              "EXT-WINDOWS-CLIENT-SERVICING"
             ],
             "relationRefs": [
               "CA-REL-002",
@@ -4386,7 +4407,14 @@
               "SRC-TEST-DOMAIN-COMPUTER-GUIDED",
               "SRC-TEST-DOMAIN-COMPUTER-META",
               "SRC-TEST-DOMAIN-COMPUTER-RECIPE",
-              "SRC-TEST-DOMAIN-COMPUTER-PROVIDER-JIT"
+              "SRC-TEST-DOMAIN-COMPUTER-PROVIDER-JIT",
+              "SRC-PRODUCT-L1",
+              "SRC-DKE-STANDARD",
+              "EXT-DISK-MGMT",
+              "EXT-WINGET-OVERVIEW",
+              "EXT-PNP-GET",
+              "EXT-PHYSICAL-DISK",
+              "EXT-WINDOWS-CLIENT-SERVICING"
             ],
             "relationRefs": [
               "CA-REL-002",
@@ -4481,7 +4509,25 @@
               "SRC-SYSTEM-PRESSURE",
               "SRC-TEST-SYSTEM-PRESSURE",
               "SRC-TEST-SYSTEM-RUNTIME",
-              "SRC-TEST-SYSTEM-INVENTORY"
+              "SRC-TEST-SYSTEM-INVENTORY",
+              "SRC-PRODUCT-PRD",
+              "SRC-PRODUCT-L1",
+              "SRC-STORAGE-EXECUTE",
+              "SRC-DOMAIN-COMPUTER-SUPPORT",
+              "SRC-DOMAIN-COMPUTER-CLOUD-GOAL",
+              "SRC-DOMAIN-COMPUTER-META",
+              "SRC-TEST-DOMAIN-COMPUTER-SUPPORT",
+              "SRC-TEST-DOMAIN-COMPUTER-META",
+              "SRC-SUPPORT-MINIMIZER",
+              "SRC-SUPPORT-WINDOWS",
+              "SRC-SUPPORT-RUNNER",
+              "SRC-TEST-SUPPORT-CONTEXT",
+              "SRC-DKE-STANDARD",
+              "EXT-DISK-MGMT",
+              "EXT-WINGET-OVERVIEW",
+              "EXT-PNP-GET",
+              "EXT-PHYSICAL-DISK",
+              "EXT-WINDOWS-CLIENT-SERVICING"
             ],
             "relationRefs": [
               "CA-REL-014"
@@ -4522,7 +4568,25 @@
               "SRC-SYSTEM-PRESSURE",
               "SRC-TEST-SYSTEM-PRESSURE",
               "SRC-TEST-SYSTEM-RUNTIME",
-              "SRC-TEST-SYSTEM-INVENTORY"
+              "SRC-TEST-SYSTEM-INVENTORY",
+              "SRC-PRODUCT-PRD",
+              "SRC-PRODUCT-L1",
+              "SRC-STORAGE-EXECUTE",
+              "SRC-DOMAIN-COMPUTER-SUPPORT",
+              "SRC-DOMAIN-COMPUTER-CLOUD-GOAL",
+              "SRC-DOMAIN-COMPUTER-META",
+              "SRC-TEST-DOMAIN-COMPUTER-SUPPORT",
+              "SRC-TEST-DOMAIN-COMPUTER-META",
+              "SRC-SUPPORT-MINIMIZER",
+              "SRC-SUPPORT-WINDOWS",
+              "SRC-SUPPORT-RUNNER",
+              "SRC-TEST-SUPPORT-CONTEXT",
+              "SRC-DKE-STANDARD",
+              "EXT-DISK-MGMT",
+              "EXT-WINGET-OVERVIEW",
+              "EXT-PNP-GET",
+              "EXT-PHYSICAL-DISK",
+              "EXT-WINDOWS-CLIENT-SERVICING"
             ],
             "relationRefs": [
               "CA-REL-014"
@@ -4563,7 +4627,25 @@
               "SRC-SYSTEM-PRESSURE",
               "SRC-TEST-SYSTEM-PRESSURE",
               "SRC-TEST-SYSTEM-RUNTIME",
-              "SRC-TEST-SYSTEM-INVENTORY"
+              "SRC-TEST-SYSTEM-INVENTORY",
+              "SRC-PRODUCT-PRD",
+              "SRC-PRODUCT-L1",
+              "SRC-STORAGE-EXECUTE",
+              "SRC-DOMAIN-COMPUTER-SUPPORT",
+              "SRC-DOMAIN-COMPUTER-CLOUD-GOAL",
+              "SRC-DOMAIN-COMPUTER-META",
+              "SRC-TEST-DOMAIN-COMPUTER-SUPPORT",
+              "SRC-TEST-DOMAIN-COMPUTER-META",
+              "SRC-SUPPORT-MINIMIZER",
+              "SRC-SUPPORT-WINDOWS",
+              "SRC-SUPPORT-RUNNER",
+              "SRC-TEST-SUPPORT-CONTEXT",
+              "SRC-DKE-STANDARD",
+              "EXT-DISK-MGMT",
+              "EXT-WINGET-OVERVIEW",
+              "EXT-PNP-GET",
+              "EXT-PHYSICAL-DISK",
+              "EXT-WINDOWS-CLIENT-SERVICING"
             ],
             "relationRefs": [
               "CA-REL-014"
@@ -4672,20 +4754,34 @@
               "EXT-DISK-INITIALIZE",
               "EXT-STORAGE-MODULE",
               "SRC-SYSTEM-INDEX",
-              "EXT-PHYSICAL-DISK"
+              "EXT-PHYSICAL-DISK",
+              "SRC-PRODUCT-PRD",
+              "SRC-PRODUCT-L1",
+              "SRC-STORAGE-EXECUTE",
+              "SRC-JIT-ORCHESTRATOR",
+              "SRC-STORAGE-PLAN",
+              "SRC-JIT-RESIDUE",
+              "SRC-TEST-JIT-RESIDUE",
+              "SRC-DKE-STANDARD",
+              "EXT-WINGET-OVERVIEW",
+              "EXT-PNP-GET",
+              "EXT-WINDOWS-CLIENT-SERVICING",
+              "SRC-PRODUCT-FREEZE",
+              "SRC-DOMAIN-COMPUTER-INDEX",
+              "EXT-PNPUTIL"
             ],
             "relationRefs": [
               "CA-REL-006",
               "CA-REL-011"
             ],
             "invariantRefs": [
+              "CA-INV-008",
               "CA-INV-001",
               "CA-INV-002",
               "CA-INV-003",
               "CA-INV-004",
               "CA-INV-005",
               "CA-INV-007",
-              "CA-INV-008",
               "CA-INV-012",
               "CA-INV-013"
             ],
@@ -4729,20 +4825,34 @@
               "EXT-DISK-INITIALIZE",
               "EXT-STORAGE-MODULE",
               "SRC-SYSTEM-INDEX",
-              "EXT-PHYSICAL-DISK"
+              "EXT-PHYSICAL-DISK",
+              "SRC-PRODUCT-PRD",
+              "SRC-PRODUCT-L1",
+              "SRC-STORAGE-EXECUTE",
+              "SRC-JIT-ORCHESTRATOR",
+              "SRC-STORAGE-PLAN",
+              "SRC-JIT-RESIDUE",
+              "SRC-TEST-JIT-RESIDUE",
+              "SRC-DKE-STANDARD",
+              "EXT-WINGET-OVERVIEW",
+              "EXT-PNP-GET",
+              "EXT-WINDOWS-CLIENT-SERVICING",
+              "SRC-PRODUCT-FREEZE",
+              "SRC-DOMAIN-COMPUTER-INDEX",
+              "EXT-PNPUTIL"
             ],
             "relationRefs": [
               "CA-REL-006",
               "CA-REL-011"
             ],
             "invariantRefs": [
+              "CA-INV-008",
               "CA-INV-001",
               "CA-INV-002",
               "CA-INV-003",
               "CA-INV-004",
               "CA-INV-005",
               "CA-INV-007",
-              "CA-INV-008",
               "CA-INV-012",
               "CA-INV-013"
             ],
@@ -4786,20 +4896,34 @@
               "EXT-DISK-INITIALIZE",
               "EXT-STORAGE-MODULE",
               "SRC-SYSTEM-INDEX",
-              "EXT-PHYSICAL-DISK"
+              "EXT-PHYSICAL-DISK",
+              "SRC-PRODUCT-PRD",
+              "SRC-PRODUCT-L1",
+              "SRC-STORAGE-EXECUTE",
+              "SRC-JIT-ORCHESTRATOR",
+              "SRC-STORAGE-PLAN",
+              "SRC-JIT-RESIDUE",
+              "SRC-TEST-JIT-RESIDUE",
+              "SRC-DKE-STANDARD",
+              "EXT-WINGET-OVERVIEW",
+              "EXT-PNP-GET",
+              "EXT-WINDOWS-CLIENT-SERVICING",
+              "SRC-PRODUCT-FREEZE",
+              "SRC-DOMAIN-COMPUTER-INDEX",
+              "EXT-PNPUTIL"
             ],
             "relationRefs": [
               "CA-REL-006",
               "CA-REL-011"
             ],
             "invariantRefs": [
+              "CA-INV-008",
               "CA-INV-001",
               "CA-INV-002",
               "CA-INV-003",
               "CA-INV-004",
               "CA-INV-005",
               "CA-INV-007",
-              "CA-INV-008",
               "CA-INV-012",
               "CA-INV-013"
             ],
@@ -4843,20 +4967,34 @@
               "EXT-DISK-INITIALIZE",
               "EXT-STORAGE-MODULE",
               "SRC-SYSTEM-INDEX",
-              "EXT-PHYSICAL-DISK"
+              "EXT-PHYSICAL-DISK",
+              "SRC-PRODUCT-PRD",
+              "SRC-PRODUCT-L1",
+              "SRC-STORAGE-EXECUTE",
+              "SRC-JIT-ORCHESTRATOR",
+              "SRC-STORAGE-PLAN",
+              "SRC-JIT-RESIDUE",
+              "SRC-TEST-JIT-RESIDUE",
+              "SRC-DKE-STANDARD",
+              "EXT-WINGET-OVERVIEW",
+              "EXT-PNP-GET",
+              "EXT-WINDOWS-CLIENT-SERVICING",
+              "SRC-PRODUCT-FREEZE",
+              "SRC-DOMAIN-COMPUTER-INDEX",
+              "EXT-PNPUTIL"
             ],
             "relationRefs": [
               "CA-REL-006",
               "CA-REL-011"
             ],
             "invariantRefs": [
+              "CA-INV-008",
               "CA-INV-001",
               "CA-INV-002",
               "CA-INV-003",
               "CA-INV-004",
               "CA-INV-005",
               "CA-INV-007",
-              "CA-INV-008",
               "CA-INV-012",
               "CA-INV-013"
             ],
@@ -4900,20 +5038,34 @@
               "EXT-DISK-INITIALIZE",
               "EXT-STORAGE-MODULE",
               "SRC-SYSTEM-INDEX",
-              "EXT-PHYSICAL-DISK"
+              "EXT-PHYSICAL-DISK",
+              "SRC-PRODUCT-PRD",
+              "SRC-PRODUCT-L1",
+              "SRC-STORAGE-EXECUTE",
+              "SRC-JIT-ORCHESTRATOR",
+              "SRC-STORAGE-PLAN",
+              "SRC-JIT-RESIDUE",
+              "SRC-TEST-JIT-RESIDUE",
+              "SRC-DKE-STANDARD",
+              "EXT-WINGET-OVERVIEW",
+              "EXT-PNP-GET",
+              "EXT-WINDOWS-CLIENT-SERVICING",
+              "SRC-PRODUCT-FREEZE",
+              "SRC-DOMAIN-COMPUTER-INDEX",
+              "EXT-PNPUTIL"
             ],
             "relationRefs": [
               "CA-REL-006",
               "CA-REL-011"
             ],
             "invariantRefs": [
+              "CA-INV-008",
               "CA-INV-001",
               "CA-INV-002",
               "CA-INV-003",
               "CA-INV-004",
               "CA-INV-005",
               "CA-INV-007",
-              "CA-INV-008",
               "CA-INV-012",
               "CA-INV-013"
             ],
@@ -4983,13 +5135,13 @@
           "CA-REL-011"
         ],
         "invariantRefs": [
+          "CA-INV-008",
           "CA-INV-001",
           "CA-INV-002",
           "CA-INV-003",
           "CA-INV-004",
           "CA-INV-005",
           "CA-INV-007",
-          "CA-INV-008",
           "CA-INV-012",
           "CA-INV-013"
         ],
@@ -5036,6 +5188,18 @@
               "SRC-TEST-DOMAIN-COMPUTER-GUIDED",
               "SRC-TEST-DOMAIN-COMPUTER-RECIPE",
               "SRC-TEST-DOMAIN-COMPUTER-PROVIDER-JIT",
+              "SRC-STORAGE-EXECUTE",
+              "SRC-JIT-ORCHESTRATOR",
+              "SRC-STORAGE-PLAN",
+              "SRC-TEST-STORAGE-PLAN",
+              "SRC-JIT-RESIDUE",
+              "SRC-TEST-JIT-RESIDUE",
+              "SRC-DKE-STANDARD",
+              "EXT-DISK-MGMT",
+              "EXT-WINGET-OVERVIEW",
+              "EXT-PNP-GET",
+              "EXT-PHYSICAL-DISK",
+              "EXT-WINDOWS-CLIENT-SERVICING",
               "SRC-FILES-PREVIEW"
             ],
             "relationRefs": [
@@ -5098,6 +5262,18 @@
               "SRC-TEST-DOMAIN-COMPUTER-GUIDED",
               "SRC-TEST-DOMAIN-COMPUTER-RECIPE",
               "SRC-TEST-DOMAIN-COMPUTER-PROVIDER-JIT",
+              "SRC-STORAGE-EXECUTE",
+              "SRC-JIT-ORCHESTRATOR",
+              "SRC-STORAGE-PLAN",
+              "SRC-TEST-STORAGE-PLAN",
+              "SRC-JIT-RESIDUE",
+              "SRC-TEST-JIT-RESIDUE",
+              "SRC-DKE-STANDARD",
+              "EXT-DISK-MGMT",
+              "EXT-WINGET-OVERVIEW",
+              "EXT-PNP-GET",
+              "EXT-PHYSICAL-DISK",
+              "EXT-WINDOWS-CLIENT-SERVICING",
               "SRC-FILES-PREVIEW"
             ],
             "relationRefs": [
@@ -5160,6 +5336,18 @@
               "SRC-TEST-DOMAIN-COMPUTER-GUIDED",
               "SRC-TEST-DOMAIN-COMPUTER-RECIPE",
               "SRC-TEST-DOMAIN-COMPUTER-PROVIDER-JIT",
+              "SRC-STORAGE-EXECUTE",
+              "SRC-JIT-ORCHESTRATOR",
+              "SRC-STORAGE-PLAN",
+              "SRC-TEST-STORAGE-PLAN",
+              "SRC-JIT-RESIDUE",
+              "SRC-TEST-JIT-RESIDUE",
+              "SRC-DKE-STANDARD",
+              "EXT-DISK-MGMT",
+              "EXT-WINGET-OVERVIEW",
+              "EXT-PNP-GET",
+              "EXT-PHYSICAL-DISK",
+              "EXT-WINDOWS-CLIENT-SERVICING",
               "SRC-FILES-PREVIEW"
             ],
             "relationRefs": [
@@ -5307,7 +5495,20 @@
               "SRC-TEST-DOMAIN-COMPUTER-SEMANTIC",
               "SRC-TEST-DOMAIN-COMPUTER-GUIDED",
               "SRC-TEST-DOMAIN-COMPUTER-META",
-              "SRC-TEST-DOMAIN-COMPUTER-RECIPE"
+              "SRC-TEST-DOMAIN-COMPUTER-RECIPE",
+              "SRC-PRODUCT-PRD",
+              "SRC-PRODUCT-L1",
+              "SRC-STORAGE-EXECUTE",
+              "EXT-PNPUTIL",
+              "SRC-STORAGE-PLAN",
+              "SRC-TEST-STORAGE-PLAN",
+              "SRC-DKE-STANDARD",
+              "EXT-DISK-MGMT",
+              "EXT-PNP-GET",
+              "EXT-PHYSICAL-DISK",
+              "EXT-WINDOWS-CLIENT-SERVICING",
+              "SRC-PRODUCT-FREEZE",
+              "EXT-DISK-INITIALIZE"
             ],
             "relationRefs": [
               "CA-REL-007",
@@ -5383,7 +5584,20 @@
               "SRC-TEST-DOMAIN-COMPUTER-SEMANTIC",
               "SRC-TEST-DOMAIN-COMPUTER-GUIDED",
               "SRC-TEST-DOMAIN-COMPUTER-META",
-              "SRC-TEST-DOMAIN-COMPUTER-RECIPE"
+              "SRC-TEST-DOMAIN-COMPUTER-RECIPE",
+              "SRC-PRODUCT-PRD",
+              "SRC-PRODUCT-L1",
+              "SRC-STORAGE-EXECUTE",
+              "EXT-PNPUTIL",
+              "SRC-STORAGE-PLAN",
+              "SRC-TEST-STORAGE-PLAN",
+              "SRC-DKE-STANDARD",
+              "EXT-DISK-MGMT",
+              "EXT-PNP-GET",
+              "EXT-PHYSICAL-DISK",
+              "EXT-WINDOWS-CLIENT-SERVICING",
+              "SRC-PRODUCT-FREEZE",
+              "EXT-DISK-INITIALIZE"
             ],
             "relationRefs": [
               "CA-REL-007",
@@ -5459,7 +5673,20 @@
               "SRC-TEST-DOMAIN-COMPUTER-SEMANTIC",
               "SRC-TEST-DOMAIN-COMPUTER-GUIDED",
               "SRC-TEST-DOMAIN-COMPUTER-META",
-              "SRC-TEST-DOMAIN-COMPUTER-RECIPE"
+              "SRC-TEST-DOMAIN-COMPUTER-RECIPE",
+              "SRC-PRODUCT-PRD",
+              "SRC-PRODUCT-L1",
+              "SRC-STORAGE-EXECUTE",
+              "EXT-PNPUTIL",
+              "SRC-STORAGE-PLAN",
+              "SRC-TEST-STORAGE-PLAN",
+              "SRC-DKE-STANDARD",
+              "EXT-DISK-MGMT",
+              "EXT-PNP-GET",
+              "EXT-PHYSICAL-DISK",
+              "EXT-WINDOWS-CLIENT-SERVICING",
+              "SRC-PRODUCT-FREEZE",
+              "EXT-DISK-INITIALIZE"
             ],
             "relationRefs": [
               "CA-REL-007",
@@ -5535,7 +5762,20 @@
               "SRC-TEST-DOMAIN-COMPUTER-SEMANTIC",
               "SRC-TEST-DOMAIN-COMPUTER-GUIDED",
               "SRC-TEST-DOMAIN-COMPUTER-META",
-              "SRC-TEST-DOMAIN-COMPUTER-RECIPE"
+              "SRC-TEST-DOMAIN-COMPUTER-RECIPE",
+              "SRC-PRODUCT-PRD",
+              "SRC-PRODUCT-L1",
+              "SRC-STORAGE-EXECUTE",
+              "EXT-PNPUTIL",
+              "SRC-STORAGE-PLAN",
+              "SRC-TEST-STORAGE-PLAN",
+              "SRC-DKE-STANDARD",
+              "EXT-DISK-MGMT",
+              "EXT-PNP-GET",
+              "EXT-PHYSICAL-DISK",
+              "EXT-WINDOWS-CLIENT-SERVICING",
+              "SRC-PRODUCT-FREEZE",
+              "EXT-DISK-INITIALIZE"
             ],
             "relationRefs": [
               "CA-REL-007",
@@ -5611,7 +5851,20 @@
               "SRC-TEST-DOMAIN-COMPUTER-SEMANTIC",
               "SRC-TEST-DOMAIN-COMPUTER-GUIDED",
               "SRC-TEST-DOMAIN-COMPUTER-META",
-              "SRC-TEST-DOMAIN-COMPUTER-RECIPE"
+              "SRC-TEST-DOMAIN-COMPUTER-RECIPE",
+              "SRC-PRODUCT-PRD",
+              "SRC-PRODUCT-L1",
+              "SRC-STORAGE-EXECUTE",
+              "EXT-PNPUTIL",
+              "SRC-STORAGE-PLAN",
+              "SRC-TEST-STORAGE-PLAN",
+              "SRC-DKE-STANDARD",
+              "EXT-DISK-MGMT",
+              "EXT-PNP-GET",
+              "EXT-PHYSICAL-DISK",
+              "EXT-WINDOWS-CLIENT-SERVICING",
+              "SRC-PRODUCT-FREEZE",
+              "EXT-DISK-INITIALIZE"
             ],
             "relationRefs": [
               "CA-REL-007",
@@ -5745,20 +5998,30 @@
               "EXT-PNP-GET",
               "EXT-PNP-ENABLE",
               "EXT-PNP-DISABLE",
-              "EXT-PNPUTIL"
+              "EXT-PNPUTIL",
+              "SRC-STORAGE-EXECUTE",
+              "SRC-JIT-ORCHESTRATOR",
+              "SRC-JIT-WINGET",
+              "EXT-WINGET-OVERVIEW",
+              "SRC-DKE-STANDARD",
+              "EXT-DISK-MGMT",
+              "EXT-PHYSICAL-DISK",
+              "EXT-WINDOWS-CLIENT-SERVICING",
+              "SRC-PRODUCT-FREEZE",
+              "EXT-DISK-INITIALIZE"
             ],
             "relationRefs": [
               "CA-REL-008",
               "CA-REL-012"
             ],
             "invariantRefs": [
+              "CA-INV-009",
               "CA-INV-001",
               "CA-INV-002",
               "CA-INV-003",
               "CA-INV-004",
               "CA-INV-005",
               "CA-INV-006",
-              "CA-INV-009",
               "CA-INV-012",
               "CA-INV-013"
             ],
@@ -5789,20 +6052,30 @@
               "EXT-PNP-GET",
               "EXT-PNP-ENABLE",
               "EXT-PNP-DISABLE",
-              "EXT-PNPUTIL"
+              "EXT-PNPUTIL",
+              "SRC-STORAGE-EXECUTE",
+              "SRC-JIT-ORCHESTRATOR",
+              "SRC-JIT-WINGET",
+              "EXT-WINGET-OVERVIEW",
+              "SRC-DKE-STANDARD",
+              "EXT-DISK-MGMT",
+              "EXT-PHYSICAL-DISK",
+              "EXT-WINDOWS-CLIENT-SERVICING",
+              "SRC-PRODUCT-FREEZE",
+              "EXT-DISK-INITIALIZE"
             ],
             "relationRefs": [
               "CA-REL-008",
               "CA-REL-012"
             ],
             "invariantRefs": [
+              "CA-INV-009",
               "CA-INV-001",
               "CA-INV-002",
               "CA-INV-003",
               "CA-INV-004",
               "CA-INV-005",
               "CA-INV-006",
-              "CA-INV-009",
               "CA-INV-012",
               "CA-INV-013"
             ],
@@ -5833,20 +6106,30 @@
               "EXT-PNP-GET",
               "EXT-PNP-ENABLE",
               "EXT-PNP-DISABLE",
-              "EXT-PNPUTIL"
+              "EXT-PNPUTIL",
+              "SRC-STORAGE-EXECUTE",
+              "SRC-JIT-ORCHESTRATOR",
+              "SRC-JIT-WINGET",
+              "EXT-WINGET-OVERVIEW",
+              "SRC-DKE-STANDARD",
+              "EXT-DISK-MGMT",
+              "EXT-PHYSICAL-DISK",
+              "EXT-WINDOWS-CLIENT-SERVICING",
+              "SRC-PRODUCT-FREEZE",
+              "EXT-DISK-INITIALIZE"
             ],
             "relationRefs": [
               "CA-REL-008",
               "CA-REL-012"
             ],
             "invariantRefs": [
+              "CA-INV-009",
               "CA-INV-001",
               "CA-INV-002",
               "CA-INV-003",
               "CA-INV-004",
               "CA-INV-005",
               "CA-INV-006",
-              "CA-INV-009",
               "CA-INV-012",
               "CA-INV-013"
             ],
@@ -5877,20 +6160,30 @@
               "EXT-PNP-GET",
               "EXT-PNP-ENABLE",
               "EXT-PNP-DISABLE",
-              "EXT-PNPUTIL"
+              "EXT-PNPUTIL",
+              "SRC-STORAGE-EXECUTE",
+              "SRC-JIT-ORCHESTRATOR",
+              "SRC-JIT-WINGET",
+              "EXT-WINGET-OVERVIEW",
+              "SRC-DKE-STANDARD",
+              "EXT-DISK-MGMT",
+              "EXT-PHYSICAL-DISK",
+              "EXT-WINDOWS-CLIENT-SERVICING",
+              "SRC-PRODUCT-FREEZE",
+              "EXT-DISK-INITIALIZE"
             ],
             "relationRefs": [
               "CA-REL-008",
               "CA-REL-012"
             ],
             "invariantRefs": [
+              "CA-INV-009",
               "CA-INV-001",
               "CA-INV-002",
               "CA-INV-003",
               "CA-INV-004",
               "CA-INV-005",
               "CA-INV-006",
-              "CA-INV-009",
               "CA-INV-012",
               "CA-INV-013"
             ],
@@ -5943,13 +6236,13 @@
           "CA-REL-012"
         ],
         "invariantRefs": [
+          "CA-INV-009",
           "CA-INV-001",
           "CA-INV-002",
           "CA-INV-003",
           "CA-INV-004",
           "CA-INV-005",
           "CA-INV-006",
-          "CA-INV-009",
           "CA-INV-012",
           "CA-INV-013"
         ],
@@ -5974,7 +6267,21 @@
               "SRC-TEST-SYSTEM-RUNTIME",
               "SRC-TEST-SYSTEM-INVENTORY",
               "SRC-SYSTEM-DIAGNOSTICS",
-              "SRC-TEST-SYSTEM-DIAGNOSTICS"
+              "SRC-TEST-SYSTEM-DIAGNOSTICS",
+              "SRC-PRODUCT-PRD",
+              "SRC-PRODUCT-L1",
+              "SRC-STORAGE-EXECUTE",
+              "SRC-JIT-ORCHESTRATOR",
+              "SRC-DKE-STANDARD",
+              "EXT-DISK-MGMT",
+              "EXT-WINGET-OVERVIEW",
+              "EXT-PNP-GET",
+              "EXT-PHYSICAL-DISK",
+              "EXT-WINDOWS-CLIENT-SERVICING",
+              "SRC-PRODUCT-FREEZE",
+              "SRC-DOMAIN-COMPUTER-INDEX",
+              "EXT-DISK-INITIALIZE",
+              "EXT-PNPUTIL"
             ],
             "relationRefs": [],
             "invariantRefs": [
@@ -6014,7 +6321,21 @@
               "SRC-TEST-SYSTEM-RUNTIME",
               "SRC-TEST-SYSTEM-INVENTORY",
               "SRC-SYSTEM-DIAGNOSTICS",
-              "SRC-TEST-SYSTEM-DIAGNOSTICS"
+              "SRC-TEST-SYSTEM-DIAGNOSTICS",
+              "SRC-PRODUCT-PRD",
+              "SRC-PRODUCT-L1",
+              "SRC-STORAGE-EXECUTE",
+              "SRC-JIT-ORCHESTRATOR",
+              "SRC-DKE-STANDARD",
+              "EXT-DISK-MGMT",
+              "EXT-WINGET-OVERVIEW",
+              "EXT-PNP-GET",
+              "EXT-PHYSICAL-DISK",
+              "EXT-WINDOWS-CLIENT-SERVICING",
+              "SRC-PRODUCT-FREEZE",
+              "SRC-DOMAIN-COMPUTER-INDEX",
+              "EXT-DISK-INITIALIZE",
+              "EXT-PNPUTIL"
             ],
             "relationRefs": [],
             "invariantRefs": [
@@ -6054,7 +6375,21 @@
               "SRC-TEST-SYSTEM-RUNTIME",
               "SRC-TEST-SYSTEM-INVENTORY",
               "SRC-SYSTEM-DIAGNOSTICS",
-              "SRC-TEST-SYSTEM-DIAGNOSTICS"
+              "SRC-TEST-SYSTEM-DIAGNOSTICS",
+              "SRC-PRODUCT-PRD",
+              "SRC-PRODUCT-L1",
+              "SRC-STORAGE-EXECUTE",
+              "SRC-JIT-ORCHESTRATOR",
+              "SRC-DKE-STANDARD",
+              "EXT-DISK-MGMT",
+              "EXT-WINGET-OVERVIEW",
+              "EXT-PNP-GET",
+              "EXT-PHYSICAL-DISK",
+              "EXT-WINDOWS-CLIENT-SERVICING",
+              "SRC-PRODUCT-FREEZE",
+              "SRC-DOMAIN-COMPUTER-INDEX",
+              "EXT-DISK-INITIALIZE",
+              "EXT-PNPUTIL"
             ],
             "relationRefs": [],
             "invariantRefs": [
@@ -6138,7 +6473,22 @@
             "id": "SAP-CA-NETWORK-01",
             "requirement": "layered diagnosis",
             "rationale": "Model network adapters, link state, IP configuration, routes, DNS, proxy, Wi-Fi, connectivity tests and network recovery.",
-            "sourceRefs": [],
+            "sourceRefs": [
+              "SRC-PRODUCT-PRD",
+              "SRC-PRODUCT-L1",
+              "SRC-STORAGE-EXECUTE",
+              "SRC-JIT-ORCHESTRATOR",
+              "SRC-DKE-STANDARD",
+              "EXT-DISK-MGMT",
+              "EXT-WINGET-OVERVIEW",
+              "EXT-PNP-GET",
+              "EXT-PHYSICAL-DISK",
+              "EXT-WINDOWS-CLIENT-SERVICING",
+              "SRC-PRODUCT-FREEZE",
+              "SRC-DOMAIN-COMPUTER-INDEX",
+              "EXT-DISK-INITIALIZE",
+              "EXT-PNPUTIL"
+            ],
             "relationRefs": [],
             "invariantRefs": [
               "CA-INV-001",
@@ -6169,7 +6519,22 @@
             "id": "SAP-CA-NETWORK-02",
             "requirement": "credential/privacy boundaries",
             "rationale": "Model network adapters, link state, IP configuration, routes, DNS, proxy, Wi-Fi, connectivity tests and network recovery.",
-            "sourceRefs": [],
+            "sourceRefs": [
+              "SRC-PRODUCT-PRD",
+              "SRC-PRODUCT-L1",
+              "SRC-STORAGE-EXECUTE",
+              "SRC-JIT-ORCHESTRATOR",
+              "SRC-DKE-STANDARD",
+              "EXT-DISK-MGMT",
+              "EXT-WINGET-OVERVIEW",
+              "EXT-PNP-GET",
+              "EXT-PHYSICAL-DISK",
+              "EXT-WINDOWS-CLIENT-SERVICING",
+              "SRC-PRODUCT-FREEZE",
+              "SRC-DOMAIN-COMPUTER-INDEX",
+              "EXT-DISK-INITIALIZE",
+              "EXT-PNPUTIL"
+            ],
             "relationRefs": [],
             "invariantRefs": [
               "CA-INV-001",
@@ -6200,7 +6565,22 @@
             "id": "SAP-CA-NETWORK-03",
             "requirement": "recovery semantics",
             "rationale": "Model network adapters, link state, IP configuration, routes, DNS, proxy, Wi-Fi, connectivity tests and network recovery.",
-            "sourceRefs": [],
+            "sourceRefs": [
+              "SRC-PRODUCT-PRD",
+              "SRC-PRODUCT-L1",
+              "SRC-STORAGE-EXECUTE",
+              "SRC-JIT-ORCHESTRATOR",
+              "SRC-DKE-STANDARD",
+              "EXT-DISK-MGMT",
+              "EXT-WINGET-OVERVIEW",
+              "EXT-PNP-GET",
+              "EXT-PHYSICAL-DISK",
+              "EXT-WINDOWS-CLIENT-SERVICING",
+              "SRC-PRODUCT-FREEZE",
+              "SRC-DOMAIN-COMPUTER-INDEX",
+              "EXT-DISK-INITIALIZE",
+              "EXT-PNPUTIL"
+            ],
             "relationRefs": [],
             "invariantRefs": [
               "CA-INV-001",
@@ -6275,16 +6655,26 @@
             "sourceRefs": [
               "SRC-PRODUCT-PRD",
               "SRC-PRODUCT-L1",
-              "SRC-DKE-PILOT"
+              "SRC-DKE-PILOT",
+              "SRC-DKE-STANDARD",
+              "EXT-DISK-MGMT",
+              "EXT-WINGET-OVERVIEW",
+              "EXT-PNP-GET",
+              "EXT-PHYSICAL-DISK",
+              "EXT-WINDOWS-CLIENT-SERVICING",
+              "SRC-PRODUCT-FREEZE",
+              "SRC-DOMAIN-COMPUTER-INDEX",
+              "EXT-DISK-INITIALIZE",
+              "EXT-PNPUTIL"
             ],
             "relationRefs": [
               "CA-REL-009",
               "CA-REL-010"
             ],
             "invariantRefs": [
+              "CA-INV-011",
               "CA-INV-001",
               "CA-INV-002",
-              "CA-INV-011",
               "CA-INV-012",
               "CA-INV-013"
             ],
@@ -6310,16 +6700,26 @@
             "sourceRefs": [
               "SRC-PRODUCT-PRD",
               "SRC-PRODUCT-L1",
-              "SRC-DKE-PILOT"
+              "SRC-DKE-PILOT",
+              "SRC-DKE-STANDARD",
+              "EXT-DISK-MGMT",
+              "EXT-WINGET-OVERVIEW",
+              "EXT-PNP-GET",
+              "EXT-PHYSICAL-DISK",
+              "EXT-WINDOWS-CLIENT-SERVICING",
+              "SRC-PRODUCT-FREEZE",
+              "SRC-DOMAIN-COMPUTER-INDEX",
+              "EXT-DISK-INITIALIZE",
+              "EXT-PNPUTIL"
             ],
             "relationRefs": [
               "CA-REL-009",
               "CA-REL-010"
             ],
             "invariantRefs": [
+              "CA-INV-011",
               "CA-INV-001",
               "CA-INV-002",
-              "CA-INV-011",
               "CA-INV-012",
               "CA-INV-013"
             ],
@@ -6345,16 +6745,26 @@
             "sourceRefs": [
               "SRC-PRODUCT-PRD",
               "SRC-PRODUCT-L1",
-              "SRC-DKE-PILOT"
+              "SRC-DKE-PILOT",
+              "SRC-DKE-STANDARD",
+              "EXT-DISK-MGMT",
+              "EXT-WINGET-OVERVIEW",
+              "EXT-PNP-GET",
+              "EXT-PHYSICAL-DISK",
+              "EXT-WINDOWS-CLIENT-SERVICING",
+              "SRC-PRODUCT-FREEZE",
+              "SRC-DOMAIN-COMPUTER-INDEX",
+              "EXT-DISK-INITIALIZE",
+              "EXT-PNPUTIL"
             ],
             "relationRefs": [
               "CA-REL-009",
               "CA-REL-010"
             ],
             "invariantRefs": [
+              "CA-INV-011",
               "CA-INV-001",
               "CA-INV-002",
-              "CA-INV-011",
               "CA-INV-012",
               "CA-INV-013"
             ],
@@ -6401,9 +6811,9 @@
           "CA-REL-010"
         ],
         "invariantRefs": [
+          "CA-INV-011",
           "CA-INV-001",
           "CA-INV-002",
-          "CA-INV-011",
           "CA-INV-012",
           "CA-INV-013"
         ],
@@ -6444,6 +6854,26 @@
               "SRC-TEST-DOMAIN-COMPUTER-PROVIDER-JIT",
               "EXT-WINDOWS-CLIENT-SERVICING",
               "EXT-WINGET-OVERVIEW",
+              "SRC-STORAGE-EXECUTE",
+              "SRC-JIT-ORCHESTRATOR",
+              "SRC-JIT-WINGET",
+              "EXT-PNPUTIL",
+              "SRC-STORAGE-PLAN",
+              "SRC-TEST-STORAGE-PLAN",
+              "SRC-JIT-RESIDUE",
+              "SRC-TEST-JIT-RESIDUE",
+              "EXT-DISK-MGMT",
+              "EXT-DISK-INITIALIZE",
+              "EXT-STORAGE-MODULE",
+              "EXT-PNP-GET",
+              "EXT-PNP-ENABLE",
+              "EXT-PNP-DISABLE",
+              "SRC-SUPPORT-MINIMIZER",
+              "SRC-SUPPORT-WINDOWS",
+              "SRC-SUPPORT-RUNNER",
+              "SRC-TEST-SUPPORT-CONTEXT",
+              "SRC-DKE-STANDARD",
+              "EXT-PHYSICAL-DISK",
               "SRC-SYSTEM-INDEX",
               "SRC-SYSTEM-DIAGNOSTICS",
               "SRC-TEST-SYSTEM-DIAGNOSTICS",
@@ -6456,7 +6886,6 @@
               "SRC-STORAGE-INDEX",
               "SRC-STORAGE-DIAGNOSE",
               "SRC-TEST-STORAGE-DIAGNOSE",
-              "SRC-TEST-STORAGE-PLAN",
               "SRC-TEST-STORAGE-EXECUTE",
               "SRC-STORAGE-ATTRIBUTE",
               "SRC-STORAGE-CLASSIFY",
@@ -6472,11 +6901,7 @@
               "SRC-TEST-FILES-PREVIEW",
               "SRC-TEST-FILES-HOST",
               "SRC-JIT-INDEX",
-              "SRC-JIT-ORCHESTRATOR",
-              "SRC-JIT-WINGET",
               "SRC-JIT-MANIFEST",
-              "SRC-JIT-RESIDUE",
-              "SRC-TEST-JIT-RESIDUE",
               "SRC-JIT-CURATED-PROVIDER",
               "SRC-JIT-PROVENANCE",
               "SRC-TEST-JIT-CURATED-PROVIDER",
@@ -6484,21 +6909,9 @@
               "SRC-TEST-JIT-LIFECYCLE-REMOVE",
               "SRC-TEST-JIT-PROVENANCE",
               "SRC-TEST-JIT-POSTSTATE",
-              "EXT-DISK-MGMT",
-              "EXT-DISK-INITIALIZE",
-              "EXT-STORAGE-MODULE",
-              "EXT-PHYSICAL-DISK",
               "EXT-WINGET-LIST",
               "EXT-WINGET-UPGRADE",
-              "EXT-WINGET-UNINSTALL",
-              "EXT-PNP-GET",
-              "EXT-PNP-ENABLE",
-              "EXT-PNP-DISABLE",
-              "EXT-PNPUTIL",
-              "SRC-SUPPORT-MINIMIZER",
-              "SRC-SUPPORT-WINDOWS",
-              "SRC-SUPPORT-RUNNER",
-              "SRC-TEST-SUPPORT-CONTEXT"
+              "EXT-WINGET-UNINSTALL"
             ],
             "relationRefs": [],
             "invariantRefs": [
@@ -6559,6 +6972,26 @@
               "SRC-TEST-DOMAIN-COMPUTER-PROVIDER-JIT",
               "EXT-WINDOWS-CLIENT-SERVICING",
               "EXT-WINGET-OVERVIEW",
+              "SRC-STORAGE-EXECUTE",
+              "SRC-JIT-ORCHESTRATOR",
+              "SRC-JIT-WINGET",
+              "EXT-PNPUTIL",
+              "SRC-STORAGE-PLAN",
+              "SRC-TEST-STORAGE-PLAN",
+              "SRC-JIT-RESIDUE",
+              "SRC-TEST-JIT-RESIDUE",
+              "EXT-DISK-MGMT",
+              "EXT-DISK-INITIALIZE",
+              "EXT-STORAGE-MODULE",
+              "EXT-PNP-GET",
+              "EXT-PNP-ENABLE",
+              "EXT-PNP-DISABLE",
+              "SRC-SUPPORT-MINIMIZER",
+              "SRC-SUPPORT-WINDOWS",
+              "SRC-SUPPORT-RUNNER",
+              "SRC-TEST-SUPPORT-CONTEXT",
+              "SRC-DKE-STANDARD",
+              "EXT-PHYSICAL-DISK",
               "SRC-SYSTEM-INDEX",
               "SRC-SYSTEM-DIAGNOSTICS",
               "SRC-TEST-SYSTEM-DIAGNOSTICS",
@@ -6571,7 +7004,6 @@
               "SRC-STORAGE-INDEX",
               "SRC-STORAGE-DIAGNOSE",
               "SRC-TEST-STORAGE-DIAGNOSE",
-              "SRC-TEST-STORAGE-PLAN",
               "SRC-TEST-STORAGE-EXECUTE",
               "SRC-STORAGE-ATTRIBUTE",
               "SRC-STORAGE-CLASSIFY",
@@ -6587,11 +7019,7 @@
               "SRC-TEST-FILES-PREVIEW",
               "SRC-TEST-FILES-HOST",
               "SRC-JIT-INDEX",
-              "SRC-JIT-ORCHESTRATOR",
-              "SRC-JIT-WINGET",
               "SRC-JIT-MANIFEST",
-              "SRC-JIT-RESIDUE",
-              "SRC-TEST-JIT-RESIDUE",
               "SRC-JIT-CURATED-PROVIDER",
               "SRC-JIT-PROVENANCE",
               "SRC-TEST-JIT-CURATED-PROVIDER",
@@ -6599,21 +7027,9 @@
               "SRC-TEST-JIT-LIFECYCLE-REMOVE",
               "SRC-TEST-JIT-PROVENANCE",
               "SRC-TEST-JIT-POSTSTATE",
-              "EXT-DISK-MGMT",
-              "EXT-DISK-INITIALIZE",
-              "EXT-STORAGE-MODULE",
-              "EXT-PHYSICAL-DISK",
               "EXT-WINGET-LIST",
               "EXT-WINGET-UPGRADE",
-              "EXT-WINGET-UNINSTALL",
-              "EXT-PNP-GET",
-              "EXT-PNP-ENABLE",
-              "EXT-PNP-DISABLE",
-              "EXT-PNPUTIL",
-              "SRC-SUPPORT-MINIMIZER",
-              "SRC-SUPPORT-WINDOWS",
-              "SRC-SUPPORT-RUNNER",
-              "SRC-TEST-SUPPORT-CONTEXT"
+              "EXT-WINGET-UNINSTALL"
             ],
             "relationRefs": [],
             "invariantRefs": [
@@ -6674,6 +7090,26 @@
               "SRC-TEST-DOMAIN-COMPUTER-PROVIDER-JIT",
               "EXT-WINDOWS-CLIENT-SERVICING",
               "EXT-WINGET-OVERVIEW",
+              "SRC-STORAGE-EXECUTE",
+              "SRC-JIT-ORCHESTRATOR",
+              "SRC-JIT-WINGET",
+              "EXT-PNPUTIL",
+              "SRC-STORAGE-PLAN",
+              "SRC-TEST-STORAGE-PLAN",
+              "SRC-JIT-RESIDUE",
+              "SRC-TEST-JIT-RESIDUE",
+              "EXT-DISK-MGMT",
+              "EXT-DISK-INITIALIZE",
+              "EXT-STORAGE-MODULE",
+              "EXT-PNP-GET",
+              "EXT-PNP-ENABLE",
+              "EXT-PNP-DISABLE",
+              "SRC-SUPPORT-MINIMIZER",
+              "SRC-SUPPORT-WINDOWS",
+              "SRC-SUPPORT-RUNNER",
+              "SRC-TEST-SUPPORT-CONTEXT",
+              "SRC-DKE-STANDARD",
+              "EXT-PHYSICAL-DISK",
               "SRC-SYSTEM-INDEX",
               "SRC-SYSTEM-DIAGNOSTICS",
               "SRC-TEST-SYSTEM-DIAGNOSTICS",
@@ -6686,7 +7122,6 @@
               "SRC-STORAGE-INDEX",
               "SRC-STORAGE-DIAGNOSE",
               "SRC-TEST-STORAGE-DIAGNOSE",
-              "SRC-TEST-STORAGE-PLAN",
               "SRC-TEST-STORAGE-EXECUTE",
               "SRC-STORAGE-ATTRIBUTE",
               "SRC-STORAGE-CLASSIFY",
@@ -6702,11 +7137,7 @@
               "SRC-TEST-FILES-PREVIEW",
               "SRC-TEST-FILES-HOST",
               "SRC-JIT-INDEX",
-              "SRC-JIT-ORCHESTRATOR",
-              "SRC-JIT-WINGET",
               "SRC-JIT-MANIFEST",
-              "SRC-JIT-RESIDUE",
-              "SRC-TEST-JIT-RESIDUE",
               "SRC-JIT-CURATED-PROVIDER",
               "SRC-JIT-PROVENANCE",
               "SRC-TEST-JIT-CURATED-PROVIDER",
@@ -6714,21 +7145,9 @@
               "SRC-TEST-JIT-LIFECYCLE-REMOVE",
               "SRC-TEST-JIT-PROVENANCE",
               "SRC-TEST-JIT-POSTSTATE",
-              "EXT-DISK-MGMT",
-              "EXT-DISK-INITIALIZE",
-              "EXT-STORAGE-MODULE",
-              "EXT-PHYSICAL-DISK",
               "EXT-WINGET-LIST",
               "EXT-WINGET-UPGRADE",
-              "EXT-WINGET-UNINSTALL",
-              "EXT-PNP-GET",
-              "EXT-PNP-ENABLE",
-              "EXT-PNP-DISABLE",
-              "EXT-PNPUTIL",
-              "SRC-SUPPORT-MINIMIZER",
-              "SRC-SUPPORT-WINDOWS",
-              "SRC-SUPPORT-RUNNER",
-              "SRC-TEST-SUPPORT-CONTEXT"
+              "EXT-WINGET-UNINSTALL"
             ],
             "relationRefs": [],
             "invariantRefs": [
@@ -6908,9 +7327,14 @@
               "SRC-TEST-DOMAIN-COMPUTER-PROVIDER-JIT",
               "EXT-WINDOWS-CLIENT-SERVICING",
               "EXT-WINGET-OVERVIEW",
-              "EXT-STORAGE-MODULE",
+              "SRC-PRODUCT-L1",
+              "SRC-DKE-STANDARD",
+              "EXT-DISK-MGMT",
               "EXT-PNP-GET",
-              "EXT-PHYSICAL-DISK"
+              "EXT-PHYSICAL-DISK",
+              "EXT-DISK-INITIALIZE",
+              "EXT-PNPUTIL",
+              "EXT-STORAGE-MODULE"
             ],
             "relationRefs": [
               "CA-REL-002",
@@ -6964,9 +7388,14 @@
               "SRC-TEST-DOMAIN-COMPUTER-PROVIDER-JIT",
               "EXT-WINDOWS-CLIENT-SERVICING",
               "EXT-WINGET-OVERVIEW",
-              "EXT-STORAGE-MODULE",
+              "SRC-PRODUCT-L1",
+              "SRC-DKE-STANDARD",
+              "EXT-DISK-MGMT",
               "EXT-PNP-GET",
-              "EXT-PHYSICAL-DISK"
+              "EXT-PHYSICAL-DISK",
+              "EXT-DISK-INITIALIZE",
+              "EXT-PNPUTIL",
+              "EXT-STORAGE-MODULE"
             ],
             "relationRefs": [
               "CA-REL-002",
@@ -7020,9 +7449,14 @@
               "SRC-TEST-DOMAIN-COMPUTER-PROVIDER-JIT",
               "EXT-WINDOWS-CLIENT-SERVICING",
               "EXT-WINGET-OVERVIEW",
-              "EXT-STORAGE-MODULE",
+              "SRC-PRODUCT-L1",
+              "SRC-DKE-STANDARD",
+              "EXT-DISK-MGMT",
               "EXT-PNP-GET",
-              "EXT-PHYSICAL-DISK"
+              "EXT-PHYSICAL-DISK",
+              "EXT-DISK-INITIALIZE",
+              "EXT-PNPUTIL",
+              "EXT-STORAGE-MODULE"
             ],
             "relationRefs": [
               "CA-REL-002",
@@ -7075,7 +7509,14 @@
               "SRC-TEST-DOMAIN-COMPUTER-RECIPE",
               "SRC-TEST-DOMAIN-COMPUTER-PROVIDER-JIT",
               "EXT-WINDOWS-CLIENT-SERVICING",
-              "EXT-WINGET-OVERVIEW"
+              "EXT-WINGET-OVERVIEW",
+              "SRC-PRODUCT-L1",
+              "SRC-DKE-STANDARD",
+              "EXT-DISK-MGMT",
+              "EXT-PNP-GET",
+              "EXT-PHYSICAL-DISK",
+              "EXT-DISK-INITIALIZE",
+              "EXT-PNPUTIL"
             ],
             "relationRefs": [
               "CA-REL-002",
@@ -7222,7 +7663,14 @@
               "SRC-TEST-DOMAIN-COMPUTER-SEMANTIC",
               "SRC-TEST-DOMAIN-COMPUTER-GUIDED",
               "SRC-TEST-DOMAIN-COMPUTER-META",
-              "SRC-TEST-DOMAIN-COMPUTER-RECIPE"
+              "SRC-TEST-DOMAIN-COMPUTER-RECIPE",
+              "SRC-STORAGE-EXECUTE",
+              "SRC-DKE-STANDARD",
+              "EXT-DISK-MGMT",
+              "EXT-WINGET-OVERVIEW",
+              "EXT-PNP-GET",
+              "EXT-PHYSICAL-DISK",
+              "EXT-WINDOWS-CLIENT-SERVICING"
             ],
             "relationRefs": [
               "CA-REL-003",
@@ -7307,7 +7755,14 @@
               "SRC-TEST-DOMAIN-COMPUTER-SEMANTIC",
               "SRC-TEST-DOMAIN-COMPUTER-GUIDED",
               "SRC-TEST-DOMAIN-COMPUTER-META",
-              "SRC-TEST-DOMAIN-COMPUTER-RECIPE"
+              "SRC-TEST-DOMAIN-COMPUTER-RECIPE",
+              "SRC-STORAGE-EXECUTE",
+              "SRC-DKE-STANDARD",
+              "EXT-DISK-MGMT",
+              "EXT-WINGET-OVERVIEW",
+              "EXT-PNP-GET",
+              "EXT-PHYSICAL-DISK",
+              "EXT-WINDOWS-CLIENT-SERVICING"
             ],
             "relationRefs": [
               "CA-REL-003",
@@ -7392,7 +7847,14 @@
               "SRC-TEST-DOMAIN-COMPUTER-SEMANTIC",
               "SRC-TEST-DOMAIN-COMPUTER-GUIDED",
               "SRC-TEST-DOMAIN-COMPUTER-META",
-              "SRC-TEST-DOMAIN-COMPUTER-RECIPE"
+              "SRC-TEST-DOMAIN-COMPUTER-RECIPE",
+              "SRC-STORAGE-EXECUTE",
+              "SRC-DKE-STANDARD",
+              "EXT-DISK-MGMT",
+              "EXT-WINGET-OVERVIEW",
+              "EXT-PNP-GET",
+              "EXT-PHYSICAL-DISK",
+              "EXT-WINDOWS-CLIENT-SERVICING"
             ],
             "relationRefs": [
               "CA-REL-003",
@@ -7569,15 +8031,17 @@
               "SRC-SYSTEM-INDEX",
               "SRC-STORAGE-INDEX",
               "EXT-PHYSICAL-DISK",
-              "EXT-WINDOWS-CLIENT-SERVICING"
+              "EXT-WINDOWS-CLIENT-SERVICING",
+              "SRC-DKE-STANDARD"
             ],
             "relationRefs": [
               "CA-REL-007",
               "CA-REL-009"
             ],
             "invariantRefs": [
-              "CA-INV-012",
-              "CA-INV-013"
+              "CA-INV-006",
+              "CA-INV-013",
+              "CA-INV-012"
             ],
             "cqRefs": [
               "CQ-CA-018"
@@ -7646,15 +8110,17 @@
               "SRC-SYSTEM-INDEX",
               "SRC-STORAGE-INDEX",
               "EXT-PHYSICAL-DISK",
-              "EXT-WINDOWS-CLIENT-SERVICING"
+              "EXT-WINDOWS-CLIENT-SERVICING",
+              "SRC-DKE-STANDARD"
             ],
             "relationRefs": [
               "CA-REL-007",
               "CA-REL-009"
             ],
             "invariantRefs": [
-              "CA-INV-012",
-              "CA-INV-013"
+              "CA-INV-006",
+              "CA-INV-013",
+              "CA-INV-012"
             ],
             "cqRefs": [
               "CQ-CA-018"
@@ -7723,15 +8189,17 @@
               "SRC-SYSTEM-INDEX",
               "SRC-STORAGE-INDEX",
               "EXT-PHYSICAL-DISK",
-              "EXT-WINDOWS-CLIENT-SERVICING"
+              "EXT-WINDOWS-CLIENT-SERVICING",
+              "SRC-DKE-STANDARD"
             ],
             "relationRefs": [
               "CA-REL-007",
               "CA-REL-009"
             ],
             "invariantRefs": [
-              "CA-INV-012",
-              "CA-INV-013"
+              "CA-INV-006",
+              "CA-INV-013",
+              "CA-INV-012"
             ],
             "cqRefs": [
               "CQ-CA-018"
@@ -7800,15 +8268,17 @@
               "SRC-SYSTEM-INDEX",
               "SRC-STORAGE-INDEX",
               "EXT-PHYSICAL-DISK",
-              "EXT-WINDOWS-CLIENT-SERVICING"
+              "EXT-WINDOWS-CLIENT-SERVICING",
+              "SRC-DKE-STANDARD"
             ],
             "relationRefs": [
               "CA-REL-007",
               "CA-REL-009"
             ],
             "invariantRefs": [
-              "CA-INV-012",
-              "CA-INV-013"
+              "CA-INV-006",
+              "CA-INV-013",
+              "CA-INV-012"
             ],
             "cqRefs": [
               "CQ-CA-018"
@@ -7896,8 +8366,9 @@
           "CA-REL-009"
         ],
         "invariantRefs": [
-          "CA-INV-012",
-          "CA-INV-013"
+          "CA-INV-006",
+          "CA-INV-013",
+          "CA-INV-012"
         ],
         "cqRefs": [
           "CQ-CA-018"
@@ -7959,7 +8430,15 @@
               "SRC-TEST-JIT-WINGET",
               "SRC-TEST-JIT-LIFECYCLE-REMOVE",
               "SRC-TEST-JIT-PROVENANCE",
-              "SRC-TEST-JIT-POSTSTATE"
+              "SRC-TEST-JIT-POSTSTATE",
+              "SRC-STORAGE-PLAN",
+              "SRC-STORAGE-EXECUTE",
+              "SRC-DKE-STANDARD",
+              "EXT-DISK-MGMT",
+              "EXT-WINGET-OVERVIEW",
+              "EXT-PNP-GET",
+              "EXT-PHYSICAL-DISK",
+              "EXT-WINDOWS-CLIENT-SERVICING"
             ],
             "relationRefs": [
               "CA-REL-004",
@@ -7967,6 +8446,10 @@
               "CA-REL-015"
             ],
             "invariantRefs": [
+              "CA-INV-001",
+              "CA-INV-002",
+              "CA-INV-003",
+              "CA-INV-007",
               "CA-INV-012"
             ],
             "cqRefs": [
@@ -8035,7 +8518,15 @@
               "SRC-TEST-JIT-WINGET",
               "SRC-TEST-JIT-LIFECYCLE-REMOVE",
               "SRC-TEST-JIT-PROVENANCE",
-              "SRC-TEST-JIT-POSTSTATE"
+              "SRC-TEST-JIT-POSTSTATE",
+              "SRC-STORAGE-PLAN",
+              "SRC-STORAGE-EXECUTE",
+              "SRC-DKE-STANDARD",
+              "EXT-DISK-MGMT",
+              "EXT-WINGET-OVERVIEW",
+              "EXT-PNP-GET",
+              "EXT-PHYSICAL-DISK",
+              "EXT-WINDOWS-CLIENT-SERVICING"
             ],
             "relationRefs": [
               "CA-REL-004",
@@ -8043,6 +8534,10 @@
               "CA-REL-015"
             ],
             "invariantRefs": [
+              "CA-INV-001",
+              "CA-INV-002",
+              "CA-INV-003",
+              "CA-INV-007",
               "CA-INV-012"
             ],
             "cqRefs": [
@@ -8111,7 +8606,15 @@
               "SRC-TEST-JIT-WINGET",
               "SRC-TEST-JIT-LIFECYCLE-REMOVE",
               "SRC-TEST-JIT-PROVENANCE",
-              "SRC-TEST-JIT-POSTSTATE"
+              "SRC-TEST-JIT-POSTSTATE",
+              "SRC-STORAGE-PLAN",
+              "SRC-STORAGE-EXECUTE",
+              "SRC-DKE-STANDARD",
+              "EXT-DISK-MGMT",
+              "EXT-WINGET-OVERVIEW",
+              "EXT-PNP-GET",
+              "EXT-PHYSICAL-DISK",
+              "EXT-WINDOWS-CLIENT-SERVICING"
             ],
             "relationRefs": [
               "CA-REL-004",
@@ -8119,6 +8622,10 @@
               "CA-REL-015"
             ],
             "invariantRefs": [
+              "CA-INV-001",
+              "CA-INV-002",
+              "CA-INV-003",
+              "CA-INV-007",
               "CA-INV-012"
             ],
             "cqRefs": [
@@ -8197,6 +8704,8 @@
           "SRC-TEST-JIT-LIFECYCLE-REMOVE",
           "SRC-TEST-JIT-PROVENANCE",
           "SRC-TEST-JIT-POSTSTATE",
+          "SRC-STORAGE-PLAN",
+          "SRC-STORAGE-EXECUTE",
           "SRC-DKE-STANDARD",
           "EXT-DISK-MGMT",
           "EXT-WINGET-OVERVIEW",
@@ -8218,6 +8727,10 @@
           "CA-REL-015"
         ],
         "invariantRefs": [
+          "CA-INV-001",
+          "CA-INV-002",
+          "CA-INV-003",
+          "CA-INV-007",
           "CA-INV-012"
         ],
         "cqRefs": [
@@ -8285,6 +8798,13 @@
               "SRC-TEST-DOMAIN-COMPUTER-GUIDED",
               "SRC-TEST-DOMAIN-COMPUTER-META",
               "SRC-TEST-DOMAIN-COMPUTER-RECIPE",
+              "SRC-STORAGE-EXECUTE",
+              "SRC-DKE-STANDARD",
+              "EXT-DISK-MGMT",
+              "EXT-WINGET-OVERVIEW",
+              "EXT-PNP-GET",
+              "EXT-PHYSICAL-DISK",
+              "EXT-WINDOWS-CLIENT-SERVICING",
               "SRC-PRODUCT-FREEZE"
             ],
             "relationRefs": [
@@ -8292,6 +8812,8 @@
               "CA-REL-006"
             ],
             "invariantRefs": [
+              "CA-INV-004",
+              "CA-INV-005",
               "CA-INV-012"
             ],
             "cqRefs": [
@@ -8364,6 +8886,13 @@
               "SRC-TEST-DOMAIN-COMPUTER-GUIDED",
               "SRC-TEST-DOMAIN-COMPUTER-META",
               "SRC-TEST-DOMAIN-COMPUTER-RECIPE",
+              "SRC-STORAGE-EXECUTE",
+              "SRC-DKE-STANDARD",
+              "EXT-DISK-MGMT",
+              "EXT-WINGET-OVERVIEW",
+              "EXT-PNP-GET",
+              "EXT-PHYSICAL-DISK",
+              "EXT-WINDOWS-CLIENT-SERVICING",
               "SRC-PRODUCT-FREEZE"
             ],
             "relationRefs": [
@@ -8371,6 +8900,8 @@
               "CA-REL-006"
             ],
             "invariantRefs": [
+              "CA-INV-004",
+              "CA-INV-005",
               "CA-INV-012"
             ],
             "cqRefs": [
@@ -8443,6 +8974,13 @@
               "SRC-TEST-DOMAIN-COMPUTER-GUIDED",
               "SRC-TEST-DOMAIN-COMPUTER-META",
               "SRC-TEST-DOMAIN-COMPUTER-RECIPE",
+              "SRC-STORAGE-EXECUTE",
+              "SRC-DKE-STANDARD",
+              "EXT-DISK-MGMT",
+              "EXT-WINGET-OVERVIEW",
+              "EXT-PNP-GET",
+              "EXT-PHYSICAL-DISK",
+              "EXT-WINDOWS-CLIENT-SERVICING",
               "SRC-PRODUCT-FREEZE"
             ],
             "relationRefs": [
@@ -8450,6 +8988,8 @@
               "CA-REL-006"
             ],
             "invariantRefs": [
+              "CA-INV-004",
+              "CA-INV-005",
               "CA-INV-012"
             ],
             "cqRefs": [
@@ -8530,6 +9070,7 @@
           "SRC-TEST-DOMAIN-COMPUTER-GUIDED",
           "SRC-TEST-DOMAIN-COMPUTER-META",
           "SRC-TEST-DOMAIN-COMPUTER-RECIPE",
+          "SRC-STORAGE-EXECUTE",
           "SRC-DKE-STANDARD",
           "EXT-DISK-MGMT",
           "EXT-WINGET-OVERVIEW",
@@ -8537,7 +9078,6 @@
           "EXT-PHYSICAL-DISK",
           "EXT-WINDOWS-CLIENT-SERVICING",
           "SRC-STORAGE-PLAN",
-          "SRC-STORAGE-EXECUTE",
           "SRC-PRODUCT-FREEZE"
         ],
         "relationRefs": [
@@ -8545,6 +9085,8 @@
           "CA-REL-006"
         ],
         "invariantRefs": [
+          "CA-INV-004",
+          "CA-INV-005",
           "CA-INV-012"
         ],
         "cqRefs": [
@@ -8591,7 +9133,13 @@
               "SRC-TEST-DOMAIN-COMPUTER-SEMANTIC",
               "SRC-TEST-DOMAIN-COMPUTER-GUIDED",
               "SRC-TEST-DOMAIN-COMPUTER-RECIPE",
-              "SRC-TEST-DOMAIN-COMPUTER-PROVIDER-JIT"
+              "SRC-TEST-DOMAIN-COMPUTER-PROVIDER-JIT",
+              "SRC-DKE-STANDARD",
+              "EXT-DISK-MGMT",
+              "EXT-WINGET-OVERVIEW",
+              "EXT-PNP-GET",
+              "EXT-PHYSICAL-DISK",
+              "EXT-WINDOWS-CLIENT-SERVICING"
             ],
             "relationRefs": [
               "CA-REL-014"
@@ -8648,7 +9196,13 @@
               "SRC-TEST-DOMAIN-COMPUTER-SEMANTIC",
               "SRC-TEST-DOMAIN-COMPUTER-GUIDED",
               "SRC-TEST-DOMAIN-COMPUTER-RECIPE",
-              "SRC-TEST-DOMAIN-COMPUTER-PROVIDER-JIT"
+              "SRC-TEST-DOMAIN-COMPUTER-PROVIDER-JIT",
+              "SRC-DKE-STANDARD",
+              "EXT-DISK-MGMT",
+              "EXT-WINGET-OVERVIEW",
+              "EXT-PNP-GET",
+              "EXT-PHYSICAL-DISK",
+              "EXT-WINDOWS-CLIENT-SERVICING"
             ],
             "relationRefs": [
               "CA-REL-014"
@@ -8705,7 +9259,13 @@
               "SRC-TEST-DOMAIN-COMPUTER-SEMANTIC",
               "SRC-TEST-DOMAIN-COMPUTER-GUIDED",
               "SRC-TEST-DOMAIN-COMPUTER-RECIPE",
-              "SRC-TEST-DOMAIN-COMPUTER-PROVIDER-JIT"
+              "SRC-TEST-DOMAIN-COMPUTER-PROVIDER-JIT",
+              "SRC-DKE-STANDARD",
+              "EXT-DISK-MGMT",
+              "EXT-WINGET-OVERVIEW",
+              "EXT-PNP-GET",
+              "EXT-PHYSICAL-DISK",
+              "EXT-WINDOWS-CLIENT-SERVICING"
             ],
             "relationRefs": [
               "CA-REL-014"
@@ -8762,7 +9322,13 @@
               "SRC-TEST-DOMAIN-COMPUTER-SEMANTIC",
               "SRC-TEST-DOMAIN-COMPUTER-GUIDED",
               "SRC-TEST-DOMAIN-COMPUTER-RECIPE",
-              "SRC-TEST-DOMAIN-COMPUTER-PROVIDER-JIT"
+              "SRC-TEST-DOMAIN-COMPUTER-PROVIDER-JIT",
+              "SRC-DKE-STANDARD",
+              "EXT-DISK-MGMT",
+              "EXT-WINGET-OVERVIEW",
+              "EXT-PNP-GET",
+              "EXT-PHYSICAL-DISK",
+              "EXT-WINDOWS-CLIENT-SERVICING"
             ],
             "relationRefs": [
               "CA-REL-014"
@@ -8902,7 +9468,8 @@
               "EXT-PNP-ENABLE",
               "EXT-PNP-DISABLE",
               "EXT-PNPUTIL",
-              "EXT-WINDOWS-CLIENT-SERVICING"
+              "EXT-WINDOWS-CLIENT-SERVICING",
+              "SRC-DKE-STANDARD"
             ],
             "relationRefs": [
               "CA-REL-010",
@@ -8981,7 +9548,8 @@
               "EXT-PNP-ENABLE",
               "EXT-PNP-DISABLE",
               "EXT-PNPUTIL",
-              "EXT-WINDOWS-CLIENT-SERVICING"
+              "EXT-WINDOWS-CLIENT-SERVICING",
+              "SRC-DKE-STANDARD"
             ],
             "relationRefs": [
               "CA-REL-010",
@@ -9060,7 +9628,8 @@
               "EXT-PNP-ENABLE",
               "EXT-PNP-DISABLE",
               "EXT-PNPUTIL",
-              "EXT-WINDOWS-CLIENT-SERVICING"
+              "EXT-WINDOWS-CLIENT-SERVICING",
+              "SRC-DKE-STANDARD"
             ],
             "relationRefs": [
               "CA-REL-010",
