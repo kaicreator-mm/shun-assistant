@@ -19,8 +19,8 @@ import { fileURLToPath } from 'node:url';
 // not to a mutable D0-provided candidateBlob claim. Changing both JSON files is
 // insufficient to manufacture a valid source pin; updating this lock requires
 // an explicit new exact-source review.
-const REVIEWED_KNOWLEDGE_HEAD = 'a8f378a12b49ff1c335a129280f32c45a6ad2cd6';
-const REVIEWED_KNOWLEDGE_BLOB = '87524bac881b84da626d2026392d99129baeb5a1';
+const REVIEWED_KNOWLEDGE_HEAD = '22a929ce1fbb5cdb5b2819cd3e98e71bbf21085a';
+const REVIEWED_KNOWLEDGE_BLOB = 'c877ec23dc59b0ae17681c7d8f7505b1521c8011';
 
 export function gitBlobSha(data) {
   const bytes = Buffer.isBuffer(data) ? data : Buffer.from(data, 'utf8');

@@ -84,3 +84,8 @@ For `ORACLE-SCOPE-1`, a synthetic journal test is an **Oracle negative test**, n
 - The R0 Node 22/22 validation receipt applies to its previous exact PR HEAD and files. An additional R1 documentation commit does not upgrade semantic gates or silently constitute fresh exact-HEAD test execution.
 
 **Priority:** close `CA-JOB-02` native read-only observation first, while asking the independent reviewer to resolve the `CA-JOB-03` verifier/scope and volume-delta claims before any real cleanup Function is admitted.
+
+
+## Post-R1 source-wording correction — independent re-review still required
+
+Upstream PR #414 moved from `a8f378a12b49ff1c335a129280f32c45a6ad2cd6` to `22a929ce1fbb5cdb5b2819cd3e98e71bbf21085a` (knowledge JSON Git Blob `c877ec23dc59b0ae17681c7d8f7505b1521c8011`). Its CA-CLM-003 Claim and Markdown capability table now correctly describe a hard-coded C: drive-root observation, not an independently identified Windows system volume. This is a DKE documentation repair only; Product admission, native Windows evidence, source runtime behavior, SAP, DIS/ECP, AOT, and all four R1 NOT_RUN Oracles are unchanged. The older D0 22/22 Node receipt and preflight file are historical, not validation of these new Exact-SHAs. A distinct fresh reviewer must re-review both.

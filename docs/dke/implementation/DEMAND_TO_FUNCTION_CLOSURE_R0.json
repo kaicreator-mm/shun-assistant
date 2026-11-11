@@ -7,9 +7,9 @@
   "mainIssue": "https://github.com/kaicreator-mm/shun-assistant/issues/411",
   "evidenceBase": {
     "knowledgePr": "#414",
-    "candidateHead": "a8f378a12b49ff1c335a129280f32c45a6ad2cd6",
+    "candidateHead": "22a929ce1fbb5cdb5b2819cd3e98e71bbf21085a",
     "candidateFile": "docs/dke/implementation/COMPUTER_ASSISTANT_KNOWLEDGE_R0.json",
-    "candidateBlob": "87524bac881b84da626d2026392d99129baeb5a1",
+    "candidateBlob": "c877ec23dc59b0ae17681c7d8f7505b1521c8011",
     "productFreeze": {
       "path": "docs/product/PRODUCT_FREEZE-v0.3.md",
       "commit": "1224fea4097799467e2c0c454885e680f1f28248",
@@ -24,7 +24,7 @@
     "sourceFirstRepair": {
       "status": "AUTHOR_DOC_REPAIR_NOT_INDEPENDENT_QUALIFICATION",
       "reviewedPreRepairHead": "a18374a18c920d4975e09be649d0a98e5dc87b32",
-      "knowledgeJsonBlob": "87524bac881b84da626d2026392d99129baeb5a1",
+      "knowledgeJsonBlob": "c877ec23dc59b0ae17681c7d8f7505b1521c8011",
       "downstreamResyncRequired": false
     }
   },
