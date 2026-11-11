@@ -1131,7 +1131,7 @@
     {
       "id": "CA-CLM-001",
       "statement": "Shun's frozen product model is goal-first: resolve a user goal to bounded registered capabilities and an environment/provider binding, expose scope/cost/risk, obtain required human approval, perform a permitted effect and verify observable outcome.",
-      "status": "GROUNDED_FROZEN_PRODUCT",
+      "status": "SUPPORTED",
       "sourceRefs": [
         "SRC-PRODUCT-FREEZE",
         "SRC-PRODUCT-PRD"
@@ -1143,12 +1143,15 @@
       "semanticOwner": "CA-GOAL-CAPABILITY",
       "applicability": "Frozen Windows-first Product semantics; v0.3 goal/capability/provider/environment boundary.",
       "falsifier": "A request resolves to an unregistered or unbounded raw command without clarification.",
-      "maturity": "FROZEN_PRODUCT"
+      "maturity": "FROZEN_PRODUCT",
+      "authorStatus": "GROUNDED_FROZEN_PRODUCT",
+      "unknownCase": "The claim remains supported only for its exact cited Product/source revision and stated applicability; if that revision or context changes, mark it stale and re-evaluate.",
+      "validationState": "NOT_RUN"
     },
     {
       "id": "CA-CLM-002",
       "statement": "The frozen v0.3 Product is a parity-preserving DomainHarness migration with explicit non-goals including autonomous general desktop operation, arbitrary LLM-generated scripts, unknown Provider marketplace and unrelated PC-management expansion.",
-      "status": "GROUNDED_FROZEN_PRODUCT_BOUNDARY",
+      "status": "SUPPORTED",
       "sourceRefs": [
         "SRC-PRODUCT-FREEZE",
         "SRC-PRODUCT-PRD"
@@ -1159,12 +1162,15 @@
       "semanticOwner": "CA-ROOT",
       "applicability": "Frozen v0.3 Product boundary; later Product amendments are separate revisions.",
       "falsifier": "The frozen Product explicitly admits arbitrary generated scripts or autonomous general desktop operation.",
-      "maturity": "FROZEN_PRODUCT"
+      "maturity": "FROZEN_PRODUCT",
+      "authorStatus": "GROUNDED_FROZEN_PRODUCT_BOUNDARY",
+      "unknownCase": "The claim remains supported only for its exact cited Product/source revision and stated applicability; if that revision or context changes, mark it stale and re-evaluate.",
+      "validationState": "NOT_RUN"
     },
     {
       "id": "CA-CLM-003",
       "statement": "The inspected public system-inventory API is read-only and returns a bounded Windows snapshot: logical CPU count, total/free memory, fixed system-volume total/free bytes and uptime; it does not accept arbitrary host, shell or filesystem-root injection.",
-      "status": "SOURCE_OBSERVED",
+      "status": "CONDITIONAL",
       "sourceRefs": [
         "SRC-SYSTEM-INDEX",
         "SRC-SYSTEM-DIAGNOSTICS",
@@ -1176,12 +1182,15 @@
       "semanticOwner": "CA-SYSTEM-OBSERVATION",
       "applicability": "Inspected version/v0.3.0 source snapshot; Windows-only public API.",
       "falsifier": "The public API accepts an arbitrary root/host/command or mutates the system.",
-      "maturity": "SOURCE_OBSERVED"
+      "maturity": "SOURCE_OBSERVED",
+      "authorStatus": "SOURCE_OBSERVED",
+      "unknownCase": "If the cited source revision, target applicability or required native/domain evidence is unavailable, retain CONDITIONAL/UNKNOWN and do not promote the claim.",
+      "validationState": "NOT_RUN"
     },
     {
       "id": "CA-CLM-004",
       "statement": "The inspected Windows runtime observations are privacy-minimal: process and startup counts, bounded top-memory process facts and a bounded installed-software sample; they do not provide general process/service control or a complete software inventory.",
-      "status": "SOURCE_OBSERVED_PARTIAL",
+      "status": "CONDITIONAL",
       "sourceRefs": [
         "SRC-SYSTEM-RUNTIME",
         "SRC-TEST-SYSTEM-SOFTWARE",
@@ -1197,12 +1206,15 @@
       "semanticOwner": "CA-SYSTEM-OBSERVATION",
       "applicability": "Inspected Windows runtime and bounded collectors in version/v0.3.0.",
       "falsifier": "The collectors enumerate every per-user and machine-wide installation or control processes/services.",
-      "maturity": "PARTIAL"
+      "maturity": "PARTIAL",
+      "authorStatus": "SOURCE_OBSERVED_PARTIAL",
+      "unknownCase": "If the cited source revision, target applicability or required native/domain evidence is unavailable, retain CONDITIONAL/UNKNOWN and do not promote the claim.",
+      "validationState": "NOT_RUN"
     },
     {
       "id": "CA-CLM-005",
       "statement": "System diagnosis is a deterministic single-snapshot advisory projection; low disk space and low free memory may be reported, but root cause and guaranteed speedup are not inferred, and advice has no effect.",
-      "status": "SOURCE_OBSERVED",
+      "status": "CONDITIONAL",
       "sourceRefs": [
         "SRC-SYSTEM-DIAGNOSTICS",
         "SRC-TEST-SYSTEM-DIAGNOSTICS"
@@ -1213,12 +1225,15 @@
       "semanticOwner": "CA-SYSTEM-OBSERVATION",
       "applicability": "Single local Windows observation snapshot and deterministic projection.",
       "falsifier": "The diagnosis claims a verified root cause, CPU bottleneck or guaranteed speedup.",
-      "maturity": "SOURCE_OBSERVED"
+      "maturity": "SOURCE_OBSERVED",
+      "authorStatus": "SOURCE_OBSERVED",
+      "unknownCase": "If the cited source revision, target applicability or required native/domain evidence is unavailable, retain CONDITIONAL/UNKNOWN and do not promote the claim.",
+      "validationState": "NOT_RUN"
     },
     {
       "id": "CA-CLM-006",
       "statement": "The inspected storage vertical owns scoped observation, evidence-backed growth attribution, fail-closed classification, plan/preview, explicit approval, bounded cleanup, journaling and post-action verification of reclaimed bytes and protected assets.",
-      "status": "SOURCE_OBSERVED_BOUNDED_CAPABILITY",
+      "status": "CONDITIONAL",
       "sourceRefs": [
         "SRC-STORAGE-INDEX",
         "SRC-STORAGE-DIAGNOSE",
@@ -1242,12 +1257,15 @@
       "semanticOwner": "CA-STORAGE",
       "applicability": "Inspected storage vertical and its Windows-gated test definitions.",
       "falsifier": "A partition/format/initialize operation is exposed by this bounded cleanup vertical or tests prove production Host composition.",
-      "maturity": "PARTIAL"
+      "maturity": "PARTIAL",
+      "authorStatus": "SOURCE_OBSERVED_BOUNDED_CAPABILITY",
+      "unknownCase": "If the cited source revision, target applicability or required native/domain evidence is unavailable, retain CONDITIONAL/UNKNOWN and do not promote the claim.",
+      "validationState": "NOT_RUN"
     },
     {
       "id": "CA-CLM-007",
       "statement": "The inspected file vertical distinguishes pure preview from physical observation: search, duplicate report, copy, move and rename can be previewed without effects; verified duplicate observation uses an authorized, bounded, handle-anchored read path and refuses incomplete or changed scans.",
-      "status": "SOURCE_OBSERVED_PARTIAL_CAPABILITY",
+      "status": "CONDITIONAL",
       "sourceRefs": [
         "SRC-FILES-INDEX",
         "SRC-FILES-HOST",
@@ -1261,12 +1279,15 @@
       "semanticOwner": "CA-FILE-ASSET",
       "applicability": "Inspected public file vertical, preview and anchored duplicate-observation path.",
       "falsifier": "A preview is treated as authorization or an unrestricted filesystem operation.",
-      "maturity": "PARTIAL"
+      "maturity": "PARTIAL",
+      "authorStatus": "SOURCE_OBSERVED_PARTIAL_CAPABILITY",
+      "unknownCase": "If the cited source revision, target applicability or required native/domain evidence is unavailable, retain CONDITIONAL/UNKNOWN and do not promote the claim.",
+      "validationState": "NOT_RUN"
     },
     {
       "id": "CA-CLM-008",
       "statement": "The inspected software JIT vertical implements a curated provider lifecycle: trusted-source resolution, exact provider/version provenance, bounded acquisition/use/verification, lifecycle checkpoints, and gated removal with manifest-restricted deletion and fail-closed residue classification.",
-      "status": "SOURCE_OBSERVED_BOUNDED_CAPABILITY",
+      "status": "CONDITIONAL",
       "sourceRefs": [
         "SRC-JIT-INDEX",
         "SRC-JIT-ORCHESTRATOR",
@@ -1291,12 +1312,15 @@
       "semanticOwner": "CA-SOFTWARE-LIFECYCLE",
       "applicability": "Inspected curated JIT provider lifecycle and manifest-bound removal implementation.",
       "falsifier": "An unknown source/package or unrecorded user file is accepted for install/removal.",
-      "maturity": "PARTIAL"
+      "maturity": "PARTIAL",
+      "authorStatus": "SOURCE_OBSERVED_BOUNDED_CAPABILITY",
+      "unknownCase": "If the cited source revision, target applicability or required native/domain evidence is unavailable, retain CONDITIONAL/UNKNOWN and do not promote the claim.",
+      "validationState": "NOT_RUN"
     },
     {
       "id": "CA-CLM-009",
       "statement": "The current inspected public domain-computer surface does not expose a general PnP device, hardware inventory or driver-management capability.",
-      "status": "NOT_FOUND_IN_REVIEWED_PUBLIC_SURFACE",
+      "status": "CONDITIONAL",
       "sourceRefs": [
         "SRC-DOMAIN-COMPUTER-INDEX",
         "SRC-PRODUCT-PRD",
@@ -1308,12 +1332,15 @@
       "semanticOwner": "CA-HARDWARE-DEVICE",
       "applicability": "Inspected public domain-computer export surface and frozen Product/L1 scope.",
       "falsifier": "A public, Product-admitted PnP/driver capability exists in the inspected surface.",
-      "maturity": "FUTURE_CANDIDATE"
+      "maturity": "FUTURE_CANDIDATE",
+      "authorStatus": "NOT_FOUND_IN_REVIEWED_PUBLIC_SURFACE",
+      "unknownCase": "If the cited source revision, target applicability or required native/domain evidence is unavailable, retain CONDITIONAL/UNKNOWN and do not promote the claim.",
+      "validationState": "NOT_RUN"
     },
     {
       "id": "CA-CLM-010",
       "statement": "Disk topology and partition management are distinct from free-space diagnosis and bounded cleanup; Windows exposes separate disk/partition/volume operations, and initialization/formatting can destroy existing data.",
-      "status": "EXTERNAL_SOURCE_GROUNDED_PRODUCT_GAP",
+      "status": "CONDITIONAL",
       "sourceRefs": [
         "EXT-DISK-MGMT",
         "EXT-DISK-INITIALIZE",
@@ -1329,12 +1356,15 @@
       "semanticOwner": "CA-STORAGE",
       "applicability": "Windows storage documentation compared with Shun's fixed-volume inventory and bounded-cleanup surfaces.",
       "falsifier": "Shun source exposes partition/format management under the reviewed public surface.",
-      "maturity": "FUTURE_CANDIDATE"
+      "maturity": "FUTURE_CANDIDATE",
+      "authorStatus": "EXTERNAL_SOURCE_GROUNDED_PRODUCT_GAP",
+      "unknownCase": "If the cited source revision, target applicability or required native/domain evidence is unavailable, retain CONDITIONAL/UNKNOWN and do not promote the claim.",
+      "validationState": "NOT_RUN"
     },
     {
       "id": "CA-CLM-011",
       "statement": "Windows software lifecycle operations are not interchangeable: inventory/list, search/show, install, upgrade and uninstall have different scope and ambiguity rules; WinGet is one provider/source, not the entire software domain.",
-      "status": "EXTERNAL_SOURCE_AND_CODE_GROUNDED",
+      "status": "CONDITIONAL",
       "sourceRefs": [
         "EXT-WINGET-OVERVIEW",
         "EXT-WINGET-LIST",
@@ -1349,12 +1379,15 @@
       "semanticOwner": "CA-SOFTWARE-LIFECYCLE",
       "applicability": "Windows WinGet documentation and Shun's curated JIT adapter.",
       "falsifier": "WinGet command availability is taken as proof that Shun exposes all of those operations.",
-      "maturity": "PARTIAL"
+      "maturity": "PARTIAL",
+      "authorStatus": "EXTERNAL_SOURCE_AND_CODE_GROUNDED",
+      "unknownCase": "If the cited source revision, target applicability or required native/domain evidence is unavailable, retain CONDITIONAL/UNKNOWN and do not promote the claim.",
+      "validationState": "NOT_RUN"
     },
     {
       "id": "CA-CLM-012",
       "statement": "PnP device enumeration, enable/disable and driver-store operations are separate hardware-management capabilities; the cited Windows commands require administrative authority for device enable/disable.",
-      "status": "EXTERNAL_SOURCE_GROUNDED_FUTURE_CANDIDATE",
+      "status": "CONDITIONAL",
       "sourceRefs": [
         "EXT-PNP-GET",
         "EXT-PNP-ENABLE",
@@ -1368,12 +1401,15 @@
       "semanticOwner": "CA-HARDWARE-DEVICE",
       "applicability": "Microsoft Learn PnP and pnputil references; no Shun implementation admission.",
       "falsifier": "A cited Microsoft command is treated as a Shun feature or as proof of driver compatibility/rollback.",
-      "maturity": "FUTURE_CANDIDATE"
+      "maturity": "FUTURE_CANDIDATE",
+      "authorStatus": "EXTERNAL_SOURCE_GROUNDED_FUTURE_CANDIDATE",
+      "unknownCase": "If the cited source revision, target applicability or required native/domain evidence is unavailable, retain CONDITIONAL/UNKNOWN and do not promote the claim.",
+      "validationState": "NOT_RUN"
     },
     {
       "id": "CA-CLM-013",
       "statement": "AOT knowledge should contain stable, source-pinned domain semantics and decision rules; live computer state, user data, current permissions, grants, provider currentness and execution receipts must be collected or verified at runtime.",
-      "status": "DKE_DERIVED_CANDIDATE_RULE",
+      "status": "UNKNOWN",
       "sourceRefs": [
         "SRC-PRODUCT-PRD",
         "SRC-PRODUCT-L1",
@@ -1385,12 +1421,15 @@
       "semanticOwner": "CA-AOT-KNOWLEDGE",
       "applicability": "DKE R2 method candidate plus Product/L1 and prior trust-pilot source boundary.",
       "falsifier": "Live host facts, grants or secrets are embedded in a reusable AOT artifact.",
-      "maturity": "FUTURE_CANDIDATE"
+      "maturity": "FUTURE_CANDIDATE",
+      "authorStatus": "DKE_DERIVED_CANDIDATE_RULE",
+      "unknownCase": "No frozen authoritative method or trusted domain oracle currently establishes this candidate rule; retain UNKNOWN and do not hand it off.",
+      "validationState": "NOT_RUN"
     },
     {
       "id": "CA-CLM-014",
       "statement": "A model-generated recommendation or local status label is not authority; effect execution requires the distinct current Product/Host authorization chain and the actual post-state must be verified.",
-      "status": "GROUNDED_FROZEN_PRODUCT",
+      "status": "SUPPORTED",
       "sourceRefs": [
         "SRC-PRODUCT-PRD",
         "SRC-PRODUCT-L1"
@@ -1401,12 +1440,15 @@
       "semanticOwner": "CA-GLOBAL-AUTHORITY",
       "applicability": "Frozen Product/L1 and related trust/effect author candidate.",
       "falsifier": "A model proposal, local label or stale grant is treated as effect authority.",
-      "maturity": "FROZEN_PRODUCT"
+      "maturity": "FROZEN_PRODUCT",
+      "authorStatus": "GROUNDED_FROZEN_PRODUCT",
+      "unknownCase": "The claim remains supported only for its exact cited Product/source revision and stated applicability; if that revision or context changes, mark it stale and re-evaluate.",
+      "validationState": "NOT_RUN"
     },
     {
       "id": "CA-CLM-015",
       "statement": "Local support context is a privacy-bounded local-only observation and must not be silently forwarded to LLM, Meta, network or external issue reporting.",
-      "status": "GROUNDED_FROZEN_PRODUCT",
+      "status": "SUPPORTED",
       "sourceRefs": [
         "SRC-PRODUCT-PRD",
         "SRC-PRODUCT-L1",
@@ -1426,12 +1468,15 @@
       "semanticOwner": "CA-GLOBAL-PRIVACY",
       "applicability": "Frozen B-040 Product/L1 support-context privacy requirements.",
       "falsifier": "Local support facts are automatically sent to an LLM, Meta or external reporting.",
-      "maturity": "FROZEN_PRODUCT"
+      "maturity": "FROZEN_PRODUCT",
+      "authorStatus": "GROUNDED_FROZEN_PRODUCT",
+      "unknownCase": "The claim remains supported only for its exact cited Product/source revision and stated applicability; if that revision or context changes, mark it stale and re-evaluate.",
+      "validationState": "NOT_RUN"
     },
     {
       "id": "CA-CLM-016",
       "statement": "The inspected public Domain Computer package exposes read-only selected-folder observation, B-040 local support-context minimization, typed goal/capability selection, a bounded one-step Guided Journey, deterministic Recipe replay proposals, curated Provider JIT proposals and opt-in redacted Meta/feedback Shadow candidates; these adapters do not themselves perform OS effects or issue Host authority.",
-      "status": "SOURCE_OBSERVED_PARTIAL_CAPABILITY",
+      "status": "CONDITIONAL",
       "maturity": "PARTIAL",
       "sourceRefs": [
         "SRC-DOMAIN-COMPUTER-INDEX",
@@ -1461,12 +1506,15 @@
       ],
       "semanticOwner": "CA-ROOT",
       "applicability": "Inspected public Domain Computer package and its v0.3 integration test definitions at version/v0.3.0@1224fea4097799467e2c0c454885e680f1f28248.",
-      "falsifier": "A public Domain Computer adapter directly performs a real OS effect or synthesizes current Host permission without the separate authorization/Host boundary."
+      "falsifier": "A public Domain Computer adapter directly performs a real OS effect or synthesizes current Host permission without the separate authorization/Host boundary.",
+      "authorStatus": "SOURCE_OBSERVED_PARTIAL_CAPABILITY",
+      "unknownCase": "If the cited source revision, target applicability or required native/domain evidence is unavailable, retain CONDITIONAL/UNKNOWN and do not promote the claim.",
+      "validationState": "NOT_RUN"
     },
     {
       "id": "CA-CLM-017",
       "statement": "Microsoft tool/API compatibility ranges and Windows client servicing lifecycle are distinct. As observed on 2026-11-11, Windows 10 Home/Pro 22H2 has ended updates; Windows 11 Home/Pro 24H2 has also ended updates, while 25H2 and 26H2 remain within their published servicing windows. A target must be evaluated by exact edition, release, build and servicing channel; a WinGet minimum-version statement does not establish OS servicing support.",
-      "status": "EXTERNAL_SOURCE_GROUNDED_CANDIDATE_NOT_PRODUCT_SUPPORT",
+      "status": "CONDITIONAL",
       "sourceRefs": [
         "EXT-WINDOWS-CLIENT-SERVICING",
         "EXT-WINGET-OVERVIEW"
@@ -1479,7 +1527,10 @@
       "semanticOwner": "CA-EXECUTION-ENVIRONMENT",
       "applicability": "Microsoft Windows client servicing table as last updated 2026-09-29 and observed 2026-11-11; exact target host must be checked.",
       "falsifier": "A Windows client release is treated as currently serviced after its end-of-updates date, or a WinGet/API minimum is treated as OS lifecycle support.",
-      "maturity": "FUTURE_CANDIDATE"
+      "maturity": "FUTURE_CANDIDATE",
+      "authorStatus": "EXTERNAL_SOURCE_GROUNDED_CANDIDATE_NOT_PRODUCT_SUPPORT",
+      "unknownCase": "If the cited source revision, target applicability or required native/domain evidence is unavailable, retain CONDITIONAL/UNKNOWN and do not promote the claim.",
+      "validationState": "NOT_RUN"
     }
   ],
   "elements": [
@@ -1539,7 +1590,46 @@
         "CQ-CA-015"
       ],
       "relationRefs": [],
-      "validationState": "NOT_RUN"
+      "validationState": "NOT_RUN",
+      "scopeContract": {
+        "scopeRevision": "COMPUTER_ASSISTANT_KNOWLEDGE_R0_CANDIDATE",
+        "owner": "CA-ROOT",
+        "purpose": "Own the complete semantic model from user goal through computer object/capability resolution, trusted environment/provider binding, authorization, execution, verification and recovery.",
+        "nonGoals": "Domain semantics from user goal through safe verified computer outcome; excludes Function ABI, Host implementation and Package production.",
+        "applicability": "Domain semantics from user goal through safe verified computer outcome; excludes Function ABI, Host implementation and Package production.",
+        "sourceClaimRefs": [
+          "CA-CLM-001",
+          "CA-CLM-002",
+          "CA-CLM-013",
+          "CA-CLM-014",
+          "CA-CLM-016",
+          "CA-CLM-017"
+        ],
+        "relationRefs": [],
+        "globalInvariantRefs": [
+          "CA-INV-001",
+          "CA-INV-002",
+          "CA-INV-003",
+          "CA-INV-004",
+          "CA-INV-005",
+          "CA-INV-006",
+          "CA-INV-007",
+          "CA-INV-008",
+          "CA-INV-009",
+          "CA-INV-010",
+          "CA-INV-011",
+          "CA-INV-012",
+          "CA-INV-013"
+        ],
+        "cqRefs": [
+          "CQ-CA-015"
+        ],
+        "sapProfileRef": "SAP-CA-ROOT",
+        "validationOracle": "CQ-CA-015 end-to-end cross-Element composition plus all global-invariant closure; a child Element PASS never substitutes for Root closure; independent Product/domain-owner review.",
+        "assertionStatus": "OPEN",
+        "validationState": "NOT_RUN",
+        "qualification": "NOT_QUALIFIED"
+      }
     },
     {
       "id": "CA-GOAL-CAPABILITY",
@@ -1576,7 +1666,36 @@
         "CA-REL-002",
         "CA-REL-003"
       ],
-      "validationState": "NOT_RUN"
+      "validationState": "NOT_RUN",
+      "scopeContract": {
+        "scopeRevision": "COMPUTER_ASSISTANT_KNOWLEDGE_R0_CANDIDATE",
+        "owner": "CA-GOAL-CAPABILITY",
+        "purpose": "Interpret the user goal, identify relevant computer objects and constraints, resolve only registered capabilities and select a trusted provider compatible with the current execution environment.",
+        "nonGoals": "Intent, target and capability meaning only; excludes permit issuance and physical effect.",
+        "applicability": "Intent, target and capability meaning only; excludes permit issuance and physical effect.",
+        "sourceClaimRefs": [
+          "CA-CLM-001",
+          "CA-CLM-002",
+          "CA-CLM-016"
+        ],
+        "relationRefs": [
+          "CA-REL-002",
+          "CA-REL-003"
+        ],
+        "globalInvariantRefs": [
+          "CA-INV-001",
+          "CA-INV-002",
+          "CA-INV-012"
+        ],
+        "cqRefs": [
+          "CQ-CA-001"
+        ],
+        "sapProfileRef": "SAP-CA-GOAL-CAPABILITY",
+        "validationOracle": "Frozen Product source plus positive/negative resolution CQs.",
+        "assertionStatus": "CONDITIONAL",
+        "validationState": "NOT_RUN",
+        "qualification": "NOT_QUALIFIED"
+      }
     },
     {
       "id": "CA-SYSTEM-OBSERVATION",
@@ -1616,7 +1735,37 @@
       "relationRefs": [
         "CA-REL-014"
       ],
-      "validationState": "NOT_RUN"
+      "validationState": "NOT_RUN",
+      "scopeContract": {
+        "scopeRevision": "COMPUTER_ASSISTANT_KNOWLEDGE_R0_CANDIDATE",
+        "owner": "CA-SYSTEM-OBSERVATION",
+        "purpose": "Collect bounded read-only facts about OS, CPU, memory, storage capacity, process pressure and installed software; distinguish observations from diagnosis and diagnosis from action.",
+        "nonGoals": "Read-only system facts and diagnostic interpretation; excludes process/service mutation and root-cause claims unsupported by evidence.",
+        "applicability": "Read-only system facts and diagnostic interpretation; excludes process/service mutation and root-cause claims unsupported by evidence.",
+        "sourceClaimRefs": [
+          "CA-CLM-003",
+          "CA-CLM-004",
+          "CA-CLM-005"
+        ],
+        "relationRefs": [
+          "CA-REL-014"
+        ],
+        "globalInvariantRefs": [
+          "CA-INV-001",
+          "CA-INV-002",
+          "CA-INV-004",
+          "CA-INV-010",
+          "CA-INV-012"
+        ],
+        "cqRefs": [
+          "CQ-CA-003"
+        ],
+        "sapProfileRef": "SAP-CA-SYSTEM-OBSERVATION",
+        "validationOracle": "Exact Windows snapshot, privacy checks and negative tests on the native host.",
+        "assertionStatus": "CONDITIONAL",
+        "validationState": "NOT_RUN",
+        "qualification": "NOT_QUALIFIED"
+      }
     },
     {
       "id": "CA-STORAGE",
@@ -1676,7 +1825,43 @@
         "CA-REL-006",
         "CA-REL-011"
       ],
-      "validationState": "NOT_RUN"
+      "validationState": "NOT_RUN",
+      "scopeContract": {
+        "scopeRevision": "COMPUTER_ASSISTANT_KNOWLEDGE_R0_CANDIDATE",
+        "owner": "CA-STORAGE",
+        "purpose": "Model physical disks, partitions, volumes, filesystems, mount/drive mappings, provider-dependent storage-health telemetry, capacity and safe cleanup as distinct concepts and workflows.",
+        "nonGoals": "Disk/partition/volume/filesystem and provider-dependent health semantics are knowledge candidates; current Shun evidence covers only fixed-volume capacity and bounded cleanup. No universal SMART-health or disk-management feature is implied.",
+        "applicability": "Disk/partition/volume/filesystem and provider-dependent health semantics are knowledge candidates; current Shun evidence covers only fixed-volume capacity and bounded cleanup. No universal SMART-health or disk-management feature is implied.",
+        "sourceClaimRefs": [
+          "CA-CLM-006",
+          "CA-CLM-010"
+        ],
+        "relationRefs": [
+          "CA-REL-006",
+          "CA-REL-011"
+        ],
+        "globalInvariantRefs": [
+          "CA-INV-008",
+          "CA-INV-001",
+          "CA-INV-002",
+          "CA-INV-003",
+          "CA-INV-004",
+          "CA-INV-005",
+          "CA-INV-007",
+          "CA-INV-012",
+          "CA-INV-013"
+        ],
+        "cqRefs": [
+          "CQ-CA-004",
+          "CQ-CA-005",
+          "CQ-CA-017"
+        ],
+        "sapProfileRef": "SAP-CA-STORAGE",
+        "validationOracle": "Microsoft Storage documentation with explicit OS/provider applicability, exact disk/volume identity, native Windows Storage Management Provider oracle and independent storage-domain review.",
+        "assertionStatus": "CONDITIONAL",
+        "validationState": "NOT_RUN",
+        "qualification": "NOT_QUALIFIED"
+      }
     },
     {
       "id": "CA-FILE-ASSET",
@@ -1719,7 +1904,39 @@
       "relationRefs": [
         "CA-REL-015"
       ],
-      "validationState": "NOT_RUN"
+      "validationState": "NOT_RUN",
+      "scopeContract": {
+        "scopeRevision": "COMPUTER_ASSISTANT_KNOWLEDGE_R0_CANDIDATE",
+        "owner": "CA-FILE-ASSET",
+        "purpose": "Model user files and directories, scopes, identity, metadata, content digest, duplicates, copy/move/rename, backup, protection and recovery.",
+        "nonGoals": "File/folder object, scope and asset-protection semantics; preview is not an effect.",
+        "applicability": "File/folder object, scope and asset-protection semantics; preview is not an effect.",
+        "sourceClaimRefs": [
+          "CA-CLM-007",
+          "CA-CLM-015",
+          "CA-CLM-016"
+        ],
+        "relationRefs": [
+          "CA-REL-015"
+        ],
+        "globalInvariantRefs": [
+          "CA-INV-001",
+          "CA-INV-002",
+          "CA-INV-003",
+          "CA-INV-004",
+          "CA-INV-005",
+          "CA-INV-007",
+          "CA-INV-012"
+        ],
+        "cqRefs": [
+          "CQ-CA-019"
+        ],
+        "sapProfileRef": "SAP-CA-FILE-ASSET",
+        "validationOracle": "Native filesystem identity/race tests and independent post-state checks.",
+        "assertionStatus": "CONDITIONAL",
+        "validationState": "NOT_RUN",
+        "qualification": "NOT_QUALIFIED"
+      }
     },
     {
       "id": "CA-SOFTWARE-LIFECYCLE",
@@ -1783,7 +2000,44 @@
         "CA-REL-007",
         "CA-REL-013"
       ],
-      "validationState": "NOT_RUN"
+      "validationState": "NOT_RUN",
+      "scopeContract": {
+        "scopeRevision": "COMPUTER_ASSISTANT_KNOWLEDGE_R0_CANDIDATE",
+        "owner": "CA-SOFTWARE-LIFECYCLE",
+        "purpose": "Model installed software, package identities, publisher, version, installer/source provenance, dependencies, install/update/repair/uninstall, provider-owned files and residual state.",
+        "nonGoals": "Package identity, source/provenance and lifecycle; current Shun evidence is limited to a bounded sample and curated Provider JIT.",
+        "applicability": "Package identity, source/provenance and lifecycle; current Shun evidence is limited to a bounded sample and curated Provider JIT.",
+        "sourceClaimRefs": [
+          "CA-CLM-004",
+          "CA-CLM-008",
+          "CA-CLM-011",
+          "CA-CLM-016"
+        ],
+        "relationRefs": [
+          "CA-REL-007",
+          "CA-REL-013"
+        ],
+        "globalInvariantRefs": [
+          "CA-INV-001",
+          "CA-INV-002",
+          "CA-INV-003",
+          "CA-INV-004",
+          "CA-INV-005",
+          "CA-INV-006",
+          "CA-INV-007",
+          "CA-INV-012",
+          "CA-INV-013"
+        ],
+        "cqRefs": [
+          "CQ-CA-006",
+          "CQ-CA-007"
+        ],
+        "sapProfileRef": "SAP-CA-SOFTWARE-LIFECYCLE",
+        "validationOracle": "Official package-manager sources, exact provider receipts, signature/hash checks and residue tests.",
+        "assertionStatus": "CONDITIONAL",
+        "validationState": "NOT_RUN",
+        "qualification": "NOT_QUALIFIED"
+      }
     },
     {
       "id": "CA-HARDWARE-DEVICE",
@@ -1835,7 +2089,41 @@
         "CA-REL-008",
         "CA-REL-012"
       ],
-      "validationState": "NOT_RUN"
+      "validationState": "NOT_RUN",
+      "scopeContract": {
+        "scopeRevision": "COMPUTER_ASSISTANT_KNOWLEDGE_R0_CANDIDATE",
+        "owner": "CA-HARDWARE-DEVICE",
+        "purpose": "Model physical hardware, PnP device instances, hardware IDs, device classes, driver packages, OEM provenance, compatibility, enable/disable, update, rollback and verification.",
+        "nonGoals": "Hardware/PnP/driver semantics as a future knowledge area; no current public Shun capability is admitted.",
+        "applicability": "Hardware/PnP/driver semantics as a future knowledge area; no current public Shun capability is admitted.",
+        "sourceClaimRefs": [
+          "CA-CLM-009",
+          "CA-CLM-012"
+        ],
+        "relationRefs": [
+          "CA-REL-008",
+          "CA-REL-012"
+        ],
+        "globalInvariantRefs": [
+          "CA-INV-009",
+          "CA-INV-001",
+          "CA-INV-002",
+          "CA-INV-003",
+          "CA-INV-004",
+          "CA-INV-005",
+          "CA-INV-006",
+          "CA-INV-012",
+          "CA-INV-013"
+        ],
+        "cqRefs": [
+          "CQ-CA-008"
+        ],
+        "sapProfileRef": "SAP-CA-HARDWARE-DEVICE",
+        "validationOracle": "Microsoft and OEM documentation, real device/driver compatibility oracle and rollback tests.",
+        "assertionStatus": "OPEN",
+        "validationState": "NOT_RUN",
+        "qualification": "NOT_QUALIFIED"
+      }
     },
     {
       "id": "CA-PROCESS-SERVICE",
@@ -1882,7 +2170,36 @@
         "CQ-CA-009"
       ],
       "relationRefs": [],
-      "validationState": "NOT_RUN"
+      "validationState": "NOT_RUN",
+      "scopeContract": {
+        "scopeRevision": "COMPUTER_ASSISTANT_KNOWLEDGE_R0_CANDIDATE",
+        "owner": "CA-PROCESS-SERVICE",
+        "purpose": "Model process and service inventory, resource pressure, startup entries, dependencies, stop/start/restart, recovery and service impact.",
+        "nonGoals": "Process/service inventory and dependency semantics; current evidence is observation-only.",
+        "applicability": "Process/service inventory and dependency semantics; current evidence is observation-only.",
+        "sourceClaimRefs": [
+          "CA-CLM-004",
+          "CA-CLM-005"
+        ],
+        "relationRefs": [],
+        "globalInvariantRefs": [
+          "CA-INV-001",
+          "CA-INV-002",
+          "CA-INV-003",
+          "CA-INV-004",
+          "CA-INV-005",
+          "CA-INV-012",
+          "CA-INV-013"
+        ],
+        "cqRefs": [
+          "CQ-CA-009"
+        ],
+        "sapProfileRef": "SAP-CA-PROCESS-SERVICE",
+        "validationOracle": "Windows-native process/service evidence and negative mutation tests.",
+        "assertionStatus": "CONDITIONAL",
+        "validationState": "NOT_RUN",
+        "qualification": "NOT_QUALIFIED"
+      }
     },
     {
       "id": "CA-NETWORK",
@@ -1926,7 +2243,33 @@
         "CQ-CA-010"
       ],
       "relationRefs": [],
-      "validationState": "NOT_RUN"
+      "validationState": "NOT_RUN",
+      "scopeContract": {
+        "scopeRevision": "COMPUTER_ASSISTANT_KNOWLEDGE_R0_CANDIDATE",
+        "owner": "CA-NETWORK",
+        "purpose": "Model network adapters, link state, IP configuration, routes, DNS, proxy, Wi-Fi, connectivity tests and network recovery.",
+        "nonGoals": "Layered network connectivity semantics; no current Shun network feature is qualified.",
+        "applicability": "Layered network connectivity semantics; no current Shun network feature is qualified.",
+        "sourceClaimRefs": [],
+        "relationRefs": [],
+        "globalInvariantRefs": [
+          "CA-INV-001",
+          "CA-INV-002",
+          "CA-INV-003",
+          "CA-INV-004",
+          "CA-INV-005",
+          "CA-INV-012",
+          "CA-INV-013"
+        ],
+        "cqRefs": [
+          "CQ-CA-010"
+        ],
+        "sapProfileRef": "SAP-CA-NETWORK",
+        "validationOracle": "Official OS documentation plus controlled live adapter/IP/route/DNS/proxy tests.",
+        "assertionStatus": "OPEN",
+        "validationState": "NOT_RUN",
+        "qualification": "NOT_QUALIFIED"
+      }
     },
     {
       "id": "CA-EXECUTION-ENVIRONMENT",
@@ -1969,7 +2312,41 @@
         "CA-REL-002",
         "CA-REL-010"
       ],
-      "validationState": "NOT_RUN"
+      "validationState": "NOT_RUN",
+      "scopeContract": {
+        "scopeRevision": "COMPUTER_ASSISTANT_KNOWLEDGE_R0_CANDIDATE",
+        "owner": "CA-EXECUTION-ENVIRONMENT",
+        "purpose": "Determine where a capability can actually run and bind it to a compatible trusted provider/environment. Current Shun scope is local Windows-first; Linux/macOS are future knowledge targets only. WSL, remote, sandbox and cloud execution are not admitted as current Product execution targets by this candidate.",
+        "nonGoals": "Current local Windows platform/provider feasibility and candidate OS compatibility semantics; excludes remote administration, WSL/cloud execution and unsupported OS claims without a separate Product amendment and exact host evidence.",
+        "applicability": "Current local Windows platform/provider feasibility and candidate OS compatibility semantics; excludes remote administration, WSL/cloud execution and unsupported OS claims without a separate Product amendment and exact host evidence.",
+        "sourceClaimRefs": [
+          "CA-CLM-001",
+          "CA-CLM-002",
+          "CA-CLM-016",
+          "CA-CLM-017"
+        ],
+        "relationRefs": [
+          "CA-REL-002",
+          "CA-REL-010"
+        ],
+        "globalInvariantRefs": [
+          "CA-INV-001",
+          "CA-INV-002",
+          "CA-INV-011",
+          "CA-INV-012",
+          "CA-INV-013"
+        ],
+        "cqRefs": [
+          "CQ-CA-002",
+          "CQ-CA-014",
+          "CQ-CA-020"
+        ],
+        "sapProfileRef": "SAP-CA-EXECUTION-ENVIRONMENT",
+        "validationOracle": "Exact OS build/edition, architecture, provider signature/version and native dependency binding; Windows client checks are required before adopting Server-view documentation.",
+        "assertionStatus": "CONDITIONAL",
+        "validationState": "NOT_RUN",
+        "qualification": "NOT_QUALIFIED"
+      }
     },
     {
       "id": "CA-TASK-LIFECYCLE",
@@ -2018,7 +2395,43 @@
         "CA-REL-004",
         "CA-REL-005"
       ],
-      "validationState": "NOT_RUN"
+      "validationState": "NOT_RUN",
+      "scopeContract": {
+        "scopeRevision": "COMPUTER_ASSISTANT_KNOWLEDGE_R0_CANDIDATE",
+        "owner": "CA-TASK-LIFECYCLE",
+        "purpose": "Model plan, preview, approval, permit, effect, journal, receipt, verification, interruption, reconciliation, recovery and truthful UNKNOWN state.",
+        "nonGoals": "Task/effect state, approval, journal, receipt, verification and recovery semantics; excludes implementation of runtime ABI.",
+        "applicability": "Task/effect state, approval, journal, receipt, verification and recovery semantics; excludes implementation of runtime ABI.",
+        "sourceClaimRefs": [
+          "CA-CLM-001",
+          "CA-CLM-006",
+          "CA-CLM-007",
+          "CA-CLM-008",
+          "CA-CLM-014",
+          "CA-CLM-016"
+        ],
+        "relationRefs": [
+          "CA-REL-003",
+          "CA-REL-004",
+          "CA-REL-005"
+        ],
+        "globalInvariantRefs": [
+          "CA-INV-001",
+          "CA-INV-002",
+          "CA-INV-003",
+          "CA-INV-004",
+          "CA-INV-005",
+          "CA-INV-012"
+        ],
+        "cqRefs": [
+          "CQ-CA-012"
+        ],
+        "sapProfileRef": "SAP-CA-TASK-LIFECYCLE",
+        "validationOracle": "Exact Host receipts, restart/interruption negatives and independent post-state oracle.",
+        "assertionStatus": "CONDITIONAL",
+        "validationState": "NOT_RUN",
+        "qualification": "NOT_QUALIFIED"
+      }
     },
     {
       "id": "CA-AOT-KNOWLEDGE",
@@ -2054,7 +2467,36 @@
         "CA-REL-009",
         "CA-REL-010"
       ],
-      "validationState": "NOT_RUN"
+      "validationState": "NOT_RUN",
+      "scopeContract": {
+        "scopeRevision": "COMPUTER_ASSISTANT_KNOWLEDGE_R0_CANDIDATE",
+        "owner": "CA-AOT-KNOWLEDGE",
+        "purpose": "Separate stable, source-pinned domain knowledge suitable for ahead-of-time compilation from live host facts and authority that must be obtained at runtime.",
+        "nonGoals": "Classification of reusable knowledge versus runtime facts; does not build or activate AOT Packages.",
+        "applicability": "Classification of reusable knowledge versus runtime facts; does not build or activate AOT Packages.",
+        "sourceClaimRefs": [
+          "CA-CLM-013"
+        ],
+        "relationRefs": [
+          "CA-REL-009",
+          "CA-REL-010"
+        ],
+        "globalInvariantRefs": [
+          "CA-INV-011",
+          "CA-INV-001",
+          "CA-INV-002",
+          "CA-INV-012",
+          "CA-INV-013"
+        ],
+        "cqRefs": [
+          "CQ-CA-011"
+        ],
+        "sapProfileRef": "SAP-CA-AOT-KNOWLEDGE",
+        "validationOracle": "DKE SAP review followed by DIS ECP and exact selected-consumer Package proof.",
+        "assertionStatus": "OPEN",
+        "validationState": "NOT_RUN",
+        "qualification": "NOT_QUALIFIED"
+      }
     },
     {
       "id": "CA-GLOBAL-PROVENANCE",
@@ -2086,7 +2528,41 @@
         "CA-REL-007",
         "CA-REL-009"
       ],
-      "validationState": "NOT_RUN"
+      "validationState": "NOT_RUN",
+      "scopeContract": {
+        "scopeRevision": "COMPUTER_ASSISTANT_KNOWLEDGE_R0_CANDIDATE",
+        "owner": "CA-GLOBAL-PROVENANCE",
+        "purpose": "Every factual claim and provider capability has exact source identity/revision, locator, authority class, applicable OS/version scope, freshness and known limitations. External OS documentation never entails Shun implementation, Product admission or supported-platform status.",
+        "nonGoals": "Source identity, authority, version, applicability, freshness and non-entailment across all child Elements; does not itself authorize feature adoption.",
+        "applicability": "Source identity, authority, version, applicability, freshness and non-entailment across all child Elements; does not itself authorize feature adoption.",
+        "sourceClaimRefs": [
+          "CA-CLM-001",
+          "CA-CLM-008",
+          "CA-CLM-011",
+          "CA-CLM-012",
+          "CA-CLM-016",
+          "CA-CLM-009",
+          "CA-CLM-010",
+          "CA-CLM-017"
+        ],
+        "relationRefs": [
+          "CA-REL-007",
+          "CA-REL-009"
+        ],
+        "globalInvariantRefs": [
+          "CA-INV-006",
+          "CA-INV-013",
+          "CA-INV-012"
+        ],
+        "cqRefs": [
+          "CQ-CA-018"
+        ],
+        "sapProfileRef": "SAP-CA-GLOBAL-PROVENANCE",
+        "validationOracle": "Exact source/blob review and provider provenance negatives.",
+        "assertionStatus": "CONDITIONAL",
+        "validationState": "NOT_RUN",
+        "qualification": "NOT_QUALIFIED"
+      }
     },
     {
       "id": "CA-GLOBAL-AUTHORITY",
@@ -2120,7 +2596,43 @@
         "CA-REL-008",
         "CA-REL-015"
       ],
-      "validationState": "NOT_RUN"
+      "validationState": "NOT_RUN",
+      "scopeContract": {
+        "scopeRevision": "COMPUTER_ASSISTANT_KNOWLEDGE_R0_CANDIDATE",
+        "owner": "CA-GLOBAL-AUTHORITY",
+        "purpose": "Observation, recommendation, preview, user approval, Kernel permit and Windows Host authorization are distinct states; no model or local label can synthesize permission. Unknown/user-created assets cannot be deleted by size or location alone.",
+        "nonGoals": "Separation of observation, proposal, approval, permit, Host authorization and asset ownership; does not define runtime authorization implementation.",
+        "applicability": "Separation of observation, proposal, approval, permit, Host authorization and asset ownership; does not define runtime authorization implementation.",
+        "sourceClaimRefs": [
+          "CA-CLM-001",
+          "CA-CLM-002",
+          "CA-CLM-014",
+          "CA-CLM-016",
+          "CA-CLM-006",
+          "CA-CLM-008"
+        ],
+        "relationRefs": [
+          "CA-REL-004",
+          "CA-REL-008",
+          "CA-REL-015"
+        ],
+        "globalInvariantRefs": [
+          "CA-INV-001",
+          "CA-INV-002",
+          "CA-INV-003",
+          "CA-INV-007",
+          "CA-INV-012"
+        ],
+        "cqRefs": [
+          "CQ-CA-001",
+          "CQ-CA-012"
+        ],
+        "sapProfileRef": "SAP-CA-GLOBAL-AUTHORITY",
+        "validationOracle": "Product/Host source review plus forged/stale/mismatched authority negatives.",
+        "assertionStatus": "CONDITIONAL",
+        "validationState": "NOT_RUN",
+        "qualification": "NOT_QUALIFIED"
+      }
     },
     {
       "id": "CA-GLOBAL-VERIFICATION",
@@ -2151,7 +2663,40 @@
         "CA-REL-005",
         "CA-REL-006"
       ],
-      "validationState": "NOT_RUN"
+      "validationState": "NOT_RUN",
+      "scopeContract": {
+        "scopeRevision": "COMPUTER_ASSISTANT_KNOWLEDGE_R0_CANDIDATE",
+        "owner": "CA-GLOBAL-VERIFICATION",
+        "purpose": "Success requires an independent observable post-state matching the declared verifier; interrupted or ambiguous outcomes remain UNKNOWN and are reconciled before retry.",
+        "nonGoals": "Truthful post-state, UNKNOWN and reconcile-before-retry semantics across effects.",
+        "applicability": "Truthful post-state, UNKNOWN and reconcile-before-retry semantics across effects.",
+        "sourceClaimRefs": [
+          "CA-CLM-006",
+          "CA-CLM-007",
+          "CA-CLM-008",
+          "CA-CLM-014",
+          "CA-CLM-016"
+        ],
+        "relationRefs": [
+          "CA-REL-005",
+          "CA-REL-006"
+        ],
+        "globalInvariantRefs": [
+          "CA-INV-004",
+          "CA-INV-005",
+          "CA-INV-012"
+        ],
+        "cqRefs": [
+          "CQ-CA-004",
+          "CQ-CA-007",
+          "CQ-CA-012"
+        ],
+        "sapProfileRef": "SAP-CA-GLOBAL-VERIFICATION",
+        "validationOracle": "Independent observable post-state and interruption/recovery tests.",
+        "assertionStatus": "CONDITIONAL",
+        "validationState": "NOT_RUN",
+        "qualification": "NOT_QUALIFIED"
+      }
     },
     {
       "id": "CA-GLOBAL-PRIVACY",
@@ -2176,7 +2721,34 @@
       "relationRefs": [
         "CA-REL-014"
       ],
-      "validationState": "NOT_RUN"
+      "validationState": "NOT_RUN",
+      "scopeContract": {
+        "scopeRevision": "COMPUTER_ASSISTANT_KNOWLEDGE_R0_CANDIDATE",
+        "owner": "CA-GLOBAL-PRIVACY",
+        "purpose": "Local-only system/support observations remain local unless a distinct explicit sharing scope and redaction contract is approved; secrets, user content and credentials are excluded.",
+        "nonGoals": "Data minimization, local-only behavior and explicit sharing scope.",
+        "applicability": "Data minimization, local-only behavior and explicit sharing scope.",
+        "sourceClaimRefs": [
+          "CA-CLM-004",
+          "CA-CLM-015",
+          "CA-CLM-016"
+        ],
+        "relationRefs": [
+          "CA-REL-014"
+        ],
+        "globalInvariantRefs": [
+          "CA-INV-010",
+          "CA-INV-012"
+        ],
+        "cqRefs": [
+          "CQ-CA-013"
+        ],
+        "sapProfileRef": "SAP-CA-GLOBAL-PRIVACY",
+        "validationOracle": "Secret/process/path/document canaries and zero-egress native checks.",
+        "assertionStatus": "CONDITIONAL",
+        "validationState": "NOT_RUN",
+        "qualification": "NOT_QUALIFIED"
+      }
     },
     {
       "id": "CA-GLOBAL-CURRENTNESS",
@@ -2211,7 +2783,44 @@
         "CA-REL-012",
         "CA-REL-013"
       ],
-      "validationState": "NOT_RUN"
+      "validationState": "NOT_RUN",
+      "scopeContract": {
+        "scopeRevision": "COMPUTER_ASSISTANT_KNOWLEDGE_R0_CANDIDATE",
+        "owner": "CA-GLOBAL-CURRENTNESS",
+        "purpose": "Source revisions, OS/provider versions, policy, host identity, user permissions and device/storage state can become stale; affected claims, Elements, CQs and executable consumers must be invalidated and rechecked.",
+        "nonGoals": "Invalidation of affected knowledge and consumers after source, platform, provider, policy or host changes.",
+        "applicability": "Invalidation of affected knowledge and consumers after source, platform, provider, policy or host changes.",
+        "sourceClaimRefs": [
+          "CA-CLM-001",
+          "CA-CLM-008",
+          "CA-CLM-013",
+          "CA-CLM-014",
+          "CA-CLM-016",
+          "CA-CLM-009",
+          "CA-CLM-010",
+          "CA-CLM-011",
+          "CA-CLM-012",
+          "CA-CLM-017"
+        ],
+        "relationRefs": [
+          "CA-REL-010",
+          "CA-REL-011",
+          "CA-REL-012",
+          "CA-REL-013"
+        ],
+        "globalInvariantRefs": [
+          "CA-INV-012"
+        ],
+        "cqRefs": [
+          "CQ-CA-016",
+          "CQ-CA-020"
+        ],
+        "sapProfileRef": "SAP-CA-GLOBAL-CURRENTNESS",
+        "validationOracle": "Exact source-delta impact review and stale-binding negative cases.",
+        "assertionStatus": "OPEN",
+        "validationState": "NOT_RUN",
+        "qualification": "NOT_QUALIFIED"
+      }
     }
   ],
   "decomposition": {
@@ -2375,6 +2984,7 @@
           "CQ-CA-015"
         ],
         "sapProfileRef": "SAP-CA-ROOT",
+        "scopeContractRef": "CA-ROOT.scopeContract",
         "semanticValidationState": "NOT_RUN"
       },
       {
@@ -2399,6 +3009,7 @@
           "CQ-CA-001"
         ],
         "sapProfileRef": "SAP-CA-GOAL-CAPABILITY",
+        "scopeContractRef": "CA-GOAL-CAPABILITY.scopeContract",
         "semanticValidationState": "NOT_RUN"
       },
       {
@@ -2424,6 +3035,7 @@
           "CQ-CA-003"
         ],
         "sapProfileRef": "SAP-CA-SYSTEM-OBSERVATION",
+        "scopeContractRef": "CA-SYSTEM-OBSERVATION.scopeContract",
         "semanticValidationState": "NOT_RUN"
       },
       {
@@ -2455,6 +3067,7 @@
           "CQ-CA-017"
         ],
         "sapProfileRef": "SAP-CA-STORAGE",
+        "scopeContractRef": "CA-STORAGE.scopeContract",
         "semanticValidationState": "NOT_RUN"
       },
       {
@@ -2482,6 +3095,7 @@
           "CQ-CA-019"
         ],
         "sapProfileRef": "SAP-CA-FILE-ASSET",
+        "scopeContractRef": "CA-FILE-ASSET.scopeContract",
         "semanticValidationState": "NOT_RUN"
       },
       {
@@ -2514,6 +3128,7 @@
           "CQ-CA-007"
         ],
         "sapProfileRef": "SAP-CA-SOFTWARE-LIFECYCLE",
+        "scopeContractRef": "CA-SOFTWARE-LIFECYCLE.scopeContract",
         "semanticValidationState": "NOT_RUN"
       },
       {
@@ -2543,6 +3158,7 @@
           "CQ-CA-008"
         ],
         "sapProfileRef": "SAP-CA-HARDWARE-DEVICE",
+        "scopeContractRef": "CA-HARDWARE-DEVICE.scopeContract",
         "semanticValidationState": "NOT_RUN"
       },
       {
@@ -2567,6 +3183,7 @@
           "CQ-CA-009"
         ],
         "sapProfileRef": "SAP-CA-PROCESS-SERVICE",
+        "scopeContractRef": "CA-PROCESS-SERVICE.scopeContract",
         "semanticValidationState": "NOT_RUN"
       },
       {
@@ -2588,6 +3205,7 @@
           "CQ-CA-010"
         ],
         "sapProfileRef": "SAP-CA-NETWORK",
+        "scopeContractRef": "CA-NETWORK.scopeContract",
         "semanticValidationState": "NOT_RUN"
       },
       {
@@ -2617,6 +3235,7 @@
           "CQ-CA-020"
         ],
         "sapProfileRef": "SAP-CA-EXECUTION-ENVIRONMENT",
+        "scopeContractRef": "CA-EXECUTION-ENVIRONMENT.scopeContract",
         "semanticValidationState": "NOT_RUN"
       },
       {
@@ -2648,6 +3267,7 @@
           "CQ-CA-012"
         ],
         "sapProfileRef": "SAP-CA-TASK-LIFECYCLE",
+        "scopeContractRef": "CA-TASK-LIFECYCLE.scopeContract",
         "semanticValidationState": "NOT_RUN"
       },
       {
@@ -2672,6 +3292,7 @@
           "CQ-CA-011"
         ],
         "sapProfileRef": "SAP-CA-AOT-KNOWLEDGE",
+        "scopeContractRef": "CA-AOT-KNOWLEDGE.scopeContract",
         "semanticValidationState": "NOT_RUN"
       },
       {
@@ -2701,6 +3322,7 @@
           "CQ-CA-018"
         ],
         "sapProfileRef": "SAP-CA-GLOBAL-PROVENANCE",
+        "scopeContractRef": "CA-GLOBAL-PROVENANCE.scopeContract",
         "semanticValidationState": "NOT_RUN"
       },
       {
@@ -2732,6 +3354,7 @@
           "CQ-CA-012"
         ],
         "sapProfileRef": "SAP-CA-GLOBAL-AUTHORITY",
+        "scopeContractRef": "CA-GLOBAL-AUTHORITY.scopeContract",
         "semanticValidationState": "NOT_RUN"
       },
       {
@@ -2760,6 +3383,7 @@
           "CQ-CA-012"
         ],
         "sapProfileRef": "SAP-CA-GLOBAL-VERIFICATION",
+        "scopeContractRef": "CA-GLOBAL-VERIFICATION.scopeContract",
         "semanticValidationState": "NOT_RUN"
       },
       {
@@ -2782,6 +3406,7 @@
           "CQ-CA-013"
         ],
         "sapProfileRef": "SAP-CA-GLOBAL-PRIVACY",
+        "scopeContractRef": "CA-GLOBAL-PRIVACY.scopeContract",
         "semanticValidationState": "NOT_RUN"
       },
       {
@@ -2814,6 +3439,7 @@
           "CQ-CA-020"
         ],
         "sapProfileRef": "SAP-CA-GLOBAL-CURRENTNESS",
+        "scopeContractRef": "CA-GLOBAL-CURRENTNESS.scopeContract",
         "semanticValidationState": "NOT_RUN"
       }
     ]
@@ -2824,7 +3450,7 @@
       "from": "CA-GOAL-CAPABILITY",
       "to": "CA-EXECUTION-ENVIRONMENT",
       "type": "REQUIRES_COMPATIBLE_PROVIDER_ENVIRONMENT_BINDING",
-      "status": "PRODUCT_GROUNDED_CANDIDATE",
+      "status": "SUPPORTED",
       "semanticOwner": "CA-GOAL-CAPABILITY",
       "sourceRefs": [
         "SRC-PRODUCT-PRD"
@@ -2845,14 +3471,15 @@
         "CA-INV-012",
         "CA-INV-013"
       ],
-      "validationState": "NOT_RUN"
+      "validationState": "NOT_RUN",
+      "authorStatus": "PRODUCT_GROUNDED_CANDIDATE"
     },
     {
       "id": "CA-REL-003",
       "from": "CA-GOAL-CAPABILITY",
       "to": "CA-TASK-LIFECYCLE",
       "type": "RESOLVES_TO_BOUNDED_TASK_PLAN",
-      "status": "PRODUCT_GROUNDED_CANDIDATE",
+      "status": "SUPPORTED",
       "semanticOwner": "CA-GOAL-CAPABILITY",
       "sourceRefs": [
         "SRC-PRODUCT-PRD"
@@ -2870,14 +3497,15 @@
         "CA-INV-001",
         "CA-INV-002"
       ],
-      "validationState": "NOT_RUN"
+      "validationState": "NOT_RUN",
+      "authorStatus": "PRODUCT_GROUNDED_CANDIDATE"
     },
     {
       "id": "CA-REL-004",
       "from": "CA-TASK-LIFECYCLE",
       "to": "CA-GLOBAL-AUTHORITY",
       "type": "CONSTRAINED_BY",
-      "status": "PRODUCT_GROUNDED_CANDIDATE",
+      "status": "SUPPORTED",
       "semanticOwner": "CA-GLOBAL-AUTHORITY",
       "sourceRefs": [
         "SRC-PRODUCT-PRD",
@@ -2898,14 +3526,15 @@
         "CA-INV-002",
         "CA-INV-003"
       ],
-      "validationState": "NOT_RUN"
+      "validationState": "NOT_RUN",
+      "authorStatus": "PRODUCT_GROUNDED_CANDIDATE"
     },
     {
       "id": "CA-REL-005",
       "from": "CA-TASK-LIFECYCLE",
       "to": "CA-GLOBAL-VERIFICATION",
       "type": "MUST_PRODUCE_VERIFIABLE_POST_STATE",
-      "status": "PRODUCT_GROUNDED_CANDIDATE",
+      "status": "SUPPORTED",
       "semanticOwner": "CA-GLOBAL-VERIFICATION",
       "sourceRefs": [
         "SRC-PRODUCT-PRD",
@@ -2924,14 +3553,15 @@
         "CA-INV-004",
         "CA-INV-005"
       ],
-      "validationState": "NOT_RUN"
+      "validationState": "NOT_RUN",
+      "authorStatus": "PRODUCT_GROUNDED_CANDIDATE"
     },
     {
       "id": "CA-REL-006",
       "from": "CA-STORAGE",
       "to": "CA-GLOBAL-VERIFICATION",
       "type": "CLEANUP_REQUIRES_RECLAIM_AND_PROTECTED_ASSET_VERIFICATION",
-      "status": "CODE_AND_TEST_GROUNDED_CANDIDATE",
+      "status": "CONDITIONAL",
       "semanticOwner": "CA-GLOBAL-VERIFICATION",
       "sourceRefs": [
         "SRC-STORAGE-DIAGNOSE",
@@ -2957,14 +3587,15 @@
         "CA-INV-005",
         "CA-INV-007"
       ],
-      "validationState": "NOT_RUN"
+      "validationState": "NOT_RUN",
+      "authorStatus": "CODE_AND_TEST_GROUNDED_CANDIDATE"
     },
     {
       "id": "CA-REL-007",
       "from": "CA-SOFTWARE-LIFECYCLE",
       "to": "CA-GLOBAL-PROVENANCE",
       "type": "INSTALL_AND_REMOVE_REQUIRE_TRUSTED_SOURCE_AND_OWNERSHIP_EVIDENCE",
-      "status": "CODE_GROUNDED_CANDIDATE",
+      "status": "CONDITIONAL",
       "semanticOwner": "CA-GLOBAL-PROVENANCE",
       "sourceRefs": [
         "SRC-JIT-ORCHESTRATOR",
@@ -2988,14 +3619,15 @@
         "CA-INV-007",
         "CA-INV-012"
       ],
-      "validationState": "NOT_RUN"
+      "validationState": "NOT_RUN",
+      "authorStatus": "CODE_GROUNDED_CANDIDATE"
     },
     {
       "id": "CA-REL-008",
       "from": "CA-HARDWARE-DEVICE",
       "to": "CA-GLOBAL-AUTHORITY",
       "type": "DEVICE_DRIVER_MUTATION_REQUIRES_ADMIN_AND_EXPLICIT_APPROVAL",
-      "status": "FUTURE_DERIVED_NEEDS_PRODUCT_AND_DOMAIN_ORACLE",
+      "status": "UNKNOWN",
       "semanticOwner": "CA-GLOBAL-AUTHORITY",
       "sourceRefs": [
         "EXT-PNP-ENABLE",
@@ -3017,14 +3649,15 @@
         "CA-INV-009",
         "CA-INV-013"
       ],
-      "validationState": "NOT_RUN"
+      "validationState": "NOT_RUN",
+      "authorStatus": "FUTURE_DERIVED_NEEDS_PRODUCT_AND_DOMAIN_ORACLE"
     },
     {
       "id": "CA-REL-009",
       "from": "CA-AOT-KNOWLEDGE",
       "to": "CA-GLOBAL-PROVENANCE",
       "type": "COMPILED_KNOWLEDGE_MUST_RETAIN_SOURCE_REVISION",
-      "status": "DKE_DERIVED_CANDIDATE",
+      "status": "UNKNOWN",
       "semanticOwner": "CA-GLOBAL-PROVENANCE",
       "sourceRefs": [
         "SRC-DKE-STANDARD",
@@ -3044,14 +3677,15 @@
         "CA-INV-012",
         "CA-INV-013"
       ],
-      "validationState": "NOT_RUN"
+      "validationState": "NOT_RUN",
+      "authorStatus": "DKE_DERIVED_CANDIDATE"
     },
     {
       "id": "CA-REL-010",
       "from": "CA-AOT-KNOWLEDGE",
       "to": "CA-EXECUTION-ENVIRONMENT",
       "type": "STATIC_OS_RULES_ARE_PLATFORM_VERSION_SCOPED",
-      "status": "DKE_DERIVED_CANDIDATE",
+      "status": "CONDITIONAL",
       "semanticOwner": "CA-GLOBAL-CURRENTNESS",
       "sourceRefs": [
         "SRC-DKE-STANDARD",
@@ -3073,14 +3707,15 @@
         "CA-INV-012",
         "CA-INV-013"
       ],
-      "validationState": "NOT_RUN"
+      "validationState": "NOT_RUN",
+      "authorStatus": "DKE_DERIVED_CANDIDATE"
     },
     {
       "id": "CA-REL-011",
       "from": "CA-GLOBAL-CURRENTNESS",
       "to": "CA-STORAGE",
       "type": "DISK_VOLUME_AND_HEALTH_FACTS_REQUIRE_RUNTIME_REFRESH",
-      "status": "DKE_DERIVED_CANDIDATE",
+      "status": "CONDITIONAL",
       "semanticOwner": "CA-GLOBAL-CURRENTNESS",
       "sourceRefs": [
         "SRC-SYSTEM-INDEX",
@@ -3103,14 +3738,15 @@
         "CA-INV-012",
         "CA-INV-013"
       ],
-      "validationState": "NOT_RUN"
+      "validationState": "NOT_RUN",
+      "authorStatus": "DKE_DERIVED_CANDIDATE"
     },
     {
       "id": "CA-REL-012",
       "from": "CA-GLOBAL-CURRENTNESS",
       "to": "CA-HARDWARE-DEVICE",
       "type": "DEVICE_INSTANCE_AND_DRIVER_STATE_REQUIRE_RUNTIME_REFRESH",
-      "status": "DKE_DERIVED_CANDIDATE",
+      "status": "CONDITIONAL",
       "semanticOwner": "CA-GLOBAL-CURRENTNESS",
       "sourceRefs": [
         "EXT-PNP-GET",
@@ -3131,14 +3767,15 @@
         "CA-INV-012",
         "CA-INV-013"
       ],
-      "validationState": "NOT_RUN"
+      "validationState": "NOT_RUN",
+      "authorStatus": "DKE_DERIVED_CANDIDATE"
     },
     {
       "id": "CA-REL-013",
       "from": "CA-GLOBAL-CURRENTNESS",
       "to": "CA-SOFTWARE-LIFECYCLE",
       "type": "INSTALLED_VERSION_AND_SOURCE_STATE_REQUIRE_RUNTIME_REFRESH",
-      "status": "DKE_DERIVED_CANDIDATE",
+      "status": "CONDITIONAL",
       "semanticOwner": "CA-GLOBAL-CURRENTNESS",
       "sourceRefs": [
         "EXT-WINGET-LIST",
@@ -3160,14 +3797,15 @@
         "CA-INV-006",
         "CA-INV-012"
       ],
-      "validationState": "NOT_RUN"
+      "validationState": "NOT_RUN",
+      "authorStatus": "DKE_DERIVED_CANDIDATE"
     },
     {
       "id": "CA-REL-014",
       "from": "CA-GLOBAL-PRIVACY",
       "to": "CA-SYSTEM-OBSERVATION",
       "type": "OBSERVATION_DATA_MINIMIZATION_AND_EGRESS_BOUNDARY",
-      "status": "PRODUCT_GROUNDED_CANDIDATE",
+      "status": "SUPPORTED",
       "semanticOwner": "CA-GLOBAL-PRIVACY",
       "sourceRefs": [
         "SRC-PRODUCT-PRD",
@@ -3187,14 +3825,15 @@
       "invariantRefs": [
         "CA-INV-010"
       ],
-      "validationState": "NOT_RUN"
+      "validationState": "NOT_RUN",
+      "authorStatus": "PRODUCT_GROUNDED_CANDIDATE"
     },
     {
       "id": "CA-REL-015",
       "from": "CA-FILE-ASSET",
       "to": "CA-GLOBAL-AUTHORITY",
       "type": "FUTURE_FILE_EFFECT_REQUIRES_EXACT_CURRENT_SCOPE_AND_HOST_AUTHORIZATION",
-      "status": "PRODUCT_AND_SOURCE_GROUNDED_CANDIDATE",
+      "status": "SUPPORTED",
       "semanticOwner": "CA-GLOBAL-AUTHORITY",
       "sourceRefs": [
         "SRC-PRODUCT-PRD",
@@ -3220,7 +3859,8 @@
         "CA-INV-004",
         "CA-INV-005",
         "CA-INV-007"
-      ]
+      ],
+      "authorStatus": "PRODUCT_AND_SOURCE_GROUNDED_CANDIDATE"
     }
   ],
   "globalInvariants": [
@@ -3255,7 +3895,8 @@
       "status": "SUPPORTED",
       "positiveCase": "Observation is reported as a fact only and never accepted as permission to mutate.",
       "unknownCase": "If authority state is unavailable, no mutation is permitted.",
-      "validationState": "NOT_RUN"
+      "validationState": "NOT_RUN",
+      "statusBasis": "FROZEN_PRODUCT_OR_OFFICIAL_SOURCE_REQUIREMENT_NOT_EXECUTION_PASS"
     },
     {
       "id": "CA-INV-002",
@@ -3288,7 +3929,8 @@
       "status": "SUPPORTED",
       "positiveCase": "LLM/advisory output is treated as untrusted proposal data; authority remains in the separate trusted chain.",
       "unknownCase": "If proposal provenance or trusted selection is unknown, reject or clarify.",
-      "validationState": "NOT_RUN"
+      "validationState": "NOT_RUN",
+      "statusBasis": "FROZEN_PRODUCT_OR_OFFICIAL_SOURCE_REQUIREMENT_NOT_EXECUTION_PASS"
     },
     {
       "id": "CA-INV-003",
@@ -3319,7 +3961,8 @@
       "status": "SUPPORTED",
       "positiveCase": "A physical effect is blocked until exact target, current scope, explicit approval and Host authorization all match.",
       "unknownCase": "If any scope, approval or Host authority input is unknown, zero effect.",
-      "validationState": "NOT_RUN"
+      "validationState": "NOT_RUN",
+      "statusBasis": "FROZEN_PRODUCT_OR_OFFICIAL_SOURCE_REQUIREMENT_NOT_EXECUTION_PASS"
     },
     {
       "id": "CA-INV-004",
@@ -3352,7 +3995,8 @@
       "status": "CONDITIONAL",
       "positiveCase": "Success is reported only when the declared independent post-state verifier agrees.",
       "unknownCase": "If independent post-state cannot be observed, report UNKNOWN.",
-      "validationState": "NOT_RUN"
+      "validationState": "NOT_RUN",
+      "statusBasis": "CANDIDATE_RULE_REQUIRES_SEMANTIC_OR_NATIVE_ORACLE"
     },
     {
       "id": "CA-INV-005",
@@ -3383,7 +4027,8 @@
       "status": "CONDITIONAL",
       "positiveCase": "An ambiguous or may-have-executed result is reconciled before any retry.",
       "unknownCase": "If execution may have occurred, do not retry until reconciliation.",
-      "validationState": "NOT_RUN"
+      "validationState": "NOT_RUN",
+      "statusBasis": "CANDIDATE_RULE_REQUIRES_SEMANTIC_OR_NATIVE_ORACLE"
     },
     {
       "id": "CA-INV-006",
@@ -3409,7 +4054,8 @@
       "status": "CONDITIONAL",
       "positiveCase": "Software/driver acquisition is limited to exact source, package/version and trust evidence.",
       "unknownCase": "If source, package identity, version or trust cannot be verified, block acquisition.",
-      "validationState": "NOT_RUN"
+      "validationState": "NOT_RUN",
+      "statusBasis": "CANDIDATE_RULE_REQUIRES_SEMANTIC_OR_NATIVE_ORACLE"
     },
     {
       "id": "CA-INV-007",
@@ -3438,7 +4084,8 @@
       "status": "CONDITIONAL",
       "positiveCase": "Unknown and user-created assets are retained regardless of size or path location.",
       "unknownCase": "If asset ownership is unknown, retain it.",
-      "validationState": "NOT_RUN"
+      "validationState": "NOT_RUN",
+      "statusBasis": "CANDIDATE_RULE_REQUIRES_SEMANTIC_OR_NATIVE_ORACLE"
     },
     {
       "id": "CA-INV-008",
@@ -3461,7 +4108,8 @@
       "status": "CONDITIONAL",
       "positiveCase": "Destructive disk/partition operations are blocked unless exact target, existing-data and backup conditions are known.",
       "unknownCase": "If disk identity, existing-data or backup state is unknown, block.",
-      "validationState": "NOT_RUN"
+      "validationState": "NOT_RUN",
+      "statusBasis": "CANDIDATE_RULE_REQUIRES_SEMANTIC_OR_NATIVE_ORACLE"
     },
     {
       "id": "CA-INV-009",
@@ -3485,7 +4133,8 @@
       "status": "CONDITIONAL",
       "positiveCase": "Device mutation requires exact InstanceId and runtime privilege; driver change additionally requires compatibility, rollback and verification.",
       "unknownCase": "If exact device identity, admin status, compatibility or rollback is unknown, block.",
-      "validationState": "NOT_RUN"
+      "validationState": "NOT_RUN",
+      "statusBasis": "CANDIDATE_RULE_REQUIRES_SEMANTIC_OR_NATIVE_ORACLE"
     },
     {
       "id": "CA-INV-010",
@@ -3517,7 +4166,8 @@
       "status": "SUPPORTED",
       "positiveCase": "B-040 support context remains local-only by default and is not automatically sent to external destinations.",
       "unknownCase": "If classification, redaction or sharing consent is unknown, no egress.",
-      "validationState": "NOT_RUN"
+      "validationState": "NOT_RUN",
+      "statusBasis": "FROZEN_PRODUCT_OR_OFFICIAL_SOURCE_REQUIREMENT_NOT_EXECUTION_PASS"
     },
     {
       "id": "CA-INV-011",
@@ -3540,7 +4190,8 @@
       "status": "CONDITIONAL",
       "positiveCase": "Reusable AOT knowledge contains stable source-pinned semantics, never live host facts or authority.",
       "unknownCase": "If source revision or static/runtime classification is unknown, keep the fact runtime-only or the AOT candidate blocked.",
-      "validationState": "NOT_RUN"
+      "validationState": "NOT_RUN",
+      "statusBasis": "CANDIDATE_RULE_REQUIRES_SEMANTIC_OR_NATIVE_ORACLE"
     },
     {
       "id": "CA-INV-012",
@@ -3583,7 +4234,8 @@
       "status": "CONDITIONAL",
       "positiveCase": "Any relevant source, OS release/servicing, provider, policy or host change invalidates the affected scope and its consumers.",
       "unknownCase": "If impact scope is unknown, invalidate conservatively and keep currentness UNKNOWN; do not assert unaffected siblings.",
-      "validationState": "NOT_RUN"
+      "validationState": "NOT_RUN",
+      "statusBasis": "CANDIDATE_RULE_REQUIRES_SEMANTIC_OR_NATIVE_ORACLE"
     },
     {
       "id": "CA-INV-013",
@@ -3618,7 +4270,8 @@
       "status": "SUPPORTED",
       "positiveCase": "External Microsoft/OEM documentation remains platform knowledge and never entails Shun capability, Product admission or permission.",
       "unknownCase": "If client applicability or Shun admission is unknown, retain external knowledge only.",
-      "validationState": "NOT_RUN"
+      "validationState": "NOT_RUN",
+      "statusBasis": "FROZEN_PRODUCT_OR_OFFICIAL_SOURCE_REQUIREMENT_NOT_EXECUTION_PASS"
     }
   ],
   "competencyQuestions": [
@@ -3657,7 +4310,8 @@
         "SRC-TEST-DOMAIN-COMPUTER-META",
         "SRC-TEST-DOMAIN-COMPUTER-RECIPE",
         "SRC-TEST-DOMAIN-COMPUTER-PROVIDER-JIT"
-      ]
+      ],
+      "result": "NOT_RUN"
     },
     {
       "id": "CQ-CA-002",
@@ -3694,7 +4348,8 @@
         "SRC-TEST-DOMAIN-COMPUTER-META",
         "SRC-TEST-DOMAIN-COMPUTER-RECIPE",
         "SRC-TEST-DOMAIN-COMPUTER-PROVIDER-JIT"
-      ]
+      ],
+      "result": "NOT_RUN"
     },
     {
       "id": "CQ-CA-003",
@@ -3721,7 +4376,8 @@
         "SRC-TEST-SYSTEM-PRESSURE",
         "SRC-TEST-SYSTEM-RUNTIME",
         "SRC-TEST-SYSTEM-INVENTORY"
-      ]
+      ],
+      "result": "NOT_RUN"
     },
     {
       "id": "CQ-CA-004",
@@ -3754,7 +4410,8 @@
         "SRC-TEST-STORAGE-CLASSIFY",
         "SRC-TEST-STORAGE-SCOPE",
         "SRC-TEST-STORAGE-VERIFY"
-      ]
+      ],
+      "result": "NOT_RUN"
     },
     {
       "id": "CQ-CA-005",
@@ -3778,7 +4435,8 @@
         "SRC-SYSTEM-INDEX",
         "SRC-STORAGE-INDEX",
         "EXT-PHYSICAL-DISK"
-      ]
+      ],
+      "result": "NOT_RUN"
     },
     {
       "id": "CQ-CA-006",
@@ -3816,7 +4474,8 @@
         "EXT-WINGET-LIST",
         "EXT-WINGET-UPGRADE",
         "EXT-WINGET-UNINSTALL"
-      ]
+      ],
+      "result": "NOT_RUN"
     },
     {
       "id": "CQ-CA-007",
@@ -3849,7 +4508,8 @@
         "SRC-TEST-JIT-POSTSTATE",
         "SRC-DOMAIN-COMPUTER-PROVIDER-JIT",
         "SRC-TEST-DOMAIN-COMPUTER-PROVIDER-JIT"
-      ]
+      ],
+      "result": "NOT_RUN"
     },
     {
       "id": "CQ-CA-008",
@@ -3872,7 +4532,8 @@
         "EXT-PNP-ENABLE",
         "EXT-PNP-DISABLE",
         "EXT-PNPUTIL"
-      ]
+      ],
+      "result": "NOT_RUN"
     },
     {
       "id": "CQ-CA-009",
@@ -3898,7 +4559,8 @@
         "SRC-TEST-SYSTEM-INVENTORY",
         "SRC-SYSTEM-DIAGNOSTICS",
         "SRC-TEST-SYSTEM-DIAGNOSTICS"
-      ]
+      ],
+      "result": "NOT_RUN"
     },
     {
       "id": "CQ-CA-010",
@@ -3915,7 +4577,8 @@
       "unknownPath": "KEEP_LAYERED_DIAGNOSIS_UNKNOWN_NO_BLIND_RESET",
       "authorStatus": "OPEN_SOURCE_AND_PRODUCT_SCOPE_REQUIRED",
       "validationState": "NOT_RUN",
-      "sourceRefs": []
+      "sourceRefs": [],
+      "result": "NOT_RUN"
     },
     {
       "id": "CQ-CA-011",
@@ -3936,7 +4599,8 @@
         "SRC-PRODUCT-PRD",
         "SRC-PRODUCT-L1",
         "SRC-DKE-PILOT"
-      ]
+      ],
+      "result": "NOT_RUN"
     },
     {
       "id": "CQ-CA-012",
@@ -3990,7 +4654,8 @@
         "SRC-DOMAIN-COMPUTER-PROVIDER-JIT",
         "SRC-TEST-DOMAIN-COMPUTER-PROVIDER-JIT",
         "SRC-PRODUCT-L1"
-      ]
+      ],
+      "result": "NOT_RUN"
     },
     {
       "id": "CQ-CA-013",
@@ -4019,7 +4684,8 @@
         "SRC-SUPPORT-WINDOWS",
         "SRC-SUPPORT-RUNNER",
         "SRC-TEST-SUPPORT-CONTEXT"
-      ]
+      ],
+      "result": "NOT_RUN"
     },
     {
       "id": "CQ-CA-014",
@@ -4056,7 +4722,8 @@
         "SRC-TEST-DOMAIN-COMPUTER-META",
         "SRC-TEST-DOMAIN-COMPUTER-RECIPE",
         "SRC-TEST-DOMAIN-COMPUTER-PROVIDER-JIT"
-      ]
+      ],
+      "result": "NOT_RUN"
     },
     {
       "id": "CQ-CA-015",
@@ -4153,7 +4820,8 @@
         "SRC-TEST-DOMAIN-COMPUTER-SEMANTIC",
         "SRC-TEST-DOMAIN-COMPUTER-GUIDED",
         "SRC-TEST-DOMAIN-COMPUTER-RECIPE"
-      ]
+      ],
+      "result": "NOT_RUN"
     },
     {
       "id": "CQ-CA-016",
@@ -4177,7 +4845,8 @@
         "SRC-DKE-PILOT",
         "EXT-WINDOWS-CLIENT-SERVICING",
         "EXT-WINGET-OVERVIEW"
-      ]
+      ],
+      "result": "NOT_RUN"
     },
     {
       "id": "CQ-CA-017",
@@ -4202,7 +4871,8 @@
         "SRC-SYSTEM-INDEX",
         "SRC-STORAGE-INDEX",
         "EXT-PHYSICAL-DISK"
-      ]
+      ],
+      "result": "NOT_RUN"
     },
     {
       "id": "CQ-CA-018",
@@ -4241,7 +4911,8 @@
         "EXT-PNP-DISABLE",
         "EXT-PNPUTIL",
         "EXT-WINDOWS-CLIENT-SERVICING"
-      ]
+      ],
+      "result": "NOT_RUN"
     },
     {
       "id": "CQ-CA-019",
@@ -4288,7 +4959,8 @@
         "SRC-TEST-DOMAIN-COMPUTER-RECIPE",
         "SRC-TEST-DOMAIN-COMPUTER-PROVIDER-JIT"
       ],
-      "validationState": "NOT_RUN"
+      "validationState": "NOT_RUN",
+      "result": "NOT_RUN"
     },
     {
       "id": "CQ-CA-020",
@@ -4312,7 +4984,8 @@
         "EXT-PNP-GET",
         "EXT-PHYSICAL-DISK"
       ],
-      "validationState": "NOT_RUN"
+      "validationState": "NOT_RUN",
+      "result": "NOT_RUN"
     }
   ],
   "semanticAssuranceProfile": {
@@ -9750,7 +10423,9 @@
       "No Element SAP is qualified and no DIS ECP exists.",
       "SAP obligation coverage is now 17/17 structurally, but no Element or Root SAP is qualified; all newly added Root/currentness/storage-health/external-doc CQs remain NOT_RUN or OPEN.",
       "No external page locator has an immutable Microsoft revision ID; the observed date and applicability notes do not replace a future source snapshot/recheck.",
-      "The new SAP obligation objects are structured candidate contracts only; all obligations remain NOT_RUN and NOT_QUALIFIED until independent source/domain review and the required oracle evidence exist."
+      "The new SAP obligation objects are structured candidate contracts only; all obligations remain NOT_RUN and NOT_QUALIFIED until independent source/domain review and the required oracle evidence exist.",
+      "Claim/Relation/Constraint status uses the canonical SUPPORTED/CONDITIONAL/UNKNOWN taxonomy; author-specific labels are retained separately as authorStatus.",
+      "Each Element now carries a first-class scopeContract with purpose, non-goals, applicability, owner, source/relationship/invariant/CQ references, oracle and NOT_RUN/NOT_QUALIFIED state."
     ],
     "authorMechanicalValidation": {
       "status": "AUTHOR_MECHANICAL_CHECK_PASS_NOT_INDEPENDENT",
@@ -9767,7 +10442,9 @@
         "Every one of 17 Elements has explicit hierarchy, relation, invariant, CQ and SAP profile cross-references.",
         "Every SAP obligation has a stable ID, source/relationship/invariant/CQ references, positive/negative/UNKNOWN cases, oracle classes and NOT_RUN/NOT_QUALIFIED state.",
         "The decomposition hierarchy is separate from the cross-Element semantic relation graph.",
-        "Every one of 13 Global Invariants has an explicit appliesTo Element set and CQ coverage; this is a structural coverage map, not semantic PASS."
+        "Every one of 13 Global Invariants has an explicit appliesTo Element set and CQ coverage; this is a structural coverage map, not semantic PASS.",
+        "All Claim, Relation and Global Invariant assertions use canonical SUPPORTED/CONDITIONAL/UNKNOWN status values while retaining original author labels separately.",
+        "All 17 Elements have first-class scopeContract records with owner, purpose, non-goals, applicability, references, oracle and NOT_RUN state."
       ],
       "limitations": [
         "Does not prove claim truth, source authority, semantic decomposition correctness, Product admission, native execution or SAP qualification."

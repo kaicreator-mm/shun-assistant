@@ -45,6 +45,18 @@
       "severity": "P2",
       "status": "REPAIRED_AS_CANDIDATE_KNOWLEDGE",
       "detail": "Added current Microsoft Windows client servicing locator, exact release/build lifecycle observations and CQ-020. WinGet/API compatibility is explicitly distinct from OS servicing and Shun support."
+    },
+    {
+      "id": "P2-03-NONCANONICAL-ASSERTION-STATUS",
+      "severity": "P2",
+      "status": "REPAIRED",
+      "detail": "Claim and Relation status fields used author-specific labels rather than the DKE canonical SUPPORTED/CONDITIONAL/UNKNOWN taxonomy. Canonical status is now explicit; original author labels are retained as authorStatus."
+    },
+    {
+      "id": "P2-04-ELEMENT-SCOPE-CONTRACT-EXPLICITNESS",
+      "severity": "P2",
+      "status": "REPAIRED",
+      "detail": "Element responsibility/boundary existed, but purpose, non-goals, applicability, cross-references and oracle were not consolidated as a first-class Scope contract. Added scopeContract to all 17 Elements and mirrored it in the coverage map."
     }
   ],
   "repair": {
@@ -58,8 +70,8 @@
     "permissionsCreated": false,
     "aotPackageCreated": false,
     "productScopeAmended": false,
-    "repairedJsonBlob": "7561fd85adb2feb356cde0e59baf57a0df420a59",
-    "repairedMarkdownBlob": "ed9af17100eb1c8bd4d869f328ded3b514402074",
+    "repairedJsonBlob": "f05934349a76dde19687731c2e367de95b333700",
+    "repairedMarkdownBlob": "02f17cf6daa97c0023b00663bd3e417b4aa7e040",
     "sourceExternalAdded": "EXT-WINDOWS-CLIENT-SERVICING",
     "newCounts": {
       "internalSources": 70,
@@ -79,15 +91,27 @@
       "ownerRefsVerified": true,
       "rootRefsAll": true
     },
-    "repairBaseHead": "f499a5aaf0a669393d2489bb785d8858a5c4aa16"
+    "repairBaseHead": "5e5ba38dc8e2f69442b3c630df47e93a85255b20",
+    "canonicalStatusTaxonomy": {
+      "claimStatuses": "SUPPORTED/CONDITIONAL/UNKNOWN",
+      "relationStatuses": "SUPPORTED/CONDITIONAL/UNKNOWN",
+      "originalLabelsPreservedAs": "authorStatus",
+      "allClaimAndRelationStatusesValid": true
+    },
+    "scopeContracts": {
+      "elements": 17,
+      "allHaveOwnerPurposeNonGoalsApplicabilityRefsOracle": true,
+      "validationState": "NOT_RUN",
+      "qualification": "NOT_QUALIFIED"
+    }
   },
   "finalQualification": {
     "P0": 0,
     "P1Found": 3,
     "P1Repaired": 3,
     "P1Open": 0,
-    "P2Found": 2,
-    "P2Repaired": 2,
+    "P2Found": 4,
+    "P2Repaired": 4,
     "P2Open": 0,
     "G1": "PASS_SOURCE_PIN_INTEGRITY_65_OF_65",
     "G2": "CONDITIONAL_SOURCE_GROUNDED_CANDIDATE",
