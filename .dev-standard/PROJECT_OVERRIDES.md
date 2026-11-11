@@ -7,14 +7,24 @@
 - Product role: AI usability layer for computers and software.
 - Standard revision: read `.dev-standard/VERSION`; it is immutable and must never be replaced with a mutable `main` / `latest` reference.
 
+
 ## Current lifecycle state
 
-- Current phase: **Product/L1 candidate**.
-- Product authority candidate: `docs/product/PRD-v0.1.md` plus the Product/L1 evidence and decision documents.
-- Product Freeze: **NOT YET CLAIMED**.
-- L2 Architecture: **NOT STARTED**.
-- Task DAG / implementation authorization: **NOT STARTED**.
-- Existing benchmark runs are product-validation evidence only; they do not authorize implementation scope.
+- **v0.1.0** historical release/tag at `2313ba2773dac7aa535570e22760147d9b383b65`. No retroactive changes to historical source, PASS/FAIL or qualification.
+- **v0.2.0** uses integration branch `version/v0.2.0`. Product Freeze (including DeepSeek-first re-freeze #96), L2 Freeze #101 and Task DAG Freeze #102 are completed. Frozen P0 DAG: **11 mandatory tasks, 26 dependency edges**; owner is `docs/planning/TASK-DAG-FREEZE-v0.2.md`.
+- **v0.2 at that historical adoption checkpoint:** implementation and scoped verification, not Product/L1 or L2 candidate. At this adoption checkpoint T00 #103, T01 #104 (source-ready admission), T03 #105, T06 #107 are closed (**4/11**). T04 #108 and T05 #106 remain open; T07–T11 are not qualified. No v0.2 Release PASS.
+- **Active predecessor-source work:** PR #150 (T05) and PR #152 (T04) were authored under existing ADS v4.9.0; independent reviews #151/#153 have blocking P1 findings, so neither PR is merge-eligible. The ADS adoption does not rebind their accepted task identity, source evidence or review to a new standard.
+
+
+## v0.3-only lifecycle, authority and branch routing (2026-10-29)
+
+- **Version integration target:** `version/v0.3.0` only. The preceding v0.2 lifecycle/4.13.1 checkpoint, previously accepted Task/PR subject identities and old in-flight ADS 4.9.0 facts are retained as **v0.2 history**, not as v0.3 stage authority. Neither `main` nor `version/v0.2.0` is changed or implicitly upgraded by this version-specific adoption.
+- **Product/L1:** explicit Product Owner Freeze [#214](https://github.com/kaicreator-mm/shun-assistant/issues/214#issuecomment-6477255283), version checkpoint `c8334c7723eecf7fbbb6895b1defd6439edc6b95`. **L2:** independent R2 `PASS 0/0/2`, explicit Architecture Owner Freeze [#217](https://github.com/kaicreator-mm/shun-assistant/issues/217#issuecomment-6478493811), exact frozen blob `8c555aff66d3006a1dbd4fb523e350f70c5db490`.
+- **Task DAG:** independent R2 `PASS 0/0/0`, explicit Task DAG Owner Freeze [#218](https://github.com/kaicreator-mm/shun-assistant/issues/218#issuecomment-6479115572). [Frozen checkpoint](../docs/planning/v0.3/TASK-DAG-FREEZE.md) at `version/v0.3.0@ae0cabca2d9c542002eac767df579f1d47598384` identifies immutable Task Pack blob `8aef87cac27297cc32e4e79e0141658a712484fb` and DAG blob `73d06cb67e08187d3ee6ae1a820c5b1f99a169e4`: 14 planned Tasks, 22 edges, eight safe post-T00 parallel lanes, disjoint write sets. This is a **frozen plan**, not proof of 14 native Issues or 22 native `blocked_by` links.
+- **Stage:** v0.3 is **post-Task-DAG-Freeze, pre-native-materialization / pre-implementation-admission**. Native v0.3 Task Issues, canonical Issue Dependencies, accepted T00 Builder Claim and three-package source Scaffold remain **NOT_CREATED / NOT_ACCEPTED / NOT_RUN**. Source generation cannot proceed until actual current native graph and legal Claim; the source-first Scaffold exception is not self-authorizing.
+- **v0.3 ADS upgrade:** local opt-in #216 proposes `4.13.1@f35fcdb153ff171aaa0027b6e1b9c7592f28d3cd → 4.18.0@2c395c55569fe2edf3f4135f12d3d069e526d0b7` under qualified manual source selection. The **actual effective** version for a checkout is always its own `.dev-standard/VERSION`. This preparation PR is **NOT adoption activation** until separately accepted independent R1/CI and authorized exact-HEAD version-only merge. No pre-existing v0.2 Claims, Reviews, PASS/FAIL, User approval, accepted Task scope or runtime effects are retrospectively re-pinned.
+- **Profile remains single and unchanged:** `A1_MANUAL_PROTOCOL`, `native-v4`, `PINNED/MANUAL`, logical Agent/Reviewer identity self-declared independently of shared GitHub transport. No new reducer, credential Owner gate, controller, external-effect authority, auto-updater or mandatory all-Task Full regression. Claims require native currentness, compatible write sets and actual serialized acceptance; Review and release remain separate.
+- **SDK boundary:** DomainHarness `v0.10.3` is Git-source-only at tag commit `061376f4a023070f215f9feffad5c24d96d503cb`; no npm v0.10.3. T00 must later verify real public packages/Node>=24 clean consumer under its own legal Claim. Frozen L2 hard acceptance remains T04/T11/V01 selected C/Host one-sender bounded DTO/deadline/UNKNOWN_COST, and T09/T11/V01 pre-`DomainApp.send` source/Case gateway zero-send/zero-Journal negatives.
 
 ## v4 Adoption / Compatibility Profile
 
@@ -26,16 +36,17 @@
 - `v4.reducer`: `disabled`
 - `v4.controllers`: `disabled`
 - `v4.fast_path`: `canonical`
+- Standard update preference: `PINNED/MANUAL`. This is an explicit one-off project opt-in, not a floating latest pin, automatic updater or unverified compatible recommendation.
+- A1 does not enable machine records/reducers, extra controllers, Tally v2, automated cross-project PR writers or organization-wide toolchain installers. Native Issue Dependencies, exact Git SHA, real permissions, Validation and risk-based Review remain authoritative.
 
-Rationale: the project is at Product/L1 and uses GitHub durable facts, exact-SHA review, and manual gates. It does not yet truthfully operate machine-contract reducers/controllers or full orchestration.
 
 ## Repository / execution profile
 
-- Integration mode: `main` plus one-concern candidate branches while Product/L1 is being established.
-- GitHub Issues are durable work items.
-- One concern -> one branch -> one PR.
-- Chat history is not project authority.
-- Review and validation bind only to the exact SHA actually inspected/executed.
+- **v0.2 prior integration profile:** `version/v0.2.0`; one concern → short PR → required exact-SHA CI/source review → merge after currentness, not per-change full release regression. **v0.3 integration target:** `version/v0.3.0` (see version-specific section above).
+- This standards-only migration changes the current project's future/checkpointed development instructions. No frozen Product/L2/Task DAG, runtime, interface, security permission, code, GitHub dependencies, evidence or release status is changed.
+- **In-flight isolation:** T04 #108 / PR #152 and T05 #106 / PR #150 retain ADS `4.9.0@7929012f36a2202dcc2edc7a414b8163adc7afbd` for their already-authored/reviewed source and accepted Task work until their lawful next checkpoint. No existing CI/Review PASS is upgraded by assertion. Eligible new/checkpointed work adopts `4.13.1@f35fcdb153ff171aaa0027b6e1b9c7592f28d3cd`.
+- Behavior/authority compatibility: retain self-declared logical Actor identity (GitHub account is transport only), no Owner-credential gate, no mandatory independent review for every fix, risk-based required Review, exact-source Validation and PR PASS ≠ Release PASS. New v4.13 optional tooling/profiles remain disabled; no schema, runtime or external effects migrate.
+- Root adoption: `AGENTS.md`, `.dev-standard/VERSION`, and this `PROJECT_OVERRIDES.md` are the effective root files. Exactly one operative `v4.adoption_level`. **v0.2** remains historically pinned to qualified ADS `4.13.1`; **v0.3** resolves the distinct immutable full SHA actually recorded by its own `.dev-standard/VERSION`. Do not infer effective adoption from mutable ADS main or an unmerged PR.
 
 ## Product hard boundaries
 
@@ -52,7 +63,11 @@ Rationale: the project is at Product/L1 and uses GitHub durable facts, exact-SHA
 - P0 collection follows data minimization: exclude credentials/tokens/private keys/session secrets and unrelated content by default; external disclosure is distinct from local collection and is constrained by user/policy requirements.
 - Provider trust is fail-closed by default: unknown provenance cannot be converted to trusted by user confirmation alone.
 
-## P0 MVP closure loops
+## Historical v0.1 P0 MVP closure loops
+
+> Retained as the v0.1 baseline; does not independently define v0.2 acceptance. v0.2 requirements are in the separately reviewed/frozen PRD candidate.
+
+### P0 MVP closure loops
 
 1. **Process an object** — file/document/media -> verified result.
 2. **Acquire and use capability** — resolve Provider -> trusted acquire/configure -> execute -> verify -> retain/remove.
@@ -75,16 +90,15 @@ Before Product Freeze:
 
 PR PASS != Product Freeze.
 
-## Validation profile at Product/L1
 
-- Cross-platform deterministic benchmark evidence may be produced before Product Freeze to test falsifiable product hypotheses.
-- Windows-specific Store/driver/OneDrive/device truth requires a real Windows executor.
-- RunX placement truth requires a real RunX-capable integration environment.
-- UI-free targets in plans are targets, not PASS evidence.
-- Safety/data integrity has priority over task success, semantic verification, recovery, user friction, and UI-free optimization.
+## Validation profile during v0.2 implementation
+
+- This exact revision-only docs/standard change uses repository/source validation and actual branch readback. No source Build Host or Windows matrix is triggered just to change documentation.
+- Windows CIM, native addon, DACL/reparse, COM, packaging and Windows Home/Pro release checks belong to their actual Task gates. Reuse accepted real-host evidence at original exact source.
+- Integrated Candidate T10/T11 owns cross-component critical journeys, required hidden/platform validation and Release Qualification; no PR-only CI or review can imply those PASS. A1 does not impose extra identity approvals or machine reducers.
 
 ## Hidden / release claims
 
-- Hidden Validation: NOT APPLICABLE at current Product/L1 candidate phase.
-- Release Qualification: NOT APPLICABLE.
-- No tag/release/publication is claimed.
+- v0.1 historical Release evidence is preserved.
+- v0.2 integrated release qualification, Windows Home/Pro critical journeys and packaging: **NOT_RUN / NOT_PROVEN** at this adoption checkpoint, not READY.
+- ADS v4.13.1 being a public published release never implies Shun Assistant v0.2 is released.
