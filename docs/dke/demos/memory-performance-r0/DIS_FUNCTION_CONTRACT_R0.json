@@ -31,7 +31,7 @@
           "privacy",
           "limitations"
         ],
-        "projection": "RESEARCH_ANALYZER_AGGREGATE_REPORT_NOT_INVOKED_DIS_FUNCTION"
+        "projection": "RESEARCH_ANALYZER_AGGREGATE_REPORT_NOT_INVOKED_DIS_FUNCTION_NOT_DIS_FUNCTION"
       },
       "preconditions": [
         "Windows host",
@@ -182,7 +182,7 @@
           "reason",
           "speedupClaim"
         ],
-        "projection": "CURRENT_RESEARCH_COMPARATOR_ALWAYS_UNKNOWN"
+        "projection": "CURRENT_RESEARCH_COMPARATOR_ALWAYS_UNKNOWN_NOT_DIS_FUNCTION"
       },
       "preconditions": [
         "same host and comparable workload attested by trusted comparator",
