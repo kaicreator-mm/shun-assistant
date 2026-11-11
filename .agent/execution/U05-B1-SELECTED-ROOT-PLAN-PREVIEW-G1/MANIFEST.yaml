@@ -1,0 +1,64 @@
+pack_id: shun-v030-u05-b1-selected-root-plan-preview-g1
+task_id: U05-B1-SELECTED-ROOT-READONLY-PLAN-PREVIEW
+issue: '#390'
+parent_issue: '#380'
+repository: kaicreator-mm/shun-assistant
+version: v0.3.0
+standard_revision: 326aaf5b0188b53cb0ed5c38752a9e299e3f9efd
+task_pack_ref: 'issue:#390; B1 freeze comment #6714603989'
+delivery_principle: ADS_1359_DELIVERY_FIRST_SINGLE_WRITER
+admission_mode: SINGLE_WRITER_ADMISSION
+claim_generation: 1
+pack_revision: 1
+owner_authorization: '#380 comment 6685260212; #390 bounded implementation under Owner-approved Product/L2'
+protected_claim_key: 'kaicreator-mm/shun-assistant#390:builder:__default__'
+dependencies:
+  host_selection: '#381 CLOSED, final source independent PASS, WIP integrated PR #393'
+  receipt_support: '#387 CLOSED, final source independent PASS, WIP integrated PR #393'
+  guided_ui: '#382 CLOSED, final source independent PASS, WIP integrated PR #393'
+  integrated_baseline: 'PR #393 WIP merge 284f96730a3e78dfbfc068f83c9f79510b80aa98'
+  no_native_dag_edge: true
+pack_base:
+  branch: wip/v0.3.0-r02-owner-repairs
+  sha: 284f96730a3e78dfbfc068f83c9f79510b80aa98
+  tree: 7210fd46d5c624eaaf90e7bcc75e017d13ac360c
+  contract: 'Exactly one added manifest path and one commit directly parented to this exact merged WIP SHA. Source branch must start from that same SHA. No stale #381 branch base.'
+execution:
+  profile: WEB_BUILDER
+  environment: WEB_SOURCE
+  source_branch: JIT_only_task/v0.3.0-u05-b1-selected-root-preview-g1
+  integration_target: wip/v0.3.0-r02-owner-repairs
+  primary_builder: WEB_CONTROLLER
+  independent_reviewer: SEPARATE_EXACT_SHA_REVIEWER
+  local_builder_required: false
+  standalone_local_validation: false
+  source_write_start_gate: 'Pack exact-SHA terminal CI SUCCESS + independent Pack review + generation-1 CAS DISPATCH_CLAIMED comment'
+authoring_write_set:
+  - .agent/execution/U05-B1-SELECTED-ROOT-PLAN-PREVIEW-G1/MANIFEST.yaml
+allowed_write_set:
+  - apps/control-api/src/v03/folder-selection-host.ts
+  - apps/control-api/src/v03/selected-root-plan-preview.ts
+  - apps/control-api/test/folder-selection-host.test.ts
+  - apps/control-api/test/selected-root-plan-preview.test.ts
+acceptance:
+  - 'Consume only the exact current, durable Host INSPECT receipt from the same task/journey/Case/step; no UI, HTTP, model, or caller-provided plan authority.'
+  - 'Build a bounded read-only immutable plan preview with only relative scope/targets, proposed operation, count, risk, expected outcome, recovery/undo guidance, exact evidence revision, root volume/file identity, plan digest and expiry. No file content, absolute path or external disclosure.'
+  - 'Issue a durable opaque Host-owned actionPreviewRef with TTL no longer than underlying selection/Guided step; bind current Case/step/root identity, immutable plan digest and metadata evidence. Reuse existing HostGuidedService.stageTrustedSelection, existing approved review-plan StepSpec and current ActionController contracts without modifying them.'
+  - 'No R2 approval/grant, K Permit, OS effect, successful journal or poststate may be minted by B1. Unknown/expired/concurrent/durability failures must stay typed fail-closed.'
+  - 'Use the existing OS ACL, path, reparse, selected-root file-ID and Host-only receipt fences. Do not represent accepted namespace path-swap or SQLite check/open TOCTOU risks as fixed.'
+negative_acceptance:
+  - 'Forged/stale/cross-task or cross-Case selectionRef, replay, step switch, consumed/expired Host receipt or changed evidence fails closed.'
+  - 'Root identity drift, edited preview/manifest, changed relative target/operation, missing preview digest, overflow, network/reparse/volume-root targets fails closed.'
+  - 'Caller-supplied APPROVE, observation receipt or grant never creates a Host preview or authority. No hidden real filesystem effect.'
+test_contract:
+  - 'Node >=24 source syntax and format/typecheck before expensive CI; deterministic positive and adversarial tests in the two admitted B1 test paths.'
+  - 'Focused existing folder selection and Guided suite regression; final exact-SHA Woodpecker Push/PR terminal SUCCESS. A conditional real Windows native check, if material, belongs to a repair-capable LOCAL_BUILDER batch, not a LOCAL_VALIDATION handoff.'
+  - 'Independent final Exact-SHA review, reviewer owns bounded in-scope repair in one batch when needed, and separate fresh final verifier when changed.'
+forbidden:
+  - source_write_before_pack_ci_and_cas
+  - modifications_to_main_server_guided_host_native_ui_or_sdk
+  - new_planner_policy_engine_kernel_or_approval_authority
+  - real_filesystem_mutation_paid_request_or_external_disclosure
+  - programdata_trust_pin_uac_acl_or_elevation_changes
+  - merge_main_or_version_branches
+  - tag_release_or_deployment
