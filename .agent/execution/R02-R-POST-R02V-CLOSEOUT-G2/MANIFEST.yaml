@@ -1,0 +1,57 @@
+pack_id: shun-v030-r02-r-closeout-g2
+task_id: R02-R-CLOSEOUT-REFRESH-G2
+issue: "#271"
+parent_issue: "#259"
+repository: kaicreator-mm/shun-assistant
+version: v0.3.0
+standard_revision: 2c395c55569fe2edf3f4135f12d3d069e526d0b7
+task_pack_ref: docs/planning/v0.3/R02-REPAIR-TASK-PACKS-R1.json@blob:93247874e37d492b49f241d294017fd2fa6cb431
+delivery_principle: ADS_1359_DELIVERY_FIRST_CONSOLIDATED_REPAIR
+admission_mode: SINGLE_WRITER_ADMISSION
+admission_generation: 2
+pack_revision: 1
+supersedes_source_claim: "#271 comment 6547910751 generation-1; terminal COMPLETED event #6549001838 at 41cbefe5b2fd20bd88bf079e8293512cd7a218b2"
+dependency_readback:
+  prerequisite: "#270"
+  state: CLOSED
+  final_verification: "#270 comment 6683020538"
+  native_blocked_by: "only closed #270 remains listed; zero open blockers"
+protected_claim_key: kaicreator-mm/shun-assistant#271:builder:__default__
+pack_base:
+  branch: wip/v0.3.0-r02-owner-repairs
+  sha: 47ecf345c4b96befd20db5c6d5673bbeaf027e49
+  tree: 8aff803fc2f80e9b683be3d5e8abea747c6677ea
+  contract: "Manifest-only pack PR is one path and one commit directly parented to this exact WIP SHA; source branch must start from this exact WIP SHA."
+execution:
+  profile: WEB_BUILDER
+  environment: WEB_SOURCE
+  source_branch: JIT_only_task/v0.3.0-r02-r-closeout-g2
+  integration_target: wip/v0.3.0-r02-owner-repairs
+  primary_builder: WEB_CONTROLLER
+  independent_reviewer: WEB_VERIFIER
+  standalone_local_validation: false
+authoring_write_set:
+  - docs/implementation/v0.3/r02-closeout/**
+acceptance:
+  - "Refresh the complete F01-F06 and Q01-Q06 finding index with task IDs, delivery/integration PR references, exact source/review/integration SHAs, exact CI and current disposition."
+  - "Reconcile #262-#270 as completed R02 outcomes; #271 remains open until its own exact-SHA review and closeout."
+  - "Record the exact current WIP candidate HEAD/tree (47ecf345c4b96befd20db5c6d5673bbeaf027e49 / 8aff803fc2f80e9b683be3d5e8abea747c6677ea), its exact WIP CI (Push #499, PR retry #501, Actions contracts #42176394537 and executor-windows #42176394504), and distinguish this from the current version/v0.3.0 ref (91420edca44009aa2c984c876104b40814a7c265; tree ea1557a1159c1f1eec458c297acaf491ce5157b8). No final version integration SHA exists."
+  - "Record R02-V PR #377 final PASS at HEAD 1f7d5c7fce4a1b2dfa9ad1cebcac68b317449fa1 / tree 2074afcdaa035c480601182c6999b46d1123b851, base 47ecf345c4b96befd20db5c6d5673bbeaf027e49, with Woodpecker #513/#514 and Actions contracts #42204356849 / executor-windows #42204364512 all SUCCESS. PR #377 remains unmerged because its own generation-2 pack explicitly sets merge_authorized=false and forbids WIP/version merge."
+  - "Preserve the J01-J06/J09 real evidence and its exact provenance; do not repeat paid J03 or physical J02/J05. J07/J08 integrated positive selected-production-BUILD / fixed-ProgramData trust remain UNKNOWN; explicitly retain the proven demo/TEST_FIXTURE and fail-closed sub-results without promoting them to production PASS."
+  - "Assess and state READY_FOR_INDEPENDENT_R03_REVIEW only if the exact WIP candidate plus all task evidence is independently eligible. If eligible, hand off the exact WIP SHA and linked unmerged #377 evidence with all UNKNOWNs visible; otherwise enumerate the exact blockers. This is not an R03 PASS or release certificate."
+  - "Preserve the WIP-to-version integration PR #272 as an open candidate; do not merge it or infer final version readiness."
+test_contract:
+  - "Documentation-only scope: validate Markdown/YAML structure and all referenced issue/PR/SHA/CI identities against live GitHub readback."
+  - "Run the repository's applicable docs/preflight checks if they exist; do not invent code syntax checks for Markdown-only changes."
+  - "Run exact-SHA Woodpecker push/PR checks for the source delivery; bind results to the final source SHA."
+  - "Independent Exact-SHA review after source delivery; reviewer consolidates all in-scope corrections under this same Claim/write set, then a separate final verifier confirms the repaired SHA."
+forbidden:
+  - "No source-code or test-path changes."
+  - "No paid DeepSeek, physical Windows effects, UAC, Provider installation, or persistent OS mutation."
+  - "No main, version/v0.2.0, or version/v0.3.0 merge."
+  - "No tag, release, deployment, or closing Issue #259."
+  - "No independent R03 self-PASS; no promotion of UNKNOWN to PASS."
+source_write_authorized: false
+merge_authorized: false
+release_authorized: false
+deployment_authorized: false
