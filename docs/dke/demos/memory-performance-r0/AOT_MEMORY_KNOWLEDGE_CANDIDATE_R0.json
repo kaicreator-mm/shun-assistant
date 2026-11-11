@@ -110,7 +110,7 @@
     {
       "id": "MEM-DEC-001",
       "when": "Legacy diagnostic reports LOW_FREE_MEMORY",
-      "outcome": "POTENTIAL_LOW_AVAILABLE_MEMORY_SIGNAL",
+      "outcome": "LOW_FREE_MEMORY_LEGACY_HEURISTIC",
       "confidence": "SINGLE_SNAPSHOT_LIMITED",
       "action": "Collect additional system/process metrics; explain signal only.",
       "prohibited": [
