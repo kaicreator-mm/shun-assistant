@@ -156,7 +156,7 @@
     "source_rights_external": "UNKNOWN",
     "native_tests_executed": true
   },
-  "next_action": "Source-first independent Windows trust/current-SID, Kernel permit and actual Host receipt negative validation on current implementation HEAD; owner rights/approval. No K4/K5 promotion from fixture source.",
+  "next_action": "Real-Windows guided bootstrap 32/32 scoped native tests PASS at pinned source 5bb4e4; mock SID is not real SID/UAC/ACL proof, Permit issuance not actual Host effect. Do not repeat for docs-only implementation PR. Fresh independent K4a original Product/L1 first, real Windows trusted Host effect+Owner before SAP K5. Separate memory DKE #416 remains an independent versioned lane, no automatic scope merging.",
   "native_reconciliation_r8": {
     "output_label": "DIE_DKE14_R8_SOURCE_NATIVE_RECEIPT_SYNC",
     "tested_exact_head": "f1ebd5dc66610053cb03de4aefea6c8699458d0a",
@@ -170,6 +170,7 @@
     "g5": "NOT_GRANTED",
     "k5_sap": "NOT_QUALIFIED",
     "closure": "NOT_QUALIFIED",
-    "note": "No native execution this GitHub metadata sync; receipt is previously executed at pinned code/source; immutable tested-head remains distinct from new docs-only head."
+    "note": "No native execution this GitHub metadata sync; receipt is previously executed at pinned code/source; immutable tested-head remains distinct from new docs-only head.",
+    "product_aligned_followup": "Tested scoped native receipt != Product release nor SAP; see next_action for current unresolved constraints."
   }
 }
