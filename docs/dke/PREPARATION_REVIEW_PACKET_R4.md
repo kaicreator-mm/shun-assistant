@@ -8,6 +8,12 @@
 - Historical lines below calling #272 an *active* PR describe the R3 intake snapshot and are now outdated as live status. For new current-state reviews inspect the **live** `version/v0.3.0` branch and its tests/merged PRs separately; do not substitute old R2 `91420ed...` nor promote #272's merged flag to real Windows Host effect, per-user protection, R04/Gate validation, or G1–G5 independent acceptance.
 - This is a bounded **source-authority correction**, not an independent Source-first Review or native execution receipt. `INDEPENDENCE_NOT_ESTABLISHED`, `FORMAL_G1_G5=0/5`, `EXTRACTION_READY=false` until a separate reviewer and Owner disposition.
 
+## R18 active authority / historical supersession (SH-B2-R18-01)
+
+**Read the [R5 source-repair handoff](DKE_HANDOFF_SOURCE_REPAIR_R5.json) as the current source-bounded Claim / Relation / CQ correction overlay** (Git Blob `0cbb9fdbb0286f778e7244e1561a12cfc9a9e570`). The [R4 candidate](DKE_HANDOFF_CANDIDATE_R4.json) is historical baseline only; it must never be consumed alone as the current G4 evidence. SH01/SH03: R4 candidate treated LocalAppData bootstrap test as Host effect / Gateway witness; R5 removes unsupported witness. The existing [R4 evidence matrix](BUSINESS_EVIDENCE_MATRIX_R4.json) remains current within its explicitly bounded source/test role and is not modified by this pointer repair.
+
+**Do not silently upgrade:** claim authority, Source Owner/rights, independent G1–G5 acceptance, native test execution, SAP/DIS or Host effects. R4 remains readable as a historical input; R5 corrections prevail where they conflict. This packet change is an author-side docs-only Repair and requires independent new Exact-SHA review. 
+
 ## G1 Project Intent / authoritative goal
 
 - **User/product outcome:** Windows Goal→Capability/Provider→approval→Kernel permit→trusted Host effect→receipt.
@@ -29,7 +35,7 @@
 
 ## G4 Domain Knowledge Scope / independent falsification plan
 
-- [R4 Claim/Relation/CQ Candidate Pack](DKE_HANDOFF_CANDIDATE_R4.json): 3 source-pinned candidates, 1 cross-Context relation/owner, 3 competence questions, paired positive/negative/UNKNOWN validation plans.
+- **Active R5 overlay:** [source-corrected Claim/Relation/CQ handoff](DKE_HANDOFF_SOURCE_REPAIR_R5.json), to be read together with the [R4 candidate baseline](DKE_HANDOFF_CANDIDATE_R4.json) for history. R4 candidate's superseded source attributions are NOT current evidence. The packet describes 3 bounded candidates, one proposed cross-Context relation and 3 CQs with explicit UNKNOWN/negative plans; none is an executed external-domain proof.
 - Every Claim must carry context, source provenance/Blob, version applicability, counterexample, invalidation trigger and external Oracle requirement.
 - Project policy or observed implementation is **not** automatically a transferable external industry/domain truth. External data permission and domain expertise remain NOT_REVIEWED.
 
