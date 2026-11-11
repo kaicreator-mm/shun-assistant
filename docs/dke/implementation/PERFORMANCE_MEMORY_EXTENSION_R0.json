@@ -723,8 +723,12 @@
       "assertionType": "SOURCE_GROUNDED_OR_DERIVED_CANDIDATE",
       "positiveCase": "Total/free memory and top WorkingSet facts retain exact metric names and snapshot limitations.",
       "unknownCase": "Native collector/API unavailable => fields UNKNOWN.",
-      "cqRefs": "CQ-CA-021",
-      "invariantRefs": "CA-INV-015",
+      "cqRefs": [
+        "CQ-CA-021"
+      ],
+      "invariantRefs": [
+        "CA-INV-015"
+      ],
       "validationState": "NOT_RUN",
       "authorStatus": "CANDIDATE_NOT_RUN"
     },
@@ -745,8 +749,12 @@
       "assertionType": "SOURCE_GROUNDED_OR_DERIVED_CANDIDATE",
       "positiveCase": "Process facts are bounded and process identity is revalidated before any future effect.",
       "unknownCase": "Stable identity or permission unavailable => no attribution beyond a snapshot ranking.",
-      "cqRefs": "CQ-CA-023",
-      "invariantRefs": "CA-INV-015",
+      "cqRefs": [
+        "CQ-CA-023"
+      ],
+      "invariantRefs": [
+        "CA-INV-015"
+      ],
       "validationState": "NOT_RUN",
       "authorStatus": "CANDIDATE_NOT_RUN"
     },
@@ -766,8 +774,12 @@
       "assertionType": "SOURCE_GROUNDED_OR_DERIVED_CANDIDATE",
       "positiveCase": "Correlated memory and storage evidence is presented with separate metric provenance.",
       "unknownCase": "Pagefile/storage telemetry missing => competing causes remain UNKNOWN.",
-      "cqRefs": "CQ-CA-022",
-      "invariantRefs": "CA-INV-014",
+      "cqRefs": [
+        "CQ-CA-022"
+      ],
+      "invariantRefs": [
+        "CA-INV-014"
+      ],
       "validationState": "NOT_RUN",
       "authorStatus": "CANDIDATE_NOT_RUN"
     },
@@ -787,8 +799,12 @@
       "assertionType": "SOURCE_GROUNDED_OR_DERIVED_CANDIDATE",
       "positiveCase": "Upgrade advice binds exact model, supported type/capacity/slots/channel and OEM evidence.",
       "unknownCase": "Hardware identity or compatibility unknown => no purchase recommendation as fact.",
-      "cqRefs": "CQ-CA-028",
-      "invariantRefs": "CA-INV-017",
+      "cqRefs": [
+        "CQ-CA-028"
+      ],
+      "invariantRefs": [
+        "CA-INV-017"
+      ],
       "validationState": "NOT_RUN",
       "authorStatus": "CANDIDATE_NOT_RUN"
     },
@@ -809,8 +825,12 @@
       "assertionType": "SOURCE_GROUNDED_OR_DERIVED_CANDIDATE",
       "positiveCase": "Same workload and host scope are established; user-relevant metric and memory evidence are independently compared.",
       "unknownCase": "Workload comparability or outcome metric missing => UNKNOWN.",
-      "cqRefs": "CQ-CA-027",
-      "invariantRefs": "CA-INV-014",
+      "cqRefs": [
+        "CQ-CA-027"
+      ],
+      "invariantRefs": [
+        "CA-INV-014"
+      ],
       "validationState": "NOT_RUN",
       "authorStatus": "CANDIDATE_NOT_RUN"
     },
@@ -831,8 +851,12 @@
       "assertionType": "SOURCE_GROUNDED_OR_DERIVED_CANDIDATE",
       "positiveCase": "The first demo produces advisory-only plans; any later effect has separate Product admission, exact scope, approval and Host authority.",
       "unknownCase": "Any authority uncertainty => zero effect.",
-      "cqRefs": "CQ-CA-026",
-      "invariantRefs": "CA-INV-018",
+      "cqRefs": [
+        "CQ-CA-026"
+      ],
+      "invariantRefs": [
+        "CA-INV-018"
+      ],
       "validationState": "NOT_RUN",
       "authorStatus": "CANDIDATE_NOT_RUN"
     },
@@ -854,8 +878,12 @@
       "assertionType": "SOURCE_GROUNDED_OR_DERIVED_CANDIDATE",
       "positiveCase": "AOT contains metric definitions, source revision, decision rules and invalidation metadata only.",
       "unknownCase": "Source applicability stale or unknown => AOT rule remains conditional and is not promoted.",
-      "cqRefs": "CQ-CA-031",
-      "invariantRefs": "CA-INV-019",
+      "cqRefs": [
+        "CQ-CA-031"
+      ],
+      "invariantRefs": [
+        "CA-INV-019"
+      ],
       "validationState": "NOT_RUN",
       "authorStatus": "CANDIDATE_NOT_RUN"
     }
