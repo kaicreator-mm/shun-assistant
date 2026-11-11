@@ -87,7 +87,7 @@
         "externalFactClaim": false
       },
       "confidence": "SOURCE_WITNESS_ONLY_NOT_SEMANTICALLY_APPROVED",
-      "negativeFalsifier": "Gateway 503 is not runtime success; old R01 pass doesn't qualify active PR #272",
+      "negativeFalsifier": "Gateway 503 is not runtime success; old R01 PASS does not qualify PR #272's now-merged source revision, real Windows Host effect or per-user trust",
       "positiveEvidencePlan": "Inspect the existing test definition and if required run it against the exact source revision; preserve terminal outcome; do not claim existing test executed",
       "negativeEvidencePlan": "Inject the named counterexample, retain observed tool output and independent reviewer verdict",
       "whenSourceChanges": "Invalidate only consumer claims that cite the modified source Blob and matching context; keep history immutable",
@@ -149,7 +149,7 @@
         "path": "apps/control-api/src/main.ts",
         "blob": "b27e32917eccafb1433c0971b2b3413fd74f1be5"
       },
-      "counterexample": "Gateway 503 is not runtime success; old R01 pass doesn't qualify active PR #272",
+      "counterexample": "Gateway 503 is not runtime success; old R01 PASS does not qualify PR #272's now-merged source revision, real Windows Host effect or per-user trust",
       "missingSourceVerdict": "UNKNOWN",
       "positiveFixture": "NOT_EXECUTED",
       "negativeFixture": "NOT_EXECUTED",
