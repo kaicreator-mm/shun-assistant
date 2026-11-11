@@ -179,11 +179,13 @@
       "preconditions": [
         "same host and comparable workload attested by trusted comparator",
         "user-relevant latency or throughput metric present",
-        "before/after source provenance current"
+        "before/after source provenance current",
+        "Trusted comparator receipt must be issued by an independent Host/Verifier port; caller-shaped JSON and evidence:// prefix are not provenance."
       ],
       "postconditions": [
         "memory-only delta never proves speedup",
-        "missing comparator => UNKNOWN"
+        "missing comparator => UNKNOWN",
+        "Until that trusted port exists, the demo implementation returns UNKNOWN for every comparator-shaped input."
       ],
       "failureOutcomes": [
         "WORKLOAD_MISMATCH",
@@ -197,7 +199,11 @@
         "trusted comparator receipt",
         "independent outcome metric"
       ],
-      "effect": "NONE"
+      "effect": "NONE",
+      "implementedDemoOutcomes": [
+        "UNKNOWN"
+      ],
+      "researchRuntimeStatus": "NOT_IMPLEMENTED_TRUSTED_COMPARATOR_PORT"
     }
   ],
   "pipeline": {
@@ -215,7 +221,8 @@
       "REFUSED"
     ],
     "successMeaning": "A truthful read-only observation and advisory plan were produced; NOT a completed OS optimization or verified speedup.",
-    "retry": "No effects exist in this demo; if a later effectful Function is admitted, it must use normal Task/Permit/Host journal and reconciliation rules."
+    "retry": "No effects exist in this demo; if a later effectful Function is admitted, it must use normal Task/Permit/Host journal and reconciliation rules.",
+    "optionalComparisonQualification": "CONTRACT_ONLY; CURRENT_DEMO_ALWAYS_UNKNOWN"
   },
   "ecpCandidate": {
     "ecpId": "ECP-MEMORY-PERFORMANCE-001",
@@ -233,7 +240,7 @@
       "CA-INV-018",
       "CA-INV-019"
     ],
-    "evidence": "Native Windows receipt still required"
+    "evidence": "Native Windows receipt NOT_RUN; no independent trusted comparator issuer exists."
   },
   "prohibitedFunctions": [
     "process.kill",
