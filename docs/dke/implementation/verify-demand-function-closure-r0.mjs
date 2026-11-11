@@ -15,6 +15,13 @@ import path from 'node:path';
 import crypto from 'node:crypto';
 import { fileURLToPath } from 'node:url';
 
+// This standalone checker is pinned to the *independently inspected source bytes*,
+// not to a mutable D0-provided candidateBlob claim. Changing both JSON files is
+// insufficient to manufacture a valid source pin; updating this lock requires
+// an explicit new exact-source review.
+const REVIEWED_KNOWLEDGE_HEAD = 'a8f378a12b49ff1c335a129280f32c45a6ad2cd6';
+const REVIEWED_KNOWLEDGE_BLOB = '87524bac881b84da626d2026392d99129baeb5a1';
+
 export function gitBlobSha(data) {
   const bytes = Buffer.isBuffer(data) ? data : Buffer.from(data, 'utf8');
   return crypto.createHash('sha1')
@@ -42,14 +49,16 @@ export function validate(matrix, knowledge, options = {}) {
       matrix.governance?.nativeWindowsDkeTests !== 'NOT_RUN') {
     add('ILLEGAL_PROMOTION_OR_AUTHORITY');
   }
-  if (matrix.evidenceBase?.candidateHead !== 'a18374a18c920d4975e09be649d0a98e5dc87b32' ||
+  if (matrix.evidenceBase?.candidateHead !== REVIEWED_KNOWLEDGE_HEAD ||
+      matrix.evidenceBase?.candidateBlob !== REVIEWED_KNOWLEDGE_BLOB ||
       matrix.evidenceBase?.productOriginal?.prdBlob !== 'f062b7f2c3dc3bf4aeeb7594ab5c2bc75b34d0ab' ||
       matrix.evidenceBase?.productOriginal?.l1Blob !== '4c703c3f0c283f4d3918babef8f87f56869698e5' ||
       matrix.evidenceBase?.productFreeze?.blob !== '0f8a67c2f06364d58a842502d3dee11bfeeedba4' ||
       matrix.evidenceBase?.sourceCodeSnapshot !== '1224fea4097799467e2c0c454885e680f1f28248') {
     add('AUTHORITY_SOURCE_REPIN_NOT_REVIEWED');
   }
-  if (options.knowledgeBlob && options.knowledgeBlob !== matrix.evidenceBase?.candidateBlob) {
+  if (options.knowledgeBlob !== REVIEWED_KNOWLEDGE_BLOB ||
+      options.knowledgeBlob !== matrix.evidenceBase?.candidateBlob) {
     add('KNOWLEDGE_DOSSIER_BLOB_MISMATCH');
   }
   const index = (array, field, label) => {
@@ -73,6 +82,7 @@ export function validate(matrix, knowledge, options = {}) {
   const ids = new Set();
   let d0 = 0;
   let candidate = 0;
+  const seenProductItems = new Set();
   for (const row of jobs) {
     const id = row?.id;
     if (!nonEmpty(id) || ids.has(id)) add('DUPLICATE_OR_EMPTY_JOB_ID', String(id));
@@ -83,6 +93,9 @@ export function validate(matrix, knowledge, options = {}) {
         !nonEmpty(row.demandEvidence.locator)) add('FALSE_DEMAND_EVIDENCE', id);
     if (row?.demandClass === 'D0') {
       d0++;
+      const productItem = /^PRD-v0\.3-domain-harness-R0\.md §2 item (10|[1-9]); Product Freeze checkpoint$/.exec(row.demandEvidence?.locator ?? '');
+      if (!productItem || seenProductItems.has(Number(productItem[1]))) add('PRODUCT_JOURNEY_COVERAGE_DRIFT', String(id));
+      if (productItem) seenProductItems.add(Number(productItem[1]));
       if (row.productAdmission !== 'FROZEN_PRODUCT_REQUIREMENT_ONLY' ||
           row.demandEvidence?.kind !== 'FROZEN_PRODUCT_JOURNEY' ||
           !/PRD-v0\.3-domain-harness-R0\.md §2 item [1-9]|PRD-v0\.3-domain-harness-R0\.md §2 item 10/.test(row.demandEvidence.locator)) {
@@ -102,6 +115,33 @@ export function validate(matrix, knowledge, options = {}) {
       if (!Array.isArray(row?.[key]) || row[key].length === 0 ||
           row[key].some(ref => !registry.has(ref))) add('BROKEN_' + label + '_REFERENCES', id);
       else if (new Set(row[key]).size !== row[key].length) add('DUPLICATE_' + label + '_REFERENCES', id);
+    }
+    // Validate the primary domain Claim-to-Element edge, rather than accepting
+    // arbitrary IDs from the global registry. Explicit gaps cannot be PASS.
+    const primary = knowledge?.elements?.find(e => e.id === row.elementIds?.[0]);
+    const witnessedClaims = (primary?.scopeContract?.sourceClaimRefs ?? [])
+      .filter(x => row.claimIds?.includes(x));
+    const declaredWitnesses = row.semanticTrace?.primaryElementClaimWitnessIds;
+    if (!primary || row.semanticTrace?.primaryElementId !== primary.id ||
+        !Array.isArray(declaredWitnesses) ||
+        JSON.stringify(declaredWitnesses) !== JSON.stringify(witnessedClaims)) {
+      add('PRIMARY_DOMAIN_CLAIM_TRACE_MISMATCH', String(id));
+    }
+    if (witnessedClaims.length === 0 && row.semanticTrace?.status !== 'NETWORK_DOMAIN_SEMANTICS_UNSOURCED') {
+      add('UNSOURCED_DOMAIN_WITNESS_NOT_DECLARED', String(id));
+    }
+    const requiredStatus = {
+      'CA-JOB-05':'HOST_EFFECT_WITNESS_NOT_PINNED',
+      'CA-JOB-07':'KERNEL_JOURNAL_HOST_E2E_NOT_PINNED',
+      'CA-JOB-08':'PRODUCT_REQUIREMENT_ONLY_NO_UI_WITNESS',
+      'CA-JOB-15':'NETWORK_DOMAIN_SEMANTICS_UNSOURCED',
+    }[id] ?? 'BOUNDED_SOURCE_CANDIDATE_NOT_FUNCTIONAL_CLOSURE';
+    if (row.semanticTrace?.status !== requiredStatus ||
+        !nonEmpty(row.semanticTrace?.evidenceGap) ||
+        row.semanticTrace?.verifiedFunctionReceipt !== 'NOT_RUN' ||
+        row.semanticTrace?.postconditionOracleExecution !== 'NOT_RUN' ||
+        row.semanticTrace?.qualifiedSourceFirstDecision !== 'PENDING') {
+      add('FALSE_SEMANTIC_TRACE_CLOSURE', String(id));
     }
     for (const idRequired of ['CA-GLOBAL-PROVENANCE','CA-GLOBAL-AUTHORITY',
        'CA-GLOBAL-VERIFICATION','CA-GLOBAL-CURRENTNESS']) {
@@ -135,6 +175,10 @@ export function validate(matrix, knowledge, options = {}) {
         row.unresolvedDecisions.length < 2) add('RISK_OR_OWNER_GATE_GAP', id);
     if (row?.verificationEvidence !== 'TEST_DEFINITIONS_ONLY_NOT_RUNTIME_RECEIPT' ||
         row?.sapQualification !== 'NOT_QUALIFIED' || row?.closure !== 'NOT_RUN') add('FORGED_QUALIFICATION_OR_CLOSURE', id);
+  }
+  if (seenProductItems.size !== 10 ||
+      [...Array(10)].some((_, i) => !seenProductItems.has(i + 1))) {
+    add('PRODUCT_JOURNEY_COVERAGE_DRIFT');
   }
   if (jobs.length !== 15 || matrix.jobCount !== 15 ||
       matrix.productCriticalCount !== 10 || matrix.futureCandidateCount !== 5 ||
