@@ -57,6 +57,12 @@ export function analyzeMemoryObservation(diagnosticResult, processResult, option
     !Array.isArray(facts.externalDisclosures) ||
     facts.externalDisclosures.length !== 0 ||
     facts.metric !== 'RESIDENT_MEMORY_BYTES_AT_SNAPSHOT' ||
+    facts.interpretation !== 'MEMORY_ONLY_NO_CPU_OR_ROOT_CAUSE_INFERENCE' ||
+    facts.provenance !== 'fixed-readonly-powershell' ||
+    !Array.isArray(report.signals) ||
+    !report.signals.every((x) => x === 'LOW_DISK_SPACE' || x === 'LOW_FREE_MEMORY') ||
+    !Number.isSafeInteger(report.evidence?.processCount) || report.evidence.processCount < 0 ||
+    !Number.isSafeInteger(report.evidence?.startupEntryCount) || report.evidence.startupEntryCount < 0 ||
     !validBytes(report.evidence?.memoryTotalBytes, report.evidence?.memoryFreeBytes) ||
     !Array.isArray(facts.top) ||
     facts.top.length < 1 ||
@@ -69,6 +75,8 @@ export function analyzeMemoryObservation(diagnosticResult, processResult, option
     const entry = facts.top[i];
     if (
       !entry || typeof entry.name !== 'string' ||
+      entry.name.length < 1 || entry.name.length > 64 ||
+      !/^[\\p{L}\\p{N}_. ()-]+$/u.test(entry.name) ||
       !Number.isSafeInteger(entry.residentBytes) ||
       entry.residentBytes < 0 || entry.residentBytes > previous
     ) return unknown('INVALID_PROCESS_MEMORY_FACT', observedAt);
@@ -93,9 +101,9 @@ export function analyzeMemoryObservation(diagnosticResult, processResult, option
     evidence: {
       memory: {
         totalBytes: report.evidence.memoryTotalBytes,
-        availableBytes: report.evidence.memoryFreeBytes,
-        availableRatio: report.evidence.memoryFreeBytes / report.evidence.memoryTotalBytes,
-        meaning: 'Existing Node os.freemem observation; not a full memory-pressure diagnosis.',
+        freeMemoryObservedBytes: report.evidence.memoryFreeBytes,
+        freeMemoryObservedRatio: report.evidence.memoryFreeBytes / report.evidence.memoryTotalBytes,
+        meaning: 'Raw existing Node os.freemem field (memoryFreeBytes), not a separately measured Windows Available MBytes or complete pressure diagnosis.',
       },
       topResidentProcesses,
       processCount: report.evidence.processCount,
@@ -157,34 +165,15 @@ export function analyzeMemoryObservation(diagnosticResult, processResult, option
  * Comparison deliberately requires an explicit trusted comparator receipt.
  * A memory-only delta never qualifies as a user-visible performance improvement.
  */
-export function compareMemoryPerformance(before, after, comparatorReceipt) {
-  if (
-    !before || !after ||
-    before.outcome !== 'OBSERVED_ONLY' ||
-    after.outcome !== 'OBSERVED_ONLY' ||
-    !comparatorReceipt ||
-    comparatorReceipt.schema !== 'shun.demo.workload-comparator-receipt.v1' ||
-    comparatorReceipt.status !== 'VERIFIED' ||
-    comparatorReceipt.sameHost !== true ||
-    comparatorReceipt.sameWorkload !== true ||
-    typeof comparatorReceipt.sourceRef !== 'string' ||
-    !comparatorReceipt.sourceRef.startsWith('evidence://') ||
-    comparatorReceipt.userOutcome?.metric !== 'P95_RESPONSE_TIME_MS' ||
-    !Number.isFinite(comparatorReceipt.userOutcome.before) ||
-    !Number.isFinite(comparatorReceipt.userOutcome.after)
-  ) {
-    return { outcome: 'UNKNOWN', reason: 'TRUSTED_COMPARABLE_WORKLOAD_AND_USER_OUTCOME_REQUIRED', speedupClaim: 'NONE' };
-  }
-  const memoryDelta = after.evidence.memory.availableBytes - before.evidence.memory.availableBytes;
-  const responseDelta = comparatorReceipt.userOutcome.after - comparatorReceipt.userOutcome.before;
-  if (responseDelta < 0 && memoryDelta > 0) {
-    return { outcome: 'IMPROVEMENT_CANDIDATE', memoryAvailableDeltaBytes: memoryDelta, p95ResponseDeltaMs: responseDelta, speedupClaim: 'CANDIDATE_ONLY_REQUIRES_INDEPENDENT_DOMAIN_REVIEW' };
-  }
-  if (responseDelta > 0 || memoryDelta < 0) {
-    return { outcome: 'REGRESSION_CANDIDATE', memoryAvailableDeltaBytes: memoryDelta, p95ResponseDeltaMs: responseDelta, speedupClaim: 'NONE' };
-  }
-  if (responseDelta === 0 && memoryDelta > 0) {
-    return { outcome: 'MEMORY_DELTA_WITHOUT_USER_PERFORMANCE_GAIN', memoryAvailableDeltaBytes: memoryDelta, p95ResponseDeltaMs: responseDelta, speedupClaim: 'NONE' };
-  }
-  return { outcome: 'TRADEOFF_OR_NO_MEASURABLE_IMPROVEMENT', memoryAvailableDeltaBytes: memoryDelta, p95ResponseDeltaMs: responseDelta, speedupClaim: 'NONE' };
+/**
+ * No trusted same-host/same-workload comparator issuer exists in this R0 demo.
+ * An object shaped like a receipt is caller data, not proof of Host provenance.
+ * Only DIS/Host integration may introduce a verified comparator port later.
+ */
+export function compareMemoryPerformance(_before, _after, _untrustedComparatorReceipt) {
+  return {
+    outcome: 'UNKNOWN',
+    reason: 'INDEPENDENT_TRUSTED_WORKLOAD_COMPARATOR_NOT_IMPLEMENTED',
+    speedupClaim: 'NONE',
+  };
 }
