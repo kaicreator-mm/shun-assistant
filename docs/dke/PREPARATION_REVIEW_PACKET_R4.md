@@ -6,11 +6,12 @@
 
 - [PR #272](https://github.com/kaicreator-mm/shun-assistant/pull/272), formerly cited as an **active** source PR in R3/R4, is now **MERGED** into `version/v0.3.0` (merged 2026-11-10T13:41:49Z). Its frozen source HEAD is `5bb4e4b27e319d0104406c3389f8b8e6149b7f0b`; merge commit `da3a36eb91d39c6bac8cd6b72b27c4b588adda4d`. The `apps/control-api/src/main.ts` Git Blob was read at both exact commits: `b27e32917eccafb1433c0971b2b3413fd74f1be5` in both. This establishes identity of that **one source file**, not entire merge tree/source equivalence or current release eligibility.
 - Historical lines below calling #272 an *active* PR describe the R3 intake snapshot and are now outdated as live status. For new current-state reviews inspect the **live** `version/v0.3.0` branch and its tests/merged PRs separately; do not substitute old R2 `91420ed...` nor promote #272's merged flag to real Windows Host effect, per-user protection, R04/Gate validation, or G1–G5 independent acceptance.
+- R4 `BUSINESS_EVIDENCE_MATRIX_R4.json` retains its **historical** `business_scope=CURRENT_ACTIVE_DRAFT_R04_NOT_OLD_R01` label from earlier intake; its `semantic_source_active=5bb4e4b27e319d0104406c3389f8b8e6149b7f0b` identifies the later merged source. The historical label is **not** a live PR-status claim or a current native/G1-G5 verdict.
 - This is a bounded **source-authority correction**, not an independent Source-first Review or native execution receipt. `INDEPENDENCE_NOT_ESTABLISHED`, `FORMAL_G1_G5=0/5`, `EXTRACTION_READY=false` until a separate reviewer and Owner disposition.
 
 ## R18 active authority / historical supersession (SH-B2-R18-01)
 
-**Read the [R5 source-repair handoff](DKE_HANDOFF_SOURCE_REPAIR_R5.json) as the current source-bounded Claim / Relation / CQ correction overlay** (Git Blob `0cbb9fdbb0286f778e7244e1561a12cfc9a9e570`). The [R4 candidate](DKE_HANDOFF_CANDIDATE_R4.json) is historical baseline only; it must never be consumed alone as the current G4 evidence. SH01/SH03: R4 candidate treated LocalAppData bootstrap test as Host effect / Gateway witness; R5 removes unsupported witness. The existing [R4 evidence matrix](BUSINESS_EVIDENCE_MATRIX_R4.json) remains current within its explicitly bounded source/test role and is not modified by this pointer repair.
+**Read the [R5 source-repair handoff](DKE_HANDOFF_SOURCE_REPAIR_R5.json) as the current source-bounded Claim / Relation / CQ correction overlay** (updated Git Blob `bfea49c66659c815403dc9a6aa29c4595c17f01e`; R19 historical Blob `0cbb9fdbb0286f778e7244e1561a12cfc9a9e570`). The [R4 candidate](DKE_HANDOFF_CANDIDATE_R4.json) is historical baseline only; it must never be consumed alone as the current G4 evidence. SH01/SH03: R4 candidate treated LocalAppData bootstrap test as Host effect / Gateway witness; R5 removes unsupported witness. The existing [R4 evidence matrix](BUSINESS_EVIDENCE_MATRIX_R4.json) remains current within its explicitly bounded source/test role and is not modified by this pointer repair.
 
 **Do not silently upgrade:** claim authority, Source Owner/rights, independent G1–G5 acceptance, native test execution, SAP/DIS or Host effects. R4 remains readable as a historical input; R5 corrections prevail where they conflict. This packet change is an author-side docs-only Repair and requires independent new Exact-SHA review. 
 
@@ -24,7 +25,7 @@
 
 - [R2 Business and Domain Preparation](PROJECT_BUSINESS_DOMAIN_PREPARATION_R2.md) describes actors, responsibilities, objects, states, primary positive and failure/recovery journeys, external dependencies and acceptance candidates.
 - [R4 Business Evidence Matrix](BUSINESS_EVIDENCE_MATRIX_R4.json) pins 3 central source/test obligations with positive/negative cases, exact Product/source/test Blob identities.
-- Key failure and recovery boundary: **Current PR #272 materially differs from R2 pinned source; actual Windows effect and per-user identity need real independent review**.
+- Key failure and recovery boundary: **PR #272 is merged at source HEAD `5bb4e4b27e319d0104406c3389f8b8e6149b7f0b`, not active; its source differs from R2, and real Windows Host effect/per-user trust still need independent verification**.
 - **Not asserted:** every business path read, every test executed, every real environment effect proven.
 
 ## G3 Domain System / bounded contexts and owners
@@ -49,6 +50,6 @@
 
 ## Requested PR Review / source acceptance decision
 
-The project source reviewer must check against current Product and available domain facts, especially `shun-assistant` authority boundaries and negative paths: `Current PR #272 materially differs from R2 pinned source; actual Windows effect and per-user identity need real independent review`. Each reviewer verdict must be attached to exact commit and reviewed source spans, with decision **PASS_PREPARATION / REWORK / BLOCKED_WITH_OWNER_DISPOSITION**. Reject any false label such as `DOMAIN_TRUTH_PROVEN`, `TESTS_EXECUTED`, `SAP_QUALIFIED`, `REAL_EFFECT_VERIFIED` without independent receipts.
+The project source reviewer must check against current Product and available domain facts, especially `shun-assistant` authority boundaries and negative paths: `PR #272 is already merged at the pinned source HEAD; R2 is historical, and true Windows effect/per-user trust still require separate native verification`. Each reviewer verdict must be attached to exact commit and reviewed source spans, with decision **PASS_PREPARATION / REWORK / BLOCKED_WITH_OWNER_DISPOSITION**. Reject any false label such as `DOMAIN_TRUTH_PROVEN`, `TESTS_EXECUTED`, `SAP_QUALIFIED`, `REAL_EFFECT_VERIFIED` without independent receipts.
 
 **State:** `PREPARATION_INPUT_DELIVERED`; `G1–G5_INDEPENDENT_REVIEW=NOT_RUN`; `EXTRACTION_READY_FORMAL=NO`; `SOURCE_LICENSE_OR_EXTERNAL_ORACLE=UNKNOWN_OR_PENDING`; `NO_PRODUCT_CODE_CHANGE`.
