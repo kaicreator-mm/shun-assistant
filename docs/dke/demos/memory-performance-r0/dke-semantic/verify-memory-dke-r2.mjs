@@ -15,7 +15,7 @@ export const PINS=Object.freeze({
  aot:'e5bf93668066be5c76148c1a4cbdd930dcf55c29',
  delta:'fddd2d9cbe9a342683eefdcabe2277dac012568c',
  oracles:'7097a1891589b6970ecd99bf00d71ec3b36bcf1c',
- evolution:'5ce9972f81e77f61a405ca8edc5f9270a180f9cd',
+ evolution:'7ba8bfddc6ef43c938028a1911af56dd8e838b24',
  handoff:'ac6e9965a4060885367dcc7b0ec16767d89c46c6'
 });
 function blob(text) {
