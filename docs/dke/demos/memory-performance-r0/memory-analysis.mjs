@@ -76,7 +76,7 @@ export function analyzeMemoryObservation(diagnosticResult, processResult, option
     if (
       !entry || typeof entry.name !== 'string' ||
       entry.name.length < 1 || entry.name.length > 64 ||
-      !/^[\\p{L}\\p{N}_. ()-]+$/u.test(entry.name) ||
+      !/^[\p{L}\p{N}_. ()-]+$/u.test(entry.name) ||
       !Number.isSafeInteger(entry.residentBytes) ||
       entry.residentBytes < 0 || entry.residentBytes > previous
     ) return unknown('INVALID_PROCESS_MEMORY_FACT', observedAt);
