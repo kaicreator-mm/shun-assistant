@@ -32,7 +32,10 @@
         "freezeScope": "PRODUCT_AND_L1_ONLY",
         "l2Freeze": false,
         "taskDagFreeze": false,
-        "releaseReady": false
+        "releaseReady": false,
+        "implementationAuthorized": false,
+        "sourceScaffoldAuthorized": false,
+        "mainOrV02MergeAuthorized": false
       },
       "currentBoundary": "The frozen v0.3 Product is a Windows-first, goal-driven assistant and a parity-preserving DomainHarness migration. It explicitly excludes autonomous general desktop interaction, arbitrary LLM-generated shell/PowerShell/CMD/JS/Python execution, unknown Provider marketplaces and expansion into unrelated PC-management features. This DKE adds a knowledge research scope at the user's direction; it does not silently amend the frozen Product or authorize implementation.",
       "amendmentRule": "Disk partitioning/formatting, broad software management, hardware/device/driver management and network administration remain candidate knowledge areas until an explicit Product amendment or later Product version adopts them."
@@ -41,7 +44,8 @@
       "branch": "version/v0.3.0",
       "commit": "1224fea4097799467e2c0c454885e680f1f28248",
       "status": "CURRENT_OBSERVED_VERSION_BRANCH_SNAPSHOT_NOT_RELEASE_QUALIFIED",
-      "note": "This branch is six commits ahead of 5bb4e4b27e319d0104406c3389f8b8e6149b7f0b; the intervening changes are packaging/release-guide files and do not change the code/test blobs pinned below."
+      "note": "This branch is six commits ahead of 5bb4e4b27e319d0104406c3389f8b8e6149b7f0b; the intervening changes are packaging/release-guide files and do not change the code/test blobs pinned below.",
+      "authorityStatus": "SOURCE_OBSERVATION_ONLY_NOT_PRODUCT_IMPLEMENTATION_AUTHORITY"
     },
     "priorDkeWork": {
       "issue411": "Project-owned DKE implementation issue; existing bounded pilot scope is Guided Trust / Kernel Permit / Windows Host receipts.",
@@ -61,7 +65,8 @@
         "extractionReady": false
       },
       "separation": "This dossier is a broader computer-assistant knowledge candidate. It does not treat PR #412's narrow pilot as qualified truth and does not replace its review."
-    }
+    },
+    "currentBoundary": "undefined The freeze checkpoint also records IMPLEMENTATION_AUTHORIZED=NO, SOURCE_SCAFFOLD=NOT_AUTHORIZED, L2_FREEZE=NO, TASK_DAG_FREEZE=NO and RELEASE_READY=NO; the inspected code branch is source evidence only, not Product implementation authorization or release qualification."
   },
   "scope": {
     "domainGoal": "A user can state a computer-related goal; the assistant can identify the relevant computer objects and bounded capability, explain scope/risk/permissions, select a trusted provider compatible with the current environment, obtain required approval, execute only an authorized effect, and verify the resulting state or report UNKNOWN.",
@@ -325,6 +330,78 @@
       "path": "docs/dke/implementation/KNOWLEDGE_PILOT_R0.json",
       "blob": "d34d2a5c264d27ab8017c7f2bdc1a4c65d75c569",
       "status": "RELATED_AUTHOR_CANDIDATE_NOT_QUALIFIED"
+    },
+    {
+      "id": "SRC-DKE-STANDARD",
+      "kind": "DKE_METHOD",
+      "repository": "kaicreator-mm/domain-forge",
+      "commit": "38f6b69f80cc2e6f9f489d02b365aa622f064c2e",
+      "path": "docs/standards/dke/DKE-0.0.1/DKE-0.0.1.zh-CN.md",
+      "blob": "eff48a7aad57f588a8abe08632967fd45b5ad29f",
+      "status": "R2_METHOD_CANDIDATE_OWNER_REVIEW_PENDING"
+    },
+    {
+      "id": "SRC-SYSTEM-SOFTWARE",
+      "kind": "CODE",
+      "repository": "kaicreator-mm/shun-assistant",
+      "commit": "1224fea4097799467e2c0c454885e680f1f28248",
+      "path": "packages/vertical-system/src/internal/windows-software.ts",
+      "blob": "6d5151cfcbb8b7c4fac1e5076f73b97eacf573be",
+      "status": "OBSERVED_BOUNDED_HKLM_SAMPLE"
+    },
+    {
+      "id": "SRC-SYSTEM-PRESSURE",
+      "kind": "CODE",
+      "repository": "kaicreator-mm/shun-assistant",
+      "commit": "1224fea4097799467e2c0c454885e680f1f28248",
+      "path": "packages/vertical-system/src/internal/windows-pressure.ts",
+      "blob": "becb976b39ef6da760d451ca8ac7f9af474dc679",
+      "status": "OBSERVED_BOUNDED_READ_ONLY"
+    },
+    {
+      "id": "SRC-TEST-SYSTEM-PRESSURE",
+      "kind": "TEST_DEFINITION",
+      "repository": "kaicreator-mm/shun-assistant",
+      "commit": "1224fea4097799467e2c0c454885e680f1f28248",
+      "path": "packages/vertical-system/test/windows-pressure.test.ts",
+      "blob": "a103a959cecf7fe67f8a626ee6b1a25b9eeeb91b",
+      "status": "TEST_SOURCE_ONLY_EXECUTION_NOT_REPEATED"
+    },
+    {
+      "id": "SRC-TEST-SYSTEM-RUNTIME",
+      "kind": "TEST_DEFINITION",
+      "repository": "kaicreator-mm/shun-assistant",
+      "commit": "1224fea4097799467e2c0c454885e680f1f28248",
+      "path": "packages/vertical-system/test/windows-runtime.test.ts",
+      "blob": "23dfc1fcf3622c0b73decfc441b24a4cd1dc0c5e",
+      "status": "TEST_SOURCE_ONLY_EXECUTION_NOT_REPEATED"
+    },
+    {
+      "id": "SRC-FILES-PREVIEW",
+      "kind": "CODE",
+      "repository": "kaicreator-mm/shun-assistant",
+      "commit": "1224fea4097799467e2c0c454885e680f1f28248",
+      "path": "packages/vertical-files/src/preview.ts",
+      "blob": "8358bd0430266e6b6299d4af0aaf8c8069777c19",
+      "status": "OBSERVED_PREVIEW_ONLY"
+    },
+    {
+      "id": "SRC-STORAGE-PLAN",
+      "kind": "CODE",
+      "repository": "kaicreator-mm/shun-assistant",
+      "commit": "1224fea4097799467e2c0c454885e680f1f28248",
+      "path": "packages/vertical-storage/src/plan.ts",
+      "blob": "93aaf565ab491ada9485b3e55bea8d6434808645",
+      "status": "OBSERVED_BOUNDED_PLAN"
+    },
+    {
+      "id": "SRC-STORAGE-EXECUTE",
+      "kind": "CODE",
+      "repository": "kaicreator-mm/shun-assistant",
+      "commit": "1224fea4097799467e2c0c454885e680f1f28248",
+      "path": "packages/vertical-storage/src/execute.ts",
+      "blob": "89696ef1fff99546867087b4106b3390740b635d",
+      "status": "OBSERVED_AUTHORIZED_EFFECT_BOUNDARY"
     }
   ],
   "externalSources": [
@@ -478,7 +555,10 @@
       "limits": [
         "Does not imply every computer-management capability is already implemented.",
         "Does not authorize an unregistered capability or arbitrary command."
-      ]
+      ],
+      "semanticOwner": "CA-GOAL-CAPABILITY",
+      "applicability": "Frozen Windows-first Product semantics; v0.3 goal/capability/provider/environment boundary.",
+      "falsifier": "A request resolves to an unregistered or unbounded raw command without clarification."
     },
     {
       "id": "CA-CLM-002",
@@ -490,7 +570,10 @@
       ],
       "limits": [
         "The current user direction can seed a future Product amendment but cannot silently rewrite this freeze."
-      ]
+      ],
+      "semanticOwner": "CA-ROOT",
+      "applicability": "Frozen v0.3 Product boundary; later Product amendments are separate revisions.",
+      "falsifier": "The frozen Product explicitly admits arbitrary generated scripts or autonomous general desktop operation."
     },
     {
       "id": "CA-CLM-003",
@@ -503,7 +586,10 @@
       ],
       "limits": [
         "This is not full hardware inventory, disk topology, SMART health, partition management or root-cause diagnosis."
-      ]
+      ],
+      "semanticOwner": "CA-SYSTEM-OBSERVATION",
+      "applicability": "Inspected version/v0.3.0 source snapshot; Windows-only public API.",
+      "falsifier": "The public API accepts an arbitrary root/host/command or mutates the system."
     },
     {
       "id": "CA-CLM-004",
@@ -515,7 +601,10 @@
       ],
       "limits": [
         "The software test explicitly constrains the sample to HKLM DisplayName/DisplayVersion and excludes uninstall behavior; completeness across per-user and non-registry installations is not established."
-      ]
+      ],
+      "semanticOwner": "CA-SYSTEM-OBSERVATION",
+      "applicability": "Inspected Windows runtime and bounded collectors in version/v0.3.0.",
+      "falsifier": "The collectors enumerate every per-user and machine-wide installation or control processes/services."
     },
     {
       "id": "CA-CLM-005",
@@ -527,7 +616,10 @@
       ],
       "limits": [
         "A diagnosis result is not permission to clean storage, terminate a process or change system settings."
-      ]
+      ],
+      "semanticOwner": "CA-SYSTEM-OBSERVATION",
+      "applicability": "Single local Windows observation snapshot and deterministic projection.",
+      "falsifier": "The diagnosis claims a verified root cause, CPU bottleneck or guaranteed speedup."
     },
     {
       "id": "CA-CLM-006",
@@ -543,7 +635,10 @@
       "limits": [
         "It is not a general disk/partition manager and does not establish initialization, repartitioning, formatting or drive-online/offline capabilities.",
         "The cited tests are source definitions; native Windows execution was not repeated for this DKE."
-      ]
+      ],
+      "semanticOwner": "CA-STORAGE",
+      "applicability": "Inspected storage vertical and its Windows-gated test definitions.",
+      "falsifier": "A partition/format/initialize operation is exposed by this bounded cleanup vertical or tests prove production Host composition."
     },
     {
       "id": "CA-CLM-007",
@@ -558,7 +653,10 @@
       "limits": [
         "A preview is not execution authorization or proof of overwrite safety.",
         "The host-observation path is duplicate observation, not an unrestricted file manager."
-      ]
+      ],
+      "semanticOwner": "CA-FILE-ASSET",
+      "applicability": "Inspected public file vertical, preview and anchored duplicate-observation path.",
+      "falsifier": "A preview is treated as authorization or an unrestricted filesystem operation."
     },
     {
       "id": "CA-CLM-008",
@@ -574,7 +672,10 @@
       ],
       "limits": [
         "This is not proof of a complete consumer-facing app catalog, arbitrary app uninstall, all-app update, repair or package-source management."
-      ]
+      ],
+      "semanticOwner": "CA-SOFTWARE-LIFECYCLE",
+      "applicability": "Inspected curated JIT provider lifecycle and manifest-bound removal implementation.",
+      "falsifier": "An unknown source/package or unrecorded user file is accepted for install/removal."
     },
     {
       "id": "CA-CLM-009",
@@ -587,7 +688,10 @@
       ],
       "limits": [
         "This is a bounded absence statement about the reviewed public surface and Product scope, not a proof that no experimental or private code exists anywhere in the repository."
-      ]
+      ],
+      "semanticOwner": "CA-HARDWARE-DEVICE",
+      "applicability": "Inspected public domain-computer export surface and frozen Product/L1 scope.",
+      "falsifier": "A public, Product-admitted PnP/driver capability exists in the inspected surface."
     },
     {
       "id": "CA-CLM-010",
@@ -602,7 +706,10 @@
       ],
       "limits": [
         "No Shun implementation or Product authorization for disk initialization, partition changes or formatting is established."
-      ]
+      ],
+      "semanticOwner": "CA-STORAGE",
+      "applicability": "Windows storage documentation compared with Shun's fixed-volume inventory and bounded-cleanup surfaces.",
+      "falsifier": "Shun source exposes partition/format management under the reviewed public surface."
     },
     {
       "id": "CA-CLM-011",
@@ -618,7 +725,10 @@
       ],
       "limits": [
         "Current Shun JIT behavior must remain limited to its curated trusted provider contract; external WinGet commands do not automatically become Shun capabilities."
-      ]
+      ],
+      "semanticOwner": "CA-SOFTWARE-LIFECYCLE",
+      "applicability": "Windows WinGet documentation and Shun's curated JIT adapter.",
+      "falsifier": "WinGet command availability is taken as proof that Shun exposes all of those operations."
     },
     {
       "id": "CA-CLM-012",
@@ -632,7 +742,10 @@
       ],
       "limits": [
         "No Shun device/driver implementation, OEM package provenance contract, rollback model or Product acceptance is proven."
-      ]
+      ],
+      "semanticOwner": "CA-HARDWARE-DEVICE",
+      "applicability": "Microsoft Learn PnP and pnputil references; no Shun implementation admission.",
+      "falsifier": "A cited Microsoft command is treated as a Shun feature or as proof of driver compatibility/rollback."
     },
     {
       "id": "CA-CLM-013",
@@ -645,7 +758,10 @@
       ],
       "limits": [
         "DKE only states semantic knowledge and candidate consumer hints; DIS must define Functionization, ECP and actual AOT Package production."
-      ]
+      ],
+      "semanticOwner": "CA-AOT-KNOWLEDGE",
+      "applicability": "DKE R2 method candidate plus Product/L1 and prior trust-pilot source boundary.",
+      "falsifier": "Live host facts, grants or secrets are embedded in a reusable AOT artifact."
     },
     {
       "id": "CA-CLM-014",
@@ -658,7 +774,10 @@
       ],
       "limits": [
         "The prior pilot is only an author candidate and is not used as an independent qualification receipt."
-      ]
+      ],
+      "semanticOwner": "CA-GLOBAL-AUTHORITY",
+      "applicability": "Frozen Product/L1 and related trust/effect author candidate.",
+      "falsifier": "A model proposal, local label or stale grant is treated as effect authority."
     },
     {
       "id": "CA-CLM-015",
@@ -670,7 +789,10 @@
       ],
       "limits": [
         "Any future sharing path requires distinct scope, explicit consent and redaction."
-      ]
+      ],
+      "semanticOwner": "CA-GLOBAL-PRIVACY",
+      "applicability": "Frozen B-040 Product/L1 support-context privacy requirements.",
+      "falsifier": "Local support facts are automatically sent to an LLM, Meta or external reporting."
     }
   ],
   "elements": [
@@ -705,7 +827,9 @@
         "CA-GLOBAL-VERIFICATION",
         "CA-GLOBAL-PRIVACY",
         "CA-GLOBAL-CURRENTNESS"
-      ]
+      ],
+      "semanticBoundary": "Domain semantics from user goal through safe verified computer outcome; excludes Function ABI, Host implementation and Package production.",
+      "validationOracle": "Cross-Element CQ composition, global invariant closure and independent Product/domain-owner review."
     },
     {
       "id": "CA-GOAL-CAPABILITY",
@@ -726,7 +850,9 @@
         "ProviderEnvironmentBinding",
         "HardGate",
         "Clarification"
-      ]
+      ],
+      "semanticBoundary": "Intent, target and capability meaning only; excludes permit issuance and physical effect.",
+      "validationOracle": "Frozen Product source plus positive/negative resolution CQs."
     },
     {
       "id": "CA-SYSTEM-OBSERVATION",
@@ -750,7 +876,9 @@
         "InstalledSoftwareSample",
         "DiagnosticSignal",
         "ObservationProvenance"
-      ]
+      ],
+      "semanticBoundary": "Read-only system facts and diagnostic interpretation; excludes process/service mutation and root-cause claims unsupported by evidence.",
+      "validationOracle": "Exact Windows snapshot, privacy checks and negative tests on the native host."
     },
     {
       "id": "CA-STORAGE",
@@ -787,7 +915,9 @@
         "format volume",
         "offline/online transitions",
         "health diagnostics"
-      ]
+      ],
+      "semanticBoundary": "Disk/partition/volume/filesystem semantics and bounded cleanup; current Shun evidence covers only bounded volume cleanup.",
+      "validationOracle": "Microsoft Storage documentation, exact disk/volume identity, native Windows tests and independent storage-domain review."
     },
     {
       "id": "CA-FILE-ASSET",
@@ -811,7 +941,9 @@
         "FileEffect",
         "Backup",
         "Recovery"
-      ]
+      ],
+      "semanticBoundary": "File/folder object, scope and asset-protection semantics; preview is not an effect.",
+      "validationOracle": "Native filesystem identity/race tests and independent post-state checks."
     },
     {
       "id": "CA-SOFTWARE-LIFECYCLE",
@@ -852,7 +984,9 @@
         "repair workflows",
         "dependency and reboot management",
         "multi-source trust policy"
-      ]
+      ],
+      "semanticBoundary": "Package identity, source/provenance and lifecycle; current Shun evidence is limited to a bounded sample and curated Provider JIT.",
+      "validationOracle": "Official package-manager sources, exact provider receipts, signature/hash checks and residue tests."
     },
     {
       "id": "CA-HARDWARE-DEVICE",
@@ -883,7 +1017,9 @@
         "driver changes require exact device identity and trusted package provenance",
         "administrator requirement must be checked at runtime",
         "a rollback plan and post-change device verification are mandatory candidate obligations"
-      ]
+      ],
+      "semanticBoundary": "Hardware/PnP/driver semantics as a future knowledge area; no current public Shun capability is admitted.",
+      "validationOracle": "Microsoft and OEM documentation, real device/driver compatibility oracle and rollback tests."
     },
     {
       "id": "CA-PROCESS-SERVICE",
@@ -914,7 +1050,9 @@
         "service start/stop/restart",
         "startup management",
         "dependency-aware recovery"
-      ]
+      ],
+      "semanticBoundary": "Process/service inventory and dependency semantics; current evidence is observation-only.",
+      "validationOracle": "Windows-native process/service evidence and negative mutation tests."
     },
     {
       "id": "CA-NETWORK",
@@ -942,7 +1080,9 @@
       ],
       "constraints": [
         "credentials and Wi-Fi secrets are never included in AOT knowledge or ordinary diagnostics"
-      ]
+      ],
+      "semanticBoundary": "Layered network connectivity semantics; no current Shun network feature is qualified.",
+      "validationOracle": "Official OS documentation plus controlled live adapter/IP/route/DNS/proxy tests."
     },
     {
       "id": "CA-EXECUTION-ENVIRONMENT",
@@ -964,7 +1104,9 @@
         "NativeDependency",
         "EnvironmentCapability",
         "RemoteBoundary"
-      ]
+      ],
+      "semanticBoundary": "Platform/provider feasibility and binding; does not grant remote administration or claim untested OS support.",
+      "validationOracle": "Exact host/OS/architecture/provider binding and native consumer tests."
     },
     {
       "id": "CA-TASK-LIFECYCLE",
@@ -993,7 +1135,9 @@
         "Verifier",
         "RecoveryClassification",
         "UnknownOutcome"
-      ]
+      ],
+      "semanticBoundary": "Task/effect state, approval, journal, receipt, verification and recovery semantics; excludes implementation of runtime ABI.",
+      "validationOracle": "Exact Host receipts, restart/interruption negatives and independent post-state oracle."
     },
     {
       "id": "CA-AOT-KNOWLEDGE",
@@ -1012,7 +1156,9 @@
         "RuntimeFact",
         "SourceRevision",
         "InvalidationTrigger"
-      ]
+      ],
+      "semanticBoundary": "Classification of reusable knowledge versus runtime facts; does not build or activate AOT Packages.",
+      "validationOracle": "DKE SAP review followed by DIS ECP and exact selected-consumer Package proof."
     },
     {
       "id": "CA-GLOBAL-PROVENANCE",
@@ -1024,7 +1170,9 @@
         "CA-CLM-008",
         "CA-CLM-011",
         "CA-CLM-012"
-      ]
+      ],
+      "semanticBoundary": "Source identity, authority, version, applicability and freshness across all child Elements.",
+      "validationOracle": "Exact source/blob review and provider provenance negatives."
     },
     {
       "id": "CA-GLOBAL-AUTHORITY",
@@ -1035,7 +1183,9 @@
         "CA-CLM-001",
         "CA-CLM-002",
         "CA-CLM-014"
-      ]
+      ],
+      "semanticBoundary": "Separation of observation, proposal, approval, permit and Host authorization; does not define the runtime authorization implementation.",
+      "validationOracle": "Product/Host source review plus forged/stale/mismatched authority negatives."
     },
     {
       "id": "CA-GLOBAL-VERIFICATION",
@@ -1047,7 +1197,9 @@
         "CA-CLM-007",
         "CA-CLM-008",
         "CA-CLM-014"
-      ]
+      ],
+      "semanticBoundary": "Truthful post-state, UNKNOWN and reconcile-before-retry semantics across effects.",
+      "validationOracle": "Independent observable post-state and interruption/recovery tests."
     },
     {
       "id": "CA-GLOBAL-PRIVACY",
@@ -1057,7 +1209,9 @@
       "sourceClaims": [
         "CA-CLM-004",
         "CA-CLM-015"
-      ]
+      ],
+      "semanticBoundary": "Data minimization, local-only behavior and explicit sharing scope.",
+      "validationOracle": "Secret/process/path/document canaries and zero-egress native checks."
     },
     {
       "id": "CA-GLOBAL-CURRENTNESS",
@@ -1069,7 +1223,9 @@
         "CA-CLM-008",
         "CA-CLM-013",
         "CA-CLM-014"
-      ]
+      ],
+      "semanticBoundary": "Invalidation of affected knowledge and consumers after source, platform, provider, policy or host changes.",
+      "validationOracle": "Exact source-delta impact review and stale-binding negative cases."
     }
   ],
   "decomposition": {
@@ -1107,98 +1263,221 @@
       "from": "CA-ROOT",
       "to": "CA-GOAL-CAPABILITY",
       "type": "HAS_SEMANTIC_CHILD",
-      "status": "CANDIDATE"
+      "status": "CANDIDATE",
+      "semanticOwner": "CA-ROOT",
+      "sourceRefs": [
+        "SRC-PRODUCT-PRD"
+      ],
+      "applicability": "The DKE hierarchy for the Windows-first computer-assistant domain.",
+      "falsifier": "A child Element exists without a root semantic owner.",
+      "assertionType": "SOURCE_GROUNDED_OR_STRUCTURAL_CANDIDATE"
     },
     {
       "id": "CA-REL-002",
       "from": "CA-GOAL-CAPABILITY",
       "to": "CA-EXECUTION-ENVIRONMENT",
       "type": "REQUIRES_COMPATIBLE_PROVIDER_ENVIRONMENT_BINDING",
-      "status": "PRODUCT_GROUNDED_CANDIDATE"
+      "status": "PRODUCT_GROUNDED_CANDIDATE",
+      "semanticOwner": "CA-GOAL-CAPABILITY",
+      "sourceRefs": [
+        "SRC-PRODUCT-PRD"
+      ],
+      "applicability": "Capability selection against a concrete execution environment.",
+      "falsifier": "A provider is selected despite incompatible OS, architecture or dependency requirements.",
+      "assertionType": "SOURCE_GROUNDED_OR_STRUCTURAL_CANDIDATE"
     },
     {
       "id": "CA-REL-003",
       "from": "CA-GOAL-CAPABILITY",
       "to": "CA-TASK-LIFECYCLE",
       "type": "RESOLVES_TO_BOUNDED_TASK_PLAN",
-      "status": "PRODUCT_GROUNDED_CANDIDATE"
+      "status": "PRODUCT_GROUNDED_CANDIDATE",
+      "semanticOwner": "CA-GOAL-CAPABILITY",
+      "sourceRefs": [
+        "SRC-PRODUCT-PRD"
+      ],
+      "applicability": "Goal normalization to registered bounded capability and task plan.",
+      "falsifier": "A user goal is translated directly into an unbounded shell command.",
+      "assertionType": "SOURCE_GROUNDED_OR_STRUCTURAL_CANDIDATE"
     },
     {
       "id": "CA-REL-004",
       "from": "CA-TASK-LIFECYCLE",
       "to": "CA-GLOBAL-AUTHORITY",
       "type": "CONSTRAINED_BY",
-      "status": "PRODUCT_GROUNDED_CANDIDATE"
+      "status": "PRODUCT_GROUNDED_CANDIDATE",
+      "semanticOwner": "CA-GLOBAL-AUTHORITY",
+      "sourceRefs": [
+        "SRC-PRODUCT-PRD",
+        "SRC-PRODUCT-L1"
+      ],
+      "applicability": "Any real or privileged effect.",
+      "falsifier": "A model recommendation or approval label alone authorizes a Host effect.",
+      "assertionType": "SOURCE_GROUNDED_OR_STRUCTURAL_CANDIDATE"
     },
     {
       "id": "CA-REL-005",
       "from": "CA-TASK-LIFECYCLE",
       "to": "CA-GLOBAL-VERIFICATION",
       "type": "MUST_PRODUCE_VERIFIABLE_POST_STATE",
-      "status": "PRODUCT_GROUNDED_CANDIDATE"
+      "status": "PRODUCT_GROUNDED_CANDIDATE",
+      "semanticOwner": "CA-GLOBAL-VERIFICATION",
+      "sourceRefs": [
+        "SRC-PRODUCT-PRD",
+        "SRC-PRODUCT-L1"
+      ],
+      "applicability": "Any action reported as completed.",
+      "falsifier": "An exit code or UI status is accepted without observable post-state.",
+      "assertionType": "SOURCE_GROUNDED_OR_STRUCTURAL_CANDIDATE"
     },
     {
       "id": "CA-REL-006",
       "from": "CA-STORAGE",
       "to": "CA-GLOBAL-VERIFICATION",
       "type": "CLEANUP_REQUIRES_RECLAIM_AND_PROTECTED_ASSET_VERIFICATION",
-      "status": "CODE_AND_TEST_GROUNDED_CANDIDATE"
+      "status": "CODE_AND_TEST_GROUNDED_CANDIDATE",
+      "semanticOwner": "CA-GLOBAL-VERIFICATION",
+      "sourceRefs": [
+        "SRC-STORAGE-DIAGNOSE",
+        "SRC-STORAGE-PLAN",
+        "SRC-STORAGE-EXECUTE",
+        "SRC-TEST-STORAGE-DIAGNOSE",
+        "SRC-TEST-STORAGE-PLAN",
+        "SRC-TEST-STORAGE-EXECUTE"
+      ],
+      "applicability": "Bounded storage cleanup only.",
+      "falsifier": "Cleanup reports success without protected-asset and post-state verification.",
+      "assertionType": "SOURCE_GROUNDED_OR_STRUCTURAL_CANDIDATE"
     },
     {
       "id": "CA-REL-007",
       "from": "CA-SOFTWARE-LIFECYCLE",
       "to": "CA-GLOBAL-PROVENANCE",
       "type": "INSTALL_AND_REMOVE_REQUIRE_TRUSTED_SOURCE_AND_OWNERSHIP_EVIDENCE",
-      "status": "CODE_GROUNDED_CANDIDATE"
+      "status": "CODE_GROUNDED_CANDIDATE",
+      "semanticOwner": "CA-GLOBAL-PROVENANCE",
+      "sourceRefs": [
+        "SRC-JIT-ORCHESTRATOR",
+        "SRC-JIT-WINGET",
+        "SRC-JIT-MANIFEST",
+        "SRC-JIT-RESIDUE",
+        "SRC-TEST-JIT-RESIDUE"
+      ],
+      "applicability": "Curated software Provider acquisition and removal.",
+      "falsifier": "An untrusted source or unrecorded residue is treated as Provider-owned.",
+      "assertionType": "SOURCE_GROUNDED_OR_STRUCTURAL_CANDIDATE"
     },
     {
       "id": "CA-REL-008",
       "from": "CA-HARDWARE-DEVICE",
       "to": "CA-GLOBAL-AUTHORITY",
       "type": "DEVICE_DRIVER_MUTATION_REQUIRES_ADMIN_AND_EXPLICIT_APPROVAL",
-      "status": "FUTURE_DERIVED_NEEDS_PRODUCT_AND_DOMAIN_ORACLE"
+      "status": "FUTURE_DERIVED_NEEDS_PRODUCT_AND_DOMAIN_ORACLE",
+      "semanticOwner": "CA-GLOBAL-AUTHORITY",
+      "sourceRefs": [
+        "EXT-PNP-ENABLE",
+        "EXT-PNP-DISABLE",
+        "EXT-PNPUTIL"
+      ],
+      "applicability": "Future PnP/device mutation candidate, not current Shun feature.",
+      "falsifier": "A device is mutated by friendly-name match without exact instance identity and runtime admin check.",
+      "assertionType": "DERIVED_CANDIDATE"
     },
     {
       "id": "CA-REL-009",
       "from": "CA-AOT-KNOWLEDGE",
       "to": "CA-GLOBAL-PROVENANCE",
       "type": "COMPILED_KNOWLEDGE_MUST_RETAIN_SOURCE_REVISION",
-      "status": "DKE_DERIVED_CANDIDATE"
+      "status": "DKE_DERIVED_CANDIDATE",
+      "semanticOwner": "CA-GLOBAL-PROVENANCE",
+      "sourceRefs": [
+        "SRC-DKE-STANDARD",
+        "SRC-PRODUCT-PRD"
+      ],
+      "applicability": "Candidate AOT knowledge derived from pinned domain claims.",
+      "falsifier": "A compiled fact has no source revision or applicability scope.",
+      "assertionType": "DERIVED_CANDIDATE"
     },
     {
       "id": "CA-REL-010",
       "from": "CA-AOT-KNOWLEDGE",
       "to": "CA-EXECUTION-ENVIRONMENT",
       "type": "STATIC_OS_RULES_ARE_PLATFORM_VERSION_SCOPED",
-      "status": "DKE_DERIVED_CANDIDATE"
+      "status": "DKE_DERIVED_CANDIDATE",
+      "semanticOwner": "CA-GLOBAL-CURRENTNESS",
+      "sourceRefs": [
+        "SRC-DKE-STANDARD",
+        "SRC-PRODUCT-PRD"
+      ],
+      "applicability": "Platform-specific static knowledge and its consumers.",
+      "falsifier": "A Windows-specific rule is applied to another OS/version without compatibility evidence.",
+      "assertionType": "DERIVED_CANDIDATE"
     },
     {
       "id": "CA-REL-011",
       "from": "CA-GLOBAL-CURRENTNESS",
       "to": "CA-STORAGE",
       "type": "DISK_VOLUME_AND_HEALTH_FACTS_REQUIRE_RUNTIME_REFRESH",
-      "status": "DKE_DERIVED_CANDIDATE"
+      "status": "DKE_DERIVED_CANDIDATE",
+      "semanticOwner": "CA-GLOBAL-CURRENTNESS",
+      "sourceRefs": [
+        "SRC-SYSTEM-INDEX",
+        "SRC-STORAGE-INDEX",
+        "EXT-DISK-MGMT"
+      ],
+      "applicability": "Current disk/volume/partition/health facts.",
+      "falsifier": "Cached topology or free-space facts are reused after host topology changes.",
+      "assertionType": "DERIVED_CANDIDATE"
     },
     {
       "id": "CA-REL-012",
       "from": "CA-GLOBAL-CURRENTNESS",
       "to": "CA-HARDWARE-DEVICE",
       "type": "DEVICE_INSTANCE_AND_DRIVER_STATE_REQUIRE_RUNTIME_REFRESH",
-      "status": "DKE_DERIVED_CANDIDATE"
+      "status": "DKE_DERIVED_CANDIDATE",
+      "semanticOwner": "CA-GLOBAL-CURRENTNESS",
+      "sourceRefs": [
+        "EXT-PNP-GET",
+        "EXT-PNP-ENABLE",
+        "EXT-PNP-DISABLE"
+      ],
+      "applicability": "Current PnP device instance and driver state.",
+      "falsifier": "A stale device instance or driver state is used after hardware changes.",
+      "assertionType": "DERIVED_CANDIDATE"
     },
     {
       "id": "CA-REL-013",
       "from": "CA-GLOBAL-CURRENTNESS",
       "to": "CA-SOFTWARE-LIFECYCLE",
       "type": "INSTALLED_VERSION_AND_SOURCE_STATE_REQUIRE_RUNTIME_REFRESH",
-      "status": "DKE_DERIVED_CANDIDATE"
+      "status": "DKE_DERIVED_CANDIDATE",
+      "semanticOwner": "CA-GLOBAL-CURRENTNESS",
+      "sourceRefs": [
+        "EXT-WINGET-LIST",
+        "EXT-WINGET-UPGRADE",
+        "SRC-JIT-WINGET",
+        "SRC-JIT-ORCHESTRATOR"
+      ],
+      "applicability": "Installed package and update availability.",
+      "falsifier": "Cached package/source/version facts are reused without a current source check.",
+      "assertionType": "DERIVED_CANDIDATE"
     },
     {
       "id": "CA-REL-014",
       "from": "CA-GLOBAL-PRIVACY",
       "to": "CA-SYSTEM-OBSERVATION",
       "type": "OBSERVATION_DATA_MINIMIZATION_AND_EGRESS_BOUNDARY",
-      "status": "PRODUCT_GROUNDED_CANDIDATE"
+      "status": "PRODUCT_GROUNDED_CANDIDATE",
+      "semanticOwner": "CA-GLOBAL-PRIVACY",
+      "sourceRefs": [
+        "SRC-PRODUCT-PRD",
+        "SRC-PRODUCT-L1",
+        "SRC-SYSTEM-RUNTIME",
+        "SRC-TEST-SYSTEM-SOFTWARE"
+      ],
+      "applicability": "Local system/support observations.",
+      "falsifier": "Local-only support or process facts are forwarded without a distinct approved sharing scope.",
+      "assertionType": "SOURCE_GROUNDED_OR_STRUCTURAL_CANDIDATE"
     }
   ],
   "globalInvariants": [
@@ -1206,73 +1485,159 @@
       "id": "CA-INV-001",
       "owner": "CA-GLOBAL-AUTHORITY",
       "property": "OBSERVATION_IS_NOT_AUTHORIZATION",
-      "violation": "BLOCK_EFFECT"
+      "violation": "BLOCK_EFFECT",
+      "sourceRefs": [
+        "SRC-PRODUCT-PRD",
+        "SRC-PRODUCT-L1"
+      ],
+      "falsifier": "A read-only observation is accepted as permission to mutate.",
+      "applicability": "All applicable computer-assistant Elements and their DIS consumers; platform-specific where the source states a platform."
     },
     {
       "id": "CA-INV-002",
       "owner": "CA-GLOBAL-AUTHORITY",
       "property": "LLM_OUTPUT_IS_UNTRUSTED_PROPOSAL_NOT_PERMISSION",
-      "violation": "REJECT_OR_CLARIFY"
+      "violation": "REJECT_OR_CLARIFY",
+      "sourceRefs": [
+        "SRC-PRODUCT-PRD",
+        "SRC-PRODUCT-L1"
+      ],
+      "falsifier": "Model output or a guided step creates a grant or bypasses approval.",
+      "applicability": "All applicable computer-assistant Elements and their DIS consumers; platform-specific where the source states a platform."
     },
     {
       "id": "CA-INV-003",
       "owner": "CA-GLOBAL-AUTHORITY",
       "property": "DESTRUCTIVE_OR_PRIVILEGED_EFFECT_REQUIRES_EXACT_SCOPE_CURRENT_APPROVAL_AND_HOST_AUTHORIZATION",
-      "violation": "ZERO_EFFECT"
+      "violation": "ZERO_EFFECT",
+      "sourceRefs": [
+        "SRC-PRODUCT-PRD",
+        "SRC-PRODUCT-L1"
+      ],
+      "falsifier": "A stale, broad or mismatched target/scope reaches a privileged effect.",
+      "applicability": "All applicable computer-assistant Elements and their DIS consumers; platform-specific where the source states a platform."
     },
     {
       "id": "CA-INV-004",
       "owner": "CA-GLOBAL-VERIFICATION",
       "property": "SUCCESS_REQUIRES_VERIFIED_POST_STATE_NOT_EXIT_CODE_OR_UI_LABEL",
-      "violation": "UNKNOWN"
+      "violation": "UNKNOWN",
+      "sourceRefs": [
+        "SRC-PRODUCT-PRD",
+        "SRC-PRODUCT-L1",
+        "SRC-STORAGE-EXECUTE"
+      ],
+      "falsifier": "The assistant claims success from process exit status without checking post-state.",
+      "applicability": "All applicable computer-assistant Elements and their DIS consumers; platform-specific where the source states a platform."
     },
     {
       "id": "CA-INV-005",
       "owner": "CA-GLOBAL-VERIFICATION",
       "property": "MAY_HAVE_EXECUTED_OR_AMBIGUOUS_OUTCOME_MUST_RECONCILE_BEFORE_RETRY",
-      "violation": "NO_BLIND_RETRY"
+      "violation": "NO_BLIND_RETRY",
+      "sourceRefs": [
+        "SRC-PRODUCT-PRD",
+        "SRC-PRODUCT-L1",
+        "SRC-STORAGE-EXECUTE",
+        "SRC-JIT-ORCHESTRATOR"
+      ],
+      "falsifier": "An ambiguous interrupted operation is blindly retried.",
+      "applicability": "All applicable computer-assistant Elements and their DIS consumers; platform-specific where the source states a platform."
     },
     {
       "id": "CA-INV-006",
       "owner": "CA-GLOBAL-PROVENANCE",
       "property": "NO_SOFTWARE_OR_DRIVER_ACQUISITION_WITHOUT_EXACT_SOURCE_PACKAGE_VERSION_AND_TRUST_EVIDENCE",
-      "violation": "BLOCK_ACQUISITION"
+      "violation": "BLOCK_ACQUISITION",
+      "sourceRefs": [
+        "SRC-JIT-WINGET",
+        "SRC-JIT-ORCHESTRATOR",
+        "EXT-WINGET-OVERVIEW",
+        "EXT-PNPUTIL"
+      ],
+      "falsifier": "A package/driver is installed without exact source, identity and trust evidence.",
+      "applicability": "All applicable computer-assistant Elements and their DIS consumers; platform-specific where the source states a platform."
     },
     {
       "id": "CA-INV-007",
       "owner": "CA-STORAGE",
       "property": "UNKNOWN_OR_USER_CREATED_ASSETS_ARE_NEVER_DELETED_BY_SIZE_OR_LOCATION_ALONE",
-      "violation": "RETAIN_AND_ESCALATE"
+      "violation": "RETAIN_AND_ESCALATE",
+      "sourceRefs": [
+        "SRC-STORAGE-PLAN",
+        "SRC-STORAGE-EXECUTE",
+        "SRC-TEST-STORAGE-PLAN",
+        "SRC-JIT-RESIDUE",
+        "SRC-TEST-JIT-RESIDUE"
+      ],
+      "falsifier": "A user-created or unknown asset is deleted because it is large or located under a program root.",
+      "applicability": "All applicable computer-assistant Elements and their DIS consumers; platform-specific where the source states a platform."
     },
     {
       "id": "CA-INV-008",
       "owner": "CA-STORAGE",
       "property": "DISK_INITIALIZE_PARTITION_OR_FORMAT_MUST_NOT_RUN_WHEN_EXISTING_DATA_OR_TARGET_IDENTITY_IS_UNKNOWN",
-      "violation": "BLOCK_AND_REQUIRE_BACKUP_REVIEW"
+      "violation": "BLOCK_AND_REQUIRE_BACKUP_REVIEW",
+      "sourceRefs": [
+        "EXT-DISK-MGMT",
+        "EXT-DISK-INITIALIZE",
+        "EXT-STORAGE-MODULE"
+      ],
+      "falsifier": "A disk with unknown or existing data is initialized, repartitioned or formatted.",
+      "applicability": "All applicable computer-assistant Elements and their DIS consumers; platform-specific where the source states a platform."
     },
     {
       "id": "CA-INV-009",
       "owner": "CA-HARDWARE-DEVICE",
       "property": "DEVICE_MUTATION_REQUIRES_EXACT_INSTANCE_ID_AND_RUNTIME_PRIVILEGE_CHECK; DRIVER_CHANGE_REQUIRES_COMPATIBILITY_AND_ROLLBACK_EVIDENCE",
-      "violation": "BLOCK"
+      "violation": "BLOCK",
+      "sourceRefs": [
+        "EXT-PNP-GET",
+        "EXT-PNP-ENABLE",
+        "EXT-PNP-DISABLE",
+        "EXT-PNPUTIL"
+      ],
+      "falsifier": "A device is changed without exact instance, admin check, compatibility or rollback evidence.",
+      "applicability": "All applicable computer-assistant Elements and their DIS consumers; platform-specific where the source states a platform."
     },
     {
       "id": "CA-INV-010",
       "owner": "CA-GLOBAL-PRIVACY",
       "property": "LOCAL_ONLY_SUPPORT_CONTEXT_MUST_NOT_BE_AUTOMATICALLY_SENT_TO_LLM_META_NETWORK_OR_EXTERNAL_ISSUE_REPORTING",
-      "violation": "NO_EGRESS"
+      "violation": "NO_EGRESS",
+      "sourceRefs": [
+        "SRC-PRODUCT-PRD",
+        "SRC-PRODUCT-L1"
+      ],
+      "falsifier": "A local-only support report is automatically disclosed externally.",
+      "applicability": "All applicable computer-assistant Elements and their DIS consumers; platform-specific where the source states a platform."
     },
     {
       "id": "CA-INV-011",
       "owner": "CA-AOT-KNOWLEDGE",
       "property": "AOT_CONTAINS_STABLE_SOURCE_PINNED_KNOWLEDGE_NOT_LIVE_HOST_STATE_OR_AUTHORITY",
-      "violation": "KEEP_RUNTIME_ONLY"
+      "violation": "KEEP_RUNTIME_ONLY",
+      "sourceRefs": [
+        "SRC-DKE-STANDARD",
+        "SRC-PRODUCT-PRD"
+      ],
+      "falsifier": "A reusable AOT artifact contains live host state, user data or authority.",
+      "applicability": "All applicable computer-assistant Elements and their DIS consumers; platform-specific where the source states a platform."
     },
     {
       "id": "CA-INV-012",
       "owner": "CA-GLOBAL-CURRENTNESS",
       "property": "SOURCE_OS_PROVIDER_POLICY_OR_HOST_CHANGE_INVALIDATES_AFFECTED_KNOWLEDGE_AND_CONSUMER_CURRENTNESS",
-      "violation": "REVALIDATE_AFFECTED_SCOPE"
+      "violation": "REVALIDATE_AFFECTED_SCOPE",
+      "sourceRefs": [
+        "SRC-DKE-STANDARD",
+        "SRC-PRODUCT-PRD",
+        "EXT-DISK-MGMT",
+        "EXT-WINGET-OVERVIEW",
+        "EXT-PNP-GET"
+      ],
+      "falsifier": "A source/platform/provider/policy change leaves affected knowledge marked current.",
+      "applicability": "All applicable computer-assistant Elements and their DIS consumers; platform-specific where the source states a platform."
     }
   ],
   "competencyQuestions": [
@@ -1282,7 +1647,13 @@
       "question": "Given a user request, can the assistant identify the target computer object, intended outcome, constraints and registered capability, or explain exactly what must be clarified?",
       "positive": "A unique capability and object are resolved with scope and preconditions.",
       "negative": "Ambiguous disk/device/software identity or unregistered capability is clarified or refused.",
-      "status": "CANDIDATE_NOT_RUN"
+      "status": "CANDIDATE_NOT_RUN",
+      "expectedEvidence": [
+        "goal request and target identity",
+        "registered capability metadata",
+        "constraints, preconditions and clarification record"
+      ],
+      "unknownPath": "ASK_CLARIFY_OR_BLOCK"
     },
     {
       "id": "CQ-CA-002",
@@ -1290,7 +1661,13 @@
       "question": "Can the assistant select a provider only when its trust, platform, architecture, privilege and dependency requirements match the current environment?",
       "positive": "A pinned provider binding passes every hard gate.",
       "negative": "Unknown signature, unsupported OS, missing native dependency or stale environment blocks selection.",
-      "status": "CANDIDATE_NOT_RUN"
+      "status": "CANDIDATE_NOT_RUN",
+      "expectedEvidence": [
+        "provider source/signature/hash/version",
+        "OS and architecture facts",
+        "native dependency and privilege feasibility"
+      ],
+      "unknownPath": "NO_PROVIDER_BINDING"
     },
     {
       "id": "CQ-CA-003",
@@ -1298,7 +1675,13 @@
       "question": "Can the assistant distinguish measured system observations from inferred root cause and recommended action?",
       "positive": "It reports only measured facts and bounded signals.",
       "negative": "A single snapshot is used to claim a root cause or guaranteed performance gain.",
-      "status": "SOURCE_AND_TEST_DEFINED_NOT_REEXECUTED"
+      "status": "SOURCE_AND_TEST_DEFINED_NOT_REEXECUTED",
+      "expectedEvidence": [
+        "bounded native system snapshot",
+        "fixed collector provenance",
+        "negative result for unsupported inference"
+      ],
+      "unknownPath": "REPORT_UNAVAILABLE_WITHOUT_INFERENCE"
     },
     {
       "id": "CQ-CA-004",
@@ -1306,7 +1689,14 @@
       "question": "Can the assistant attribute storage growth and select only policy-eligible disposable targets while preserving user-created and protected assets?",
       "positive": "Evidence-backed cache/temp targets are previewed, approved, cleaned and verified.",
       "negative": "A same-size user file, unknown path, reparse point or protected canary is selected/deleted.",
-      "status": "SOURCE_AND_TEST_DEFINED_NOT_REEXECUTED"
+      "status": "SOURCE_AND_TEST_DEFINED_NOT_REEXECUTED",
+      "expectedEvidence": [
+        "storage observation and attribution evidence",
+        "classified target manifest",
+        "approval and authorization receipts",
+        "journal, reclaimed-space and protected-asset post-state"
+      ],
+      "unknownPath": "NO_EFFECT_RETAIN_PROTECTED_AND_UNKNOWN_ASSETS"
     },
     {
       "id": "CQ-CA-005",
@@ -1314,7 +1704,13 @@
       "question": "Can the assistant distinguish low free space and scoped cleanup from disk initialization, partition changes and formatting?",
       "positive": "It explains the separate operation and its data-loss implications.",
       "negative": "It initializes or formats a disk when identity, existing data or backup state is unknown.",
-      "status": "EXTERNAL_SOURCE_GROUNDED_CANDIDATE_NOT_RUN"
+      "status": "EXTERNAL_SOURCE_GROUNDED_CANDIDATE_NOT_RUN",
+      "expectedEvidence": [
+        "disk unique identity and partition/volume map",
+        "existing-data and backup evidence",
+        "explicit user-approved target and destructive scope"
+      ],
+      "unknownPath": "BLOCK_DESTRUCTIVE_STORAGE_OPERATION"
     },
     {
       "id": "CQ-CA-006",
@@ -1322,7 +1718,14 @@
       "question": "Can the assistant resolve an exact application/package identity and show source, publisher, version, installer and update/uninstall scope before effect?",
       "positive": "Exact package identity and trusted source are bound.",
       "negative": "Ambiguous name, untrusted source, changed hash or unsupported installer is silently accepted.",
-      "status": "SOURCE_GROUNDED_CANDIDATE_NOT_RUN"
+      "status": "SOURCE_GROUNDED_CANDIDATE_NOT_RUN",
+      "expectedEvidence": [
+        "exact package ID/name/version",
+        "source, publisher and installer provenance",
+        "hash/signature and package scope",
+        "dependency/reboot impact"
+      ],
+      "unknownPath": "ASK_FOR_EXACT_PACKAGE_OR_BLOCK"
     },
     {
       "id": "CQ-CA-007",
@@ -1330,7 +1733,13 @@
       "question": "Can the assistant preserve user-created or unknown residue during software removal?",
       "positive": "Only manifest-owned entries are eligible; configuration and unknown/user-created assets are retained.",
       "negative": "A whole install root or unknown residue is deleted.",
-      "status": "SOURCE_AND_TEST_DEFINED_NOT_REEXECUTED"
+      "status": "SOURCE_AND_TEST_DEFINED_NOT_REEXECUTED",
+      "expectedEvidence": [
+        "install-time ownership manifest",
+        "file identity and protected-root census",
+        "residue classification and removal receipt"
+      ],
+      "unknownPath": "RETAIN_UNKNOWN_RESIDUE"
     },
     {
       "id": "CQ-CA-008",
@@ -1338,7 +1747,14 @@
       "question": "Can the assistant identify the exact PnP device and compatible trusted driver, determine required privilege, preserve rollback and verify post-change health?",
       "positive": "Exact device instance, OEM package provenance, compatibility, approval and rollback are evidenced.",
       "negative": "Friendly-name match, unknown driver source or absent rollback is treated as sufficient.",
-      "status": "OPEN_DOMAIN_ORACLE_AND_PRODUCT_DECISION_REQUIRED"
+      "status": "OPEN_DOMAIN_ORACLE_AND_PRODUCT_DECISION_REQUIRED",
+      "expectedEvidence": [
+        "device instance and hardware ID",
+        "OEM driver package source/hash/signature",
+        "compatibility and privilege evidence",
+        "rollback plan and post-change device state"
+      ],
+      "unknownPath": "BLOCK_DEVICE_OR_DRIVER_MUTATION"
     },
     {
       "id": "CQ-CA-009",
@@ -1346,7 +1762,13 @@
       "question": "Can the assistant distinguish process-count or memory-pressure observation from CPU bottleneck, root cause or authorization to terminate a process/service?",
       "positive": "Only supported metrics and safe recommendations are reported.",
       "negative": "A high-memory process is automatically killed or a service stopped.",
-      "status": "SOURCE_GROUNDED_PARTIAL_NOT_RUN"
+      "status": "SOURCE_GROUNDED_PARTIAL_NOT_RUN",
+      "expectedEvidence": [
+        "bounded process metrics",
+        "service dependency and impact facts where relevant",
+        "explicit plan and approval for any mutation"
+      ],
+      "unknownPath": "OBSERVE_ONLY_NO_PROCESS_OR_SERVICE_MUTATION"
     },
     {
       "id": "CQ-CA-010",
@@ -1354,7 +1776,13 @@
       "question": "Can the assistant separate adapter/link, IP configuration, routing, DNS, proxy and remote endpoint failures using evidence appropriate to each layer?",
       "positive": "The fault is narrowed only to layers supported by observations.",
       "negative": "A generic reset or credential disclosure is recommended without evidence.",
-      "status": "OPEN_SOURCE_AND_PRODUCT_SCOPE_REQUIRED"
+      "status": "OPEN_SOURCE_AND_PRODUCT_SCOPE_REQUIRED",
+      "expectedEvidence": [
+        "adapter/link facts",
+        "IP/route/DNS/proxy probes",
+        "credential-free diagnostic evidence"
+      ],
+      "unknownPath": "KEEP_LAYERED_DIAGNOSIS_UNKNOWN_NO_BLIND_RESET"
     },
     {
       "id": "CQ-CA-011",
@@ -1362,7 +1790,13 @@
       "question": "Can the system identify which facts are stable enough to compile AOT and which facts must be refreshed from the live host?",
       "positive": "OS semantics and decision rules are pinned; current disk/device/software/permission facts are runtime observations.",
       "negative": "Live state, grants, secrets or user files are compiled into a reusable package.",
-      "status": "DKE_DERIVED_CANDIDATE_NOT_RUN"
+      "status": "DKE_DERIVED_CANDIDATE_NOT_RUN",
+      "expectedEvidence": [
+        "source revision and applicability range",
+        "static knowledge record",
+        "runtime fact schema and invalidation rules"
+      ],
+      "unknownPath": "KEEP_UNVERIFIED_FACT_RUNTIME_ONLY_OR_MARK_OPEN"
     },
     {
       "id": "CQ-CA-012",
@@ -1370,7 +1804,13 @@
       "question": "Can the assistant report success only after independent post-state verification and recover honestly after interruption?",
       "positive": "Receipt and post-state match the declared verifier.",
       "negative": "Exit code, UI progress or model claim is reported as success; ambiguous action is blindly retried.",
-      "status": "PRODUCT_AND_CODE_GROUNDED_NOT_REEXECUTED"
+      "status": "PRODUCT_AND_CODE_GROUNDED_NOT_REEXECUTED",
+      "expectedEvidence": [
+        "plan and approval identity",
+        "permit/Host authorization receipt",
+        "effect journal and independent post-state verifier"
+      ],
+      "unknownPath": "REPORT_UNKNOWN_RECONCILE_BEFORE_RETRY"
     },
     {
       "id": "CQ-CA-013",
@@ -1378,7 +1818,13 @@
       "question": "Can local support/system facts be minimized and kept local unless a separate sharing consent is granted?",
       "positive": "No automatic egress and no raw secrets, process command lines or unrelated document bodies.",
       "negative": "A support report is silently sent to LLM, Meta, network or issue reporting.",
-      "status": "FROZEN_PRODUCT_REQUIREMENT_NOT_REEXECUTED"
+      "status": "FROZEN_PRODUCT_REQUIREMENT_NOT_REEXECUTED",
+      "expectedEvidence": [
+        "data classification and local-only marker",
+        "redaction result",
+        "separate explicit sharing consent if egress is requested"
+      ],
+      "unknownPath": "NO_EGRESS"
     },
     {
       "id": "CQ-CA-014",
@@ -1386,7 +1832,13 @@
       "question": "Can the assistant truthfully distinguish current Windows support from future Linux/macOS knowledge coverage?",
       "positive": "A capability is available only for a proven OS/architecture/provider binding.",
       "negative": "Windows code or tests are presented as Linux/macOS support.",
-      "status": "CANDIDATE_NOT_RUN"
+      "status": "CANDIDATE_NOT_RUN",
+      "expectedEvidence": [
+        "exact OS build and architecture",
+        "provider/native binding",
+        "platform-specific native test receipt"
+      ],
+      "unknownPath": "MARK_UNSUPPORTED_PLATFORM"
     }
   ],
   "semanticAssuranceProfile": {
@@ -1499,7 +1951,19 @@
       "Microsoft Learn pages are official source locators; licensing and domain-owner adoption are not independently qualified here.",
       "No hardware OEM or Windows storage specialist has signed the candidate semantics.",
       "No Element SAP is qualified and no DIS ECP exists."
-    ]
+    ],
+    "authorMechanicalValidation": {
+      "status": "AUTHOR_MECHANICAL_CHECK_PASS_NOT_INDEPENDENT",
+      "checks": [
+        "All source/claim/Element/relation/invariant/CQ identifiers are unique.",
+        "All claim source references resolve to internal or external source records.",
+        "All relation endpoints, semantic owners, invariant owners and CQ Element references resolve.",
+        "Root/Child/Global-Semantic hierarchy references resolve and parent-child hierarchy is acyclic."
+      ],
+      "limitations": [
+        "Does not prove claim truth, source authority, semantic decomposition correctness, Product admission, native execution or SAP qualification."
+      ]
+    }
   },
   "aotKnowledgeBoundary": {
     "owner": "DKE defines candidate knowledge and semantic obligations; DIS decides Functionization, ECP, dependency binding and AOT Package production.",
@@ -1540,9 +2004,9 @@
     "promotionRule": "No candidate knowledge becomes an active AOT package until independent SAP review, explicit Product scope admission where needed, DIS Function/ECP qualification and exact Package/consumer qualification are complete."
   },
   "qualification": {
-    "k1": "AUTHOR_SOURCE_INVENTORY_PINNED",
-    "k2": "AUTHOR_CLAIMS_AND_RELATIONS_CANDIDATE",
-    "k3": "AUTHOR_ELEMENT_BLUEPRINT_AND_CQ_CANDIDATE",
+    "k1": "AUTHOR_SOURCE_INVENTORY_PINNED_33_INTERNAL_AND_EXTERNAL_LOCATORS",
+    "k2": "AUTHOR_CLAIMS_RELATIONS_AND_OWNERSHIP_CANDIDATE",
+    "k3": "AUTHOR_ELEMENT_BLUEPRINT_CQS_AND_SAP_OBLIGATIONS_CANDIDATE",
     "k4IndependentReview": "NOT_RUN",
     "k4NativeWindowsExecution": "NOT_RUN",
     "ownerSemanticDecision": "NOT_REQUESTED",
