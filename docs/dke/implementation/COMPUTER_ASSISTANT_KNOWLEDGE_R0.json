@@ -1595,8 +1595,8 @@
         "scopeRevision": "COMPUTER_ASSISTANT_KNOWLEDGE_R0_CANDIDATE",
         "owner": "CA-ROOT",
         "purpose": "Own the complete semantic model from user goal through computer object/capability resolution, trusted environment/provider binding, authorization, execution, verification and recovery.",
-        "nonGoals": "Domain semantics from user goal through safe verified computer outcome; excludes Function ABI, Host implementation and Package production.",
-        "applicability": "Domain semantics from user goal through safe verified computer outcome; excludes Function ABI, Host implementation and Package production.",
+        "nonGoals": "Function ABI, runtime Host implementation, Package publication, physical effect claims and unaudited admission are excluded.",
+        "applicability": "Across all Windows-first user-goal-to-outcome knowledge; Root closure requires the independently checked composition of every applicable Child and Global Semantic obligation.",
         "sourceClaimRefs": [
           "CA-CLM-001",
           "CA-CLM-002",
@@ -1671,8 +1671,8 @@
         "scopeRevision": "COMPUTER_ASSISTANT_KNOWLEDGE_R0_CANDIDATE",
         "owner": "CA-GOAL-CAPABILITY",
         "purpose": "Interpret the user goal, identify relevant computer objects and constraints, resolve only registered capabilities and select a trusted provider compatible with the current execution environment.",
-        "nonGoals": "Intent, target and capability meaning only; excludes permit issuance and physical effect.",
-        "applicability": "Intent, target and capability meaning only; excludes permit issuance and physical effect.",
+        "nonGoals": "No raw shell execution, invented capability, ambient permission, or physical effect authority.",
+        "applicability": "Frozen goal/registered-capability selection on supported Shun v0.3 local Windows journeys; runtime registry/target/permission currentness must be re-observed.",
         "sourceClaimRefs": [
           "CA-CLM-001",
           "CA-CLM-002",
@@ -1740,8 +1740,8 @@
         "scopeRevision": "COMPUTER_ASSISTANT_KNOWLEDGE_R0_CANDIDATE",
         "owner": "CA-SYSTEM-OBSERVATION",
         "purpose": "Collect bounded read-only facts about OS, CPU, memory, storage capacity, process pressure and installed software; distinguish observations from diagnosis and diagnosis from action.",
-        "nonGoals": "Read-only system facts and diagnostic interpretation; excludes process/service mutation and root-cause claims unsupported by evidence.",
-        "applicability": "Read-only system facts and diagnostic interpretation; excludes process/service mutation and root-cause claims unsupported by evidence.",
+        "nonGoals": "No process/service control, unconditional hardware-health diagnosis, guaranteed speedup, or inferred root cause from one snapshot.",
+        "applicability": "Pinned read-only Windows system/runtime collectors and B-040 privacy-bound observations; exact host accessibility and build applicability remain Runtime evidence.",
         "sourceClaimRefs": [
           "CA-CLM-003",
           "CA-CLM-004",
@@ -1830,8 +1830,8 @@
         "scopeRevision": "COMPUTER_ASSISTANT_KNOWLEDGE_R0_CANDIDATE",
         "owner": "CA-STORAGE",
         "purpose": "Model physical disks, partitions, volumes, filesystems, mount/drive mappings, provider-dependent storage-health telemetry, capacity and safe cleanup as distinct concepts and workflows.",
-        "nonGoals": "Disk/partition/volume/filesystem and provider-dependent health semantics are knowledge candidates; current Shun evidence covers only fixed-volume capacity and bounded cleanup. No universal SMART-health or disk-management feature is implied.",
-        "applicability": "Disk/partition/volume/filesystem and provider-dependent health semantics are knowledge candidates; current Shun evidence covers only fixed-volume capacity and bounded cleanup. No universal SMART-health or disk-management feature is implied.",
+        "nonGoals": "No current partition/format/initialize authority or universal SMART diagnosis; unknown and user-created assets never become automatically disposable.",
+        "applicability": "Present Shun source proves bounded storage observation/cleanup candidates only; disk, partition, volume and provider-dependent health are future knowledge, requiring Product/Windows/Oracle gates.",
         "sourceClaimRefs": [
           "CA-CLM-006",
           "CA-CLM-010"
@@ -1909,8 +1909,8 @@
         "scopeRevision": "COMPUTER_ASSISTANT_KNOWLEDGE_R0_CANDIDATE",
         "owner": "CA-FILE-ASSET",
         "purpose": "Model user files and directories, scopes, identity, metadata, content digest, duplicates, copy/move/rename, backup, protection and recovery.",
-        "nonGoals": "File/folder object, scope and asset-protection semantics; preview is not an effect.",
-        "applicability": "File/folder object, scope and asset-protection semantics; preview is not an effect.",
+        "nonGoals": "No unconditional physical file changes from previews and no permission to delete private or unknown ownership assets.",
+        "applicability": "Current file preview and bounded handle-anchored observation sources; any effect remains separately authorized and Host identity/poststate checked.",
         "sourceClaimRefs": [
           "CA-CLM-007",
           "CA-CLM-015",
@@ -2005,8 +2005,8 @@
         "scopeRevision": "COMPUTER_ASSISTANT_KNOWLEDGE_R0_CANDIDATE",
         "owner": "CA-SOFTWARE-LIFECYCLE",
         "purpose": "Model installed software, package identities, publisher, version, installer/source provenance, dependencies, install/update/repair/uninstall, provider-owned files and residual state.",
-        "nonGoals": "Package identity, source/provenance and lifecycle; current Shun evidence is limited to a bounded sample and curated Provider JIT.",
-        "applicability": "Package identity, source/provenance and lifecycle; current Shun evidence is limited to a bounded sample and curated Provider JIT.",
+        "nonGoals": "No generic consumer app manager, open Provider marketplace, or deletion of unknown installer/user residue.",
+        "applicability": "Current bounded registry sample and curated signed Provider JIT source only; general software lifecycle is future knowledge pending Product admission.",
         "sourceClaimRefs": [
           "CA-CLM-004",
           "CA-CLM-008",
@@ -2094,8 +2094,8 @@
         "scopeRevision": "COMPUTER_ASSISTANT_KNOWLEDGE_R0_CANDIDATE",
         "owner": "CA-HARDWARE-DEVICE",
         "purpose": "Model physical hardware, PnP device instances, hardware IDs, device classes, driver packages, OEM provenance, compatibility, enable/disable, update, rollback and verification.",
-        "nonGoals": "Hardware/PnP/driver semantics as a future knowledge area; no current public Shun capability is admitted.",
-        "applicability": "Hardware/PnP/driver semantics as a future knowledge area; no current public Shun capability is admitted.",
+        "nonGoals": "No current Shun device mutation, firmware flashing, arbitrary driver installation, or inference of Windows client support from Server-view docs.",
+        "applicability": "Future candidate Windows PnP/driver knowledge only, conditional on exact OEM device/driver identity, applicable OS and specialist/rollback evidence.",
         "sourceClaimRefs": [
           "CA-CLM-009",
           "CA-CLM-012"
@@ -2175,8 +2175,8 @@
         "scopeRevision": "COMPUTER_ASSISTANT_KNOWLEDGE_R0_CANDIDATE",
         "owner": "CA-PROCESS-SERVICE",
         "purpose": "Model process and service inventory, resource pressure, startup entries, dependencies, stop/start/restart, recovery and service impact.",
-        "nonGoals": "Process/service inventory and dependency semantics; current evidence is observation-only.",
-        "applicability": "Process/service inventory and dependency semantics; current evidence is observation-only.",
+        "nonGoals": "No current Shun process kill/service stop-start authority; counts cannot establish root cause or permission.",
+        "applicability": "Current process/startup read-only observation; service dependency and controlled mutation are future research pending explicit Product admission.",
         "sourceClaimRefs": [
           "CA-CLM-004",
           "CA-CLM-005"
@@ -2248,8 +2248,8 @@
         "scopeRevision": "COMPUTER_ASSISTANT_KNOWLEDGE_R0_CANDIDATE",
         "owner": "CA-NETWORK",
         "purpose": "Model network adapters, link state, IP configuration, routes, DNS, proxy, Wi-Fi, connectivity tests and network recovery.",
-        "nonGoals": "Layered network connectivity semantics; no current Shun network feature is qualified.",
-        "applicability": "Layered network connectivity semantics; no current Shun network feature is qualified.",
+        "nonGoals": "No qualified current Shun network configuration, Wi-Fi secret export or reset operation; documentation cannot substitute for layered diagnostic observations.",
+        "applicability": "Future network knowledge candidate only; lacks a qualifying network-domain source Claim and source-linked CQ, so semantics and feasibility remain UNKNOWN.",
         "sourceClaimRefs": [],
         "relationRefs": [],
         "globalInvariantRefs": [
@@ -2268,7 +2268,8 @@
         "validationOracle": "Official OS documentation plus controlled live adapter/IP/route/DNS/proxy tests.",
         "assertionStatus": "OPEN",
         "validationState": "NOT_RUN",
-        "qualification": "NOT_QUALIFIED"
+        "qualification": "NOT_QUALIFIED",
+        "knowledgeSourceGap": "UNSOURCED_NETWORK_DOMAIN_CLAIM_AND_CQ_UNQUALIFIED"
       }
     },
     {
@@ -2317,8 +2318,8 @@
         "scopeRevision": "COMPUTER_ASSISTANT_KNOWLEDGE_R0_CANDIDATE",
         "owner": "CA-EXECUTION-ENVIRONMENT",
         "purpose": "Determine where a capability can actually run and bind it to a compatible trusted provider/environment. Current Shun scope is local Windows-first; Linux/macOS are future knowledge targets only. WSL, remote, sandbox and cloud execution are not admitted as current Product execution targets by this candidate.",
-        "nonGoals": "Current local Windows platform/provider feasibility and candidate OS compatibility semantics; excludes remote administration, WSL/cloud execution and unsupported OS claims without a separate Product amendment and exact host evidence.",
-        "applicability": "Current local Windows platform/provider feasibility and candidate OS compatibility semantics; excludes remote administration, WSL/cloud execution and unsupported OS claims without a separate Product amendment and exact host evidence.",
+        "nonGoals": "No automatic WSL, remote, sandbox, cloud, macOS or Linux execution adoption; no API minimum implies serviced Windows.",
+        "applicability": "Pinned Windows-local host selection semantics; exact edition/build/architecture/Provider/dependency/revocation must be checked at Runtime before any binding.",
         "sourceClaimRefs": [
           "CA-CLM-001",
           "CA-CLM-002",
@@ -2400,8 +2401,8 @@
         "scopeRevision": "COMPUTER_ASSISTANT_KNOWLEDGE_R0_CANDIDATE",
         "owner": "CA-TASK-LIFECYCLE",
         "purpose": "Model plan, preview, approval, permit, effect, journal, receipt, verification, interruption, reconciliation, recovery and truthful UNKNOWN state.",
-        "nonGoals": "Task/effect state, approval, journal, receipt, verification and recovery semantics; excludes implementation of runtime ABI.",
-        "applicability": "Task/effect state, approval, journal, receipt, verification and recovery semantics; excludes implementation of runtime ABI.",
+        "nonGoals": "No duplicated K effect writer, model approval, retry from optimistic transport, or production Function ABI granted by the knowledge model.",
+        "applicability": "Product-level effect lifecycle contract spanning Shun Host approval and selected K, durable Journal, independent poststate, UNKNOWN and safe recovery.",
         "sourceClaimRefs": [
           "CA-CLM-001",
           "CA-CLM-006",
@@ -2472,8 +2473,8 @@
         "scopeRevision": "COMPUTER_ASSISTANT_KNOWLEDGE_R0_CANDIDATE",
         "owner": "CA-AOT-KNOWLEDGE",
         "purpose": "Separate stable, source-pinned domain knowledge suitable for ahead-of-time compilation from live host facts and authority that must be obtained at runtime.",
-        "nonGoals": "Classification of reusable knowledge versus runtime facts; does not build or activate AOT Packages.",
-        "applicability": "Classification of reusable knowledge versus runtime facts; does not build or activate AOT Packages.",
+        "nonGoals": "No active AOT Package is built; live host facts, approvals, user paths, credentials and execution receipts are never compiled.",
+        "applicability": "Stable source-pinned semantics only, subject to DKE SAP and later DIS ECP/Package qualification; all environment-specific facts remain Runtime-only.",
         "sourceClaimRefs": [
           "CA-CLM-013"
         ],
@@ -2533,8 +2534,8 @@
         "scopeRevision": "COMPUTER_ASSISTANT_KNOWLEDGE_R0_CANDIDATE",
         "owner": "CA-GLOBAL-PROVENANCE",
         "purpose": "Every factual claim and provider capability has exact source identity/revision, locator, authority class, applicable OS/version scope, freshness and known limitations. External OS documentation never entails Shun implementation, Product admission or supported-platform status.",
-        "nonGoals": "Source identity, authority, version, applicability, freshness and non-entailment across all child Elements; does not itself authorize feature adoption.",
-        "applicability": "Source identity, authority, version, applicability, freshness and non-entailment across all child Elements; does not itself authorize feature adoption.",
+        "nonGoals": "No unsupported external claim becomes Shun implementation, Product feature or qualified professional truth merely by citation.",
+        "applicability": "Across every Claim, provider, versioned OS applicability and external source locator; source revision and license/authority must be independently checked.",
         "sourceClaimRefs": [
           "CA-CLM-001",
           "CA-CLM-008",
@@ -2601,8 +2602,8 @@
         "scopeRevision": "COMPUTER_ASSISTANT_KNOWLEDGE_R0_CANDIDATE",
         "owner": "CA-GLOBAL-AUTHORITY",
         "purpose": "Observation, recommendation, preview, user approval, Kernel permit and Windows Host authorization are distinct states; no model or local label can synthesize permission. Unknown/user-created assets cannot be deleted by size or location alone.",
-        "nonGoals": "Separation of observation, proposal, approval, permit, Host authorization and asset ownership; does not define runtime authorization implementation.",
-        "applicability": "Separation of observation, proposal, approval, permit, Host authorization and asset ownership; does not define runtime authorization implementation.",
+        "nonGoals": "No observation, plan, LLM advice, UI click, K Permit or Shun grant alone grants physical effect permission.",
+        "applicability": "Applies to any source-derived or Runtime-selected capability that may reach effects; each separate current approval/permit/Host OS/target gate is necessary.",
         "sourceClaimRefs": [
           "CA-CLM-001",
           "CA-CLM-002",
@@ -2668,8 +2669,8 @@
         "scopeRevision": "COMPUTER_ASSISTANT_KNOWLEDGE_R0_CANDIDATE",
         "owner": "CA-GLOBAL-VERIFICATION",
         "purpose": "Success requires an independent observable post-state matching the declared verifier; interrupted or ambiguous outcomes remain UNKNOWN and are reconciled before retry.",
-        "nonGoals": "Truthful post-state, UNKNOWN and reconcile-before-retry semantics across effects.",
-        "applicability": "Truthful post-state, UNKNOWN and reconcile-before-retry semantics across effects.",
+        "nonGoals": "No SUCCESS from exit code, transport response, UI label or unverified self-report; no blind retries after uncertainty.",
+        "applicability": "All effectful and claimed-completed tasks; independent poststate and journal reconciliation are mandatory before user-visible COMPLETED.",
         "sourceClaimRefs": [
           "CA-CLM-006",
           "CA-CLM-007",
@@ -2726,8 +2727,8 @@
         "scopeRevision": "COMPUTER_ASSISTANT_KNOWLEDGE_R0_CANDIDATE",
         "owner": "CA-GLOBAL-PRIVACY",
         "purpose": "Local-only system/support observations remain local unless a distinct explicit sharing scope and redaction contract is approved; secrets, user content and credentials are excluded.",
-        "nonGoals": "Data minimization, local-only behavior and explicit sharing scope.",
-        "applicability": "Data minimization, local-only behavior and explicit sharing scope.",
+        "nonGoals": "No auto-egress of B-040, model-visible raw support context, unrelated documents, secrets, process command lines or personal paths.",
+        "applicability": "All diagnostic/support, feedback, DeepSeek and future-sharing paths; default localOnly and independently scoped disclosure/consent apply.",
         "sourceClaimRefs": [
           "CA-CLM-004",
           "CA-CLM-015",
@@ -2788,8 +2789,8 @@
         "scopeRevision": "COMPUTER_ASSISTANT_KNOWLEDGE_R0_CANDIDATE",
         "owner": "CA-GLOBAL-CURRENTNESS",
         "purpose": "Source revisions, OS/provider versions, policy, host identity, user permissions and device/storage state can become stale; affected claims, Elements, CQs and executable consumers must be invalidated and rechecked.",
-        "nonGoals": "Invalidation of affected knowledge and consumers after source, platform, provider, policy or host changes.",
-        "applicability": "Invalidation of affected knowledge and consumers after source, platform, provider, policy or host changes.",
+        "nonGoals": "No stale source/version/provider/grant/host binding remains valid by cached status alone; avoid unrelated mass invalidation.",
+        "applicability": "Every source/OS/provider/policy/host change; compute affected claim/element/CQ/consumer impact and revalidate on observed Runtime change.",
         "sourceClaimRefs": [
           "CA-CLM-001",
           "CA-CLM-008",
@@ -5004,7 +5005,7 @@
           {
             "id": "SAP-CA-GOAL-CAPABILITY-01",
             "requirement": "Product goal-to-capability semantics",
-            "rationale": "Interpret the user goal, identify relevant computer objects and constraints, resolve only registered capabilities and select a trusted provider compatible with the current execution environment.",
+            "rationale": "Product goal-to-capability semantics: bounded semantic obligation, independently tested only when the named positive/negative/UNKNOWN oracle and evidence are provided.",
             "sourceRefs": [
               "SRC-PRODUCT-FREEZE",
               "SRC-PRODUCT-PRD",
@@ -5045,9 +5046,9 @@
             "cqRefs": [
               "CQ-CA-001"
             ],
-            "positiveCase": "A unique capability and object are resolved with scope and preconditions.",
-            "negativeCase": "Ambiguous disk/device/software identity or unregistered capability is clarified or refused.",
-            "unknownCase": "ASK_CLARIFY_OR_BLOCK",
+            "positiveCase": "A registered capability resolves uniquely to the user's current target and bounded plan.",
+            "negativeCase": "LLM proposes unregistered command or target outside the approved folder; no capability plan issues.",
+            "unknownCase": "Missing target identity or registry snapshot => clarify and make no effect.",
             "oracle": "FROZEN_PRODUCT_SOURCE_PLUS_INDEPENDENT_REVIEW",
             "oracleClasses": [
               "SOURCE_EVIDENCE_REVIEW"
@@ -5060,7 +5061,7 @@
           {
             "id": "SAP-CA-GOAL-CAPABILITY-02",
             "requirement": "unknown/unsupported request refusal",
-            "rationale": "Interpret the user goal, identify relevant computer objects and constraints, resolve only registered capabilities and select a trusted provider compatible with the current execution environment.",
+            "rationale": "unknown/unsupported request refusal: bounded semantic obligation, independently tested only when the named positive/negative/UNKNOWN oracle and evidence are provided.",
             "sourceRefs": [
               "SRC-PRODUCT-FREEZE",
               "SRC-PRODUCT-PRD",
@@ -5101,9 +5102,9 @@
             "cqRefs": [
               "CQ-CA-001"
             ],
-            "positiveCase": "A unique capability and object are resolved with scope and preconditions.",
-            "negativeCase": "Ambiguous disk/device/software identity or unregistered capability is clarified or refused.",
-            "unknownCase": "ASK_CLARIFY_OR_BLOCK",
+            "positiveCase": "Ambiguous disk or unsupported capability is explicitly refused with a named reason.",
+            "negativeCase": "Unsupported disk partition request resolves to a generic cleanup effect; refuse.",
+            "unknownCase": "Registry or target observations unavailable => remain UNKNOWN.",
             "oracle": "FROZEN_PRODUCT_SOURCE_PLUS_INDEPENDENT_REVIEW",
             "oracleClasses": [
               "SOURCE_EVIDENCE_REVIEW"
@@ -5172,7 +5173,7 @@
           {
             "id": "SAP-CA-SYSTEM-OBSERVATION-01",
             "requirement": "bounded metrics",
-            "rationale": "Collect bounded read-only facts about OS, CPU, memory, storage capacity, process pressure and installed software; distinguish observations from diagnosis and diagnosis from action.",
+            "rationale": "bounded metrics: bounded semantic obligation, independently tested only when the named positive/negative/UNKNOWN oracle and evidence are provided.",
             "sourceRefs": [
               "SRC-SYSTEM-INDEX",
               "SRC-SYSTEM-DIAGNOSTICS",
@@ -5215,9 +5216,9 @@
             "cqRefs": [
               "CQ-CA-003"
             ],
-            "positiveCase": "It reports only measured facts and bounded signals.",
-            "negativeCase": "A single snapshot is used to claim a root cause or guaranteed performance gain.",
-            "unknownCase": "REPORT_UNAVAILABLE_WITHOUT_INFERENCE",
+            "positiveCase": "Windows collector returns bounded CPU/memory/volume and timestamped readings.",
+            "negativeCase": "An unobserved disk health or full process table is presented as measured; reject overclaim.",
+            "unknownCase": "Native collector inaccessible => measured field UNKNOWN.",
             "oracle": "CODE_AND_TEST_SOURCE_PLUS_WINDOWS_NATIVE_RECHECK",
             "oracleClasses": [
               "SOURCE_EVIDENCE_REVIEW",
@@ -5231,7 +5232,7 @@
           {
             "id": "SAP-CA-SYSTEM-OBSERVATION-02",
             "requirement": "privacy minimization",
-            "rationale": "Collect bounded read-only facts about OS, CPU, memory, storage capacity, process pressure and installed software; distinguish observations from diagnosis and diagnosis from action.",
+            "rationale": "privacy minimization: bounded semantic obligation, independently tested only when the named positive/negative/UNKNOWN oracle and evidence are provided.",
             "sourceRefs": [
               "SRC-SYSTEM-INDEX",
               "SRC-SYSTEM-DIAGNOSTICS",
@@ -5274,9 +5275,9 @@
             "cqRefs": [
               "CQ-CA-003"
             ],
-            "positiveCase": "It reports only measured facts and bounded signals.",
-            "negativeCase": "A single snapshot is used to claim a root cause or guaranteed performance gain.",
-            "unknownCase": "REPORT_UNAVAILABLE_WITHOUT_INFERENCE",
+            "positiveCase": "B-040 minimizer drops env values, process command lines, unrelated document data and absolute paths.",
+            "negativeCase": "A secret or path leaks into local report or feedback/LLM/Meta; reject.",
+            "unknownCase": "Redaction coverage incomplete => local-only/no-egress, report gap.",
             "oracle": "CODE_AND_TEST_SOURCE_PLUS_WINDOWS_NATIVE_RECHECK",
             "oracleClasses": [
               "SOURCE_EVIDENCE_REVIEW",
@@ -5290,7 +5291,7 @@
           {
             "id": "SAP-CA-SYSTEM-OBSERVATION-03",
             "requirement": "no root-cause overclaim",
-            "rationale": "Collect bounded read-only facts about OS, CPU, memory, storage capacity, process pressure and installed software; distinguish observations from diagnosis and diagnosis from action.",
+            "rationale": "no root-cause overclaim: bounded semantic obligation, independently tested only when the named positive/negative/UNKNOWN oracle and evidence are provided.",
             "sourceRefs": [
               "SRC-SYSTEM-INDEX",
               "SRC-SYSTEM-DIAGNOSTICS",
@@ -5333,9 +5334,9 @@
             "cqRefs": [
               "CQ-CA-003"
             ],
-            "positiveCase": "It reports only measured facts and bounded signals.",
-            "negativeCase": "A single snapshot is used to claim a root cause or guaranteed performance gain.",
-            "unknownCase": "REPORT_UNAVAILABLE_WITHOUT_INFERENCE",
+            "positiveCase": "Low free memory produces a bounded pressure signal without guaranteed speedup.",
+            "negativeCase": "Single snapshot claims to identify root-cause process or recommends automatic termination.",
+            "unknownCase": "Insufficient sample/telemetry => advisory UNKNOWN.",
             "oracle": "CODE_AND_TEST_SOURCE_PLUS_WINDOWS_NATIVE_RECHECK",
             "oracleClasses": [
               "SOURCE_EVIDENCE_REVIEW",
@@ -5407,7 +5408,7 @@
           {
             "id": "SAP-CA-STORAGE-01",
             "requirement": "volume and scope semantics",
-            "rationale": "Model physical disks, partitions, volumes, filesystems, mount/drive mappings, provider-dependent storage-health telemetry, capacity and safe cleanup as distinct concepts and workflows.",
+            "rationale": "volume and scope semantics: bounded semantic obligation, independently tested only when the named positive/negative/UNKNOWN oracle and evidence are provided.",
             "sourceRefs": [
               "SRC-STORAGE-INDEX",
               "SRC-STORAGE-DIAGNOSE",
@@ -5461,9 +5462,9 @@
             "cqRefs": [
               "CQ-CA-004"
             ],
-            "positiveCase": "Evidence-backed cache/temp targets are previewed, approved, cleaned and verified.",
-            "negativeCase": "A same-size user file, unknown path, reparse point or protected canary is selected/deleted.",
-            "unknownCase": "NO_EFFECT_RETAIN_PROTECTED_AND_UNKNOWN_ASSETS",
+            "positiveCase": "Disk, partition, volume and selected cleanup root identities are kept distinct in a bounded preview.",
+            "negativeCase": "Free space is mistaken for disk health or partition format is treated as cache cleanup.",
+            "unknownCase": "Disk/volume identity or native scope ambiguous => no effect.",
             "oracle": "CODE_TESTS_PLUS_MICROSOFT_STORAGE_SOURCES_WITH_EXPLICIT_APPLICABILITY; NATIVE_WINDOWS_STORAGE_PROVIDER_AND_DOMAIN_REVIEW_REQUIRED",
             "oracleClasses": [
               "SOURCE_EVIDENCE_REVIEW",
@@ -5478,7 +5479,7 @@
           {
             "id": "SAP-CA-STORAGE-02",
             "requirement": "protected asset precedence",
-            "rationale": "Model physical disks, partitions, volumes, filesystems, mount/drive mappings, provider-dependent storage-health telemetry, capacity and safe cleanup as distinct concepts and workflows.",
+            "rationale": "protected asset precedence: bounded semantic obligation, independently tested only when the named positive/negative/UNKNOWN oracle and evidence are provided.",
             "sourceRefs": [
               "SRC-STORAGE-INDEX",
               "SRC-STORAGE-DIAGNOSE",
@@ -5532,9 +5533,9 @@
             "cqRefs": [
               "CQ-CA-004"
             ],
-            "positiveCase": "Evidence-backed cache/temp targets are previewed, approved, cleaned and verified.",
-            "negativeCase": "A same-size user file, unknown path, reparse point or protected canary is selected/deleted.",
-            "unknownCase": "NO_EFFECT_RETAIN_PROTECTED_AND_UNKNOWN_ASSETS",
+            "positiveCase": "Source-classified cache files are eligible only after explicit ownership and canary checks.",
+            "negativeCase": "Unknown, user-created or reparse-point asset is included in cleanup; refuse.",
+            "unknownCase": "Ownership or protected canary status unknown => retain asset.",
             "oracle": "CODE_TESTS_PLUS_MICROSOFT_STORAGE_SOURCES_WITH_EXPLICIT_APPLICABILITY; NATIVE_WINDOWS_STORAGE_PROVIDER_AND_DOMAIN_REVIEW_REQUIRED",
             "oracleClasses": [
               "SOURCE_EVIDENCE_REVIEW",
@@ -5549,7 +5550,7 @@
           {
             "id": "SAP-CA-STORAGE-03",
             "requirement": "approval and recovery",
-            "rationale": "Model physical disks, partitions, volumes, filesystems, mount/drive mappings, provider-dependent storage-health telemetry, capacity and safe cleanup as distinct concepts and workflows.",
+            "rationale": "approval and recovery: bounded semantic obligation, independently tested only when the named positive/negative/UNKNOWN oracle and evidence are provided.",
             "sourceRefs": [
               "SRC-STORAGE-INDEX",
               "SRC-STORAGE-DIAGNOSE",
@@ -5603,9 +5604,9 @@
             "cqRefs": [
               "CQ-CA-004"
             ],
-            "positiveCase": "Evidence-backed cache/temp targets are previewed, approved, cleaned and verified.",
-            "negativeCase": "A same-size user file, unknown path, reparse point or protected canary is selected/deleted.",
-            "unknownCase": "NO_EFFECT_RETAIN_PROTECTED_AND_UNKNOWN_ASSETS",
+            "positiveCase": "Approved exact-root effect rechecks Host authority and reconciles journal/poststate.",
+            "negativeCase": "Stale approval or lost receipt is reported COMPLETED or deletion retried blindly.",
+            "unknownCase": "Effect window interrupted => UNKNOWN until independent observation.",
             "oracle": "CODE_TESTS_PLUS_MICROSOFT_STORAGE_SOURCES_WITH_EXPLICIT_APPLICABILITY; NATIVE_WINDOWS_STORAGE_PROVIDER_AND_DOMAIN_REVIEW_REQUIRED",
             "oracleClasses": [
               "SOURCE_EVIDENCE_REVIEW",
@@ -5620,7 +5621,7 @@
           {
             "id": "SAP-CA-STORAGE-04",
             "requirement": "disk topology and data-loss semantics",
-            "rationale": "Model physical disks, partitions, volumes, filesystems, mount/drive mappings, provider-dependent storage-health telemetry, capacity and safe cleanup as distinct concepts and workflows.",
+            "rationale": "disk topology and data-loss semantics: bounded semantic obligation, independently tested only when the named positive/negative/UNKNOWN oracle and evidence are provided.",
             "sourceRefs": [
               "SRC-STORAGE-INDEX",
               "SRC-STORAGE-DIAGNOSE",
@@ -5674,9 +5675,9 @@
             "cqRefs": [
               "CQ-CA-005"
             ],
-            "positiveCase": "It explains the separate operation and its data-loss implications.",
-            "negativeCase": "It initializes or formats a disk when identity, existing data or backup state is unknown.",
-            "unknownCase": "BLOCK_DESTRUCTIVE_STORAGE_OPERATION",
+            "positiveCase": "Format/initialize is described as destructive, distinct from permitted cleanup.",
+            "negativeCase": "Formatting of boot, unknown or unbacked disk is presented as admitted capability.",
+            "unknownCase": "Target/backup/professional recovery uncertain => NOT_ADMITTED/BLOCKED.",
             "oracle": "CODE_TESTS_PLUS_MICROSOFT_STORAGE_SOURCES_WITH_EXPLICIT_APPLICABILITY; NATIVE_WINDOWS_STORAGE_PROVIDER_AND_DOMAIN_REVIEW_REQUIRED",
             "oracleClasses": [
               "SOURCE_EVIDENCE_REVIEW",
@@ -5691,7 +5692,7 @@
           {
             "id": "SAP-CA-STORAGE-05",
             "requirement": "provider-dependent physical-disk health telemetry versus UNKNOWN",
-            "rationale": "Model physical disks, partitions, volumes, filesystems, mount/drive mappings, provider-dependent storage-health telemetry, capacity and safe cleanup as distinct concepts and workflows.",
+            "rationale": "provider-dependent physical-disk health telemetry versus UNKNOWN: bounded semantic obligation, independently tested only when the named positive/negative/UNKNOWN oracle and evidence are provided.",
             "sourceRefs": [
               "SRC-STORAGE-INDEX",
               "SRC-STORAGE-DIAGNOSE",
@@ -5745,9 +5746,9 @@
             "cqRefs": [
               "CQ-CA-017"
             ],
-            "positiveCase": "Health is reported only with exact disk identity, provider and observation time; unavailable or unsupported telemetry remains UNKNOWN.",
-            "negativeCase": "Free space, disk online state or missing provider data is used to claim that a physical disk is healthy or failing.",
-            "unknownCase": "REPORT_HEALTH_UNKNOWN_NO_REMEDIATION",
+            "positiveCase": "SMART/provider health reading cites exact physical disk, provider and observation time.",
+            "negativeCase": "Low free space or missing provider data is asserted as healthy/unhealthy disk.",
+            "unknownCase": "Provider does not expose valid telemetry => HEALTH_UNKNOWN.",
             "oracle": "CODE_TESTS_PLUS_MICROSOFT_STORAGE_SOURCES_WITH_EXPLICIT_APPLICABILITY; NATIVE_WINDOWS_STORAGE_PROVIDER_AND_DOMAIN_REVIEW_REQUIRED",
             "oracleClasses": [
               "SOURCE_EVIDENCE_REVIEW",
@@ -5832,7 +5833,7 @@
           {
             "id": "SAP-CA-FILE-ASSET-01",
             "requirement": "preview versus effect",
-            "rationale": "Model user files and directories, scopes, identity, metadata, content digest, duplicates, copy/move/rename, backup, protection and recovery.",
+            "rationale": "preview versus effect: bounded semantic obligation, independently tested only when the named positive/negative/UNKNOWN oracle and evidence are provided.",
             "sourceRefs": [
               "SRC-FILES-INDEX",
               "SRC-FILES-HOST",
@@ -5890,9 +5891,9 @@
             "cqRefs": [
               "CQ-CA-019"
             ],
-            "positiveCase": "Pure preview remains PREVIEW_ONLY with executionAuthorized=false and filesystemObserved=false; the separate duplicate-observation path requires a current authorized action and completes only after bounded handle-anchored, identity-consistent passes.",
-            "negativeCase": "A caller-supplied root/path/callback, traversal, UNC/subst/reparse target, same-name swap, stale/forged action or preview label is treated as permission for filesystem IO/effect.",
-            "unknownCase": "If root, file identity, reparse/alias status, current authorization or scan completeness is unknown, refuse/UNKNOWN; no effect and no completion claim.",
+            "positiveCase": "Duplicate/copy/move/rename preview has zero physical mutations and explicit effect boundary.",
+            "negativeCase": "A file preview or report silently writes/deletes files.",
+            "unknownCase": "Effect authorization absent => PLAN_ONLY.",
             "oracle": "CODE_TESTS_PLUS_NATIVE_WINDOWS_RECHECK",
             "oracleClasses": [
               "SOURCE_EVIDENCE_REVIEW",
@@ -5906,7 +5907,7 @@
           {
             "id": "SAP-CA-FILE-ASSET-02",
             "requirement": "stable identity and race refusal",
-            "rationale": "Model user files and directories, scopes, identity, metadata, content digest, duplicates, copy/move/rename, backup, protection and recovery.",
+            "rationale": "stable identity and race refusal: bounded semantic obligation, independently tested only when the named positive/negative/UNKNOWN oracle and evidence are provided.",
             "sourceRefs": [
               "SRC-FILES-INDEX",
               "SRC-FILES-HOST",
@@ -5964,9 +5965,9 @@
             "cqRefs": [
               "CQ-CA-019"
             ],
-            "positiveCase": "Pure preview remains PREVIEW_ONLY with executionAuthorized=false and filesystemObserved=false; the separate duplicate-observation path requires a current authorized action and completes only after bounded handle-anchored, identity-consistent passes.",
-            "negativeCase": "A caller-supplied root/path/callback, traversal, UNC/subst/reparse target, same-name swap, stale/forged action or preview label is treated as permission for filesystem IO/effect.",
-            "unknownCase": "If root, file identity, reparse/alias status, current authorization or scan completeness is unknown, refuse/UNKNOWN; no effect and no completion claim.",
+            "positiveCase": "Handle-bound file identity is rechecked before any authorized action.",
+            "negativeCase": "Rename/reparse/alias races redirect the action outside selected root.",
+            "unknownCase": "Stable file identity cannot be confirmed => refuse.",
             "oracle": "CODE_TESTS_PLUS_NATIVE_WINDOWS_RECHECK",
             "oracleClasses": [
               "SOURCE_EVIDENCE_REVIEW",
@@ -5980,7 +5981,7 @@
           {
             "id": "SAP-CA-FILE-ASSET-03",
             "requirement": "user asset protection",
-            "rationale": "Model user files and directories, scopes, identity, metadata, content digest, duplicates, copy/move/rename, backup, protection and recovery.",
+            "rationale": "user asset protection: bounded semantic obligation, independently tested only when the named positive/negative/UNKNOWN oracle and evidence are provided.",
             "sourceRefs": [
               "SRC-FILES-INDEX",
               "SRC-FILES-HOST",
@@ -6038,9 +6039,9 @@
             "cqRefs": [
               "CQ-CA-019"
             ],
-            "positiveCase": "Pure preview remains PREVIEW_ONLY with executionAuthorized=false and filesystemObserved=false; the separate duplicate-observation path requires a current authorized action and completes only after bounded handle-anchored, identity-consistent passes.",
-            "negativeCase": "A caller-supplied root/path/callback, traversal, UNC/subst/reparse target, same-name swap, stale/forged action or preview label is treated as permission for filesystem IO/effect.",
-            "unknownCase": "If root, file identity, reparse/alias status, current authorization or scan completeness is unknown, refuse/UNKNOWN; no effect and no completion claim.",
+            "positiveCase": "Unknown/user-created and protected assets remain unchanged after scoped operation.",
+            "negativeCase": "Similar size or name authorizes deletion without provenance.",
+            "unknownCase": "Ownership and canary unknown => preserve and classify UNKNOWN.",
             "oracle": "CODE_TESTS_PLUS_NATIVE_WINDOWS_RECHECK",
             "oracleClasses": [
               "SOURCE_EVIDENCE_REVIEW",
@@ -6127,7 +6128,7 @@
           {
             "id": "SAP-CA-SOFTWARE-LIFECYCLE-01",
             "requirement": "provider provenance",
-            "rationale": "Model installed software, package identities, publisher, version, installer/source provenance, dependencies, install/update/repair/uninstall, provider-owned files and residual state.",
+            "rationale": "provider provenance: bounded semantic obligation, independently tested only when the named positive/negative/UNKNOWN oracle and evidence are provided.",
             "sourceRefs": [
               "SRC-SYSTEM-RUNTIME",
               "SRC-TEST-SYSTEM-SOFTWARE",
@@ -6201,9 +6202,9 @@
             "cqRefs": [
               "CQ-CA-006"
             ],
-            "positiveCase": "Exact package identity and trusted source are bound.",
-            "negativeCase": "Ambiguous name, untrusted source, changed hash or unsupported installer is silently accepted.",
-            "unknownCase": "ASK_FOR_EXACT_PACKAGE_OR_BLOCK",
+            "positiveCase": "Curated provider artifact identity includes signer/source/expected hash before JIT use.",
+            "negativeCase": "Unsigned or wrong-publisher binary is installed because an executable exists.",
+            "unknownCase": "Signer/revocation unreachable => block.",
             "oracle": "CODE_TESTS_PLUS_MICROSOFT_WINGET_SOURCES_AND_REAL_PROVIDER_RECEIPT",
             "oracleClasses": [
               "SOURCE_EVIDENCE_REVIEW"
@@ -6216,7 +6217,7 @@
           {
             "id": "SAP-CA-SOFTWARE-LIFECYCLE-02",
             "requirement": "exact package identity",
-            "rationale": "Model installed software, package identities, publisher, version, installer/source provenance, dependencies, install/update/repair/uninstall, provider-owned files and residual state.",
+            "rationale": "exact package identity: bounded semantic obligation, independently tested only when the named positive/negative/UNKNOWN oracle and evidence are provided.",
             "sourceRefs": [
               "SRC-SYSTEM-RUNTIME",
               "SRC-TEST-SYSTEM-SOFTWARE",
@@ -6290,9 +6291,9 @@
             "cqRefs": [
               "CQ-CA-007"
             ],
-            "positiveCase": "Only manifest-owned entries are eligible; configuration and unknown/user-created assets are retained.",
-            "negativeCase": "A whole install root or unknown residue is deleted.",
-            "unknownCase": "RETAIN_UNKNOWN_RESIDUE",
+            "positiveCase": "Exact provider/version identity resolves without ambiguous package-name guessing.",
+            "negativeCase": "A substring WinGet match is treated as exact install target.",
+            "unknownCase": "Package/publisher/version ambiguous => clarify.",
             "oracle": "CODE_TESTS_PLUS_MICROSOFT_WINGET_SOURCES_AND_REAL_PROVIDER_RECEIPT",
             "oracleClasses": [
               "SOURCE_EVIDENCE_REVIEW"
@@ -6305,7 +6306,7 @@
           {
             "id": "SAP-CA-SOFTWARE-LIFECYCLE-03",
             "requirement": "manifest-bound removal",
-            "rationale": "Model installed software, package identities, publisher, version, installer/source provenance, dependencies, install/update/repair/uninstall, provider-owned files and residual state.",
+            "rationale": "manifest-bound removal: bounded semantic obligation, independently tested only when the named positive/negative/UNKNOWN oracle and evidence are provided.",
             "sourceRefs": [
               "SRC-SYSTEM-RUNTIME",
               "SRC-TEST-SYSTEM-SOFTWARE",
@@ -6379,9 +6380,9 @@
             "cqRefs": [
               "CQ-CA-007"
             ],
-            "positiveCase": "Only manifest-owned entries are eligible; configuration and unknown/user-created assets are retained.",
-            "negativeCase": "A whole install root or unknown residue is deleted.",
-            "unknownCase": "RETAIN_UNKNOWN_RESIDUE",
+            "positiveCase": "Removal touches only manifest-owned files and records preserved unknown residue.",
+            "negativeCase": "An untracked user-created file is deleted as provider residue.",
+            "unknownCase": "Manifest provenance incomplete => no remove.",
             "oracle": "CODE_TESTS_PLUS_MICROSOFT_WINGET_SOURCES_AND_REAL_PROVIDER_RECEIPT",
             "oracleClasses": [
               "SOURCE_EVIDENCE_REVIEW"
@@ -6394,7 +6395,7 @@
           {
             "id": "SAP-CA-SOFTWARE-LIFECYCLE-04",
             "requirement": "residue preservation",
-            "rationale": "Model installed software, package identities, publisher, version, installer/source provenance, dependencies, install/update/repair/uninstall, provider-owned files and residual state.",
+            "rationale": "residue preservation: bounded semantic obligation, independently tested only when the named positive/negative/UNKNOWN oracle and evidence are provided.",
             "sourceRefs": [
               "SRC-SYSTEM-RUNTIME",
               "SRC-TEST-SYSTEM-SOFTWARE",
@@ -6468,9 +6469,9 @@
             "cqRefs": [
               "CQ-CA-007"
             ],
-            "positiveCase": "Only manifest-owned entries are eligible; configuration and unknown/user-created assets are retained.",
-            "negativeCase": "A whole install root or unknown residue is deleted.",
-            "unknownCase": "RETAIN_UNKNOWN_RESIDUE",
+            "positiveCase": "Unknown residue is retained and separately reported after bounded uninstall.",
+            "negativeCase": "Exit 0 implies all unknown files are safe to delete.",
+            "unknownCase": "Post-uninstall state uncertain => UNKNOWN and re-observe.",
             "oracle": "CODE_TESTS_PLUS_MICROSOFT_WINGET_SOURCES_AND_REAL_PROVIDER_RECEIPT",
             "oracleClasses": [
               "SOURCE_EVIDENCE_REVIEW"
@@ -6483,7 +6484,7 @@
           {
             "id": "SAP-CA-SOFTWARE-LIFECYCLE-05",
             "requirement": "distinguish vertical JIT lifecycle library from proposal-only Domain Computer T08 adapter and complete user-facing software manager",
-            "rationale": "Model installed software, package identities, publisher, version, installer/source provenance, dependencies, install/update/repair/uninstall, provider-owned files and residual state.",
+            "rationale": "distinguish vertical JIT lifecycle library from proposal-only Domain Computer T08 adapter and complete user-facing software manager: bounded semantic obligation, independently tested only when the named positive/negative/UNKNOWN oracle and evidence are provided.",
             "sourceRefs": [
               "SRC-SYSTEM-RUNTIME",
               "SRC-TEST-SYSTEM-SOFTWARE",
@@ -6557,9 +6558,9 @@
             "cqRefs": [
               "CQ-CA-006"
             ],
-            "positiveCase": "Exact package identity and trusted source are bound.",
-            "negativeCase": "Ambiguous name, untrusted source, changed hash or unsupported installer is silently accepted.",
-            "unknownCase": "ASK_FOR_EXACT_PACKAGE_OR_BLOCK",
+            "positiveCase": "Proposal-only Domain Computer JIT adapter is distinguished from real trusted Host first-use.",
+            "negativeCase": "A T08 proposal is counted as real installed software or full app-manager support.",
+            "unknownCase": "Host binding/native receipt absent => source observed only, no Function completion.",
             "oracle": "CODE_TESTS_PLUS_MICROSOFT_WINGET_SOURCES_AND_REAL_PROVIDER_RECEIPT",
             "oracleClasses": [
               "SOURCE_EVIDENCE_REVIEW"
@@ -6663,7 +6664,7 @@
           {
             "id": "SAP-CA-HARDWARE-DEVICE-01",
             "requirement": "device identity",
-            "rationale": "Model physical hardware, PnP device instances, hardware IDs, device classes, driver packages, OEM provenance, compatibility, enable/disable, update, rollback and verification.",
+            "rationale": "device identity: bounded semantic obligation, independently tested only when the named positive/negative/UNKNOWN oracle and evidence are provided.",
             "sourceRefs": [
               "SRC-DOMAIN-COMPUTER-INDEX",
               "SRC-PRODUCT-PRD",
@@ -6701,9 +6702,9 @@
             "cqRefs": [
               "CQ-CA-008"
             ],
-            "positiveCase": "Exact device instance, OEM package provenance, compatibility, approval and rollback are evidenced.",
-            "negativeCase": "Friendly-name match, unknown driver source or absent rollback is treated as sufficient.",
-            "unknownCase": "BLOCK_DEVICE_OR_DRIVER_MUTATION",
+            "positiveCase": "PnP instance ID and hardware IDs identify one exact device.",
+            "negativeCase": "Class label or friendly name used to act on several devices.",
+            "unknownCase": "Ambiguous instance => no mutation.",
             "oracle": "MICROSOFT_DOCUMENTATION_PLUS_OEM_OR_HARDWARE_DOMAIN_OWNER",
             "oracleClasses": [
               "SOURCE_EVIDENCE_REVIEW",
@@ -6717,7 +6718,7 @@
           {
             "id": "SAP-CA-HARDWARE-DEVICE-02",
             "requirement": "driver provenance/compatibility",
-            "rationale": "Model physical hardware, PnP device instances, hardware IDs, device classes, driver packages, OEM provenance, compatibility, enable/disable, update, rollback and verification.",
+            "rationale": "driver provenance/compatibility: bounded semantic obligation, independently tested only when the named positive/negative/UNKNOWN oracle and evidence are provided.",
             "sourceRefs": [
               "SRC-DOMAIN-COMPUTER-INDEX",
               "SRC-PRODUCT-PRD",
@@ -6755,9 +6756,9 @@
             "cqRefs": [
               "CQ-CA-008"
             ],
-            "positiveCase": "Exact device instance, OEM package provenance, compatibility, approval and rollback are evidenced.",
-            "negativeCase": "Friendly-name match, unknown driver source or absent rollback is treated as sufficient.",
-            "unknownCase": "BLOCK_DEVICE_OR_DRIVER_MUTATION",
+            "positiveCase": "Signed driver and OEM compatibility are checked for exact device and OS.",
+            "negativeCase": "Incompatible driver-store package inferred safe from generic docs.",
+            "unknownCase": "OEM applicability unknown => require specialist.",
             "oracle": "MICROSOFT_DOCUMENTATION_PLUS_OEM_OR_HARDWARE_DOMAIN_OWNER",
             "oracleClasses": [
               "SOURCE_EVIDENCE_REVIEW",
@@ -6771,7 +6772,7 @@
           {
             "id": "SAP-CA-HARDWARE-DEVICE-03",
             "requirement": "privilege",
-            "rationale": "Model physical hardware, PnP device instances, hardware IDs, device classes, driver packages, OEM provenance, compatibility, enable/disable, update, rollback and verification.",
+            "rationale": "privilege: bounded semantic obligation, independently tested only when the named positive/negative/UNKNOWN oracle and evidence are provided.",
             "sourceRefs": [
               "SRC-DOMAIN-COMPUTER-INDEX",
               "SRC-PRODUCT-PRD",
@@ -6809,9 +6810,9 @@
             "cqRefs": [
               "CQ-CA-008"
             ],
-            "positiveCase": "Exact device instance, OEM package provenance, compatibility, approval and rollback are evidenced.",
-            "negativeCase": "Friendly-name match, unknown driver source or absent rollback is treated as sufficient.",
-            "unknownCase": "BLOCK_DEVICE_OR_DRIVER_MUTATION",
+            "positiveCase": "OS privilege and user approval are independently checked before device mutation.",
+            "negativeCase": "Model instruction or UAC dialog text alone bypasses Host currentness.",
+            "unknownCase": "No privileged session => refuse.",
             "oracle": "MICROSOFT_DOCUMENTATION_PLUS_OEM_OR_HARDWARE_DOMAIN_OWNER",
             "oracleClasses": [
               "SOURCE_EVIDENCE_REVIEW",
@@ -6825,7 +6826,7 @@
           {
             "id": "SAP-CA-HARDWARE-DEVICE-04",
             "requirement": "rollback and verification",
-            "rationale": "Model physical hardware, PnP device instances, hardware IDs, device classes, driver packages, OEM provenance, compatibility, enable/disable, update, rollback and verification.",
+            "rationale": "rollback and verification: bounded semantic obligation, independently tested only when the named positive/negative/UNKNOWN oracle and evidence are provided.",
             "sourceRefs": [
               "SRC-DOMAIN-COMPUTER-INDEX",
               "SRC-PRODUCT-PRD",
@@ -6863,9 +6864,9 @@
             "cqRefs": [
               "CQ-CA-008"
             ],
-            "positiveCase": "Exact device instance, OEM package provenance, compatibility, approval and rollback are evidenced.",
-            "negativeCase": "Friendly-name match, unknown driver source or absent rollback is treated as sufficient.",
-            "unknownCase": "BLOCK_DEVICE_OR_DRIVER_MUTATION",
+            "positiveCase": "After driver update, reboot health and usable rollback are independently evidenced.",
+            "negativeCase": "Exit code alone claims successful rollback or driver compatibility.",
+            "unknownCase": "Device disappears or rollback unavailable => UNKNOWN/BLOCKED.",
             "oracle": "MICROSOFT_DOCUMENTATION_PLUS_OEM_OR_HARDWARE_DOMAIN_OWNER",
             "oracleClasses": [
               "SOURCE_EVIDENCE_REVIEW",
@@ -6931,7 +6932,7 @@
           {
             "id": "SAP-CA-PROCESS-SERVICE-01",
             "requirement": "observation boundaries",
-            "rationale": "Model process and service inventory, resource pressure, startup entries, dependencies, stop/start/restart, recovery and service impact.",
+            "rationale": "observation boundaries: bounded semantic obligation, independently tested only when the named positive/negative/UNKNOWN oracle and evidence are provided.",
             "sourceRefs": [
               "SRC-SYSTEM-RUNTIME",
               "SRC-TEST-SYSTEM-SOFTWARE",
@@ -6969,9 +6970,9 @@
             "cqRefs": [
               "CQ-CA-009"
             ],
-            "positiveCase": "Only supported metrics and safe recommendations are reported.",
-            "negativeCase": "A high-memory process is automatically killed or a service stopped.",
-            "unknownCase": "OBSERVE_ONLY_NO_PROCESS_OR_SERVICE_MUTATION",
+            "positiveCase": "Read-only CPU/memory/process counts are timestamped observations only.",
+            "negativeCase": "Top-memory process is treated as authorized kill target.",
+            "unknownCase": "PID/current owner unknown => observation only.",
             "oracle": "MICROSOFT_DOCUMENTATION_PLUS_WINDOWS_NATIVE_ORACLE",
             "oracleClasses": [
               "SOURCE_EVIDENCE_REVIEW",
@@ -6985,7 +6986,7 @@
           {
             "id": "SAP-CA-PROCESS-SERVICE-02",
             "requirement": "service/process dependency semantics",
-            "rationale": "Model process and service inventory, resource pressure, startup entries, dependencies, stop/start/restart, recovery and service impact.",
+            "rationale": "service/process dependency semantics: bounded semantic obligation, independently tested only when the named positive/negative/UNKNOWN oracle and evidence are provided.",
             "sourceRefs": [
               "SRC-SYSTEM-RUNTIME",
               "SRC-TEST-SYSTEM-SOFTWARE",
@@ -7023,9 +7024,9 @@
             "cqRefs": [
               "CQ-CA-009"
             ],
-            "positiveCase": "Only supported metrics and safe recommendations are reported.",
-            "negativeCase": "A high-memory process is automatically killed or a service stopped.",
-            "unknownCase": "OBSERVE_ONLY_NO_PROCESS_OR_SERVICE_MUTATION",
+            "positiveCase": "Service dependency/criticality evidence is required before any future restart plan.",
+            "negativeCase": "Generic service name used as proof that stopping it is safe.",
+            "unknownCase": "Dependency tree unavailable => block.",
             "oracle": "MICROSOFT_DOCUMENTATION_PLUS_WINDOWS_NATIVE_ORACLE",
             "oracleClasses": [
               "SOURCE_EVIDENCE_REVIEW",
@@ -7039,7 +7040,7 @@
           {
             "id": "SAP-CA-PROCESS-SERVICE-03",
             "requirement": "safe mutation",
-            "rationale": "Model process and service inventory, resource pressure, startup entries, dependencies, stop/start/restart, recovery and service impact.",
+            "rationale": "safe mutation: bounded semantic obligation, independently tested only when the named positive/negative/UNKNOWN oracle and evidence are provided.",
             "sourceRefs": [
               "SRC-SYSTEM-RUNTIME",
               "SRC-TEST-SYSTEM-SOFTWARE",
@@ -7077,9 +7078,9 @@
             "cqRefs": [
               "CQ-CA-009"
             ],
-            "positiveCase": "Only supported metrics and safe recommendations are reported.",
-            "negativeCase": "A high-memory process is automatically killed or a service stopped.",
-            "unknownCase": "OBSERVE_ONLY_NO_PROCESS_OR_SERVICE_MUTATION",
+            "positiveCase": "Future stop/start would require Product admission, exact identity and independent state/side-effect audit.",
+            "negativeCase": "Source code that lists processes is presented as a working service-control Function.",
+            "unknownCase": "No admitted Function or Native receipt => NOT_ADMITTED.",
             "oracle": "MICROSOFT_DOCUMENTATION_PLUS_WINDOWS_NATIVE_ORACLE",
             "oracleClasses": [
               "SOURCE_EVIDENCE_REVIEW",
@@ -7145,7 +7146,7 @@
           {
             "id": "SAP-CA-NETWORK-01",
             "requirement": "layered diagnosis",
-            "rationale": "Model network adapters, link state, IP configuration, routes, DNS, proxy, Wi-Fi, connectivity tests and network recovery.",
+            "rationale": "layered diagnosis: bounded semantic obligation, independently tested only when the named positive/negative/UNKNOWN oracle and evidence are provided.",
             "sourceRefs": [
               "SRC-PRODUCT-PRD",
               "SRC-PRODUCT-L1",
@@ -7175,9 +7176,9 @@
             "cqRefs": [
               "CQ-CA-010"
             ],
-            "positiveCase": "The fault is narrowed only to layers supported by observations.",
-            "negativeCase": "A generic reset or credential disclosure is recommended without evidence.",
-            "unknownCase": "KEEP_LAYERED_DIAGNOSIS_UNKNOWN_NO_BLIND_RESET",
+            "positiveCase": "Future diagnostics distinguish link, IP, gateway, route, DNS and endpoint tests with layer-specific evidence.",
+            "negativeCase": "One failed ping is treated as proof of DNS or Wi-Fi credential failure.",
+            "unknownCase": "No network-domain Claim/Oracle => UNKNOWN/UNSOURCED.",
             "oracle": "MICROSOFT_DOCUMENTATION_PLUS_LIVE_NETWORK_ORACLE",
             "oracleClasses": [
               "SOURCE_EVIDENCE_REVIEW",
@@ -7191,7 +7192,7 @@
           {
             "id": "SAP-CA-NETWORK-02",
             "requirement": "credential/privacy boundaries",
-            "rationale": "Model network adapters, link state, IP configuration, routes, DNS, proxy, Wi-Fi, connectivity tests and network recovery.",
+            "rationale": "credential/privacy boundaries: bounded semantic obligation, independently tested only when the named positive/negative/UNKNOWN oracle and evidence are provided.",
             "sourceRefs": [
               "SRC-PRODUCT-PRD",
               "SRC-PRODUCT-L1",
@@ -7221,9 +7222,9 @@
             "cqRefs": [
               "CQ-CA-010"
             ],
-            "positiveCase": "The fault is narrowed only to layers supported by observations.",
-            "negativeCase": "A generic reset or credential disclosure is recommended without evidence.",
-            "unknownCase": "KEEP_LAYERED_DIAGNOSIS_UNKNOWN_NO_BLIND_RESET",
+            "positiveCase": "Wi-Fi secrets and private proxy credentials never enter AOT or ordinary reports.",
+            "negativeCase": "Network configuration capture includes PSK, token or private profile body.",
+            "unknownCase": "Redaction or permission unknown => no collection or transmission.",
             "oracle": "MICROSOFT_DOCUMENTATION_PLUS_LIVE_NETWORK_ORACLE",
             "oracleClasses": [
               "SOURCE_EVIDENCE_REVIEW",
@@ -7237,7 +7238,7 @@
           {
             "id": "SAP-CA-NETWORK-03",
             "requirement": "recovery semantics",
-            "rationale": "Model network adapters, link state, IP configuration, routes, DNS, proxy, Wi-Fi, connectivity tests and network recovery.",
+            "rationale": "recovery semantics: bounded semantic obligation, independently tested only when the named positive/negative/UNKNOWN oracle and evidence are provided.",
             "sourceRefs": [
               "SRC-PRODUCT-PRD",
               "SRC-PRODUCT-L1",
@@ -7267,9 +7268,9 @@
             "cqRefs": [
               "CQ-CA-010"
             ],
-            "positiveCase": "The fault is narrowed only to layers supported by observations.",
-            "negativeCase": "A generic reset or credential disclosure is recommended without evidence.",
-            "unknownCase": "KEEP_LAYERED_DIAGNOSIS_UNKNOWN_NO_BLIND_RESET",
+            "positiveCase": "A future network change has a separate rollback/control channel and postchange connectivity observation.",
+            "negativeCase": "Sole remote/control route is disabled without recovery.",
+            "unknownCase": "Control channel lost => UNKNOWN and stop.",
             "oracle": "MICROSOFT_DOCUMENTATION_PLUS_LIVE_NETWORK_ORACLE",
             "oracleClasses": [
               "SOURCE_EVIDENCE_REVIEW",
@@ -7316,7 +7317,8 @@
           "CQ-CA-010"
         ],
         "validationState": "NOT_RUN",
-        "qualification": "NOT_QUALIFIED"
+        "qualification": "NOT_QUALIFIED",
+        "evidenceGap": "NO_QUALIFIED_NETWORK_DOMAIN_SOURCE_CLAIM_OR_EXTERNAL_ORACLE"
       },
       {
         "element": "CA-AOT-KNOWLEDGE",
@@ -7324,7 +7326,7 @@
           {
             "id": "SAP-CA-AOT-KNOWLEDGE-01",
             "requirement": "static/runtime separation",
-            "rationale": "Separate stable, source-pinned domain knowledge suitable for ahead-of-time compilation from live host facts and authority that must be obtained at runtime.",
+            "rationale": "static/runtime separation: bounded semantic obligation, independently tested only when the named positive/negative/UNKNOWN oracle and evidence are provided.",
             "sourceRefs": [
               "SRC-PRODUCT-PRD",
               "SRC-PRODUCT-L1",
@@ -7354,9 +7356,9 @@
             "cqRefs": [
               "CQ-CA-011"
             ],
-            "positiveCase": "OS semantics and decision rules are pinned; current disk/device/software/permission facts are runtime observations.",
-            "negativeCase": "Live state, grants, secrets or user files are compiled into a reusable package.",
-            "unknownCase": "KEEP_UNVERIFIED_FACT_RUNTIME_ONLY_OR_MARK_OPEN",
+            "positiveCase": "Static Windows semantics compile with immutable source/applicability, while live disk/ACL state stays Runtime.",
+            "negativeCase": "AOT includes current user ACL, token, disk serial or user file path.",
+            "unknownCase": "Source/currentness unavailable => defer materialization.",
             "oracle": "DKE_REVIEW_PLUS_DIS_CONSUMER_PROOF",
             "oracleClasses": [
               "UNKNOWN"
@@ -7369,7 +7371,7 @@
           {
             "id": "SAP-CA-AOT-KNOWLEDGE-02",
             "requirement": "source invalidation",
-            "rationale": "Separate stable, source-pinned domain knowledge suitable for ahead-of-time compilation from live host facts and authority that must be obtained at runtime.",
+            "rationale": "source invalidation: bounded semantic obligation, independently tested only when the named positive/negative/UNKNOWN oracle and evidence are provided.",
             "sourceRefs": [
               "SRC-PRODUCT-PRD",
               "SRC-PRODUCT-L1",
@@ -7399,9 +7401,9 @@
             "cqRefs": [
               "CQ-CA-011"
             ],
-            "positiveCase": "OS semantics and decision rules are pinned; current disk/device/software/permission facts are runtime observations.",
-            "negativeCase": "Live state, grants, secrets or user files are compiled into a reusable package.",
-            "unknownCase": "KEEP_UNVERIFIED_FACT_RUNTIME_ONLY_OR_MARK_OPEN",
+            "positiveCase": "Changed OS/provider/source revision invalidates affected facts and consumer dependencies.",
+            "negativeCase": "Old compatibility result remains valid after provider/version revocation.",
+            "unknownCase": "No delta adjudication => affected claims UNKNOWN.",
             "oracle": "DKE_REVIEW_PLUS_DIS_CONSUMER_PROOF",
             "oracleClasses": [
               "UNKNOWN"
@@ -7414,7 +7416,7 @@
           {
             "id": "SAP-CA-AOT-KNOWLEDGE-03",
             "requirement": "package consumer obligations",
-            "rationale": "Separate stable, source-pinned domain knowledge suitable for ahead-of-time compilation from live host facts and authority that must be obtained at runtime.",
+            "rationale": "package consumer obligations: bounded semantic obligation, independently tested only when the named positive/negative/UNKNOWN oracle and evidence are provided.",
             "sourceRefs": [
               "SRC-PRODUCT-PRD",
               "SRC-PRODUCT-L1",
@@ -7444,9 +7446,9 @@
             "cqRefs": [
               "CQ-CA-011"
             ],
-            "positiveCase": "OS semantics and decision rules are pinned; current disk/device/software/permission facts are runtime observations.",
-            "negativeCase": "Live state, grants, secrets or user files are compiled into a reusable package.",
-            "unknownCase": "KEEP_UNVERIFIED_FACT_RUNTIME_ONLY_OR_MARK_OPEN",
+            "positiveCase": "DIS package consumer validates exact profile, typed outcome and error/UNKNOWN obligation before use.",
+            "negativeCase": "A candidate Element file is treated as published AOT Function.",
+            "unknownCase": "DIS ECP/public consumer proof absent => Package NOT_CREATED.",
             "oracle": "DKE_REVIEW_PLUS_DIS_CONSUMER_PROOF",
             "oracleClasses": [
               "UNKNOWN"
@@ -7502,7 +7504,7 @@
           {
             "id": "SAP-CA-ROOT-01",
             "requirement": "End-to-end goal/object/capability/provider/environment/authority/effect/verification/recovery composition",
-            "rationale": "Own the complete semantic model from user goal through computer object/capability resolution, trusted environment/provider binding, authorization, execution, verification and recovery.",
+            "rationale": "End-to-end goal/object/capability/provider/environment/authority/effect/verification/recovery composition: bounded semantic obligation, independently tested only when the named positive/negative/UNKNOWN oracle and evidence are provided.",
             "sourceRefs": [
               "SRC-PRODUCT-FREEZE",
               "SRC-PRODUCT-PRD",
@@ -7605,9 +7607,9 @@
             "cqRefs": [
               "CQ-CA-015"
             ],
-            "positiveCase": "One end-to-end trace binds exact identities and current evidence across every required Element and Global Semantic; the independent post-state oracle agrees.",
-            "negativeCase": "A child Element passes in isolation while a cross-Element identity, provider, authority, verification or recovery edge is missing, stale or mismatched.",
-            "unknownCase": "ROOT_NOT_CLOSED_BLOCK_PROMOTION",
+            "positiveCase": "One admitted user journey links current target, registered capability, separate approval/K permit/Host effect and independent poststate.",
+            "negativeCase": "A source definition, mock receipt or one Child PASS is claimed as end-to-end physical completion.",
+            "unknownCase": "Any missing stage => Root NOT_QUALIFIED, no user-visible COMPLETE.",
             "oracle": "CQ-CA-015_CROSS_ELEMENT_COMPOSITION_PLUS_INDEPENDENT_PRODUCT_AND_DOMAIN_OWNER_REVIEW",
             "oracleClasses": [
               "DOMAIN_OWNER_REQUIRED"
@@ -7620,7 +7622,7 @@
           {
             "id": "SAP-CA-ROOT-02",
             "requirement": "All five Global Semantic Elements apply across child Elements",
-            "rationale": "Own the complete semantic model from user goal through computer object/capability resolution, trusted environment/provider binding, authorization, execution, verification and recovery.",
+            "rationale": "All five Global Semantic Elements apply across child Elements: bounded semantic obligation, independently tested only when the named positive/negative/UNKNOWN oracle and evidence are provided.",
             "sourceRefs": [
               "SRC-PRODUCT-FREEZE",
               "SRC-PRODUCT-PRD",
@@ -7723,9 +7725,9 @@
             "cqRefs": [
               "CQ-CA-015"
             ],
-            "positiveCase": "One end-to-end trace binds exact identities and current evidence across every required Element and Global Semantic; the independent post-state oracle agrees.",
-            "negativeCase": "A child Element passes in isolation while a cross-Element identity, provider, authority, verification or recovery edge is missing, stale or mismatched.",
-            "unknownCase": "ROOT_NOT_CLOSED_BLOCK_PROMOTION",
+            "positiveCase": "All five Global Semantic owners independently check provenance, authority, verification, privacy and currentness in one journey.",
+            "negativeCase": "Privacy/currentness bypass exists even though task-level test passes.",
+            "unknownCase": "One global invariant unverified => Root UNKNOWN/NOT_QUALIFIED.",
             "oracle": "CQ-CA-015_CROSS_ELEMENT_COMPOSITION_PLUS_INDEPENDENT_PRODUCT_AND_DOMAIN_OWNER_REVIEW",
             "oracleClasses": [
               "DOMAIN_OWNER_REQUIRED"
@@ -7738,7 +7740,7 @@
           {
             "id": "SAP-CA-ROOT-03",
             "requirement": "No child Element PASS substitutes for Root closure",
-            "rationale": "Own the complete semantic model from user goal through computer object/capability resolution, trusted environment/provider binding, authorization, execution, verification and recovery.",
+            "rationale": "No child Element PASS substitutes for Root closure: bounded semantic obligation, independently tested only when the named positive/negative/UNKNOWN oracle and evidence are provided.",
             "sourceRefs": [
               "SRC-PRODUCT-FREEZE",
               "SRC-PRODUCT-PRD",
@@ -7841,9 +7843,9 @@
             "cqRefs": [
               "CQ-CA-015"
             ],
-            "positiveCase": "One end-to-end trace binds exact identities and current evidence across every required Element and Global Semantic; the independent post-state oracle agrees.",
-            "negativeCase": "A child Element passes in isolation while a cross-Element identity, provider, authority, verification or recovery edge is missing, stale or mismatched.",
-            "unknownCase": "ROOT_NOT_CLOSED_BLOCK_PROMOTION",
+            "positiveCase": "A child source/test PASS stays child-qualified only until full Root cross-element CQ verifies semantics.",
+            "negativeCase": "AOT-only Element or read-only test is used to certify real Windows effect.",
+            "unknownCase": "Root independent oracle absent => Root NOT_QUALIFIED.",
             "oracle": "CQ-CA-015_CROSS_ELEMENT_COMPOSITION_PLUS_INDEPENDENT_PRODUCT_AND_DOMAIN_OWNER_REVIEW",
             "oracleClasses": [
               "DOMAIN_OWNER_REQUIRED"
@@ -7977,7 +7979,7 @@
           {
             "id": "SAP-CA-EXECUTION-ENVIRONMENT-01",
             "requirement": "Windows-first local current execution scope",
-            "rationale": "Determine where a capability can actually run and bind it to a compatible trusted provider/environment. Current Shun scope is local Windows-first; Linux/macOS are future knowledge targets only. WSL, remote, sandbox and cloud execution are not admitted as current Product execution targets by this candidate.",
+            "rationale": "Windows-first local current execution scope: bounded semantic obligation, independently tested only when the named positive/negative/UNKNOWN oracle and evidence are provided.",
             "sourceRefs": [
               "SRC-PRODUCT-FREEZE",
               "SRC-PRODUCT-PRD",
@@ -8023,9 +8025,9 @@
             "cqRefs": [
               "CQ-CA-020"
             ],
-            "positiveCase": "The exact target build is checked against the current Windows client servicing table and the specific tool/module/provider applicability; the resulting binding is scoped to that target.",
-            "negativeCase": "A family label such as Windows 10/11 or WinGet's Windows 10 1809+ minimum is treated as proof that the target OS is still serviced or that every cmdlet/provider is available.",
-            "unknownCase": "If exact release, servicing channel, ESU/LTSC status or tool/provider availability cannot be established, platform currentness remains UNKNOWN and no feature binding is promoted.",
+            "positiveCase": "Local Windows Host runs a registered capability within frozen Product scope.",
+            "negativeCase": "WSL/Linux/macOS/remote probe becomes a current executor without Product amendment.",
+            "unknownCase": "Platform support unavailable => NOT_ADMITTED.",
             "oracle": "EXACT_TARGET_HOST_PLATFORM_AND_PROVIDER_BINDING_PLUS_NATIVE_CLIENT_CHECK",
             "oracleClasses": [
               "UNKNOWN"
@@ -8038,7 +8040,7 @@
           {
             "id": "SAP-CA-EXECUTION-ENVIRONMENT-02",
             "requirement": "Exact OS edition/build and architecture compatibility",
-            "rationale": "Determine where a capability can actually run and bind it to a compatible trusted provider/environment. Current Shun scope is local Windows-first; Linux/macOS are future knowledge targets only. WSL, remote, sandbox and cloud execution are not admitted as current Product execution targets by this candidate.",
+            "rationale": "Exact OS edition/build and architecture compatibility: bounded semantic obligation, independently tested only when the named positive/negative/UNKNOWN oracle and evidence are provided.",
             "sourceRefs": [
               "SRC-PRODUCT-FREEZE",
               "SRC-PRODUCT-PRD",
@@ -8084,9 +8086,9 @@
             "cqRefs": [
               "CQ-CA-020"
             ],
-            "positiveCase": "The exact target build is checked against the current Windows client servicing table and the specific tool/module/provider applicability; the resulting binding is scoped to that target.",
-            "negativeCase": "A family label such as Windows 10/11 or WinGet's Windows 10 1809+ minimum is treated as proof that the target OS is still serviced or that every cmdlet/provider is available.",
-            "unknownCase": "If exact release, servicing channel, ESU/LTSC status or tool/provider availability cannot be established, platform currentness remains UNKNOWN and no feature binding is promoted.",
+            "positiveCase": "Exact edition/build/arch and servicing state are checked for selected OS API.",
+            "negativeCase": "WinGet 1809 minimum is treated as currently serviced Win10 eligibility.",
+            "unknownCase": "Exact build/ESU unknown => block binding.",
             "oracle": "EXACT_TARGET_HOST_PLATFORM_AND_PROVIDER_BINDING_PLUS_NATIVE_CLIENT_CHECK",
             "oracleClasses": [
               "UNKNOWN"
@@ -8099,7 +8101,7 @@
           {
             "id": "SAP-CA-EXECUTION-ENVIRONMENT-03",
             "requirement": "Provider source/signature/version and native dependency binding",
-            "rationale": "Determine where a capability can actually run and bind it to a compatible trusted provider/environment. Current Shun scope is local Windows-first; Linux/macOS are future knowledge targets only. WSL, remote, sandbox and cloud execution are not admitted as current Product execution targets by this candidate.",
+            "rationale": "Provider source/signature/version and native dependency binding: bounded semantic obligation, independently tested only when the named positive/negative/UNKNOWN oracle and evidence are provided.",
             "sourceRefs": [
               "SRC-PRODUCT-FREEZE",
               "SRC-PRODUCT-PRD",
@@ -8145,9 +8147,9 @@
             "cqRefs": [
               "CQ-CA-020"
             ],
-            "positiveCase": "The exact target build is checked against the current Windows client servicing table and the specific tool/module/provider applicability; the resulting binding is scoped to that target.",
-            "negativeCase": "A family label such as Windows 10/11 or WinGet's Windows 10 1809+ minimum is treated as proof that the target OS is still serviced or that every cmdlet/provider is available.",
-            "unknownCase": "If exact release, servicing channel, ESU/LTSC status or tool/provider availability cannot be established, platform currentness remains UNKNOWN and no feature binding is promoted.",
+            "positiveCase": "Exact signed Provider and native dependencies are reverified on current host.",
+            "negativeCase": "Cached signature or wrong-ABI Provider is accepted after file change.",
+            "unknownCase": "Signer/ABI/dependency unknown => refuse.",
             "oracle": "EXACT_TARGET_HOST_PLATFORM_AND_PROVIDER_BINDING_PLUS_NATIVE_CLIENT_CHECK",
             "oracleClasses": [
               "UNKNOWN"
@@ -8160,7 +8162,7 @@
           {
             "id": "SAP-CA-EXECUTION-ENVIRONMENT-04",
             "requirement": "WSL/remote/sandbox/cloud are not current Product targets",
-            "rationale": "Determine where a capability can actually run and bind it to a compatible trusted provider/environment. Current Shun scope is local Windows-first; Linux/macOS are future knowledge targets only. WSL, remote, sandbox and cloud execution are not admitted as current Product execution targets by this candidate.",
+            "rationale": "WSL/remote/sandbox/cloud are not current Product targets: bounded semantic obligation, independently tested only when the named positive/negative/UNKNOWN oracle and evidence are provided.",
             "sourceRefs": [
               "SRC-PRODUCT-FREEZE",
               "SRC-PRODUCT-PRD",
@@ -8205,9 +8207,9 @@
             "cqRefs": [
               "CQ-CA-002"
             ],
-            "positiveCase": "A pinned provider binding passes every hard gate.",
-            "negativeCase": "Unknown signature, unsupported OS, missing native dependency or stale environment blocks selection.",
-            "unknownCase": "NO_PROVIDER_BINDING",
+            "positiveCase": "WSL/remote/sandbox/cloud may be documented but not dispatched as current Product capability.",
+            "negativeCase": "Knowledge of remote API implies a Shun remote execution feature.",
+            "unknownCase": "New Product admission absent => proposal-only.",
             "oracle": "EXACT_TARGET_HOST_PLATFORM_AND_PROVIDER_BINDING_PLUS_NATIVE_CLIENT_CHECK",
             "oracleClasses": [
               "UNKNOWN"
@@ -8284,7 +8286,7 @@
           {
             "id": "SAP-CA-TASK-LIFECYCLE-01",
             "requirement": "Proposal versus approval versus permit versus Host authorization",
-            "rationale": "Model plan, preview, approval, permit, effect, journal, receipt, verification, interruption, reconciliation, recovery and truthful UNKNOWN state.",
+            "rationale": "Proposal versus approval versus permit versus Host authorization: bounded semantic obligation, independently tested only when the named positive/negative/UNKNOWN oracle and evidence are provided.",
             "sourceRefs": [
               "SRC-PRODUCT-FREEZE",
               "SRC-PRODUCT-PRD",
@@ -8361,9 +8363,9 @@
             "cqRefs": [
               "CQ-CA-012"
             ],
-            "positiveCase": "Receipt and post-state match the declared verifier.",
-            "negativeCase": "Exit code, UI progress or model claim is reported as success; ambiguous action is blindly retried.",
-            "unknownCase": "REPORT_UNKNOWN_RECONCILE_BEFORE_RETRY",
+            "positiveCase": "Typed proposal, R2 user approval, K permit and Shun Host authorization are separate current records.",
+            "negativeCase": "A model-filled approval field or Kernel permit alone causes physical effect.",
+            "unknownCase": "Any authority missing or stale => no effect.",
             "oracle": "NATIVE_HOST_EFFECT_RECEIPT_POSTSTATE_AND_RESTART_RECOVERY_ORACLE",
             "oracleClasses": [
               "WINDOWS_NATIVE_ORACLE_REQUIRED"
@@ -8376,7 +8378,7 @@
           {
             "id": "SAP-CA-TASK-LIFECYCLE-02",
             "requirement": "Effect journal, truthful receipt and independent post-state",
-            "rationale": "Model plan, preview, approval, permit, effect, journal, receipt, verification, interruption, reconciliation, recovery and truthful UNKNOWN state.",
+            "rationale": "Effect journal, truthful receipt and independent post-state: bounded semantic obligation, independently tested only when the named positive/negative/UNKNOWN oracle and evidence are provided.",
             "sourceRefs": [
               "SRC-PRODUCT-FREEZE",
               "SRC-PRODUCT-PRD",
@@ -8453,9 +8455,9 @@
             "cqRefs": [
               "CQ-CA-012"
             ],
-            "positiveCase": "Receipt and post-state match the declared verifier.",
-            "negativeCase": "Exit code, UI progress or model claim is reported as success; ambiguous action is blindly retried.",
-            "unknownCase": "REPORT_UNKNOWN_RECONCILE_BEFORE_RETRY",
+            "positiveCase": "Journaled effect with independent observed poststate projects COMPLETED only after verification.",
+            "negativeCase": "A successful transport ACK is projected as verified user outcome.",
+            "unknownCase": "Receipt/poststate mismatch => UNKNOWN.",
             "oracle": "NATIVE_HOST_EFFECT_RECEIPT_POSTSTATE_AND_RESTART_RECOVERY_ORACLE",
             "oracleClasses": [
               "WINDOWS_NATIVE_ORACLE_REQUIRED"
@@ -8468,7 +8470,7 @@
           {
             "id": "SAP-CA-TASK-LIFECYCLE-03",
             "requirement": "Interruption, UNKNOWN and reconcile-before-retry",
-            "rationale": "Model plan, preview, approval, permit, effect, journal, receipt, verification, interruption, reconciliation, recovery and truthful UNKNOWN state.",
+            "rationale": "Interruption, UNKNOWN and reconcile-before-retry: bounded semantic obligation, independently tested only when the named positive/negative/UNKNOWN oracle and evidence are provided.",
             "sourceRefs": [
               "SRC-PRODUCT-FREEZE",
               "SRC-PRODUCT-PRD",
@@ -8545,9 +8547,9 @@
             "cqRefs": [
               "CQ-CA-012"
             ],
-            "positiveCase": "Receipt and post-state match the declared verifier.",
-            "negativeCase": "Exit code, UI progress or model claim is reported as success; ambiguous action is blindly retried.",
-            "unknownCase": "REPORT_UNKNOWN_RECONCILE_BEFORE_RETRY",
+            "positiveCase": "Lost ACK and interrupted action are reconciled before any retry.",
+            "negativeCase": "An UNKNOWN effect is re-sent to Windows Host on restart.",
+            "unknownCase": "Effect occurrence cannot be disproved => MAY_HAVE_EXECUTED_UNCERTAIN.",
             "oracle": "NATIVE_HOST_EFFECT_RECEIPT_POSTSTATE_AND_RESTART_RECOVERY_ORACLE",
             "oracleClasses": [
               "WINDOWS_NATIVE_ORACLE_REQUIRED"
@@ -8655,7 +8657,7 @@
           {
             "id": "SAP-CA-GLOBAL-PROVENANCE-01",
             "requirement": "Exact source identity/revision and authority class",
-            "rationale": "Every factual claim and provider capability has exact source identity/revision, locator, authority class, applicable OS/version scope, freshness and known limitations. External OS documentation never entails Shun implementation, Product admission or supported-platform status.",
+            "rationale": "Exact source identity/revision and authority class: bounded semantic obligation, independently tested only when the named positive/negative/UNKNOWN oracle and evidence are provided.",
             "sourceRefs": [
               "SRC-PRODUCT-FREEZE",
               "SRC-PRODUCT-PRD",
@@ -8719,9 +8721,9 @@
             "cqRefs": [
               "CQ-CA-018"
             ],
-            "positiveCase": "The external fact carries its OS/version applicability while Shun capability maturity remains FUTURE_CANDIDATE or UNKNOWN until independently admitted.",
-            "negativeCase": "A Microsoft command or API is presented as a current Shun feature or as proof of client-OS support without exact Shun evidence.",
-            "unknownCase": "KEEP_EXTERNAL_KNOWLEDGE_ONLY_NO_PRODUCT_ADMISSION",
+            "positiveCase": "Each Claim has immutable repo/path/blob/revision and authority class.",
+            "negativeCase": "A mutable wiki link or local mock is asserted as Product-approved truth.",
+            "unknownCase": "Missing source revision => Claim UNKNOWN.",
             "oracle": "SOURCE_BLOB_AND_EXTERNAL_APPLICABILITY_REVIEW_PLUS_CQ_CA_018_NEGATIVE",
             "oracleClasses": [
               "SOURCE_EVIDENCE_REVIEW"
@@ -8734,7 +8736,7 @@
           {
             "id": "SAP-CA-GLOBAL-PROVENANCE-02",
             "requirement": "External OS/version applicability and mutable-page freshness",
-            "rationale": "Every factual claim and provider capability has exact source identity/revision, locator, authority class, applicable OS/version scope, freshness and known limitations. External OS documentation never entails Shun implementation, Product admission or supported-platform status.",
+            "rationale": "External OS/version applicability and mutable-page freshness: bounded semantic obligation, independently tested only when the named positive/negative/UNKNOWN oracle and evidence are provided.",
             "sourceRefs": [
               "SRC-PRODUCT-FREEZE",
               "SRC-PRODUCT-PRD",
@@ -8798,9 +8800,9 @@
             "cqRefs": [
               "CQ-CA-018"
             ],
-            "positiveCase": "The external fact carries its OS/version applicability while Shun capability maturity remains FUTURE_CANDIDATE or UNKNOWN until independently admitted.",
-            "negativeCase": "A Microsoft command or API is presented as a current Shun feature or as proof of client-OS support without exact Shun evidence.",
-            "unknownCase": "KEEP_EXTERNAL_KNOWLEDGE_ONLY_NO_PRODUCT_ADMISSION",
+            "positiveCase": "Windows command semantics are bound to exact client edition/build and observation date.",
+            "negativeCase": "Server-view PnP docs imply Windows 11 Home support without proof.",
+            "unknownCase": "Client applicability unavailable => UNKNOWN.",
             "oracle": "SOURCE_BLOB_AND_EXTERNAL_APPLICABILITY_REVIEW_PLUS_CQ_CA_018_NEGATIVE",
             "oracleClasses": [
               "SOURCE_EVIDENCE_REVIEW"
@@ -8813,7 +8815,7 @@
           {
             "id": "SAP-CA-GLOBAL-PROVENANCE-03",
             "requirement": "Provider signer/hash/version provenance",
-            "rationale": "Every factual claim and provider capability has exact source identity/revision, locator, authority class, applicable OS/version scope, freshness and known limitations. External OS documentation never entails Shun implementation, Product admission or supported-platform status.",
+            "rationale": "Provider signer/hash/version provenance: bounded semantic obligation, independently tested only when the named positive/negative/UNKNOWN oracle and evidence are provided.",
             "sourceRefs": [
               "SRC-PRODUCT-FREEZE",
               "SRC-PRODUCT-PRD",
@@ -8877,9 +8879,9 @@
             "cqRefs": [
               "CQ-CA-018"
             ],
-            "positiveCase": "The external fact carries its OS/version applicability while Shun capability maturity remains FUTURE_CANDIDATE or UNKNOWN until independently admitted.",
-            "negativeCase": "A Microsoft command or API is presented as a current Shun feature or as proof of client-OS support without exact Shun evidence.",
-            "unknownCase": "KEEP_EXTERNAL_KNOWLEDGE_ONLY_NO_PRODUCT_ADMISSION",
+            "positiveCase": "Provider signer, version, content hash and revocation are verified independently.",
+            "negativeCase": "Trusted filename or stale hash replaces signer and revocation checks.",
+            "unknownCase": "Provider origin unknown => no bind.",
             "oracle": "SOURCE_BLOB_AND_EXTERNAL_APPLICABILITY_REVIEW_PLUS_CQ_CA_018_NEGATIVE",
             "oracleClasses": [
               "SOURCE_EVIDENCE_REVIEW"
@@ -8892,7 +8894,7 @@
           {
             "id": "SAP-CA-GLOBAL-PROVENANCE-04",
             "requirement": "External documentation must not entail Shun feature admission",
-            "rationale": "Every factual claim and provider capability has exact source identity/revision, locator, authority class, applicable OS/version scope, freshness and known limitations. External OS documentation never entails Shun implementation, Product admission or supported-platform status.",
+            "rationale": "External documentation must not entail Shun feature admission: bounded semantic obligation, independently tested only when the named positive/negative/UNKNOWN oracle and evidence are provided.",
             "sourceRefs": [
               "SRC-PRODUCT-FREEZE",
               "SRC-PRODUCT-PRD",
@@ -8956,9 +8958,9 @@
             "cqRefs": [
               "CQ-CA-018"
             ],
-            "positiveCase": "The external fact carries its OS/version applicability while Shun capability maturity remains FUTURE_CANDIDATE or UNKNOWN until independently admitted.",
-            "negativeCase": "A Microsoft command or API is presented as a current Shun feature or as proof of client-OS support without exact Shun evidence.",
-            "unknownCase": "KEEP_EXTERNAL_KNOWLEDGE_ONLY_NO_PRODUCT_ADMISSION",
+            "positiveCase": "External Windows docs remain OS knowledge without Shun Product admission or Host implementation.",
+            "negativeCase": "Microsoft command existence is shown as a Shun Function.",
+            "unknownCase": "Product/Host/Oracle evidence absent => NOT_ADMITTED.",
             "oracle": "SOURCE_BLOB_AND_EXTERNAL_APPLICABILITY_REVIEW_PLUS_CQ_CA_018_NEGATIVE",
             "oracleClasses": [
               "SOURCE_EVIDENCE_REVIEW"
@@ -9055,7 +9057,7 @@
           {
             "id": "SAP-CA-GLOBAL-AUTHORITY-01",
             "requirement": "Observation/proposal/approval/permit/Host authorization separation",
-            "rationale": "Observation, recommendation, preview, user approval, Kernel permit and Windows Host authorization are distinct states; no model or local label can synthesize permission. Unknown/user-created assets cannot be deleted by size or location alone.",
+            "rationale": "Observation/proposal/approval/permit/Host authorization separation: bounded semantic obligation, independently tested only when the named positive/negative/UNKNOWN oracle and evidence are provided.",
             "sourceRefs": [
               "SRC-PRODUCT-FREEZE",
               "SRC-PRODUCT-PRD",
@@ -9128,9 +9130,9 @@
             "cqRefs": [
               "CQ-CA-001"
             ],
-            "positiveCase": "A unique capability and object are resolved with scope and preconditions.",
-            "negativeCase": "Ambiguous disk/device/software identity or unregistered capability is clarified or refused.",
-            "unknownCase": "ASK_CLARIFY_OR_BLOCK",
+            "positiveCase": "Observation, advisory, consent, R2 approval, Kernel Permit and Host authorization are distinct.",
+            "negativeCase": "LLM response or UI flag mints grant without trusted current authority.",
+            "unknownCase": "No independent authority => BLOCKED.",
             "oracle": "FORGED_STALE_MISMATCHED_AUTHORITY_AND_PROTECTED_ASSET_NEGATIVES",
             "oracleClasses": [
               "UNKNOWN"
@@ -9143,7 +9145,7 @@
           {
             "id": "SAP-CA-GLOBAL-AUTHORITY-02",
             "requirement": "Exact target/scope and current authority",
-            "rationale": "Observation, recommendation, preview, user approval, Kernel permit and Windows Host authorization are distinct states; no model or local label can synthesize permission. Unknown/user-created assets cannot be deleted by size or location alone.",
+            "rationale": "Exact target/scope and current authority: bounded semantic obligation, independently tested only when the named positive/negative/UNKNOWN oracle and evidence are provided.",
             "sourceRefs": [
               "SRC-PRODUCT-FREEZE",
               "SRC-PRODUCT-PRD",
@@ -9216,9 +9218,9 @@
             "cqRefs": [
               "CQ-CA-001"
             ],
-            "positiveCase": "A unique capability and object are resolved with scope and preconditions.",
-            "negativeCase": "Ambiguous disk/device/software identity or unregistered capability is clarified or refused.",
-            "unknownCase": "ASK_CLARIFY_OR_BLOCK",
+            "positiveCase": "Selected root and object identity are rebound at effect-time with valid current approval.",
+            "negativeCase": "Stale plan/renamed path or policy revision is accepted by Host.",
+            "unknownCase": "Currentness unavailable => no effect.",
             "oracle": "FORGED_STALE_MISMATCHED_AUTHORITY_AND_PROTECTED_ASSET_NEGATIVES",
             "oracleClasses": [
               "UNKNOWN"
@@ -9231,7 +9233,7 @@
           {
             "id": "SAP-CA-GLOBAL-AUTHORITY-03",
             "requirement": "Unknown/user-created asset protection across Storage and JIT",
-            "rationale": "Observation, recommendation, preview, user approval, Kernel permit and Windows Host authorization are distinct states; no model or local label can synthesize permission. Unknown/user-created assets cannot be deleted by size or location alone.",
+            "rationale": "Unknown/user-created asset protection across Storage and JIT: bounded semantic obligation, independently tested only when the named positive/negative/UNKNOWN oracle and evidence are provided.",
             "sourceRefs": [
               "SRC-PRODUCT-FREEZE",
               "SRC-PRODUCT-PRD",
@@ -9304,9 +9306,9 @@
             "cqRefs": [
               "CQ-CA-001"
             ],
-            "positiveCase": "A unique capability and object are resolved with scope and preconditions.",
-            "negativeCase": "Ambiguous disk/device/software identity or unregistered capability is clarified or refused.",
-            "unknownCase": "ASK_CLARIFY_OR_BLOCK",
+            "positiveCase": "Both storage cleanup and provider removal preserve unknown/user-created assets.",
+            "negativeCase": "Manifest omission or size heuristic deletes a private file.",
+            "unknownCase": "Ownership uncertain => preserve.",
             "oracle": "FORGED_STALE_MISMATCHED_AUTHORITY_AND_PROTECTED_ASSET_NEGATIVES",
             "oracleClasses": [
               "UNKNOWN"
@@ -9419,7 +9421,7 @@
           {
             "id": "SAP-CA-GLOBAL-VERIFICATION-01",
             "requirement": "Independent observable post-state",
-            "rationale": "Success requires an independent observable post-state matching the declared verifier; interrupted or ambiguous outcomes remain UNKNOWN and are reconciled before retry.",
+            "rationale": "Independent observable post-state: bounded semantic obligation, independently tested only when the named positive/negative/UNKNOWN oracle and evidence are provided.",
             "sourceRefs": [
               "SRC-STORAGE-INDEX",
               "SRC-STORAGE-DIAGNOSE",
@@ -9492,9 +9494,9 @@
             "cqRefs": [
               "CQ-CA-012"
             ],
-            "positiveCase": "Receipt and post-state match the declared verifier.",
-            "negativeCase": "Exit code, UI progress or model claim is reported as success; ambiguous action is blindly retried.",
-            "unknownCase": "REPORT_UNKNOWN_RECONCILE_BEFORE_RETRY",
+            "positiveCase": "Independent read-only poststate checks expected bytes/canary after actual authorized effect.",
+            "negativeCase": "An executor-returned success label is used as sole postcondition.",
+            "unknownCase": "Verifier unavailable => UNKNOWN.",
             "oracle": "NATIVE_POSTSTATE_AND_INTERRUPTION_RECONCILIATION_ORACLE",
             "oracleClasses": [
               "UNKNOWN"
@@ -9507,7 +9509,7 @@
           {
             "id": "SAP-CA-GLOBAL-VERIFICATION-02",
             "requirement": "Journal/receipt consistency",
-            "rationale": "Success requires an independent observable post-state matching the declared verifier; interrupted or ambiguous outcomes remain UNKNOWN and are reconciled before retry.",
+            "rationale": "Journal/receipt consistency: bounded semantic obligation, independently tested only when the named positive/negative/UNKNOWN oracle and evidence are provided.",
             "sourceRefs": [
               "SRC-STORAGE-INDEX",
               "SRC-STORAGE-DIAGNOSE",
@@ -9580,9 +9582,9 @@
             "cqRefs": [
               "CQ-CA-012"
             ],
-            "positiveCase": "Receipt and post-state match the declared verifier.",
-            "negativeCase": "Exit code, UI progress or model claim is reported as success; ambiguous action is blindly retried.",
-            "unknownCase": "REPORT_UNKNOWN_RECONCILE_BEFORE_RETRY",
+            "positiveCase": "Durable journal, receipt and poststate agree on effect identity and terminal state.",
+            "negativeCase": "Receipt says succeeded but journal/canary contradicts it.",
+            "unknownCase": "Conflict => MAY_HAVE_EXECUTED_UNCERTAIN.",
             "oracle": "NATIVE_POSTSTATE_AND_INTERRUPTION_RECONCILIATION_ORACLE",
             "oracleClasses": [
               "UNKNOWN"
@@ -9595,7 +9597,7 @@
           {
             "id": "SAP-CA-GLOBAL-VERIFICATION-03",
             "requirement": "Interruption and recovery honesty; no blind retry",
-            "rationale": "Success requires an independent observable post-state matching the declared verifier; interrupted or ambiguous outcomes remain UNKNOWN and are reconciled before retry.",
+            "rationale": "Interruption and recovery honesty; no blind retry: bounded semantic obligation, independently tested only when the named positive/negative/UNKNOWN oracle and evidence are provided.",
             "sourceRefs": [
               "SRC-STORAGE-INDEX",
               "SRC-STORAGE-DIAGNOSE",
@@ -9668,9 +9670,9 @@
             "cqRefs": [
               "CQ-CA-012"
             ],
-            "positiveCase": "Receipt and post-state match the declared verifier.",
-            "negativeCase": "Exit code, UI progress or model claim is reported as success; ambiguous action is blindly retried.",
-            "unknownCase": "REPORT_UNKNOWN_RECONCILE_BEFORE_RETRY",
+            "positiveCase": "Interrupted operations never blindly replay until absence or completion independently proven.",
+            "negativeCase": "Lost result triggers automatic second write or install.",
+            "unknownCase": "No decisive observation => retain UNKNOWN.",
             "oracle": "NATIVE_POSTSTATE_AND_INTERRUPTION_RECONCILIATION_ORACLE",
             "oracleClasses": [
               "UNKNOWN"
@@ -9776,7 +9778,7 @@
           {
             "id": "SAP-CA-GLOBAL-PRIVACY-01",
             "requirement": "B-040 minimization and local-only default",
-            "rationale": "Local-only system/support observations remain local unless a distinct explicit sharing scope and redaction contract is approved; secrets, user content and credentials are excluded.",
+            "rationale": "B-040 minimization and local-only default: bounded semantic obligation, independently tested only when the named positive/negative/UNKNOWN oracle and evidence are provided.",
             "sourceRefs": [
               "SRC-SYSTEM-RUNTIME",
               "SRC-TEST-SYSTEM-SOFTWARE",
@@ -9824,9 +9826,9 @@
             "cqRefs": [
               "CQ-CA-013"
             ],
-            "positiveCase": "No automatic egress and no raw secrets, process command lines or unrelated document bodies.",
-            "negativeCase": "A support report is silently sent to LLM, Meta, network or issue reporting.",
-            "unknownCase": "NO_EGRESS",
+            "positiveCase": "B-040 minimized support report has shun.support-context.v1, localOnly true and no disclosure.",
+            "negativeCase": "Raw env/process/private doc included in minimized report.",
+            "unknownCase": "Unminimized sensitive field => withhold report.",
             "oracle": "SUPPORT_CANARIES_NO_NETWORK_SPY_AND_ZERO_EGRESS_NATIVE_ORACLE",
             "oracleClasses": [
               "UNKNOWN"
@@ -9839,7 +9841,7 @@
           {
             "id": "SAP-CA-GLOBAL-PRIVACY-02",
             "requirement": "No automatic egress of support/system context",
-            "rationale": "Local-only system/support observations remain local unless a distinct explicit sharing scope and redaction contract is approved; secrets, user content and credentials are excluded.",
+            "rationale": "No automatic egress of support/system context: bounded semantic obligation, independently tested only when the named positive/negative/UNKNOWN oracle and evidence are provided.",
             "sourceRefs": [
               "SRC-SYSTEM-RUNTIME",
               "SRC-TEST-SYSTEM-SOFTWARE",
@@ -9887,9 +9889,9 @@
             "cqRefs": [
               "CQ-CA-013"
             ],
-            "positiveCase": "No automatic egress and no raw secrets, process command lines or unrelated document bodies.",
-            "negativeCase": "A support report is silently sent to LLM, Meta, network or issue reporting.",
-            "unknownCase": "NO_EGRESS",
+            "positiveCase": "No default LLM/Meta/network/issue path receives B-040 observation.",
+            "negativeCase": "Consent for unrelated cloud request is reused to upload support context.",
+            "unknownCase": "Share authorization unavailable => zero egress.",
             "oracle": "SUPPORT_CANARIES_NO_NETWORK_SPY_AND_ZERO_EGRESS_NATIVE_ORACLE",
             "oracleClasses": [
               "UNKNOWN"
@@ -9902,7 +9904,7 @@
           {
             "id": "SAP-CA-GLOBAL-PRIVACY-03",
             "requirement": "Secrets, user content, paths and process command lines excluded",
-            "rationale": "Local-only system/support observations remain local unless a distinct explicit sharing scope and redaction contract is approved; secrets, user content and credentials are excluded.",
+            "rationale": "Secrets, user content, paths and process command lines excluded: bounded semantic obligation, independently tested only when the named positive/negative/UNKNOWN oracle and evidence are provided.",
             "sourceRefs": [
               "SRC-SYSTEM-RUNTIME",
               "SRC-TEST-SYSTEM-SOFTWARE",
@@ -9950,9 +9952,9 @@
             "cqRefs": [
               "CQ-CA-013"
             ],
-            "positiveCase": "No automatic egress and no raw secrets, process command lines or unrelated document bodies.",
-            "negativeCase": "A support report is silently sent to LLM, Meta, network or issue reporting.",
-            "unknownCase": "NO_EGRESS",
+            "positiveCase": "Secrets, private paths, unrelated bodies, env values and process command lines are removed.",
+            "negativeCase": "Canary secret or absolute user path survives minimization.",
+            "unknownCase": "Unsafe content detected => redact or refuse.",
             "oracle": "SUPPORT_CANARIES_NO_NETWORK_SPY_AND_ZERO_EGRESS_NATIVE_ORACLE",
             "oracleClasses": [
               "UNKNOWN"
@@ -9965,7 +9967,7 @@
           {
             "id": "SAP-CA-GLOBAL-PRIVACY-04",
             "requirement": "Separate consent and redaction for any future sharing",
-            "rationale": "Local-only system/support observations remain local unless a distinct explicit sharing scope and redaction contract is approved; secrets, user content and credentials are excluded.",
+            "rationale": "Separate consent and redaction for any future sharing: bounded semantic obligation, independently tested only when the named positive/negative/UNKNOWN oracle and evidence are provided.",
             "sourceRefs": [
               "SRC-SYSTEM-RUNTIME",
               "SRC-TEST-SYSTEM-SOFTWARE",
@@ -10013,9 +10015,9 @@
             "cqRefs": [
               "CQ-CA-013"
             ],
-            "positiveCase": "No automatic egress and no raw secrets, process command lines or unrelated document bodies.",
-            "negativeCase": "A support report is silently sent to LLM, Meta, network or issue reporting.",
-            "unknownCase": "NO_EGRESS",
+            "positiveCase": "A separate exact user consent and redaction review precedes any later scoped sharing.",
+            "negativeCase": "Implicit consent via general 'help' button sends full local context.",
+            "unknownCase": "Sharing source/scope insufficient => no send.",
             "oracle": "SUPPORT_CANARIES_NO_NETWORK_SPY_AND_ZERO_EGRESS_NATIVE_ORACLE",
             "oracleClasses": [
               "UNKNOWN"
@@ -10091,7 +10093,7 @@
           {
             "id": "SAP-CA-GLOBAL-CURRENTNESS-01",
             "requirement": "Source/platform/provider/policy/host changes invalidate affected claims and consumers",
-            "rationale": "Source revisions, OS/provider versions, policy, host identity, user permissions and device/storage state can become stale; affected claims, Elements, CQs and executable consumers must be invalidated and rechecked.",
+            "rationale": "Source/platform/provider/policy/host changes invalidate affected claims and consumers: bounded semantic obligation, independently tested only when the named positive/negative/UNKNOWN oracle and evidence are provided.",
             "sourceRefs": [
               "SRC-PRODUCT-FREEZE",
               "SRC-PRODUCT-PRD",
@@ -10156,9 +10158,9 @@
             "cqRefs": [
               "CQ-CA-020"
             ],
-            "positiveCase": "The exact target build is checked against the current Windows client servicing table and the specific tool/module/provider applicability; the resulting binding is scoped to that target.",
-            "negativeCase": "A family label such as Windows 10/11 or WinGet's Windows 10 1809+ minimum is treated as proof that the target OS is still serviced or that every cmdlet/provider is available.",
-            "unknownCase": "If exact release, servicing channel, ESU/LTSC status or tool/provider availability cannot be established, platform currentness remains UNKNOWN and no feature binding is promoted.",
+            "positiveCase": "A source/OS/provider/policy/host change invalidates every actually affected Claim/CQ/consumer.",
+            "negativeCase": "Current authority is reused after revocation or OS major-version change.",
+            "unknownCase": "Impact analysis incomplete => affected state UNKNOWN.",
             "oracle": "CQ-CA-016_EXACT_SOURCE_DELTA_IMPACT_AND_UNAFFECTED_SIBLING_CONTROLS",
             "oracleClasses": [
               "SOURCE_EVIDENCE_REVIEW"
@@ -10171,7 +10173,7 @@
           {
             "id": "SAP-CA-GLOBAL-CURRENTNESS-02",
             "requirement": "No stale binding remains current",
-            "rationale": "Source revisions, OS/provider versions, policy, host identity, user permissions and device/storage state can become stale; affected claims, Elements, CQs and executable consumers must be invalidated and rechecked.",
+            "rationale": "No stale binding remains current: bounded semantic obligation, independently tested only when the named positive/negative/UNKNOWN oracle and evidence are provided.",
             "sourceRefs": [
               "SRC-PRODUCT-FREEZE",
               "SRC-PRODUCT-PRD",
@@ -10236,9 +10238,9 @@
             "cqRefs": [
               "CQ-CA-016"
             ],
-            "positiveCase": "A source/platform delta produces a justified affected-set, invalidates stale dependent claims/consumers, and preserves unaffected sibling controls.",
-            "negativeCase": "Stale facts remain current, or unrelated Elements are invalidated by an unbounded blast radius.",
-            "unknownCase": "INVALIDATE_AFFECTED_SCOPE_AND_KEEP_UNKNOWN",
+            "positiveCase": "Invalidated binding cannot authorize a later effect without exact re-evaluation.",
+            "negativeCase": "A cached K permit replaces Host currentness on retry.",
+            "unknownCase": "Recheck unavailable => BLOCKED.",
             "oracle": "CQ-CA-016_EXACT_SOURCE_DELTA_IMPACT_AND_UNAFFECTED_SIBLING_CONTROLS",
             "oracleClasses": [
               "SOURCE_EVIDENCE_REVIEW"
@@ -10251,7 +10253,7 @@
           {
             "id": "SAP-CA-GLOBAL-CURRENTNESS-03",
             "requirement": "Unaffected sibling Elements are not over-invalidated",
-            "rationale": "Source revisions, OS/provider versions, policy, host identity, user permissions and device/storage state can become stale; affected claims, Elements, CQs and executable consumers must be invalidated and rechecked.",
+            "rationale": "Unaffected sibling Elements are not over-invalidated: bounded semantic obligation, independently tested only when the named positive/negative/UNKNOWN oracle and evidence are provided.",
             "sourceRefs": [
               "SRC-PRODUCT-FREEZE",
               "SRC-PRODUCT-PRD",
@@ -10316,9 +10318,9 @@
             "cqRefs": [
               "CQ-CA-016"
             ],
-            "positiveCase": "A source/platform delta produces a justified affected-set, invalidates stale dependent claims/consumers, and preserves unaffected sibling controls.",
-            "negativeCase": "Stale facts remain current, or unrelated Elements are invalidated by an unbounded blast radius.",
-            "unknownCase": "INVALIDATE_AFFECTED_SCOPE_AND_KEEP_UNKNOWN",
+            "positiveCase": "Unaffected unrelated sibling Element retains its valid source revision.",
+            "negativeCase": "Changing one external PnP page invalidates unrelated support-context source.",
+            "unknownCase": "Dependency lineage ambiguous => report impact UNKNOWN before broad promotion.",
             "oracle": "CQ-CA-016_EXACT_SOURCE_DELTA_IMPACT_AND_UNAFFECTED_SIBLING_CONTROLS",
             "oracleClasses": [
               "SOURCE_EVIDENCE_REVIEW"
@@ -10493,7 +10495,7 @@
     "k1": "AUTHOR_SOURCE_INVENTORY_PINNED_70_INTERNAL_AND_13_EXTERNAL_LOCATORS_65_CODE_TEST_BLOBS_EXACT",
     "k2": "AUTHOR_CLAIMS_RELATIONS_AND_OWNERSHIP_CANDIDATE",
     "k3": "AUTHOR_ELEMENT_BLUEPRINT_CQS_AND_SAP_OBLIGATIONS_CANDIDATE",
-    "k4IndependentReview": "INITIAL_EXACT_SHA_REVIEW_COMPLETED_REPAIRS_APPLIED_FINAL_EXACT_SHA_REVIEW_PENDING",
+    "k4IndependentReview": "R0_SOURCE_FIRST_TECHNICAL_REPAIR_PENDING_FRESH_EXACT_SHA_RECHECK",
     "k4NativeWindowsExecution": "NOT_RUN",
     "ownerSemanticDecision": "NOT_REQUESTED",
     "k5Sap": "NOT_QUALIFIED",
