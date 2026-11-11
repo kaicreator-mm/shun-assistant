@@ -126,3 +126,17 @@ The matrix records for **every job**: original demand, Product admission, source
 - For this JSON-only test fixture, `JSON.parse(JSON.stringify(matrix))` intentionally replaces `structuredClone` to avoid a needless feature dependency.
 - Never mistake a successful cross-version Node structural test for Windows native Host-effect execution, independent semantic review or SAP qualification.
 
+
+
+## 10. D0 Source-First repair and exact knowledge rebind (2026-11-11)
+
+OUTPUT_LABEL=`SHUN_ASSISTANT_DKE_D0_R0_FRESH_SOURCE_FIRST_REVIEW_REPAIR`. Original Product Freeze, Product PRD/L1, original Code and original Test **definition** were frozen first in [Issue #411 Stage-0](https://github.com/kaicreator-mm/shun-assistant/issues/411#issuecomment-6798790192).
+
+- **F-D0-01 / P1 — paired candidate Blob repinning could fake provenance.** The previous CLI checker only checked whether local JSON bytes matched the *matrix-provided* `candidateBlob`; modifying both files could pass without an independent source pin. The verifier now independently locks the reviewed upstream #414 knowledge **HEAD** `a8f378a12b49ff1c335a129280f32c45a6ad2cd6` and its knowledge JSON **Blob** `87524bac881b84da626d2026392d99129baeb5a1`. A paired-dossier-tamper negative has been added. This is a source-identity structural safeguard, **not** a Product/SAP/oracle PASS.
+- **F-D0-02 / P2 — Product §2 coverage counted rather than compared.** All ten D0 jobs remain Product §2 items 1–10, each mapped once, with duplicate/missing numbered-item negatives. Product §5 still contains only nine acceptance rows J01–J09, not a fictitious J10.
+- **F-D0-03 / P2 — reference existence was mistaken for domain semantic closure.** Each Job now identifies its primary Element and actual claim intersection. CA-JOB-15 carries a hard `NETWORK_DOMAIN_SEMANTICS_UNSOURCED` gap (CA-NETWORK has zero source Claim and CQ-CA-010 has no domain-source witness). Cloud consent/cost (CA-JOB-05), selected Kernel journal/recovery (CA-JOB-07), and CN/EN UI/packaging (CA-JOB-08) also explicitly retain missing Host/runtime witnesses. The verifier does not permit these named gaps to masquerade as closed.
+- **F-D0-04 / P2 — stale hosted-preflight source identity.** The preflight must record new exact verifier/test/knowledge/matrix Blobs after readback. Earlier 17/17 hosted V8 mutation probes are historical author evidence and **must not** be inherited as new native Node execution.
+
+All 15 Job rows remain author **requirements and feasibility hypotheses**, not current native callable Functions. Ten frozen Product requirements are traced at requirement level; five general PC management tasks remain `FUTURE_CANDIDATE_NOT_ADMITTED`. I0–I4 entries are intended feasibility/risk classifications, **not** evidence that a Windows Host effect is implemented. Actual DIS schema/pipeline/ECP, AOT package and native Windows postcondition receipts remain **NOT_DEFINED/NOT_QUALIFIED/NOT_CREATED/NOT_RUN**.
+
+This D0 PR follows #414 as a stacked **docs-only candidate**. Its new upstream merge establishes source ancestry; all downstream source and receipt pins must correspond to the revised #414 candidate. #410 → #412 still has independent ancestry drift. No Product Freeze, L2, effect authority or feature admission changed. Any post-repair review by this Repairer is **not** a formally independent reviewer decision.
