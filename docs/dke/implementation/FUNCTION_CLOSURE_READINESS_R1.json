@@ -1,0 +1,318 @@
+{
+  "schema": "shun.dke.closure-readiness-r1",
+  "revision": "R1",
+  "outputLabel": "SHUN_ASSISTANT_DKE_JOB02_JOB03_FIRST_FUNCTION_CLOSURE_READINESS_R1",
+  "status": "AUTHOR_SOURCE_ANALYSIS_NOT_INDEPENDENTLY_QUALIFIED",
+  "asOf": "2026-11-11",
+  "mainIssue": "https://github.com/kaicreator-mm/shun-assistant/issues/411",
+  "upstream": {
+    "pr414": 414,
+    "pr414Head": "a8f378a12b49ff1c335a129280f32c45a6ad2cd6",
+    "pr415": 415,
+    "startingPr415Head": "a184d39a1526c3a04ec3b0656ce3adec1f7f24e6",
+    "startingDemandMatrixBlob": "eb00c3ac99ced49a95d0a1ff06d216f4d4cf9a69",
+    "originalSourceCodeCommit": "1224fea4097799467e2c0c454885e680f1f28248"
+  },
+  "qualifications": {
+    "productImplementationAuthorized": false,
+    "sourceVersionQualification": "PINNED_ORIGINAL_READ_ONLY",
+    "independentReview": "NOT_RUN_ON_R1",
+    "productAdmission": "ONLY_FROZEN_REQUIREMENT_SCOPE",
+    "sapQualifiedCount": 0,
+    "actualDisFunctionCount": 0,
+    "actualAotPackageCount": 0,
+    "nativeHostEffectReceipts": "NOT_RUN_IN_THIS_DKE_WORKSTREAM",
+    "functionalClosureCount": 0,
+    "sourceReviewStatement": "Original Code/Test reviewed in current author context; this is not fresh independent Reviewer approval."
+  },
+  "scope": {
+    "userJobs": [
+      "CA-JOB-02",
+      "CA-JOB-03"
+    ],
+    "researchOnly": true,
+    "noRuntimeCodeChanges": true,
+    "apiAvailableNotEquivalentToProductAdmission": true,
+    "sourceEvidenceDoesNotProveNativeExecution": true
+  },
+  "sourcePins": [
+    {
+      "id": "SRC-PRODUCT-FREEZE",
+      "path": "docs/product/PRODUCT_FREEZE-v0.3.md",
+      "revision": "1224fea4097799467e2c0c454885e680f1f28248",
+      "gitBlob": "0f8a67c2f06364d58a842502d3dee11bfeeedba4",
+      "lines": "39-45",
+      "kind": "PRODUCT_AUTHORITY"
+    },
+    {
+      "id": "SYS-INDEX",
+      "path": "packages/vertical-system/src/index.ts",
+      "revision": "1224fea4097799467e2c0c454885e680f1f28248",
+      "gitBlob": "7f687a10f216fc9c792cb689942da792ee8e8d88",
+      "lines": "34-79",
+      "kind": "CODE"
+    },
+    {
+      "id": "SYS-DIAG",
+      "path": "packages/vertical-system/src/diagnostics.ts",
+      "revision": "1224fea4097799467e2c0c454885e680f1f28248",
+      "gitBlob": "79cd145dbcd212968846fad39f7e7f68e21923a2",
+      "lines": "40-135",
+      "kind": "CODE"
+    },
+    {
+      "id": "SYS-RUNTIME",
+      "path": "packages/vertical-system/src/windows-runtime.ts",
+      "revision": "1224fea4097799467e2c0c454885e680f1f28248",
+      "gitBlob": "1f425854b688a1981b4f3c28cd4de39bb5cc6288",
+      "lines": "1-80",
+      "kind": "CODE"
+    },
+    {
+      "id": "STG-SCOPE",
+      "path": "packages/vertical-storage/src/scope.ts",
+      "revision": "1224fea4097799467e2c0c454885e680f1f28248",
+      "gitBlob": "e7d499a7a381611a93f45513455a165bf1104d22",
+      "lines": "28-103",
+      "kind": "CODE"
+    },
+    {
+      "id": "STG-PLAN",
+      "path": "packages/vertical-storage/src/plan.ts",
+      "revision": "1224fea4097799467e2c0c454885e680f1f28248",
+      "gitBlob": "93aaf565ab491ada9485b3e55bea8d6434808645",
+      "lines": "64-214",
+      "kind": "CODE"
+    },
+    {
+      "id": "STG-EXECUTE",
+      "path": "packages/vertical-storage/src/execute.ts",
+      "revision": "1224fea4097799467e2c0c454885e680f1f28248",
+      "gitBlob": "89696ef1fff99546867087b4106b3390740b635d",
+      "lines": "90-160,264-323,549-608",
+      "kind": "CODE"
+    },
+    {
+      "id": "STG-DIAGNOSE",
+      "path": "packages/vertical-storage/src/diagnose.ts",
+      "revision": "1224fea4097799467e2c0c454885e680f1f28248",
+      "gitBlob": "6f6f9e704b29189e79a62062910522ae1c0ee314",
+      "lines": "98-120,220-413",
+      "kind": "CODE"
+    },
+    {
+      "id": "STG-VERIFY",
+      "path": "packages/vertical-storage/src/verify.ts",
+      "revision": "1224fea4097799467e2c0c454885e680f1f28248",
+      "gitBlob": "1552f9e5b84209af37cd1ddcfd6e1291a7c1572f",
+      "lines": "137-305",
+      "kind": "CODE"
+    },
+    {
+      "id": "STG-VERIFY-TEST",
+      "path": "packages/vertical-storage/test/verify.test.ts",
+      "revision": "1224fea4097799467e2c0c454885e680f1f28248",
+      "gitBlob": "c7c1babb707ef8d0a67565da504a31c9dfad8c51",
+      "lines": "72-92,241-257",
+      "kind": "TEST_DEFINITION"
+    },
+    {
+      "id": "STG-EXECUTE-TEST",
+      "path": "packages/vertical-storage/test/execute.test.ts",
+      "revision": "1224fea4097799467e2c0c454885e680f1f28248",
+      "gitBlob": "085b83c8075b828b50ef9c861c678ae76479bc22",
+      "lines": "137-214,215-296",
+      "kind": "TEST_DEFINITION"
+    },
+    {
+      "id": "HOST-EFFECT",
+      "path": "packages/domain-host/src/windows/effect-host.ts",
+      "revision": "1224fea4097799467e2c0c454885e680f1f28248",
+      "gitBlob": "821a812a8abac31470056a8edc6ea6c48d35fb88",
+      "lines": "230-360",
+      "kind": "CODE"
+    },
+    {
+      "id": "COMPUTER-FOLDER",
+      "path": "packages/domain-computer/src/computer/folder-observation.ts",
+      "revision": "1224fea4097799467e2c0c454885e680f1f28248",
+      "gitBlob": "8313f0dfbd7a8feff0de86b463a90c2082baa142",
+      "lines": "1-59,289-332",
+      "kind": "CODE"
+    },
+    {
+      "id": "CONTROL-API",
+      "path": "apps/control-api/src/server.ts",
+      "revision": "1224fea4097799467e2c0c454885e680f1f28248",
+      "gitBlob": "59f0bb1d42b737fbc69065f7977ad6965a033335",
+      "lines": "740-780",
+      "kind": "CODE"
+    }
+  ],
+  "findings": [
+    {
+      "id": "CLOSURE-R1-SYS-01",
+      "jobId": "CA-JOB-02",
+      "classification": "SOURCE_CONFIRMED_APPLICABILITY_LIMIT",
+      "sourceIds": [
+        "SYS-INDEX",
+        "SYS-DIAG"
+      ],
+      "priority": "P2_CANDIDATE",
+      "finding": "System inventory fixes trusted disk root to C:\\\\; it does not prove that C: is the current Windows system volume on every supported machine. Diagnosis is a single snapshot with effect NONE and no root-cause assertion.",
+      "claimScope": "No general 'any system disk' or quantified speedup claim is justified from this source.",
+      "oracle": "With exact current Windows system root known from trusted Host, verify snapshot volume identity or return applicability UNKNOWN; ensure advice remains effect NONE and localOnly true.",
+      "negativeCase": "OS system root differs from C:; pretend C: free bytes describe actual system volume → must be rejected/qualified.",
+      "owner": "CA-SYSTEM-OBSERVATION",
+      "evidenceStatus": "SOURCE_CODE_READ_ONLY_NOT_RUN",
+      "result": "NEEDS_NATIVE_ORACLE_AND_SCOPE_REVIEW"
+    },
+    {
+      "id": "CLOSURE-R1-SYS-02",
+      "jobId": "CA-JOB-02",
+      "classification": "SOURCE_CONFIRMED_READONLY_LIMIT",
+      "sourceIds": [
+        "SYS-DIAG",
+        "SYS-RUNTIME"
+      ],
+      "priority": "P2_CANDIDATE",
+      "finding": "collectWindowsReadonlyDiagnosis refuses non-Windows/invalid observation and reports OBSERVED_ONLY. It cannot establish causality from process counts, an underlying disk failure or an effective automated optimization.",
+      "claimScope": "I1 observation candidate only; no mutating Function, active diagnosis of all sources, or independent end-user UI proof.",
+      "oracle": "Real Windows Host snapshot, bounded reliable provenance, correct error statuses and no local support-data egress; UI recheck separate.",
+      "negativeCase": "Missing native evidence, non-win32 platform or malformed memory/volume numbers → refuse; never return root-cause or effect success.",
+      "owner": "CA-SYSTEM-OBSERVATION",
+      "evidenceStatus": "SOURCE_CODE_READ_ONLY_NOT_RUN",
+      "result": "ADMISSIBLE_KNOWLEDGE_CANDIDATE_NOT_FUNCTION_CLOSED"
+    },
+    {
+      "id": "CLOSURE-R1-STG-01",
+      "jobId": "CA-JOB-03",
+      "classification": "SOURCE_CONFIRMED_VERIFIER_CHECK_WEAKNESS",
+      "sourceIds": [
+        "STG-VERIFY",
+        "STG-VERIFY-TEST",
+        "STG-SCOPE",
+        "STG-EXECUTE"
+      ],
+      "priority": "P1_CANDIDATE_FOR_INDEPENDENT_REVIEW",
+      "finding": "verifyStorageCleanup's checkId targets-within-scope is PASS whenever oracleInputs.scopeRoots is a nonempty array; that check does not compare actual journaled paths against authorized scope. Its test positive control uses arbitrary 'f.bin' with ['C:\\\\scope'] and expects task PASS. The lower-level executor separately performs scope checks; the weakness is specifically in the claimed INDEPENDENT verifier assertion, not proof of an out-of-scope OS deletion.",
+      "claimScope": "Do not claim independent target containment proof solely from the current verifier check or successful unit fixture; that guarantee needs stronger oracle/independent source and runtime evidence.",
+      "oracle": "An independent verifier must derive and bind exact authorized target IDs from trusted plan/Host; compare every journal/receipt action and affected file with that scope, including Windows path aliases/reparse races, and fail closed if evidence is incomplete.",
+      "negativeCase": "Trusted-looking receipt/journal records EXEC_DONE on an out-of-scope file while scopeRoots remains nonempty and reclaimed bytes match; independent verifier must FAIL/UNKNOWN, not PASS.",
+      "owner": "CA-GLOBAL-VERIFICATION",
+      "evidenceStatus": "SOURCE_CONFIRMED_CONTROL_FLOW_NO_NATIVE_REPRO",
+      "result": "REVIEW_REQUIRED_NO_UNAUTHORIZED_RUNTIME_PATCH"
+    },
+    {
+      "id": "CLOSURE-R1-STG-02",
+      "jobId": "CA-JOB-03",
+      "classification": "SOURCE_CONFIRMED_MEASUREMENT_NON_EQUIVALENCE",
+      "sourceIds": [
+        "STG-VERIFY",
+        "STG-DIAGNOSE",
+        "STG-EXECUTE"
+      ],
+      "priority": "P2_CANDIDATE",
+      "finding": "reclaimed-bytes-verified compares grossBytes against Σ journal EXEC_DONE file byte sizes, and records a post-growth-source directory measurement as context; it does not independently compare before/after volume free bytes. Journaled gross deleted file bytes are not necessarily actual free-space increase on every filesystem.",
+      "claimScope": "The R0 desired oracle 'Re-observed free-space delta' is an acceptance requirement, not evidence that existing code already verifies actual disk free-space change.",
+      "oracle": "Independently read target volume pre/post free bytes where the Product claims free space increase; distinguish physical free-space delta, journal gross, and regrowth/other concurrent writers; explain UNKNOWN if delta is not attributable.",
+      "negativeCase": "Journal says 100 bytes deleted but volume free bytes do not increase because of concurrent writes, shared extents, allocation behavior, etc.; never present 100 bytes as measured free-space increase.",
+      "owner": "CA-STORAGE",
+      "evidenceStatus": "SOURCE_READ_AND_VERIFIER_LIMIT_IDENTIFIED",
+      "result": "NEEDS_INDEPENDENT_MEASUREMENT_DESIGN"
+    },
+    {
+      "id": "CLOSURE-R1-STG-03",
+      "jobId": "CA-JOB-03",
+      "classification": "CROSS_COMPONENT_COMPOSITION_GAP",
+      "sourceIds": [
+        "STG-DIAGNOSE",
+        "STG-EXECUTE",
+        "HOST-EFFECT",
+        "CONTROL-API",
+        "COMPUTER-FOLDER"
+      ],
+      "priority": "P1_CANDIDATE_FOR_INDEPENDENT_REVIEW",
+      "finding": "Bounded storage vertical has its own action/controller/legacy authorization flows, and generic K→C Windows Host effect adapter and selected-root control route exist. These separate source components do not, by themselves, establish that the selected-root UI production journey invokes precisely the bounded storage cleanup Function via selected K Permit and Shun Host; actual composition, exact action identity and both-level postconditions remain to be proved.",
+      "claimScope": "No transfer of a separate storage benchmark or generic Host effect adapter PASS to an end-to-end CA-JOB-03 claim.",
+      "oracle": "Trace a real approved selected-root task from UI caseId to Host-picked exact scope, immutable plan/grant, K Permit, ActionController and OS currentness, actual bounded cleanup, durable journal, independent protected-asset and free-space postconditions, and UI history.",
+      "negativeCase": "Forged {path,plan,grant,permit}, mismatched caseId/selected-root, stale grant, duplicated action across restart, partial deletion or UI-only fake success → BLOCKED/UNKNOWN with no automatic replay.",
+      "owner": "CA-TASK-LIFECYCLE",
+      "evidenceStatus": "CROSS_COMPONENT_SOURCE_READ_ONLY_NOT_END_TO_END",
+      "result": "DIS_AND_PRODUCT_ADMISSION_PENDING"
+    },
+    {
+      "id": "CLOSURE-R1-STG-04",
+      "jobId": "CA-JOB-03",
+      "classification": "SOURCE_CONFIRMED_EFFECT_RECEIPT_BOUNDARY",
+      "sourceIds": [
+        "STG-EXECUTE",
+        "STG-VERIFY",
+        "HOST-EFFECT"
+      ],
+      "priority": "P2_CANDIDATE",
+      "finding": "executeBoundedCleanup explicitly sets postStateVerified:false and delegates semantic verification to a separate post-execution verifier; the generic Windows effect host completes K only when a trusted WindowsEffectPort receipt declares COMPLETED_VERIFIED and postStateVerified true. The conversion and independently verified proof are separate obligations.",
+      "claimScope": "An executor SUCCEEDED terminal alone is not a completed, independently verified K task outcome.",
+      "oracle": "Verify actual composition to a trusted postcondition receipt after semantic checks, bound to same action/effect ID, with durable evidence and no premature COMPLETED.",
+      "negativeCase": "Executor returns SUCCEEDED with postStateVerified false; K must remain running/UNKNOWN until distinct independent verifier evidence and reconciliation.",
+      "owner": "CA-GLOBAL-VERIFICATION",
+      "evidenceStatus": "SOURCE_CONFIRMED_ROLE_SEPARATION_NOT_E2E",
+      "result": "COMPOSITION_ORACLE_UNVERIFIED"
+    }
+  ],
+  "recommendedOrder": [
+    {
+      "step": 1,
+      "action": "Treat CA-JOB-02 as the first real read-only/low-risk observation oracle; bind actual Windows edition, system volume identity, privacy and truthful OBSERVED_ONLY UI result; never infer optimization effect.",
+      "gate": "NATIVE_WITNESS_AND_PRODUCT_JOURNEY_REVIEW"
+    },
+    {
+      "step": 2,
+      "action": "Independently review verifier target-scope and gross-vs-free-space evidence for CA-JOB-03 before declaring a correct Function postcondition; propose negative tests.",
+      "gate": "INDEPENDENT_SOURCE_FIRST_AND_DOMAIN_ORACLE"
+    },
+    {
+      "step": 3,
+      "action": "Trace selected-root UI/Host/K/ActionController effect identity through actual production composition and durable journal; no future mutation without approved Product/Task admission.",
+      "gate": "PRODUCT_AND_DIS_ADMISSION"
+    },
+    {
+      "step": 4,
+      "action": "Require separate SAP qualification and K/C/Host native effect poststate receipt; fail closed on mismatch, partial, stale approval or unknown effect.",
+      "gate": "SAP_DIS_NATIVE_VERIFIED_NOT_RUN"
+    }
+  ],
+  "excluded": [
+    "No code changes under packages/**/apps/**",
+    "No new product scope or automated execution",
+    "No invented root cause, storage free-space delta or Native PASS",
+    "No independent Gate signature by author",
+    "No regression of existing PR #414/#415 historical reviewer or Node receipt"
+  ],
+  "redTeamCases": [
+    {
+      "id": "ORACLE-SCOPE-1",
+      "type": "NEGATIVE",
+      "requirement": "Actual journal action/path outside the independently authorized scope with a syntactically nonempty scopeRoots must not pass independent scope verification",
+      "actual": "NOT_RUN"
+    },
+    {
+      "id": "ORACLE-GROSS-1",
+      "type": "NEGATIVE",
+      "requirement": "Journal gross deleted bytes cannot be reported as an observed increase of volume free bytes without a separate volume reading",
+      "actual": "NOT_RUN"
+    },
+    {
+      "id": "ORACLE-KHOST-1",
+      "type": "NEGATIVE",
+      "requirement": "K effect cannot become terminal from SUCCEEDED alone when postStateVerified=false or Host authorization/context changes",
+      "actual": "NOT_RUN"
+    },
+    {
+      "id": "ORACLE-SYSROOT-1",
+      "type": "BOUNDARY",
+      "requirement": "If Windows system volume differs from C:, require truthful provenance/refusal rather than claiming fixed C: is the system root",
+      "actual": "NOT_RUN"
+    }
+  ]
+}
