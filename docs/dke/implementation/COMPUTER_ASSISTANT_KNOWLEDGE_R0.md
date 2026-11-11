@@ -32,7 +32,7 @@ The source-first inventory shows that Shun is not devoid of real computer operat
 
 | Domain | Current source-backed capability | Boundary / gap |
 |---|---|---|
-| System inventory | Read-only CPU count, memory, fixed system-volume capacity/free space and uptime | Not full hardware inventory, disk topology or provider-backed storage-health diagnosis |
+| System inventory | Read-only CPU count, memory, hard-coded C: drive-root capacity/free space (actual system volume not established) and uptime | Not full hardware inventory, disk topology or provider-backed storage-health diagnosis |
 | System diagnosis | Bounded process/startup counts, top-memory observations, limited HKLM installed-software sample, low-disk/low-memory advisory | Single-snapshot diagnosis; no root-cause or guaranteed-speedup claim; no service inventory/dependency model or process/service control |
 | Storage | Scoped storage observation, growth attribution, fail-closed classification, preview, approval, bounded cleanup, journaling and protected-asset verification | Not disk initialization, partition create/resize/delete, volume formatting, disk online/offline or provider-backed health management |
 | Files | Pure preview for search, duplicate report, copy, move and rename; authorized handle-anchored duplicate observation | Preview is not execution authority; no unrestricted file manager is established by these surfaces |

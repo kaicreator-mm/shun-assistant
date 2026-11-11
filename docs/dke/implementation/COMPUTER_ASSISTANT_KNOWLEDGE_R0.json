@@ -1169,7 +1169,7 @@
     },
     {
       "id": "CA-CLM-003",
-      "statement": "The inspected public system-inventory API is read-only and returns a bounded Windows snapshot: logical CPU count, total/free memory, fixed system-volume total/free bytes and uptime; it does not accept arbitrary host, shell or filesystem-root injection.",
+      "statement": "The inspected public system-inventory API is read-only and returns a bounded Windows snapshot: logical CPU count, total/free memory, total/free bytes at the hard-coded C: drive root (actual Windows system-volume identity not verified) and uptime; it does not accept arbitrary host, shell or filesystem-root injection.",
       "status": "CONDITIONAL",
       "sourceRefs": [
         "SRC-SYSTEM-INDEX",
@@ -1177,11 +1177,11 @@
         "SRC-TEST-SYSTEM-DIAGNOSTICS"
       ],
       "limits": [
-        "This is not full hardware inventory, disk topology, SMART health, partition management or root-cause diagnosis."
+        "The measurement root is hard-coded to C: and is not proven to be the actual Windows system volume. This is not full hardware inventory, disk topology, SMART health, partition management or root-cause diagnosis."
       ],
       "semanticOwner": "CA-SYSTEM-OBSERVATION",
-      "applicability": "Inspected version/v0.3.0 source snapshot; Windows-only public API.",
-      "falsifier": "The public API accepts an arbitrary root/host/command or mutates the system.",
+      "applicability": "Inspected version/v0.3.0 source snapshot; Windows-only public API measuring C: drive root; current Windows system-volume identity remains UNKNOWN.",
+      "falsifier": "An unverified fixed C: observation is claimed to identify the actual Windows system volume; or the public API accepts an arbitrary root/host/command or mutates the system.",
       "maturity": "SOURCE_OBSERVED",
       "authorStatus": "SOURCE_OBSERVED",
       "unknownCase": "If the cited source revision, target applicability or required native/domain evidence is unavailable, retain CONDITIONAL/UNKNOWN and do not promote the claim.",
