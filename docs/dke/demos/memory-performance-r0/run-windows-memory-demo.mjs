@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 import { readFile } from 'node:fs/promises';
 import { analyzeMemoryObservation } from './memory-analysis.mjs';
+import { validateMemoryAotCandidate } from './memory-aot-integrity.mjs';
 
 const args = process.argv.slice(2);
 const includeLocalProcessNames = args.includes('--show-local-process-names');
@@ -18,7 +19,10 @@ if (args.some((x) => x !== '--show-local-process-names')) {
   process.exitCode = 2;
 } else {
   try {
-    const aot = JSON.parse(await readFile(new URL('./AOT_MEMORY_KNOWLEDGE_CANDIDATE_R0.json', import.meta.url), 'utf8'));
+    const aotRaw = await readFile(new URL('./AOT_MEMORY_KNOWLEDGE_CANDIDATE_R0.json', import.meta.url), 'utf8');
+    const aotIntegrity = validateMemoryAotCandidate(aotRaw);
+    if (!aotIntegrity.ok) throw new Error(aotIntegrity.code);
+    const aot = JSON.parse(aotRaw);
     const contract = JSON.parse(await readFile(new URL('./DIS_FUNCTION_CONTRACT_R0.json', import.meta.url), 'utf8'));
     if (aot.status !== 'DEMO_ONLY_CANDIDATE_NOT_QUALIFIED' || aot.productionConsumable !== false ||
         contract.status !== 'DIS_CONTRACT_CANDIDATE_NOT_QUALIFIED') {
@@ -33,7 +37,14 @@ if (args.some((x) => x !== '--show-local-process-names')) {
       schema: 'shun.demo.memory-performance-runtime.v0',
       demoOnly: true,
       productFeature: false,
-      aotPackage: { packageId: aot.packageId, packageVersion: aot.packageVersion, status: aot.status, activation: aot.activation },
+      aotPackage: {
+        packageId: aot.packageId, packageVersion: aot.packageVersion,
+        status: aot.status, activation: aot.activation,
+        sourceGitBlob: aotIntegrity.gitBlob,
+        integrity: aotIntegrity.integrity,
+        sourceRulesApplied: [],
+        consumption: 'VALIDATED_CANDIDATE_BYTES_ONLY_NOT_RULE_EXECUTION',
+      },
       disPipeline: contract.pipeline.pipelineId,
       runtime: { platform: process.platform, arch: process.arch, nodeVersion: process.version, sourceCommit: '1224fea4097799467e2c0c454885e680f1f28248' },
       report,
