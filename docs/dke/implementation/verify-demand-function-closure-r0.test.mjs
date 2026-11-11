@@ -9,7 +9,8 @@ const root=path.dirname(fileURLToPath(import.meta.url));
 const sourceBytes=fs.readFileSync(path.join(root,'COMPUTER_ASSISTANT_KNOWLEDGE_R0.json'));
 const source=JSON.parse(sourceBytes.toString('utf8'));
 const matrix=JSON.parse(fs.readFileSync(path.join(root,'DEMAND_TO_FUNCTION_CLOSURE_R0.json'),'utf8'));
-const clone=()=>structuredClone(matrix);
+// The fixture is plain JSON; avoid an unnecessary structuredClone runtime dependency.
+const clone=()=>JSON.parse(JSON.stringify(matrix));
 const expectReject=(edit,expected)=>{
  const x=clone(); edit(x); const result=validate(x,source,{knowledgeBlob:gitBlobSha(sourceBytes)});
  assert.equal(result.ok,false,'tampered matrix must be rejected');
