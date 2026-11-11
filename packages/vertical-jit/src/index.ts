@@ -28,6 +28,13 @@ export {
   WingetAcquisition,
   WingetPrivilegedBackend,
 } from './adapters/winget.ts';
+export {
+  CuratedProviderVerifier,
+  type ProviderDependencyEntry,
+  type ProviderVerificationRefusal,
+  type ProviderVerificationResult,
+  type TrustedProviderScope,
+} from './curated-provider.ts';
 export type { FailureRecovery, JitFailureCode } from './failures.ts';
 export { isJitLifecycleError, JitLifecycleError } from './failures.ts';
 export type { JournalEntry, JournalPhase, JournalPort, RecoveryClassification } from './journal.ts';

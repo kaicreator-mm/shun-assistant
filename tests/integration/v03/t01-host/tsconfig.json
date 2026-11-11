@@ -1,0 +1,16 @@
+{
+  "extends": "../../../../tsconfig.base.json",
+  "compilerOptions": {
+    "baseUrl": ".",
+    "types": ["node"],
+    "typeRoots": ["../../../../packages/authorization/node_modules/@types"],
+    "paths": {
+      "vitest": ["../../../../packages/authorization/node_modules/vitest/dist/index.d.ts"]
+    }
+  },
+  "include": [
+    "../../../../packages/domain-host/src/windows/**/*.ts",
+    "../../../../packages/domain-host/src/state/**/*.ts",
+    "./**/*.test.ts"
+  ]
+}

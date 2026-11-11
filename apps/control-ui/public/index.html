@@ -36,6 +36,62 @@
         </form>
       </section>
 
+      <section id="system-section" aria-labelledby="system-title">
+        <h2 id="system-title">Live Windows system information</h2>
+        <p class="muted">
+          Read-only facts from this computer, not simulated task results. Nothing is sent to a
+          cloud provider.
+        </p>
+        <button id="read-system-info" type="button">Read system information</button>
+        <p id="system-status" role="status">Not requested yet.</p>
+        <ul id="system-facts"></ul>
+        <button id="read-windows-diagnosis" type="button">Diagnose this PC (read-only)</button>
+        <p id="diagnosis-status" role="status">Not requested yet.</p>
+        <ul id="diagnosis-facts"></ul>
+        <p id="diagnosis-limitation" class="muted"></p>
+      </section>
+
+      <section id="recipe-section" aria-labelledby="recipe-title">
+        <h2 id="recipe-title">Reusable system information Recipe</h2>
+        <p class="muted">
+          Save the built-in read-only system inventory Recipe to local SQLite.
+          This only stores an immutable candidate: no model calls, no script
+          execution, no authorization grant, and no automatic activation.
+          Saving requires the real Windows backend, not Demo mode.
+        </p>
+        <button id="save-inventory-recipe" type="button">Save built-in Recipe candidate</button>
+        <button id="read-inventory-recipe" type="button">Review saved Recipe candidate</button>
+        <button id="run-inventory-recipe" type="button">Run saved read-only Recipe (operator R0 policy required)</button>
+        <p id="recipe-run-status" role="status">Not run. An external durable operator rule is required.</p>
+        <ul id="recipe-run-facts"></ul>
+        <p id="recipe-save-status" role="status">Not saved in this session.</p>
+        <p id="recipe-save-identity" class="muted"></p>
+      </section>
+
+      <section id="cloud-disclosure-section" aria-labelledby="cloud-disclosure-title">
+        <h2 id="cloud-disclosure-title">DeepSeek Flash disclosure preview</h2>
+        <p class="muted">
+          Preview exactly what Shun would share with the DeepSeek provider. This is a local
+          preview only — it does not approve a cloud call, send any data or charge tokens.
+        </p>
+        <label for="cloud-preview-goal">Goal text to preview</label>
+        <textarea id="cloud-preview-goal" rows="3" maxlength="8192"
+          placeholder="Describe a non-sensitive task for DeepSeek to plan"></textarea>
+        <button id="cloud-preview-button" type="button">Show disclosure preview</button>
+        <p id="cloud-preview-status" role="status">Checking whether this Windows host has a trusted consent broker and cloud policy.</p>
+        <p id="cloud-preview-hash" class="muted"></p>
+        <pre id="cloud-preview-json"></pre>
+        <p class="muted">
+          Real DeepSeek planning requires a separate Windows desktop consent dialog.
+          A model response is a suggestion, not an executable action. Actual charges may remain unknown.
+        </p>
+        <button id="cloud-send-button" type="button" disabled>
+          Request real DeepSeek interpretation (Windows consent required)
+        </button>
+        <p id="cloud-send-status" role="status">Checking trusted local cloud availability…</p>
+        <pre id="cloud-result-text"></pre>
+      </section>
+
       <section id="approvals-section" aria-labelledby="approvals-title">
         <h2 id="approvals-title">Waiting for your approval</h2>
         <ul id="approval-list"></ul>

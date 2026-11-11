@@ -1,0 +1,4 @@
+ed3409e011e70c467dbf70f6ddd8d78885f24daef0690089077fa7159e2ed42d *kaicreator-domain-harness-build-0.10.2-rc.0.tgz
+df2ca0fbf537f4da823800c1fa3b5a7f014e25b9aeb5c21143c99a2e829c1bbd *kaicreator-domain-harness-contracts-0.10.2-rc.0.tgz
+f4600539e9e7c3e6f74bf41d386f467610096315093b1588df9cd24579f0450a *kaicreator-domain-harness-host-node-0.10.2-rc.0.tgz
+cc8bcf50cb10691b10a6bb972d555326252e54f81354318ba1454e94d618270f *kaicreator-domain-harness-microkernel-0.10.2-rc.0.tgz
