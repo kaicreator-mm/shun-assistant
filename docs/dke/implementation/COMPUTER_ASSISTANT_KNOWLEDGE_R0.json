@@ -66,7 +66,12 @@
       },
       "separation": "This dossier is a broader computer-assistant knowledge candidate. It does not treat PR #412's narrow pilot as qualified truth and does not replace its review."
     },
-    "currentBoundary": "undefined The freeze checkpoint also records IMPLEMENTATION_AUTHORIZED=NO, SOURCE_SCAFFOLD=NOT_AUTHORIZED, L2_FREEZE=NO, TASK_DAG_FREEZE=NO and RELEASE_READY=NO; the inspected code branch is source evidence only, not Product implementation authorization or release qualification."
+    "currentBoundary": "The v0.3.0 Product Freeze checkpoint records IMPLEMENTATION_AUTHORIZED=NO, SOURCE_SCAFFOLD=NOT_AUTHORIZED, L2_FREEZE=NO, TASK_DAG_FREEZE=NO and RELEASE_READY=NO. The inspected source branch is evidence only, not implementation authorization or release qualification.",
+    "ownerDecisionPolicy": {
+      "currentDkeRepair": "No Product Owner decision is needed to repair source evidence, maturity labels, SAP coverage or candidate CQs inside this documentation-only DKE PR.",
+      "futureProductAdmission": "An explicit Product Owner amendment is required before partition/format, general software management, PnP/device/driver mutation, process/service mutation, network administration, WSL, remote, sandbox or cloud execution becomes a supported Shun feature.",
+      "domainOracles": "Hardware/driver semantics require an OEM or hardware-domain oracle; storage-health semantics require a Windows Storage Management Provider/storage specialist; network semantics require a network-domain oracle. Owner acceptance is required before SAP qualification."
+    }
   },
   "scope": {
     "domainGoal": "A user can state a computer-related goal; the assistant can identify the relevant computer objects and bounded capability, explain scope/risk/permissions, select a trusted provider compatible with the current environment, obtain required approval, execute only an authorized effect, and verify the resulting state or report UNKNOWN.",
@@ -77,7 +82,14 @@
         "Linux",
         "macOS"
       ],
-      "futureTargetsStatus": "KNOWLEDGE_CANDIDATE_ONLY_NOT_CURRENT_PRODUCT_SUPPORT"
+      "futureTargetsStatus": "KNOWLEDGE_CANDIDATE_ONLY_NOT_CURRENT_PRODUCT_SUPPORT",
+      "currentExecutionScope": "Windows-first local host only for the inspected native system/storage/files/JIT paths. This DKE does not admit WSL, remote administration, sandbox or cloud execution as current Shun targets.",
+      "nonCurrentExecutionTargets": [
+        "WSL",
+        "remote administration",
+        "sandbox execution",
+        "cloud execution"
+      ]
     },
     "included": [
       "Computer and OS object model",
@@ -103,7 +115,16 @@
       "Claiming Linux or macOS support from Windows-only evidence",
       "Creating runtime Functions, ABI, permissions, grants or AOT Packages in DKE"
     ],
-    "productBoundary": "Knowledge coverage can be broader than current product implementation. Every capability must carry a maturity label: FROZEN_PRODUCT, SOURCE_OBSERVED, PARTIAL, FUTURE_CANDIDATE, OUT_OF_CURRENT_SCOPE or UNKNOWN."
+    "productBoundary": "Knowledge coverage can be broader than current product implementation. Every capability must carry a maturity label: FROZEN_PRODUCT, SOURCE_OBSERVED, PARTIAL, FUTURE_CANDIDATE, OUT_OF_CURRENT_SCOPE or UNKNOWN.",
+    "maturitySemantics": {
+      "FROZEN_PRODUCT": "Explicitly admitted by the frozen Product; this is a requirement boundary, not proof of implementation.",
+      "SOURCE_OBSERVED": "Directly observed in pinned source; not a release or end-to-end integration claim.",
+      "PARTIAL": "A bounded subset exists, but full lifecycle, integration or domain coverage is not established.",
+      "FUTURE_CANDIDATE": "Knowledge candidate only; no current Product capability or implementation is implied.",
+      "OUT_OF_CURRENT_SCOPE": "Explicitly excluded from the current Product boundary.",
+      "UNKNOWN": "Evidence or a reliable oracle is insufficient; do not promote or infer."
+    },
+    "externalSourcePolicy": "Microsoft Learn/OEM sources establish only documented platform semantics and their stated OS/version applicability. They do not entail Shun implementation, Product admission, permission or supported-platform status. Mutable external pages are link-only locators observed on 2026-11-11; recheck before runtime use. If a page has no explicit client applicability matrix, client support remains UNKNOWN."
   },
   "sourceInventory": [
     {
@@ -402,6 +423,339 @@
       "path": "packages/vertical-storage/src/execute.ts",
       "blob": "89696ef1fff99546867087b4106b3390740b635d",
       "status": "OBSERVED_AUTHORIZED_EFFECT_BOUNDARY"
+    },
+    {
+      "id": "SRC-TEST-SYSTEM-INVENTORY",
+      "kind": "TEST_DEFINITION",
+      "repository": "kaicreator-mm/shun-assistant",
+      "commit": "1224fea4097799467e2c0c454885e680f1f28248",
+      "path": "packages/vertical-system/test/inventory.test.ts",
+      "blob": "0cb0df3e6bce77ad40a4d2b8b8f3418277296a1c",
+      "status": "TEST_SOURCE_ONLY_EXECUTION_NOT_REPEATED"
+    },
+    {
+      "id": "SRC-STORAGE-ATTRIBUTE",
+      "kind": "CODE",
+      "repository": "kaicreator-mm/shun-assistant",
+      "commit": "1224fea4097799467e2c0c454885e680f1f28248",
+      "path": "packages/vertical-storage/src/attribute.ts",
+      "blob": "90fb58049d3af46cb484d71faac8a089ed059f8d",
+      "status": "OBSERVED_EVIDENCE_BACKED_GROWTH_ATTRIBUTION"
+    },
+    {
+      "id": "SRC-STORAGE-CLASSIFY",
+      "kind": "CODE",
+      "repository": "kaicreator-mm/shun-assistant",
+      "commit": "1224fea4097799467e2c0c454885e680f1f28248",
+      "path": "packages/vertical-storage/src/classify.ts",
+      "blob": "daf1eeb977084c4859a46b01c366dfb4fe33090e",
+      "status": "OBSERVED_FAIL_CLOSED_CACHE_TEMP_CLASSIFICATION"
+    },
+    {
+      "id": "SRC-STORAGE-OBSERVE",
+      "kind": "CODE",
+      "repository": "kaicreator-mm/shun-assistant",
+      "commit": "1224fea4097799467e2c0c454885e680f1f28248",
+      "path": "packages/vertical-storage/src/observe.ts",
+      "blob": "27e5027a9b2e3b48136683dd89bcb1e60b8731a9",
+      "status": "OBSERVED_METADATA_ONLY_SCOPED_WALK"
+    },
+    {
+      "id": "SRC-STORAGE-SCOPE",
+      "kind": "CODE",
+      "repository": "kaicreator-mm/shun-assistant",
+      "commit": "1224fea4097799467e2c0c454885e680f1f28248",
+      "path": "packages/vertical-storage/src/scope.ts",
+      "blob": "e7d499a7a381611a93f45513455a165bf1104d22",
+      "status": "OBSERVED_CANONICAL_SCOPE_AND_REPARSE_REFUSAL"
+    },
+    {
+      "id": "SRC-STORAGE-VERIFY",
+      "kind": "CODE",
+      "repository": "kaicreator-mm/shun-assistant",
+      "commit": "1224fea4097799467e2c0c454885e680f1f28248",
+      "path": "packages/vertical-storage/src/verify.ts",
+      "blob": "1552f9e5b84209af37cd1ddcfd6e1291a7c1572f",
+      "status": "OBSERVED_JOURNAL_AND_PROTECTED_ASSET_POSTSTATE_VERIFICATION"
+    },
+    {
+      "id": "SRC-TEST-STORAGE-ATTRIBUTE",
+      "kind": "TEST_DEFINITION",
+      "repository": "kaicreator-mm/shun-assistant",
+      "commit": "1224fea4097799467e2c0c454885e680f1f28248",
+      "path": "packages/vertical-storage/test/attribute.test.ts",
+      "blob": "6e2299e11aa5b9ec878534b1579329f789d33191",
+      "status": "TEST_SOURCE_ONLY_EXECUTION_NOT_REPEATED"
+    },
+    {
+      "id": "SRC-TEST-STORAGE-CLASSIFY",
+      "kind": "TEST_DEFINITION",
+      "repository": "kaicreator-mm/shun-assistant",
+      "commit": "1224fea4097799467e2c0c454885e680f1f28248",
+      "path": "packages/vertical-storage/test/classify.test.ts",
+      "blob": "e7750f5f004e76f84a3029486eb0f04f1c173cd4",
+      "status": "TEST_SOURCE_ONLY_EXECUTION_NOT_REPEATED"
+    },
+    {
+      "id": "SRC-TEST-STORAGE-SCOPE",
+      "kind": "TEST_DEFINITION",
+      "repository": "kaicreator-mm/shun-assistant",
+      "commit": "1224fea4097799467e2c0c454885e680f1f28248",
+      "path": "packages/vertical-storage/test/scope.test.ts",
+      "blob": "d4e437ac6c823e2c4ad9e07739bdd5aec5b4577d",
+      "status": "WINDOWS_GATED_TEST_SOURCE_ONLY_EXECUTION_NOT_REPEATED"
+    },
+    {
+      "id": "SRC-TEST-STORAGE-VERIFY",
+      "kind": "TEST_DEFINITION",
+      "repository": "kaicreator-mm/shun-assistant",
+      "commit": "1224fea4097799467e2c0c454885e680f1f28248",
+      "path": "packages/vertical-storage/test/verify.test.ts",
+      "blob": "c7c1babb707ef8d0a67565da504a31c9dfad8c51",
+      "status": "TEST_SOURCE_ONLY_EXECUTION_NOT_REPEATED"
+    },
+    {
+      "id": "SRC-JIT-CURATED-PROVIDER",
+      "kind": "CODE",
+      "repository": "kaicreator-mm/shun-assistant",
+      "commit": "1224fea4097799467e2c0c454885e680f1f28248",
+      "path": "packages/vertical-jit/src/curated-provider.ts",
+      "blob": "a080fabc7075c91e9d8f05205c6f176f8c3935c7",
+      "status": "OBSERVED_SIGNED_CATALOG_AND_ARTIFACT_VERIFICATION"
+    },
+    {
+      "id": "SRC-JIT-PROVENANCE",
+      "kind": "CODE",
+      "repository": "kaicreator-mm/shun-assistant",
+      "commit": "1224fea4097799467e2c0c454885e680f1f28248",
+      "path": "packages/vertical-jit/src/provenance.ts",
+      "blob": "7fa9a453ffe122f45a03dd849624c174e04ad013",
+      "status": "OBSERVED_FAIL_CLOSED_PROVIDER_PROVENANCE"
+    },
+    {
+      "id": "SRC-TEST-JIT-CURATED-PROVIDER",
+      "kind": "TEST_DEFINITION",
+      "repository": "kaicreator-mm/shun-assistant",
+      "commit": "1224fea4097799467e2c0c454885e680f1f28248",
+      "path": "packages/vertical-jit/test/curated-provider.test.ts",
+      "blob": "187d211400d4886965fdba2ad14823e2f3c1dab1",
+      "status": "TEST_SOURCE_ONLY_EXECUTION_NOT_REPEATED"
+    },
+    {
+      "id": "SRC-TEST-JIT-WINGET",
+      "kind": "TEST_DEFINITION",
+      "repository": "kaicreator-mm/shun-assistant",
+      "commit": "1224fea4097799467e2c0c454885e680f1f28248",
+      "path": "packages/vertical-jit/test/winget-adapter.test.ts",
+      "blob": "ec18d29413ef687a9ad340c3f193dd325648526e",
+      "status": "TEST_SOURCE_ONLY_EXECUTION_NOT_REPEATED"
+    },
+    {
+      "id": "SRC-TEST-JIT-LIFECYCLE-REMOVE",
+      "kind": "TEST_DEFINITION",
+      "repository": "kaicreator-mm/shun-assistant",
+      "commit": "1224fea4097799467e2c0c454885e680f1f28248",
+      "path": "packages/vertical-jit/test/lifecycle-remove.test.ts",
+      "blob": "942a12d8ccb881c2c542519efeb1085b0c2ddf46",
+      "status": "TEST_SOURCE_ONLY_EXECUTION_NOT_REPEATED"
+    },
+    {
+      "id": "SRC-TEST-JIT-PROVENANCE",
+      "kind": "TEST_DEFINITION",
+      "repository": "kaicreator-mm/shun-assistant",
+      "commit": "1224fea4097799467e2c0c454885e680f1f28248",
+      "path": "packages/vertical-jit/test/provenance-fail-closed.test.ts",
+      "blob": "17f61eb4af6cf36a34d81139ce390f80bd42bd11",
+      "status": "TEST_SOURCE_ONLY_EXECUTION_NOT_REPEATED"
+    },
+    {
+      "id": "SRC-TEST-JIT-POSTSTATE",
+      "kind": "TEST_DEFINITION",
+      "repository": "kaicreator-mm/shun-assistant",
+      "commit": "1224fea4097799467e2c0c454885e680f1f28248",
+      "path": "packages/vertical-jit/test/poststate-verification-honesty.test.ts",
+      "blob": "be5276de4f574dc4b9b87b7a270ccdb6126e00c0",
+      "status": "TEST_SOURCE_ONLY_EXECUTION_NOT_REPEATED"
+    },
+    {
+      "id": "SRC-DOMAIN-COMPUTER-FOLDER",
+      "kind": "CODE",
+      "repository": "kaicreator-mm/shun-assistant",
+      "commit": "1224fea4097799467e2c0c454885e680f1f28248",
+      "path": "packages/domain-computer/src/computer/folder-observation.ts",
+      "blob": "8313f0dfbd7a8feff0de86b463a90c2082baa142",
+      "status": "OBSERVED_READ_ONLY_HOST_SELECTED_ROOT"
+    },
+    {
+      "id": "SRC-DOMAIN-COMPUTER-SUPPORT",
+      "kind": "CODE",
+      "repository": "kaicreator-mm/shun-assistant",
+      "commit": "1224fea4097799467e2c0c454885e680f1f28248",
+      "path": "packages/domain-computer/src/computer/support-context.ts",
+      "blob": "8ddc453cba4a266bccbb78e65111d2f25e48d5d7",
+      "status": "OBSERVED_LOCAL_ONLY_SUPPORT_CONTEXT_ADAPTER"
+    },
+    {
+      "id": "SRC-DOMAIN-COMPUTER-SEMANTIC",
+      "kind": "CODE",
+      "repository": "kaicreator-mm/shun-assistant",
+      "commit": "1224fea4097799467e2c0c454885e680f1f28248",
+      "path": "packages/domain-computer/src/semantic/goal-semantic.ts",
+      "blob": "84af798a974a3ddb11ee7a0cd203a7abfed87a3a",
+      "status": "OBSERVED_TYPED_GOAL_AND_CAPABILITY_SELECTION"
+    },
+    {
+      "id": "SRC-DOMAIN-COMPUTER-GUIDED",
+      "kind": "CODE",
+      "repository": "kaicreator-mm/shun-assistant",
+      "commit": "1224fea4097799467e2c0c454885e680f1f28248",
+      "path": "packages/domain-computer/src/guided/guided-journey.ts",
+      "blob": "ff36ee1ae672f501808f50b6b23a381931c1778e",
+      "status": "OBSERVED_ONE_STEP_GUIDED_VALIDATION"
+    },
+    {
+      "id": "SRC-DOMAIN-COMPUTER-GUIDED-CONTRACT",
+      "kind": "CODE",
+      "repository": "kaicreator-mm/shun-assistant",
+      "commit": "1224fea4097799467e2c0c454885e680f1f28248",
+      "path": "packages/domain-computer/src/guided/guided-contract.ts",
+      "blob": "94a42ed87e12a68e0c109ac94b6b1c7754b0f0a0",
+      "status": "OBSERVED_DOMAIN_OWNED_GUIDED_CONTRACT"
+    },
+    {
+      "id": "SRC-DOMAIN-COMPUTER-RECIPE",
+      "kind": "CODE",
+      "repository": "kaicreator-mm/shun-assistant",
+      "commit": "1224fea4097799467e2c0c454885e680f1f28248",
+      "path": "packages/domain-computer/src/recipes/recipe-replay.ts",
+      "blob": "697896f0d3b2a15abe03ca917fcf09855c144be2",
+      "status": "OBSERVED_DETERMINISTIC_PROPOSAL_ONLY_REPLAY"
+    },
+    {
+      "id": "SRC-DOMAIN-COMPUTER-PROVIDER-JIT",
+      "kind": "CODE",
+      "repository": "kaicreator-mm/shun-assistant",
+      "commit": "1224fea4097799467e2c0c454885e680f1f28248",
+      "path": "packages/domain-computer/src/provider/provider-jit.ts",
+      "blob": "eb70c8d110a8c2dcab7cd5ce5c3bcdb1936cdcc7",
+      "status": "OBSERVED_PROPOSAL_ONLY_T11_WIRING_ONLY"
+    },
+    {
+      "id": "SRC-DOMAIN-COMPUTER-META",
+      "kind": "CODE",
+      "repository": "kaicreator-mm/shun-assistant",
+      "commit": "1224fea4097799467e2c0c454885e680f1f28248",
+      "path": "packages/domain-computer/src/feedback/meta-feedback.ts",
+      "blob": "32adfd79c9053aed88d40fe260c5cfe6878f034d",
+      "status": "OBSERVED_OPT_IN_HOST_PERSISTED_SHADOW_CANDIDATE"
+    },
+    {
+      "id": "SRC-DOMAIN-COMPUTER-CLOUD-GOAL",
+      "kind": "CODE",
+      "repository": "kaicreator-mm/shun-assistant",
+      "commit": "1224fea4097799467e2c0c454885e680f1f28248",
+      "path": "packages/domain-computer/src/cloud/goal-request.ts",
+      "blob": "a98b596d2ec29e60c2fdf4cd12e5aeba0f7560c0",
+      "status": "OBSERVED_NEUTRAL_GOAL_ONLY_NO_SUPPORT_CONTEXT"
+    },
+    {
+      "id": "SRC-TEST-DOMAIN-COMPUTER-FOLDER",
+      "kind": "TEST_DEFINITION",
+      "repository": "kaicreator-mm/shun-assistant",
+      "commit": "1224fea4097799467e2c0c454885e680f1f28248",
+      "path": "tests/integration/v03/t02-computer/folder-observation.test.ts",
+      "blob": "d152f07a11f2e9aef062521061f9588e55f66d9a",
+      "status": "TEST_SOURCE_ONLY_EXECUTION_NOT_REPEATED"
+    },
+    {
+      "id": "SRC-TEST-DOMAIN-COMPUTER-SUPPORT",
+      "kind": "TEST_DEFINITION",
+      "repository": "kaicreator-mm/shun-assistant",
+      "commit": "1224fea4097799467e2c0c454885e680f1f28248",
+      "path": "tests/integration/v03/t02-computer/support-context.test.ts",
+      "blob": "702ecfc9f40125372bb38b3e175c867356627b99",
+      "status": "TEST_SOURCE_ONLY_EXECUTION_NOT_REPEATED"
+    },
+    {
+      "id": "SRC-TEST-DOMAIN-COMPUTER-SEMANTIC",
+      "kind": "TEST_DEFINITION",
+      "repository": "kaicreator-mm/shun-assistant",
+      "commit": "1224fea4097799467e2c0c454885e680f1f28248",
+      "path": "tests/integration/v03/t03-semantic/goal-semantic.test.ts",
+      "blob": "1a353da777031ef8d3ed8f1689f98791bee05ec9",
+      "status": "TEST_SOURCE_ONLY_EXECUTION_NOT_REPEATED"
+    },
+    {
+      "id": "SRC-TEST-DOMAIN-COMPUTER-GUIDED",
+      "kind": "TEST_DEFINITION",
+      "repository": "kaicreator-mm/shun-assistant",
+      "commit": "1224fea4097799467e2c0c454885e680f1f28248",
+      "path": "tests/integration/v03/t05-guided/guided-journey.test.ts",
+      "blob": "bce1093e5a0629d80380864af0cd702671c4989b",
+      "status": "TEST_SOURCE_ONLY_EXECUTION_NOT_REPEATED"
+    },
+    {
+      "id": "SRC-TEST-DOMAIN-COMPUTER-META",
+      "kind": "TEST_DEFINITION",
+      "repository": "kaicreator-mm/shun-assistant",
+      "commit": "1224fea4097799467e2c0c454885e680f1f28248",
+      "path": "tests/integration/v03/t06-meta/meta-feedback.test.ts",
+      "blob": "b45fe5902bb7809eef7834d97912179d8ad82d7f",
+      "status": "TEST_SOURCE_ONLY_EXECUTION_NOT_REPEATED"
+    },
+    {
+      "id": "SRC-TEST-DOMAIN-COMPUTER-RECIPE",
+      "kind": "TEST_DEFINITION",
+      "repository": "kaicreator-mm/shun-assistant",
+      "commit": "1224fea4097799467e2c0c454885e680f1f28248",
+      "path": "tests/integration/v03/t07-recipes/recipe-replay.test.ts",
+      "blob": "57def68c72a3a761409412181e80d0b37ee1fd46",
+      "status": "TEST_SOURCE_ONLY_EXECUTION_NOT_REPEATED"
+    },
+    {
+      "id": "SRC-TEST-DOMAIN-COMPUTER-PROVIDER-JIT",
+      "kind": "TEST_DEFINITION",
+      "repository": "kaicreator-mm/shun-assistant",
+      "commit": "1224fea4097799467e2c0c454885e680f1f28248",
+      "path": "tests/integration/v03/t08-provider/provider-jit.test.ts",
+      "blob": "c7ecea3373066ebb3446c46bc2dafb02e88b6ee9",
+      "status": "TEST_SOURCE_ONLY_EXECUTION_NOT_REPEATED"
+    },
+    {
+      "id": "SRC-SUPPORT-MINIMIZER",
+      "kind": "CODE",
+      "repository": "kaicreator-mm/shun-assistant",
+      "commit": "1224fea4097799467e2c0c454885e680f1f28248",
+      "path": "packages/vertical-support/src/minimize.ts",
+      "blob": "8a270f8f47bf533d67d37493976b610548f53e16",
+      "status": "OBSERVED_B040_LOCAL_SUPPORT_MINIMIZATION"
+    },
+    {
+      "id": "SRC-SUPPORT-WINDOWS",
+      "kind": "CODE",
+      "repository": "kaicreator-mm/shun-assistant",
+      "commit": "1224fea4097799467e2c0c454885e680f1f28248",
+      "path": "packages/vertical-support/src/windows.ts",
+      "blob": "b8787f093ff9dbff9c442805947480fba97515f9",
+      "status": "OBSERVED_WINDOWS_ONLY_FIXED_COLLECTOR"
+    },
+    {
+      "id": "SRC-SUPPORT-RUNNER",
+      "kind": "CODE",
+      "repository": "kaicreator-mm/shun-assistant",
+      "commit": "1224fea4097799467e2c0c454885e680f1f28248",
+      "path": "packages/vertical-support/src/internal/windows-runner.ts",
+      "blob": "2e9ca393e1a42a013fb1973d7f69f4bde373defc",
+      "status": "OBSERVED_FIXED_SYSTEM32_POWERSHELL_RUNNER"
+    },
+    {
+      "id": "SRC-TEST-SUPPORT-CONTEXT",
+      "kind": "TEST_DEFINITION",
+      "repository": "kaicreator-mm/shun-assistant",
+      "commit": "1224fea4097799467e2c0c454885e680f1f28248",
+      "path": "packages/vertical-support/test/support-context.test.ts",
+      "blob": "4ae5f5315d196b29d1c3973ea17a1a1e3696fcd3",
+      "status": "WINDOWS_GATED_TEST_SOURCE_ONLY_EXECUTION_NOT_REPEATED"
     }
   ],
   "externalSources": [
@@ -420,7 +774,23 @@
         "uninstall",
         "source"
       ],
-      "rights": "LINK_ONLY_NO_CONTENT_REPRODUCTION_LICENSE_NOT_INDEPENDENTLY_REVIEWED"
+      "rights": "LINK_ONLY_NO_CONTENT_REPRODUCTION_LICENSE_NOT_INDEPENDENTLY_REVIEWED",
+      "applicability": {
+        "documentationView": "Microsoft Learn current WinGet overview",
+        "supportedOS": [
+          "Windows 10 version 1809 (build 17763) or later",
+          "Windows 11",
+          "Windows Server 2025"
+        ],
+        "prerequisites": [
+          "App Installer / Windows Package Manager registration; first user logon may be required before winget is available."
+        ],
+        "runtimeRequirement": "Read the installed winget client version and App Installer availability on the target host; the documentation locator does not pin a specific client build.",
+        "limitations": [
+          "WinGet availability does not imply a Shun feature or a complete inventory."
+        ]
+      },
+      "sourceRevision": "Microsoft Learn locator observed 2026-11-11; no immutable page revision identifier exposed by this locator."
     },
     {
       "id": "EXT-WINGET-LIST",
@@ -431,7 +801,16 @@
       "supports": [
         "WinGet list includes packages installed by other means and may show upgrade availability"
       ],
-      "rights": "LINK_ONLY_NO_CONTENT_REPRODUCTION_LICENSE_NOT_INDEPENDENTLY_REVIEWED"
+      "rights": "LINK_ONLY_NO_CONTENT_REPRODUCTION_LICENSE_NOT_INDEPENDENTLY_REVIEWED",
+      "applicability": {
+        "documentationView": "Microsoft Learn WinGet list command",
+        "supportedOS": "Inherits the WinGet overview support range: Windows 10 1809+, Windows 11 and Windows Server 2025; exact client version must be checked at runtime.",
+        "runtimeRequirement": "Verify winget --version, source configuration and package scope on the target host.",
+        "limitations": [
+          "The command can show apps installed by other means, but this does not prove Shun's HKLM sample is complete."
+        ]
+      },
+      "sourceRevision": "Microsoft Learn locator observed 2026-11-11; no immutable page revision identifier exposed by this locator."
     },
     {
       "id": "EXT-WINGET-UPGRADE",
@@ -444,7 +823,16 @@
         "upgrade --all has broad scope",
         "pins and unknown versions affect upgrade selection"
       ],
-      "rights": "LINK_ONLY_NO_CONTENT_REPRODUCTION_LICENSE_NOT_INDEPENDENTLY_REVIEWED"
+      "rights": "LINK_ONLY_NO_CONTENT_REPRODUCTION_LICENSE_NOT_INDEPENDENTLY_REVIEWED",
+      "applicability": {
+        "documentationView": "Microsoft Learn WinGet upgrade command",
+        "supportedOS": "Inherits the WinGet overview support range: Windows 10 1809+, Windows 11 and Windows Server 2025; exact client version must be checked at runtime.",
+        "runtimeRequirement": "Resolve exact package identity/version/source and recheck availability immediately before action.",
+        "limitations": [
+          "Command availability is not Shun upgrade capability."
+        ]
+      },
+      "sourceRevision": "Microsoft Learn locator observed 2026-11-11; no immutable page revision identifier exposed by this locator."
     },
     {
       "id": "EXT-WINGET-UNINSTALL",
@@ -455,7 +843,16 @@
       "supports": [
         "uninstall requires resolving an exact application when query is ambiguous"
       ],
-      "rights": "LINK_ONLY_NO_CONTENT_REPRODUCTION_LICENSE_NOT_INDEPENDENTLY_REVIEWED"
+      "rights": "LINK_ONLY_NO_CONTENT_REPRODUCTION_LICENSE_NOT_INDEPENDENTLY_REVIEWED",
+      "applicability": {
+        "documentationView": "Microsoft Learn WinGet uninstall command",
+        "supportedOS": "Inherits the WinGet overview support range: Windows 10 1809+, Windows 11 and Windows Server 2025; exact client version must be checked at runtime.",
+        "runtimeRequirement": "Resolve exact package identity/version/source and uninstall scope immediately before action.",
+        "limitations": [
+          "Command availability is not Shun uninstall capability; package removal may involve source agreement prompts."
+        ]
+      },
+      "sourceRevision": "Microsoft Learn locator observed 2026-11-11; no immutable page revision identifier exposed by this locator."
     },
     {
       "id": "EXT-DISK-MGMT",
@@ -468,7 +865,23 @@
         "initialize disks",
         "extend and shrink volumes"
       ],
-      "rights": "LINK_ONLY_NO_CONTENT_REPRODUCTION_LICENSE_NOT_INDEPENDENTLY_REVIEWED"
+      "rights": "LINK_ONLY_NO_CONTENT_REPRODUCTION_LICENSE_NOT_INDEPENDENTLY_REVIEWED",
+      "applicability": {
+        "documentationView": "Microsoft Learn Disk Management overview",
+        "supportedOS": [
+          "Windows 10",
+          "Windows 11",
+          "Windows Server 2016",
+          "Windows Server 2019",
+          "Windows Server 2022",
+          "Windows Server 2025"
+        ],
+        "runtimeRequirement": "Confirm exact edition/build and disk identity on the target host; documentation is not Shun support evidence.",
+        "limitations": [
+          "Platform capability description only; no Shun disk-management feature is implied."
+        ]
+      },
+      "sourceRevision": "Microsoft Learn locator observed 2026-11-11; no immutable page revision identifier exposed by this locator."
     },
     {
       "id": "EXT-DISK-INITIALIZE",
@@ -481,20 +894,49 @@
         "initialization erases data",
         "Backup Operators or Administrators membership required"
       ],
-      "rights": "LINK_ONLY_NO_CONTENT_REPRODUCTION_LICENSE_NOT_INDEPENDENTLY_REVIEWED"
+      "rights": "LINK_ONLY_NO_CONTENT_REPRODUCTION_LICENSE_NOT_INDEPENDENTLY_REVIEWED",
+      "applicability": {
+        "documentationView": "Microsoft Learn Initialize new disks",
+        "supportedOS": [
+          "Windows 10",
+          "Windows 11",
+          "Windows Server 2016",
+          "Windows Server 2019",
+          "Windows Server 2022",
+          "Windows Server 2025"
+        ],
+        "prerequisites": [
+          "A new disk with no existing data",
+          "Backup Operators or Administrators membership"
+        ],
+        "runtimeRequirement": "Recheck exact disk unique identity, existing-data state and backup state before any separately authorized future operation.",
+        "limitations": [
+          "Microsoft warns initialization erases data on a disk already in use; no Shun initialization capability is admitted."
+        ]
+      },
+      "sourceRevision": "Microsoft Learn locator observed 2026-11-11; no immutable page revision identifier exposed by this locator."
     },
     {
       "id": "EXT-STORAGE-MODULE",
       "authority": "MICROSOFT_LEARN",
       "title": "Storage Module",
-      "url": "https://learn.microsoft.com/en-us/powershell/module/storage",
+      "url": "https://learn.microsoft.com/en-us/powershell/module/storage/?view=windowsserver2025-ps",
       "observed": "2026-11-11",
       "supports": [
         "Get-Disk",
         "Get-Partition",
         "Format-Volume and related storage cmdlet family"
       ],
-      "rights": "LINK_ONLY_NO_CONTENT_REPRODUCTION_LICENSE_NOT_INDEPENDENTLY_REVIEWED"
+      "rights": "LINK_ONLY_NO_CONTENT_REPRODUCTION_LICENSE_NOT_INDEPENDENTLY_REVIEWED",
+      "applicability": {
+        "documentationView": "windowsserver2025-ps",
+        "supportedOS": "The module reference is rendered for Windows Server 2025 PowerShell; this locator does not prove every cmdlet/provider is available on every Windows 10/11 SKU/build.",
+        "runtimeRequirement": "Check Get-Module Storage, Get-Command and the actual Storage Management Provider on the exact target host.",
+        "limitations": [
+          "Get-Disk/Get-Partition/Format-Volume semantics are platform references only; destructive actions remain outside current Shun Product scope."
+        ]
+      },
+      "sourceRevision": "Microsoft Learn locator observed 2026-11-11; no immutable page revision identifier exposed by this locator."
     },
     {
       "id": "EXT-PNP-GET",
@@ -505,7 +947,17 @@
       "supports": [
         "enumerate Plug and Play devices and filter by class, status and presence"
       ],
-      "rights": "LINK_ONLY_NO_CONTENT_REPRODUCTION_LICENSE_NOT_INDEPENDENTLY_REVIEWED"
+      "rights": "LINK_ONLY_NO_CONTENT_REPRODUCTION_LICENSE_NOT_INDEPENDENTLY_REVIEWED",
+      "applicability": {
+        "documentationView": "windowsserver2025-ps",
+        "supportedOS": "The retrieved PnPDevice cmdlet page has no explicit Windows 10/11 client applicability matrix; client support remains UNKNOWN from this locator.",
+        "runtimeRequirement": "Verify module availability and returned properties on the exact target Windows client before adoption.",
+        "limitations": [
+          "Get-PnpDevice returns basic PnP information, not full OEM driver provenance or compatibility.",
+          "CimSession can target remote sessions in the documented cmdlet; remote administration is outside this Product scope."
+        ]
+      },
+      "sourceRevision": "Microsoft Learn locator observed 2026-11-11; no immutable page revision identifier exposed by this locator."
     },
     {
       "id": "EXT-PNP-ENABLE",
@@ -517,19 +969,45 @@
         "enable a PnP device",
         "Administrator account required"
       ],
-      "rights": "LINK_ONLY_NO_CONTENT_REPRODUCTION_LICENSE_NOT_INDEPENDENTLY_REVIEWED"
+      "rights": "LINK_ONLY_NO_CONTENT_REPRODUCTION_LICENSE_NOT_INDEPENDENTLY_REVIEWED",
+      "applicability": {
+        "documentationView": "windowsserver2025-ps",
+        "supportedOS": "The retrieved PnPDevice cmdlet page has no explicit Windows 10/11 client applicability matrix; client support remains UNKNOWN from this locator.",
+        "prerequisites": [
+          "Administrator account required by Microsoft documentation."
+        ],
+        "runtimeRequirement": "Exact device InstanceId and current Administrator authority must be checked on the target host.",
+        "limitations": [
+          "CimSession supports remote sessions in the cmdlet contract; remote administration is not admitted by this candidate.",
+          "No Shun device mutation capability is implied."
+        ]
+      },
+      "sourceRevision": "Microsoft Learn locator observed 2026-11-11; no immutable page revision identifier exposed by this locator."
     },
     {
       "id": "EXT-PNP-DISABLE",
       "authority": "MICROSOFT_LEARN",
       "title": "Disable-PnpDevice",
-      "url": "https://learn.microsoft.com/en-us/powershell/module/pnpdevice/disable-pnpdevice",
+      "url": "https://learn.microsoft.com/en-us/powershell/module/pnpdevice/disable-pnpdevice?view=windowsserver2025-ps",
       "observed": "2026-11-11",
       "supports": [
         "disable a PnP device",
         "Administrator account required"
       ],
-      "rights": "LINK_ONLY_NO_CONTENT_REPRODUCTION_LICENSE_NOT_INDEPENDENTLY_REVIEWED"
+      "rights": "LINK_ONLY_NO_CONTENT_REPRODUCTION_LICENSE_NOT_INDEPENDENTLY_REVIEWED",
+      "applicability": {
+        "documentationView": "windowsserver2025-ps",
+        "supportedOS": "The retrieved PnPDevice cmdlet page has no explicit Windows 10/11 client applicability matrix; client support remains UNKNOWN from this locator.",
+        "prerequisites": [
+          "Administrator account required by Microsoft documentation."
+        ],
+        "runtimeRequirement": "Exact device InstanceId and current Administrator authority must be checked on the target host.",
+        "limitations": [
+          "CimSession supports remote sessions in the cmdlet contract; remote administration is not admitted by this candidate.",
+          "No Shun device mutation capability is implied."
+        ]
+      },
+      "sourceRevision": "Microsoft Learn locator observed 2026-11-11; no immutable page revision identifier exposed by this locator."
     },
     {
       "id": "EXT-PNPUTIL",
@@ -540,7 +1018,49 @@
       "supports": [
         "driver-store enumeration, adding and deleting driver packages"
       ],
-      "rights": "LINK_ONLY_NO_CONTENT_REPRODUCTION_LICENSE_NOT_INDEPENDENTLY_REVIEWED"
+      "rights": "LINK_ONLY_NO_CONTENT_REPRODUCTION_LICENSE_NOT_INDEPENDENTLY_REVIEWED",
+      "applicability": {
+        "documentationView": "Microsoft Learn pnputil",
+        "supportedOS": [
+          "Windows 10",
+          "Windows 11",
+          "Windows Server 2016",
+          "Windows Server 2019",
+          "Windows Server 2022",
+          "Windows Server 2025",
+          "Azure Local 2311.2 and later"
+        ],
+        "runtimeRequirement": "Verify exact pnputil command support, package identity, signer and OEM compatibility on the target host.",
+        "limitations": [
+          "The tool manages the driver store (add/remove/list); it is not an OEM compatibility or rollback oracle and does not imply Shun driver management."
+        ]
+      },
+      "sourceRevision": "Microsoft Learn locator observed 2026-11-11; no immutable page revision identifier exposed by this locator."
+    },
+    {
+      "id": "EXT-PHYSICAL-DISK",
+      "authority": "MICROSOFT_LEARN_OFFICIAL",
+      "title": "Get-PhysicalDisk (Storage)",
+      "url": "https://learn.microsoft.com/en-us/powershell/module/storage/get-physicaldisk?view=windowsserver2025-ps",
+      "observed": "2026-11-11",
+      "supports": [
+        "Get-PhysicalDisk",
+        "HealthStatus",
+        "UniqueId",
+        "Manufacturer",
+        "Model"
+      ],
+      "rights": "LINK_ONLY_NO_CONTENT_REPRODUCTION_LICENSE_NOT_INDEPENDENTLY_REVIEWED",
+      "applicability": {
+        "documentationView": "windowsserver2025-ps",
+        "supportedOS": "The page is rendered for the Windows Server 2025 PowerShell reference view; it does not provide a Windows 10/11 client applicability matrix in the retrieved page.",
+        "runtimeRequirement": "Verify the Storage module and a supporting Storage Management Provider on the exact target host before collecting HealthStatus.",
+        "limitations": [
+          "HealthStatus is provider-dependent telemetry, not a universal SMART oracle.",
+          "The command documents Windows platform behavior only; it does not establish Shun implementation or feature admission."
+        ]
+      },
+      "sourceRevision": "Microsoft Learn locator observed 2026-11-11; no immutable page revision identifier exposed by this locator."
     }
   ],
   "claims": [
@@ -558,7 +1078,8 @@
       ],
       "semanticOwner": "CA-GOAL-CAPABILITY",
       "applicability": "Frozen Windows-first Product semantics; v0.3 goal/capability/provider/environment boundary.",
-      "falsifier": "A request resolves to an unregistered or unbounded raw command without clarification."
+      "falsifier": "A request resolves to an unregistered or unbounded raw command without clarification.",
+      "maturity": "FROZEN_PRODUCT"
     },
     {
       "id": "CA-CLM-002",
@@ -573,7 +1094,8 @@
       ],
       "semanticOwner": "CA-ROOT",
       "applicability": "Frozen v0.3 Product boundary; later Product amendments are separate revisions.",
-      "falsifier": "The frozen Product explicitly admits arbitrary generated scripts or autonomous general desktop operation."
+      "falsifier": "The frozen Product explicitly admits arbitrary generated scripts or autonomous general desktop operation.",
+      "maturity": "FROZEN_PRODUCT"
     },
     {
       "id": "CA-CLM-003",
@@ -589,7 +1111,8 @@
       ],
       "semanticOwner": "CA-SYSTEM-OBSERVATION",
       "applicability": "Inspected version/v0.3.0 source snapshot; Windows-only public API.",
-      "falsifier": "The public API accepts an arbitrary root/host/command or mutates the system."
+      "falsifier": "The public API accepts an arbitrary root/host/command or mutates the system.",
+      "maturity": "SOURCE_OBSERVED"
     },
     {
       "id": "CA-CLM-004",
@@ -597,14 +1120,20 @@
       "status": "SOURCE_OBSERVED_PARTIAL",
       "sourceRefs": [
         "SRC-SYSTEM-RUNTIME",
-        "SRC-TEST-SYSTEM-SOFTWARE"
+        "SRC-TEST-SYSTEM-SOFTWARE",
+        "SRC-SYSTEM-PRESSURE",
+        "SRC-TEST-SYSTEM-PRESSURE",
+        "SRC-TEST-SYSTEM-RUNTIME",
+        "SRC-TEST-SYSTEM-INVENTORY"
       ],
       "limits": [
-        "The software test explicitly constrains the sample to HKLM DisplayName/DisplayVersion and excludes uninstall behavior; completeness across per-user and non-registry installations is not established."
+        "The software test explicitly constrains the sample to HKLM DisplayName/DisplayVersion and excludes uninstall behavior; completeness across per-user and non-registry installations is not established.",
+        "The inspected runtime does not establish service inventory, service dependency observation or process/service mutation."
       ],
       "semanticOwner": "CA-SYSTEM-OBSERVATION",
       "applicability": "Inspected Windows runtime and bounded collectors in version/v0.3.0.",
-      "falsifier": "The collectors enumerate every per-user and machine-wide installation or control processes/services."
+      "falsifier": "The collectors enumerate every per-user and machine-wide installation or control processes/services.",
+      "maturity": "PARTIAL"
     },
     {
       "id": "CA-CLM-005",
@@ -619,7 +1148,8 @@
       ],
       "semanticOwner": "CA-SYSTEM-OBSERVATION",
       "applicability": "Single local Windows observation snapshot and deterministic projection.",
-      "falsifier": "The diagnosis claims a verified root cause, CPU bottleneck or guaranteed speedup."
+      "falsifier": "The diagnosis claims a verified root cause, CPU bottleneck or guaranteed speedup.",
+      "maturity": "SOURCE_OBSERVED"
     },
     {
       "id": "CA-CLM-006",
@@ -630,7 +1160,16 @@
         "SRC-STORAGE-DIAGNOSE",
         "SRC-TEST-STORAGE-DIAGNOSE",
         "SRC-TEST-STORAGE-PLAN",
-        "SRC-TEST-STORAGE-EXECUTE"
+        "SRC-TEST-STORAGE-EXECUTE",
+        "SRC-STORAGE-ATTRIBUTE",
+        "SRC-STORAGE-CLASSIFY",
+        "SRC-STORAGE-OBSERVE",
+        "SRC-STORAGE-SCOPE",
+        "SRC-STORAGE-VERIFY",
+        "SRC-TEST-STORAGE-ATTRIBUTE",
+        "SRC-TEST-STORAGE-CLASSIFY",
+        "SRC-TEST-STORAGE-SCOPE",
+        "SRC-TEST-STORAGE-VERIFY"
       ],
       "limits": [
         "It is not a general disk/partition manager and does not establish initialization, repartitioning, formatting or drive-online/offline capabilities.",
@@ -638,7 +1177,8 @@
       ],
       "semanticOwner": "CA-STORAGE",
       "applicability": "Inspected storage vertical and its Windows-gated test definitions.",
-      "falsifier": "A partition/format/initialize operation is exposed by this bounded cleanup vertical or tests prove production Host composition."
+      "falsifier": "A partition/format/initialize operation is exposed by this bounded cleanup vertical or tests prove production Host composition.",
+      "maturity": "PARTIAL"
     },
     {
       "id": "CA-CLM-007",
@@ -656,7 +1196,8 @@
       ],
       "semanticOwner": "CA-FILE-ASSET",
       "applicability": "Inspected public file vertical, preview and anchored duplicate-observation path.",
-      "falsifier": "A preview is treated as authorization or an unrestricted filesystem operation."
+      "falsifier": "A preview is treated as authorization or an unrestricted filesystem operation.",
+      "maturity": "PARTIAL"
     },
     {
       "id": "CA-CLM-008",
@@ -668,14 +1209,25 @@
         "SRC-JIT-WINGET",
         "SRC-JIT-MANIFEST",
         "SRC-JIT-RESIDUE",
-        "SRC-TEST-JIT-RESIDUE"
+        "SRC-TEST-JIT-RESIDUE",
+        "SRC-JIT-CURATED-PROVIDER",
+        "SRC-JIT-PROVENANCE",
+        "SRC-TEST-JIT-CURATED-PROVIDER",
+        "SRC-TEST-JIT-WINGET",
+        "SRC-TEST-JIT-LIFECYCLE-REMOVE",
+        "SRC-TEST-JIT-PROVENANCE",
+        "SRC-TEST-JIT-POSTSTATE",
+        "SRC-DOMAIN-COMPUTER-PROVIDER-JIT",
+        "SRC-TEST-DOMAIN-COMPUTER-PROVIDER-JIT"
       ],
       "limits": [
-        "This is not proof of a complete consumer-facing app catalog, arbitrary app uninstall, all-app update, repair or package-source management."
+        "This is not proof of a complete consumer-facing app catalog, arbitrary app uninstall, all-app update, repair or package-source management.",
+        "The Domain Computer T08 Provider JIT adapter is proposal-only/T11-wiring-only; the vertical JIT library is not proof of a fully integrated consumer-facing software manager."
       ],
       "semanticOwner": "CA-SOFTWARE-LIFECYCLE",
       "applicability": "Inspected curated JIT provider lifecycle and manifest-bound removal implementation.",
-      "falsifier": "An unknown source/package or unrecorded user file is accepted for install/removal."
+      "falsifier": "An unknown source/package or unrecorded user file is accepted for install/removal.",
+      "maturity": "PARTIAL"
     },
     {
       "id": "CA-CLM-009",
@@ -691,7 +1243,8 @@
       ],
       "semanticOwner": "CA-HARDWARE-DEVICE",
       "applicability": "Inspected public domain-computer export surface and frozen Product/L1 scope.",
-      "falsifier": "A public, Product-admitted PnP/driver capability exists in the inspected surface."
+      "falsifier": "A public, Product-admitted PnP/driver capability exists in the inspected surface.",
+      "maturity": "FUTURE_CANDIDATE"
     },
     {
       "id": "CA-CLM-010",
@@ -702,14 +1255,17 @@
         "EXT-DISK-INITIALIZE",
         "EXT-STORAGE-MODULE",
         "SRC-SYSTEM-INDEX",
-        "SRC-STORAGE-INDEX"
+        "SRC-STORAGE-INDEX",
+        "EXT-PHYSICAL-DISK"
       ],
       "limits": [
-        "No Shun implementation or Product authorization for disk initialization, partition changes or formatting is established."
+        "No Shun implementation or Product authorization for disk initialization, partition changes or formatting is established.",
+        "Get-PhysicalDisk HealthStatus is provider-dependent telemetry; it is not a universal SMART-health oracle and is not implemented by Shun."
       ],
       "semanticOwner": "CA-STORAGE",
       "applicability": "Windows storage documentation compared with Shun's fixed-volume inventory and bounded-cleanup surfaces.",
-      "falsifier": "Shun source exposes partition/format management under the reviewed public surface."
+      "falsifier": "Shun source exposes partition/format management under the reviewed public surface.",
+      "maturity": "FUTURE_CANDIDATE"
     },
     {
       "id": "CA-CLM-011",
@@ -728,7 +1284,8 @@
       ],
       "semanticOwner": "CA-SOFTWARE-LIFECYCLE",
       "applicability": "Windows WinGet documentation and Shun's curated JIT adapter.",
-      "falsifier": "WinGet command availability is taken as proof that Shun exposes all of those operations."
+      "falsifier": "WinGet command availability is taken as proof that Shun exposes all of those operations.",
+      "maturity": "PARTIAL"
     },
     {
       "id": "CA-CLM-012",
@@ -741,11 +1298,13 @@
         "EXT-PNPUTIL"
       ],
       "limits": [
-        "No Shun device/driver implementation, OEM package provenance contract, rollback model or Product acceptance is proven."
+        "No Shun device/driver implementation, OEM package provenance contract, rollback model or Product acceptance is proven.",
+        "The PnPDevice cmdlet pages are rendered under the Windows Server 2025 PowerShell documentation view and do not provide an explicit Windows 10/11 client applicability matrix; client availability remains UNKNOWN until verified on the target host."
       ],
       "semanticOwner": "CA-HARDWARE-DEVICE",
       "applicability": "Microsoft Learn PnP and pnputil references; no Shun implementation admission.",
-      "falsifier": "A cited Microsoft command is treated as a Shun feature or as proof of driver compatibility/rollback."
+      "falsifier": "A cited Microsoft command is treated as a Shun feature or as proof of driver compatibility/rollback.",
+      "maturity": "FUTURE_CANDIDATE"
     },
     {
       "id": "CA-CLM-013",
@@ -761,7 +1320,8 @@
       ],
       "semanticOwner": "CA-AOT-KNOWLEDGE",
       "applicability": "DKE R2 method candidate plus Product/L1 and prior trust-pilot source boundary.",
-      "falsifier": "Live host facts, grants or secrets are embedded in a reusable AOT artifact."
+      "falsifier": "Live host facts, grants or secrets are embedded in a reusable AOT artifact.",
+      "maturity": "FUTURE_CANDIDATE"
     },
     {
       "id": "CA-CLM-014",
@@ -769,15 +1329,15 @@
       "status": "GROUNDED_FROZEN_PRODUCT",
       "sourceRefs": [
         "SRC-PRODUCT-PRD",
-        "SRC-PRODUCT-L1",
-        "SRC-DKE-PILOT"
+        "SRC-PRODUCT-L1"
       ],
       "limits": [
         "The prior pilot is only an author candidate and is not used as an independent qualification receipt."
       ],
       "semanticOwner": "CA-GLOBAL-AUTHORITY",
       "applicability": "Frozen Product/L1 and related trust/effect author candidate.",
-      "falsifier": "A model proposal, local label or stale grant is treated as effect authority."
+      "falsifier": "A model proposal, local label or stale grant is treated as effect authority.",
+      "maturity": "FROZEN_PRODUCT"
     },
     {
       "id": "CA-CLM-015",
@@ -785,14 +1345,59 @@
       "status": "GROUNDED_FROZEN_PRODUCT",
       "sourceRefs": [
         "SRC-PRODUCT-PRD",
-        "SRC-PRODUCT-L1"
+        "SRC-PRODUCT-L1",
+        "SRC-DOMAIN-COMPUTER-SUPPORT",
+        "SRC-DOMAIN-COMPUTER-CLOUD-GOAL",
+        "SRC-DOMAIN-COMPUTER-META",
+        "SRC-TEST-DOMAIN-COMPUTER-SUPPORT",
+        "SRC-TEST-DOMAIN-COMPUTER-META",
+        "SRC-SUPPORT-MINIMIZER",
+        "SRC-SUPPORT-WINDOWS",
+        "SRC-SUPPORT-RUNNER",
+        "SRC-TEST-SUPPORT-CONTEXT"
       ],
       "limits": [
         "Any future sharing path requires distinct scope, explicit consent and redaction."
       ],
       "semanticOwner": "CA-GLOBAL-PRIVACY",
       "applicability": "Frozen B-040 Product/L1 support-context privacy requirements.",
-      "falsifier": "Local support facts are automatically sent to an LLM, Meta or external reporting."
+      "falsifier": "Local support facts are automatically sent to an LLM, Meta or external reporting.",
+      "maturity": "FROZEN_PRODUCT"
+    },
+    {
+      "id": "CA-CLM-016",
+      "statement": "The inspected public Domain Computer package exposes read-only selected-folder observation, B-040 local support-context minimization, typed goal/capability selection, a bounded one-step Guided Journey, deterministic Recipe replay proposals, curated Provider JIT proposals and opt-in redacted Meta/feedback Shadow candidates; these adapters do not themselves perform OS effects or issue Host authority.",
+      "status": "SOURCE_OBSERVED_PARTIAL_CAPABILITY",
+      "maturity": "PARTIAL",
+      "sourceRefs": [
+        "SRC-DOMAIN-COMPUTER-INDEX",
+        "SRC-DOMAIN-COMPUTER-FOLDER",
+        "SRC-DOMAIN-COMPUTER-SUPPORT",
+        "SRC-DOMAIN-COMPUTER-SEMANTIC",
+        "SRC-DOMAIN-COMPUTER-GUIDED",
+        "SRC-DOMAIN-COMPUTER-GUIDED-CONTRACT",
+        "SRC-DOMAIN-COMPUTER-RECIPE",
+        "SRC-DOMAIN-COMPUTER-PROVIDER-JIT",
+        "SRC-DOMAIN-COMPUTER-META",
+        "SRC-DOMAIN-COMPUTER-CLOUD-GOAL",
+        "SRC-TEST-DOMAIN-COMPUTER-FOLDER",
+        "SRC-TEST-DOMAIN-COMPUTER-SUPPORT",
+        "SRC-TEST-DOMAIN-COMPUTER-SEMANTIC",
+        "SRC-TEST-DOMAIN-COMPUTER-GUIDED",
+        "SRC-TEST-DOMAIN-COMPUTER-META",
+        "SRC-TEST-DOMAIN-COMPUTER-RECIPE",
+        "SRC-TEST-DOMAIN-COMPUTER-PROVIDER-JIT"
+      ],
+      "limits": [
+        "These are package/adapter surfaces, not proof of production UI availability, complete Host composition, end-to-end Windows effects or a released user-facing computer manager.",
+        "The Domain Computer Provider JIT adapter is PROPOSAL_ONLY and T11_WIRING_ONLY; the underlying vertical-jit lifecycle library does not prove an integrated consumer-facing software manager.",
+        "Recipe replay returns a deterministic proposal, not an execution grant or effect.",
+        "Meta/feedback is an explicit opt-in Host-persisted Shadow candidate; it is not automatically activated or sent to an external service.",
+        "The pinned tests are definitions only; no native or integration test execution is claimed by this DKE review."
+      ],
+      "semanticOwner": "CA-ROOT",
+      "applicability": "Inspected public Domain Computer package and its v0.3 integration test definitions at version/v0.3.0@1224fea4097799467e2c0c454885e680f1f28248.",
+      "falsifier": "A public Domain Computer adapter directly performs a real OS effect or synthesizes current Host permission without the separate authorization/Host boundary."
     }
   ],
   "elements": [
@@ -806,7 +1411,8 @@
         "CA-CLM-001",
         "CA-CLM-002",
         "CA-CLM-013",
-        "CA-CLM-014"
+        "CA-CLM-014",
+        "CA-CLM-016"
       ],
       "children": [
         "CA-GOAL-CAPABILITY",
@@ -829,7 +1435,8 @@
         "CA-GLOBAL-CURRENTNESS"
       ],
       "semanticBoundary": "Domain semantics from user goal through safe verified computer outcome; excludes Function ABI, Host implementation and Package production.",
-      "validationOracle": "Cross-Element CQ composition, global invariant closure and independent Product/domain-owner review."
+      "validationOracle": "CQ-CA-015 end-to-end cross-Element composition plus all global-invariant closure; a child Element PASS never substitutes for Root closure; independent Product/domain-owner review.",
+      "maturity": "FUTURE_CANDIDATE"
     },
     {
       "id": "CA-GOAL-CAPABILITY",
@@ -838,9 +1445,10 @@
       "responsibility": "Interpret the user goal, identify relevant computer objects and constraints, resolve only registered capabilities and select a trusted provider compatible with the current execution environment.",
       "sourceClaims": [
         "CA-CLM-001",
-        "CA-CLM-002"
+        "CA-CLM-002",
+        "CA-CLM-016"
       ],
-      "maturity": "FROZEN_PRODUCT_SEMANTICS_PARTIAL_IMPLEMENTATION",
+      "maturity": "FROZEN_PRODUCT",
       "concepts": [
         "Goal",
         "ComputerObject",
@@ -864,7 +1472,7 @@
         "CA-CLM-004",
         "CA-CLM-005"
       ],
-      "maturity": "SOURCE_OBSERVED_PARTIAL",
+      "maturity": "PARTIAL",
       "concepts": [
         "OperatingSystem",
         "SystemSnapshot",
@@ -884,12 +1492,12 @@
       "id": "CA-STORAGE",
       "kind": "CHILD",
       "parent": "CA-ROOT",
-      "responsibility": "Model physical disks, partitions, volumes, filesystems, mount/drive mappings, storage health, capacity and safe cleanup as distinct concepts and workflows.",
+      "responsibility": "Model physical disks, partitions, volumes, filesystems, mount/drive mappings, provider-dependent storage-health telemetry, capacity and safe cleanup as distinct concepts and workflows.",
       "sourceClaims": [
         "CA-CLM-006",
         "CA-CLM-010"
       ],
-      "maturity": "PARTIAL_CURRENT_CLEANUP_PLUS_FUTURE_TOPOLOGY",
+      "maturity": "PARTIAL",
       "concepts": [
         "PhysicalDisk",
         "DiskIdentity",
@@ -916,8 +1524,8 @@
         "offline/online transitions",
         "health diagnostics"
       ],
-      "semanticBoundary": "Disk/partition/volume/filesystem semantics and bounded cleanup; current Shun evidence covers only bounded volume cleanup.",
-      "validationOracle": "Microsoft Storage documentation, exact disk/volume identity, native Windows tests and independent storage-domain review."
+      "semanticBoundary": "Disk/partition/volume/filesystem and provider-dependent health semantics are knowledge candidates; current Shun evidence covers only fixed-volume capacity and bounded cleanup. No universal SMART-health or disk-management feature is implied.",
+      "validationOracle": "Microsoft Storage documentation with explicit OS/provider applicability, exact disk/volume identity, native Windows Storage Management Provider oracle and independent storage-domain review."
     },
     {
       "id": "CA-FILE-ASSET",
@@ -926,9 +1534,10 @@
       "responsibility": "Model user files and directories, scopes, identity, metadata, content digest, duplicates, copy/move/rename, backup, protection and recovery.",
       "sourceClaims": [
         "CA-CLM-007",
-        "CA-CLM-015"
+        "CA-CLM-015",
+        "CA-CLM-016"
       ],
-      "maturity": "PARTIAL_CURRENT_PREVIEW_AND_DUPLICATE_OBSERVATION",
+      "maturity": "PARTIAL",
       "concepts": [
         "File",
         "Directory",
@@ -953,9 +1562,10 @@
       "sourceClaims": [
         "CA-CLM-004",
         "CA-CLM-008",
-        "CA-CLM-011"
+        "CA-CLM-011",
+        "CA-CLM-016"
       ],
-      "maturity": "PARTIAL_CURATED_JIT_PLUS_READONLY_SAMPLE",
+      "maturity": "PARTIAL",
       "concepts": [
         "SoftwareProduct",
         "Package",
@@ -997,7 +1607,7 @@
         "CA-CLM-009",
         "CA-CLM-012"
       ],
-      "maturity": "FUTURE_KNOWLEDGE_CANDIDATE_NOT_CURRENT_SHUN_CAPABILITY",
+      "maturity": "FUTURE_CANDIDATE",
       "concepts": [
         "HardwareComponent",
         "PnPDevice",
@@ -1030,7 +1640,7 @@
         "CA-CLM-004",
         "CA-CLM-005"
       ],
-      "maturity": "PARTIAL_READ_ONLY_OBSERVATION_ONLY",
+      "maturity": "PARTIAL",
       "concepts": [
         "Process",
         "ProcessIdentity",
@@ -1060,7 +1670,7 @@
       "parent": "CA-ROOT",
       "responsibility": "Model network adapters, link state, IP configuration, routes, DNS, proxy, Wi-Fi, connectivity tests and network recovery.",
       "sourceClaims": [],
-      "maturity": "FUTURE_KNOWLEDGE_CANDIDATE_NO_SHUN_SOURCE_QUALIFICATION",
+      "maturity": "FUTURE_CANDIDATE",
       "concepts": [
         "NetworkAdapter",
         "LinkState",
@@ -1088,12 +1698,13 @@
       "id": "CA-EXECUTION-ENVIRONMENT",
       "kind": "CHILD",
       "parent": "CA-ROOT",
-      "responsibility": "Determine where a capability can actually run and bind it to a compatible, trusted local Windows, Linux, WSL, remote, sandbox or cloud environment.",
+      "responsibility": "Determine where a capability can actually run and bind it to a compatible trusted provider/environment. Current Shun scope is local Windows-first; Linux/macOS are future knowledge targets only. WSL, remote, sandbox and cloud execution are not admitted as current Product execution targets by this candidate.",
       "sourceClaims": [
         "CA-CLM-001",
-        "CA-CLM-002"
+        "CA-CLM-002",
+        "CA-CLM-016"
       ],
-      "maturity": "FROZEN_PRODUCT_CONCEPT_WINDOWS_FIRST_IMPLEMENTATION_NOT_FULLY_QUALIFIED",
+      "maturity": "PARTIAL",
       "concepts": [
         "ExecutionEnvironment",
         "Host",
@@ -1105,8 +1716,8 @@
         "EnvironmentCapability",
         "RemoteBoundary"
       ],
-      "semanticBoundary": "Platform/provider feasibility and binding; does not grant remote administration or claim untested OS support.",
-      "validationOracle": "Exact host/OS/architecture/provider binding and native consumer tests."
+      "semanticBoundary": "Current local Windows platform/provider feasibility and candidate OS compatibility semantics; excludes remote administration, WSL/cloud execution and unsupported OS claims without a separate Product amendment and exact host evidence.",
+      "validationOracle": "Exact OS build/edition, architecture, provider signature/version and native dependency binding; Windows client checks are required before adopting Server-view documentation."
     },
     {
       "id": "CA-TASK-LIFECYCLE",
@@ -1118,9 +1729,10 @@
         "CA-CLM-006",
         "CA-CLM-007",
         "CA-CLM-008",
-        "CA-CLM-014"
+        "CA-CLM-014",
+        "CA-CLM-016"
       ],
-      "maturity": "FROZEN_PRODUCT_SEMANTICS_PARTIAL_INTEGRATION",
+      "maturity": "PARTIAL",
       "concepts": [
         "Task",
         "ActionPlan",
@@ -1147,7 +1759,7 @@
       "sourceClaims": [
         "CA-CLM-013"
       ],
-      "maturity": "DKE_CANDIDATE_RULE_DIS_NOT_IMPLEMENTED",
+      "maturity": "FUTURE_CANDIDATE",
       "concepts": [
         "KnowledgeClaim",
         "ElementScope",
@@ -1164,28 +1776,36 @@
       "id": "CA-GLOBAL-PROVENANCE",
       "kind": "GLOBAL_SEMANTIC",
       "parent": "CA-ROOT",
-      "responsibility": "Every factual claim and provider capability has source identity, exact revision, locator, authority class, applicable OS/version scope, freshness and known limitations.",
+      "responsibility": "Every factual claim and provider capability has exact source identity/revision, locator, authority class, applicable OS/version scope, freshness and known limitations. External OS documentation never entails Shun implementation, Product admission or supported-platform status.",
       "sourceClaims": [
         "CA-CLM-001",
         "CA-CLM-008",
         "CA-CLM-011",
-        "CA-CLM-012"
+        "CA-CLM-012",
+        "CA-CLM-016",
+        "CA-CLM-009",
+        "CA-CLM-010"
       ],
-      "semanticBoundary": "Source identity, authority, version, applicability and freshness across all child Elements.",
-      "validationOracle": "Exact source/blob review and provider provenance negatives."
+      "semanticBoundary": "Source identity, authority, version, applicability, freshness and non-entailment across all child Elements; does not itself authorize feature adoption.",
+      "validationOracle": "Exact source/blob review and provider provenance negatives.",
+      "maturity": "PARTIAL"
     },
     {
       "id": "CA-GLOBAL-AUTHORITY",
       "kind": "GLOBAL_SEMANTIC",
       "parent": "CA-ROOT",
-      "responsibility": "Observation, recommendation, preview, user approval, Kernel permit and Windows Host authorization are distinct states; no model or local label can synthesize permission.",
+      "responsibility": "Observation, recommendation, preview, user approval, Kernel permit and Windows Host authorization are distinct states; no model or local label can synthesize permission. Unknown/user-created assets cannot be deleted by size or location alone.",
       "sourceClaims": [
         "CA-CLM-001",
         "CA-CLM-002",
-        "CA-CLM-014"
+        "CA-CLM-014",
+        "CA-CLM-016",
+        "CA-CLM-006",
+        "CA-CLM-008"
       ],
-      "semanticBoundary": "Separation of observation, proposal, approval, permit and Host authorization; does not define the runtime authorization implementation.",
-      "validationOracle": "Product/Host source review plus forged/stale/mismatched authority negatives."
+      "semanticBoundary": "Separation of observation, proposal, approval, permit, Host authorization and asset ownership; does not define runtime authorization implementation.",
+      "validationOracle": "Product/Host source review plus forged/stale/mismatched authority negatives.",
+      "maturity": "FROZEN_PRODUCT"
     },
     {
       "id": "CA-GLOBAL-VERIFICATION",
@@ -1196,10 +1816,12 @@
         "CA-CLM-006",
         "CA-CLM-007",
         "CA-CLM-008",
-        "CA-CLM-014"
+        "CA-CLM-014",
+        "CA-CLM-016"
       ],
       "semanticBoundary": "Truthful post-state, UNKNOWN and reconcile-before-retry semantics across effects.",
-      "validationOracle": "Independent observable post-state and interruption/recovery tests."
+      "validationOracle": "Independent observable post-state and interruption/recovery tests.",
+      "maturity": "PARTIAL"
     },
     {
       "id": "CA-GLOBAL-PRIVACY",
@@ -1208,10 +1830,12 @@
       "responsibility": "Local-only system/support observations remain local unless a distinct explicit sharing scope and redaction contract is approved; secrets, user content and credentials are excluded.",
       "sourceClaims": [
         "CA-CLM-004",
-        "CA-CLM-015"
+        "CA-CLM-015",
+        "CA-CLM-016"
       ],
       "semanticBoundary": "Data minimization, local-only behavior and explicit sharing scope.",
-      "validationOracle": "Secret/process/path/document canaries and zero-egress native checks."
+      "validationOracle": "Secret/process/path/document canaries and zero-egress native checks.",
+      "maturity": "FROZEN_PRODUCT"
     },
     {
       "id": "CA-GLOBAL-CURRENTNESS",
@@ -1222,10 +1846,16 @@
         "CA-CLM-001",
         "CA-CLM-008",
         "CA-CLM-013",
-        "CA-CLM-014"
+        "CA-CLM-014",
+        "CA-CLM-016",
+        "CA-CLM-009",
+        "CA-CLM-010",
+        "CA-CLM-011",
+        "CA-CLM-012"
       ],
       "semanticBoundary": "Invalidation of affected knowledge and consumers after source, platform, provider, policy or host changes.",
-      "validationOracle": "Exact source-delta impact review and stale-binding negative cases."
+      "validationOracle": "Exact source-delta impact review and stale-binding negative cases.",
+      "maturity": "FUTURE_CANDIDATE"
     }
   ],
   "decomposition": {
@@ -1423,7 +2053,8 @@
       "sourceRefs": [
         "SRC-SYSTEM-INDEX",
         "SRC-STORAGE-INDEX",
-        "EXT-DISK-MGMT"
+        "EXT-DISK-MGMT",
+        "EXT-PHYSICAL-DISK"
       ],
       "applicability": "Current disk/volume/partition/health facts.",
       "falsifier": "Cached topology or free-space facts are reused after host topology changes.",
@@ -1560,7 +2191,7 @@
     },
     {
       "id": "CA-INV-007",
-      "owner": "CA-STORAGE",
+      "owner": "CA-GLOBAL-AUTHORITY",
       "property": "UNKNOWN_OR_USER_CREATED_ASSETS_ARE_NEVER_DELETED_BY_SIZE_OR_LOCATION_ALONE",
       "violation": "RETAIN_AND_ESCALATE",
       "sourceRefs": [
@@ -1607,7 +2238,16 @@
       "violation": "NO_EGRESS",
       "sourceRefs": [
         "SRC-PRODUCT-PRD",
-        "SRC-PRODUCT-L1"
+        "SRC-PRODUCT-L1",
+        "SRC-DOMAIN-COMPUTER-SUPPORT",
+        "SRC-DOMAIN-COMPUTER-CLOUD-GOAL",
+        "SRC-DOMAIN-COMPUTER-META",
+        "SRC-TEST-DOMAIN-COMPUTER-SUPPORT",
+        "SRC-TEST-DOMAIN-COMPUTER-META",
+        "SRC-SUPPORT-MINIMIZER",
+        "SRC-SUPPORT-WINDOWS",
+        "SRC-SUPPORT-RUNNER",
+        "SRC-TEST-SUPPORT-CONTEXT"
       ],
       "falsifier": "A local-only support report is automatically disclosed externally.",
       "applicability": "All applicable computer-assistant Elements and their DIS consumers; platform-specific where the source states a platform."
@@ -1634,10 +2274,27 @@
         "SRC-PRODUCT-PRD",
         "EXT-DISK-MGMT",
         "EXT-WINGET-OVERVIEW",
-        "EXT-PNP-GET"
+        "EXT-PNP-GET",
+        "EXT-PHYSICAL-DISK"
       ],
       "falsifier": "A source/platform/provider/policy change leaves affected knowledge marked current.",
       "applicability": "All applicable computer-assistant Elements and their DIS consumers; platform-specific where the source states a platform."
+    },
+    {
+      "id": "CA-INV-013",
+      "statement": "External Microsoft/OEM documentation establishes only the documented OS operation semantics and applicability range; it never establishes a Shun capability, Product admission, permission or supported-platform claim without matching Shun source evidence, explicit Product authority and applicable native consumer evidence.",
+      "owner": "CA-GLOBAL-PROVENANCE",
+      "applicability": "All external-source-derived computer-management claims and future capability candidates.",
+      "sourceRefs": [
+        "SRC-PRODUCT-FREEZE",
+        "SRC-DOMAIN-COMPUTER-INDEX",
+        "EXT-DISK-MGMT",
+        "EXT-DISK-INITIALIZE",
+        "EXT-WINGET-OVERVIEW",
+        "EXT-PNP-GET",
+        "EXT-PNPUTIL"
+      ],
+      "falsifier": "A Microsoft command page or Windows capability is treated as proof that Shun implements, supports or is authorized to execute that operation."
     }
   ],
   "competencyQuestions": [
@@ -1839,6 +2496,67 @@
         "platform-specific native test receipt"
       ],
       "unknownPath": "MARK_UNSUPPORTED_PLATFORM"
+    },
+    {
+      "id": "CQ-CA-015",
+      "element": "CA-ROOT",
+      "question": "Can one complete computer-assistant journey be traced from user goal and exact object through registered capability, compatible provider/environment, current authority, effect receipt, independent post-state verification and recovery, with every applicable Global Semantic invariant enforced?",
+      "positive": "One end-to-end trace binds exact identities and current evidence across every required Element and Global Semantic; the independent post-state oracle agrees.",
+      "negative": "A child Element passes in isolation while a cross-Element identity, provider, authority, verification or recovery edge is missing, stale or mismatched.",
+      "status": "CANDIDATE_NOT_RUN",
+      "expectedEvidence": [
+        "root-to-child ownership and relation trace",
+        "exact target/capability/provider/environment identities",
+        "current approval/permit/Host receipt chain",
+        "effect journal and independent post-state/recovery receipt",
+        "explicit check that all global invariants apply"
+      ],
+      "unknownPath": "ROOT_NOT_CLOSED_BLOCK_PROMOTION"
+    },
+    {
+      "id": "CQ-CA-016",
+      "element": "CA-GLOBAL-CURRENTNESS",
+      "question": "When a source Blob, OS build, provider version, policy, host identity or permission changes, can the knowledge model invalidate exactly the affected Claims, Elements, CQs and consumers without retaining stale bindings or invalidating unrelated siblings?",
+      "positive": "A source/platform delta produces a justified affected-set, invalidates stale dependent claims/consumers, and preserves unaffected sibling controls.",
+      "negative": "Stale facts remain current, or unrelated Elements are invalidated by an unbounded blast radius.",
+      "status": "CANDIDATE_NOT_RUN",
+      "expectedEvidence": [
+        "before/after exact source or platform identity",
+        "dependency/impact map from source to Claim/Element/CQ/consumer",
+        "affected and unaffected control cases",
+        "requalification receipt for changed scope"
+      ],
+      "unknownPath": "INVALIDATE_AFFECTED_SCOPE_AND_KEEP_UNKNOWN"
+    },
+    {
+      "id": "CQ-CA-017",
+      "element": "CA-STORAGE",
+      "question": "Can the assistant distinguish provider-reported physical-disk health telemetry from a universal SMART diagnosis, and report UNKNOWN when the Storage Management Provider does not expose a trustworthy health value?",
+      "positive": "Health is reported only with exact disk identity, provider and observation time; unavailable or unsupported telemetry remains UNKNOWN.",
+      "negative": "Free space, disk online state or missing provider data is used to claim that a physical disk is healthy or failing.",
+      "status": "OPEN_DOMAIN_ORACLE_REQUIRED_NOT_RUN",
+      "expectedEvidence": [
+        "exact physical disk unique identity",
+        "Storage Management Provider identity and Get-PhysicalDisk HealthStatus result if available",
+        "observation time and provider availability",
+        "native target-host result and independent hardware/storage-domain oracle"
+      ],
+      "unknownPath": "REPORT_HEALTH_UNKNOWN_NO_REMEDIATION"
+    },
+    {
+      "id": "CQ-CA-018",
+      "element": "CA-GLOBAL-PROVENANCE",
+      "question": "When Microsoft Learn documents a Windows disk, WinGet or PnP operation, does the knowledge model keep that as platform knowledge unless Shun source, Product authority and target-platform evidence separately admit a Shun capability?",
+      "positive": "The external fact carries its OS/version applicability while Shun capability maturity remains FUTURE_CANDIDATE or UNKNOWN until independently admitted.",
+      "negative": "A Microsoft command or API is presented as a current Shun feature or as proof of client-OS support without exact Shun evidence.",
+      "status": "CANDIDATE_NOT_RUN",
+      "expectedEvidence": [
+        "official external source locator and observed revision date",
+        "documented OS/version applicability and limitations",
+        "Shun public source/absence evidence",
+        "frozen Product boundary and explicit amendment decision if feature adoption is proposed"
+      ],
+      "unknownPath": "KEEP_EXTERNAL_KNOWLEDGE_ONLY_NO_PRODUCT_ADMISSION"
     }
   ],
   "semanticAssuranceProfile": {
@@ -1876,9 +2594,10 @@
           "volume and scope semantics",
           "protected asset precedence",
           "approval and recovery",
-          "disk topology and data-loss semantics"
+          "disk topology and data-loss semantics",
+          "provider-dependent physical-disk health telemetry versus UNKNOWN"
         ],
-        "oracle": "CODE_TESTS_PLUS_MICROSOFT_STORAGE_SOURCES; NATIVE_WINDOWS_AND_DOMAIN_REVIEW_REQUIRED",
+        "oracle": "CODE_TESTS_PLUS_MICROSOFT_STORAGE_SOURCES_WITH_EXPLICIT_APPLICABILITY; NATIVE_WINDOWS_STORAGE_PROVIDER_AND_DOMAIN_REVIEW_REQUIRED",
         "status": "PARTIAL_WITH_FUTURE_GAPS"
       },
       {
@@ -1897,7 +2616,8 @@
           "provider provenance",
           "exact package identity",
           "manifest-bound removal",
-          "residue preservation"
+          "residue preservation",
+          "distinguish vertical JIT lifecycle library from proposal-only Domain Computer T08 adapter and complete user-facing software manager"
         ],
         "oracle": "CODE_TESTS_PLUS_MICROSOFT_WINGET_SOURCES_AND_REAL_PROVIDER_RECEIPT",
         "status": "PARTIAL"
@@ -1942,6 +2662,89 @@
         ],
         "oracle": "DKE_REVIEW_PLUS_DIS_CONSUMER_PROOF",
         "status": "OPEN"
+      },
+      {
+        "element": "CA-ROOT",
+        "obligations": [
+          "End-to-end goal/object/capability/provider/environment/authority/effect/verification/recovery composition",
+          "All five Global Semantic Elements apply across child Elements",
+          "No child Element PASS substitutes for Root closure"
+        ],
+        "oracle": "CQ-CA-015_CROSS_ELEMENT_COMPOSITION_PLUS_INDEPENDENT_PRODUCT_AND_DOMAIN_OWNER_REVIEW",
+        "status": "OPEN"
+      },
+      {
+        "element": "CA-EXECUTION-ENVIRONMENT",
+        "obligations": [
+          "Windows-first local current execution scope",
+          "Exact OS edition/build and architecture compatibility",
+          "Provider source/signature/version and native dependency binding",
+          "WSL/remote/sandbox/cloud are not current Product targets"
+        ],
+        "oracle": "EXACT_TARGET_HOST_PLATFORM_AND_PROVIDER_BINDING_PLUS_NATIVE_CLIENT_CHECK",
+        "status": "PARTIAL_WINDOWS_ONLY_OTHER_TARGETS_OPEN"
+      },
+      {
+        "element": "CA-TASK-LIFECYCLE",
+        "obligations": [
+          "Proposal versus approval versus permit versus Host authorization",
+          "Effect journal, truthful receipt and independent post-state",
+          "Interruption, UNKNOWN and reconcile-before-retry"
+        ],
+        "oracle": "NATIVE_HOST_EFFECT_RECEIPT_POSTSTATE_AND_RESTART_RECOVERY_ORACLE",
+        "status": "PARTIAL"
+      },
+      {
+        "element": "CA-GLOBAL-PROVENANCE",
+        "obligations": [
+          "Exact source identity/revision and authority class",
+          "External OS/version applicability and mutable-page freshness",
+          "Provider signer/hash/version provenance",
+          "External documentation must not entail Shun feature admission"
+        ],
+        "oracle": "SOURCE_BLOB_AND_EXTERNAL_APPLICABILITY_REVIEW_PLUS_CQ_CA_018_NEGATIVE",
+        "status": "PARTIAL"
+      },
+      {
+        "element": "CA-GLOBAL-AUTHORITY",
+        "obligations": [
+          "Observation/proposal/approval/permit/Host authorization separation",
+          "Exact target/scope and current authority",
+          "Unknown/user-created asset protection across Storage and JIT"
+        ],
+        "oracle": "FORGED_STALE_MISMATCHED_AUTHORITY_AND_PROTECTED_ASSET_NEGATIVES",
+        "status": "PARTIAL"
+      },
+      {
+        "element": "CA-GLOBAL-VERIFICATION",
+        "obligations": [
+          "Independent observable post-state",
+          "Journal/receipt consistency",
+          "Interruption and recovery honesty; no blind retry"
+        ],
+        "oracle": "NATIVE_POSTSTATE_AND_INTERRUPTION_RECONCILIATION_ORACLE",
+        "status": "PARTIAL"
+      },
+      {
+        "element": "CA-GLOBAL-PRIVACY",
+        "obligations": [
+          "B-040 minimization and local-only default",
+          "No automatic egress of support/system context",
+          "Secrets, user content, paths and process command lines excluded",
+          "Separate consent and redaction for any future sharing"
+        ],
+        "oracle": "SUPPORT_CANARIES_NO_NETWORK_SPY_AND_ZERO_EGRESS_NATIVE_ORACLE",
+        "status": "PARTIAL"
+      },
+      {
+        "element": "CA-GLOBAL-CURRENTNESS",
+        "obligations": [
+          "Source/platform/provider/policy/host changes invalidate affected claims and consumers",
+          "No stale binding remains current",
+          "Unaffected sibling Elements are not over-invalidated"
+        ],
+        "oracle": "CQ-CA-016_EXACT_SOURCE_DELTA_IMPACT_AND_UNAFFECTED_SIBLING_CONTROLS",
+        "status": "OPEN"
       }
     ],
     "explicitLimitations": [
@@ -1950,7 +2753,9 @@
       "Test files are pinned definitions, not execution receipts.",
       "Microsoft Learn pages are official source locators; licensing and domain-owner adoption are not independently qualified here.",
       "No hardware OEM or Windows storage specialist has signed the candidate semantics.",
-      "No Element SAP is qualified and no DIS ECP exists."
+      "No Element SAP is qualified and no DIS ECP exists.",
+      "SAP obligation coverage is now 17/17 structurally, but no Element or Root SAP is qualified; all newly added Root/currentness/storage-health/external-doc CQs remain NOT_RUN or OPEN.",
+      "No external page locator has an immutable Microsoft revision ID; the observed date and applicability notes do not replace a future source snapshot/recheck."
     ],
     "authorMechanicalValidation": {
       "status": "AUTHOR_MECHANICAL_CHECK_PASS_NOT_INDEPENDENT",
@@ -1958,7 +2763,12 @@
         "All source/claim/Element/relation/invariant/CQ identifiers are unique.",
         "All claim source references resolve to internal or external source records.",
         "All relation endpoints, semantic owners, invariant owners and CQ Element references resolve.",
-        "Root/Child/Global-Semantic hierarchy references resolve and parent-child hierarchy is acyclic."
+        "Root/Child/Global-Semantic hierarchy references resolve and parent-child hierarchy is acyclic.",
+        "Every one of the 17 Root/Child/Global-Semantic Elements has an explicit SAP obligation record; coverage is structural only and does not qualify any Element.",
+        "Root closure has a dedicated cross-Element CQ; Global Currentness has a source-delta invalidation CQ.",
+        "Every Claim and Element carries one explicit maturity label from the declared taxonomy.",
+        "Every external Microsoft Learn source carries observed date, source revision note and OS/version applicability or an explicit UNKNOWN applicability boundary.",
+        "Domain Computer, Storage, JIT and B-040 support-context implementation modules and corresponding test-definition Blobs are pinned."
       ],
       "limitations": [
         "Does not prove claim truth, source authority, semantic decomposition correctness, Product admission, native execution or SAP qualification."
@@ -2022,5 +2832,17 @@
     "Run meaningful native Windows tests only where the claimed behavior depends on the real Windows filesystem, package manager, device manager or host authority; record actual command, exit code and environment. Do not mark skipped tests PASS.",
     "Obtain Product Owner amendment before admitting partition/format, general software management, device/driver management or network administration as supported Shun features.",
     "After SAP and Product admission, create a separate DIS task to functionize selected Elements and produce ECP/AOT Package evidence."
-  ]
+  ],
+  "inventorySummary": {
+    "internalSourceRecords": 70,
+    "code": 37,
+    "tests": 28,
+    "externalSources": 12,
+    "claims": 16,
+    "elements": 17,
+    "relations": 14,
+    "invariants": 13,
+    "cqs": 18,
+    "sapElements": 17
+  }
 }

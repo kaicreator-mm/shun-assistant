@@ -32,13 +32,14 @@ The source-first inventory shows that Shun is not devoid of real computer operat
 
 | Domain | Current source-backed capability | Boundary / gap |
 |---|---|---|
-| System inventory | Read-only CPU count, memory, fixed system-volume capacity/free space and uptime | Not full hardware inventory, disk topology or storage-health management |
-| System diagnosis | Bounded process/startup counts, top-memory observations, limited installed-software sample, low-disk/low-memory advisory | Single-snapshot diagnosis; no root-cause or guaranteed-speedup claim; no process/service control |
-| Storage | Scoped storage observation, growth attribution, fail-closed classification, preview, approval, bounded cleanup, journaling and protected-asset verification | Not disk initialization, partition create/resize/delete, volume formatting or disk online/offline management |
+| System inventory | Read-only CPU count, memory, fixed system-volume capacity/free space and uptime | Not full hardware inventory, disk topology or provider-backed storage-health diagnosis |
+| System diagnosis | Bounded process/startup counts, top-memory observations, limited HKLM installed-software sample, low-disk/low-memory advisory | Single-snapshot diagnosis; no root-cause or guaranteed-speedup claim; no service inventory/dependency model or process/service control |
+| Storage | Scoped storage observation, growth attribution, fail-closed classification, preview, approval, bounded cleanup, journaling and protected-asset verification | Not disk initialization, partition create/resize/delete, volume formatting, disk online/offline or provider-backed health management |
 | Files | Pure preview for search, duplicate report, copy, move and rename; authorized handle-anchored duplicate observation | Preview is not execution authority; no unrestricted file manager is established by these surfaces |
-| Software | Bounded installed-software observation and curated trusted-provider JIT acquisition/use/verification/removal | Not a complete app catalog or general consumer install/update/repair/uninstall manager |
-| Hardware / drivers | Windows documentation establishes PnP and driver-store concepts | No general Shun PnP/device/driver capability was found in the reviewed public domain-computer surface |
+| Software | Bounded HKLM installed-software observation and curated trusted-provider JIT acquisition/use/verification/removal library | Not a complete app catalog or general consumer install/update/repair/uninstall manager; Domain Computer T08 Provider JIT is proposal-only/T11-wiring-only |
+| Hardware / drivers | Microsoft documents PnP enumeration, device enable/disable and driver-store operations | No general Shun PnP/device/driver capability, OEM compatibility contract or rollback implementation is admitted |
 | Network | Domain concepts identified for future knowledge coverage | No Shun network-management capability is qualified by this source set |
+| Domain Computer orchestration | Typed goal/capability selection, selected-folder read-only observation, B-040 support-context minimization, one-step Guided Journey, Recipe proposals, Provider JIT proposals and opt-in Meta Shadow candidates | These are bounded adapters/proposals, not proof of complete UI/Host composition or real OS effects; no adapter itself grants authority |
 
 Important distinctions:
 
@@ -75,7 +76,7 @@ Global Semantic Elements
 └── Source / Policy / Host Invalidation
 ```
 
-This is not one Element per command or per Function. A child is split further only when it has an independently coherent semantic owner, boundary, CQ set and verification oracle. Semantic relations may cross child Elements; the parent/child ownership hierarchy itself must remain acyclic.
+This is not one Element per command or per Function. A child is split further only when it has an independently coherent semantic owner, boundary, CQ set and verification oracle. Semantic relations may cross child Elements; the parent/child ownership hierarchy itself must remain acyclic. The Root requires a dedicated cross-Element closure CQ; no Child or Global Semantic Element can independently establish Root SAP.
 
 ## 4. AOT knowledge: what should be compiled
 
@@ -97,7 +98,7 @@ AOT must **not** compile:
 - User files, personal paths, document contents, credentials, API keys, Wi-Fi secrets or other private state.
 - Live provider signatures/revocation state, source reachability or execution receipts.
 
-The simple rule is: **compile how to understand and safely reason about a computer; observe what this computer is like now; authorize each real effect at runtime.**
+The simple rule is: **compile how to understand and safely reason about a computer; observe what this computer is like now; authorize each real effect at runtime.** Source/platform/provider/policy/host changes must invalidate exactly the affected knowledge and consumers; unrelated siblings must remain current.
 
 DKE defines the knowledge and SAP obligations. DIS must separately decide Functionization, ECP, dependency/Target binding and actual AOT Package production. No Package is created by this PR.
 
@@ -118,23 +119,29 @@ DKE defines the knowledge and SAP obligations. DIS must separately decide Functi
 
 ## 6. Competency Questions and SAP
 
-The machine-readable dossier contains 14 CQs spanning goal resolution, provider/environment binding, system diagnosis, storage cleanup, disk topology, software lifecycle, residue preservation, hardware/driver management, process/service boundaries, network diagnosis, AOT/runtime separation, recovery, privacy and platform claims.
+The repaired machine-readable dossier contains 18 CQs spanning goal resolution, provider/environment binding, system diagnosis, storage cleanup and health, disk topology, software lifecycle, residue preservation, hardware/driver management, process/service boundaries, network diagnosis, AOT/runtime separation, recovery, privacy, Root cross-Element closure, source-currentness invalidation and external-document non-entailment.
 
 Current status is deliberately conservative:
 
-- K1: source inventory pinned by the author.
+- K1: 70 internal source records (37 code, 28 test definitions, 5 Product/method records) and 12 Microsoft Learn external locators pinned by the author; exact original Code/Test Blobs are checked against the immutable source tree.
 - K2: claims and relations are an author candidate.
-- K3: recursive Element blueprint and CQs are an author candidate.
+- K3: 17 Root/Child/Global-Semantic Elements, 13 global invariants and 18 CQs are an author candidate; all 17 Elements now have explicit SAP obligation records, including Root and every Global Semantic Element.
 - K4: independent review has **not** run.
 - Native Windows tests were **not** executed in this DKE turn; test source files are not execution receipts.
-- A mechanical author check now confirms unique IDs, resolved source/Element references and an acyclic parent-child hierarchy. This is not a semantic or independent review.
-- SAP is **not qualified**.
+- A mechanical author check confirms unique IDs, resolved source/Element references, acyclic hierarchy, 17/17 SAP obligation coverage, maturity labels and external-source applicability fields. This is not a semantic or independent review.
+- SAP is **not qualified**: 17/17 obligation records are present, but every Element/Root remains unqualified pending independent review, CQs, applicable native/domain oracles and Owner acceptance.
 - DIS handoff is **blocked**.
 - No runtime implementation or AOT Package was created.
 
-Hardware/driver and broader disk-management semantics still require stronger domain oracles, Product admission and real Windows evidence. Microsoft Learn sources establish the existence and administrative/destructive nature of relevant Windows operations, not Shun implementation or authorization.
+Hardware/driver, provider-dependent storage health, network and broader disk-management semantics still require stronger domain oracles, Product admission and real Windows evidence. Microsoft Learn sources establish only documented Windows operations and their applicability, not Shun implementation or authorization. The PnPDevice PowerShell pages are rendered under the Windows Server 2025 documentation view and do not provide an explicit Windows 10/11 client applicability matrix; client support remains UNKNOWN until verified.
 
-## 7. Next gates
+## 7. Owner decisions and platform applicability
+
+No Product Owner decision is required to repair this documentation-only DKE candidate. An explicit Product amendment is required before partition/format, general software management, PnP/device/driver mutation, process/service mutation, network administration, WSL, remote, sandbox or cloud execution becomes a supported Shun feature. Hardware/driver semantics require an OEM or hardware-domain oracle; storage-health semantics require a Windows Storage Management Provider/storage specialist; network semantics require a network-domain oracle.
+
+Current execution scope remains local Windows-first. Linux/macOS are future knowledge targets only; WSL, remote administration, sandbox and cloud execution are not current Product targets. External Microsoft Learn pages are mutable link-only locators observed on 2026-11-11; the dossier records their documented OS/version applicability or an explicit UNKNOWN boundary, and they must be rechecked before runtime use.
+
+## 8. Next gates
 
 1. Fresh independent Source-First review of the exact PR HEAD. The Reviewer must read frozen Product and original Code/Test sources before this dossier, freeze an independent Stage-0, then compare claims, relations, Element boundaries, negative cases and AOT/runtime separation.
 2. Repair only verified P0/P1/P2 findings; re-review the final exact SHA. Builder self-review is not independent PASS.
@@ -142,18 +149,29 @@ Hardware/driver and broader disk-management semantics still require stronger dom
 4. Obtain explicit Product amendment before treating partition/format, general software management, hardware/device/driver management or network administration as supported Shun features.
 5. After SAP and Product admission, open a separate DIS task to functionize selected Elements and qualify ECP/AOT Package consumption.
 
-## 8. External source locators
+## 9. External source locators
 
 Official Microsoft Learn sources used as external knowledge locators (link-only; licensing and domain-owner adoption have not been independently qualified in this DKE):
 
 - [Disk Management overview](https://learn.microsoft.com/en-us/windows-server/storage/disk-management/overview-of-disk-management)
 - [Initialize new disks](https://learn.microsoft.com/en-us/windows-server/storage/disk-management/initialize-new-disks) — initialization is intended for a new disk with no existing data; the process erases data and requires elevated membership.
-- [Windows Storage PowerShell module](https://learn.microsoft.com/en-us/powershell/module/storage)
+- [Windows Storage PowerShell module](https://learn.microsoft.com/en-us/powershell/module/storage/?view=windowsserver2025-ps) — the current locator is a Windows Server 2025 PowerShell view; verify module/cmdlet/provider availability on the exact target client.
+- [Get-PhysicalDisk](https://learn.microsoft.com/en-us/powershell/module/storage/get-physicaldisk?view=windowsserver2025-ps) — `HealthStatus` is provider-dependent telemetry, not a universal SMART oracle.
 - [WinGet overview](https://learn.microsoft.com/en-us/windows/package-manager/winget/)
 - [WinGet list](https://learn.microsoft.com/en-us/windows/package-manager/winget/list)
 - [WinGet upgrade](https://learn.microsoft.com/en-us/windows/package-manager/winget/upgrade)
 - [WinGet uninstall](https://learn.microsoft.com/en-us/windows/package-manager/winget/uninstall)
 - [Get-PnpDevice](https://learn.microsoft.com/en-us/powershell/module/pnpdevice/get-pnpdevice?view=windowsserver2025-ps)
 - [Enable-PnpDevice](https://learn.microsoft.com/en-us/powershell/module/pnpdevice/enable-pnpdevice?view=windowsserver2025-ps)
-- [Disable-PnpDevice](https://learn.microsoft.com/en-us/powershell/module/pnpdevice/disable-pnpdevice)
+- [Disable-PnpDevice](https://learn.microsoft.com/en-us/powershell/module/pnpdevice/disable-pnpdevice?view=windowsserver2025-ps)
 - [pnputil](https://learn.microsoft.com/en-us/windows-server/administration/windows-commands/pnputil)
+
+
+## 10. Repair reconciliation (R0 review repair)
+
+- Added module-level Domain Computer and B-040 support-context source/test Blob pins; explicitly distinguished observation/proposal adapters from real effects and authority.
+- Added missing Storage classification/scope/observation/verification sources and tests, and JIT curated-provider/provenance/lifecycle tests.
+- Added explicit maturity labels to all Claims and Elements; clarified that WSL, remote, sandbox and cloud execution are not current Product targets.
+- Added OS/version applicability or explicit UNKNOWN applicability to each Microsoft Learn locator.
+- Completed structural SAP obligations for all 17 Elements, added Root closure, source-currentness, storage-health and external-document non-entailment CQs, and moved the cross-domain protected-asset invariant to Global Authority.
+- These are documentation repairs only. No Product, runtime code, permission, implementation authorization, native test execution or SAP qualification is claimed.
