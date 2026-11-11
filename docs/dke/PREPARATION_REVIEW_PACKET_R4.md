@@ -2,6 +2,12 @@
 
 > [devkit #5](https://github.com/kaicreator-mm/devkit/issues/5), 2026-11-11. **REVIEWABLE RESEARCH INPUT, NOT VERIFIED DOMAIN KNOWLEDGE, NOT OFFICIALLY ACCEPTED.** Research base pinned to `91420edca44009aa2c984c876104b40814a7c265`; corrected active version must be checked separately.
 
+## R7 SH02 direct-source correction (docs-only, independent re-review pending)
+
+- Active SH02 trust/bootstrap source for per-user identity, UAC different-account rejection, and explicit first-run consent is **not** `apps/control-api/src/main.ts` alone: the direct first-run writer is `apps/control-api/scripts/bootstrap-guided-localappdata.ts` original Blob `a8887a1e71d7c3e72bf06595642e3ea80b001ef1`; OS SID/LocalAppData guard is `apps/control-api/src/real-storage/guided-provenance-issuance.ts` original Blob `82aa130d49647d00294bf4afe92131c29a419ba0`. `main.ts` original Blob `b27e32917eccafb1433c0971b2b3413fd74f1be5` is startup composition only.
+- Current [R5 handoff](DKE_HANDOFF_SOURCE_REPAIR_R5.json) Blob `ff944fc51adee8aeb9a3cc60ca2c1952a475a21d` and [R4 business matrix](BUSINESS_EVIDENCE_MATRIX_R4.json) Blob `ac46c08cf9be4fb89ca98ff4b38a37870efdcc32` correct SH02 evidence roles; R18/R19 source history stays immutable. The original `guided-localappdata-bootstrap.test.ts` Blob `3bbb7ed84dbb75d46490c89e88ca9b1b37737ba6` defines **ephemeral test fixtures**, not execution receipts or physical Windows trust proof.
+- Finding `SH-B2-R7-01 P2`: direct source citation repaired in original DKE preparation PR under single Writer. **Native/Windows NOT_RUN**, independent postrepair Exact-SHA Review PENDING, Source Owner not signed, G1–G5 formal/Extraction/SAP not granted. R6's earlier merged #272 currentness fix and R18's R4→R5 supersession remain intact and must not be repeated.
+
 ## R11 live source-authority addendum (2026-11-11, author-side correction)
 
 - [PR #272](https://github.com/kaicreator-mm/shun-assistant/pull/272), formerly cited as an **active** source PR in R3/R4, is now **MERGED** into `version/v0.3.0` (merged 2026-11-10T13:41:49Z). Its frozen source HEAD is `5bb4e4b27e319d0104406c3389f8b8e6149b7f0b`; merge commit `da3a36eb91d39c6bac8cd6b72b27c4b588adda4d`. The `apps/control-api/src/main.ts` Git Blob was read at both exact commits: `b27e32917eccafb1433c0971b2b3413fd74f1be5` in both. This establishes identity of that **one source file**, not entire merge tree/source equivalence or current release eligibility.
@@ -11,7 +17,7 @@
 
 ## R18 active authority / historical supersession (SH-B2-R18-01)
 
-**Read the [R5 source-repair handoff](DKE_HANDOFF_SOURCE_REPAIR_R5.json) as the current source-bounded Claim / Relation / CQ correction overlay** (updated Git Blob `bfea49c66659c815403dc9a6aa29c4595c17f01e`; R19 historical Blob `0cbb9fdbb0286f778e7244e1561a12cfc9a9e570`). The [R4 candidate](DKE_HANDOFF_CANDIDATE_R4.json) is historical baseline only; it must never be consumed alone as the current G4 evidence. SH01/SH03: R4 candidate treated LocalAppData bootstrap test as Host effect / Gateway witness; R5 removes unsupported witness. The existing [R4 evidence matrix](BUSINESS_EVIDENCE_MATRIX_R4.json) remains current within its explicitly bounded source/test role and is not modified by this pointer repair.
+**Read the [R5 source-repair handoff](DKE_HANDOFF_SOURCE_REPAIR_R5.json) as the current source-bounded Claim / Relation / CQ correction overlay** (updated Git Blob `ff944fc51adee8aeb9a3cc60ca2c1952a475a21d`; R19 historical Blob `0cbb9fdbb0286f778e7244e1561a12cfc9a9e570`). The [R4 candidate](DKE_HANDOFF_CANDIDATE_R4.json) is historical baseline only; it must never be consumed alone as the current G4 evidence. SH01/SH03: R4 candidate treated LocalAppData bootstrap test as Host effect / Gateway witness; R5 removes unsupported witness. The existing [R4 evidence matrix](BUSINESS_EVIDENCE_MATRIX_R4.json) remains current within its explicitly bounded source/test role and is not modified by this pointer repair.
 
 **Do not silently upgrade:** claim authority, Source Owner/rights, independent G1–G5 acceptance, native test execution, SAP/DIS or Host effects. R4 remains readable as a historical input; R5 corrections prevail where they conflict. This packet change is an author-side docs-only Repair and requires independent new Exact-SHA review. 
 
