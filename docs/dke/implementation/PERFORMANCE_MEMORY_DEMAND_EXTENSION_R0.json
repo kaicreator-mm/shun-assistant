@@ -1,0 +1,150 @@
+{
+  "schema": "shun.computer-assistant.demand-extension.r0",
+  "revision": "R0",
+  "outputLabel": "SHUN_ASSISTANT_DKE_MEMORY_PERFORMANCE_DEMAND_R0",
+  "mainIssue": 411,
+  "baseDemandHead": "406605ae0d931440338b398d29c2a6dcf4674c80",
+  "baseDemandBlob": "74c10245e88608d12ae716bd2bae1623a2f55dc5",
+  "status": "FUTURE_CANDIDATE_NOT_ADMITTED",
+  "jobs": [
+    {
+      "id": "CA-JOB-16",
+      "title": "Memory performance diagnosis and guided optimization planning",
+      "demandClass": "D1",
+      "productAdmission": "FUTURE_CANDIDATE_NOT_ADMITTED",
+      "demandEvidence": {
+        "kind": "OWNER_REQUESTED_DKE_EXTENSION_ONLY",
+        "locator": "shun-assistant #411 user-directed DKE extension on 2026-11-12; not a Product amendment",
+        "frequencyEvidence": "UNKNOWN_NOT_MEASURED",
+        "businessValue": "NOT_QUANTIFIED"
+      },
+      "goal": "Explain memory pressure and likely contributors using accurate Windows memory semantics; produce a safe, evidence-backed advisory optimization plan and define how a future effect could be verified under a comparable workload.",
+      "knowledgeRequirements": [
+        "Working Set vs Private Working Set vs PrivateUsage/Private Bytes vs system Commit/Commit Limit",
+        "Available memory, pagefile, page input/output, pools, standby/cache and compression semantics",
+        "Bounded process identity and privacy minimization",
+        "Time-series and comparable-workload requirements for suspected leaks",
+        "Cross-domain memory/CPU/storage/driver/thermal attribution",
+        "Risk, reversibility, authority and independent post-state rules"
+      ],
+      "elementIds": [
+        "CA-PERFORMANCE-OPTIMIZATION",
+        "CA-MEMORY-PERFORMANCE",
+        "CA-SYSTEM-OBSERVATION",
+        "CA-PROCESS-SERVICE",
+        "CA-STORAGE",
+        "CA-HARDWARE-DEVICE",
+        "CA-AOT-KNOWLEDGE",
+        "CA-TASK-LIFECYCLE",
+        "CA-GLOBAL-AUTHORITY",
+        "CA-GLOBAL-VERIFICATION",
+        "CA-GLOBAL-PRIVACY",
+        "CA-GLOBAL-CURRENTNESS"
+      ],
+      "claimIds": [
+        "CA-CLM-018",
+        "CA-CLM-019",
+        "CA-CLM-020",
+        "CA-CLM-021",
+        "CA-CLM-022",
+        "CA-CLM-023",
+        "CA-CLM-024"
+      ],
+      "cqIds": [
+        "CQ-CA-021",
+        "CQ-CA-022",
+        "CQ-CA-023",
+        "CQ-CA-024",
+        "CQ-CA-025",
+        "CQ-CA-026",
+        "CQ-CA-027",
+        "CQ-CA-028",
+        "CQ-CA-029",
+        "CQ-CA-030",
+        "CQ-CA-031"
+      ],
+      "sourceRefs": [
+        "SRC-SYSTEM-PRESSURE",
+        "SRC-TEST-SYSTEM-PRESSURE",
+        "SRC-SYSTEM-DIAGNOSTICS",
+        "SRC-TEST-SYSTEM-DIAGNOSTICS",
+        "SRC-SYSTEM-RUNTIME",
+        "SRC-TEST-SYSTEM-RUNTIME",
+        "EXT-MEM-WORKING-SET",
+        "EXT-MEM-PERFORMANCE-INFO",
+        "EXT-MEM-PROCESS-COUNTERS-EX",
+        "EXT-MEM-GETPROCESSMEMORYINFO",
+        "EXT-MEM-PERFORMANCE-COUNTERS",
+        "EXT-MEM-PAGEFILE",
+        "EXT-MEM-CACHE-MANAGER",
+        "EXT-MEM-RAMMAP",
+        "EXT-MEM-TROUBLESHOOT",
+        "SRC-PRODUCT-FREEZE",
+        "SRC-PRODUCT-PRD",
+        "SRC-PRODUCT-L1"
+      ],
+      "aotEligible": [
+        "stable memory metric definitions and non-equivalence rules",
+        "source-pinned Windows memory-manager semantics",
+        "diagnostic decision tree and falsifiers",
+        "safe advisory strategies and risk taxonomy",
+        "verification requirements and invalidation triggers"
+      ],
+      "runtimeOnly": [
+        "current OS/build/API/counter availability",
+        "current total/available/commit/pagefile/pool counters",
+        "current process instance identities and memory values",
+        "time-stamped samples and workload identity",
+        "current permissions/approval/Host authority",
+        "actual user-visible response/throughput measurements and outcome receipts"
+      ],
+      "feasibility": {
+        "targetClass": "I2",
+        "currentSourceObservation": "READONLY_TOTAL_FREE_MEMORY_AND_TOP_8_WORKINGSET64_ONLY_NO_PRIVATE_BYTES_NO_COMMIT_NO_TIME_SERIES",
+        "actualNativeEvidence": "NOT_RUN_IN_THIS_DEMO",
+        "integrationEvidence": "DEMO_HARNESS_ONLY_NOT_PRODUCT_INTEGRATION",
+        "productImplementationAuthorization": "NOT_AUTHORIZED_BY_FROZEN_PRODUCT_CHECKPOINT",
+        "implementationEstimate": "UNKNOWN",
+        "maintenanceEstimate": "UNKNOWN"
+      },
+      "functionCandidate": {
+        "status": "DEMO_CONTRACT_CANDIDATE_NOT_QUALIFIED",
+        "names": [
+          "computer.memory.observe/0.1",
+          "computer.memory.assess/0.1",
+          "computer.memory.plan/0.1",
+          "computer.memory.compare/0.1"
+        ],
+        "inputSchema": "See DIS_FUNCTION_CONTRACT_R0.json",
+        "typedOutcome": "OBSERVED_ONLY | ADVISORY_ONLY | UNKNOWN | REFUSED | COMPARISON_UNKNOWN | IMPROVEMENT_CANDIDATE | REGRESSION",
+        "pipeline": "memory.performance.review/0.1"
+      },
+      "preconditions": [
+        "Windows host and exact supported collector availability",
+        "source-pinned AOT candidate loaded only by research demo harness",
+        "read-only local-only evidence",
+        "no Product effect permission or mutation path"
+      ],
+      "independentPostcondition": "Runtime report accurately preserves metric semantics and source; plan is advisory only; zero host effects; any improvement comparison remains UNKNOWN unless a trusted comparable-workload receipt and user outcome metric exist.",
+      "negativeOrRefusalCase": "Treat top WorkingSet64 as Private Bytes/leak/root cause; clear standby cache; kill top process; infer improvement from free-memory delta; send process data to cloud.",
+      "unknownOrRecoveryCase": "Missing metrics, access denied, process identity instability, workload mismatch, unsupported API/build, no independent post-state => field-level UNKNOWN and no effect.",
+      "risk": "LOW_READ_ONLY_RESEARCH_DEMO",
+      "verificationEvidence": "Current source/test definitions are pinned; native Windows run pending; no effect receipt expected in this read-only demo.",
+      "sapQualification": "NOT_QUALIFIED",
+      "closure": "NOT_RUN",
+      "unresolvedDecisions": [
+        "Fresh independent Source-First review and Domain Owner SAP qualification",
+        "Whether Product Owner admits any memory optimization user journey beyond existing read-only observation",
+        "Any later process/service/pagefile/cache effect requires a separate Product amendment and authorization"
+      ],
+      "semanticTrace": {
+        "primaryElementId": "CA-MEMORY-PERFORMANCE",
+        "parentElementId": "CA-PERFORMANCE-OPTIMIZATION",
+        "status": "SOURCE_GROUNDED_CANDIDATE_NOT_FUNCTIONAL_PRODUCT_CLOSURE",
+        "verifiedFunctionReceipt": "NOT_RUN",
+        "postconditionOracleExecution": "NOT_RUN",
+        "qualifiedSourceFirstDecision": "PENDING"
+      }
+    }
+  ]
+}
