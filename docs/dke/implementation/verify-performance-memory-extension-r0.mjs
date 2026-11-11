@@ -96,6 +96,29 @@ export function validateArtifacts(base, ext, demand, demo, contract, aot, baseTe
   add(contract.pipeline.steps.join(',') === 'computer.memory.observe,computer.memory.assess,computer.memory.plan', 'DIS_PIPELINE_ORDER');
   add(contract.ecpCandidate.status === 'NOT_QUALIFIED', 'DIS_ECP_STATUS');
 
+  // The four contract candidates are NOT callable DIS ports in this research
+  // runner. Fail closed on future documentation that inflates observed facts,
+  // claims applied AOT rules, or confuses a pipeline label with execution.
+  const researchOutcomes = {
+    'computer.memory.observe': ['OBSERVED_ONLY', 'UNKNOWN'],
+    'computer.memory.assess': ['LOW_FREE_MEMORY_LEGACY_HEURISTIC', 'NO_LEGACY_LOW_FREE_MEMORY_SIGNAL', 'UNKNOWN'],
+    'computer.memory.plan': ['ADVISORY_ONLY', 'NOT_PRODUCED'],
+    'computer.memory.compare': ['UNKNOWN'],
+  };
+  add(Object.entries(researchOutcomes).every(([id, expected]) => {
+    const f = contract.functions.find((x) => x.functionId === id);
+    return JSON.stringify(f?.output?.variants) === JSON.stringify(expected) &&
+      typeof f.output.projection === 'string' && f.output.projection.includes('NOT_DIS_FUNCTION');
+  }), 'DIS_RUNTIME_VARIANT_ALIGNMENT');
+  const assess = contract.functions.find((x) => x.functionId === 'computer.memory.assess');
+  add(assess?.researchRuntimeStatus === 'PURE_ANALYZER_HEURISTIC_ONLY_NO_AOT_RULE_EXECUTION' &&
+    assess?.evidence?.some((x) => x.includes('sourceRulesApplied=[]')) &&
+    !assess?.evidence?.some((x) => x === 'AOT rule IDs applied'), 'DIS_AOT_NOT_APPLIED');
+  add(contract.pipeline.runtimeInvocation === 'NOT_INVOKED_BY_CURRENT_RESEARCH_RUNNER' &&
+    contract.pipeline.currentDemoAotRuleConsumption === 'NOT_APPLIED_BY_THIS_DEMO' &&
+    contract.ecpCandidate.status === 'NOT_QUALIFIED', 'DIS_RUNTIME_NO_SELECTED_ECP');
+
+
   add(aot.status === 'DEMO_ONLY_CANDIDATE_NOT_QUALIFIED' && aot.productionConsumable === false && aot.activation === 'RESEARCH_DEMO_HARNESS_ONLY', 'AOT_NOT_PRODUCTION');
   add(aot.sourceRules.length >= 8 && aot.decisionRules.length >= 6, 'AOT_RULE_COVERAGE');
   add(aot.neverCompile.some((x) => x.includes('process lists')) && aot.neverCompile.some((x) => x.includes('approvals')), 'AOT_NEVER_COMPILE');

@@ -16,18 +16,22 @@
       "output": {
         "schema": "shun.memory.observe.output.v1",
         "variants": [
-          "OBSERVED",
-          "UNKNOWN",
-          "REFUSED"
+          "OBSERVED_ONLY",
+          "UNKNOWN"
         ],
         "fields": [
           "observedAt",
-          "systemMemory",
-          "topResidentProcesses",
-          "sourceRefs",
-          "metricLimitations",
-          "privacy"
-        ]
+          "sampledAt",
+          "analyzedAt",
+          "source",
+          "evidence",
+          "diagnosis",
+          "optimizationPlan",
+          "verification",
+          "privacy",
+          "limitations"
+        ],
+        "projection": "RESEARCH_ANALYZER_AGGREGATE_REPORT_NOT_INVOKED_DIS_FUNCTION"
       },
       "preconditions": [
         "Windows host",
@@ -38,7 +42,8 @@
         "bounded source-backed memory facts",
         "localOnly=true",
         "externalDisclosures=[]",
-        "no effect"
+        "no effect",
+        "sampledAt and observedAt remain UNKNOWN until independently trusted Host timestamps exist"
       ],
       "failureOutcomes": [
         "WINDOWS_REQUIRED",
@@ -48,12 +53,13 @@
         "PROCESS_FACTS_INVALID"
       ],
       "evidence": [
-        "system collector result",
-        "top-memory collector result",
-        "exact source commit",
-        "runtime host platform"
+        "fixed read-only Windows collector results",
+        "source schema and provenance",
+        "localOnly and empty disclosures",
+        "UNKNOWN on invalid or unavailable evidence; CLI argument refusal is not an observe Function output"
       ],
-      "effect": "NONE"
+      "effect": "NONE",
+      "researchRuntimeStatus": "COLLECTOR_ADAPTER_PLUS_PURE_ANALYZER_NOT_REGISTERED_DIS_FUNCTION"
     },
     {
       "functionId": "computer.memory.assess",
@@ -70,17 +76,19 @@
       "output": {
         "schema": "shun.memory.assess.output.v1",
         "variants": [
-          "POTENTIAL_PRESSURE",
-          "NO_LEGACY_SIGNAL",
+          "LOW_FREE_MEMORY_LEGACY_HEURISTIC",
+          "NO_LEGACY_LOW_FREE_MEMORY_SIGNAL",
           "UNKNOWN"
         ],
         "fields": [
-          "pressureSignal",
+          "status",
           "confidence",
           "rootCause",
-          "missingMetrics",
-          "explanation"
-        ]
+          "leakStatus",
+          "explanation",
+          "missingMetrics"
+        ],
+        "projection": "RESEARCH_REPORT_DIAGNOSIS_NOT_DIS_FUNCTION_OUTCOME"
       },
       "preconditions": [
         "observation schema valid",
@@ -89,7 +97,8 @@
       ],
       "postconditions": [
         "no metric conflation",
-        "rootCause=UNKNOWN unless independent multi-signal oracle qualifies"
+        "rootCause=UNKNOWN unless independent multi-signal oracle qualifies",
+        "legacy os.freemem LOW_FREE_MEMORY is not independently measured Windows Available"
       ],
       "failureOutcomes": [
         "INVALID_EVIDENCE",
@@ -97,11 +106,13 @@
         "METRIC_UNAVAILABLE"
       ],
       "evidence": [
-        "input observation",
-        "AOT rule IDs applied",
-        "decision trace"
+        "read-only observation with source metric identity",
+        "AOT candidate bytes checked for integrity only",
+        "aotRuleConsumption=NOT_APPLIED_BY_THIS_DEMO; sourceRulesApplied=[]; source.aotRuleIds=[]",
+        "NO selected DIS assess Function or ECP invoked"
       ],
-      "effect": "NONE"
+      "effect": "NONE",
+      "researchRuntimeStatus": "PURE_ANALYZER_HEURISTIC_ONLY_NO_AOT_RULE_EXECUTION"
     },
     {
       "functionId": "computer.memory.plan",
@@ -118,17 +129,16 @@
         "schema": "shun.memory.plan.output.v1",
         "variants": [
           "ADVISORY_ONLY",
-          "UNKNOWN",
-          "REFUSED"
+          "NOT_PRODUCED"
         ],
         "fields": [
+          "status",
           "steps",
-          "risk",
-          "expectedBenefit",
-          "tradeoffs",
-          "reversibility",
-          "effectsAuthorized"
-        ]
+          "effectsAuthorized",
+          "executed",
+          "prohibitedActions"
+        ],
+        "projection": "RESEARCH_REPORT_OPTIMIZATION_PLAN_NOT_DIS_FUNCTION_OUTCOME"
       },
       "preconditions": [
         "assessment valid",
@@ -147,7 +157,8 @@
         "plan trace",
         "no-effect runtime receipt"
       ],
-      "effect": "NONE"
+      "effect": "NONE",
+      "researchRuntimeStatus": "ANALYZER_ADVISORY_PROJECTION_ONLY"
     },
     {
       "functionId": "computer.memory.compare",
@@ -164,17 +175,14 @@
       "output": {
         "schema": "shun.memory.compare.output.v1",
         "variants": [
-          "IMPROVEMENT_CANDIDATE",
-          "REGRESSION_CANDIDATE",
-          "TRADEOFF",
           "UNKNOWN"
         ],
         "fields": [
-          "memoryDelta",
-          "userOutcomeDelta",
-          "comparability",
-          "reason"
-        ]
+          "outcome",
+          "reason",
+          "speedupClaim"
+        ],
+        "projection": "CURRENT_RESEARCH_COMPARATOR_ALWAYS_UNKNOWN"
       },
       "preconditions": [
         "same host and comparable workload attested by trusted comparator",
@@ -203,7 +211,12 @@
       "implementedDemoOutcomes": [
         "UNKNOWN"
       ],
-      "researchRuntimeStatus": "NOT_IMPLEMENTED_TRUSTED_COMPARATOR_PORT"
+      "researchRuntimeStatus": "NOT_IMPLEMENTED_TRUSTED_COMPARATOR_PORT_CURRENT_ALWAYS_UNKNOWN",
+      "futureQualifiedDesignVariants": [
+        "IMPROVEMENT_CANDIDATE",
+        "REGRESSION_CANDIDATE",
+        "TRADEOFF"
+      ]
     }
   ],
   "pipeline": {
@@ -222,7 +235,11 @@
     ],
     "successMeaning": "A truthful read-only observation and advisory plan were produced; NOT a completed OS optimization or verified speedup.",
     "retry": "No effects exist in this demo; if a later effectful Function is admitted, it must use normal Task/Permit/Host journal and reconciliation rules.",
-    "optionalComparisonQualification": "CONTRACT_ONLY; CURRENT_DEMO_ALWAYS_UNKNOWN"
+    "optionalComparisonQualification": "CONTRACT_ONLY; CURRENT_DEMO_ALWAYS_UNKNOWN",
+    "runtimeInvocation": "NOT_INVOKED_BY_CURRENT_RESEARCH_RUNNER",
+    "stepsMeaning": "ORDERED_FUNCTION_DESIGN_CANDIDATES_NOT_EXECUTED_DIS_PIPELINE",
+    "currentDemoExecution": "Fixed read-only Windows collectors → analyzeMemoryObservation pure report; checks candidate AOT Git Blob integrity only. Prints pipeline ID as declarative metadata, never invokes a registered DIS Function/ECP or applies AOT sourceRules.",
+    "currentDemoAotRuleConsumption": "NOT_APPLIED_BY_THIS_DEMO"
   },
   "ecpCandidate": {
     "ecpId": "ECP-MEMORY-PERFORMANCE-001",
@@ -240,7 +257,7 @@
       "CA-INV-018",
       "CA-INV-019"
     ],
-    "evidence": "Native Windows receipt NOT_RUN; no independent trusted comparator issuer exists."
+    "evidence": "A scoped Windows read-only R3 receipt exists at the original exact-head source Blobs (6e5f4fe73aa560368b533242cdbaa492bec7b0a3); NOT an independent semantic Oracle, ECP execution, SAP qualification or proof for changed code."
   },
   "prohibitedFunctions": [
     "process.kill",
@@ -251,5 +268,7 @@
     "memory.setPagefile",
     "registry.tune",
     "hardware.memoryOverclock"
-  ]
+  ],
+  "researchAlignmentReview": "R4_SOURCE_REVIEW_CONTRACT_ACTUAL_DEMO_ALIGNMENT",
+  "contractInterpretation": "The typed outcomes below document projections of the current read-only research analyzer, not callable registered DIS Functions/ECP, selected AOT execution, or Product-admitted Runtime capability. Future function designs require separate schema and qualification."
 }

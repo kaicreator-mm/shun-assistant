@@ -40,3 +40,18 @@ By default process names are replaced with local aliases. `--show-local-process-
 ## Local validation receipt
 
 Record: exact branch HEAD, working tree, Windows edition/release/build, architecture, Node version, actual command lines and exit codes, test counts, runner outcome, and whether the two collectors returned OBSERVED or UNKNOWN. Do not upload raw process names, PIDs, paths or other local data. No Native PASS is claimed until the local command has actually run.
+
+## R4 contract-to-runtime correction (source-first R3 review follow-up)
+
+The JSON Function definitions are **unqualified typed research projections**, not selected DIS Function implementations.
+The current read-only runner calls fixed Windows collectors and the pure analyzer, never a registered DIS SDK/ECP,
+and it validates candidate AOT bytes without applying source rules (sourceRulesApplied=[], source.aotRuleIds=[]).
+The actual report is OBSERVED_ONLY or UNKNOWN; assess statuses are legacy-heuristic or UNKNOWN; plan is
+ADVISORY_ONLY or NOT_PRODUCED; the comparator always returns UNKNOWN. CLI usage refusal is not a
+Function-level REFUSED result. New contract/validator negative regressions reject false OBSERVED,
+applied-AOT provenance, or a merely labeled pipeline masquerading as invoked Functions.
+
+Historical R3 Windows native and Woodpecker receipts at `6e5f4fe73aa560368b533242cdbaa492bec7b0a3`
+remain valid **only for their exact source Blobs**. The current amended source requires new-head
+targeted tests and fresh independent review; semantic Owner/Oracle, SAP, Product admission,
+production DIS/ECP/AOT, measured optimization effect and verified user Function closure remain zero.

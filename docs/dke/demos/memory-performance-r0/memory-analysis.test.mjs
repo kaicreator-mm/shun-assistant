@@ -154,3 +154,24 @@ test('AOT candidate exact Git Blob rejects forged semantic rule and matching edi
   assert.deepEqual(validateMemoryAotCandidate(JSON.stringify(tampered)).ok,false);
   assert.deepEqual(validateMemoryAotCandidate('{"status":"DEMO_ONLY_CANDIDATE_NOT_QUALIFIED"}').ok,false);
 });
+
+test('R4 DIS research contract matches real analyzer projections, never fabricates Function/AOT execution', () => {
+  const contract = JSON.parse(readFileSync(new URL('./DIS_FUNCTION_CONTRACT_R0.json', import.meta.url), 'utf8'));
+  const selected = (name) => contract.functions.find((f) => f.functionId === 'computer.memory.' + name);
+  const yes = analyzeMemoryObservation(diagnostic({ free: 50 }), processes());
+  const no = analyzeMemoryObservation(diagnostic({ free: 700, signals: [] }), processes());
+  const unavailable = analyzeMemoryObservation({ ok: false, code: 'OBSERVATION_UNAVAILABLE' }, { ok: false });
+  for (const observation of [yes, no, unavailable]) {
+    assert.ok(selected('observe').output.variants.includes(observation.outcome));
+    assert.ok(selected('assess').output.variants.includes(observation.diagnosis.status));
+    assert.ok(selected('plan').output.variants.includes(observation.optimizationPlan.status));
+  }
+  assert.deepEqual(yes.source.aotRuleIds, []);
+  assert.equal(yes.source.aotRuleConsumption, 'NOT_APPLIED_BY_THIS_DEMO');
+  assert.equal(contract.pipeline.runtimeInvocation, 'NOT_INVOKED_BY_CURRENT_RESEARCH_RUNNER');
+  assert.equal(contract.pipeline.currentDemoAotRuleConsumption, 'NOT_APPLIED_BY_THIS_DEMO');
+  assert.deepEqual(selected('compare').output.variants, ['UNKNOWN']);
+  assert.ok(selected('compare').output.variants.includes(compareMemoryPerformance(yes, no, { status: 'VERIFIED' }).outcome));
+  assert.ok(!selected('observe').output.variants.includes('OBSERVED'));
+  assert.ok(!selected('assess').evidence.some((item) => item === 'AOT rule IDs applied'));
+});

@@ -80,3 +80,21 @@ test('paired demand-matrix plus self-reported Git blob tamper cannot bypass inde
   const result = validate(f);
   assert.ok(result.errors.includes('BASE_DEMAND_BLOB_MISMATCH'));
 });
+
+test('legacy OBSERVED status cannot silently replace actual OBSERVED_ONLY research report', async () => {
+  const f = await fixtures();
+  f.contract.functions.find((x) => x.functionId === 'computer.memory.observe').output.variants = ['OBSERVED', 'UNKNOWN', 'REFUSED'];
+  assert.ok(validate(f).errors.includes('DIS_RUNTIME_VARIANT_ALIGNMENT'));
+});
+
+test('research candidate cannot falsely declare AOT rules applied', async () => {
+  const f = await fixtures();
+  f.contract.functions.find((x) => x.functionId === 'computer.memory.assess').evidence = ['AOT rule IDs applied'];
+  assert.ok(validate(f).errors.includes('DIS_AOT_NOT_APPLIED'));
+});
+
+test('pipeline label cannot be promoted into executed DIS/ECP', async () => {
+  const f = await fixtures();
+  f.contract.pipeline.runtimeInvocation = 'EXECUTED_DIS_FUNCTIONS';
+  assert.ok(validate(f).errors.includes('DIS_RUNTIME_NO_SELECTED_ECP'));
+});
