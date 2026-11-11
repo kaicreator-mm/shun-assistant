@@ -12,7 +12,7 @@
     "handoff_blob": "90f92e381eb16ca98a24de61ef7650f7a82c19de",
     "formal_g5": "NOT_ACCEPTED"
   },
-  "classification": "BOUNDED_SOURCE_FIRST_AUTHOR_CANDIDATE_NOT_QUALIFIED",
+  "classification": "BOUNDED_SOURCE_FIRST_WINDOWS_GUIDED_TRUST_32_NATIVE_SCOPED_PASS_SID_HOST_EFFECT_UNKNOWN",
   "source_provenance": {
     "original_revision": "5bb4e4b27e319d0104406c3389f8b8e6149b7f0b",
     "read_sources": [
@@ -149,11 +149,27 @@
   "qualification": {
     "upstream_g5": "NOT_ACCEPTED",
     "independent_k4": "NOT_RUN",
-    "native_tests": "NOT_RUN",
+    "native_tests": "SCOPED_WINDOWS_GUIDED_TRUST_32_OF_32_PASS_SOURCE_REVISION_5BB4E4",
     "owner": "NOT_RUN",
     "sap_k5": "NOT_QUALIFIED",
     "dis_eligible": false,
-    "source_rights_external": "UNKNOWN"
+    "source_rights_external": "UNKNOWN",
+    "native_tests_executed": true
   },
-  "next_action": "Source-first independent Windows trust/current-SID, Kernel permit and actual Host receipt negative validation on current implementation HEAD; owner rights/approval. No K4/K5 promotion from fixture source."
+  "next_action": "Source-first independent Windows trust/current-SID, Kernel permit and actual Host receipt negative validation on current implementation HEAD; owner rights/approval. No K4/K5 promotion from fixture source.",
+  "native_reconciliation_r8": {
+    "output_label": "DIE_DKE14_R8_SOURCE_NATIVE_RECEIPT_SYNC",
+    "tested_exact_head": "f1ebd5dc66610053cb03de4aefea6c8699458d0a",
+    "source_receipt": "https://github.com/kaicreator-mm/shun-assistant/issues/411#issuecomment-6805661606",
+    "technical_native_scope": "Windows guided-trust pilot 32/32 PASS on pinned source revision 5bb4e4b27e319d0104406c3389f8b8e6149b7f0b; mock SID, no actual UAC ACL or full Host effect",
+    "execution_status": "SCOPED_NATIVE_PASS_LIMITED",
+    "qualification_impact": "K4B_SCOPED_TECHNICAL_EVIDENCE_ONLY",
+    "independent_k4a": "NOT_GRANTED_BY_THIS_SYNC",
+    "owner_k4c": "NOT_GRANTED",
+    "formal_cq_semantic_oracle": "NOT_GRANTED",
+    "g5": "NOT_GRANTED",
+    "k5_sap": "NOT_QUALIFIED",
+    "closure": "NOT_QUALIFIED",
+    "note": "No native execution this GitHub metadata sync; receipt is previously executed at pinned code/source; immutable tested-head remains distinct from new docs-only head."
+  }
 }
