@@ -1,0 +1,75 @@
+pack_id: shun-v030-u05-b2-selected-root-r2-g1
+task_id: U05-B2-SELECTED-ROOT-R2-EFFECT-BINDING
+issue: '#390'
+parent_issue: '#380'
+repository: kaicreator-mm/shun-assistant
+version: v0.3.0
+standard_revision: 326aaf5b0188b53cb0ed5c38752a9e299e3f9efd
+delivery_principle: ADS_1359_DELIVERY_FIRST_SINGLE_WRITER_REPAIR_INCLUDED
+pack_revision: 1
+claim_generation: 2
+owner_authorization: 'Owner conversational instruction 2026-11-08: resolve blocker, continue Delivery-First. WIP source only, no effect/release.'
+protected_claim_key: 'kaicreator-mm/shun-assistant#390:builder:__default__'
+dependencies:
+  b1_source: 'PR #395 squash WIP merge efa1c6fbf84c7b91284109b00a6a88b6a65e5e0d'
+  b1_review_debt: 'Issue #390 comment #6718287271; independent full integration review still REQUIRED'
+  no_native_dag_edge: true
+pack_base:
+  branch: wip/v0.3.0-r02-owner-repairs
+  sha: efa1c6fbf84c7b91284109b00a6a88b6a65e5e0d
+  tree: 85ecb3776c52f71677abfcfe66b90949cacdbf1f
+  tree_evidence: 'Source PR #395 HEAD tree; squash onto same unchanged base; all four changed source blobs readback identical at WIP merge; recheck at admission.'
+  contract: 'One immutable manifest commit on this exact WIP base. Admit source only after postmerge WIP CI, Pack CI and reviewer/claim readback.'
+execution:
+  profile: ONE_BUILDER_FULL_SLICE
+  source_branch: JIT_only_task/v0.3.0-u05-b2-selected-root-r2-g1
+  integration_target: wip/v0.3.0-r02-owner-repairs
+  primary_builder: FIRST_CAPABLE_WEB_OR_LOCAL_WRITER
+  reviewer: ONE_FRESH_EXACT_SHA_REVIEW_AND_REPAIR
+  final_verifier: DISTINCT_AFTER_REPAIR
+  local_validation_only: false
+  source_write_start_gate: 'Postmerge WIP CI SUCCESS, Pack exact-SHA CI + Pack review, generation-2 CAS Claim, no other writer'
+authoring_write_set:
+  - .agent/execution/U05-B2-SELECTED-ROOT-R2-G1/MANIFEST.yaml
+allowed_write_set:
+  - apps/control-api/src/v03/folder-selection-host.ts
+  - apps/control-api/src/v03/folder-selection-route.ts
+  - apps/control-api/src/v03/guided-route.ts
+  - apps/control-api/src/v03/selected-root-effect-flow.ts
+  - apps/control-api/src/v03/composition-journeys.ts
+  - apps/control-api/src/v03/composition-production.ts
+  - packages/domain-host/src/windows/effect-host-binding.ts
+  - apps/control-api/src/main.ts
+  - apps/control-api/src/server.ts
+  - apps/control-ui/public/v03/app.js
+  - apps/control-api/test/folder-selection-host.test.ts
+  - apps/control-api/test/folder-selection-route.test.ts
+  - apps/control-api/test/selected-root-effect-flow.test.ts
+  - tests/integration/v03/t11-runtime/server-v03-gateway.test.ts
+  - packages/domain-host/test/selected-root-effect-binding.test.ts
+minimum_product_outcome:
+  - 'ONE existing supported windows.fs.write action, only as a deterministic injected no-effect fixture: Host-selected root -> metadata -> specific target/operation/expected change/undo preview -> independent human R2 + canonical action planHash and grant -> selected K Permit -> Host effect-time native root identity recheck -> truthful completion/refusal/unknown projection.'
+  - 'Reuse existing HostGuidedService review-plan, ActionController, FilePlanSource, FileGrantSource, K and WindowsEffectHost. No second planner, policy system, approval ledger or Kernel.'
+  - 'B1 planDigest/opaque preview ref are metadata/evidence only; never substitute for ActionPlan.planHash, grantRef, Kernel Permit, R2 or effect journal.'
+  - 'Root canonical path, file ID and volume serial remain Host-private; do not let UI/model/HTTP mint approval, handle, grant or physical effect.'
+  - 'Full UX flow uses existing routes/view; avoid framework/layout rewrite. No cloud metadata disclosure by default.'
+  - 'Reuse the existing FolderSelectionRoute and GuidedRoute adapters for trusted Host-only staging/readback of preview. Never surface private paths or publish approval authority in route output.'
+negative_acceptance:
+  - 'Forged, expired, replayed, cross Case/step/root/plan preview; changed volume/fileId; changed plan hash/target/evidence; missing R2/grant/Permit; stale/unknown OS currentness -> REFUSED/UNKNOWN and no effects.'
+  - 'UNKNOWN never becomes COMPLETED, never causes blind retry or fabricated durable Journal/poststate.'
+  - 'No effect outside declared scope, reparse point, mapped/network/volume root; acknowledge accepted namespace/SQLite races without new system-wide OS isolation.'
+test_contract:
+  - 'At least one actual composed Guided+Host+selected K+ActionController R2 positive fixture, and deterministic failures for each authority boundary. All Windows effect ports injected/dry-run only.'
+  - 'Run Node>=24 syntax, Biome format/lint and TS typecheck BEFORE first expensive CI, then targeted and existing suite, Woodpecker Push/PR exact final SHA.'
+  - 'Single Builder owns review feedback repairs within same write set. Independent review after B2 includes B1 deferred integration debt; when source changes, distinct final verifier after repair.'
+closeout:
+  - 'Do not count U05-B 4/4 until WIP-only integration, exact SHA CI, end-user flow and distinct final reviewer PASS, with production boot prerequisites separately recorded.'
+forbidden:
+  - source_write_without_pack_ci_and_generation_2_cas
+  - second_preview_or_authorization_authority
+  - new_domain_kernel_planner_framework
+  - full_ui_rewrite_or_unbounded_research
+  - actual_windows_filesystem_effect_or_elevation
+  - paid_model_request_or_external_data_disclosure
+  - programdata_trust_pin_provisioning_or_acl_change
+  - merge_main_or_version_or_tag_or_release_or_deployment
