@@ -30,6 +30,7 @@ function processes(top = [{ name: 'Editor', residentBytes: 900 }, { name: 'Brows
       externalDisclosures: [],
       metric: 'RESIDENT_MEMORY_BYTES_AT_SNAPSHOT',
       interpretation: 'MEMORY_ONLY_NO_CPU_OR_ROOT_CAUSE_INFERENCE',
+      provenance: 'fixed-readonly-powershell',
       top,
     },
   };
@@ -96,14 +97,23 @@ test('mismatched workload or missing user outcome remains UNKNOWN', () => {
   assert.equal(r.outcome, 'UNKNOWN');
 });
 
-test('controlled fixture can produce only an improvement candidate, not a verified speedup', () => {
+test('a syntactically valid but caller-forged comparator receipt is not trusted', () => {
   const before = snapshot(100), after = snapshot(400);
   const r = compareMemoryPerformance(before, after, {
     schema: 'shun.demo.workload-comparator-receipt.v1',
     status: 'VERIFIED', sameHost: true, sameWorkload: true,
-    sourceRef: 'evidence://controlled-fixture/compare-001',
+    sourceRef: 'evidence://caller-forged/compare-001',
     userOutcome: { metric: 'P95_RESPONSE_TIME_MS', before: 500, after: 300 },
   });
-  assert.equal(r.outcome, 'IMPROVEMENT_CANDIDATE');
-  assert.equal(r.speedupClaim, 'CANDIDATE_ONLY_REQUIRES_INDEPENDENT_DOMAIN_REVIEW');
+  assert.equal(r.outcome, 'UNKNOWN');
+  assert.equal(r.speedupClaim, 'NONE');
+  assert.equal(r.reason, 'INDEPENDENT_TRUSTED_WORKLOAD_COMPARATOR_NOT_IMPLEMENTED');
+});
+
+test('invalid process names and unknown provenance fail closed', () => {
+  const unsafe = processes([{ name: 'C:/private', residentBytes: 100 }]);
+  assert.equal(analyzeMemoryObservation(diagnostic(), unsafe).outcome, 'UNKNOWN');
+  const wrong = processes();
+  wrong.facts.provenance = 'UNTRUSTED';
+  assert.equal(analyzeMemoryObservation(diagnostic(), wrong).outcome, 'UNKNOWN');
 });
