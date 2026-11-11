@@ -1,0 +1,1391 @@
+{
+  "schema": "shun.dke.demand-functional-closure-r0",
+  "revision": "R0",
+  "outputLabel": "SHUN_ASSISTANT_DKE_D0_DEMAND_FEASIBILITY_CLOSURE_R0",
+  "status": "AUTHOR_CANDIDATE_NOT_INDEPENDENTLY_REVIEWED",
+  "asOf": "2026-11-11",
+  "mainIssue": "https://github.com/kaicreator-mm/shun-assistant/issues/411",
+  "evidenceBase": {
+    "knowledgePr": "#414",
+    "candidateHead": "a18374a18c920d4975e09be649d0a98e5dc87b32",
+    "candidateFile": "docs/dke/implementation/COMPUTER_ASSISTANT_KNOWLEDGE_R0.json",
+    "candidateBlob": "f05934349a76dde19687731c2e367de95b333700",
+    "productFreeze": {
+      "path": "docs/product/PRODUCT_FREEZE-v0.3.md",
+      "commit": "1224fea4097799467e2c0c454885e680f1f28248",
+      "blob": "0f8a67c2f06364d58a842502d3dee11bfeeedba4"
+    },
+    "productOriginal": {
+      "commit": "4c2f8e84b6e6f3f5b526e52d01356159f2dce0e7",
+      "prdBlob": "f062b7f2c3dc3bf4aeeb7594ab5c2bc75b34d0ab",
+      "l1Blob": "4c703c3f0c283f4d3918babef8f87f56869698e5"
+    },
+    "sourceCodeSnapshot": "1224fea4097799467e2c0c454885e680f1f28248"
+  },
+  "governance": {
+    "productScope": "FROZEN_PRODUCT_AND_L1_ONLY",
+    "implementationAuthorized": false,
+    "sourceScaffoldAuthorized": false,
+    "allowedWork": "DKE_DOCS_ONLY",
+    "noImplicitAdmission": true,
+    "sourceFirstAuthorWork": true,
+    "independentStage0": "NOT_CLAIMED",
+    "k4": "REQUIRES_FRESH_INDEPENDENT_EXACT_SHA_REVIEW",
+    "k5": "NOT_QUALIFIED",
+    "disHandoff": "BLOCKED",
+    "aotPackage": "NOT_CREATED",
+    "nativeWindowsDkeTests": "NOT_RUN"
+  },
+  "levelDefinitions": {
+    "I0": "explanation/advice only",
+    "I1": "real read-only observation",
+    "I2": "scope-bound plan/preview without effect",
+    "I3": "approved bounded effect with poststate verification",
+    "I4": "destructive/privileged/high-risk effect requiring separate admission and stronger oracle"
+  },
+  "jobCount": 15,
+  "productCriticalCount": 10,
+  "futureCandidateCount": 5,
+  "requirements": [
+    "Every Product job is derived from the original PRD §2 and L1 with a later exact Product freeze; not from candidate API lists.",
+    "Every job separately traces to an existing Element, Claim, CQ and source ID; all links are candidate knowledge, not SAP qualification.",
+    "Every future expanded capability is NOT_ADMITTED and has no approved DIS Function.",
+    "Tool/API availability does not imply Shun implementation, execution authority, or Windows edition/build support.",
+    "Preview is not effect; Function self-reported success does not meet independent poststate.",
+    "AOT stable knowledge excludes live device state, permissions, grants/permits, user data or runtime receipts.",
+    "All cost/frequency/user-value scores remain UNKNOWN until evidence exists.",
+    "No native Windows DKE execution/independent reviewer is claimed in this file."
+  ],
+  "jobs": [
+    {
+      "id": "CA-JOB-01",
+      "title": "Goal-to-registered-capability resolution",
+      "demandClass": "D0",
+      "productAdmission": "FROZEN_PRODUCT_REQUIREMENT_ONLY",
+      "demandEvidence": {
+        "kind": "FROZEN_PRODUCT_JOURNEY",
+        "locator": "PRD-v0.3-domain-harness-R0.md §2 item 1; Product Freeze checkpoint",
+        "frequencyEvidence": "UNKNOWN_NOT_MEASURED",
+        "businessValue": "NOT_QUANTIFIED"
+      },
+      "goal": "Clarify a concrete user goal and select only a registered capability within its object/privacy/environment bounds",
+      "knowledgeRequirements": [
+        "object identity",
+        "goal schema",
+        "capability registry",
+        "trust and environment scope",
+        "clarification/unsupported handling"
+      ],
+      "elementIds": [
+        "CA-GOAL-CAPABILITY",
+        "CA-EXECUTION-ENVIRONMENT",
+        "CA-GLOBAL-PROVENANCE",
+        "CA-GLOBAL-AUTHORITY",
+        "CA-GLOBAL-VERIFICATION",
+        "CA-GLOBAL-CURRENTNESS"
+      ],
+      "claimIds": [
+        "CA-CLM-001",
+        "CA-CLM-016"
+      ],
+      "cqIds": [
+        "CQ-CA-001",
+        "CQ-CA-002",
+        "CQ-CA-015"
+      ],
+      "sourceRefs": [
+        "SRC-PRODUCT-PRD",
+        "SRC-PRODUCT-L1",
+        "SRC-PRODUCT-FREEZE",
+        "SRC-DOMAIN-COMPUTER-SEMANTIC",
+        "SRC-TEST-DOMAIN-COMPUTER-SEMANTIC"
+      ],
+      "aotEligible": [
+        "goal and capability schemas",
+        "scope rules",
+        "selection/incompatibility/refusal rules"
+      ],
+      "runtimeOnly": [
+        "user request",
+        "current registry revision",
+        "trusted Host observations",
+        "current environment and scope"
+      ],
+      "feasibility": {
+        "targetClass": "I2",
+        "currentSourceObservation": "BOUNDED_SEMANTIC_ADAPTER_SOURCE_OBSERVED",
+        "actualNativeEvidence": "NOT_RUN_IN_THIS_DKE_WORKSTREAM",
+        "integrationEvidence": "NOT_ESTABLISHED",
+        "productImplementationAuthorization": "NOT_AUTHORIZED_BY_FROZEN_PRODUCT_CHECKPOINT",
+        "implementationEstimate": "UNKNOWN",
+        "maintenanceEstimate": "UNKNOWN"
+      },
+      "functionCandidate": {
+        "status": "DIS_NOT_PROPOSED_OR_QUALIFIED",
+        "name": "goal.resolve",
+        "inputSchema": "NOT_DEFINED_DIS_OWNER",
+        "typedOutput": "NOT_DEFINED_DIS_OWNER",
+        "pipeline": "NOT_DEFINED_DIS_OWNER"
+      },
+      "preconditions": [
+        "strict input parse",
+        "trusted registry snapshot",
+        "exact object identity"
+      ],
+      "independentPostcondition": "Chosen capability and constraints match exact current user intent and registry; no effect occurred",
+      "negativeOrRefusalCase": "Planner changes path, scope, privacy or environment; reject",
+      "unknownOrRecoveryCase": "Missing/stale Host observation or unknown object identity → clarify/UNKNOWN",
+      "risk": "LOW_READ_OR_ADVICE",
+      "verificationEvidence": "TEST_DEFINITIONS_ONLY_NOT_RUNTIME_RECEIPT",
+      "sapQualification": "NOT_QUALIFIED",
+      "closure": "NOT_RUN",
+      "unresolvedDecisions": [
+        "Product/L2/runtime qualification and current implementation parity must be demonstrated",
+        "Fresh independent source-first Element/SAP review and applicable native/domain Oracle evidence"
+      ]
+    },
+    {
+      "id": "CA-JOB-02",
+      "title": "Windows diagnosis and B-040 local support context",
+      "demandClass": "D0",
+      "productAdmission": "FROZEN_PRODUCT_REQUIREMENT_ONLY",
+      "demandEvidence": {
+        "kind": "FROZEN_PRODUCT_JOURNEY",
+        "locator": "PRD-v0.3-domain-harness-R0.md §2 item 2; Product Freeze checkpoint",
+        "frequencyEvidence": "UNKNOWN_NOT_MEASURED",
+        "businessValue": "NOT_QUANTIFIED"
+      },
+      "goal": "Explain bounded system or selected-folder symptoms without leaking local-only support data",
+      "knowledgeRequirements": [
+        "OS/CPU/memory/volume semantics",
+        "diagnosis vs observation",
+        "B-040 schema",
+        "localOnly and minimization",
+        "supported measurement scope"
+      ],
+      "elementIds": [
+        "CA-SYSTEM-OBSERVATION",
+        "CA-FILE-ASSET",
+        "CA-GLOBAL-PROVENANCE",
+        "CA-GLOBAL-AUTHORITY",
+        "CA-GLOBAL-VERIFICATION",
+        "CA-GLOBAL-CURRENTNESS"
+      ],
+      "claimIds": [
+        "CA-CLM-003",
+        "CA-CLM-004",
+        "CA-CLM-005",
+        "CA-CLM-015"
+      ],
+      "cqIds": [
+        "CQ-CA-003",
+        "CQ-CA-013",
+        "CQ-CA-017"
+      ],
+      "sourceRefs": [
+        "SRC-PRODUCT-PRD",
+        "SRC-PRODUCT-L1",
+        "SRC-PRODUCT-FREEZE",
+        "SRC-SYSTEM-DIAGNOSTICS",
+        "SRC-SYSTEM-RUNTIME",
+        "SRC-DOMAIN-COMPUTER-SUPPORT",
+        "SRC-TEST-SYSTEM-DIAGNOSTICS",
+        "SRC-TEST-DOMAIN-COMPUTER-SUPPORT"
+      ],
+      "aotEligible": [
+        "OS-specific observation meanings",
+        "diagnostic thresholds and falsifiers when qualified",
+        "minimization policy"
+      ],
+      "runtimeOnly": [
+        "current native metrics",
+        "task-selected folder",
+        "local support context",
+        "OS edition/build",
+        "current privacy consent"
+      ],
+      "feasibility": {
+        "targetClass": "I1",
+        "currentSourceObservation": "READ_ONLY_SYSTEM_AND_SUPPORT_ADAPTER_SOURCE_OBSERVED",
+        "actualNativeEvidence": "NOT_RUN_IN_THIS_DKE_WORKSTREAM",
+        "integrationEvidence": "NOT_ESTABLISHED",
+        "productImplementationAuthorization": "NOT_AUTHORIZED_BY_FROZEN_PRODUCT_CHECKPOINT",
+        "implementationEstimate": "UNKNOWN",
+        "maintenanceEstimate": "UNKNOWN"
+      },
+      "functionCandidate": {
+        "status": "DIS_NOT_PROPOSED_OR_QUALIFIED",
+        "name": "system.diagnoseAndMinimize",
+        "inputSchema": "NOT_DEFINED_DIS_OWNER",
+        "typedOutput": "NOT_DEFINED_DIS_OWNER",
+        "pipeline": "NOT_DEFINED_DIS_OWNER"
+      },
+      "preconditions": [
+        "observation local-only",
+        "no automatic network or model egress"
+      ],
+      "independentPostcondition": "Native readings supported by fresh local evidence; report remains localOnly=true and externalDisclosures=[]",
+      "negativeOrRefusalCase": "Missing values or data leakage toward LLM/Meta/network is rejected",
+      "unknownOrRecoveryCase": "Inaccessible target or incompatible OS → UNKNOWN; no invented root-cause or optimization guarantee",
+      "risk": "PRIVACY_SENSITIVE_READ_ONLY",
+      "verificationEvidence": "TEST_DEFINITIONS_ONLY_NOT_RUNTIME_RECEIPT",
+      "sapQualification": "NOT_QUALIFIED",
+      "closure": "NOT_RUN",
+      "unresolvedDecisions": [
+        "Product/L2/runtime qualification and current implementation parity must be demonstrated",
+        "Fresh independent source-first Element/SAP review and applicable native/domain Oracle evidence"
+      ]
+    },
+    {
+      "id": "CA-JOB-03",
+      "title": "Exact-root cleanup preview and approved bounded cleanup",
+      "demandClass": "D0",
+      "productAdmission": "FROZEN_PRODUCT_REQUIREMENT_ONLY",
+      "demandEvidence": {
+        "kind": "FROZEN_PRODUCT_JOURNEY",
+        "locator": "PRD-v0.3-domain-harness-R0.md §2 item 3; Product Freeze checkpoint",
+        "frequencyEvidence": "UNKNOWN_NOT_MEASURED",
+        "businessValue": "NOT_QUANTIFIED"
+      },
+      "goal": "Safely diagnose storage growth, preview eligible cache/temp targets and verify protected assets and reclaimed bytes after an approved effect",
+      "knowledgeRequirements": [
+        "selected-volume vs partition distinction",
+        "disposable classifications",
+        "user asset protection",
+        "path identity and reparse rules",
+        "R2 approval",
+        "independent poststate"
+      ],
+      "elementIds": [
+        "CA-STORAGE",
+        "CA-FILE-ASSET",
+        "CA-TASK-LIFECYCLE",
+        "CA-GLOBAL-PROVENANCE",
+        "CA-GLOBAL-AUTHORITY",
+        "CA-GLOBAL-VERIFICATION",
+        "CA-GLOBAL-CURRENTNESS"
+      ],
+      "claimIds": [
+        "CA-CLM-006",
+        "CA-CLM-007",
+        "CA-CLM-014"
+      ],
+      "cqIds": [
+        "CQ-CA-004",
+        "CQ-CA-005",
+        "CQ-CA-012",
+        "CQ-CA-019"
+      ],
+      "sourceRefs": [
+        "SRC-PRODUCT-PRD",
+        "SRC-PRODUCT-L1",
+        "SRC-PRODUCT-FREEZE",
+        "SRC-STORAGE-PLAN",
+        "SRC-STORAGE-EXECUTE",
+        "SRC-STORAGE-VERIFY",
+        "SRC-TEST-STORAGE-PLAN",
+        "SRC-TEST-STORAGE-EXECUTE",
+        "SRC-TEST-STORAGE-VERIFY"
+      ],
+      "aotEligible": [
+        "stable file taxonomy",
+        "protected-asset policy",
+        "precondition/refusal rules",
+        "verification invariants"
+      ],
+      "runtimeOnly": [
+        "current selected root/files",
+        "ACLs and locks",
+        "observed file identity",
+        "approval/grant and permit",
+        "journal",
+        "poststate bytes and canaries"
+      ],
+      "feasibility": {
+        "targetClass": "I3",
+        "currentSourceObservation": "BOUNDED_STORAGE_PLAN_AND_EXECUTE_SOURCE_OBSERVED",
+        "actualNativeEvidence": "NOT_RUN_IN_THIS_DKE_WORKSTREAM",
+        "integrationEvidence": "NOT_ESTABLISHED",
+        "productImplementationAuthorization": "NOT_AUTHORIZED_BY_FROZEN_PRODUCT_CHECKPOINT",
+        "implementationEstimate": "UNKNOWN",
+        "maintenanceEstimate": "UNKNOWN"
+      },
+      "functionCandidate": {
+        "status": "DIS_NOT_PROPOSED_OR_QUALIFIED",
+        "name": "storage.boundedCleanup",
+        "inputSchema": "NOT_DEFINED_DIS_OWNER",
+        "typedOutput": "NOT_DEFINED_DIS_OWNER",
+        "pipeline": "NOT_DEFINED_DIS_OWNER"
+      },
+      "preconditions": [
+        "scope/identity pinned",
+        "explicit human R2 approval",
+        "current independent Host authorization",
+        "protected assets excluded"
+      ],
+      "independentPostcondition": "Re-observed free-space delta and target poststate consistent with plan; protected canaries independently unchanged",
+      "negativeOrRefusalCase": "Unknown or user-created files, renamed target, alias, stale grant, UAC refusal → BLOCKED",
+      "unknownOrRecoveryCase": "Interrupted or ambiguous effect → journal reconciliation/UNKNOWN; never blindly replay deletion",
+      "risk": "HIGH_IRREVERSIBLE_FILES",
+      "verificationEvidence": "TEST_DEFINITIONS_ONLY_NOT_RUNTIME_RECEIPT",
+      "sapQualification": "NOT_QUALIFIED",
+      "closure": "NOT_RUN",
+      "unresolvedDecisions": [
+        "Product/L2/runtime qualification and current implementation parity must be demonstrated",
+        "Fresh independent source-first Element/SAP review and applicable native/domain Oracle evidence"
+      ]
+    },
+    {
+      "id": "CA-JOB-04",
+      "title": "Offline deterministic Recipe replay",
+      "demandClass": "D0",
+      "productAdmission": "FROZEN_PRODUCT_REQUIREMENT_ONLY",
+      "demandEvidence": {
+        "kind": "FROZEN_PRODUCT_JOURNEY",
+        "locator": "PRD-v0.3-domain-harness-R0.md §2 item 4; Product Freeze checkpoint",
+        "frequencyEvidence": "UNKNOWN_NOT_MEASURED",
+        "businessValue": "NOT_QUANTIFIED"
+      },
+      "goal": "Replay only a verified immutable Recipe against the same source, graph, parameters and current authorization without LLM calls",
+      "knowledgeRequirements": [
+        "Recipe identity",
+        "source/graph revision",
+        "input binding",
+        "idempotency",
+        "approval/permit separation",
+        "provenance of zero-model replay"
+      ],
+      "elementIds": [
+        "CA-GOAL-CAPABILITY",
+        "CA-TASK-LIFECYCLE",
+        "CA-GLOBAL-PROVENANCE",
+        "CA-GLOBAL-AUTHORITY",
+        "CA-GLOBAL-VERIFICATION",
+        "CA-GLOBAL-CURRENTNESS"
+      ],
+      "claimIds": [
+        "CA-CLM-001",
+        "CA-CLM-014",
+        "CA-CLM-016"
+      ],
+      "cqIds": [
+        "CQ-CA-015",
+        "CQ-CA-016"
+      ],
+      "sourceRefs": [
+        "SRC-PRODUCT-PRD",
+        "SRC-PRODUCT-L1",
+        "SRC-PRODUCT-FREEZE",
+        "SRC-DOMAIN-COMPUTER-RECIPE",
+        "SRC-TEST-DOMAIN-COMPUTER-RECIPE"
+      ],
+      "aotEligible": [
+        "Recipe identity canonicalization",
+        "template constraints",
+        "refusal of changed graph"
+      ],
+      "runtimeOnly": [
+        "current target binding",
+        "approval/permit",
+        "provider readiness",
+        "actual model-call counter",
+        "journal and observed effects"
+      ],
+      "feasibility": {
+        "targetClass": "I3",
+        "currentSourceObservation": "RECIPE_SEMANTIC_ADAPTER_SOURCE_OBSERVED_NOT_END_TO_END",
+        "actualNativeEvidence": "NOT_RUN_IN_THIS_DKE_WORKSTREAM",
+        "integrationEvidence": "NOT_ESTABLISHED",
+        "productImplementationAuthorization": "NOT_AUTHORIZED_BY_FROZEN_PRODUCT_CHECKPOINT",
+        "implementationEstimate": "UNKNOWN",
+        "maintenanceEstimate": "UNKNOWN"
+      },
+      "functionCandidate": {
+        "status": "DIS_NOT_PROPOSED_OR_QUALIFIED",
+        "name": "recipe.replay",
+        "inputSchema": "NOT_DEFINED_DIS_OWNER",
+        "typedOutput": "NOT_DEFINED_DIS_OWNER",
+        "pipeline": "NOT_DEFINED_DIS_OWNER"
+      },
+      "preconditions": [
+        "exact recipe/source/graph digest",
+        "new valid authority per effect"
+      ],
+      "independentPostcondition": "Replay matches immutable Recipe and approved postcondition; zero model calls where offline path is promised",
+      "negativeOrRefusalCase": "Modified graph/source or substituted parameter with stale grant → BLOCKED",
+      "unknownOrRecoveryCase": "Unknown replay effect after restart → reconcile before retry",
+      "risk": "EFFECT_DEPENDENT",
+      "verificationEvidence": "TEST_DEFINITIONS_ONLY_NOT_RUNTIME_RECEIPT",
+      "sapQualification": "NOT_QUALIFIED",
+      "closure": "NOT_RUN",
+      "unresolvedDecisions": [
+        "Product/L2/runtime qualification and current implementation parity must be demonstrated",
+        "Fresh independent source-first Element/SAP review and applicable native/domain Oracle evidence"
+      ]
+    },
+    {
+      "id": "CA-JOB-05",
+      "title": "Private consent and cost-bounded DeepSeek request",
+      "demandClass": "D0",
+      "productAdmission": "FROZEN_PRODUCT_REQUIREMENT_ONLY",
+      "demandEvidence": {
+        "kind": "FROZEN_PRODUCT_JOURNEY",
+        "locator": "PRD-v0.3-domain-harness-R0.md §2 item 5; Product Freeze checkpoint",
+        "frequencyEvidence": "UNKNOWN_NOT_MEASURED",
+        "businessValue": "NOT_QUANTIFIED"
+      },
+      "goal": "Make an explicitly consented model request without leaking local-only B-040 observations or misreporting uncertain send/cost",
+      "knowledgeRequirements": [
+        "separate privacy/cost consent",
+        "remote output untrusted",
+        "at-most-once reservations",
+        "MAY_HAVE_SENT",
+        "UNKNOWN_COST",
+        "local-only exclusions"
+      ],
+      "elementIds": [
+        "CA-GOAL-CAPABILITY",
+        "CA-TASK-LIFECYCLE",
+        "CA-GLOBAL-PROVENANCE",
+        "CA-GLOBAL-AUTHORITY",
+        "CA-GLOBAL-VERIFICATION",
+        "CA-GLOBAL-CURRENTNESS"
+      ],
+      "claimIds": [
+        "CA-CLM-001",
+        "CA-CLM-014",
+        "CA-CLM-015"
+      ],
+      "cqIds": [
+        "CQ-CA-013",
+        "CQ-CA-015"
+      ],
+      "sourceRefs": [
+        "SRC-PRODUCT-PRD",
+        "SRC-PRODUCT-L1",
+        "SRC-PRODUCT-FREEZE",
+        "SRC-DOMAIN-COMPUTER-CLOUD-GOAL",
+        "SRC-DOMAIN-COMPUTER-SUPPORT",
+        "SRC-TEST-DOMAIN-COMPUTER-SUPPORT"
+      ],
+      "aotEligible": [
+        "fixed provider routing policy",
+        "consent scope and minimization rules",
+        "uncertain-send refusal/recovery"
+      ],
+      "runtimeOnly": [
+        "current consent",
+        "selected endpoint/model/key",
+        "budget",
+        "actual request bytes",
+        "transport send receipt"
+      ],
+      "feasibility": {
+        "targetClass": "I3",
+        "currentSourceObservation": "SOURCE_OBSERVED_GOAL_ADAPTER_ONLY_NO_REAL_PAID_CALL_PROOF",
+        "actualNativeEvidence": "NOT_RUN_IN_THIS_DKE_WORKSTREAM",
+        "integrationEvidence": "NOT_ESTABLISHED",
+        "productImplementationAuthorization": "NOT_AUTHORIZED_BY_FROZEN_PRODUCT_CHECKPOINT",
+        "implementationEstimate": "UNKNOWN",
+        "maintenanceEstimate": "UNKNOWN"
+      },
+      "functionCandidate": {
+        "status": "DIS_NOT_PROPOSED_OR_QUALIFIED",
+        "name": "llm.requestWithConsent",
+        "inputSchema": "NOT_DEFINED_DIS_OWNER",
+        "typedOutput": "NOT_DEFINED_DIS_OWNER",
+        "pipeline": "NOT_DEFINED_DIS_OWNER"
+      },
+      "preconditions": [
+        "independent privacy and budget consent",
+        "no B-040 automatic disclosure"
+      ],
+      "independentPostcondition": "Observed approved request route and exact disclosure/cost bookkeeping; no phantom refund or retry",
+      "negativeOrRefusalCase": "Consent absent/expired, unauthorized endpoint, local-only report included → BLOCKED",
+      "unknownOrRecoveryCase": "MAY_HAVE_SENT/UNKNOWN_COST → report uncertainty, never blind retry",
+      "risk": "PRIVACY_AND_COST",
+      "verificationEvidence": "TEST_DEFINITIONS_ONLY_NOT_RUNTIME_RECEIPT",
+      "sapQualification": "NOT_QUALIFIED",
+      "closure": "NOT_RUN",
+      "unresolvedDecisions": [
+        "Product/L2/runtime qualification and current implementation parity must be demonstrated",
+        "Fresh independent source-first Element/SAP review and applicable native/domain Oracle evidence"
+      ]
+    },
+    {
+      "id": "CA-JOB-06",
+      "title": "Curated signed Provider JIT lifecycle",
+      "demandClass": "D0",
+      "productAdmission": "FROZEN_PRODUCT_REQUIREMENT_ONLY",
+      "demandEvidence": {
+        "kind": "FROZEN_PRODUCT_JOURNEY",
+        "locator": "PRD-v0.3-domain-harness-R0.md §2 item 6; Product Freeze checkpoint",
+        "frequencyEvidence": "UNKNOWN_NOT_MEASURED",
+        "businessValue": "NOT_QUANTIFIED"
+      },
+      "goal": "Acquire, bind, use, verify and remove only a curated trusted Provider, preserving unknown/user-owned residue",
+      "knowledgeRequirements": [
+        "publisher/signature/hash",
+        "curated source",
+        "architecture/ABI",
+        "owned-file manifest",
+        "residue classes",
+        "journaled remove"
+      ],
+      "elementIds": [
+        "CA-SOFTWARE-LIFECYCLE",
+        "CA-EXECUTION-ENVIRONMENT",
+        "CA-TASK-LIFECYCLE",
+        "CA-GLOBAL-PROVENANCE",
+        "CA-GLOBAL-AUTHORITY",
+        "CA-GLOBAL-VERIFICATION",
+        "CA-GLOBAL-CURRENTNESS"
+      ],
+      "claimIds": [
+        "CA-CLM-008",
+        "CA-CLM-011",
+        "CA-CLM-014"
+      ],
+      "cqIds": [
+        "CQ-CA-002",
+        "CQ-CA-006",
+        "CQ-CA-007",
+        "CQ-CA-012"
+      ],
+      "sourceRefs": [
+        "SRC-PRODUCT-PRD",
+        "SRC-PRODUCT-L1",
+        "SRC-PRODUCT-FREEZE",
+        "SRC-JIT-ORCHESTRATOR",
+        "SRC-JIT-PROVENANCE",
+        "SRC-JIT-RESIDUE",
+        "SRC-TEST-JIT-PROVENANCE",
+        "SRC-TEST-JIT-LIFECYCLE-REMOVE",
+        "SRC-TEST-JIT-POSTSTATE"
+      ],
+      "aotEligible": [
+        "provider trust schema",
+        "signature/provenance rules",
+        "removal protection and poststate verification"
+      ],
+      "runtimeOnly": [
+        "current installed Provider/version",
+        "current trust/revocation",
+        "approval",
+        "file IDs",
+        "task and removal journal"
+      ],
+      "feasibility": {
+        "targetClass": "I3",
+        "currentSourceObservation": "CURATED_JIT_LIFECYCLE_SOURCE_OBSERVED_NOT_GENERAL_APP_INSTALLER",
+        "actualNativeEvidence": "NOT_RUN_IN_THIS_DKE_WORKSTREAM",
+        "integrationEvidence": "NOT_ESTABLISHED",
+        "productImplementationAuthorization": "NOT_AUTHORIZED_BY_FROZEN_PRODUCT_CHECKPOINT",
+        "implementationEstimate": "UNKNOWN",
+        "maintenanceEstimate": "UNKNOWN"
+      },
+      "functionCandidate": {
+        "status": "DIS_NOT_PROPOSED_OR_QUALIFIED",
+        "name": "provider.curatedLifecycle",
+        "inputSchema": "NOT_DEFINED_DIS_OWNER",
+        "typedOutput": "NOT_DEFINED_DIS_OWNER",
+        "pipeline": "NOT_DEFINED_DIS_OWNER"
+      },
+      "preconditions": [
+        "exact curated provider artifact",
+        "valid signature/ABI",
+        "current approval/permit"
+      ],
+      "independentPostcondition": "Independent poststate confirms Provider-owned change and protected/user files preserved",
+      "negativeOrRefusalCase": "Untrusted source, signature/hash mismatch, unknown residue deletion → BLOCKED",
+      "unknownOrRecoveryCase": "Unknown remove completion → use journal and re-observe before retry",
+      "risk": "HIGH_SOFTWARE_FILES",
+      "verificationEvidence": "TEST_DEFINITIONS_ONLY_NOT_RUNTIME_RECEIPT",
+      "sapQualification": "NOT_QUALIFIED",
+      "closure": "NOT_RUN",
+      "unresolvedDecisions": [
+        "Product/L2/runtime qualification and current implementation parity must be demonstrated",
+        "Fresh independent source-first Element/SAP review and applicable native/domain Oracle evidence"
+      ]
+    },
+    {
+      "id": "CA-JOB-07",
+      "title": "Durable journal and truthful UNKNOWN recovery",
+      "demandClass": "D0",
+      "productAdmission": "FROZEN_PRODUCT_REQUIREMENT_ONLY",
+      "demandEvidence": {
+        "kind": "FROZEN_PRODUCT_JOURNEY",
+        "locator": "PRD-v0.3-domain-harness-R0.md §2 item 7; Product Freeze checkpoint",
+        "frequencyEvidence": "UNKNOWN_NOT_MEASURED",
+        "businessValue": "NOT_QUANTIFIED"
+      },
+      "goal": "Recover a task without duplicating an uncertain effect and show faithful history",
+      "knowledgeRequirements": [
+        "single writer/effect identity",
+        "journal phases",
+        "idempotency",
+        "UNC and mapped path limitations",
+        "UNKNOWN/partial state"
+      ],
+      "elementIds": [
+        "CA-TASK-LIFECYCLE",
+        "CA-STORAGE",
+        "CA-GLOBAL-PROVENANCE",
+        "CA-GLOBAL-AUTHORITY",
+        "CA-GLOBAL-VERIFICATION",
+        "CA-GLOBAL-CURRENTNESS"
+      ],
+      "claimIds": [
+        "CA-CLM-001",
+        "CA-CLM-006",
+        "CA-CLM-014"
+      ],
+      "cqIds": [
+        "CQ-CA-012",
+        "CQ-CA-015",
+        "CQ-CA-016"
+      ],
+      "sourceRefs": [
+        "SRC-PRODUCT-PRD",
+        "SRC-PRODUCT-L1",
+        "SRC-PRODUCT-FREEZE",
+        "SRC-STORAGE-EXECUTE",
+        "SRC-STORAGE-VERIFY",
+        "SRC-TEST-STORAGE-EXECUTE",
+        "SRC-TEST-STORAGE-VERIFY"
+      ],
+      "aotEligible": [
+        "state machine and reconciliation rules",
+        "postcondition oracle requirements"
+      ],
+      "runtimeOnly": [
+        "current journal",
+        "filesystem state",
+        "task claim",
+        "Host receipt",
+        "exact original effect identity"
+      ],
+      "feasibility": {
+        "targetClass": "I3",
+        "currentSourceObservation": "SCOPED_STORAGE_JOURNAL_SOURCE_OBSERVED_NO_WHOLE_APP_PROOF",
+        "actualNativeEvidence": "NOT_RUN_IN_THIS_DKE_WORKSTREAM",
+        "integrationEvidence": "NOT_ESTABLISHED",
+        "productImplementationAuthorization": "NOT_AUTHORIZED_BY_FROZEN_PRODUCT_CHECKPOINT",
+        "implementationEstimate": "UNKNOWN",
+        "maintenanceEstimate": "UNKNOWN"
+      },
+      "functionCandidate": {
+        "status": "DIS_NOT_PROPOSED_OR_QUALIFIED",
+        "name": "task.reconcile",
+        "inputSchema": "NOT_DEFINED_DIS_OWNER",
+        "typedOutput": "NOT_DEFINED_DIS_OWNER",
+        "pipeline": "NOT_DEFINED_DIS_OWNER"
+      },
+      "preconditions": [
+        "journal trusted",
+        "exact effect ID",
+        "reconciliation before restart"
+      ],
+      "independentPostcondition": "No duplicate physical effect; result and history equal independently observed state",
+      "negativeOrRefusalCase": "Restart after uncertain effect must not synthesize SUCCESS",
+      "unknownOrRecoveryCase": "Persist UNKNOWN with safe reconcile path, not blind retry",
+      "risk": "HIGH_EFFECT_UNCERTAINTY",
+      "verificationEvidence": "TEST_DEFINITIONS_ONLY_NOT_RUNTIME_RECEIPT",
+      "sapQualification": "NOT_QUALIFIED",
+      "closure": "NOT_RUN",
+      "unresolvedDecisions": [
+        "Product/L2/runtime qualification and current implementation parity must be demonstrated",
+        "Fresh independent source-first Element/SAP review and applicable native/domain Oracle evidence"
+      ]
+    },
+    {
+      "id": "CA-JOB-08",
+      "title": "CN/EN selected-root, approval, refusal and history UI",
+      "demandClass": "D0",
+      "productAdmission": "FROZEN_PRODUCT_REQUIREMENT_ONLY",
+      "demandEvidence": {
+        "kind": "FROZEN_PRODUCT_JOURNEY",
+        "locator": "PRD-v0.3-domain-harness-R0.md §2 item 8; Product Freeze checkpoint",
+        "frequencyEvidence": "UNKNOWN_NOT_MEASURED",
+        "businessValue": "NOT_QUANTIFIED"
+      },
+      "goal": "Provide actual Chinese/English nondeveloper UI with truthful selected root, approval, status and UNKNOWN",
+      "knowledgeRequirements": [
+        "human comprehension",
+        "one approval gesture separate from advice",
+        "history provenance",
+        "meaning-equivalent bilingual refusal/UNKNOWN"
+      ],
+      "elementIds": [
+        "CA-GOAL-CAPABILITY",
+        "CA-TASK-LIFECYCLE",
+        "CA-GLOBAL-PROVENANCE",
+        "CA-GLOBAL-AUTHORITY",
+        "CA-GLOBAL-VERIFICATION",
+        "CA-GLOBAL-CURRENTNESS"
+      ],
+      "claimIds": [
+        "CA-CLM-001",
+        "CA-CLM-014"
+      ],
+      "cqIds": [
+        "CQ-CA-001",
+        "CQ-CA-012",
+        "CQ-CA-015"
+      ],
+      "sourceRefs": [
+        "SRC-PRODUCT-PRD",
+        "SRC-PRODUCT-L1",
+        "SRC-PRODUCT-FREEZE"
+      ],
+      "aotEligible": [
+        "approved UI vocabulary and explanation semantics",
+        "scope/risk labels"
+      ],
+      "runtimeOnly": [
+        "actual browser UI interactions",
+        "Host selected root",
+        "user gesture",
+        "current journal/history"
+      ],
+      "feasibility": {
+        "targetClass": "I2",
+        "currentSourceObservation": "PRODUCT_REQUIREMENT_ONLY_NO_UI_CODE_IN_PINNED_DKE_SOURCE_SLICE",
+        "actualNativeEvidence": "NOT_RUN_IN_THIS_DKE_WORKSTREAM",
+        "integrationEvidence": "NOT_ESTABLISHED",
+        "productImplementationAuthorization": "NOT_AUTHORIZED_BY_FROZEN_PRODUCT_CHECKPOINT",
+        "implementationEstimate": "UNKNOWN",
+        "maintenanceEstimate": "UNKNOWN"
+      },
+      "functionCandidate": {
+        "status": "DIS_NOT_PROPOSED_OR_QUALIFIED",
+        "name": "ui.presentAndConfirm",
+        "inputSchema": "NOT_DEFINED_DIS_OWNER",
+        "typedOutput": "NOT_DEFINED_DIS_OWNER",
+        "pipeline": "NOT_DEFINED_DIS_OWNER"
+      },
+      "preconditions": [
+        "real selected root from Host",
+        "independent approval gesture not LLM"
+      ],
+      "independentPostcondition": "Independent CN and EN end-user actions show correct scope, refusal and persisted history",
+      "negativeOrRefusalCase": "UI-synthesized approval or display-only success misrepresented as effect → FAIL",
+      "unknownOrRecoveryCase": "If state not verified, UI must render UNKNOWN/PARTIAL explicitly",
+      "risk": "CONSENT_UI",
+      "verificationEvidence": "TEST_DEFINITIONS_ONLY_NOT_RUNTIME_RECEIPT",
+      "sapQualification": "NOT_QUALIFIED",
+      "closure": "NOT_RUN",
+      "unresolvedDecisions": [
+        "Product/L2/runtime qualification and current implementation parity must be demonstrated",
+        "Fresh independent source-first Element/SAP review and applicable native/domain Oracle evidence"
+      ]
+    },
+    {
+      "id": "CA-JOB-09",
+      "title": "Bounded one-step Guided Journey",
+      "demandClass": "D0",
+      "productAdmission": "FROZEN_PRODUCT_REQUIREMENT_ONLY",
+      "demandEvidence": {
+        "kind": "FROZEN_PRODUCT_JOURNEY",
+        "locator": "PRD-v0.3-domain-harness-R0.md §2 item 9; Product Freeze checkpoint",
+        "frequencyEvidence": "UNKNOWN_NOT_MEASURED",
+        "businessValue": "NOT_QUANTIFIED"
+      },
+      "goal": "Guide user through a single approved step using trusted Host facts, with untrusted LLM advice",
+      "knowledgeRequirements": [
+        "StepSpec/StepOutcome",
+        "approved templates",
+        "fixed choices",
+        "Host currentness",
+        "advisory boundary"
+      ],
+      "elementIds": [
+        "CA-GOAL-CAPABILITY",
+        "CA-TASK-LIFECYCLE",
+        "CA-GLOBAL-PROVENANCE",
+        "CA-GLOBAL-AUTHORITY",
+        "CA-GLOBAL-VERIFICATION",
+        "CA-GLOBAL-CURRENTNESS"
+      ],
+      "claimIds": [
+        "CA-CLM-001",
+        "CA-CLM-016"
+      ],
+      "cqIds": [
+        "CQ-CA-001",
+        "CQ-CA-015"
+      ],
+      "sourceRefs": [
+        "SRC-PRODUCT-PRD",
+        "SRC-PRODUCT-L1",
+        "SRC-PRODUCT-FREEZE",
+        "SRC-DOMAIN-COMPUTER-GUIDED",
+        "SRC-DOMAIN-COMPUTER-GUIDED-CONTRACT",
+        "SRC-TEST-DOMAIN-COMPUTER-GUIDED"
+      ],
+      "aotEligible": [
+        "versioned StepTemplate/FormSchema/ChoiceCatalog",
+        "clarification semantics"
+      ],
+      "runtimeOnly": [
+        "current Host observation",
+        "rendered UI",
+        "user StepOutcome",
+        "approval/permit if effect follows"
+      ],
+      "feasibility": {
+        "targetClass": "I2",
+        "currentSourceObservation": "ONE_STEP_GUIDED_ADAPTER_SOURCE_OBSERVED_UI_END_TO_END_UNKNOWN",
+        "actualNativeEvidence": "NOT_RUN_IN_THIS_DKE_WORKSTREAM",
+        "integrationEvidence": "NOT_ESTABLISHED",
+        "productImplementationAuthorization": "NOT_AUTHORIZED_BY_FROZEN_PRODUCT_CHECKPOINT",
+        "implementationEstimate": "UNKNOWN",
+        "maintenanceEstimate": "UNKNOWN"
+      },
+      "functionCandidate": {
+        "status": "DIS_NOT_PROPOSED_OR_QUALIFIED",
+        "name": "guided.nextStep",
+        "inputSchema": "NOT_DEFINED_DIS_OWNER",
+        "typedOutput": "NOT_DEFINED_DIS_OWNER",
+        "pipeline": "NOT_DEFINED_DIS_OWNER"
+      },
+      "preconditions": [
+        "approved step template",
+        "no model-created fields/permissions"
+      ],
+      "independentPostcondition": "Trusted step and user's explicit answer bound to one intended task; no unintended effect",
+      "negativeOrRefusalCase": "Forged form field or advice-as-approval → BLOCKED",
+      "unknownOrRecoveryCase": "Missing current facts → clarification/UNKNOWN",
+      "risk": "LOW_UNTIL_EFFECT",
+      "verificationEvidence": "TEST_DEFINITIONS_ONLY_NOT_RUNTIME_RECEIPT",
+      "sapQualification": "NOT_QUALIFIED",
+      "closure": "NOT_RUN",
+      "unresolvedDecisions": [
+        "Product/L2/runtime qualification and current implementation parity must be demonstrated",
+        "Fresh independent source-first Element/SAP review and applicable native/domain Oracle evidence"
+      ]
+    },
+    {
+      "id": "CA-JOB-10",
+      "title": "Opt-in redacted feedback and candidate Shadow",
+      "demandClass": "D0",
+      "productAdmission": "FROZEN_PRODUCT_REQUIREMENT_ONLY",
+      "demandEvidence": {
+        "kind": "FROZEN_PRODUCT_JOURNEY",
+        "locator": "PRD-v0.3-domain-harness-R0.md §2 item 10; Product Freeze checkpoint",
+        "frequencyEvidence": "UNKNOWN_NOT_MEASURED",
+        "businessValue": "NOT_QUANTIFIED"
+      },
+      "goal": "Collect consented redacted task feedback, validate candidates, retain Shadow without auto-promoting current BUILD",
+      "knowledgeRequirements": [
+        "redaction",
+        "explicit opt-in",
+        "candidate validation",
+        "Shadow/version boundaries",
+        "future owner acceptance"
+      ],
+      "elementIds": [
+        "CA-TASK-LIFECYCLE",
+        "CA-AOT-KNOWLEDGE",
+        "CA-GLOBAL-PROVENANCE",
+        "CA-GLOBAL-AUTHORITY",
+        "CA-GLOBAL-VERIFICATION",
+        "CA-GLOBAL-CURRENTNESS"
+      ],
+      "claimIds": [
+        "CA-CLM-015",
+        "CA-CLM-016"
+      ],
+      "cqIds": [
+        "CQ-CA-013",
+        "CQ-CA-016"
+      ],
+      "sourceRefs": [
+        "SRC-PRODUCT-PRD",
+        "SRC-PRODUCT-L1",
+        "SRC-PRODUCT-FREEZE",
+        "SRC-DOMAIN-COMPUTER-META",
+        "SRC-TEST-DOMAIN-COMPUTER-META"
+      ],
+      "aotEligible": [
+        "feedback schema",
+        "safety and promotion policy"
+      ],
+      "runtimeOnly": [
+        "actual opt-in",
+        "task receipt",
+        "redacted observations",
+        "current active build"
+      ],
+      "feasibility": {
+        "targetClass": "I2",
+        "currentSourceObservation": "META_FEEDBACK_ADAPTER_SOURCE_OBSERVED_HOST_INTEGRATION_UNKNOWN",
+        "actualNativeEvidence": "NOT_RUN_IN_THIS_DKE_WORKSTREAM",
+        "integrationEvidence": "NOT_ESTABLISHED",
+        "productImplementationAuthorization": "NOT_AUTHORIZED_BY_FROZEN_PRODUCT_CHECKPOINT",
+        "implementationEstimate": "UNKNOWN",
+        "maintenanceEstimate": "UNKNOWN"
+      },
+      "functionCandidate": {
+        "status": "DIS_NOT_PROPOSED_OR_QUALIFIED",
+        "name": "meta.feedbackCandidate",
+        "inputSchema": "NOT_DEFINED_DIS_OWNER",
+        "typedOutput": "NOT_DEFINED_DIS_OWNER",
+        "pipeline": "NOT_DEFINED_DIS_OWNER"
+      },
+      "preconditions": [
+        "user opt-in",
+        "redaction current",
+        "no local-only B-040 leakage"
+      ],
+      "independentPostcondition": "Candidate remains unpromoted; feedback provenance and redaction evidenced",
+      "negativeOrRefusalCase": "Synthetic approval, raw local-only support or automatic build promotion → BLOCKED",
+      "unknownOrRecoveryCase": "Unknown consent/provenance → no feedback send/store",
+      "risk": "PRIVACY_AND_TRUST",
+      "verificationEvidence": "TEST_DEFINITIONS_ONLY_NOT_RUNTIME_RECEIPT",
+      "sapQualification": "NOT_QUALIFIED",
+      "closure": "NOT_RUN",
+      "unresolvedDecisions": [
+        "Product/L2/runtime qualification and current implementation parity must be demonstrated",
+        "Fresh independent source-first Element/SAP review and applicable native/domain Oracle evidence"
+      ]
+    },
+    {
+      "id": "CA-JOB-11",
+      "title": "General installed-app management",
+      "demandClass": "D1",
+      "productAdmission": "FUTURE_CANDIDATE_NOT_ADMITTED",
+      "demandEvidence": {
+        "kind": "OWNER_REQUESTED_KNOWLEDGE_RESEARCH_ONLY",
+        "locator": "shun-assistant Issue #411 DKE-D0 analysis workstream; not a Product amendment",
+        "frequencyEvidence": "UNKNOWN_NOT_MEASURED",
+        "businessValue": "NOT_QUANTIFIED"
+      },
+      "goal": "Enumerate, distinguish, install, upgrade or uninstall ordinary software packages beyond curated Provider JIT",
+      "knowledgeRequirements": [
+        "exact package/publisher/installer identity",
+        "source trust",
+        "version/architecture",
+        "upgrade compatibility",
+        "uninstall residue"
+      ],
+      "elementIds": [
+        "CA-SOFTWARE-LIFECYCLE",
+        "CA-GLOBAL-PROVENANCE",
+        "CA-GLOBAL-AUTHORITY",
+        "CA-GLOBAL-VERIFICATION",
+        "CA-GLOBAL-CURRENTNESS"
+      ],
+      "claimIds": [
+        "CA-CLM-004",
+        "CA-CLM-008",
+        "CA-CLM-011"
+      ],
+      "cqIds": [
+        "CQ-CA-006",
+        "CQ-CA-007",
+        "CQ-CA-018"
+      ],
+      "sourceRefs": [
+        "SRC-PRODUCT-PRD",
+        "SRC-PRODUCT-L1",
+        "SRC-PRODUCT-FREEZE",
+        "SRC-SYSTEM-SOFTWARE",
+        "SRC-JIT-WINGET",
+        "SRC-JIT-ORCHESTRATOR",
+        "SRC-TEST-SYSTEM-SOFTWARE"
+      ],
+      "aotEligible": [
+        "package identity and source trust",
+        "compatibility/refusal",
+        "postinstall version rules"
+      ],
+      "runtimeOnly": [
+        "current installed inventory",
+        "package/source candidate",
+        "privileges",
+        "user approval",
+        "postinstall/uninstall facts"
+      ],
+      "feasibility": {
+        "targetClass": "I3",
+        "currentSourceObservation": "LIMITED_REGISTRY_SAMPLE_AND_PROVIDER_JIT_ONLY_NOT_GENERAL_MANAGER",
+        "actualNativeEvidence": "NOT_RUN_IN_THIS_DKE_WORKSTREAM",
+        "integrationEvidence": "NOT_ESTABLISHED",
+        "productImplementationAuthorization": "NOT_AUTHORIZED_BY_FROZEN_PRODUCT_CHECKPOINT",
+        "implementationEstimate": "UNKNOWN",
+        "maintenanceEstimate": "UNKNOWN"
+      },
+      "functionCandidate": {
+        "status": "NOT_ADMITTED",
+        "name": "software.manageGeneral",
+        "inputSchema": "NOT_DEFINED_DIS_OWNER",
+        "typedOutput": "NOT_DEFINED_DIS_OWNER",
+        "pipeline": "NOT_DEFINED_DIS_OWNER"
+      },
+      "preconditions": [
+        "new Product amendment",
+        "trusted exact package ID",
+        "no system critical package removal"
+      ],
+      "independentPostcondition": "Re-enumeration verifies exact package version/state and no unexpected user data loss",
+      "negativeOrRefusalCase": "Ambiguous package name, unsigned source, unknown leftovers → refuse",
+      "unknownOrRecoveryCase": "Uninstaller unknown/partial effect → reconcile with actual installed state",
+      "risk": "HIGH_SOFTWARE_CHANGE",
+      "verificationEvidence": "TEST_DEFINITIONS_ONLY_NOT_RUNTIME_RECEIPT",
+      "sapQualification": "NOT_QUALIFIED",
+      "closure": "NOT_RUN",
+      "unresolvedDecisions": [
+        "Explicit future Product admission and risk/authority decision",
+        "Fresh independent source-first Element/SAP review and applicable native/domain Oracle evidence"
+      ]
+    },
+    {
+      "id": "CA-JOB-12",
+      "title": "Disk topology, partition and format management",
+      "demandClass": "D2",
+      "productAdmission": "FUTURE_CANDIDATE_NOT_ADMITTED",
+      "demandEvidence": {
+        "kind": "OWNER_REQUESTED_KNOWLEDGE_RESEARCH_ONLY",
+        "locator": "shun-assistant Issue #411 DKE-D0 analysis workstream; not a Product amendment",
+        "frequencyEvidence": "UNKNOWN_NOT_MEASURED",
+        "businessValue": "NOT_QUANTIFIED"
+      },
+      "goal": "View disks/partitions/volumes separately; evaluate whether any future partition mutations could ever be admitted safely",
+      "knowledgeRequirements": [
+        "physical vs virtual disk",
+        "partition/volume mapping",
+        "system/boot flags",
+        "data loss, locks and backup",
+        "Windows Storage provider applicability"
+      ],
+      "elementIds": [
+        "CA-STORAGE",
+        "CA-GLOBAL-PROVENANCE",
+        "CA-GLOBAL-AUTHORITY",
+        "CA-GLOBAL-VERIFICATION",
+        "CA-GLOBAL-CURRENTNESS"
+      ],
+      "claimIds": [
+        "CA-CLM-010",
+        "CA-CLM-014"
+      ],
+      "cqIds": [
+        "CQ-CA-005",
+        "CQ-CA-018",
+        "CQ-CA-020"
+      ],
+      "sourceRefs": [
+        "SRC-PRODUCT-PRD",
+        "SRC-PRODUCT-L1",
+        "SRC-PRODUCT-FREEZE",
+        "SRC-SYSTEM-INDEX",
+        "SRC-STORAGE-INDEX"
+      ],
+      "aotEligible": [
+        "disk ontology",
+        "destructive-operation prohibitions and refusal rules"
+      ],
+      "runtimeOnly": [
+        "exact disk unique ID",
+        "live topology",
+        "boot/system identity",
+        "backups",
+        "privilege",
+        "user confirmation",
+        "Host poststate"
+      ],
+      "feasibility": {
+        "targetClass": "I4",
+        "currentSourceObservation": "NO_DISK_PARTITION_MUTATION_SOURCE_ESTABLISHED",
+        "actualNativeEvidence": "NOT_RUN_IN_THIS_DKE_WORKSTREAM",
+        "integrationEvidence": "NOT_ESTABLISHED",
+        "productImplementationAuthorization": "NOT_AUTHORIZED_BY_FROZEN_PRODUCT_CHECKPOINT",
+        "implementationEstimate": "UNKNOWN",
+        "maintenanceEstimate": "UNKNOWN"
+      },
+      "functionCandidate": {
+        "status": "NOT_ADMITTED",
+        "name": "storage.partitionManage",
+        "inputSchema": "NOT_DEFINED_DIS_OWNER",
+        "typedOutput": "NOT_DEFINED_DIS_OWNER",
+        "pipeline": "NOT_DEFINED_DIS_OWNER"
+      },
+      "preconditions": [
+        "separate Product Owner admission",
+        "exact disk and partition identity",
+        "independent recovery oracle"
+      ],
+      "independentPostcondition": "No existing data loss; expected volume/partition state independently verified with restore plan",
+      "negativeOrRefusalCase": "Unknown disk identity, system/boot volume or absent backup → BLOCKED",
+      "unknownOrRecoveryCase": "Any uncertain partial mutation → STOP/UNKNOWN and recovery specialist",
+      "risk": "DESTRUCTIVE_IRREVERSIBLE",
+      "verificationEvidence": "TEST_DEFINITIONS_ONLY_NOT_RUNTIME_RECEIPT",
+      "sapQualification": "NOT_QUALIFIED",
+      "closure": "NOT_RUN",
+      "unresolvedDecisions": [
+        "Explicit future Product admission and risk/authority decision",
+        "Fresh independent source-first Element/SAP review and applicable native/domain Oracle evidence"
+      ]
+    },
+    {
+      "id": "CA-JOB-13",
+      "title": "PnP hardware and driver diagnosis/change",
+      "demandClass": "D2",
+      "productAdmission": "FUTURE_CANDIDATE_NOT_ADMITTED",
+      "demandEvidence": {
+        "kind": "OWNER_REQUESTED_KNOWLEDGE_RESEARCH_ONLY",
+        "locator": "shun-assistant Issue #411 DKE-D0 analysis workstream; not a Product amendment",
+        "frequencyEvidence": "UNKNOWN_NOT_MEASURED",
+        "businessValue": "NOT_QUANTIFIED"
+      },
+      "goal": "Read device identity and compatibility first; separately evaluate future signed driver operations",
+      "knowledgeRequirements": [
+        "PnP instance/hardware IDs",
+        "driver signing and OEM provenance",
+        "OS build applicability",
+        "reboot and rollback"
+      ],
+      "elementIds": [
+        "CA-HARDWARE-DEVICE",
+        "CA-GLOBAL-PROVENANCE",
+        "CA-GLOBAL-AUTHORITY",
+        "CA-GLOBAL-VERIFICATION",
+        "CA-GLOBAL-CURRENTNESS"
+      ],
+      "claimIds": [
+        "CA-CLM-009",
+        "CA-CLM-012",
+        "CA-CLM-014"
+      ],
+      "cqIds": [
+        "CQ-CA-008",
+        "CQ-CA-018",
+        "CQ-CA-020"
+      ],
+      "sourceRefs": [
+        "SRC-PRODUCT-PRD",
+        "SRC-PRODUCT-L1",
+        "SRC-PRODUCT-FREEZE",
+        "SRC-DOMAIN-COMPUTER-INDEX"
+      ],
+      "aotEligible": [
+        "PnP ontology",
+        "compatibility conditions",
+        "risk/refusal and recovery criteria"
+      ],
+      "runtimeOnly": [
+        "current device instance",
+        "driver store/signature",
+        "admin grant",
+        "reboot state",
+        "postchange device health"
+      ],
+      "feasibility": {
+        "targetClass": "I4",
+        "currentSourceObservation": "NO_GENERAL_PNP_OR_DRIVER_MANAGER_OBSERVED",
+        "actualNativeEvidence": "NOT_RUN_IN_THIS_DKE_WORKSTREAM",
+        "integrationEvidence": "NOT_ESTABLISHED",
+        "productImplementationAuthorization": "NOT_AUTHORIZED_BY_FROZEN_PRODUCT_CHECKPOINT",
+        "implementationEstimate": "UNKNOWN",
+        "maintenanceEstimate": "UNKNOWN"
+      },
+      "functionCandidate": {
+        "status": "NOT_ADMITTED",
+        "name": "hardware.driverManage",
+        "inputSchema": "NOT_DEFINED_DIS_OWNER",
+        "typedOutput": "NOT_DEFINED_DIS_OWNER",
+        "pipeline": "NOT_DEFINED_DIS_OWNER"
+      },
+      "preconditions": [
+        "explicit Product scope approval",
+        "OEM/Windows driver oracle",
+        "signed compatible package",
+        "rollback path"
+      ],
+      "independentPostcondition": "Driver/device health after reboot independently observed and rollback functional",
+      "negativeOrRefusalCase": "Unverified hardware ID, incompatible/unsigned driver, missing rollback → BLOCKED",
+      "unknownOrRecoveryCase": "Device missing after driver change → UNKNOWN/rollback specialist",
+      "risk": "HIGH_DEVICE_AVAILABILITY",
+      "verificationEvidence": "TEST_DEFINITIONS_ONLY_NOT_RUNTIME_RECEIPT",
+      "sapQualification": "NOT_QUALIFIED",
+      "closure": "NOT_RUN",
+      "unresolvedDecisions": [
+        "Explicit future Product admission and risk/authority decision",
+        "Fresh independent source-first Element/SAP review and applicable native/domain Oracle evidence"
+      ]
+    },
+    {
+      "id": "CA-JOB-14",
+      "title": "Process and service diagnosis/control",
+      "demandClass": "D1",
+      "productAdmission": "FUTURE_CANDIDATE_NOT_ADMITTED",
+      "demandEvidence": {
+        "kind": "OWNER_REQUESTED_KNOWLEDGE_RESEARCH_ONLY",
+        "locator": "shun-assistant Issue #411 DKE-D0 analysis workstream; not a Product amendment",
+        "frequencyEvidence": "UNKNOWN_NOT_MEASURED",
+        "businessValue": "NOT_QUANTIFIED"
+      },
+      "goal": "Distinguish bounded process pressure observation from service/process mutation",
+      "knowledgeRequirements": [
+        "process identity",
+        "service dependencies",
+        "system criticality",
+        "startup semantics",
+        "restart recovery"
+      ],
+      "elementIds": [
+        "CA-PROCESS-SERVICE",
+        "CA-SYSTEM-OBSERVATION",
+        "CA-GLOBAL-PROVENANCE",
+        "CA-GLOBAL-AUTHORITY",
+        "CA-GLOBAL-VERIFICATION",
+        "CA-GLOBAL-CURRENTNESS"
+      ],
+      "claimIds": [
+        "CA-CLM-004",
+        "CA-CLM-005"
+      ],
+      "cqIds": [
+        "CQ-CA-003",
+        "CQ-CA-009",
+        "CQ-CA-018"
+      ],
+      "sourceRefs": [
+        "SRC-PRODUCT-PRD",
+        "SRC-PRODUCT-L1",
+        "SRC-PRODUCT-FREEZE",
+        "SRC-SYSTEM-RUNTIME",
+        "SRC-SYSTEM-PRESSURE",
+        "SRC-TEST-SYSTEM-PRESSURE"
+      ],
+      "aotEligible": [
+        "diagnostic distinctions",
+        "critical process refusal",
+        "service dependency rules"
+      ],
+      "runtimeOnly": [
+        "current PID/service instance",
+        "privilege",
+        "dependencies",
+        "criticality",
+        "postrestart health"
+      ],
+      "feasibility": {
+        "targetClass": "I3",
+        "currentSourceObservation": "BOUNDED_PROCESS_STARTUP_COUNTS_ONLY_NO_GENERIC_MUTATION",
+        "actualNativeEvidence": "NOT_RUN_IN_THIS_DKE_WORKSTREAM",
+        "integrationEvidence": "NOT_ESTABLISHED",
+        "productImplementationAuthorization": "NOT_AUTHORIZED_BY_FROZEN_PRODUCT_CHECKPOINT",
+        "implementationEstimate": "UNKNOWN",
+        "maintenanceEstimate": "UNKNOWN"
+      },
+      "functionCandidate": {
+        "status": "NOT_ADMITTED",
+        "name": "process.serviceControl",
+        "inputSchema": "NOT_DEFINED_DIS_OWNER",
+        "typedOutput": "NOT_DEFINED_DIS_OWNER",
+        "pipeline": "NOT_DEFINED_DIS_OWNER"
+      },
+      "preconditions": [
+        "Product amendment for stop/start",
+        "exact identity and dependency check",
+        "current approval"
+      ],
+      "independentPostcondition": "Independent process/service state observed without unintended critical dependency loss",
+      "negativeOrRefusalCase": "Counting top-memory processes is not evidence to terminate them",
+      "unknownOrRecoveryCase": "Process/Service changed while planning → UNKNOWN/reobserve; no stale PID kill",
+      "risk": "HIGH_SYSTEM_AVAILABILITY",
+      "verificationEvidence": "TEST_DEFINITIONS_ONLY_NOT_RUNTIME_RECEIPT",
+      "sapQualification": "NOT_QUALIFIED",
+      "closure": "NOT_RUN",
+      "unresolvedDecisions": [
+        "Explicit future Product admission and risk/authority decision",
+        "Fresh independent source-first Element/SAP review and applicable native/domain Oracle evidence"
+      ]
+    },
+    {
+      "id": "CA-JOB-15",
+      "title": "Network diagnosis and configuration",
+      "demandClass": "D1",
+      "productAdmission": "FUTURE_CANDIDATE_NOT_ADMITTED",
+      "demandEvidence": {
+        "kind": "OWNER_REQUESTED_KNOWLEDGE_RESEARCH_ONLY",
+        "locator": "shun-assistant Issue #411 DKE-D0 analysis workstream; not a Product amendment",
+        "frequencyEvidence": "UNKNOWN_NOT_MEASURED",
+        "businessValue": "NOT_QUANTIFIED"
+      },
+      "goal": "Diagnose connectivity layers before contemplating mutable network settings",
+      "knowledgeRequirements": [
+        "link vs IP vs route vs DNS vs proxy",
+        "connection tests",
+        "network changes can strand Host"
+      ],
+      "elementIds": [
+        "CA-NETWORK",
+        "CA-EXECUTION-ENVIRONMENT",
+        "CA-GLOBAL-PROVENANCE",
+        "CA-GLOBAL-AUTHORITY",
+        "CA-GLOBAL-VERIFICATION",
+        "CA-GLOBAL-CURRENTNESS"
+      ],
+      "claimIds": [
+        "CA-CLM-002",
+        "CA-CLM-014"
+      ],
+      "cqIds": [
+        "CQ-CA-010",
+        "CQ-CA-018",
+        "CQ-CA-020"
+      ],
+      "sourceRefs": [
+        "SRC-PRODUCT-PRD",
+        "SRC-PRODUCT-L1",
+        "SRC-PRODUCT-FREEZE"
+      ],
+      "aotEligible": [
+        "diagnostic protocol",
+        "layered troubleshooting",
+        "refusal and rollback policy"
+      ],
+      "runtimeOnly": [
+        "current NIC/link/IP/route/DNS/proxy",
+        "current network access",
+        "admin privilege",
+        "rollback channel"
+      ],
+      "feasibility": {
+        "targetClass": "I4",
+        "currentSourceObservation": "NO_GENERAL_NETWORK_ADMIN_SOURCE_ESTABLISHED",
+        "actualNativeEvidence": "NOT_RUN_IN_THIS_DKE_WORKSTREAM",
+        "integrationEvidence": "NOT_ESTABLISHED",
+        "productImplementationAuthorization": "NOT_AUTHORIZED_BY_FROZEN_PRODUCT_CHECKPOINT",
+        "implementationEstimate": "UNKNOWN",
+        "maintenanceEstimate": "UNKNOWN"
+      },
+      "functionCandidate": {
+        "status": "NOT_ADMITTED",
+        "name": "network.configure",
+        "inputSchema": "NOT_DEFINED_DIS_OWNER",
+        "typedOutput": "NOT_DEFINED_DIS_OWNER",
+        "pipeline": "NOT_DEFINED_DIS_OWNER"
+      },
+      "preconditions": [
+        "explicit Product admission",
+        "safe offline rollback path",
+        "no self-disconnection without recovery"
+      ],
+      "independentPostcondition": "Independent connectivity checks and restored baseline for all affected routes",
+      "negativeOrRefusalCase": "Inconclusive layer diagnosis or risk of losing sole control channel → BLOCKED",
+      "unknownOrRecoveryCase": "Network config unknown after disconnect → stop and recover through separate channel",
+      "risk": "HIGH_CONNECTIVITY_AND_ACCESS",
+      "verificationEvidence": "TEST_DEFINITIONS_ONLY_NOT_RUNTIME_RECEIPT",
+      "sapQualification": "NOT_QUALIFIED",
+      "closure": "NOT_RUN",
+      "unresolvedDecisions": [
+        "Explicit future Product admission and risk/authority decision",
+        "Fresh independent source-first Element/SAP review and applicable native/domain Oracle evidence"
+      ]
+    }
+  ]
+}
