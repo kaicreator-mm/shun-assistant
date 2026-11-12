@@ -53,14 +53,62 @@ if (suites.some((s) => s.requiresVitest) && !existsSync(vitest)) {
   process.exit(1);
 }
 
+// VITEST-WORKER RPC STARVATION TRANSIENT (2026-11-11 Woodpecker #775/#776):
+// vitest 3.2.7 hard-codes a 60s birpc timeout (DEFAULT_TIMEOUT = 6e4) on the
+// worker→main channel and the pool configs cannot override it. Under heavy
+// agent load (11 concurrent full-qualification pipelines on one worker) the
+// main thread can starve past that deadline; vitest then records one unhandled
+// error and exits nonzero EVEN THOUGH EVERY TEST PASSED. A real test failure
+// never carries that marker, so one marker-gated retry keeps the gate
+// fail-closed while surviving the starvation transient.
+const VITEST_WORKER_RPC_TRANSIENT_MARKER = '[vitest-worker]: Timeout calling';
+
+// Vitest suites run captured instead of inherited so the RPC transient is
+// detectable; the full captured trace is still echoed, because this
+// deployment retains no server logs and this output is the only post-mortem
+// evidence path (see .woodpecker.yml).
+function runVitestSuite(suite) {
+  const result = spawnSync(process.execPath, suite.args, {
+    cwd: workspaceRoot,
+    encoding: 'buffer',
+    maxBuffer: 128 * 1024 * 1024,
+    env: process.env,
+  });
+  if (result.stdout?.length) process.stdout.write(result.stdout);
+  if (result.stderr?.length) process.stderr.write(result.stderr);
+  return result;
+}
+
+function isVitestWorkerRpcTransient(suite, result) {
+  return (
+    suite.requiresVitest === true &&
+    !result.error &&
+    result.status !== 0 &&
+    `${result.stdout?.toString() ?? ''}${result.stderr?.toString() ?? ''}`.includes(
+      VITEST_WORKER_RPC_TRANSIENT_MARKER,
+    )
+  );
+}
+
 let passed = 0;
 for (const suite of suites) {
   console.log(`[integration] RUN ${suite.name}`);
-  const result = spawnSync(process.execPath, suite.args, {
-    cwd: workspaceRoot,
-    stdio: 'inherit',
-    env: process.env,
-  });
+  let result;
+  if (suite.requiresVitest) {
+    result = runVitestSuite(suite);
+    if (isVitestWorkerRpcTransient(suite, result)) {
+      console.error(
+        `[integration] TRANSIENT ${suite.name}: vitest worker RPC starvation (tests may have all passed); retrying once`,
+      );
+      result = runVitestSuite(suite);
+    }
+  } else {
+    result = spawnSync(process.execPath, suite.args, {
+      cwd: workspaceRoot,
+      stdio: 'inherit',
+      env: process.env,
+    });
+  }
   if (result.error || result.status !== 0) {
     console.error(`[integration] FAIL ${suite.name}: ${result.error?.message ?? result.status ?? 'no exit'}`);
     process.exit(result.status && result.status > 0 ? result.status : 1);
