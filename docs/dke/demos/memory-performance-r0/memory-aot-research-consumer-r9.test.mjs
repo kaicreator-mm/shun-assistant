@@ -41,3 +41,10 @@ test('unverified AOT raw data can never issue an execution receipt',()=>{
  const r=consumePinnedResearchAot('{',report());assert.equal(r.outcome,'UNKNOWN');
  assert.equal(r.productionAotExecuted,false);assert.equal(r.disFunctionInvoked,false);
  assert.deepEqual(r.decisionRulesEvaluated,[]);});
+test('report label refuses rule execution on unknown or unpinned predicates',async()=>{
+ const {researchAotConsumptionLabel}=await import('./memory-aot-research-consumer-r9.mjs');
+ assert.equal(researchAotConsumptionLabel({outcome:'UNKNOWN'}),'NO_RESEARCH_RULES_EVALUATED_UNKNOWN');
+ assert.equal(researchAotConsumptionLabel({outcome:'ADVISORY_ONLY'}),'NO_RESEARCH_RULES_EVALUATED_UNKNOWN');
+ assert.equal(researchAotConsumptionLabel({outcome:'ADVISORY_ONLY',researchDecisionRuleConsumption:'EXECUTED_IN_RESEARCH_RUNTIME_ONLY'}),
+  'RESEARCH_DECISION_RULES_EVALUATED_NOT_PRODUCTION_AOT');
+});

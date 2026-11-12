@@ -39,3 +39,11 @@ export function consumePinnedResearchAot(rawCandidate,report,options={}){
  if(r.outcome!=='ADVISORY_ONLY')return r;
  return {...r,source:'EXACT_PINNED_AOT_CANDIDATE_DECISION_RULES',sourceGitBlob:proof.gitBlob,
  researchDecisionRuleConsumption:'EXECUTED_IN_RESEARCH_RUNTIME_ONLY'};}
+
+// UNKNOWN reports (or unpinned predicate-only tests) cannot claim that rules ran.
+export function researchAotConsumptionLabel(evaluation) {
+ return evaluation?.outcome==='ADVISORY_ONLY' &&
+   evaluation.researchDecisionRuleConsumption==='EXECUTED_IN_RESEARCH_RUNTIME_ONLY'
+   ? 'RESEARCH_DECISION_RULES_EVALUATED_NOT_PRODUCTION_AOT'
+   : 'NO_RESEARCH_RULES_EVALUATED_UNKNOWN';
+}
