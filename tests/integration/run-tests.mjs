@@ -45,6 +45,23 @@ for (const dirName of readdirSync(v03, { withFileTypes: true })
   }
 }
 
+// When the bounded DKE R9 research module exists in a downstream stack,
+// its real pinned AOT candidate and negative tests are mandatory CI suites.
+// Upstream branches without the feature do not invent an absent test target.
+const dkeR9 = join(workspaceRoot, 'docs/dke/demos/memory-performance-r0');
+if (existsSync(join(dkeR9, 'memory-aot-research-consumer-r9.mjs'))) {
+  for (const name of [
+    'memory-aot-research-consumer-r9.test.mjs',
+    'memory-aot-pinned-consumption-r9.test.mjs',
+  ]) {
+    const file = join(dkeR9, name);
+    if (!existsSync(file)) {
+      throw new Error(`DKE_R9_MANDATORY_TEST_MISSING: ${name}`);
+    }
+    addNative(file);
+  }
+}
+
 if (suites.length === 0) {
   console.error('[integration] MANDATORY_SUITES_MISSING');
   process.exit(1);
