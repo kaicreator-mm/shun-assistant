@@ -109,10 +109,11 @@
         "read-only observation with source metric identity",
         "AOT candidate bytes checked for integrity only",
         "aotRuleConsumption=NOT_APPLIED_BY_THIS_DEMO; sourceRulesApplied=[]; source.aotRuleIds=[]",
-        "NO selected DIS assess Function or ECP invoked"
+        "NO selected DIS assess Function or ECP invoked",
+        "R9 research-only candidate MEM-DEC predicate evaluation, exact AOT candidate Git Blob; sourceRulesApplied stays empty; not selected DIS/AOT execution."
       ],
       "effect": "NONE",
-      "researchRuntimeStatus": "PURE_ANALYZER_HEURISTIC_ONLY_NO_AOT_RULE_EXECUTION"
+      "researchRuntimeStatus": "PURE_ANALYZER_PLUS_R9_RESEARCH_DECISION_PREDICATES; NOT_REGISTERED_DIS_FUNCTION_OR_PRODUCTION_AOT"
     },
     {
       "functionId": "computer.memory.plan",
@@ -238,8 +239,9 @@
     "optionalComparisonQualification": "CONTRACT_ONLY; CURRENT_DEMO_ALWAYS_UNKNOWN",
     "runtimeInvocation": "NOT_INVOKED_BY_CURRENT_RESEARCH_RUNNER",
     "stepsMeaning": "ORDERED_FUNCTION_DESIGN_CANDIDATES_NOT_EXECUTED_DIS_PIPELINE",
-    "currentDemoExecution": "Fixed read-only Windows collectors → analyzeMemoryObservation pure report; checks candidate AOT Git Blob integrity only. Prints pipeline ID as declarative metadata, never invokes a registered DIS Function/ECP or applies AOT sourceRules.",
-    "currentDemoAotRuleConsumption": "NOT_APPLIED_BY_THIS_DEMO"
+    "currentDemoExecution": "Fixed trusted Windows read-only collectors -> pure analyzer -> exact Git-Blob-checked research candidate decision predicate evaluator (R9). The consumer actually evaluates the six author-candidate MEM-DEC rules but neither executes AOT sourceRules nor invokes a registered DIS Function/ECP.",
+    "currentDemoAotRuleConsumption": "NOT_APPLIED_BY_THIS_DEMO",
+    "researchDecisionRuleExecution": "R9_RESEARCH_ONLY_EXACT_BLOB_CANDIDATE_DECISION_RULES_ACTUALLY_EVALUATED; NOT_PRODUCTION_AOT; NO_SEMANTIC_ORACLE"
   },
   "ecpCandidate": {
     "ecpId": "ECP-MEMORY-PERFORMANCE-001",

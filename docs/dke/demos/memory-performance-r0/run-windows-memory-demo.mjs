@@ -2,6 +2,7 @@
 import { readFile } from 'node:fs/promises';
 import { analyzeMemoryObservation } from './memory-analysis.mjs';
 import { validateMemoryAotCandidate } from './memory-aot-integrity.mjs';
+import { consumePinnedResearchAot } from './memory-aot-research-consumer-r9.mjs';
 
 const args = process.argv.slice(2);
 const includeLocalProcessNames = args.includes('--show-local-process-names');
@@ -33,6 +34,10 @@ if (args.some((x) => x !== '--show-local-process-names')) {
     const diagnostic = collectWindowsReadonlyDiagnosis();
     const topMemory = collectWindowsTopMemoryProcesses();
     const report = analyzeMemoryObservation(diagnostic, topMemory, { includeLocalProcessNames });
+    const researchDecisionEvaluation = consumePinnedResearchAot(aotRaw, report);
+    if (report.outcome === 'OBSERVED_ONLY' && researchDecisionEvaluation.outcome !== 'ADVISORY_ONLY') {
+      throw new Error('RESEARCH_AOT_DECISION_CONSUMPTION_FAILED');
+    }
     process.stdout.write(JSON.stringify({
       schema: 'shun.demo.memory-performance-runtime.v0',
       demoOnly: true,
@@ -43,9 +48,11 @@ if (args.some((x) => x !== '--show-local-process-names')) {
         sourceGitBlob: aotIntegrity.gitBlob,
         integrity: aotIntegrity.integrity,
         sourceRulesApplied: [],
-        consumption: 'VALIDATED_CANDIDATE_BYTES_ONLY_NOT_RULE_EXECUTION',
+        researchDecisionRuleIdsMatched: researchDecisionEvaluation.matchedDecisionRuleIds,
+        consumption: 'RESEARCH_DECISION_RULES_EVALUATED_NOT_PRODUCTION_AOT',
       },
       disPipeline: contract.pipeline.pipelineId,
+      researchAotDecisionEvaluation: researchDecisionEvaluation,
       runtime: { platform: process.platform, arch: process.arch, nodeVersion: process.version, sourceCommit: '1224fea4097799467e2c0c454885e680f1f28248' },
       report,
       effectsAuthorized: false,

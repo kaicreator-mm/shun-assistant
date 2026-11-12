@@ -55,3 +55,11 @@ Historical R3 Windows native and Woodpecker receipts at `6e5f4fe73aa560368b53324
 remain valid **only for their exact source Blobs**. The current amended source requires new-head
 targeted tests and fresh independent review; semantic Owner/Oracle, SAP, Product admission,
 production DIS/ECP/AOT, measured optimization effect and verified user Function closure remain zero.
+
+## R9 research candidate decision-rule consumption (NOT production AOT)
+
+The research runner now passes the `AOT_MEMORY_KNOWLEDGE_CANDIDATE_R0.json` **exact original Git Blob** to `consumePinnedResearchAot`. A fixed, read-only predicate engine evaluates six `MEM-DEC-001…006` candidate decisions against an actual `OBSERVED_ONLY` analyzer report, reporting both evaluated and matching rule IDs. No AOT `sourceRules` are applied, no generated binary or production AOT Package is activated, and the analyzer's `source.aotRuleIds=[]` remains honest.
+
+The candidate evaluator strictly refuses unknown/malformed observations, disclosure, effectful plans, fabricated root causes, claimed speedups, invalid rule IDs and source-byte tampering. It marks provenance `NOT_ESTABLISHED_BY_RESEARCH_CONSUMER` and all SAP/Host/OS/selected DIS qualifications unadmitted. A missing real Windows sample still remains UNKNOWN; the runner does not mutate the host.
+
+Run focused tests: `node --test docs/dke/demos/memory-performance-r0/memory-aot-research-consumer-r9.test.mjs docs/dke/demos/memory-performance-r0/memory-aot-pinned-consumption-r9.test.mjs`. Record exact Node, exit and candidate Git Blob. This is **research-level execution of authored decision predicates**, not a qualified DKE→DIS→production AOT→Runtime Function or an observed user-visible performance improvement. The actual first Product-bound read-only user journey CA-JOB-02 still needs genuine Host-sampled provenance, Product/L2 and owner/Oracle qualifications.
