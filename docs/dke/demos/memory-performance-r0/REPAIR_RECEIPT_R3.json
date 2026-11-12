@@ -1,0 +1,75 @@
+{
+  "schema": "shun.dke.memory-performance.repair-receipt.r3",
+  "outputLabel": "SHUN_ASSISTANT_DKE_R3_MEMORY_RUNTIME_SOURCE_INTEGRITY_REPAIR",
+  "projectMainIssue": "https://github.com/kaicreator-mm/shun-assistant/issues/411",
+  "sourcePullRequest": "https://github.com/kaicreator-mm/shun-assistant/pull/416",
+  "previousR2ExactHead": "030dad140910fd629d0168c0523b7841fc2f248a",
+  "preReceiptHead": "6ac496c0aa87f7fd8e5766006bbf725f3af2a7da",
+  "reviewSource": "https://github.com/kaicreator-mm/shun-assistant/pull/416#pullrequestreview-5863890814",
+  "work": "SOURCE_CODE_REPAIR_AND_NEGATIVE_TEST_DEFINITIONS",
+  "findings": [
+    {
+      "key": "MEM-R0-01",
+      "severity": "P1",
+      "state": "PREVIOUSLY_REPAIRED_WITH_NATIVE_R0_RECEIPT",
+      "detail": "Windows read-only collector import made available in merged source tree; existing native R0 receipt applies only to its pinned source Blobs."
+    },
+    {
+      "key": "MEM-R0-02",
+      "severity": "P1",
+      "state": "REPAIR_CODE_COMMITTED_TESTS_NOT_RUN",
+      "detail": "Actual AOT candidate byte-integrity guard; runtime fails closed on source/rule edits, does not falsely report any source AOT rules as applied. This is not semantic AOT qualification."
+    },
+    {
+      "key": "MEM-R0-03",
+      "severity": "P2",
+      "state": "REPAIR_CODE_COMMITTED_TESTS_NOT_RUN",
+      "detail": "Legacy Node os.freemem free-memory heuristic no longer labeled a measured Windows Available Memory signal; AOT decision candidate updated and repinned."
+    },
+    {
+      "key": "MEM-R0-04",
+      "severity": "P2",
+      "state": "REPAIR_CODE_COMMITTED_TESTS_NOT_RUN",
+      "detail": "Unknown Host sampling time distinguished from analysis time; caller-supplied observedAt/sampledAt never accepted as Host evidence."
+    }
+  ],
+  "sourceBlobs": {
+    "analyzer": "2401f5af94743e11c2498978594cb6ed4b9d8ad8",
+    "tests": "1b2157f6f99856aeb664a62f213df22fb2e47458",
+    "runtimeRunner": "d80aae41e3fdbf3b51f150d5df91036c54901b5a",
+    "aotCandidate": "ccbb6b4d2f97e62cbecdade81405a73148ec29fb",
+    "aotIntegrityGuard": "2104f6792a45d856f5c9cff764fe31037e37142d",
+    "r2Verifier": "e1495073bc1041462a5e88c6ac98376e306347bc"
+  },
+  "testCommands": [
+    "node --test docs/dke/demos/memory-performance-r0/memory-analysis.test.mjs",
+    "node docs/dke/implementation/verify-performance-memory-extension-r0.mjs",
+    "node --test docs/dke/implementation/verify-performance-memory-extension-r0.test.mjs",
+    "node docs/dke/demos/memory-performance-r0/dke-semantic/verify-memory-dke-r2.mjs",
+    "node --test docs/dke/demos/memory-performance-r0/dke-semantic/verify-memory-dke-r2.test.mjs",
+    "node docs/dke/demos/memory-performance-r0/run-windows-memory-demo.mjs"
+  ],
+  "validation": {
+    "currentExactHeadNodeCli": "NOT_RUN",
+    "currentExactHeadWindowsNative": "NOT_RUN",
+    "authorStaticGitReadback": "SOURCE_BLOBS_CONFIRMED_BY_GITHUB",
+    "independentPostRepairReview": "NOT_RUN",
+    "historicalR0Native": "SEE_PRIOR_PINNED_PR_416_RECEIPT_NOT_TRANSFERRED_TO_CHANGED_BLOBS"
+  },
+  "qualification": {
+    "sapQualified": 0,
+    "disQualifiedProductionFunctions": 0,
+    "productionAotPackages": 0,
+    "verifiedOptimizationEffects": 0,
+    "aotCandidateIntegrity": "PINNED_NOT_QUALIFIED",
+    "aotRulesExecutedByDemo": false,
+    "productScopeAmendment": "NOT_AUTHORIZED",
+    "effectAuthority": "NONE"
+  },
+  "nextGates": [
+    "Current-head Node CLI plus required Windows read-only host run with real exits and machine receipts",
+    "Fresh independent Source-First review using original Product/L1 and original Code/Test before amended PR files",
+    "Domain/Owner semantic Oracle ruling per SAP; no SAP gate self-signing",
+    "Only after Product and SAP admission: selected DIS/ECP/AOT consumer integration, independent user-visible Function closure"
+  ]
+}

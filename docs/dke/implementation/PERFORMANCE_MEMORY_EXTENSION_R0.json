@@ -1,0 +1,2367 @@
+{
+  "schema": "shun.computer-assistant.performance-memory-extension.r0",
+  "revision": "R0",
+  "outputLabel": "SHUN_ASSISTANT_DKE_PERFORMANCE_MEMORY_EXTENSION_R0",
+  "status": "AUTHOR_CANDIDATE_EXTENSION_NOT_INDEPENDENTLY_QUALIFIED",
+  "asOf": "2026-11-12",
+  "project": "kaicreator-mm/shun-assistant",
+  "mainIssue": 411,
+  "stackedOn": {
+    "knowledgePr": 414,
+    "knowledgeHead": "22a929ce1fbb5cdb5b2819cd3e98e71bbf21085a",
+    "knowledgeBlob": "c877ec23dc59b0ae17681c7d8f7505b1521c8011",
+    "demandPr": 415,
+    "demandHead": "406605ae0d931440338b398d29c2a6dcf4674c80",
+    "demandBlob": "74c10245e88608d12ae716bd2bae1623a2f55dc5"
+  },
+  "originalSourceBaseline": "1224fea4097799467e2c0c454885e680f1f28248",
+  "sourceEvidencePins": [
+    {
+      "id": "SRC-SYSTEM-PRESSURE",
+      "repository": "kaicreator-mm/shun-assistant",
+      "commit": "1224fea4097799467e2c0c454885e680f1f28248",
+      "path": "packages/vertical-system/src/internal/windows-pressure.ts",
+      "blob": "becb976b39ef6da760d451ca8ac7f9af474dc679",
+      "kind": "CODE",
+      "status": "OBSERVED_BOUNDED_READ_ONLY"
+    },
+    {
+      "id": "SRC-TEST-SYSTEM-PRESSURE",
+      "repository": "kaicreator-mm/shun-assistant",
+      "commit": "1224fea4097799467e2c0c454885e680f1f28248",
+      "path": "packages/vertical-system/test/windows-pressure.test.ts",
+      "blob": "a103a959cecf7fe67f8a626ee6b1a25b9eeeb91b",
+      "kind": "TEST_DEFINITION",
+      "status": "TEST_SOURCE_ONLY_EXECUTION_NOT_REPEATED"
+    },
+    {
+      "id": "SRC-SYSTEM-DIAGNOSTICS",
+      "repository": "kaicreator-mm/shun-assistant",
+      "commit": "1224fea4097799467e2c0c454885e680f1f28248",
+      "path": "packages/vertical-system/src/diagnostics.ts",
+      "blob": "79cd145dbcd212968846fad39f7e7f68e21923a2",
+      "kind": "CODE",
+      "status": "OBSERVED"
+    },
+    {
+      "id": "SRC-TEST-SYSTEM-DIAGNOSTICS",
+      "repository": "kaicreator-mm/shun-assistant",
+      "commit": "1224fea4097799467e2c0c454885e680f1f28248",
+      "path": "packages/vertical-system/test/diagnostics.test.ts",
+      "blob": "b163404542bc73c1fedb9a56fd8b9edf39436896",
+      "kind": "TEST_DEFINITION",
+      "status": "TEST_SOURCE_ONLY_EXECUTION_NOT_REPEATED"
+    },
+    {
+      "id": "SRC-SYSTEM-RUNTIME",
+      "repository": "kaicreator-mm/shun-assistant",
+      "commit": "1224fea4097799467e2c0c454885e680f1f28248",
+      "path": "packages/vertical-system/src/windows-runtime.ts",
+      "blob": "1f425854b688a1981b4f3c28cd4de39bb5cc6288",
+      "kind": "CODE",
+      "status": "OBSERVED"
+    },
+    {
+      "id": "SRC-TEST-SYSTEM-RUNTIME",
+      "repository": "kaicreator-mm/shun-assistant",
+      "commit": "1224fea4097799467e2c0c454885e680f1f28248",
+      "path": "packages/vertical-system/test/windows-runtime.test.ts",
+      "blob": "23dfc1fcf3622c0b73decfc441b24a4cd1dc0c5e",
+      "kind": "TEST_DEFINITION",
+      "status": "TEST_SOURCE_ONLY_EXECUTION_NOT_REPEATED"
+    },
+    {
+      "id": "SRC-SYSTEM-INDEX",
+      "repository": "kaicreator-mm/shun-assistant",
+      "commit": "1224fea4097799467e2c0c454885e680f1f28248",
+      "path": "packages/vertical-system/src/index.ts",
+      "blob": "7f687a10f216fc9c792cb689942da792ee8e8d88",
+      "kind": "CODE",
+      "status": "OBSERVED"
+    },
+    {
+      "id": "SRC-PRODUCT-FREEZE",
+      "repository": "kaicreator-mm/shun-assistant",
+      "path": "docs/product/PRODUCT_FREEZE-v0.3.md",
+      "blob": "0f8a67c2f06364d58a842502d3dee11bfeeedba4",
+      "kind": "PRODUCT_AUTHORITY",
+      "status": "FROZEN_CHECKPOINT",
+      "branch": "version/v0.3.0"
+    },
+    {
+      "id": "SRC-PRODUCT-PRD",
+      "repository": "kaicreator-mm/shun-assistant",
+      "commit": "4c2f8e84b6e6f3f5b526e52d01356159f2dce0e7",
+      "path": "docs/product/PRD-v0.3-domain-harness-R0.md",
+      "blob": "f062b7f2c3dc3bf4aeeb7594ab5c2bc75b34d0ab",
+      "kind": "PRODUCT",
+      "status": "FROZEN_BY_OWNER_CHECKPOINT"
+    },
+    {
+      "id": "SRC-PRODUCT-L1",
+      "repository": "kaicreator-mm/shun-assistant",
+      "commit": "4c2f8e84b6e6f3f5b526e52d01356159f2dce0e7",
+      "path": "docs/product/L1-v0.3-domain-harness-parity-R0.md",
+      "blob": "4c703c3f0c283f4d3918babef8f87f56869698e5",
+      "kind": "PRODUCT_EVIDENCE",
+      "status": "FROZEN_BY_OWNER_CHECKPOINT"
+    }
+  ],
+  "externalSources": [
+    {
+      "id": "EXT-MEM-WORKING-SET",
+      "authority": "MICROSOFT_LEARN",
+      "title": "Working Set",
+      "url": "https://learn.microsoft.com/en-us/windows/win32/memory/working-set",
+      "observed": "2026-11-12",
+      "supports": [
+        "process working set means pageable virtual-memory pages currently resident in physical memory",
+        "hard and soft page fault distinction",
+        "shared pages can appear in multiple process working sets"
+      ],
+      "rights": "LINK_ONLY_NO_CONTENT_REPRODUCTION_LICENSE_NOT_INDEPENDENTLY_REVIEWED",
+      "applicability": {
+        "documentationView": "Working Set",
+        "supportedOS": "As stated by the linked Microsoft documentation; exact target Windows edition/release/build and API availability must be checked at Runtime.",
+        "runtimeRequirement": "Bind every use to the exact target OS/build and API/counter availability; do not infer Shun capability from documentation alone.",
+        "limitations": [
+          "Working Set is not Private Bytes, commit charge, or an attribution of uniquely owned physical RAM."
+        ]
+      },
+      "sourceRevision": "Microsoft Learn locator observed 2026-11-12; no immutable page revision identifier exposed by this locator."
+    },
+    {
+      "id": "EXT-MEM-PERFORMANCE-INFO",
+      "authority": "MICROSOFT_LEARN",
+      "title": "Memory Performance Information",
+      "url": "https://learn.microsoft.com/en-us/windows/win32/memory/memory-performance-information",
+      "observed": "2026-11-12",
+      "supports": [
+        "Available physical memory",
+        "Committed Bytes and Commit Limit",
+        "process Working Set, Private Bytes and pool counters"
+      ],
+      "rights": "LINK_ONLY_NO_CONTENT_REPRODUCTION_LICENSE_NOT_INDEPENDENTLY_REVIEWED",
+      "applicability": {
+        "documentationView": "Memory Performance Information",
+        "supportedOS": "As stated by the linked Microsoft documentation; exact target Windows edition/release/build and API availability must be checked at Runtime.",
+        "runtimeRequirement": "Bind every use to the exact target OS/build and API/counter availability; do not infer Shun capability from documentation alone.",
+        "limitations": [
+          "Counter names and API availability must be checked on the target OS; a single counter is not a complete diagnosis."
+        ]
+      },
+      "sourceRevision": "Microsoft Learn locator observed 2026-11-12; no immutable page revision identifier exposed by this locator."
+    },
+    {
+      "id": "EXT-MEM-PROCESS-COUNTERS-EX",
+      "authority": "MICROSOFT_LEARN",
+      "title": "PROCESS_MEMORY_COUNTERS_EX",
+      "url": "https://learn.microsoft.com/en-us/windows/win32/api/psapi/ns-psapi-process_memory_counters_ex",
+      "observed": "2026-11-12",
+      "supports": [
+        "WorkingSetSize",
+        "PrivateUsage and PagefileUsage commit charge",
+        "PageFaultCount and paged/nonpaged pool counters"
+      ],
+      "rights": "LINK_ONLY_NO_CONTENT_REPRODUCTION_LICENSE_NOT_INDEPENDENTLY_REVIEWED",
+      "applicability": {
+        "documentationView": "PROCESS_MEMORY_COUNTERS_EX",
+        "supportedOS": "As stated by the linked Microsoft documentation; exact target Windows edition/release/build and API availability must be checked at Runtime.",
+        "runtimeRequirement": "Bind every use to the exact target OS/build and API/counter availability; do not infer Shun capability from documentation alone.",
+        "limitations": [
+          "Access rights and process-handle availability are Runtime facts; PageFaultCount is cumulative and is not by itself a hard-page-fault rate."
+        ]
+      },
+      "sourceRevision": "Microsoft Learn locator observed 2026-11-12; no immutable page revision identifier exposed by this locator."
+    },
+    {
+      "id": "EXT-MEM-GETPROCESSMEMORYINFO",
+      "authority": "MICROSOFT_LEARN",
+      "title": "GetProcessMemoryInfo",
+      "url": "https://learn.microsoft.com/en-us/windows/win32/api/psapi/nf-psapi-getprocessmemoryinfo",
+      "observed": "2026-11-12",
+      "supports": [
+        "process memory retrieval API",
+        "PROCESS_QUERY_INFORMATION or PROCESS_QUERY_LIMITED_INFORMATION access rights"
+      ],
+      "rights": "LINK_ONLY_NO_CONTENT_REPRODUCTION_LICENSE_NOT_INDEPENDENTLY_REVIEWED",
+      "applicability": {
+        "documentationView": "GetProcessMemoryInfo",
+        "supportedOS": "As stated by the linked Microsoft documentation; exact target Windows edition/release/build and API availability must be checked at Runtime.",
+        "runtimeRequirement": "Bind every use to the exact target OS/build and API/counter availability; do not infer Shun capability from documentation alone.",
+        "limitations": [
+          "Permission refusal must remain UNKNOWN; no privilege escalation is implied."
+        ]
+      },
+      "sourceRevision": "Microsoft Learn locator observed 2026-11-12; no immutable page revision identifier exposed by this locator."
+    },
+    {
+      "id": "EXT-MEM-PERFORMANCE-COUNTERS",
+      "authority": "MICROSOFT_LEARN",
+      "title": "About Performance Counters",
+      "url": "https://learn.microsoft.com/en-us/windows/win32/perfctrs/about-performance-counters",
+      "observed": "2026-11-12",
+      "supports": [
+        "system and process performance counters",
+        "counter collection suitability and limitations"
+      ],
+      "rights": "LINK_ONLY_NO_CONTENT_REPRODUCTION_LICENSE_NOT_INDEPENDENTLY_REVIEWED",
+      "applicability": {
+        "documentationView": "About Performance Counters",
+        "supportedOS": "As stated by the linked Microsoft documentation; exact target Windows edition/release/build and API availability must be checked at Runtime.",
+        "runtimeRequirement": "Bind every use to the exact target OS/build and API/counter availability; do not infer Shun capability from documentation alone.",
+        "limitations": [
+          "Counters are not designed for collection more than once per second; avoid high-frequency polling and treat counter availability as Runtime-specific."
+        ]
+      },
+      "sourceRevision": "Microsoft Learn locator observed 2026-11-12; no immutable page revision identifier exposed by this locator."
+    },
+    {
+      "id": "EXT-MEM-PAGEFILE",
+      "authority": "MICROSOFT_LEARN",
+      "title": "Introduction to the page file",
+      "url": "https://learn.microsoft.com/en-us/troubleshoot/windows-client/performance/introduction-to-the-page-file",
+      "observed": "2026-11-12",
+      "supports": [
+        "system commit charge and commit limit",
+        "page file contributes to commit limit",
+        "commit pressure and system-managed page file"
+      ],
+      "rights": "LINK_ONLY_NO_CONTENT_REPRODUCTION_LICENSE_NOT_INDEPENDENTLY_REVIEWED",
+      "applicability": {
+        "documentationView": "Introduction to the page file",
+        "supportedOS": "As stated by the linked Microsoft documentation; exact target Windows edition/release/build and API availability must be checked at Runtime.",
+        "runtimeRequirement": "Bind every use to the exact target OS/build and API/counter availability; do not infer Shun capability from documentation alone.",
+        "limitations": [
+          "Do not recommend disabling or resizing the page file from generic heuristics; crash-dump, workload and disk-space needs are target-specific."
+        ]
+      },
+      "sourceRevision": "Microsoft Learn locator observed 2026-11-12; no immutable page revision identifier exposed by this locator."
+    },
+    {
+      "id": "EXT-MEM-CACHE-MANAGER",
+      "authority": "MICROSOFT_LEARN",
+      "title": "Performance Tuning for Cache and Memory Manager",
+      "url": "https://learn.microsoft.com/en-us/windows-server/administration/performance-tuning/subsystem/cache-memory-management/",
+      "observed": "2026-11-12",
+      "supports": [
+        "system file cache and standby behavior",
+        "cache manager writes and retains file data"
+      ],
+      "rights": "LINK_ONLY_NO_CONTENT_REPRODUCTION_LICENSE_NOT_INDEPENDENTLY_REVIEWED",
+      "applicability": {
+        "documentationView": "Performance Tuning for Cache and Memory Manager",
+        "supportedOS": "As stated by the linked Microsoft documentation; exact target Windows edition/release/build and API availability must be checked at Runtime.",
+        "runtimeRequirement": "Bind every use to the exact target OS/build and API/counter availability; do not infer Shun capability from documentation alone.",
+        "limitations": [
+          "Server tuning settings are not automatically applicable to Windows Client; normal cache/standby memory must not be treated as waste."
+        ]
+      },
+      "sourceRevision": "Microsoft Learn locator observed 2026-11-12; no immutable page revision identifier exposed by this locator."
+    },
+    {
+      "id": "EXT-MEM-RAMMAP",
+      "authority": "MICROSOFT_LEARN",
+      "title": "RAMMap",
+      "url": "https://learn.microsoft.com/en-us/sysinternals/downloads/rammap",
+      "observed": "2026-11-12",
+      "supports": [
+        "physical memory use counts",
+        "process working sets",
+        "standby lists, file cache and kernel/driver memory"
+      ],
+      "rights": "LINK_ONLY_NO_CONTENT_REPRODUCTION_LICENSE_NOT_INDEPENDENTLY_REVIEWED",
+      "applicability": {
+        "documentationView": "RAMMap",
+        "supportedOS": "As stated by the linked Microsoft documentation; exact target Windows edition/release/build and API availability must be checked at Runtime.",
+        "runtimeRequirement": "Bind every use to the exact target OS/build and API/counter availability; do not infer Shun capability from documentation alone.",
+        "limitations": [
+          "External utility availability, version and signature must be checked; the DKE demo does not download or invoke it."
+        ]
+      },
+      "sourceRevision": "Microsoft Learn locator observed 2026-11-12; no immutable page revision identifier exposed by this locator."
+    },
+    {
+      "id": "EXT-MEM-TROUBLESHOOT",
+      "authority": "MICROSOFT_LEARN",
+      "title": "Troubleshoot performance problems in Windows",
+      "url": "https://learn.microsoft.com/en-us/troubleshoot/windows-server/performance/troubleshoot-performance-problems-in-windows",
+      "observed": "2026-11-12",
+      "supports": [
+        "Available MBytes and committed-bytes counters",
+        "process working set",
+        "paged and nonpaged pool context"
+      ],
+      "rights": "LINK_ONLY_NO_CONTENT_REPRODUCTION_LICENSE_NOT_INDEPENDENTLY_REVIEWED",
+      "applicability": {
+        "documentationView": "Troubleshoot performance problems in Windows",
+        "supportedOS": "As stated by the linked Microsoft documentation; exact target Windows edition/release/build and API availability must be checked at Runtime.",
+        "runtimeRequirement": "Bind every use to the exact target OS/build and API/counter availability; do not infer Shun capability from documentation alone.",
+        "limitations": [
+          "Server-specific thresholds are not universal Windows Client thresholds and must not be hard-coded into the AOT package."
+        ]
+      },
+      "sourceRevision": "Microsoft Learn locator observed 2026-11-12; no immutable page revision identifier exposed by this locator."
+    }
+  ],
+  "rootExtension": {
+    "elementId": "CA-ROOT",
+    "appendChildren": [
+      "CA-PERFORMANCE-OPTIMIZATION"
+    ],
+    "appendClaimRefs": [
+      "CA-CLM-018",
+      "CA-CLM-019",
+      "CA-CLM-020",
+      "CA-CLM-021",
+      "CA-CLM-022",
+      "CA-CLM-023",
+      "CA-CLM-024"
+    ],
+    "appendRelationRefs": [
+      "CA-REL-016",
+      "CA-REL-017",
+      "CA-REL-018",
+      "CA-REL-019",
+      "CA-REL-020",
+      "CA-REL-021",
+      "CA-REL-022"
+    ],
+    "appendInvariantRefs": [
+      "CA-INV-014",
+      "CA-INV-015",
+      "CA-INV-016",
+      "CA-INV-017",
+      "CA-INV-018",
+      "CA-INV-019"
+    ],
+    "appendCqRefs": [
+      "CQ-CA-021",
+      "CQ-CA-022",
+      "CQ-CA-023",
+      "CQ-CA-024",
+      "CQ-CA-025",
+      "CQ-CA-026",
+      "CQ-CA-027",
+      "CQ-CA-028",
+      "CQ-CA-029",
+      "CQ-CA-030",
+      "CQ-CA-031"
+    ]
+  },
+  "claims": [
+    {
+      "id": "CA-CLM-018",
+      "statement": "The current Shun memory collector reports at most eight process names and their WorkingSet64 values at one snapshot. WorkingSet64 is resident working-set memory, not per-process private commit, private working set, total committed memory, or proof of reclaimable memory.",
+      "status": "SUPPORTED",
+      "sourceRefs": [
+        "SRC-SYSTEM-PRESSURE",
+        "SRC-TEST-SYSTEM-PRESSURE",
+        "EXT-MEM-WORKING-SET",
+        "EXT-MEM-PERFORMANCE-INFO"
+      ],
+      "limits": [
+        "No stable process identity, PID, command line, private bytes or timestamp is currently emitted by this collector."
+      ],
+      "semanticOwner": "CA-MEMORY-PERFORMANCE",
+      "applicability": "The inspected v0.3.0 Windows read-only collector at the exact source revision.",
+      "falsifier": "The collector output is described as Private Bytes, unique physical ownership, or leak proof.",
+      "maturity": "PARTIAL",
+      "authorStatus": "SOURCE_GROUNDED_CANDIDATE",
+      "unknownCase": "If the exact metric/API mapping is unavailable, retain the raw metric label and mark derived meaning UNKNOWN.",
+      "validationState": "NOT_RUN"
+    },
+    {
+      "id": "CA-CLM-019",
+      "statement": "Windows memory diagnosis must keep physical availability, system commit charge/limit, per-process Working Set, per-process PrivateUsage, pagefile, page-fault behavior and kernel pools as distinct metrics; none is a substitute for the others.",
+      "status": "SUPPORTED",
+      "sourceRefs": [
+        "EXT-MEM-PERFORMANCE-INFO",
+        "EXT-MEM-PROCESS-COUNTERS-EX",
+        "EXT-MEM-PAGEFILE",
+        "EXT-MEM-TROUBLESHOOT"
+      ],
+      "limits": [
+        "The current Shun source does not collect most of these metrics."
+      ],
+      "semanticOwner": "CA-MEMORY-PERFORMANCE",
+      "applicability": "Metric semantics are Windows-specific and require exact OS/API applicability at Runtime.",
+      "falsifier": "A single free-memory percentage or one process WorkingSet value is treated as a complete pressure diagnosis.",
+      "maturity": "FUTURE_CANDIDATE",
+      "authorStatus": "SOURCE_GROUNDED_CANDIDATE",
+      "unknownCase": "Missing counters or unsupported APIs remain UNKNOWN; do not fill values from another metric.",
+      "validationState": "NOT_RUN"
+    },
+    {
+      "id": "CA-CLM-020",
+      "statement": "A suspected process memory leak requires repeated, time-stamped observations of a stable process identity under comparable workload, including growth and idle/recovery behavior; a single snapshot or monotonically rising WorkingSet alone cannot prove a leak.",
+      "status": "CONDITIONAL",
+      "sourceRefs": [
+        "EXT-MEM-PROCESS-COUNTERS-EX",
+        "EXT-MEM-PERFORMANCE-INFO",
+        "EXT-MEM-PERFORMANCE-COUNTERS"
+      ],
+      "limits": [
+        "No process time-series collector or stable process identity exists in the pinned current source."
+      ],
+      "semanticOwner": "CA-MEMORY-PERFORMANCE",
+      "applicability": "Future leak-analysis Function only; process identity, sample interval, workload comparability and access must be trusted Runtime evidence.",
+      "falsifier": "A single top-memory list or PID/name match is labeled a confirmed leak.",
+      "maturity": "FUTURE_CANDIDATE",
+      "authorStatus": "SOURCE_GROUNDED_CANDIDATE",
+      "unknownCase": "If identity continuity, workload comparability, sufficient samples or idle observation is absent, return SUSPECTED/UNKNOWN, never LEAK_CONFIRMED.",
+      "validationState": "NOT_RUN"
+    },
+    {
+      "id": "CA-CLM-021",
+      "statement": "A performance optimization claim requires a comparable pre/post workload and an outcome metric relevant to user experience, with memory/resource measurements as supporting evidence; increased available memory alone does not prove a speedup.",
+      "status": "CONDITIONAL",
+      "sourceRefs": [
+        "SRC-PRODUCT-PRD",
+        "SRC-PRODUCT-L1",
+        "EXT-MEM-PERFORMANCE-COUNTERS",
+        "EXT-MEM-TROUBLESHOOT"
+      ],
+      "limits": [
+        "No current Shun memory optimization effect or before/after performance receipt is proven."
+      ],
+      "semanticOwner": "CA-PERFORMANCE-OPTIMIZATION",
+      "applicability": "Any future optimization outcome claim; exact workload and outcome metric are Runtime evidence.",
+      "falsifier": "The assistant reports 'faster' solely because a memory counter decreased or free memory increased.",
+      "maturity": "FUTURE_CANDIDATE",
+      "authorStatus": "SOURCE_GROUNDED_CANDIDATE",
+      "unknownCase": "If same workload, host scope, observation window or response/throughput metric cannot be established, outcome is UNKNOWN or CORRELATED_CHANGE_ONLY.",
+      "validationState": "NOT_RUN"
+    },
+    {
+      "id": "CA-CLM-022",
+      "statement": "Windows cache/standby memory is part of normal memory management and can be repurposed by the system; indiscriminate cache clearing or working-set trimming is not a safe default optimization and may degrade performance.",
+      "status": "SUPPORTED",
+      "sourceRefs": [
+        "EXT-MEM-WORKING-SET",
+        "EXT-MEM-CACHE-MANAGER",
+        "EXT-MEM-RAMMAP"
+      ],
+      "limits": [
+        "The DKE demo has no cache-clearing or working-set-trimming action."
+      ],
+      "semanticOwner": "CA-MEMORY-PERFORMANCE",
+      "applicability": "Windows cache and memory-manager semantics; specific tuning remains OS/workload scoped.",
+      "falsifier": "AOT or Runtime labels standby/file cache as junk and recommends clearing it to improve performance without a measured workload reason.",
+      "maturity": "FUTURE_CANDIDATE",
+      "authorStatus": "SOURCE_GROUNDED_CANDIDATE",
+      "unknownCase": "If cache type, dirty state, workload and actual bottleneck are not established, do not clear or trim it.",
+      "validationState": "NOT_RUN"
+    },
+    {
+      "id": "CA-CLM-023",
+      "statement": "Current Shun process-memory evidence is observation-only and local-only. A top-memory process is not an authorized termination target; process/service mutation requires separate Product admission, exact identity, current approval, Host authorization and independently verified outcome.",
+      "status": "SUPPORTED",
+      "sourceRefs": [
+        "SRC-SYSTEM-PRESSURE",
+        "SRC-TEST-SYSTEM-PRESSURE",
+        "SRC-PRODUCT-FREEZE",
+        "SRC-PRODUCT-PRD",
+        "SRC-PRODUCT-L1"
+      ],
+      "limits": [
+        "The current Product checkpoint explicitly records IMPLEMENTATION_AUTHORIZED=NO."
+      ],
+      "semanticOwner": "CA-GLOBAL-AUTHORITY",
+      "applicability": "Current frozen Product v0.3.0 and pinned read-only process collector.",
+      "falsifier": "A diagnostic recommendation or LLM output is used to terminate a process, change service state or create a grant.",
+      "maturity": "FROZEN_PRODUCT",
+      "authorStatus": "SOURCE_GROUNDED_CANDIDATE",
+      "unknownCase": "If Product admission, process identity, dependency impact, approval or Host authority is missing, zero effect.",
+      "validationState": "NOT_RUN"
+    },
+    {
+      "id": "CA-CLM-024",
+      "statement": "Performance bottleneck attribution is cross-domain: memory pressure may interact with CPU scheduling, storage paging latency, driver/kernel pools, application workload, thermal/power limits and hardware capacity; memory-only evidence must not claim an exclusive cause.",
+      "status": "CONDITIONAL",
+      "sourceRefs": [
+        "EXT-MEM-PAGEFILE",
+        "EXT-MEM-TROUBLESHOOT",
+        "EXT-MEM-RAMMAP",
+        "SRC-SYSTEM-DIAGNOSTICS"
+      ],
+      "limits": [
+        "Current source does not provide a full CPU/GPU/thermal/latency correlation model."
+      ],
+      "semanticOwner": "CA-PERFORMANCE-OPTIMIZATION",
+      "applicability": "Cross-domain diagnosis across memory, process, storage, hardware, software and execution environment.",
+      "falsifier": "A single memory counter is used to rule out CPU, storage, driver, thermal or workload causes.",
+      "maturity": "FUTURE_CANDIDATE",
+      "authorStatus": "SOURCE_GROUNDED_CANDIDATE",
+      "unknownCase": "If relevant adjacent-domain telemetry is unavailable, report the competing causes and keep root cause UNKNOWN.",
+      "validationState": "NOT_RUN"
+    }
+  ],
+  "elements": [
+    {
+      "id": "CA-PERFORMANCE-OPTIMIZATION",
+      "kind": "CHILD",
+      "parent": "CA-ROOT",
+      "name": "ComputerPerformanceOptimization",
+      "responsibility": "Own cross-domain performance diagnosis, bottleneck hypotheses, safe optimization planning, comparable workload baselines, trade-off analysis and independently verified user-visible outcomes across memory, CPU, storage I/O, GPU, thermal/power, network and applications.",
+      "sourceClaims": [
+        "CA-CLM-021",
+        "CA-CLM-024"
+      ],
+      "children": [
+        "CA-MEMORY-PERFORMANCE"
+      ],
+      "globalSemantics": [
+        "CA-GLOBAL-AUTHORITY",
+        "CA-GLOBAL-VERIFICATION",
+        "CA-GLOBAL-PRIVACY",
+        "CA-GLOBAL-CURRENTNESS"
+      ],
+      "semanticBoundary": "Cross-domain performance reasoning and optimization-plan semantics; excludes arbitrary tuning, process/service/cache/pagefile/device mutation, hardware control and Product authorization.",
+      "validationOracle": "Independent source/domain review plus controlled workload baseline/post-state and native zero-effect/authority-negative oracles.",
+      "maturity": "FUTURE_CANDIDATE",
+      "globalInvariantRefs": [
+        "CA-INV-001",
+        "CA-INV-002",
+        "CA-INV-003",
+        "CA-INV-004",
+        "CA-INV-014",
+        "CA-INV-016",
+        "CA-INV-017",
+        "CA-INV-018",
+        "CA-INV-019"
+      ],
+      "cqRefs": [
+        "CQ-CA-026",
+        "CQ-CA-027",
+        "CQ-CA-028"
+      ],
+      "relationRefs": [
+        "CA-REL-018",
+        "CA-REL-019",
+        "CA-REL-020",
+        "CA-REL-021"
+      ],
+      "validationState": "NOT_RUN",
+      "scopeContract": {
+        "scopeRevision": "PERFORMANCE_MEMORY_EXTENSION_R0_CANDIDATE",
+        "owner": "CA-PERFORMANCE-OPTIMIZATION",
+        "purpose": "Cross-domain performance diagnosis, safe plan selection and measurable outcome verification.",
+        "nonGoals": "No automatic performance tuning, arbitrary registry/driver/service/process/pagefile changes, cache clearing or guaranteed speedup.",
+        "applicability": "Research-only DKE candidate. Any actual Shun feature requires separate Product amendment and DIS/Host qualification.",
+        "sourceClaimRefs": [
+          "CA-CLM-021",
+          "CA-CLM-024"
+        ],
+        "relationRefs": [
+          "CA-REL-018",
+          "CA-REL-019",
+          "CA-REL-020",
+          "CA-REL-021"
+        ],
+        "globalInvariantRefs": [
+          "CA-INV-001",
+          "CA-INV-002",
+          "CA-INV-003",
+          "CA-INV-004",
+          "CA-INV-014",
+          "CA-INV-016",
+          "CA-INV-017",
+          "CA-INV-018",
+          "CA-INV-019"
+        ],
+        "cqRefs": [
+          "CQ-CA-026",
+          "CQ-CA-027",
+          "CQ-CA-028"
+        ],
+        "sapProfileRef": "SAP-CA-PERFORMANCE-OPTIMIZATION",
+        "validationOracle": "Cross-domain evidence, exact workload comparability, independent post-state and Product/Host authority.",
+        "assertionStatus": "OPEN",
+        "validationState": "NOT_RUN",
+        "qualification": "NOT_QUALIFIED"
+      }
+    },
+    {
+      "id": "CA-MEMORY-PERFORMANCE",
+      "kind": "CHILD",
+      "parent": "CA-PERFORMANCE-OPTIMIZATION",
+      "name": "MemoryPerformanceEngineering",
+      "responsibility": "Model Windows physical/available memory, system commit/limit, pagefile and paging, process Working Set/private commit, kernel pools, cache/standby, compression, pressure signals, process identity, time-series leak hypotheses, safe optimization strategies and comparable outcome verification.",
+      "sourceClaims": [
+        "CA-CLM-018",
+        "CA-CLM-019",
+        "CA-CLM-020",
+        "CA-CLM-022",
+        "CA-CLM-023"
+      ],
+      "children": [],
+      "globalSemantics": [
+        "CA-GLOBAL-PROVENANCE",
+        "CA-GLOBAL-AUTHORITY",
+        "CA-GLOBAL-VERIFICATION",
+        "CA-GLOBAL-PRIVACY",
+        "CA-GLOBAL-CURRENTNESS"
+      ],
+      "semanticBoundary": "Memory metric semantics, diagnosis and advisory optimization; excludes process termination, service control, cache/working-set trimming, pagefile/registry mutation and hardware change.",
+      "validationOracle": "Windows-native metric/API oracle, comparable time-series/workload evidence, privacy negative tests and independent memory-domain review.",
+      "maturity": "PARTIAL",
+      "globalInvariantRefs": [
+        "CA-INV-001",
+        "CA-INV-002",
+        "CA-INV-003",
+        "CA-INV-004",
+        "CA-INV-014",
+        "CA-INV-015",
+        "CA-INV-016",
+        "CA-INV-017",
+        "CA-INV-018",
+        "CA-INV-019"
+      ],
+      "cqRefs": [
+        "CQ-CA-021",
+        "CQ-CA-022",
+        "CQ-CA-023",
+        "CQ-CA-024",
+        "CQ-CA-025",
+        "CQ-CA-029",
+        "CQ-CA-030",
+        "CQ-CA-031"
+      ],
+      "relationRefs": [
+        "CA-REL-016",
+        "CA-REL-017",
+        "CA-REL-018",
+        "CA-REL-020",
+        "CA-REL-022"
+      ],
+      "validationState": "NOT_RUN",
+      "scopeContract": {
+        "scopeRevision": "PERFORMANCE_MEMORY_EXTENSION_R0_CANDIDATE",
+        "owner": "CA-MEMORY-PERFORMANCE",
+        "purpose": "Distinguish memory metrics, assess pressure, identify bounded process contributors, reason about leak hypotheses and produce safe advisory plans.",
+        "nonGoals": "No one-snapshot leak/root-cause claim, no treating cache/standby as junk, no process kill/service stop/cache trim/pagefile change and no guaranteed speedup.",
+        "applicability": "Current Shun source only provides total/free memory, a low-free-memory advisory and top-eight WorkingSet64 names; other metrics/time-series/identity are future evidence requirements.",
+        "sourceClaimRefs": [
+          "CA-CLM-018",
+          "CA-CLM-019",
+          "CA-CLM-020",
+          "CA-CLM-022",
+          "CA-CLM-023"
+        ],
+        "relationRefs": [
+          "CA-REL-016",
+          "CA-REL-017",
+          "CA-REL-018",
+          "CA-REL-020",
+          "CA-REL-022"
+        ],
+        "globalInvariantRefs": [
+          "CA-INV-001",
+          "CA-INV-002",
+          "CA-INV-003",
+          "CA-INV-004",
+          "CA-INV-014",
+          "CA-INV-015",
+          "CA-INV-016",
+          "CA-INV-017",
+          "CA-INV-018",
+          "CA-INV-019"
+        ],
+        "cqRefs": [
+          "CQ-CA-021",
+          "CQ-CA-022",
+          "CQ-CA-023",
+          "CQ-CA-024",
+          "CQ-CA-025",
+          "CQ-CA-029",
+          "CQ-CA-030",
+          "CQ-CA-031"
+        ],
+        "sapProfileRef": "SAP-CA-MEMORY-PERFORMANCE",
+        "validationOracle": "Exact Windows metric semantics, source-pinned counters, native host collection and comparable controlled workload.",
+        "assertionStatus": "CONDITIONAL",
+        "validationState": "NOT_RUN",
+        "qualification": "NOT_QUALIFIED"
+      }
+    }
+  ],
+  "decomposition": {
+    "hierarchyEdgesAppend": [
+      {
+        "from": "CA-ROOT",
+        "to": "CA-PERFORMANCE-OPTIMIZATION",
+        "kind": "CHILD_OWNERSHIP",
+        "owner": "CA-ROOT"
+      },
+      {
+        "from": "CA-PERFORMANCE-OPTIMIZATION",
+        "to": "CA-MEMORY-PERFORMANCE",
+        "kind": "CHILD_OWNERSHIP",
+        "owner": "CA-PERFORMANCE-OPTIMIZATION"
+      }
+    ],
+    "hierarchyAcyclic": true,
+    "semanticRelationsMayCycle": true
+  },
+  "relations": [
+    {
+      "id": "CA-REL-016",
+      "from": "CA-SYSTEM-OBSERVATION",
+      "to": "CA-MEMORY-PERFORMANCE",
+      "type": "SUPPLIES_BOUNDED_SYSTEM_MEMORY_SNAPSHOT",
+      "status": "SUPPORTED",
+      "semanticOwner": "CA-MEMORY-PERFORMANCE",
+      "sourceRefs": [
+        "SRC-SYSTEM-INDEX",
+        "SRC-SYSTEM-DIAGNOSTICS",
+        "SRC-SYSTEM-PRESSURE",
+        "SRC-TEST-SYSTEM-PRESSURE"
+      ],
+      "applicability": "Current v0.3.0 read-only Windows collectors.",
+      "falsifier": "System snapshot is treated as a complete memory profile or as an effect.",
+      "assertionType": "SOURCE_GROUNDED_OR_DERIVED_CANDIDATE",
+      "positiveCase": "Total/free memory and top WorkingSet facts retain exact metric names and snapshot limitations.",
+      "unknownCase": "Native collector/API unavailable => fields UNKNOWN.",
+      "cqRefs": [
+        "CQ-CA-021"
+      ],
+      "invariantRefs": [
+        "CA-INV-015"
+      ],
+      "validationState": "NOT_RUN",
+      "authorStatus": "CANDIDATE_NOT_RUN"
+    },
+    {
+      "id": "CA-REL-017",
+      "from": "CA-MEMORY-PERFORMANCE",
+      "to": "CA-PROCESS-SERVICE",
+      "type": "ATTRIBUTES_PROCESS_MEMORY_WITH_EXPLICIT_IDENTITY_LIMITS",
+      "status": "CONDITIONAL",
+      "semanticOwner": "CA-MEMORY-PERFORMANCE",
+      "sourceRefs": [
+        "SRC-SYSTEM-PRESSURE",
+        "SRC-TEST-SYSTEM-PRESSURE",
+        "EXT-MEM-PROCESS-COUNTERS-EX"
+      ],
+      "applicability": "Top-process attribution and any future process time series.",
+      "falsifier": "Process name or reused PID is treated as stable identity or causal proof.",
+      "assertionType": "SOURCE_GROUNDED_OR_DERIVED_CANDIDATE",
+      "positiveCase": "Process facts are bounded and process identity is revalidated before any future effect.",
+      "unknownCase": "Stable identity or permission unavailable => no attribution beyond a snapshot ranking.",
+      "cqRefs": [
+        "CQ-CA-023"
+      ],
+      "invariantRefs": [
+        "CA-INV-015"
+      ],
+      "validationState": "NOT_RUN",
+      "authorStatus": "CANDIDATE_NOT_RUN"
+    },
+    {
+      "id": "CA-REL-018",
+      "from": "CA-MEMORY-PERFORMANCE",
+      "to": "CA-STORAGE",
+      "type": "PAGING_AND_COMMIT_PRESSURE_MAY_DEPEND_ON_STORAGE_BEHAVIOR",
+      "status": "CONDITIONAL",
+      "semanticOwner": "CA-PERFORMANCE-OPTIMIZATION",
+      "sourceRefs": [
+        "EXT-MEM-PAGEFILE",
+        "EXT-MEM-TROUBLESHOOT"
+      ],
+      "applicability": "Memory paging and pagefile diagnosis; exact storage volume and latency remain Runtime facts.",
+      "falsifier": "High commit or page faults alone are reported as proof of a failing disk or insufficient RAM.",
+      "assertionType": "SOURCE_GROUNDED_OR_DERIVED_CANDIDATE",
+      "positiveCase": "Correlated memory and storage evidence is presented with separate metric provenance.",
+      "unknownCase": "Pagefile/storage telemetry missing => competing causes remain UNKNOWN.",
+      "cqRefs": [
+        "CQ-CA-022"
+      ],
+      "invariantRefs": [
+        "CA-INV-014"
+      ],
+      "validationState": "NOT_RUN",
+      "authorStatus": "CANDIDATE_NOT_RUN"
+    },
+    {
+      "id": "CA-REL-019",
+      "from": "CA-MEMORY-PERFORMANCE",
+      "to": "CA-HARDWARE-DEVICE",
+      "type": "MEMORY_CAPACITY_UPGRADE_REQUIRES_EXACT_HARDWARE_COMPATIBILITY",
+      "status": "CONDITIONAL",
+      "semanticOwner": "CA-PERFORMANCE-OPTIMIZATION",
+      "sourceRefs": [
+        "EXT-MEM-PERFORMANCE-INFO",
+        "SRC-PRODUCT-FREEZE"
+      ],
+      "applicability": "Future hardware upgrade advice only.",
+      "falsifier": "A RAM upgrade is recommended from memory pressure without exact device, board, capacity and form-factor facts.",
+      "assertionType": "SOURCE_GROUNDED_OR_DERIVED_CANDIDATE",
+      "positiveCase": "Upgrade advice binds exact model, supported type/capacity/slots/channel and OEM evidence.",
+      "unknownCase": "Hardware identity or compatibility unknown => no purchase recommendation as fact.",
+      "cqRefs": [
+        "CQ-CA-028"
+      ],
+      "invariantRefs": [
+        "CA-INV-017"
+      ],
+      "validationState": "NOT_RUN",
+      "authorStatus": "CANDIDATE_NOT_RUN"
+    },
+    {
+      "id": "CA-REL-020",
+      "from": "CA-MEMORY-PERFORMANCE",
+      "to": "CA-GLOBAL-VERIFICATION",
+      "type": "OPTIMIZATION_CLAIM_REQUIRES_COMPARABLE_BASELINE_AND_POST_MEASUREMENT",
+      "status": "CONDITIONAL",
+      "semanticOwner": "CA-GLOBAL-VERIFICATION",
+      "sourceRefs": [
+        "SRC-PRODUCT-PRD",
+        "SRC-PRODUCT-L1",
+        "EXT-MEM-PERFORMANCE-COUNTERS"
+      ],
+      "applicability": "Any future claim that optimization improved user-visible performance.",
+      "falsifier": "Available memory rises but the assistant reports a speedup without workload outcome evidence.",
+      "assertionType": "SOURCE_GROUNDED_OR_DERIVED_CANDIDATE",
+      "positiveCase": "Same workload and host scope are established; user-relevant metric and memory evidence are independently compared.",
+      "unknownCase": "Workload comparability or outcome metric missing => UNKNOWN.",
+      "cqRefs": [
+        "CQ-CA-027"
+      ],
+      "invariantRefs": [
+        "CA-INV-014"
+      ],
+      "validationState": "NOT_RUN",
+      "authorStatus": "CANDIDATE_NOT_RUN"
+    },
+    {
+      "id": "CA-REL-021",
+      "from": "CA-PERFORMANCE-OPTIMIZATION",
+      "to": "CA-GLOBAL-AUTHORITY",
+      "type": "EFFECTFUL_OPTIMIZATION_REQUIRES_CURRENT_EXPLICIT_AUTHORITY",
+      "status": "SUPPORTED",
+      "semanticOwner": "CA-GLOBAL-AUTHORITY",
+      "sourceRefs": [
+        "SRC-PRODUCT-FREEZE",
+        "SRC-PRODUCT-PRD",
+        "SRC-PRODUCT-L1"
+      ],
+      "applicability": "All future process/service/cache/pagefile/system configuration effects.",
+      "falsifier": "A model recommendation or local plan is treated as a grant.",
+      "assertionType": "SOURCE_GROUNDED_OR_DERIVED_CANDIDATE",
+      "positiveCase": "The first demo produces advisory-only plans; any later effect has separate Product admission, exact scope, approval and Host authority.",
+      "unknownCase": "Any authority uncertainty => zero effect.",
+      "cqRefs": [
+        "CQ-CA-026"
+      ],
+      "invariantRefs": [
+        "CA-INV-018"
+      ],
+      "validationState": "NOT_RUN",
+      "authorStatus": "CANDIDATE_NOT_RUN"
+    },
+    {
+      "id": "CA-REL-022",
+      "from": "CA-AOT-KNOWLEDGE",
+      "to": "CA-MEMORY-PERFORMANCE",
+      "type": "COMPILES_STABLE_MEMORY_SEMANTICS_NOT_LIVE_MEMORY_FACTS",
+      "status": "CONDITIONAL",
+      "semanticOwner": "CA-GLOBAL-PROVENANCE",
+      "sourceRefs": [
+        "SRC-DKE-PILOT",
+        "EXT-MEM-WORKING-SET",
+        "EXT-MEM-PERFORMANCE-INFO",
+        "EXT-MEM-PAGEFILE"
+      ],
+      "applicability": "Candidate AOT knowledge for memory diagnosis.",
+      "falsifier": "Current RAM, process list, PID, host identity, approvals or live thresholds are compiled into AOT.",
+      "assertionType": "SOURCE_GROUNDED_OR_DERIVED_CANDIDATE",
+      "positiveCase": "AOT contains metric definitions, source revision, decision rules and invalidation metadata only.",
+      "unknownCase": "Source applicability stale or unknown => AOT rule remains conditional and is not promoted.",
+      "cqRefs": [
+        "CQ-CA-031"
+      ],
+      "invariantRefs": [
+        "CA-INV-019"
+      ],
+      "validationState": "NOT_RUN",
+      "authorStatus": "CANDIDATE_NOT_RUN"
+    }
+  ],
+  "invariants": [
+    {
+      "id": "CA-INV-014",
+      "owner": "CA-GLOBAL-VERIFICATION",
+      "property": "PERFORMANCE_IMPROVEMENT_REQUIRES_COMPARABLE_WORKLOAD_AND_USER_OUTCOME_METRIC",
+      "violation": "UNKNOWN",
+      "sourceRefs": [
+        "SRC-PRODUCT-PRD",
+        "SRC-PRODUCT-L1",
+        "EXT-MEM-PERFORMANCE-COUNTERS"
+      ],
+      "falsifier": "Memory available bytes increase but no comparable workload or user outcome metric exists.",
+      "applicability": "Performance Optimization and Memory Performance journeys.",
+      "appliesTo": [
+        "CA-PERFORMANCE-OPTIMIZATION",
+        "CA-MEMORY-PERFORMANCE",
+        "CA-TASK-LIFECYCLE",
+        "CA-GLOBAL-VERIFICATION"
+      ],
+      "cqRefs": [
+        "CQ-CA-027"
+      ],
+      "status": "CONDITIONAL",
+      "positiveCase": "The same workload and host scope are established, with before/after response-time or throughput plus supporting memory evidence.",
+      "unknownCase": "No trusted workload comparator or user outcome metric => UNKNOWN.",
+      "validationState": "NOT_RUN",
+      "statusBasis": "SOURCE_GROUNDED_CANDIDATE_NOT_EXECUTION_PASS"
+    },
+    {
+      "id": "CA-INV-015",
+      "owner": "CA-GLOBAL-VERIFICATION",
+      "property": "MEMORY_METRICS_REMAIN_SEMANTICALLY_DISTINCT",
+      "violation": "UNKNOWN",
+      "sourceRefs": [
+        "EXT-MEM-WORKING-SET",
+        "EXT-MEM-PERFORMANCE-INFO",
+        "EXT-MEM-PROCESS-COUNTERS-EX"
+      ],
+      "falsifier": "Working Set is reported as Private Bytes, unique physical ownership or system commit.",
+      "applicability": "All memory observation, diagnosis and attribution paths.",
+      "appliesTo": [
+        "CA-MEMORY-PERFORMANCE",
+        "CA-SYSTEM-OBSERVATION",
+        "CA-PROCESS-SERVICE",
+        "CA-GLOBAL-VERIFICATION"
+      ],
+      "cqRefs": [
+        "CQ-CA-021",
+        "CQ-CA-022",
+        "CQ-CA-023"
+      ],
+      "status": "CONDITIONAL",
+      "positiveCase": "Every metric preserves its documented meaning, source and applicability.",
+      "unknownCase": "Metric mapping unavailable or ambiguous => preserve raw label and UNKNOWN.",
+      "validationState": "NOT_RUN",
+      "statusBasis": "SOURCE_GROUNDED_CANDIDATE_NOT_EXECUTION_PASS"
+    },
+    {
+      "id": "CA-INV-016",
+      "owner": "CA-GLOBAL-VERIFICATION",
+      "property": "CACHE_AND_STANDBY_MEMORY_ARE_NOT_DEFAULT_JUNK",
+      "violation": "BLOCK_UNSAFE_OPTIMIZATION",
+      "sourceRefs": [
+        "EXT-MEM-WORKING-SET",
+        "EXT-MEM-CACHE-MANAGER",
+        "EXT-MEM-RAMMAP"
+      ],
+      "falsifier": "Standby/file cache is indiscriminately cleared or working sets trimmed without a measured workload reason.",
+      "applicability": "Windows memory management and any future memory optimization plan.",
+      "appliesTo": [
+        "CA-MEMORY-PERFORMANCE",
+        "CA-PERFORMANCE-OPTIMIZATION",
+        "CA-GLOBAL-VERIFICATION"
+      ],
+      "cqRefs": [
+        "CQ-CA-025"
+      ],
+      "status": "CONDITIONAL",
+      "positiveCase": "Cache/standby is treated as normal memory-manager state and not targeted by default.",
+      "unknownCase": "Cache type, dirty state or workload benefit unknown => no clearing recommendation.",
+      "validationState": "NOT_RUN",
+      "statusBasis": "SOURCE_GROUNDED_CANDIDATE_NOT_EXECUTION_PASS"
+    },
+    {
+      "id": "CA-INV-017",
+      "owner": "CA-GLOBAL-PRIVACY",
+      "property": "PROCESS_MEMORY_TELEMETRY_IS_MINIMIZED_AND_LOCAL_ONLY",
+      "violation": "BLOCK_DISCLOSURE",
+      "sourceRefs": [
+        "SRC-SYSTEM-PRESSURE",
+        "SRC-TEST-SYSTEM-PRESSURE",
+        "SRC-PRODUCT-PRD",
+        "SRC-PRODUCT-L1"
+      ],
+      "falsifier": "PID, command line, user, path or environment is collected/disclosed beyond an explicit approved scope.",
+      "applicability": "Process memory evidence and future time-series analysis.",
+      "appliesTo": [
+        "CA-MEMORY-PERFORMANCE",
+        "CA-PERFORMANCE-OPTIMIZATION",
+        "CA-PROCESS-SERVICE",
+        "CA-GLOBAL-PRIVACY"
+      ],
+      "cqRefs": [
+        "CQ-CA-029"
+      ],
+      "status": "CONDITIONAL",
+      "positiveCase": "Default report is local-only, names are minimized or aliased, and command lines/paths/users are absent.",
+      "unknownCase": "Redaction/egress proof incomplete => no sharing and UNKNOWN.",
+      "validationState": "NOT_RUN",
+      "statusBasis": "SOURCE_GROUNDED_CANDIDATE_NOT_EXECUTION_PASS"
+    },
+    {
+      "id": "CA-INV-018",
+      "owner": "CA-GLOBAL-AUTHORITY",
+      "property": "NO_MEMORY_OR_PROCESS_EFFECT_WITHOUT_PRODUCT_ADMISSION_AND_CURRENT_AUTHORITY",
+      "violation": "ZERO_EFFECT",
+      "sourceRefs": [
+        "SRC-PRODUCT-FREEZE",
+        "SRC-PRODUCT-PRD",
+        "SRC-PRODUCT-L1"
+      ],
+      "falsifier": "An advisory plan kills a process, changes service/startup/pagefile/cache settings or modifies hardware without separate admission and current Host authority.",
+      "applicability": "All effectful performance optimization candidates.",
+      "appliesTo": [
+        "CA-PERFORMANCE-OPTIMIZATION",
+        "CA-MEMORY-PERFORMANCE",
+        "CA-PROCESS-SERVICE",
+        "CA-TASK-LIFECYCLE",
+        "CA-GLOBAL-AUTHORITY"
+      ],
+      "cqRefs": [
+        "CQ-CA-026"
+      ],
+      "status": "CONDITIONAL",
+      "positiveCase": "The research demo has effect NONE; future effects require separate Product, approval, Permit and Host gates.",
+      "unknownCase": "Any authority or target identity missing => zero effect.",
+      "validationState": "NOT_RUN",
+      "statusBasis": "SOURCE_GROUNDED_CANDIDATE_NOT_EXECUTION_PASS"
+    },
+    {
+      "id": "CA-INV-019",
+      "owner": "CA-GLOBAL-CURRENTNESS",
+      "property": "MEMORY_METRIC_AND_RULE_APPLICABILITY_IS_BOUND_TO_OS_AND_API",
+      "violation": "INVALIDATE_AFFECTED_KNOWLEDGE",
+      "sourceRefs": [
+        "EXT-MEM-WORKING-SET",
+        "EXT-MEM-PERFORMANCE-INFO",
+        "EXT-MEM-PROCESS-COUNTERS-EX",
+        "EXT-MEM-PERFORMANCE-COUNTERS",
+        "EXT-MEM-PAGEFILE"
+      ],
+      "falsifier": "A memory counter or API is assumed to exist or have the same meaning on an unverified target build.",
+      "applicability": "Windows memory metrics, API and performance-counter consumers.",
+      "appliesTo": [
+        "CA-MEMORY-PERFORMANCE",
+        "CA-PERFORMANCE-OPTIMIZATION",
+        "CA-EXECUTION-ENVIRONMENT",
+        "CA-AOT-KNOWLEDGE",
+        "CA-GLOBAL-CURRENTNESS"
+      ],
+      "cqRefs": [
+        "CQ-CA-030",
+        "CQ-CA-031"
+      ],
+      "status": "CONDITIONAL",
+      "positiveCase": "Exact OS/API/counter applicability is recorded and rechecked before use.",
+      "unknownCase": "Unavailable API/counter or unsupported build => UNKNOWN and invalidate affected binding.",
+      "validationState": "NOT_RUN",
+      "statusBasis": "SOURCE_GROUNDED_CANDIDATE_NOT_EXECUTION_PASS"
+    }
+  ],
+  "invariantExtensions": [
+    {
+      "id": "CA-INV-001",
+      "appendAppliesTo": [
+        "CA-PERFORMANCE-OPTIMIZATION",
+        "CA-MEMORY-PERFORMANCE"
+      ]
+    },
+    {
+      "id": "CA-INV-002",
+      "appendAppliesTo": [
+        "CA-PERFORMANCE-OPTIMIZATION",
+        "CA-MEMORY-PERFORMANCE"
+      ]
+    },
+    {
+      "id": "CA-INV-003",
+      "appendAppliesTo": [
+        "CA-PERFORMANCE-OPTIMIZATION",
+        "CA-MEMORY-PERFORMANCE"
+      ]
+    },
+    {
+      "id": "CA-INV-004",
+      "appendAppliesTo": [
+        "CA-PERFORMANCE-OPTIMIZATION",
+        "CA-MEMORY-PERFORMANCE"
+      ]
+    },
+    {
+      "id": "CA-INV-010",
+      "appendAppliesTo": [
+        "CA-MEMORY-PERFORMANCE"
+      ]
+    },
+    {
+      "id": "CA-INV-011",
+      "appendAppliesTo": [
+        "CA-PERFORMANCE-OPTIMIZATION",
+        "CA-MEMORY-PERFORMANCE"
+      ]
+    },
+    {
+      "id": "CA-INV-012",
+      "appendAppliesTo": [
+        "CA-PERFORMANCE-OPTIMIZATION",
+        "CA-MEMORY-PERFORMANCE"
+      ]
+    },
+    {
+      "id": "CA-INV-013",
+      "appendAppliesTo": [
+        "CA-PERFORMANCE-OPTIMIZATION",
+        "CA-MEMORY-PERFORMANCE"
+      ]
+    }
+  ],
+  "globalElementExtensions": [
+    {
+      "element": "CA-GLOBAL-AUTHORITY",
+      "appendClaimRefs": [
+        "CA-CLM-023"
+      ],
+      "appendRelationRefs": [
+        "CA-REL-021"
+      ],
+      "appendInvariantRefs": [
+        "CA-INV-018"
+      ],
+      "appendCqRefs": [
+        "CQ-CA-026"
+      ]
+    },
+    {
+      "element": "CA-GLOBAL-VERIFICATION",
+      "appendClaimRefs": [
+        "CA-CLM-021"
+      ],
+      "appendRelationRefs": [
+        "CA-REL-020"
+      ],
+      "appendInvariantRefs": [
+        "CA-INV-014",
+        "CA-INV-015",
+        "CA-INV-016"
+      ],
+      "appendCqRefs": [
+        "CQ-CA-021",
+        "CQ-CA-022",
+        "CQ-CA-027"
+      ]
+    },
+    {
+      "element": "CA-GLOBAL-PRIVACY",
+      "appendRelationRefs": [
+        "CA-REL-017"
+      ],
+      "appendInvariantRefs": [
+        "CA-INV-017"
+      ],
+      "appendCqRefs": [
+        "CQ-CA-029"
+      ]
+    },
+    {
+      "element": "CA-GLOBAL-CURRENTNESS",
+      "appendInvariantRefs": [
+        "CA-INV-019"
+      ],
+      "appendCqRefs": [
+        "CQ-CA-030",
+        "CQ-CA-031"
+      ]
+    },
+    {
+      "element": "CA-AOT-KNOWLEDGE",
+      "appendRelationRefs": [
+        "CA-REL-022"
+      ],
+      "appendInvariantRefs": [
+        "CA-INV-019"
+      ],
+      "appendCqRefs": [
+        "CQ-CA-031"
+      ]
+    },
+    {
+      "element": "CA-SYSTEM-OBSERVATION",
+      "appendClaimRefs": [
+        "CA-CLM-018"
+      ],
+      "appendRelationRefs": [
+        "CA-REL-016"
+      ],
+      "appendCqRefs": [
+        "CQ-CA-021",
+        "CQ-CA-022"
+      ]
+    },
+    {
+      "element": "CA-PROCESS-SERVICE",
+      "appendClaimRefs": [
+        "CA-CLM-018",
+        "CA-CLM-020",
+        "CA-CLM-023"
+      ],
+      "appendRelationRefs": [
+        "CA-REL-017"
+      ],
+      "appendCqRefs": [
+        "CQ-CA-023",
+        "CQ-CA-024"
+      ]
+    },
+    {
+      "element": "CA-STORAGE",
+      "appendClaimRefs": [
+        "CA-CLM-024"
+      ],
+      "appendRelationRefs": [
+        "CA-REL-018"
+      ],
+      "appendCqRefs": [
+        "CQ-CA-022"
+      ]
+    },
+    {
+      "element": "CA-HARDWARE-DEVICE",
+      "appendRelationRefs": [
+        "CA-REL-019"
+      ],
+      "appendCqRefs": [
+        "CQ-CA-028"
+      ]
+    }
+  ],
+  "competencyQuestions": [
+    {
+      "id": "CQ-CA-021",
+      "element": "CA-MEMORY-PERFORMANCE",
+      "question": "Can the assistant distinguish Available Physical Memory, Working Set, Private Working Set, PrivateUsage/Private Bytes, system Commit/Commit Limit, pagefile and pool counters without substituting one for another?",
+      "positive": "Each value carries its exact metric name, source/API, unit and applicability; the current WorkingSet64 sample is labeled only as resident Working Set.",
+      "negative": "WorkingSet64 or low free memory is presented as Private Bytes, unique ownership or total system commit.",
+      "status": "OPEN",
+      "expectedEvidence": [
+        "exact metric/API mapping",
+        "target OS/build and permission",
+        "positive/negative/unknown counter fixtures"
+      ],
+      "unknownPath": "If an API/counter is missing or ambiguous, preserve UNKNOWN rather than infer it.",
+      "authorStatus": "CANDIDATE_NOT_RUN",
+      "validationState": "NOT_RUN",
+      "sourceRefs": [
+        "SRC-SYSTEM-PRESSURE",
+        "SRC-TEST-SYSTEM-PRESSURE",
+        "EXT-MEM-WORKING-SET",
+        "EXT-MEM-PERFORMANCE-INFO",
+        "EXT-MEM-PROCESS-COUNTERS-EX"
+      ],
+      "result": "NOT_RUN"
+    },
+    {
+      "id": "CQ-CA-022",
+      "element": "CA-MEMORY-PERFORMANCE",
+      "question": "Can the assistant determine sustained memory pressure from multiple system signals rather than a single free-memory threshold?",
+      "positive": "Available memory, system commit/limit, page output/input behavior, pools and workload impact are jointly observed with timestamps.",
+      "negative": "One snapshot or low free percentage is called confirmed pressure or the root cause.",
+      "status": "OPEN",
+      "expectedEvidence": [
+        "time-stamped system memory metrics",
+        "commit/pagefile/paging/pool counters",
+        "workload and response evidence"
+      ],
+      "unknownPath": "Missing counter, insufficient samples or no workload context => POTENTIAL/UNKNOWN only.",
+      "authorStatus": "CANDIDATE_NOT_RUN",
+      "validationState": "NOT_RUN",
+      "sourceRefs": [
+        "EXT-MEM-PERFORMANCE-INFO",
+        "EXT-MEM-PAGEFILE",
+        "EXT-MEM-TROUBLESHOOT",
+        "EXT-MEM-PERFORMANCE-COUNTERS"
+      ],
+      "result": "NOT_RUN"
+    },
+    {
+      "id": "CQ-CA-023",
+      "element": "CA-MEMORY-PERFORMANCE",
+      "question": "Can the assistant identify the largest process Working Sets without confusing ranking with private memory ownership or root-cause attribution?",
+      "positive": "Top entries are labeled resident Working Set snapshots, and stable process identity is revalidated before any future action.",
+      "negative": "A top-eight process name is labeled a leak, uniquely owned RAM or a safe termination target.",
+      "status": "OPEN",
+      "expectedEvidence": [
+        "exact process memory metric",
+        "process identity continuity and access result",
+        "negative name/PID reuse and shared-page cases"
+      ],
+      "unknownPath": "No stable process identity or private metric => ranking only; cause UNKNOWN.",
+      "authorStatus": "CANDIDATE_NOT_RUN",
+      "validationState": "NOT_RUN",
+      "sourceRefs": [
+        "SRC-SYSTEM-PRESSURE",
+        "SRC-TEST-SYSTEM-PRESSURE",
+        "EXT-MEM-WORKING-SET",
+        "EXT-MEM-PROCESS-COUNTERS-EX"
+      ],
+      "result": "NOT_RUN"
+    },
+    {
+      "id": "CQ-CA-024",
+      "element": "CA-MEMORY-PERFORMANCE",
+      "question": "Can the assistant identify a suspected memory leak only from repeated samples under comparable workload and stable process identity?",
+      "positive": "A candidate shows sustained private-commit growth across sufficient samples and does not recover during a comparable idle period; result remains suspected until a domain oracle confirms.",
+      "negative": "One high Working Set or process name recurrence is called a confirmed leak.",
+      "status": "OPEN",
+      "expectedEvidence": [
+        "multi-sample series",
+        "stable process instance identity",
+        "comparable workload and idle/recovery window",
+        "private commit/WorkingSet metrics"
+      ],
+      "unknownPath": "Process restart/PID reuse, workload drift, missing idle sample or incomplete counter set => UNKNOWN.",
+      "authorStatus": "CANDIDATE_NOT_RUN",
+      "validationState": "NOT_RUN",
+      "sourceRefs": [
+        "EXT-MEM-PROCESS-COUNTERS-EX",
+        "EXT-MEM-PERFORMANCE-COUNTERS",
+        "EXT-MEM-PERFORMANCE-INFO"
+      ],
+      "result": "NOT_RUN"
+    },
+    {
+      "id": "CQ-CA-025",
+      "element": "CA-MEMORY-PERFORMANCE",
+      "question": "Can the assistant distinguish normal standby/file cache and compressed memory from harmful pressure, and avoid clearing them by default?",
+      "positive": "The report explains normal cache/standby behavior and recommends further measurement rather than indiscriminate clearing.",
+      "negative": "Standby/cache is labeled junk and an empty-standby-list action is recommended without evidence.",
+      "status": "OPEN",
+      "expectedEvidence": [
+        "cache/standby evidence",
+        "documented memory-manager behavior",
+        "negative cache-clearing plan"
+      ],
+      "unknownPath": "Cache type, dirty state, pressure or workload impact unknown => no cache mutation recommendation.",
+      "authorStatus": "CANDIDATE_NOT_RUN",
+      "validationState": "NOT_RUN",
+      "sourceRefs": [
+        "EXT-MEM-CACHE-MANAGER",
+        "EXT-MEM-WORKING-SET",
+        "EXT-MEM-RAMMAP"
+      ],
+      "result": "NOT_RUN"
+    },
+    {
+      "id": "CQ-CA-026",
+      "element": "CA-PERFORMANCE-OPTIMIZATION",
+      "question": "Can the assistant produce a safe, reversible, user-understandable optimization plan without treating advice as permission to mutate?",
+      "positive": "Plan labels risk, expected benefit, evidence, reversibility, user action and no-effect status; first demo is advisory-only.",
+      "negative": "LLM output or a plan automatically kills a process, stops services, clears cache or changes pagefile.",
+      "status": "OPEN",
+      "expectedEvidence": [
+        "typed plan and risk classification",
+        "Product scope decision",
+        "negative no-effect proof"
+      ],
+      "unknownPath": "Product admission, target identity, dependency, approval or Host authority missing => zero effect.",
+      "authorStatus": "CANDIDATE_NOT_RUN",
+      "validationState": "NOT_RUN",
+      "sourceRefs": [
+        "SRC-PRODUCT-FREEZE",
+        "SRC-PRODUCT-PRD",
+        "SRC-SYSTEM-PRESSURE"
+      ],
+      "result": "NOT_RUN"
+    },
+    {
+      "id": "CQ-CA-027",
+      "element": "CA-PERFORMANCE-OPTIMIZATION",
+      "question": "Can the assistant verify an optimization claim using comparable pre/post workload and a user-relevant response or throughput metric alongside memory evidence?",
+      "positive": "Independent comparator confirms same host/workload/window and user metric improves without a disqualifying regression.",
+      "negative": "Only free memory increases and assistant claims the computer is faster.",
+      "status": "OPEN",
+      "expectedEvidence": [
+        "baseline and post evidence",
+        "trusted workload comparator",
+        "latency/throughput and memory measurements",
+        "regression controls"
+      ],
+      "unknownPath": "No trusted workload comparator or outcome metric => UNKNOWN/CORRELATED_CHANGE_ONLY.",
+      "authorStatus": "CANDIDATE_NOT_RUN",
+      "validationState": "NOT_RUN",
+      "sourceRefs": [
+        "SRC-PRODUCT-PRD",
+        "SRC-PRODUCT-L1",
+        "EXT-MEM-PERFORMANCE-COUNTERS"
+      ],
+      "result": "NOT_RUN"
+    },
+    {
+      "id": "CQ-CA-028",
+      "element": "CA-PERFORMANCE-OPTIMIZATION",
+      "question": "Can the assistant distinguish software pressure from insufficient physical RAM and produce a hardware upgrade recommendation only with exact compatibility evidence?",
+      "positive": "Recommendation cites exact machine/board/CPU, supported RAM type/capacity/slots/channel and a measured workload requirement.",
+      "negative": "An upgrade is recommended solely from one low-memory snapshot or guessed model.",
+      "status": "OPEN",
+      "expectedEvidence": [
+        "exact device/board identity",
+        "OEM or manufacturer compatibility source",
+        "sustained workload demand evidence"
+      ],
+      "unknownPath": "Hardware identity, slot topology, supported capacity or workload requirement unknown => no compatibility claim.",
+      "authorStatus": "CANDIDATE_NOT_RUN",
+      "validationState": "NOT_RUN",
+      "sourceRefs": [
+        "SRC-PRODUCT-FREEZE",
+        "EXT-MEM-PERFORMANCE-INFO"
+      ],
+      "result": "NOT_RUN"
+    },
+    {
+      "id": "CQ-CA-029",
+      "element": "CA-MEMORY-PERFORMANCE",
+      "question": "Can process memory evidence remain privacy-minimal and local-only, with no command lines, user names, paths or automatic cloud disclosure?",
+      "positive": "Default report contains only bounded metrics and local aliases; no external disclosure occurs.",
+      "negative": "Raw process command line, user, environment or path appears in telemetry, prompts, Meta or issue comments.",
+      "status": "OPEN",
+      "expectedEvidence": [
+        "canary secret/path tests",
+        "network spy/zero-egress evidence",
+        "report schema allowlist"
+      ],
+      "unknownPath": "Redaction/egress proof incomplete => no sharing; local-only boundary retained.",
+      "authorStatus": "CANDIDATE_NOT_RUN",
+      "validationState": "NOT_RUN",
+      "sourceRefs": [
+        "SRC-SYSTEM-PRESSURE",
+        "SRC-TEST-SYSTEM-PRESSURE",
+        "SRC-PRODUCT-PRD",
+        "SRC-PRODUCT-L1"
+      ],
+      "result": "NOT_RUN"
+    },
+    {
+      "id": "CQ-CA-030",
+      "element": "CA-MEMORY-PERFORMANCE",
+      "question": "Can unsupported Windows builds, denied process access and unavailable counters return explicit UNKNOWN without substituting guessed values?",
+      "positive": "Each metric carries observed source and a precise refusal/unknown outcome.",
+      "negative": "Missing PrivateUsage or counter is inferred from WorkingSet64 or a cached prior value.",
+      "status": "OPEN",
+      "expectedEvidence": [
+        "Windows native positive/negative access cases",
+        "exact OS/build/API evidence",
+        "field-level refusal tests"
+      ],
+      "unknownPath": "Unavailable API/counter/permission => field-level UNKNOWN and no root-cause claim.",
+      "authorStatus": "CANDIDATE_NOT_RUN",
+      "validationState": "NOT_RUN",
+      "sourceRefs": [
+        "EXT-MEM-GETPROCESSMEMORYINFO",
+        "EXT-MEM-PERFORMANCE-COUNTERS",
+        "SRC-SYSTEM-PRESSURE"
+      ],
+      "result": "NOT_RUN"
+    },
+    {
+      "id": "CQ-CA-031",
+      "element": "CA-AOT-KNOWLEDGE",
+      "question": "Can the memory AOT candidate compile only stable metric semantics, source-pinned decision rules and invalidation metadata while all live memory/process facts remain Runtime-only?",
+      "positive": "AOT package contains no host metrics, process names/IDs, user paths, approvals, permits or execution receipts; runtime binds exact current observations.",
+      "negative": "AOT contains a live process list, memory snapshot, current PID, fixed per-machine threshold or ambient permission.",
+      "status": "OPEN",
+      "expectedEvidence": [
+        "AOT package content audit",
+        "source Blob and applicability pins",
+        "negative live-fact/authority injection tests"
+      ],
+      "unknownPath": "Source revision or target applicability unknown => candidate is not promoted or consumed outside demo harness.",
+      "authorStatus": "CANDIDATE_NOT_RUN",
+      "validationState": "NOT_RUN",
+      "sourceRefs": [
+        "SRC-DKE-PILOT",
+        "EXT-MEM-WORKING-SET",
+        "EXT-MEM-PERFORMANCE-INFO",
+        "EXT-MEM-PAGEFILE"
+      ],
+      "result": "NOT_RUN"
+    }
+  ],
+  "semanticAssuranceProfiles": [
+    {
+      "element": "CA-PERFORMANCE-OPTIMIZATION",
+      "profileId": "SAP-CA-PERFORMANCE-OPTIMIZATION",
+      "elementScopeRef": "CA-PERFORMANCE-OPTIMIZATION",
+      "claimRefs": [
+        "CA-CLM-021",
+        "CA-CLM-024"
+      ],
+      "sourceRefs": [
+        "SRC-PRODUCT-FREEZE",
+        "SRC-PRODUCT-PRD",
+        "SRC-PRODUCT-L1",
+        "SRC-SYSTEM-DIAGNOSTICS",
+        "EXT-MEM-PERFORMANCE-COUNTERS",
+        "EXT-MEM-TROUBLESHOOT"
+      ],
+      "relationRefs": [
+        "CA-REL-018",
+        "CA-REL-019",
+        "CA-REL-020",
+        "CA-REL-021"
+      ],
+      "invariantRefs": [
+        "CA-INV-001",
+        "CA-INV-002",
+        "CA-INV-003",
+        "CA-INV-004",
+        "CA-INV-014",
+        "CA-INV-018",
+        "CA-INV-019"
+      ],
+      "cqRefs": [
+        "CQ-CA-026",
+        "CQ-CA-027",
+        "CQ-CA-028"
+      ],
+      "validationState": "NOT_RUN",
+      "qualification": "NOT_QUALIFIED",
+      "status": "OPEN",
+      "obligations": [
+        {
+          "id": "SAP-CA-PERFORMANCE-OPTIMIZATION-01",
+          "requirement": "Cross-domain bottleneck attribution",
+          "rationale": "Cross-domain bottleneck attribution: a bounded memory/performance semantic obligation; qualification requires the exact positive, negative and UNKNOWN oracles below.",
+          "sourceRefs": [
+            "SRC-SYSTEM-DIAGNOSTICS",
+            "EXT-MEM-TROUBLESHOOT",
+            "EXT-MEM-PAGEFILE"
+          ],
+          "relationRefs": [
+            "CA-REL-018",
+            "CA-REL-019"
+          ],
+          "invariantRefs": [
+            "CA-INV-014",
+            "CA-INV-019"
+          ],
+          "cqRefs": [
+            "CQ-CA-022",
+            "CQ-CA-028"
+          ],
+          "positiveCase": "Memory, CPU, storage, workload and thermal signals are kept distinct and the leading hypothesis cites multiple independent observations.",
+          "negativeCase": "A single memory counter is declared the exclusive cause of slowness.",
+          "unknownCase": "Adjacent-domain evidence unavailable => competing causes and root cause UNKNOWN.",
+          "oracle": "CROSS_DOMAIN_SOURCE_REVIEW_PLUS_NATIVE_WORKLOAD_ORACLE",
+          "oracleClasses": [
+            "SOURCE_EVIDENCE_REVIEW",
+            "WINDOWS_NATIVE_ORACLE_REQUIRED"
+          ],
+          "status": "OPEN",
+          "validationState": "NOT_RUN",
+          "evidenceRefs": [],
+          "qualification": "NOT_QUALIFIED"
+        },
+        {
+          "id": "SAP-CA-PERFORMANCE-OPTIMIZATION-02",
+          "requirement": "Comparable workload baseline and post-state",
+          "rationale": "Comparable workload baseline and post-state: a bounded memory/performance semantic obligation; qualification requires the exact positive, negative and UNKNOWN oracles below.",
+          "sourceRefs": [
+            "SRC-PRODUCT-PRD",
+            "SRC-PRODUCT-L1",
+            "EXT-MEM-PERFORMANCE-COUNTERS"
+          ],
+          "relationRefs": [
+            "CA-REL-020"
+          ],
+          "invariantRefs": [
+            "CA-INV-004",
+            "CA-INV-014"
+          ],
+          "cqRefs": [
+            "CQ-CA-027"
+          ],
+          "positiveCase": "A trusted comparator binds same host, workload, observation window and user-relevant metric before/after.",
+          "negativeCase": "Free memory rises but no latency/throughput metric exists and a speedup is claimed.",
+          "unknownCase": "Comparator or workload equivalence missing => UNKNOWN/CORRELATED_CHANGE_ONLY.",
+          "oracle": "CONTROLLED_WORKLOAD_AND_INDEPENDENT_POSTSTATE_ORACLE",
+          "oracleClasses": [
+            "SOURCE_EVIDENCE_REVIEW",
+            "WINDOWS_NATIVE_ORACLE_REQUIRED"
+          ],
+          "status": "OPEN",
+          "validationState": "NOT_RUN",
+          "evidenceRefs": [],
+          "qualification": "NOT_QUALIFIED"
+        },
+        {
+          "id": "SAP-CA-PERFORMANCE-OPTIMIZATION-03",
+          "requirement": "Risk, reversibility and trade-off assessment",
+          "rationale": "Risk, reversibility and trade-off assessment: a bounded memory/performance semantic obligation; qualification requires the exact positive, negative and UNKNOWN oracles below.",
+          "sourceRefs": [
+            "SRC-PRODUCT-FREEZE",
+            "SRC-PRODUCT-PRD",
+            "EXT-MEM-PAGEFILE",
+            "EXT-MEM-CACHE-MANAGER"
+          ],
+          "relationRefs": [
+            "CA-REL-021"
+          ],
+          "invariantRefs": [
+            "CA-INV-003",
+            "CA-INV-016",
+            "CA-INV-018"
+          ],
+          "cqRefs": [
+            "CQ-CA-026"
+          ],
+          "positiveCase": "Each proposed step identifies expected benefit, risk, side effects, reversibility and evidence.",
+          "negativeCase": "A plan disables services, clears cache or changes pagefile without an explicit risk and approval path.",
+          "unknownCase": "Reversibility or impact unknown => do not propose effectful action.",
+          "oracle": "DOMAIN_OWNER_AND_NEGATIVE_EFFECT_ORACLE",
+          "oracleClasses": [
+            "SOURCE_EVIDENCE_REVIEW",
+            "WINDOWS_NATIVE_ORACLE_REQUIRED"
+          ],
+          "status": "OPEN",
+          "validationState": "NOT_RUN",
+          "evidenceRefs": [],
+          "qualification": "NOT_QUALIFIED"
+        },
+        {
+          "id": "SAP-CA-PERFORMANCE-OPTIMIZATION-04",
+          "requirement": "No unauthorized optimization effect",
+          "rationale": "No unauthorized optimization effect: a bounded memory/performance semantic obligation; qualification requires the exact positive, negative and UNKNOWN oracles below.",
+          "sourceRefs": [
+            "SRC-PRODUCT-FREEZE",
+            "SRC-PRODUCT-PRD",
+            "SRC-PRODUCT-L1"
+          ],
+          "relationRefs": [
+            "CA-REL-021"
+          ],
+          "invariantRefs": [
+            "CA-INV-001",
+            "CA-INV-002",
+            "CA-INV-003",
+            "CA-INV-018"
+          ],
+          "cqRefs": [
+            "CQ-CA-026"
+          ],
+          "positiveCase": "The first demo emits advisory plans only and the host effect count remains zero.",
+          "negativeCase": "Any process/service/cache/pagefile/device mutation occurs from the research demo.",
+          "unknownCase": "No separate Product amendment/current authority => zero effect.",
+          "oracle": "PRODUCT_AUTHORITY_AND_NATIVE_ZERO_EFFECT_ORACLE",
+          "oracleClasses": [
+            "SOURCE_EVIDENCE_REVIEW",
+            "WINDOWS_NATIVE_ORACLE_REQUIRED"
+          ],
+          "status": "OPEN",
+          "validationState": "NOT_RUN",
+          "evidenceRefs": [],
+          "qualification": "NOT_QUALIFIED"
+        }
+      ]
+    },
+    {
+      "element": "CA-MEMORY-PERFORMANCE",
+      "profileId": "SAP-CA-MEMORY-PERFORMANCE",
+      "elementScopeRef": "CA-MEMORY-PERFORMANCE",
+      "claimRefs": [
+        "CA-CLM-018",
+        "CA-CLM-019",
+        "CA-CLM-020",
+        "CA-CLM-022",
+        "CA-CLM-023"
+      ],
+      "sourceRefs": [
+        "SRC-SYSTEM-INDEX",
+        "SRC-SYSTEM-DIAGNOSTICS",
+        "SRC-SYSTEM-PRESSURE",
+        "SRC-TEST-SYSTEM-PRESSURE",
+        "SRC-SYSTEM-RUNTIME",
+        "SRC-TEST-SYSTEM-RUNTIME",
+        "EXT-MEM-WORKING-SET",
+        "EXT-MEM-PERFORMANCE-INFO",
+        "EXT-MEM-PROCESS-COUNTERS-EX",
+        "EXT-MEM-GETPROCESSMEMORYINFO",
+        "EXT-MEM-PERFORMANCE-COUNTERS",
+        "EXT-MEM-PAGEFILE",
+        "EXT-MEM-CACHE-MANAGER",
+        "EXT-MEM-RAMMAP"
+      ],
+      "relationRefs": [
+        "CA-REL-016",
+        "CA-REL-017",
+        "CA-REL-018",
+        "CA-REL-020",
+        "CA-REL-022"
+      ],
+      "invariantRefs": [
+        "CA-INV-001",
+        "CA-INV-002",
+        "CA-INV-003",
+        "CA-INV-004",
+        "CA-INV-014",
+        "CA-INV-015",
+        "CA-INV-016",
+        "CA-INV-017",
+        "CA-INV-018",
+        "CA-INV-019"
+      ],
+      "cqRefs": [
+        "CQ-CA-021",
+        "CQ-CA-022",
+        "CQ-CA-023",
+        "CQ-CA-024",
+        "CQ-CA-025",
+        "CQ-CA-029",
+        "CQ-CA-030",
+        "CQ-CA-031"
+      ],
+      "validationState": "NOT_RUN",
+      "qualification": "NOT_QUALIFIED",
+      "status": "OPEN",
+      "obligations": [
+        {
+          "id": "SAP-CA-MEMORY-PERFORMANCE-01",
+          "requirement": "Memory metric semantic separation",
+          "rationale": "Memory metric semantic separation: a bounded memory/performance semantic obligation; qualification requires the exact positive, negative and UNKNOWN oracles below.",
+          "sourceRefs": [
+            "SRC-SYSTEM-PRESSURE",
+            "SRC-TEST-SYSTEM-PRESSURE",
+            "EXT-MEM-WORKING-SET",
+            "EXT-MEM-PERFORMANCE-INFO",
+            "EXT-MEM-PROCESS-COUNTERS-EX"
+          ],
+          "relationRefs": [
+            "CA-REL-016",
+            "CA-REL-017"
+          ],
+          "invariantRefs": [
+            "CA-INV-015"
+          ],
+          "cqRefs": [
+            "CQ-CA-021",
+            "CQ-CA-023"
+          ],
+          "positiveCase": "WorkingSet64 is labeled resident Working Set; PrivateUsage/commit/available/pool counters have separate fields and units.",
+          "negativeCase": "WorkingSet64 is reported as Private Bytes or total commit.",
+          "unknownCase": "Counter missing or unsupported => field UNKNOWN; no substitution.",
+          "oracle": "METRIC_MAPPING_SOURCE_REVIEW_AND_NATIVE_COUNTER_ORACLE",
+          "oracleClasses": [
+            "SOURCE_EVIDENCE_REVIEW",
+            "WINDOWS_NATIVE_ORACLE_REQUIRED"
+          ],
+          "status": "OPEN",
+          "validationState": "NOT_RUN",
+          "evidenceRefs": [],
+          "qualification": "NOT_QUALIFIED"
+        },
+        {
+          "id": "SAP-CA-MEMORY-PERFORMANCE-02",
+          "requirement": "Multi-signal system memory pressure",
+          "rationale": "Multi-signal system memory pressure: a bounded memory/performance semantic obligation; qualification requires the exact positive, negative and UNKNOWN oracles below.",
+          "sourceRefs": [
+            "EXT-MEM-PERFORMANCE-INFO",
+            "EXT-MEM-PAGEFILE",
+            "EXT-MEM-TROUBLESHOOT",
+            "EXT-MEM-PERFORMANCE-COUNTERS"
+          ],
+          "relationRefs": [
+            "CA-REL-016",
+            "CA-REL-018"
+          ],
+          "invariantRefs": [
+            "CA-INV-014",
+            "CA-INV-015",
+            "CA-INV-019"
+          ],
+          "cqRefs": [
+            "CQ-CA-022",
+            "CQ-CA-030"
+          ],
+          "positiveCase": "Available memory, commit ratio, paging activity and workload impact are timestamped and evaluated together.",
+          "negativeCase": "A one-snapshot <10% heuristic is declared confirmed memory pressure.",
+          "unknownCase": "Insufficient metrics or duration => POTENTIAL/UNKNOWN only.",
+          "oracle": "WINDOWS_NATIVE_MULTI_COUNTER_ORACLE",
+          "oracleClasses": [
+            "SOURCE_EVIDENCE_REVIEW",
+            "WINDOWS_NATIVE_ORACLE_REQUIRED"
+          ],
+          "status": "OPEN",
+          "validationState": "NOT_RUN",
+          "evidenceRefs": [],
+          "qualification": "NOT_QUALIFIED"
+        },
+        {
+          "id": "SAP-CA-MEMORY-PERFORMANCE-03",
+          "requirement": "Process attribution and stable identity",
+          "rationale": "Process attribution and stable identity: a bounded memory/performance semantic obligation; qualification requires the exact positive, negative and UNKNOWN oracles below.",
+          "sourceRefs": [
+            "SRC-SYSTEM-PRESSURE",
+            "SRC-TEST-SYSTEM-PRESSURE",
+            "EXT-MEM-PROCESS-COUNTERS-EX",
+            "EXT-MEM-WORKING-SET"
+          ],
+          "relationRefs": [
+            "CA-REL-017"
+          ],
+          "invariantRefs": [
+            "CA-INV-015",
+            "CA-INV-017"
+          ],
+          "cqRefs": [
+            "CQ-CA-023",
+            "CQ-CA-029"
+          ],
+          "positiveCase": "A process snapshot is clearly ranked by Working Set and any future longitudinal identity is Host-issued and revalidated.",
+          "negativeCase": "Process name or recycled PID is treated as stable identity or permission.",
+          "unknownCase": "Current source only provides names and WorkingSet64 => ranking only; identity and cause UNKNOWN.",
+          "oracle": "PROCESS_IDENTITY_AND_NATIVE_ACCESS_ORACLE",
+          "oracleClasses": [
+            "SOURCE_EVIDENCE_REVIEW",
+            "WINDOWS_NATIVE_ORACLE_REQUIRED"
+          ],
+          "status": "OPEN",
+          "validationState": "NOT_RUN",
+          "evidenceRefs": [],
+          "qualification": "NOT_QUALIFIED"
+        },
+        {
+          "id": "SAP-CA-MEMORY-PERFORMANCE-04",
+          "requirement": "Leak suspicion requires comparable time series",
+          "rationale": "Leak suspicion requires comparable time series: a bounded memory/performance semantic obligation; qualification requires the exact positive, negative and UNKNOWN oracles below.",
+          "sourceRefs": [
+            "EXT-MEM-PROCESS-COUNTERS-EX",
+            "EXT-MEM-PERFORMANCE-COUNTERS",
+            "EXT-MEM-PERFORMANCE-INFO"
+          ],
+          "relationRefs": [
+            "CA-REL-017"
+          ],
+          "invariantRefs": [
+            "CA-INV-014",
+            "CA-INV-015",
+            "CA-INV-019"
+          ],
+          "cqRefs": [
+            "CQ-CA-024"
+          ],
+          "positiveCase": "Repeated private-commit/working-set samples bind one process instance and comparable workload/idle recovery.",
+          "negativeCase": "Single sample or rising Working Set alone is labeled a confirmed leak.",
+          "unknownCase": "Insufficient samples, identity continuity or workload comparability => UNKNOWN/SUSPECTED.",
+          "oracle": "CONTROLLED_TIME_SERIES_AND_DOMAIN_OWNER_ORACLE",
+          "oracleClasses": [
+            "SOURCE_EVIDENCE_REVIEW",
+            "WINDOWS_NATIVE_ORACLE_REQUIRED"
+          ],
+          "status": "OPEN",
+          "validationState": "NOT_RUN",
+          "evidenceRefs": [],
+          "qualification": "NOT_QUALIFIED"
+        },
+        {
+          "id": "SAP-CA-MEMORY-PERFORMANCE-05",
+          "requirement": "Cache/standby and compressed-memory semantics",
+          "rationale": "Cache/standby and compressed-memory semantics: a bounded memory/performance semantic obligation; qualification requires the exact positive, negative and UNKNOWN oracles below.",
+          "sourceRefs": [
+            "EXT-MEM-WORKING-SET",
+            "EXT-MEM-CACHE-MANAGER",
+            "EXT-MEM-RAMMAP"
+          ],
+          "relationRefs": [
+            "CA-REL-018"
+          ],
+          "invariantRefs": [
+            "CA-INV-016"
+          ],
+          "cqRefs": [
+            "CQ-CA-025"
+          ],
+          "positiveCase": "Standby/file cache is treated as normal OS-managed state and not targeted by default.",
+          "negativeCase": "Clear-cache/working-set-trim action is proposed as universal speedup.",
+          "unknownCase": "Cache category or workload benefit unknown => no mutation recommendation.",
+          "oracle": "MICROSOFT_MEMORY_MANAGER_SOURCE_REVIEW_AND_NEGATIVE_PLAN_ORACLE",
+          "oracleClasses": [
+            "SOURCE_EVIDENCE_REVIEW",
+            "WINDOWS_NATIVE_ORACLE_REQUIRED"
+          ],
+          "status": "OPEN",
+          "validationState": "NOT_RUN",
+          "evidenceRefs": [],
+          "qualification": "NOT_QUALIFIED"
+        },
+        {
+          "id": "SAP-CA-MEMORY-PERFORMANCE-06",
+          "requirement": "Privacy-minimal local observation",
+          "rationale": "Privacy-minimal local observation: a bounded memory/performance semantic obligation; qualification requires the exact positive, negative and UNKNOWN oracles below.",
+          "sourceRefs": [
+            "SRC-SYSTEM-PRESSURE",
+            "SRC-TEST-SYSTEM-PRESSURE",
+            "SRC-PRODUCT-PRD",
+            "SRC-PRODUCT-L1"
+          ],
+          "relationRefs": [
+            "CA-REL-017"
+          ],
+          "invariantRefs": [
+            "CA-INV-017"
+          ],
+          "cqRefs": [
+            "CQ-CA-029"
+          ],
+          "positiveCase": "Default evidence excludes command lines, PIDs, users, environment and paths; no automatic egress.",
+          "negativeCase": "A canary path/secret/command line appears in report or outbound payload.",
+          "unknownCase": "Redaction or zero-egress evidence incomplete => local-only/no-sharing and UNKNOWN.",
+          "oracle": "CANARY_PRIVACY_AND_NATIVE_ZERO_EGRESS_ORACLE",
+          "oracleClasses": [
+            "SOURCE_EVIDENCE_REVIEW",
+            "WINDOWS_NATIVE_ORACLE_REQUIRED"
+          ],
+          "status": "OPEN",
+          "validationState": "NOT_RUN",
+          "evidenceRefs": [],
+          "qualification": "NOT_QUALIFIED"
+        },
+        {
+          "id": "SAP-CA-MEMORY-PERFORMANCE-07",
+          "requirement": "Safe advisory optimization plan",
+          "rationale": "Safe advisory optimization plan: a bounded memory/performance semantic obligation; qualification requires the exact positive, negative and UNKNOWN oracles below.",
+          "sourceRefs": [
+            "SRC-PRODUCT-FREEZE",
+            "SRC-PRODUCT-PRD",
+            "SRC-SYSTEM-PRESSURE",
+            "EXT-MEM-CACHE-MANAGER"
+          ],
+          "relationRefs": [
+            "CA-REL-021"
+          ],
+          "invariantRefs": [
+            "CA-INV-001",
+            "CA-INV-002",
+            "CA-INV-018"
+          ],
+          "cqRefs": [
+            "CQ-CA-026"
+          ],
+          "positiveCase": "Plan contains review steps and explicit no-effect status; no process/service/cache mutation occurs.",
+          "negativeCase": "Top-memory rank is treated as kill target or model suggestion as authority.",
+          "unknownCase": "Product admission or exact identity missing => advisory only/zero effect.",
+          "oracle": "PRODUCT_SCOPE_AND_NATIVE_ZERO_EFFECT_ORACLE",
+          "oracleClasses": [
+            "SOURCE_EVIDENCE_REVIEW",
+            "WINDOWS_NATIVE_ORACLE_REQUIRED"
+          ],
+          "status": "OPEN",
+          "validationState": "NOT_RUN",
+          "evidenceRefs": [],
+          "qualification": "NOT_QUALIFIED"
+        },
+        {
+          "id": "SAP-CA-MEMORY-PERFORMANCE-08",
+          "requirement": "Optimization result verification",
+          "rationale": "Optimization result verification: a bounded memory/performance semantic obligation; qualification requires the exact positive, negative and UNKNOWN oracles below.",
+          "sourceRefs": [
+            "SRC-PRODUCT-PRD",
+            "SRC-PRODUCT-L1",
+            "EXT-MEM-PERFORMANCE-COUNTERS"
+          ],
+          "relationRefs": [
+            "CA-REL-020"
+          ],
+          "invariantRefs": [
+            "CA-INV-004",
+            "CA-INV-014"
+          ],
+          "cqRefs": [
+            "CQ-CA-027"
+          ],
+          "positiveCase": "Same workload and user-relevant outcome metric improve with independent before/after evidence and no unacceptable regression.",
+          "negativeCase": "Available memory rises without a response/throughput comparison yet a speedup is claimed.",
+          "unknownCase": "No trusted comparator or post-state => UNKNOWN/CORRELATED_CHANGE_ONLY.",
+          "oracle": "CONTROLLED_WORKLOAD_INDEPENDENT_POSTSTATE_ORACLE",
+          "oracleClasses": [
+            "SOURCE_EVIDENCE_REVIEW",
+            "WINDOWS_NATIVE_ORACLE_REQUIRED"
+          ],
+          "status": "OPEN",
+          "validationState": "NOT_RUN",
+          "evidenceRefs": [],
+          "qualification": "NOT_QUALIFIED"
+        }
+      ]
+    }
+  ],
+  "counts": {
+    "claims": 7,
+    "elements": 2,
+    "relations": 7,
+    "globalInvariants": 6,
+    "competencyQuestions": 11,
+    "sapProfiles": 2,
+    "sapObligations": 12,
+    "coverageMapAppend": 2
+  },
+  "qualification": {
+    "independentReview": "NOT_RUN",
+    "sapQualifiedElements": 0,
+    "sapObligationsQualified": 0,
+    "nativeWindowsExecution": "NOT_RUN",
+    "productAdmission": "NOT_ADMITTED",
+    "disFunctionQualification": "NOT_QUALIFIED",
+    "aotProductionPackage": "NOT_CREATED",
+    "runtimeDemo": "RESEARCH_HARNESS_ONLY_NOT_PRODUCT_FUNCTION"
+  },
+  "coverageMapAppend": [
+    {
+      "element": "CA-PERFORMANCE-OPTIMIZATION",
+      "kind": "CHILD",
+      "parent": "CA-ROOT",
+      "claimRefs": [
+        "CA-CLM-021",
+        "CA-CLM-024"
+      ],
+      "relationRefs": [
+        "CA-REL-018",
+        "CA-REL-019",
+        "CA-REL-020",
+        "CA-REL-021"
+      ],
+      "globalInvariantRefs": [
+        "CA-INV-001",
+        "CA-INV-002",
+        "CA-INV-003",
+        "CA-INV-004",
+        "CA-INV-014",
+        "CA-INV-016",
+        "CA-INV-017",
+        "CA-INV-018",
+        "CA-INV-019"
+      ],
+      "cqRefs": [
+        "CQ-CA-026",
+        "CQ-CA-027",
+        "CQ-CA-028"
+      ],
+      "sapProfileRef": "SAP-CA-PERFORMANCE-OPTIMIZATION",
+      "scopeContractRef": "CA-PERFORMANCE-OPTIMIZATION.scopeContract",
+      "semanticValidationState": "NOT_RUN"
+    },
+    {
+      "element": "CA-MEMORY-PERFORMANCE",
+      "kind": "CHILD",
+      "parent": "CA-PERFORMANCE-OPTIMIZATION",
+      "claimRefs": [
+        "CA-CLM-018",
+        "CA-CLM-019",
+        "CA-CLM-020",
+        "CA-CLM-022",
+        "CA-CLM-023"
+      ],
+      "relationRefs": [
+        "CA-REL-016",
+        "CA-REL-017",
+        "CA-REL-018",
+        "CA-REL-020",
+        "CA-REL-022"
+      ],
+      "globalInvariantRefs": [
+        "CA-INV-001",
+        "CA-INV-002",
+        "CA-INV-003",
+        "CA-INV-004",
+        "CA-INV-014",
+        "CA-INV-015",
+        "CA-INV-016",
+        "CA-INV-017",
+        "CA-INV-018",
+        "CA-INV-019"
+      ],
+      "cqRefs": [
+        "CQ-CA-021",
+        "CQ-CA-022",
+        "CQ-CA-023",
+        "CQ-CA-024",
+        "CQ-CA-025",
+        "CQ-CA-029",
+        "CQ-CA-030",
+        "CQ-CA-031"
+      ],
+      "sapProfileRef": "SAP-CA-MEMORY-PERFORMANCE",
+      "scopeContractRef": "CA-MEMORY-PERFORMANCE.scopeContract",
+      "semanticValidationState": "NOT_RUN"
+    }
+  ],
+  "coverageMapExtensions": [
+    {
+      "element": "CA-GLOBAL-AUTHORITY",
+      "appendClaimRefs": [
+        "CA-CLM-023"
+      ],
+      "appendRelationRefs": [
+        "CA-REL-021"
+      ],
+      "appendGlobalInvariantRefs": [
+        "CA-INV-018"
+      ],
+      "appendCqRefs": [
+        "CQ-CA-026"
+      ],
+      "semanticValidationState": "NOT_RUN"
+    },
+    {
+      "element": "CA-GLOBAL-VERIFICATION",
+      "appendClaimRefs": [
+        "CA-CLM-021"
+      ],
+      "appendRelationRefs": [
+        "CA-REL-020"
+      ],
+      "appendGlobalInvariantRefs": [
+        "CA-INV-014",
+        "CA-INV-015",
+        "CA-INV-016"
+      ],
+      "appendCqRefs": [
+        "CQ-CA-021",
+        "CQ-CA-022",
+        "CQ-CA-027"
+      ],
+      "semanticValidationState": "NOT_RUN"
+    },
+    {
+      "element": "CA-GLOBAL-PRIVACY",
+      "appendClaimRefs": [],
+      "appendRelationRefs": [
+        "CA-REL-017"
+      ],
+      "appendGlobalInvariantRefs": [
+        "CA-INV-017"
+      ],
+      "appendCqRefs": [
+        "CQ-CA-029"
+      ],
+      "semanticValidationState": "NOT_RUN"
+    },
+    {
+      "element": "CA-GLOBAL-CURRENTNESS",
+      "appendClaimRefs": [],
+      "appendRelationRefs": [],
+      "appendGlobalInvariantRefs": [
+        "CA-INV-019"
+      ],
+      "appendCqRefs": [
+        "CQ-CA-030",
+        "CQ-CA-031"
+      ],
+      "semanticValidationState": "NOT_RUN"
+    },
+    {
+      "element": "CA-AOT-KNOWLEDGE",
+      "appendClaimRefs": [],
+      "appendRelationRefs": [
+        "CA-REL-022"
+      ],
+      "appendGlobalInvariantRefs": [
+        "CA-INV-019"
+      ],
+      "appendCqRefs": [
+        "CQ-CA-031"
+      ],
+      "semanticValidationState": "NOT_RUN"
+    },
+    {
+      "element": "CA-SYSTEM-OBSERVATION",
+      "appendClaimRefs": [
+        "CA-CLM-018"
+      ],
+      "appendRelationRefs": [
+        "CA-REL-016"
+      ],
+      "appendGlobalInvariantRefs": [],
+      "appendCqRefs": [
+        "CQ-CA-021",
+        "CQ-CA-022"
+      ],
+      "semanticValidationState": "NOT_RUN"
+    },
+    {
+      "element": "CA-PROCESS-SERVICE",
+      "appendClaimRefs": [
+        "CA-CLM-018",
+        "CA-CLM-020",
+        "CA-CLM-023"
+      ],
+      "appendRelationRefs": [
+        "CA-REL-017"
+      ],
+      "appendGlobalInvariantRefs": [],
+      "appendCqRefs": [
+        "CQ-CA-023",
+        "CQ-CA-024"
+      ],
+      "semanticValidationState": "NOT_RUN"
+    },
+    {
+      "element": "CA-STORAGE",
+      "appendClaimRefs": [
+        "CA-CLM-024"
+      ],
+      "appendRelationRefs": [
+        "CA-REL-018"
+      ],
+      "appendGlobalInvariantRefs": [],
+      "appendCqRefs": [
+        "CQ-CA-022"
+      ],
+      "semanticValidationState": "NOT_RUN"
+    },
+    {
+      "element": "CA-HARDWARE-DEVICE",
+      "appendClaimRefs": [],
+      "appendRelationRefs": [
+        "CA-REL-019"
+      ],
+      "appendGlobalInvariantRefs": [],
+      "appendCqRefs": [
+        "CQ-CA-028"
+      ],
+      "semanticValidationState": "NOT_RUN"
+    }
+  ],
+  "semanticAssuranceProfileExtensions": [
+    {
+      "profileId": "SAP-CA-SYSTEM-OBSERVATION",
+      "appendClaimRefs": [
+        "CA-CLM-018"
+      ],
+      "appendRelationRefs": [
+        "CA-REL-016"
+      ],
+      "appendInvariantRefs": [
+        "CA-INV-015"
+      ],
+      "appendCqRefs": [
+        "CQ-CA-021",
+        "CQ-CA-022"
+      ]
+    },
+    {
+      "profileId": "SAP-CA-PROCESS-SERVICE",
+      "appendClaimRefs": [
+        "CA-CLM-018",
+        "CA-CLM-020",
+        "CA-CLM-023"
+      ],
+      "appendRelationRefs": [
+        "CA-REL-017"
+      ],
+      "appendInvariantRefs": [
+        "CA-INV-015",
+        "CA-INV-017",
+        "CA-INV-018"
+      ],
+      "appendCqRefs": [
+        "CQ-CA-023",
+        "CQ-CA-024",
+        "CQ-CA-029"
+      ]
+    },
+    {
+      "profileId": "SAP-CA-STORAGE",
+      "appendClaimRefs": [
+        "CA-CLM-024"
+      ],
+      "appendRelationRefs": [
+        "CA-REL-018"
+      ],
+      "appendInvariantRefs": [
+        "CA-INV-019"
+      ],
+      "appendCqRefs": [
+        "CQ-CA-022"
+      ]
+    },
+    {
+      "profileId": "SAP-CA-HARDWARE-DEVICE",
+      "appendRelationRefs": [
+        "CA-REL-019"
+      ],
+      "appendInvariantRefs": [
+        "CA-INV-019"
+      ],
+      "appendCqRefs": [
+        "CQ-CA-028"
+      ]
+    },
+    {
+      "profileId": "SAP-CA-GLOBAL-AUTHORITY",
+      "appendClaimRefs": [
+        "CA-CLM-023"
+      ],
+      "appendRelationRefs": [
+        "CA-REL-021"
+      ],
+      "appendInvariantRefs": [
+        "CA-INV-018"
+      ],
+      "appendCqRefs": [
+        "CQ-CA-026"
+      ]
+    },
+    {
+      "profileId": "SAP-CA-GLOBAL-VERIFICATION",
+      "appendClaimRefs": [
+        "CA-CLM-021"
+      ],
+      "appendRelationRefs": [
+        "CA-REL-020"
+      ],
+      "appendInvariantRefs": [
+        "CA-INV-014",
+        "CA-INV-015",
+        "CA-INV-016"
+      ],
+      "appendCqRefs": [
+        "CQ-CA-021",
+        "CQ-CA-022",
+        "CQ-CA-027"
+      ]
+    },
+    {
+      "profileId": "SAP-CA-GLOBAL-PRIVACY",
+      "appendRelationRefs": [
+        "CA-REL-017"
+      ],
+      "appendInvariantRefs": [
+        "CA-INV-017"
+      ],
+      "appendCqRefs": [
+        "CQ-CA-029"
+      ]
+    },
+    {
+      "profileId": "SAP-CA-GLOBAL-CURRENTNESS",
+      "appendInvariantRefs": [
+        "CA-INV-019"
+      ],
+      "appendCqRefs": [
+        "CQ-CA-030",
+        "CQ-CA-031"
+      ]
+    },
+    {
+      "profileId": "SAP-CA-AOT-KNOWLEDGE",
+      "appendRelationRefs": [
+        "CA-REL-022"
+      ],
+      "appendInvariantRefs": [
+        "CA-INV-019"
+      ],
+      "appendCqRefs": [
+        "CQ-CA-031"
+      ]
+    }
+  ]
+}

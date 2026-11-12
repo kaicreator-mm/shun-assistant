@@ -1,0 +1,110 @@
+{
+  "schema": "shun.dke-dis-aot-runtime-demo.memory-performance.r0",
+  "outputLabel": "SHUN_ASSISTANT_MEMORY_PERFORMANCE_DKE_DIS_AOT_RUNTIME_DEMO_R0",
+  "status": "RESEARCH_DEMO_READY_FOR_LOCAL_VALIDATION",
+  "mainIssue": "https://github.com/kaicreator-mm/shun-assistant/issues/411",
+  "base": {
+    "knowledgePr": 414,
+    "knowledgeHead": "22a929ce1fbb5cdb5b2819cd3e98e71bbf21085a",
+    "demandPr": 415,
+    "demandHead": "406605ae0d931440338b398d29c2a6dcf4674c80",
+    "originalSourceCommit": "1224fea4097799467e2c0c454885e680f1f28248"
+  },
+  "demandId": "CA-JOB-16",
+  "elements": [
+    "CA-PERFORMANCE-OPTIMIZATION",
+    "CA-MEMORY-PERFORMANCE"
+  ],
+  "stages": [
+    {
+      "stage": "DKE",
+      "status": "CANDIDATE_ARTIFACT_CREATED",
+      "artifact": "docs/dke/implementation/PERFORMANCE_MEMORY_EXTENSION_R0.json",
+      "outputs": [
+        "2 Elements",
+        "7 Claims",
+        "7 Relations",
+        "6 Invariants",
+        "11 CQs",
+        "2 SAP profiles",
+        "12 SAP obligations"
+      ],
+      "qualification": "NOT_QUALIFIED"
+    },
+    {
+      "stage": "DIS",
+      "status": "CONTRACT_CANDIDATE_CREATED",
+      "artifact": "docs/dke/demos/memory-performance-r0/DIS_FUNCTION_CONTRACT_R0.json",
+      "outputs": [
+        "observe",
+        "assess",
+        "plan",
+        "compare typed Function contracts",
+        "ECP candidate"
+      ],
+      "qualification": "NOT_QUALIFIED"
+    },
+    {
+      "stage": "AOT",
+      "status": "DEMO_ONLY_CANDIDATE_CREATED",
+      "artifact": "docs/dke/demos/memory-performance-r0/AOT_MEMORY_KNOWLEDGE_CANDIDATE_R0.json",
+      "outputs": [
+        "metric semantics",
+        "non-equivalence rules",
+        "diagnostic decision rules",
+        "falsifiers",
+        "invalidation triggers"
+      ],
+      "activation": "DEMO_HARNESS_ONLY",
+      "productionConsumable": false
+    },
+    {
+      "stage": "Runtime",
+      "status": "READ_ONLY_HARNESS_CREATED_NATIVE_EXECUTION_PENDING",
+      "artifact": "docs/dke/demos/memory-performance-r0/run-windows-memory-demo.mjs",
+      "outputs": [
+        "existing Windows system diagnosis",
+        "existing top-eight WorkingSet64 observation",
+        "typed local-only report",
+        "advisory-only plan",
+        "UNKNOWN on unsupported/unavailable"
+      ],
+      "mutation": "NONE",
+      "network": "NONE",
+      "nativeReceipt": "NOT_RUN"
+    }
+  ],
+  "runtimeScope": {
+    "supportedTarget": "Windows host where existing fixed collectors are available",
+    "usesExistingSources": [
+      "packages/vertical-system/src/diagnostics.ts",
+      "packages/vertical-system/src/windows-runtime.ts",
+      "packages/vertical-system/src/internal/windows-pressure.ts"
+    ],
+    "newProductRuntimeSourceChanges": false,
+    "readOnly": true,
+    "localOnly": true,
+    "defaultProcessNameHandling": "REDACTED_TO_LOCAL_ALIASES",
+    "optionalLocalNamesFlag": "--show-local-process-names",
+    "effectsAuthorized": false,
+    "automaticEgress": false
+  },
+  "demoClosure": {
+    "closedPath": "DKE candidate → DIS contract candidate → AOT research candidate → Runtime read-only observation/assessment/advisory plan",
+    "notClosed": [
+      "production SAP qualification",
+      "production DIS Function/ECP qualification",
+      "production AOT Package qualification",
+      "native Windows receipt until local run",
+      "actual OS optimization effect",
+      "verified speedup or leak diagnosis"
+    ],
+    "comparisonRule": "computer.memory.compare returns UNKNOWN without trusted same-host/same-workload comparator and user-relevant response/throughput evidence."
+  },
+  "productAuthority": {
+    "productFreeze": "v0.3.0 unchanged",
+    "implementationAuthorized": false,
+    "productAdmission": "NOT_ADMITTED",
+    "futureMutationRequires": "Separate Product amendment plus fresh SAP/DIS/Host authorization and native post-state proof"
+  }
+}

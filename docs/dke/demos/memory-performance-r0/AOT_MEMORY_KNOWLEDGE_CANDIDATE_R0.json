@@ -1,0 +1,187 @@
+{
+  "schema": "shun.aot.knowledge-candidate.memory-performance.r0",
+  "packageId": "shun.computer.memory-performance.knowledge",
+  "packageVersion": "0.1.0-candidate",
+  "revision": "R0",
+  "status": "DEMO_ONLY_CANDIDATE_NOT_QUALIFIED",
+  "activation": "RESEARCH_DEMO_HARNESS_ONLY",
+  "productionConsumable": false,
+  "baseKnowledgeHead": "22a929ce1fbb5cdb5b2819cd3e98e71bbf21085a",
+  "extensionModel": "docs/dke/implementation/PERFORMANCE_MEMORY_EXTENSION_R0.json",
+  "claimIds": [
+    "CA-CLM-018",
+    "CA-CLM-019",
+    "CA-CLM-020",
+    "CA-CLM-021",
+    "CA-CLM-022",
+    "CA-CLM-023",
+    "CA-CLM-024"
+  ],
+  "elementIds": [
+    "CA-PERFORMANCE-OPTIMIZATION",
+    "CA-MEMORY-PERFORMANCE"
+  ],
+  "sourceRules": [
+    {
+      "id": "MEM-AOT-001",
+      "rule": "WorkingSetSize/WorkingSet64 represents pageable pages currently resident in physical memory for a process; it may include shared pages.",
+      "sourceRefs": [
+        "EXT-MEM-WORKING-SET",
+        "EXT-MEM-PERFORMANCE-INFO"
+      ],
+      "falsifier": "Treat Working Set as Private Bytes, unique physical ownership or commit charge.",
+      "applicability": "Windows API/counter semantics; target API availability is Runtime-only."
+    },
+    {
+      "id": "MEM-AOT-002",
+      "rule": "PrivateUsage/Private Bytes is a process private commit-charge metric and is not interchangeable with current resident Working Set.",
+      "sourceRefs": [
+        "EXT-MEM-PROCESS-COUNTERS-EX",
+        "EXT-MEM-PERFORMANCE-INFO"
+      ],
+      "falsifier": "Infer PrivateUsage from WorkingSet64 when the private counter is absent.",
+      "applicability": "Exact PROCESS_MEMORY_COUNTERS_EX/API support and access are Runtime-only."
+    },
+    {
+      "id": "MEM-AOT-003",
+      "rule": "System Available Physical Memory, Committed Bytes, Commit Limit and pagefile capacity describe distinct system-level quantities.",
+      "sourceRefs": [
+        "EXT-MEM-PERFORMANCE-INFO",
+        "EXT-MEM-PAGEFILE"
+      ],
+      "falsifier": "Treat free RAM, commit charge and pagefile usage as the same metric.",
+      "applicability": "Windows target build and counter/API availability required."
+    },
+    {
+      "id": "MEM-AOT-004",
+      "rule": "PageFaultCount is cumulative and does not by itself provide a hard-page-fault rate; use appropriate system paging counters and workload evidence.",
+      "sourceRefs": [
+        "EXT-MEM-PROCESS-COUNTERS-EX",
+        "EXT-MEM-PERFORMANCE-COUNTERS",
+        "EXT-MEM-TROUBLESHOOT"
+      ],
+      "falsifier": "Call cumulative PageFaultCount a hard-fault rate or performance bottleneck.",
+      "applicability": "Counter semantics and collection interval are Runtime-specific."
+    },
+    {
+      "id": "MEM-AOT-005",
+      "rule": "Cache/standby memory is normal Windows memory-manager behavior and is not default junk; do not clear or trim it without a specific measured workload reason and separate authority.",
+      "sourceRefs": [
+        "EXT-MEM-CACHE-MANAGER",
+        "EXT-MEM-WORKING-SET",
+        "EXT-MEM-RAMMAP"
+      ],
+      "falsifier": "Recommend indiscriminate standby-list clearing or working-set trimming as universal optimization.",
+      "applicability": "OS version and workload behavior must be checked; server tuning thresholds are not universal client rules."
+    },
+    {
+      "id": "MEM-AOT-006",
+      "rule": "A suspected leak requires repeated time-stamped measurements for a stable process instance under comparable workload, including idle/recovery behavior; a single sample is never leak proof.",
+      "sourceRefs": [
+        "EXT-MEM-PROCESS-COUNTERS-EX",
+        "EXT-MEM-PERFORMANCE-COUNTERS"
+      ],
+      "falsifier": "Label a high Working Set or one rising sample as a confirmed memory leak.",
+      "applicability": "Stable process identity, workload comparator and sample availability are Runtime-only."
+    },
+    {
+      "id": "MEM-AOT-007",
+      "rule": "An optimization improvement claim requires a comparable pre/post workload and a user-relevant response/throughput metric; increased available memory alone is insufficient.",
+      "sourceRefs": [
+        "SRC-PRODUCT-PRD",
+        "SRC-PRODUCT-L1",
+        "EXT-MEM-PERFORMANCE-COUNTERS"
+      ],
+      "falsifier": "Claim speedup only from increased available bytes or reduced process Working Set.",
+      "applicability": "Trusted workload comparator and outcome metric are Runtime evidence."
+    },
+    {
+      "id": "MEM-AOT-008",
+      "rule": "Current Shun top-memory collector returns a bounded WorkingSet64 snapshot only; it does not establish process identity continuity, private commit, leak, cause or safe termination.",
+      "sourceRefs": [
+        "SRC-SYSTEM-PRESSURE",
+        "SRC-TEST-SYSTEM-PRESSURE"
+      ],
+      "falsifier": "Promote top-eight process rank to a process-control target or longitudinal diagnosis.",
+      "applicability": "Exact Shun source commit is pinned; any later implementation change invalidates this rule."
+    }
+  ],
+  "decisionRules": [
+    {
+      "id": "MEM-DEC-001",
+      "when": "Legacy diagnostic reports LOW_FREE_MEMORY",
+      "outcome": "LOW_FREE_MEMORY_LEGACY_HEURISTIC",
+      "confidence": "SINGLE_SNAPSHOT_LIMITED",
+      "action": "Collect additional system/process metrics; explain signal only.",
+      "prohibited": [
+        "root-cause assertion",
+        "speedup claim",
+        "automatic process termination"
+      ]
+    },
+    {
+      "id": "MEM-DEC-002",
+      "when": "No LOW_FREE_MEMORY signal in current snapshot",
+      "outcome": "NO_LEGACY_LOW_FREE_MEMORY_SIGNAL",
+      "action": "Do not assert healthy/no-pressure; ask for workload or more evidence if slowness persists."
+    },
+    {
+      "id": "MEM-DEC-003",
+      "when": "Only WorkingSet64 top-process facts are available",
+      "outcome": "SNAPSHOT_RANKING_ONLY",
+      "action": "Show resident working-set ranking; do not infer private bytes, leak or cause."
+    },
+    {
+      "id": "MEM-DEC-004",
+      "when": "Required metric/API/counter or stable identity is unavailable",
+      "outcome": "UNKNOWN",
+      "action": "Preserve field-level UNKNOWN; do not substitute another metric."
+    },
+    {
+      "id": "MEM-DEC-005",
+      "when": "User asks to optimize memory",
+      "outcome": "ADVISORY_PLAN_ONLY",
+      "action": "Provide safe review steps and explain evidence; no process/service/cache/pagefile/registry/hardware mutation."
+    },
+    {
+      "id": "MEM-DEC-006",
+      "when": "Before/after evidence lacks trusted same-host/same-workload comparison and user outcome metric",
+      "outcome": "COMPARISON_UNKNOWN",
+      "action": "Do not claim improvement."
+    }
+  ],
+  "aotEligible": [
+    "metric definitions and non-equivalence",
+    "source-pinned Windows memory-manager semantics",
+    "diagnostic decision tree and falsifiers",
+    "safe advisory strategies",
+    "risk and verification contracts",
+    "OS/API applicability and invalidation metadata"
+  ],
+  "runtimeOnly": [
+    "current memory values",
+    "current process names/identities and values",
+    "PID or process instance identity",
+    "OS build and API/counter availability",
+    "sample timestamps and workload identity",
+    "permissions/approvals/Host authority",
+    "before/after performance metrics and execution receipts"
+  ],
+  "neverCompile": [
+    "passwords, tokens, credentials or secrets",
+    "process lists, process names, PIDs, command lines, user names, environment or paths",
+    "live RAM/commit/pagefile/pool values",
+    "host identifiers, user files or document contents",
+    "current permissions, approvals, grants, permits or Host identity",
+    "unverified LLM output, runtime evidence or execution receipts"
+  ],
+  "invalidationTriggers": [
+    "source Blob or source revision changes",
+    "Windows build, API or counter semantics change",
+    "PowerShell/provider implementation or output schema changes",
+    "new memory metric or changed units/collection semantics",
+    "Product, risk, privacy or authorization policy changes",
+    "SAP obligation, CQ, relation or Element ownership changes"
+  ],
+  "promotionRule": "No production AOT Package until fresh independent SAP qualification, Product admission where needed, DIS Function/ECP qualification, exact package digest and selected Runtime consumer proof are complete."
+}

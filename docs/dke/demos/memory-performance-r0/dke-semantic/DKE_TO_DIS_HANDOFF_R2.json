@@ -1,0 +1,114 @@
+{
+  "schema": "shun.dke.to.dis.memory-handoff.r2",
+  "outputLabel": "SHUN_DKE_MEMORY_R2_DIS_HANDOFF_GATE",
+  "mainIssue": 411,
+  "repo": "kaicreator-mm/shun-assistant",
+  "pr": 416,
+  "status": "BLOCKED_PENDING_INDEPENDENT_SEMANTIC_QUALIFICATION",
+  "sourceRoots": {
+    "upstreamKnowledge": "22a929ce1fbb5cdb5b2819cd3e98e71bbf21085a",
+    "upstreamDemand": "406605ae0d931440338b398d29c2a6dcf4674c80",
+    "originalCodeTest": "1224fea4097799467e2c0c454885e680f1f28248"
+  },
+  "semanticInputs": [
+    "PERFORMANCE_MEMORY_EXTENSION_R0.json",
+    "SOURCE_FIRST_KNOWLEDGE_DELTA_R2.json",
+    "SEMANTIC_ORACLES_R2.json",
+    "EVOLUTION_IMPACT_R2.json"
+  ],
+  "qualifications": {
+    "dkeElements": 0,
+    "sapObligationsQualified": 0,
+    "independentSourceFirst": "PENDING_NEW_EXACT_SHA_REVIEW",
+    "productImplementationAuthorized": false,
+    "realWindowsReadOnlyObservation": "R0_NATIVE_RECEIPT_AVAILABLE_FOR_EXACT_OLDER_DOC_BLOBS",
+    "newCounterNativeOracles": "NOT_RUN",
+    "aotProductionPackage": false,
+    "realOptimizationEffect": "EXCLUDED",
+    "truePerformanceImprovement": "NOT_PROVEN"
+  },
+  "functionDependencies": [
+    {
+      "id": "computer.memory.observe",
+      "dependencyObligations": [
+        "SAP-CA-MEMORY-PERFORMANCE-01",
+        "SAP-CA-MEMORY-PERFORMANCE-03",
+        "SAP-CA-MEMORY-PERFORMANCE-06",
+        "SAP-CA-MEMORY-PERFORMANCE-09",
+        "SAP-CA-GLOBAL-CURRENTNESS-MEMORY-R2-01"
+      ],
+      "nativeOracle": "Real Windows Host exact metric identities, privacy and timestamp provenance, read-only effects"
+    },
+    {
+      "id": "computer.memory.assess",
+      "dependencyObligations": [
+        "SAP-CA-MEMORY-PERFORMANCE-01",
+        "SAP-CA-MEMORY-PERFORMANCE-02",
+        "SAP-CA-MEMORY-PERFORMANCE-04",
+        "SAP-CA-MEMORY-PERFORMANCE-05",
+        "SAP-CA-MEMORY-PERFORMANCE-09",
+        "SAP-CA-MEMORY-PERFORMANCE-10",
+        "SAP-CA-MEMORY-PERFORMANCE-11"
+      ],
+      "nativeOracle": "Multiple memory counters at supported diagnostic cadence, correct UNKNOWN and no single-snapshot leak/root cause"
+    },
+    {
+      "id": "computer.memory.plan",
+      "dependencyObligations": [
+        "SAP-CA-PERFORMANCE-OPTIMIZATION-03",
+        "SAP-CA-PERFORMANCE-OPTIMIZATION-04",
+        "SAP-CA-MEMORY-PERFORMANCE-07"
+      ],
+      "nativeOracle": "Advisory-only no effect, current Product admission required for any mutation"
+    },
+    {
+      "id": "computer.memory.compare",
+      "dependencyObligations": [
+        "SAP-CA-PERFORMANCE-OPTIMIZATION-02",
+        "SAP-CA-PERFORMANCE-OPTIMIZATION-05",
+        "SAP-CA-MEMORY-PERFORMANCE-08"
+      ],
+      "nativeOracle": "Independent Host-issued comparable workload evidence and user outcome; current implementation always UNKNOWN"
+    }
+  ],
+  "aot": {
+    "existingR0Artifact": "docs/dke/demos/memory-performance-r0/AOT_MEMORY_KNOWLEDGE_CANDIDATE_R0.json",
+    "eligibility": "RESEARCH_ONLY_NO_PRODUCTION_CONSUMPTION",
+    "r2NewKnowledgeLoadedByCurrentRuntime": false,
+    "sourceOfTruth": "Only authenticated, independently qualified DKE source pins and SAP; a RuleId list in output does not imply execution or provenance.",
+    "revalidation": "Invalidated affected source rules after source/claim/CQ/SAP change, not an implicit whole-package PASS."
+  },
+  "requiredForGateA": [
+    "Original Product and Code/Test frozen before reading candidate; Source-First independent review",
+    "5 new Claims/5 CQs/5 SAP obligations provenance, applicability and counterexample review",
+    "16 CQ positive/negative/UNKNOWN deterministic Oracle outcomes independently reviewed",
+    "Element/Global owner and recursive-stop conditions verified",
+    "Targeted reverse-impact with no unexplained omission, no blanket unrelated invalidation",
+    "Exact reviewed HEAD, source Blobs and fresh qualification receipt"
+  ],
+  "requiredForGateB": [
+    "Gate A accepted by independent Reviewer",
+    "Each selected DIS Function has typed preconditions, postconditions and UNKNOWN/REFUSED outcomes",
+    "Native Windows source identity and counter/API applicability independently demonstrated as required",
+    "Function/AOT consumer cannot claim production eligibility from an author fixture or R0 document",
+    "Product Owner separately admits any new user-facing feature; no effect permitted by research Demo",
+    "Any changed source invalidates relevant qualified contract and requires requalification"
+  ],
+  "decisionsNeedingOwner": [
+    "Whether new performance analysis user journey should amend frozen Product",
+    "Whether future process/Service/Pagefile effect should ever be admitted (not in this Demo)",
+    "Whether separate Win Client/Server OS counter applicability policy is needed"
+  ],
+  "stopRule": "If SAP remains NOT_QUALIFIED, handoff is a versioned proposal only; DIS cannot promote an ECP, function, pipeline or production AOT Package.",
+  "gates": {
+    "gateA": {
+      "status": "BLOCKED",
+      "reason": "Independent SAP review on R2 exact SHA pending"
+    },
+    "gateB": {
+      "status": "BLOCKED",
+      "reason": "Gate A blocked; Product admission and selected native oracles pending"
+    }
+  },
+  "closureStatus": "DKE_AUTHOR_CANDIDATE_ONLY_NOT_DIS_RUNTIME_PRODUCTION"
+}

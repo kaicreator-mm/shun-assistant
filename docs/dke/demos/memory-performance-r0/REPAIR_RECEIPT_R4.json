@@ -1,0 +1,130 @@
+{
+  "schema": "shun.dke.memory-performance.r4.stack-and-contract-repair-receipt.v1",
+  "outputLabel": "SHUN_ASSISTANT_DKE_R4_STACK_AND_CONTRACT_REPAIR",
+  "mainIssue": "kaicreator-mm/shun-assistant#411",
+  "sourcePr": "kaicreator-mm/shun-assistant#416",
+  "sourceHeadBeforeReceiptCommit": "ac1b6fd1610a7461083edaabd3a35823f376fcbc",
+  "qualification": "AUTHOR_REPAIR_NOT_INDEPENDENT_SAP_QUALIFICATION",
+  "stack": {
+    "main": "3694f600b68d54ef25eeb143f867febda6309bbc",
+    "preparation410": {
+      "head": "e756e28e3eb88527a8190651e218ffb94d0ed61c",
+      "prDiffDocsDke": 10,
+      "nonDocsDke": 0
+    },
+    "trust412": {
+      "head": "a50d8501ef371303be3c375700a3eadb7ea4aa24",
+      "prDiffDocsDke": 1,
+      "nonDocsDke": 0
+    },
+    "knowledge414": {
+      "head": "5d28ec1d6ec426c02b1e12a496d112faf06a5f4e",
+      "prDiffDocsDke": 3,
+      "nonDocsDke": 0
+    },
+    "demand415": {
+      "head": "a023841d24c4756afd43a0b86252594d3cb8be7d",
+      "prDiffDocsDke": 7,
+      "nonDocsDke": 0
+    },
+    "memory416": {
+      "head": "ac1b6fd1610a7461083edaabd3a35823f376fcbc",
+      "prDiffDocsDke": 26,
+      "nonDocsDke": 0
+    },
+    "ancestryStrategy": "Two-parent fast-forward merges carried up-to-date upstream source trees and only each PR's own docs/dke files, preserving previous head ancestry without force pushes or altering published main.",
+    "observations": [
+      "Original R3 #416 diff vs stale #415 had 529 files, 503 outside docs/dke",
+      "At sourceHeadBeforeReceiptCommit new #416 vs current #415 had 26 files, ALL under docs/dke",
+      "Current branch source tree resolves packages/vertical-system/src/index.ts from the published main"
+    ]
+  },
+  "repairedR3Findings": [
+    {
+      "id": "R3-416-STACK-DIFF-01",
+      "priority": "P1",
+      "authorRepair": "EFFECTIVE_PR_DIFF_BOUNDED_26_DOCS_ONLY",
+      "technicalReReview": "NOT_RUN_NEW_SHA"
+    },
+    {
+      "id": "R3-416-DIS-CONTRACT-02",
+      "priority": "P2",
+      "authorRepair": "CANDIDATE_VARIANTS_MATCH_RESEARCH_ANALYZER_NO_DIS_ECP_OR_AOT_RULES_APPLIED",
+      "technicalReReview": "NOT_RUN_NEW_SHA"
+    }
+  ],
+  "sourceBlobs": {
+    "contract": "746ac9f19ae40e3e9d91e74ac20909ab37430e14",
+    "analyzer": "2401f5af94743e11c2498978594cb6ed4b9d8ad8",
+    "analyzerTests": "fc1f070b52612efca8127e33f6b826513e54b8b2",
+    "researchContractValidator": "e1903651a6966fa42b246e0588103317a4924f40",
+    "researchContractValidatorTests": "0cac32efb3fc7908d9f935a8152a336f1e8bbd23",
+    "windowsRunner": "d80aae41e3fdbf3b51f150d5df91036c54901b5a",
+    "aotGuard": "2104f6792a45d856f5c9cff764fe31037e37142d",
+    "aotCandidate": "ccbb6b4d2f97e62cbecdade81405a73148ec29fb",
+    "knowledgeBase": "c877ec23dc59b0ae17681c7d8f7505b1521c8011",
+    "demandBase": "74c10245e88608d12ae716bd2bae1623a2f55dc5",
+    "availableVerticalSystemIndex": "7f687a10f216fc9c792cb689942da792ee8e8d88"
+  },
+  "contractBoundaries": {
+    "observe": [
+      "OBSERVED_ONLY",
+      "UNKNOWN"
+    ],
+    "assess": [
+      "LOW_FREE_MEMORY_LEGACY_HEURISTIC",
+      "NO_LEGACY_LOW_FREE_MEMORY_SIGNAL",
+      "UNKNOWN"
+    ],
+    "plan": [
+      "ADVISORY_ONLY",
+      "NOT_PRODUCED"
+    ],
+    "compare": [
+      "UNKNOWN"
+    ],
+    "runnerDisFunctionInvocation": false,
+    "runnerAotRulesApplied": 0,
+    "productionAotPackage": false,
+    "authorizedOsEffects": false,
+    "productAdmission": "NOT_ADMITTED"
+  },
+  "newRegressionDefinitions": [
+    "R4 positive/negative/unavailable analyzer outcome vs research candidate contract",
+    "legacy OBSERVED variant is rejected (actual OBSERVED_ONLY)",
+    "false AOT applied-source evidence is rejected",
+    "pipeline label cannot be represented as an executed DIS/ECP pipeline"
+  ],
+  "checks": {
+    "githubEffectivePrDiff": "GITHUB_API_SCOPED_PASS_BEFORE_RECEIPT_COMMIT",
+    "sourceBlobReadback": "GITHUB_API_MATCH_AT_SOURCE_HEAD",
+    "nodeCliNewHead": "NOT_RUN",
+    "woodpeckerAtSourceHead": "PENDING_AT_CHECKPOINT",
+    "windowsNativeNewHead": "NOT_RUN",
+    "r3PreviousScopedWindowsReceipt": "R3_6e5f4fe7__VALID_FOR_BYTE_IDENTICAL_EXECUTABLE_BLOBS_ONLY",
+    "freshIndependentTechnicalReview": "NOT_RUN_AT_THIS_HEAD",
+    "independentSapAndDomainOracle": "NOT_QUALIFIED",
+    "effectfulUserFunctionClosure": "NOT_RUN_NO_PRODUCT_AUTHORITY"
+  },
+  "remainingGates": [
+    "Run new head memory-analysis.test.mjs and verify-performance-memory-extension-r0.mjs plus test; repair failures and record actual Node/EXIT",
+    "Reconcile CI results at final Exact HEAD without using pending as PASS",
+    "Fresh independent Source-First Reviewer freezes original Product/L1/Code/Test before inspecting these new heads and R4 tests",
+    "Independent domain/source Owner and SAP Oracle, G1-G5 and appropriate native proof; DKE Gate A then DIS Gate B decision",
+    "Separate Product admission and Host-authorized user-visible closure if future functionality is approved"
+  ],
+  "qualificationTotals": {
+    "sapQualified": 0,
+    "productionDisEcp": 0,
+    "productionAot": 0,
+    "verifiedImprovementEffects": 0,
+    "fullUserFunctionClosures": 0
+  },
+  "explicitExclusions": [
+    "NO_MERGE",
+    "NO_PRODUCT_SCOPE_EXPANSION",
+    "NO_HOST_MUTATION",
+    "NO_ORACLE_SELF_SIGNATURE",
+    "NO_K5_OR_RELEASE_PROMOTION"
+  ]
+}

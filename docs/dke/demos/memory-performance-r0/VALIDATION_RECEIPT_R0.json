@@ -1,0 +1,126 @@
+{
+  "schema": "shun.dke-dis-memory-performance-validation-receipt.r0",
+  "outputLabel": "SHUN_ASSISTANT_MEMORY_PERFORMANCE_R0_LINUX_NODE_TEST_AND_HOSTED_STRUCTURE_RECEIPT",
+  "date": "2026-11-12",
+  "reviewRole": "AUTHOR_MECHANICAL_VALIDATION_NOT_INDEPENDENT_REVIEW",
+  "branch": "dke/memory-performance-demo-r0",
+  "currentQualification": {
+    "dkeSap": "NOT_QUALIFIED",
+    "disEcp": "NOT_QUALIFIED",
+    "aotProduction": "NOT_CREATED",
+    "productAdmission": "NOT_ADMITTED",
+    "effectCount": "NO_EFFECT_FUNCTION_EXPOSED",
+    "windowsNative": "NOT_RUN",
+    "trueOptimizationProof": "NOT_RUN"
+  },
+  "inputPins": {
+    "sourceCode": "1224fea4097799467e2c0c454885e680f1f28248",
+    "upstreamKnowledgeHead": "22a929ce1fbb5cdb5b2819cd3e98e71bbf21085a",
+    "upstreamDemandHead": "406605ae0d931440338b398d29c2a6dcf4674c80",
+    "memoryAnalysisBlob": "ff992ca206661fc558d9b8eb83568760192e78a6",
+    "memoryAnalysisNodeTestBlob": "72e257249d166b2bac476abf35fee82e26c8d379",
+    "runtimeRunnerBlob": "7aeec4dd72f5ee2b80c844c56427db07085f273f"
+  },
+  "executions": [
+    {
+      "id": "RUN-LINUX-NODE-PURE-001",
+      "description": "Run exact Git Blob copies of the pure analyzer and its repository Node test file under real Node CLI",
+      "context": "Linux x64 container, NOT Windows, NOT repo checked out; file bytes manually copied and each independently verified with git hash-object to match GitHub source blob",
+      "nodeVersion": "v22.16.0",
+      "actualCommands": [
+        "git hash-object /mnt/data/shun_memory_demo/memory-analysis.mjs",
+        "git hash-object /mnt/data/shun_memory_demo/memory-analysis.test.mjs",
+        "node --test /mnt/data/shun_memory_demo/memory-analysis.test.mjs"
+      ],
+      "blobMatch": "2/2 EXACT",
+      "exitCode": 0,
+      "tests": 9,
+      "pass": 9,
+      "fail": 0,
+      "skip": 0,
+      "result": "PASS_PURE_ANALYSIS_ON_EXACT_SOURCE_FILES_ONLY",
+      "limitations": [
+        "Not a Windows native host test",
+        "Not a full mono-repo checkout or exact HEAD build/test",
+        "No Product/DIS/AOT semantic qualification inferred"
+      ]
+    },
+    {
+      "id": "RUN-LINUX-RUNTIME-REFUSAL-001",
+      "description": "Native Node refusal path on non-Windows without reading AOT/contract or invoking Windows collector",
+      "context": "Linux x64 container, Node v22.16.0, exact Git Blob copy of Windows runner with adjacent pure analyzer",
+      "actualCommands": [
+        "git hash-object /mnt/data/shun_memory_demo/run-windows-memory-demo.mjs",
+        "node --check /mnt/data/shun_memory_demo/run-windows-memory-demo.mjs",
+        "node /mnt/data/shun_memory_demo/run-windows-memory-demo.mjs"
+      ],
+      "blobMatch": "1/1 EXACT",
+      "actualOutput": {
+        "schema": "shun.demo.memory-performance-runtime.v0",
+        "outcome": "UNKNOWN",
+        "code": "WINDOWS_REQUIRED",
+        "effectsAuthorized": false,
+        "externalDisclosures": []
+      },
+      "exitCode": 2,
+      "expectedExitCode": 2,
+      "result": "PASS_EXPECTED_UNSUPPORTED_PLATFORM_REFUSAL",
+      "limitations": [
+        "This is not a positive Windows observation",
+        "No privileged/system effect executed"
+      ]
+    },
+    {
+      "id": "RUN-HOSTED-V8-STRUCTURE-001",
+      "description": "Execute structural validator core with exact fetched input models and independently matched upstream Git file Blob IDs",
+      "context": "Connected GitHub source files parsed in hosted JS (not Node CLI; Git Blob IDs supplied from GitHub readback and not rehashed in hosted V8)",
+      "sourceBaseKnowledgeBlob": "c877ec23dc59b0ae17681c7d8f7505b1521c8011",
+      "sourceBaseDemandBlob": "74c10245e88608d12ae716bd2bae1623a2f55dc5",
+      "result": "PASS_WITH_ZERO_REFERENCE_ERRORS",
+      "metrics": {
+        "claims": 7,
+        "elements": 2,
+        "relations": 7,
+        "invariants": 6,
+        "cqs": 11,
+        "sapProfiles": 2,
+        "sapObligations": 12,
+        "externalSources": 9,
+        "internalSourcePins": 10,
+        "functions": 4,
+        "aotRules": 8
+      },
+      "negativeCases": [
+        {
+          "name": "tampered relation CQ reference",
+          "expected": "RELATION_EVIDENCE:CA-REL-016",
+          "observed": "REJECTED"
+        },
+        {
+          "name": "AOT production promotion attempted",
+          "expected": "AOT_NOT_PRODUCTION",
+          "observed": "REJECTED"
+        },
+        {
+          "name": "tampered original source Blob",
+          "expected": "SOURCE_PIN_MISMATCH:SRC-SYSTEM-PRESSURE",
+          "observed": "REJECTED"
+        }
+      ],
+      "limitations": [
+        "Hosted JS adapter is not identical to full Node validator CLI, which was not run",
+        "GitHub source files read from a branch before the final receipt commit"
+      ]
+    }
+  ],
+  "notExecuted": [
+    "node docs/dke/implementation/verify-performance-memory-extension-r0.mjs on exact repo checkout",
+    "node --test docs/dke/implementation/verify-performance-memory-extension-r0.test.mjs on exact repo checkout",
+    "native Windows positive read-only memory observation",
+    "any Windows OS effect or native poststate",
+    "independent Source-First Reviewer acceptance",
+    "SAP, DIS ECP, production AOT Package qualification",
+    "same-host/same-workload performance improvement comparison"
+  ],
+  "nodePolicy": "Use any installed Node runtime supporting actual code features; no artificial minimum version imposed."
+}

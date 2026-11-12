@@ -1,0 +1,639 @@
+{
+  "schema": "shun.dke.memory-semantic-oracles.r2",
+  "outputLabel": "SHUN_DKE_MEMORY_SEMANTIC_ORACLES_R2",
+  "status": "AUTHOR_ORACLE_CANDIDATES_NOT_SAP_QUALIFIED",
+  "mainIssue": 411,
+  "source": "SOURCE_FIRST_KNOWLEDGE_DELTA_R2.json + PERFORMANCE_MEMORY_EXTENSION_R0.json + Microsoft Learn original URLs",
+  "fixtureMode": "DETERMINISTIC_NO_OS_EFFECT_NO_NETWORK",
+  "semanticCases": [
+    {
+      "id": "ORACLE-CQ-CA-021",
+      "kind": "metric-separation",
+      "cqId": "CQ-CA-021",
+      "owner": "CA-MEMORY-PERFORMANCE",
+      "cases": [
+        {
+          "polarity": "POSITIVE",
+          "input": {
+            "metric": "WorkingSet64",
+            "interpretation": "RESIDENT_WORKING_SET",
+            "source": "SOURCE_PINNED"
+          },
+          "expected": "SUPPORTED"
+        },
+        {
+          "polarity": "NEGATIVE",
+          "input": {
+            "metric": "WorkingSet64",
+            "interpretation": "PRIVATE_BYTES",
+            "source": "SOURCE_PINNED"
+          },
+          "expected": "REFUTED"
+        },
+        {
+          "polarity": "UNKNOWN",
+          "input": {
+            "metric": "WorkingSet64",
+            "interpretation": "UNKNOWN",
+            "source": "UNAVAILABLE"
+          },
+          "expected": "UNKNOWN"
+        }
+      ],
+      "semanticBasis": "independent reviewer must verify official-source meaning and applicability; deterministic fixtures are a challenger not SAP qualification"
+    },
+    {
+      "id": "ORACLE-CQ-CA-022",
+      "kind": "memory-pressure",
+      "cqId": "CQ-CA-022",
+      "owner": "CA-MEMORY-PERFORMANCE",
+      "cases": [
+        {
+          "polarity": "POSITIVE",
+          "input": {
+            "observations": 4,
+            "available": true,
+            "commit": true,
+            "paging": true,
+            "workload": true,
+            "conclusion": "POTENTIAL_PRESSURE"
+          },
+          "expected": "SUPPORTED"
+        },
+        {
+          "polarity": "NEGATIVE",
+          "input": {
+            "observations": 1,
+            "available": true,
+            "commit": false,
+            "paging": false,
+            "workload": false,
+            "conclusion": "CONFIRMED_ROOT_CAUSE"
+          },
+          "expected": "REFUTED"
+        },
+        {
+          "polarity": "UNKNOWN",
+          "input": {
+            "observations": 1,
+            "available": true,
+            "commit": false,
+            "paging": false,
+            "workload": false,
+            "conclusion": "UNKNOWN"
+          },
+          "expected": "UNKNOWN"
+        }
+      ],
+      "semanticBasis": "independent reviewer must verify official-source meaning and applicability; deterministic fixtures are a challenger not SAP qualification"
+    },
+    {
+      "id": "ORACLE-CQ-CA-023",
+      "kind": "process-ranking",
+      "cqId": "CQ-CA-023",
+      "owner": "CA-MEMORY-PERFORMANCE",
+      "cases": [
+        {
+          "polarity": "POSITIVE",
+          "input": {
+            "metric": "WORKING_SET",
+            "ranking": true,
+            "attribution": "RANKING_ONLY",
+            "action": "NONE"
+          },
+          "expected": "SUPPORTED"
+        },
+        {
+          "polarity": "NEGATIVE",
+          "input": {
+            "metric": "WORKING_SET",
+            "ranking": true,
+            "attribution": "SAFE_TO_KILL",
+            "action": "KILL"
+          },
+          "expected": "REFUTED"
+        },
+        {
+          "polarity": "UNKNOWN",
+          "input": {
+            "metric": "UNKNOWN",
+            "ranking": false,
+            "attribution": "UNKNOWN",
+            "action": "NONE"
+          },
+          "expected": "UNKNOWN"
+        }
+      ],
+      "semanticBasis": "independent reviewer must verify official-source meaning and applicability; deterministic fixtures are a challenger not SAP qualification"
+    },
+    {
+      "id": "ORACLE-CQ-CA-024",
+      "kind": "leak-hypothesis",
+      "cqId": "CQ-CA-024",
+      "owner": "CA-MEMORY-PERFORMANCE",
+      "cases": [
+        {
+          "polarity": "POSITIVE",
+          "input": {
+            "stableProcessInstance": true,
+            "privateCommitSeries": 5,
+            "sameWorkload": true,
+            "idleRecoveryObserved": true,
+            "conclusion": "SUSPECTED_ONLY"
+          },
+          "expected": "SUPPORTED"
+        },
+        {
+          "polarity": "NEGATIVE",
+          "input": {
+            "stableProcessInstance": false,
+            "privateCommitSeries": 1,
+            "sameWorkload": false,
+            "idleRecoveryObserved": false,
+            "conclusion": "CONFIRMED_LEAK"
+          },
+          "expected": "REFUTED"
+        },
+        {
+          "polarity": "UNKNOWN",
+          "input": {
+            "stableProcessInstance": false,
+            "privateCommitSeries": 1,
+            "sameWorkload": false,
+            "idleRecoveryObserved": false,
+            "conclusion": "UNKNOWN"
+          },
+          "expected": "UNKNOWN"
+        }
+      ],
+      "semanticBasis": "independent reviewer must verify official-source meaning and applicability; deterministic fixtures are a challenger not SAP qualification"
+    },
+    {
+      "id": "ORACLE-CQ-CA-025",
+      "kind": "cache-standby",
+      "cqId": "CQ-CA-025",
+      "owner": "CA-MEMORY-PERFORMANCE",
+      "cases": [
+        {
+          "polarity": "POSITIVE",
+          "input": {
+            "cacheType": "STANDBY",
+            "action": "EXPLAIN_NO_EFFECT"
+          },
+          "expected": "SUPPORTED"
+        },
+        {
+          "polarity": "NEGATIVE",
+          "input": {
+            "cacheType": "STANDBY",
+            "action": "CLEAR_BY_DEFAULT"
+          },
+          "expected": "REFUTED"
+        },
+        {
+          "polarity": "UNKNOWN",
+          "input": {
+            "cacheType": "UNKNOWN",
+            "action": "NONE"
+          },
+          "expected": "UNKNOWN"
+        }
+      ],
+      "semanticBasis": "independent reviewer must verify official-source meaning and applicability; deterministic fixtures are a challenger not SAP qualification"
+    },
+    {
+      "id": "ORACLE-CQ-CA-026",
+      "kind": "effect-authorization",
+      "cqId": "CQ-CA-026",
+      "owner": "CA-MEMORY-PERFORMANCE",
+      "cases": [
+        {
+          "polarity": "POSITIVE",
+          "input": {
+            "productAdmission": false,
+            "effect": "NONE",
+            "planRisks": true,
+            "planEvidence": true
+          },
+          "expected": "SUPPORTED"
+        },
+        {
+          "polarity": "NEGATIVE",
+          "input": {
+            "productAdmission": false,
+            "effect": "PROCESS_KILL",
+            "planRisks": true,
+            "planEvidence": true
+          },
+          "expected": "REFUTED"
+        },
+        {
+          "polarity": "UNKNOWN",
+          "input": {
+            "productAdmission": false,
+            "effect": "NONE",
+            "planRisks": false,
+            "planEvidence": false
+          },
+          "expected": "UNKNOWN"
+        }
+      ],
+      "semanticBasis": "independent reviewer must verify official-source meaning and applicability; deterministic fixtures are a challenger not SAP qualification"
+    },
+    {
+      "id": "ORACLE-CQ-CA-027",
+      "kind": "performance-comparison",
+      "cqId": "CQ-CA-027",
+      "owner": "CA-PERFORMANCE-OPTIMIZATION",
+      "cases": [
+        {
+          "polarity": "POSITIVE",
+          "input": {
+            "independentComparator": false,
+            "userOutcome": false,
+            "conclusion": "NO_SPEEDUP_CLAIM"
+          },
+          "expected": "SUPPORTED"
+        },
+        {
+          "polarity": "NEGATIVE",
+          "input": {
+            "independentComparator": false,
+            "userOutcome": false,
+            "conclusion": "SPEEDUP_PROVED"
+          },
+          "expected": "REFUTED"
+        },
+        {
+          "polarity": "UNKNOWN",
+          "input": {
+            "independentComparator": false,
+            "userOutcome": false,
+            "conclusion": "UNKNOWN"
+          },
+          "expected": "UNKNOWN"
+        }
+      ],
+      "semanticBasis": "independent reviewer must verify official-source meaning and applicability; deterministic fixtures are a challenger not SAP qualification"
+    },
+    {
+      "id": "ORACLE-CQ-CA-028",
+      "kind": "hardware-upgrade",
+      "cqId": "CQ-CA-028",
+      "owner": "CA-PERFORMANCE-OPTIMIZATION",
+      "cases": [
+        {
+          "polarity": "POSITIVE",
+          "input": {
+            "exactModel": true,
+            "oemCompatibility": true,
+            "sustainedDemand": true,
+            "conclusion": "ADVICE_CANDIDATE"
+          },
+          "expected": "SUPPORTED"
+        },
+        {
+          "polarity": "NEGATIVE",
+          "input": {
+            "exactModel": false,
+            "oemCompatibility": false,
+            "sustainedDemand": false,
+            "conclusion": "UPGRADE_COMPATIBLE"
+          },
+          "expected": "REFUTED"
+        },
+        {
+          "polarity": "UNKNOWN",
+          "input": {
+            "exactModel": false,
+            "oemCompatibility": false,
+            "sustainedDemand": false,
+            "conclusion": "UNKNOWN"
+          },
+          "expected": "UNKNOWN"
+        }
+      ],
+      "semanticBasis": "independent reviewer must verify official-source meaning and applicability; deterministic fixtures are a challenger not SAP qualification"
+    },
+    {
+      "id": "ORACLE-CQ-CA-029",
+      "kind": "privacy-minimization",
+      "cqId": "CQ-CA-029",
+      "owner": "CA-MEMORY-PERFORMANCE",
+      "cases": [
+        {
+          "polarity": "POSITIVE",
+          "input": {
+            "localOnly": true,
+            "redaction": true,
+            "noAutomaticEgress": true,
+            "rawCommandLine": false
+          },
+          "expected": "SUPPORTED"
+        },
+        {
+          "polarity": "NEGATIVE",
+          "input": {
+            "localOnly": false,
+            "redaction": false,
+            "noAutomaticEgress": false,
+            "rawCommandLine": true
+          },
+          "expected": "REFUTED"
+        },
+        {
+          "polarity": "UNKNOWN",
+          "input": {
+            "localOnly": true,
+            "redaction": false,
+            "noAutomaticEgress": null,
+            "rawCommandLine": false
+          },
+          "expected": "UNKNOWN"
+        }
+      ],
+      "semanticBasis": "independent reviewer must verify official-source meaning and applicability; deterministic fixtures are a challenger not SAP qualification"
+    },
+    {
+      "id": "ORACLE-CQ-CA-030",
+      "kind": "api-unknown",
+      "cqId": "CQ-CA-030",
+      "owner": "CA-MEMORY-PERFORMANCE",
+      "cases": [
+        {
+          "polarity": "POSITIVE",
+          "input": {
+            "osApplicabilityVerified": true,
+            "apiAvailable": true,
+            "metric": "PrivateUsage",
+            "reportedAs": "PRIVATE_COMMIT"
+          },
+          "expected": "SUPPORTED"
+        },
+        {
+          "polarity": "NEGATIVE",
+          "input": {
+            "osApplicabilityVerified": false,
+            "apiAvailable": false,
+            "metric": "WorkingSet64",
+            "reportedAs": "PrivateUsage"
+          },
+          "expected": "REFUTED"
+        },
+        {
+          "polarity": "UNKNOWN",
+          "input": {
+            "osApplicabilityVerified": null,
+            "apiAvailable": null,
+            "metric": "UNKNOWN",
+            "reportedAs": "UNKNOWN"
+          },
+          "expected": "UNKNOWN"
+        }
+      ],
+      "semanticBasis": "independent reviewer must verify official-source meaning and applicability; deterministic fixtures are a challenger not SAP qualification"
+    },
+    {
+      "id": "ORACLE-CQ-CA-031",
+      "kind": "aot-boundary",
+      "cqId": "CQ-CA-031",
+      "owner": "CA-MEMORY-PERFORMANCE",
+      "cases": [
+        {
+          "polarity": "POSITIVE",
+          "input": {
+            "sourcePinned": true,
+            "stableSemantics": true,
+            "liveFacts": false,
+            "permissions": false
+          },
+          "expected": "SUPPORTED"
+        },
+        {
+          "polarity": "NEGATIVE",
+          "input": {
+            "sourcePinned": true,
+            "stableSemantics": true,
+            "liveFacts": true,
+            "permissions": true
+          },
+          "expected": "REFUTED"
+        },
+        {
+          "polarity": "UNKNOWN",
+          "input": {
+            "sourcePinned": false,
+            "stableSemantics": true,
+            "liveFacts": false,
+            "permissions": false
+          },
+          "expected": "UNKNOWN"
+        }
+      ],
+      "semanticBasis": "independent reviewer must verify official-source meaning and applicability; deterministic fixtures are a challenger not SAP qualification"
+    },
+    {
+      "id": "ORACLE-CQ-CA-032",
+      "kind": "ex2-availability",
+      "cqId": "CQ-CA-032",
+      "owner": "CA-MEMORY-PERFORMANCE",
+      "cases": [
+        {
+          "polarity": "POSITIVE",
+          "input": {
+            "osBuildVerified": true,
+            "ex2Supported": true,
+            "field": "PrivateWorkingSetSize",
+            "reportedAs": "PRIVATE_RESIDENT"
+          },
+          "expected": "SUPPORTED"
+        },
+        {
+          "polarity": "NEGATIVE",
+          "input": {
+            "osBuildVerified": true,
+            "ex2Supported": false,
+            "field": "WorkingSetSize",
+            "reportedAs": "PRIVATE_RESIDENT"
+          },
+          "expected": "REFUTED"
+        },
+        {
+          "polarity": "UNKNOWN",
+          "input": {
+            "osBuildVerified": false,
+            "ex2Supported": null,
+            "field": "UNKNOWN",
+            "reportedAs": "UNKNOWN"
+          },
+          "expected": "UNKNOWN"
+        }
+      ],
+      "semanticBasis": "independent reviewer must verify official-source meaning and applicability; deterministic fixtures are a challenger not SAP qualification"
+    },
+    {
+      "id": "ORACLE-CQ-CA-033",
+      "kind": "counter-cadence",
+      "cqId": "CQ-CA-033",
+      "owner": "CA-MEMORY-PERFORMANCE",
+      "cases": [
+        {
+          "polarity": "POSITIVE",
+          "input": {
+            "sampleIntervalMs": 1500,
+            "stableInstanceKey": true,
+            "conclusion": "DIAGNOSTIC_TREND_CANDIDATE"
+          },
+          "expected": "SUPPORTED"
+        },
+        {
+          "polarity": "NEGATIVE",
+          "input": {
+            "sampleIntervalMs": 100,
+            "stableInstanceKey": false,
+            "conclusion": "CONFIRMED_LEAK_BY_NAME"
+          },
+          "expected": "REFUTED"
+        },
+        {
+          "polarity": "UNKNOWN",
+          "input": {
+            "sampleIntervalMs": null,
+            "stableInstanceKey": false,
+            "conclusion": "UNKNOWN"
+          },
+          "expected": "UNKNOWN"
+        }
+      ],
+      "semanticBasis": "independent reviewer must verify official-source meaning and applicability; deterministic fixtures are a challenger not SAP qualification"
+    },
+    {
+      "id": "ORACLE-CQ-CA-034",
+      "kind": "fault-counter",
+      "cqId": "CQ-CA-034",
+      "owner": "CA-MEMORY-PERFORMANCE",
+      "cases": [
+        {
+          "polarity": "POSITIVE",
+          "input": {
+            "counter": "PageFaultCount",
+            "unit": "CUMULATIVE",
+            "claim": "CUMULATIVE_ONLY"
+          },
+          "expected": "SUPPORTED"
+        },
+        {
+          "polarity": "NEGATIVE",
+          "input": {
+            "counter": "PageFaultCount",
+            "unit": "CUMULATIVE",
+            "claim": "HARD_FAULTS_PER_SECOND"
+          },
+          "expected": "REFUTED"
+        },
+        {
+          "polarity": "UNKNOWN",
+          "input": {
+            "counter": "UNKNOWN",
+            "unit": "UNKNOWN",
+            "claim": "UNKNOWN"
+          },
+          "expected": "UNKNOWN"
+        }
+      ],
+      "semanticBasis": "independent reviewer must verify official-source meaning and applicability; deterministic fixtures are a challenger not SAP qualification"
+    },
+    {
+      "id": "ORACLE-CQ-CA-035",
+      "kind": "reference-set",
+      "cqId": "CQ-CA-035",
+      "owner": "CA-PERFORMANCE-OPTIMIZATION",
+      "cases": [
+        {
+          "polarity": "POSITIVE",
+          "input": {
+            "scenarioBound": true,
+            "explicitConsent": true,
+            "overheadDisclosed": true,
+            "claim": "SCENARIO_REFERENCE_SET_CANDIDATE"
+          },
+          "expected": "SUPPORTED"
+        },
+        {
+          "polarity": "NEGATIVE",
+          "input": {
+            "scenarioBound": false,
+            "explicitConsent": false,
+            "overheadDisclosed": false,
+            "claim": "SAFE_PASSIVE_INSTANT_READING"
+          },
+          "expected": "REFUTED"
+        },
+        {
+          "polarity": "UNKNOWN",
+          "input": {
+            "scenarioBound": null,
+            "explicitConsent": false,
+            "overheadDisclosed": false,
+            "claim": "UNKNOWN"
+          },
+          "expected": "UNKNOWN"
+        }
+      ],
+      "semanticBasis": "independent reviewer must verify official-source meaning and applicability; deterministic fixtures are a challenger not SAP qualification"
+    },
+    {
+      "id": "ORACLE-CQ-CA-036",
+      "kind": "sample-timestamp",
+      "cqId": "CQ-CA-036",
+      "owner": "CA-GLOBAL-CURRENTNESS",
+      "cases": [
+        {
+          "polarity": "POSITIVE",
+          "input": {
+            "analyzedAtKnown": true,
+            "hostSampledAtVerified": false,
+            "sampledAt": "UNKNOWN",
+            "claim": "PROCESSING_TIMESTAMP_ONLY"
+          },
+          "expected": "SUPPORTED"
+        },
+        {
+          "polarity": "NEGATIVE",
+          "input": {
+            "analyzedAtKnown": true,
+            "hostSampledAtVerified": false,
+            "sampledAt": "2026-11-12T01:00:00Z",
+            "claim": "HOST_SAMPLED_AT_VERIFIED"
+          },
+          "expected": "REFUTED"
+        },
+        {
+          "polarity": "UNKNOWN",
+          "input": {
+            "analyzedAtKnown": true,
+            "hostSampledAtVerified": false,
+            "sampledAt": "UNKNOWN",
+            "claim": "UNKNOWN"
+          },
+          "expected": "UNKNOWN"
+        }
+      ],
+      "semanticBasis": "independent reviewer must verify official-source meaning and applicability; deterministic fixtures are a challenger not SAP qualification"
+    }
+  ],
+  "coverage": {
+    "cqs": 16,
+    "positive": 16,
+    "negative": 16,
+    "unknown": 16,
+    "expectedTotal": 48
+  },
+  "qualification": {
+    "structuralFixturePass": "NOT_RUN",
+    "independentSourceFirstSemanticReview": "NOT_RUN",
+    "windowsNativeCounters": "NOT_RUN_NEW_COUNTERS",
+    "sap": "NOT_QUALIFIED",
+    "productionFunction": "BLOCKED"
+  }
+}

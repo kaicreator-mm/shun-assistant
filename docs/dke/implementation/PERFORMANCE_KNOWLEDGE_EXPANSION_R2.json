@@ -1,0 +1,182 @@
+{
+  "schema": "shun.dke.performance-knowledge-gap-roadmap.r2",
+  "outputLabel": "SHUN_ASSISTANT_DKE_PERFORMANCE_KNOWLEDGE_EXPANSION_R2",
+  "mainIssue": 411,
+  "revision": "R2",
+  "status": "RESEARCH_TOPICS_NOT_PRODUCT_ADMITTED_NOT_ELEMENTS",
+  "parentElement": "CA-PERFORMANCE-OPTIMIZATION",
+  "firstChildElement": "CA-MEMORY-PERFORMANCE",
+  "principle": "Source-first owner/boundary and user task value before further Element decomposition; existing System/Storage/Process/Hardware/Network owners are authoritative for raw facts. Future topics are not new accepted Elements or Functions.",
+  "topics": [
+    {
+      "id": "PERF-CPU",
+      "priority": "P0",
+      "area": "CPU/threads/scheduling",
+      "userJobs": [
+        "Find single-core saturation despite low total CPU",
+        "Distinguish workload from scheduler contention and throttling"
+      ],
+      "sourceNeeds": [
+        "Windows counter/API and WPR/WPA CPU usage and utilization definitions",
+        "CPU frequency, processor groups, SMT and topology applicability"
+      ],
+      "ownedBy": [
+        "CA-SYSTEM-OBSERVATION",
+        "CA-PROCESS-SERVICE"
+      ],
+      "semanticOwnerCandidate": "CA-PERFORMANCE-OPTIMIZATION",
+      "positive": "Single core is saturated while total utilization is modest; distinguish bottleneck from claim of broken CPU",
+      "negative": "Total CPU=40% implies every thread has capacity",
+      "unknown": "Missing thread/core topology and workload evidence",
+      "implementationAdmission": "NOT_ADMITTED"
+    },
+    {
+      "id": "PERF-STORAGE-IO",
+      "priority": "P0",
+      "area": "Storage latency / queue / throughput",
+      "userJobs": [
+        "Why does an SSD feel slow despite high peak throughput?",
+        "Distinguish free disk space from I/O performance"
+      ],
+      "sourceNeeds": [
+        "Windows storage latency/perf counter definitions and permissions",
+        "SSD health/driver/firmware sources tied to exact model"
+      ],
+      "ownedBy": [
+        "CA-STORAGE",
+        "CA-HARDWARE-DEVICE"
+      ],
+      "semanticOwnerCandidate": "CA-PERFORMANCE-OPTIMIZATION",
+      "positive": "High random-read latency at low MB/s can still delay launch",
+      "negative": "Sequential benchmark MB/s proves all app I/O is fast",
+      "unknown": "No exact I/O latency, queue and workload trace",
+      "implementationAdmission": "NOT_ADMITTED"
+    },
+    {
+      "id": "PERF-STARTUP",
+      "priority": "P0",
+      "area": "Startup/background software",
+      "userJobs": [
+        "Find resource-heavy auto-start applications",
+        "Propose safe reversible startup review"
+      ],
+      "sourceNeeds": [
+        "Windows Startup Apps, scheduled tasks and service dependency rules",
+        "Signed package identity and rollback safety"
+      ],
+      "ownedBy": [
+        "CA-SOFTWARE-LIFECYCLE",
+        "CA-PROCESS-SERVICE"
+      ],
+      "semanticOwnerCandidate": "CA-PERFORMANCE-OPTIMIZATION",
+      "positive": "Exact identified noncritical autostart item with measured delay candidate",
+      "negative": "Disable unknown Windows service solely from high memory ranking",
+      "unknown": "Unclear service dependencies or Product authority",
+      "implementationAdmission": "NOT_ADMITTED"
+    },
+    {
+      "id": "PERF-APPLICATION",
+      "priority": "P0",
+      "area": "Application latency / workload regression",
+      "userJobs": [
+        "Explain browser/Electron/app freezes",
+        "Distinguish crash from slowdown and compare same workload"
+      ],
+      "sourceNeeds": [
+        "WPR/WPA process/thread event semantics",
+        "Browser and app-specific vendor documentation"
+      ],
+      "ownedBy": [
+        "CA-PROCESS-SERVICE",
+        "CA-SOFTWARE-LIFECYCLE"
+      ],
+      "semanticOwnerCandidate": "CA-PERFORMANCE-OPTIMIZATION",
+      "positive": "Same workload with response latency and CPU/IO evidence reveals a candidate bottleneck",
+      "negative": "One high process Working Set proves app memory leak",
+      "unknown": "No reproducible workload/response metric",
+      "implementationAdmission": "NOT_ADMITTED"
+    },
+    {
+      "id": "PERF-THERMAL-POWER",
+      "priority": "P1",
+      "area": "Thermal throttling / battery / power",
+      "userJobs": [
+        "Why is performance slower on battery?",
+        "Distinguish thermal throttling from software workload"
+      ],
+      "sourceNeeds": [
+        "OEM sensor/power profile and Windows power diagnostics applicability",
+        "System model, charger/battery/thermal sensor trust"
+      ],
+      "ownedBy": [
+        "CA-HARDWARE-DEVICE",
+        "CA-EXECUTION-ENVIRONMENT"
+      ],
+      "semanticOwnerCandidate": "CA-PERFORMANCE-OPTIMIZATION",
+      "positive": "Reproducible frequency and temperature limit under stable workload",
+      "negative": "CPU utilization alone proves heat throttling",
+      "unknown": "OEM telemetry unavailable or permissions denied",
+      "implementationAdmission": "NOT_ADMITTED"
+    },
+    {
+      "id": "PERF-GPU",
+      "priority": "P1",
+      "area": "GPU/VRAM/acceleration",
+      "userJobs": [
+        "Explain video playback stutter or AI not using GPU",
+        "Distinguish GPU engine load from VRAM allocation"
+      ],
+      "sourceNeeds": [
+        "Windows graphics performance counter and driver/API documentation",
+        "GPU vendor/driver-specific compatibility and telemetry"
+      ],
+      "ownedBy": [
+        "CA-HARDWARE-DEVICE",
+        "CA-SOFTWARE-LIFECYCLE"
+      ],
+      "semanticOwnerCandidate": "CA-PERFORMANCE-OPTIMIZATION",
+      "positive": "Correct engine, frame-time and GPU memory observations under exact workload",
+      "negative": "GPU total utilization=0 proves acceleration is disabled",
+      "unknown": "Driver/API/engine telemetry missing",
+      "implementationAdmission": "NOT_ADMITTED"
+    },
+    {
+      "id": "PERF-NETWORK",
+      "priority": "P1",
+      "area": "Network latency and throughput",
+      "userJobs": [
+        "Why is SSH slow despite a fast bandwidth test?",
+        "Distinguish DNS, routing, proxy and link problems"
+      ],
+      "sourceNeeds": [
+        "Windows NIC/interface/network counter semantics",
+        "TCP/DNS/Routing/Proxy application and test applicability"
+      ],
+      "ownedBy": [
+        "CA-NETWORK",
+        "CA-EXECUTION-ENVIRONMENT"
+      ],
+      "semanticOwnerCandidate": "CA-PERFORMANCE-OPTIMIZATION",
+      "positive": "A high RTT or packet loss on chosen path with corresponding app latency evidence",
+      "negative": "Good bandwidth rules out DNS or high RTT",
+      "unknown": "No trusted path/route/DNS/RTT evidence",
+      "implementationAdmission": "NOT_ADMITTED"
+    }
+  ],
+  "crossDomainGlobalObligations": [
+    "Metric names/units and trustworthy time interval",
+    "OS/version/vendor applicability",
+    "Source-first Claim and Element owners",
+    "Privacy-minimized local observation",
+    "Independent comparable workload and user outcome",
+    "Authorization and zero-effect default",
+    "Recovery and UNKNOWN/refusal"
+  ],
+  "currentBuild": "ONLY_MEMORY_CHILD_HAS_R2_SEMANTIC_ORACLE_DEMO",
+  "futurePromotionRule": "Each topic requires separate user demand, source inventory and exact applicability, Element decision, CQ positive/negative/UNKNOWN, independent SAP qualification and Product admission before DIS/Runtime effect.",
+  "qualifications": {
+    "newElements": 0,
+    "newQualifiedSap": 0,
+    "newProductFeatures": 0
+  }
+}

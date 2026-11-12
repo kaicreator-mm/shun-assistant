@@ -1,0 +1,235 @@
+{
+  "schema": "shun.dke.memory-source-impact.r2",
+  "outputLabel": "SHUN_DKE_MEMORY_R2_INCREMENTAL_IMPACT",
+  "status": "AUTHOR_SOURCE_DEPENDENCY_MODEL_CANDIDATE",
+  "rootOwner": "CA-ROOT",
+  "focusElements": [
+    "CA-PERFORMANCE-OPTIMIZATION",
+    "CA-MEMORY-PERFORMANCE"
+  ],
+  "graphRules": {
+    "direction": "SOURCE→CLAIM/CQ/RELATION/INVARIANT/AOT-RULE→SAP-OBLIGATION→DIS-CONTRACT-CANDIDATE",
+    "directSelection": "Objects with an explicit sourceRef to changed source are directly impacted.",
+    "semanticPropagation": "For each directly impacted Claim/CQ/Relation/Invariant, qualify related SAP obligations via claimRefs/cqRefs/relationRefs/globalInvariantRefs; do not recursively traverse every relation to the whole Root.",
+    "ownership": "Impacted Element is the explicit Claim semanticOwner, CQ element or SAP obligation owner. Global owner changes require global gate review, not ownership takeover.",
+    "downstream": "Function candidate is impacted only when a listed SAP obligation dependency is impacted. Production gate stays blocked even when unrelated artifacts unaffected.",
+    "invariantRule": "Source change alone never claims SAP requalification, Product authorization or actual OS effect.",
+    "unknownSource": "Unknown source is classified UNREGISTERED_SOURCE; no automatic claims invalidated; a reviewer must adjudicate whether it is genuinely unrelated.",
+    "elementSplit": "If the Memory Element ownership changes, all its directly-owned CQ/SAP and downstream dependent Function candidates must be marked for review; unrelated Root branches need not be invalidated.",
+    "stopRule": "Stop propagation at dependency leaves; no ungrounded whole-graph invalidation or automatic promotion."
+  },
+  "reviewFixtures": [
+    {
+      "id": "EVOL-MEM-01",
+      "kind": "SOURCE_CHANGE",
+      "sourceId": "EXT-MEM-PROCESS-COUNTERS-EX2",
+      "why": "New OS-build-specific PrivateWorkingSetSize support or field semantics changed",
+      "mustInclude": {
+        "claims": [
+          "CA-CLM-025"
+        ],
+        "cqs": [
+          "CQ-CA-032"
+        ],
+        "sapObligations": [
+          "SAP-CA-MEMORY-PERFORMANCE-09"
+        ],
+        "functions": [
+          "computer.memory.observe",
+          "computer.memory.assess"
+        ]
+      },
+      "mustExclude": {
+        "claims": [
+          "CA-CLM-028"
+        ],
+        "aotRules": [
+          "MEM-AOT-001"
+        ],
+        "sapObligations": [
+          "SAP-CA-PERFORMANCE-OPTIMIZATION-05"
+        ]
+      }
+    },
+    {
+      "id": "EVOL-MEM-02",
+      "kind": "SOURCE_CHANGE",
+      "sourceId": "EXT-MEM-WPA-REFERENCE-SET",
+      "why": "Reference Set trace overhead or scenario interpretation changed",
+      "mustInclude": {
+        "claims": [
+          "CA-CLM-028"
+        ],
+        "cqs": [
+          "CQ-CA-035"
+        ],
+        "sapObligations": [
+          "SAP-CA-PERFORMANCE-OPTIMIZATION-05"
+        ],
+        "functions": [
+          "computer.memory.compare"
+        ]
+      },
+      "mustExclude": {
+        "claims": [
+          "CA-CLM-025"
+        ],
+        "aotRules": [
+          "MEM-AOT-001"
+        ],
+        "sapObligations": [
+          "SAP-CA-MEMORY-PERFORMANCE-09"
+        ]
+      }
+    },
+    {
+      "id": "EVOL-MEM-03",
+      "kind": "SOURCE_CHANGE",
+      "sourceId": "EXT-MEM-WORKING-SET",
+      "why": "Microsoft Working Set meaning revised; Reference Set methodology also cites Working Set, so its performance SAP is legitimately impacted. Shared metric-distinction invariant CA-INV-015 also reaches EX2 SAP and is a legitimate broader review obligation; do not pretend it is independent.",
+      "mustInclude": {
+        "claims": [
+          "CA-CLM-018",
+          "CA-CLM-022"
+        ],
+        "aotRules": [
+          "MEM-AOT-001",
+          "MEM-AOT-005"
+        ],
+        "sapObligations": [
+          "SAP-CA-MEMORY-PERFORMANCE-01"
+        ]
+      },
+      "mustExclude": {
+        "claims": [
+          "CA-CLM-025"
+        ],
+        "aotRules": [
+          "MEM-AOT-004"
+        ]
+      }
+    },
+    {
+      "id": "EVOL-MEM-04",
+      "kind": "SOURCE_CHANGE",
+      "sourceId": "SRC-SYSTEM-PRESSURE",
+      "why": "Original bounded collector metric identity or privacy schema changed",
+      "mustInclude": {
+        "claims": [
+          "CA-CLM-018",
+          "CA-CLM-023",
+          "CA-CLM-026",
+          "CA-CLM-029"
+        ],
+        "aotRules": [
+          "MEM-AOT-008"
+        ],
+        "cqs": [
+          "CQ-CA-029"
+        ],
+        "functions": [
+          "computer.memory.observe"
+        ]
+      },
+      "mustExclude": {
+        "claims": [
+          "CA-CLM-025",
+          "CA-CLM-028"
+        ],
+        "aotRules": [
+          "MEM-AOT-001"
+        ]
+      }
+    },
+    {
+      "id": "EVOL-MEM-05",
+      "kind": "SOURCE_CHANGE",
+      "sourceId": "EXT-MEM-PERFORMANCE-COUNTERS",
+      "why": "Counter identity/collection interval or process name instance behavior changed",
+      "mustInclude": {
+        "claims": [
+          "CA-CLM-026",
+          "CA-CLM-027"
+        ],
+        "cqs": [
+          "CQ-CA-033",
+          "CQ-CA-034"
+        ],
+        "sapObligations": [
+          "SAP-CA-MEMORY-PERFORMANCE-10",
+          "SAP-CA-MEMORY-PERFORMANCE-11"
+        ],
+        "aotRules": [
+          "MEM-AOT-004"
+        ]
+      },
+      "mustExclude": {
+        "claims": [
+          "CA-CLM-025"
+        ],
+        "aotRules": [
+          "MEM-AOT-001"
+        ]
+      }
+    },
+    {
+      "id": "EVOL-MEM-06",
+      "kind": "SOURCE_CHANGE",
+      "sourceId": "SRC-PRODUCT-FREEZE",
+      "why": "Product implementation-authority checkpoint changed",
+      "mustInclude": {
+        "claims": [
+          "CA-CLM-023"
+        ],
+        "sapObligations": [
+          "SAP-CA-PERFORMANCE-OPTIMIZATION-04"
+        ],
+        "functions": [
+          "computer.memory.plan"
+        ]
+      },
+      "mustExclude": {
+        "claims": [
+          "CA-CLM-025"
+        ],
+        "aotRules": [
+          "MEM-AOT-001"
+        ]
+      }
+    },
+    {
+      "id": "EVOL-MEM-07",
+      "kind": "UNRELATED_SOURCE_CHANGE",
+      "sourceId": "SRC-UNRELATED-THIRD-PARTY",
+      "why": "Unrelated non-register source must not silently invalidate entire memory graph",
+      "mustInclude": {},
+      "mustExclude": {
+        "claims": [
+          "CA-CLM-025",
+          "CA-CLM-028"
+        ],
+        "aotRules": [
+          "MEM-AOT-001"
+        ],
+        "functions": [
+          "computer.memory.observe",
+          "computer.memory.compare"
+        ]
+      }
+    }
+  ],
+  "independentReviewerObligations": [
+    "For changes to any original source Blob, independently verify old/new content and source applicability.",
+    "Disagreeing source or Source Owner decision may expand impact; the machine minimum is not a semantic completeness proof.",
+    "Test a new relevant source missing all reverse edges and ensure it is reported UNKNOWN, not silently treated as qualified.",
+    "Test unrelated sources and independent non-impacted Element obligations to bound false-positive invalidation.",
+    "Review each impacted SAP before allowing DIS handoff; no repair to production Function without new admission."
+  ],
+  "qualification": {
+    "impactAlgorithm": "CANDIDATE_NOT_INDEPENDENTLY_QUALIFIED",
+    "fixtures": "NOT_RUN",
+    "sapRequalification": "NOT_RUN",
+    "disImpact": "HOLD_AFFECTED_CONTRACTS",
+    "productionAot": "NOT_CREATED"
+  }
+}

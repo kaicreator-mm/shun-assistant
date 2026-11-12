@@ -1,0 +1,93 @@
+{
+  "schema": "shun.dke.memory-semantic-r2-preflight-receipt",
+  "outputLabel": "SHUN_ASSISTANT_DKE_MEMORY_R2_HOSTED_SEMANTIC_AND_IMPACT_PREFLIGHT",
+  "date": "2026-11-12",
+  "role": "AUTHOR_MECHANICAL_VALIDATION_NOT_INDEPENDENT_REVIEW",
+  "repo": "kaicreator-mm/shun-assistant",
+  "mainIssue": 411,
+  "pr": 416,
+  "branch": "dke/memory-performance-demo-r0",
+  "status": "PASS_HOSTED_V8_CORE_REFERENCE_CHECK_NOT_NODE_CLI",
+  "sourceGitBlobs": {
+    "delta": {
+      "path": "docs/dke/demos/memory-performance-r0/dke-semantic/SOURCE_FIRST_KNOWLEDGE_DELTA_R2.json",
+      "blob": "fddd2d9cbe9a342683eefdcabe2277dac012568c"
+    },
+    "oracles": {
+      "path": "docs/dke/demos/memory-performance-r0/dke-semantic/SEMANTIC_ORACLES_R2.json",
+      "blob": "7097a1891589b6970ecd99bf00d71ec3b36bcf1c"
+    },
+    "evolution": {
+      "path": "docs/dke/demos/memory-performance-r0/dke-semantic/EVOLUTION_IMPACT_R2.json",
+      "blob": "7ba8bfddc6ef43c938028a1911af56dd8e838b24"
+    },
+    "handoff": {
+      "path": "docs/dke/demos/memory-performance-r0/dke-semantic/DKE_TO_DIS_HANDOFF_R2.json",
+      "blob": "ac6e9965a4060885367dcc7b0ec16767d89c46c6"
+    },
+    "evaluator": {
+      "path": "docs/dke/demos/memory-performance-r0/dke-semantic/memory-dke-evaluator-r2.mjs",
+      "blob": "5af72e9df4f74d91e8b25904de270ae15b4a0f2f"
+    },
+    "validator": {
+      "path": "docs/dke/demos/memory-performance-r0/dke-semantic/verify-memory-dke-r2.mjs",
+      "blob": "b6f412119c013da3bd360cc755769343c94e5b08"
+    },
+    "tests": {
+      "path": "docs/dke/demos/memory-performance-r0/dke-semantic/verify-memory-dke-r2.test.mjs",
+      "blob": "3ed360e52a9d6b7b3a364acfa005cc431766d8c8"
+    },
+    "readme": {
+      "path": "docs/dke/demos/memory-performance-r0/dke-semantic/README.md",
+      "blob": "38ae2cdcfc2db27475f4484a7706f24be8310da0"
+    },
+    "roadmap": {
+      "path": "docs/dke/implementation/PERFORMANCE_KNOWLEDGE_EXPANSION_R2.json",
+      "blob": "91ee9f4976439ff8c65e57fae0bc1bbb20f0bb25"
+    }
+  },
+  "upstreamExactSourceLocks": {
+    "knowledge": "c877ec23dc59b0ae17681c7d8f7505b1521c8011",
+    "demand": "74c10245e88608d12ae716bd2bae1623a2f55dc5",
+    "extension": "8d0c1c0e732cb7e9183ca830a0384798946b43a6",
+    "aot": "e5bf93668066be5c76148c1a4cbdd930dcf55c29"
+  },
+  "coverage": {
+    "sourceFirstNewClaims": 5,
+    "newCompetencyQuestions": 5,
+    "newSapObligations": 5,
+    "totalCqScenarios": 16,
+    "oracleTriplets": 48,
+    "sourceChangeScenarios": 7,
+    "futurePerformanceTopics": 7
+  },
+  "checks": {
+    "16 CQ triad semantics": "PASS_HOSTED_V8_REFERENCE_48_OF_48",
+    "7 source-change reverse-impact challenge cases": "PASS_HOSTED_V8_REFERENCE_7_OF_7",
+    "8 exact frozen Git Blob source locks": "PASS_GITHUB_FETCH_READBACK_8_OF_8",
+    "candidate qualification remains blocked": "PASS",
+    "tampered handoff gate marked QUALIFIED": "REJECTED_PIN_AND_HANDOFF_STATUS",
+    "false Working Set exclusion caused by global invariant": "REPAIRED_AND_RECHECKED",
+    "exact repo Node CLI R2 validator": "NOT_RUN",
+    "exact repo Node CLI R2 tests": "NOT_RUN",
+    "new Windows EX2/Reference-Set counter/oracle": "NOT_RUN",
+    "independent Source-First semantic review": "NOT_RUN"
+  },
+  "limitations": [
+    "Hosted V8 executed the pure verifier and evaluator core with GitHub-reported Git Blob identities as its hash oracle; it did not execute the full Node CLI or its file I/O.",
+    "Deterministic fixture consistency is not evidence that Microsoft semantics are independently qualified.",
+    "Microsoft Learn locators are source URLs, not frozen text revisions or native applicability proofs.",
+    "R0 Windows read-only receipt at earlier HEAD is not evidence of R2 private Working Set, reference set or trusted sampledAt support.",
+    "R0 independent Reviewer P1 AOT trace defect and P2 metric-label/timestamp defects remain separate review/repair gates.",
+    "No Product implementation authorization, production DIS Function/ECP or AOT Package is granted."
+  ],
+  "qualification": {
+    "knowledgeGateA": "BLOCKED_INDEPENDENT_REVIEW",
+    "disGateB": "BLOCKED_GATE_A_AND_PRODUCT",
+    "qualifiedSap": 0,
+    "disProductionFunctions": 0,
+    "aotProductionPackages": 0,
+    "optimizationEffects": 0
+  },
+  "next": "Execute exact-HEAD Node mechanical tests; independent Source-First Reviewer validates Microsoft applicability, 16 CQ triads, seven reverse impacts, Owner boundaries and handoff; repair confirmed defects and re-review new SHA."
+}

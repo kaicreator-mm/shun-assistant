@@ -1,0 +1,359 @@
+{
+  "schema": "shun.dke.memory-semantic-qualification-extension.r2",
+  "outputLabel": "SHUN_ASSISTANT_DKE_MEMORY_SEMANTIC_QUALIFICATION_R2",
+  "status": "SOURCE_LINKED_AUTHOR_CANDIDATE",
+  "projectMainIssue": 411,
+  "knowledgePr": 414,
+  "demandPr": 415,
+  "demoPr": 416,
+  "baseHead": "3a29954c88178d5ba872f871e0e30aed127c8f03",
+  "parentElement": "CA-PERFORMANCE-OPTIMIZATION",
+  "childElement": "CA-MEMORY-PERFORMANCE",
+  "sourceObservation": "Existing v0.3 source and Windows Native R0 receipt have been checked; this R2 knowledge delta does not claim new native collectors or performance effect.",
+  "sources": [
+    {
+      "id": "EXT-MEM-PROCESS-COUNTERS-EX2",
+      "title": "PROCESS_MEMORY_COUNTERS_EX2 structure",
+      "url": "https://learn.microsoft.com/en-us/windows/win32/api/psapi/ns-psapi-process_memory_counters_ex2",
+      "claimScope": "PrivateWorkingSetSize and SharedCommitUsage fields have specific OS update prerequisites; not universally available on all Windows builds.",
+      "applicability": "Windows 10 22H2 or Windows 11 22H2 with the specified September 2023 cumulative update or later; verify target build and actual API/SDK availability.",
+      "status": "OFFICIAL_URL_LOCATOR_NOT_IMMUTABLE_GIT_BLOB"
+    },
+    {
+      "id": "EXT-MEM-WPA-REFERENCE-SET",
+      "title": "Reference sets and system-wide effects on memory use",
+      "url": "https://learn.microsoft.com/en-us/windows-hardware/test/wpt/wpa-reference-set",
+      "claimScope": "Scenario-bound reference set captures memory touch behavior beyond a single process Working Set; capture may noticeably disturb memory and system performance.",
+      "applicability": "WPR/WPA scenario collection, not passive single-snapshot monitoring. Native trace collection requires separate consent/cost and trustworthy scenario fixture.",
+      "status": "OFFICIAL_URL_LOCATOR_NOT_IMMUTABLE_GIT_BLOB"
+    }
+  ],
+  "claims": [
+    {
+      "id": "CA-CLM-025",
+      "owner": "CA-MEMORY-PERFORMANCE",
+      "statement": "PROCESS_MEMORY_COUNTERS_EX2 exposes PrivateWorkingSetSize distinct from PrivateUsage, but is available only on documented eligible Windows builds/updates; missing support cannot be filled from WorkingSet64.",
+      "sources": [
+        "EXT-MEM-PROCESS-COUNTERS-EX2",
+        "EXT-MEM-PROCESS-COUNTERS-EX",
+        "EXT-MEM-PERFORMANCE-INFO"
+      ],
+      "cq": "CQ-CA-032",
+      "sap": "SAP-CA-MEMORY-PERFORMANCE-09",
+      "positive": "Exact supported OS/build plus API field present and separately labeled",
+      "negative": "Infer PrivateWorkingSetSize=WorkingSetSize on unsupported target",
+      "unknown": "Build/update/API unknown => UNAVAILABLE / UNKNOWN, never estimated",
+      "epistemic": "SUPPORTED_PLATFORM_SEMANTICS_NOT_SHUN_IMPLEMENTATION"
+    },
+    {
+      "id": "CA-CLM-026",
+      "owner": "CA-MEMORY-PERFORMANCE",
+      "statement": "Performance counters are diagnostic rather than high-frequency profiling tools; process counter instance names can be non-unique, so name-only longitudinal matching cannot establish process identity.",
+      "sources": [
+        "EXT-MEM-PERFORMANCE-COUNTERS",
+        "SRC-SYSTEM-PRESSURE"
+      ],
+      "cq": "CQ-CA-033",
+      "sap": "SAP-CA-MEMORY-PERFORMANCE-10",
+      "positive": "Sampling at a supported diagnostic cadence with a stable independent process instance key",
+      "negative": "Poll performance counter more than once per second or equate two same-name processes",
+      "unknown": "Sampling timestamps, instance identity or counter support absent => do not label a leak trend",
+      "epistemic": "SUPPORTED_PLATFORM_SEMANTICS_NOT_NATIVE_PROOF"
+    },
+    {
+      "id": "CA-CLM-027",
+      "owner": "CA-MEMORY-PERFORMANCE",
+      "statement": "PROCESS_MEMORY_COUNTERS_EX.PageFaultCount is cumulative, not a hard-page-faults-per-second counter; distinguishing soft/hard faults requires the appropriate separate event/counter and time interval.",
+      "sources": [
+        "EXT-MEM-PROCESS-COUNTERS-EX",
+        "EXT-MEM-WORKING-SET",
+        "EXT-MEM-PERFORMANCE-COUNTERS"
+      ],
+      "cq": "CQ-CA-034",
+      "sap": "SAP-CA-MEMORY-PERFORMANCE-11",
+      "positive": "Cumulative fault count is reported as cumulative; hard-fault rate only when independently measured",
+      "negative": "Report PageFaultCount=1200 as 1200 hard faults per second",
+      "unknown": "Missing interval or separate hard-page-fault counter => rate UNKNOWN",
+      "epistemic": "SUPPORTED_PLATFORM_SEMANTICS_NOT_SHUN_CAPTURE"
+    },
+    {
+      "id": "CA-CLM-028",
+      "owner": "CA-PERFORMANCE-OPTIMIZATION",
+      "statement": "Windows Performance Analyzer reference sets represent memory touched during a specified workload scenario and account for system-wide effects that a single per-process Working Set omits; WPR capture can itself perturb performance and requires separate authorization.",
+      "sources": [
+        "EXT-MEM-WPA-REFERENCE-SET",
+        "EXT-MEM-WORKING-SET",
+        "EXT-MEM-PERFORMANCE-COUNTERS"
+      ],
+      "cq": "CQ-CA-035",
+      "sap": "SAP-CA-PERFORMANCE-OPTIMIZATION-05",
+      "positive": "Reference-set results attributed to exact consented workload with explicit instrumentation cost",
+      "negative": "Treat reference set as instant RAM usage or run intrusive WPR tracing without consent",
+      "unknown": "No comparable scenario/trace/consent => skip trace and return UNKNOWN",
+      "epistemic": "SUPPORTED_DOCUMENTED_METHOD_NOT_CURRENT_SHUN_CAPABILITY"
+    },
+    {
+      "id": "CA-CLM-029",
+      "owner": "CA-GLOBAL-CURRENTNESS",
+      "statement": "Data processing time and trusted Host sample-capture time are separate facts; an author supplied analyzedAt or JSON observedAt is not provenance proving when an OS memory sample was taken.",
+      "sources": [
+        "SRC-SYSTEM-PRESSURE",
+        "SRC-SYSTEM-DIAGNOSTICS",
+        "EXT-MEM-PERFORMANCE-COUNTERS"
+      ],
+      "cq": "CQ-CA-036",
+      "sap": "SAP-CA-GLOBAL-CURRENTNESS-MEMORY-R2-01",
+      "positive": "analyzedAt is runtime processing time, sampledAt is separately attested by Host with exact source identity",
+      "negative": "Reflect caller-chosen observedAt as verified collector timestamp",
+      "unknown": "No Host-issued capture timestamp => sampledAt UNKNOWN",
+      "epistemic": "SOURCE_AND_TRUST_BOUNDARY_REQUIREMENT"
+    }
+  ],
+  "competencyQuestions": [
+    {
+      "id": "CQ-CA-032",
+      "element": "CA-MEMORY-PERFORMANCE",
+      "question": "Can the assistant distinguish PrivateWorkingSetSize from PrivateUsage and enforce PROCESS_MEMORY_COUNTERS_EX2 OS/build applicability?",
+      "positive": "Exact supported OS/build plus API field present and separately labeled",
+      "negative": "Infer PrivateWorkingSetSize=WorkingSetSize on unsupported target",
+      "unknown": "Build/update/API unknown => UNAVAILABLE / UNKNOWN, never estimated",
+      "status": "OPEN",
+      "sourceRefs": [
+        "EXT-MEM-PROCESS-COUNTERS-EX2",
+        "EXT-MEM-PROCESS-COUNTERS-EX",
+        "EXT-MEM-PERFORMANCE-INFO"
+      ],
+      "validationState": "NOT_RUN",
+      "oracleId": "ORACLE-MEM-R2-01"
+    },
+    {
+      "id": "CQ-CA-033",
+      "element": "CA-MEMORY-PERFORMANCE",
+      "question": "Can sampling cadence and non-unique process instance names be handled without inventing a longitudinal identity?",
+      "positive": "Sampling at a supported diagnostic cadence with a stable independent process instance key",
+      "negative": "Poll performance counter more than once per second or equate two same-name processes",
+      "unknown": "Sampling timestamps, instance identity or counter support absent => do not label a leak trend",
+      "status": "OPEN",
+      "sourceRefs": [
+        "EXT-MEM-PERFORMANCE-COUNTERS",
+        "SRC-SYSTEM-PRESSURE"
+      ],
+      "validationState": "NOT_RUN",
+      "oracleId": "ORACLE-MEM-R2-02"
+    },
+    {
+      "id": "CQ-CA-034",
+      "element": "CA-MEMORY-PERFORMANCE",
+      "question": "Can cumulative PageFaultCount be kept separate from hard-fault rate?",
+      "positive": "Cumulative fault count is reported as cumulative; hard-fault rate only when independently measured",
+      "negative": "Report PageFaultCount=1200 as 1200 hard faults per second",
+      "unknown": "Missing interval or separate hard-page-fault counter => rate UNKNOWN",
+      "status": "OPEN",
+      "sourceRefs": [
+        "EXT-MEM-PROCESS-COUNTERS-EX",
+        "EXT-MEM-WORKING-SET",
+        "EXT-MEM-PERFORMANCE-COUNTERS"
+      ],
+      "validationState": "NOT_RUN",
+      "oracleId": "ORACLE-MEM-R2-03"
+    },
+    {
+      "id": "CQ-CA-035",
+      "element": "CA-PERFORMANCE-OPTIMIZATION",
+      "question": "Can a scenario-based Reference Set be distinguished from instantaneous Working Set and its trace overhead/authorization be disclosed?",
+      "positive": "Reference-set results attributed to exact consented workload with explicit instrumentation cost",
+      "negative": "Treat reference set as instant RAM usage or run intrusive WPR tracing without consent",
+      "unknown": "No comparable scenario/trace/consent => skip trace and return UNKNOWN",
+      "status": "OPEN",
+      "sourceRefs": [
+        "EXT-MEM-WPA-REFERENCE-SET",
+        "EXT-MEM-WORKING-SET",
+        "EXT-MEM-PERFORMANCE-COUNTERS"
+      ],
+      "validationState": "NOT_RUN",
+      "oracleId": "ORACLE-MEM-R2-04"
+    },
+    {
+      "id": "CQ-CA-036",
+      "element": "CA-GLOBAL-CURRENTNESS",
+      "question": "Can host sampledAt be separated from analyzedAt and caller-provided metadata?",
+      "positive": "analyzedAt is runtime processing time, sampledAt is separately attested by Host with exact source identity",
+      "negative": "Reflect caller-chosen observedAt as verified collector timestamp",
+      "unknown": "No Host-issued capture timestamp => sampledAt UNKNOWN",
+      "status": "OPEN",
+      "sourceRefs": [
+        "SRC-SYSTEM-PRESSURE",
+        "SRC-SYSTEM-DIAGNOSTICS",
+        "EXT-MEM-PERFORMANCE-COUNTERS"
+      ],
+      "validationState": "NOT_RUN",
+      "oracleId": "ORACLE-MEM-R2-05"
+    }
+  ],
+  "sapObligations": [
+    {
+      "id": "SAP-CA-MEMORY-PERFORMANCE-09",
+      "owner": "CA-MEMORY-PERFORMANCE",
+      "profileId": "SAP-CA-MEMORY-PERFORMANCE",
+      "claimRefs": [
+        "CA-CLM-025"
+      ],
+      "cqRefs": [
+        "CQ-CA-032"
+      ],
+      "sourceRefs": [
+        "EXT-MEM-PROCESS-COUNTERS-EX2",
+        "EXT-MEM-PROCESS-COUNTERS-EX",
+        "EXT-MEM-PERFORMANCE-INFO"
+      ],
+      "globalInvariantRefs": [
+        "CA-INV-015",
+        "CA-INV-019"
+      ],
+      "positive": "Exact supported OS/build plus API field present and separately labeled",
+      "negative": "Infer PrivateWorkingSetSize=WorkingSetSize on unsupported target",
+      "unknown": "Build/update/API unknown => UNAVAILABLE / UNKNOWN, never estimated",
+      "oracle": "SOURCE_FIRST_PLUS_DETERMINISTIC_FIXTURE_PLUS_WINDOWS_APPLICABILITY_OR_NATIVE",
+      "qualification": "NOT_QUALIFIED",
+      "validationState": "NOT_RUN",
+      "evidenceRefs": []
+    },
+    {
+      "id": "SAP-CA-MEMORY-PERFORMANCE-10",
+      "owner": "CA-MEMORY-PERFORMANCE",
+      "profileId": "SAP-CA-MEMORY-PERFORMANCE",
+      "claimRefs": [
+        "CA-CLM-026"
+      ],
+      "cqRefs": [
+        "CQ-CA-033"
+      ],
+      "sourceRefs": [
+        "EXT-MEM-PERFORMANCE-COUNTERS",
+        "SRC-SYSTEM-PRESSURE"
+      ],
+      "globalInvariantRefs": [
+        "CA-INV-015",
+        "CA-INV-019"
+      ],
+      "positive": "Sampling at a supported diagnostic cadence with a stable independent process instance key",
+      "negative": "Poll performance counter more than once per second or equate two same-name processes",
+      "unknown": "Sampling timestamps, instance identity or counter support absent => do not label a leak trend",
+      "oracle": "SOURCE_FIRST_PLUS_DETERMINISTIC_FIXTURE_PLUS_WINDOWS_APPLICABILITY_OR_NATIVE",
+      "qualification": "NOT_QUALIFIED",
+      "validationState": "NOT_RUN",
+      "evidenceRefs": []
+    },
+    {
+      "id": "SAP-CA-MEMORY-PERFORMANCE-11",
+      "owner": "CA-MEMORY-PERFORMANCE",
+      "profileId": "SAP-CA-MEMORY-PERFORMANCE",
+      "claimRefs": [
+        "CA-CLM-027"
+      ],
+      "cqRefs": [
+        "CQ-CA-034"
+      ],
+      "sourceRefs": [
+        "EXT-MEM-PROCESS-COUNTERS-EX",
+        "EXT-MEM-WORKING-SET",
+        "EXT-MEM-PERFORMANCE-COUNTERS"
+      ],
+      "globalInvariantRefs": [
+        "CA-INV-015",
+        "CA-INV-019"
+      ],
+      "positive": "Cumulative fault count is reported as cumulative; hard-fault rate only when independently measured",
+      "negative": "Report PageFaultCount=1200 as 1200 hard faults per second",
+      "unknown": "Missing interval or separate hard-page-fault counter => rate UNKNOWN",
+      "oracle": "SOURCE_FIRST_PLUS_DETERMINISTIC_FIXTURE_PLUS_WINDOWS_APPLICABILITY_OR_NATIVE",
+      "qualification": "NOT_QUALIFIED",
+      "validationState": "NOT_RUN",
+      "evidenceRefs": []
+    },
+    {
+      "id": "SAP-CA-PERFORMANCE-OPTIMIZATION-05",
+      "owner": "CA-PERFORMANCE-OPTIMIZATION",
+      "profileId": "SAP-CA-PERFORMANCE-OPTIMIZATION",
+      "claimRefs": [
+        "CA-CLM-028"
+      ],
+      "cqRefs": [
+        "CQ-CA-035"
+      ],
+      "sourceRefs": [
+        "EXT-MEM-WPA-REFERENCE-SET",
+        "EXT-MEM-WORKING-SET",
+        "EXT-MEM-PERFORMANCE-COUNTERS"
+      ],
+      "globalInvariantRefs": [
+        "CA-INV-014",
+        "CA-INV-018"
+      ],
+      "positive": "Reference-set results attributed to exact consented workload with explicit instrumentation cost",
+      "negative": "Treat reference set as instant RAM usage or run intrusive WPR tracing without consent",
+      "unknown": "No comparable scenario/trace/consent => skip trace and return UNKNOWN",
+      "oracle": "SOURCE_FIRST_PLUS_DETERMINISTIC_FIXTURE_PLUS_WORKLOAD_COST_NATIVE",
+      "qualification": "NOT_QUALIFIED",
+      "validationState": "NOT_RUN",
+      "evidenceRefs": []
+    },
+    {
+      "id": "SAP-CA-GLOBAL-CURRENTNESS-MEMORY-R2-01",
+      "owner": "CA-GLOBAL-CURRENTNESS",
+      "profileId": "SAP-CA-GLOBAL-CURRENTNESS",
+      "claimRefs": [
+        "CA-CLM-029"
+      ],
+      "cqRefs": [
+        "CQ-CA-036"
+      ],
+      "sourceRefs": [
+        "SRC-SYSTEM-PRESSURE",
+        "SRC-SYSTEM-DIAGNOSTICS",
+        "EXT-MEM-PERFORMANCE-COUNTERS"
+      ],
+      "globalInvariantRefs": [
+        "CA-INV-015",
+        "CA-INV-019"
+      ],
+      "positive": "analyzedAt is runtime processing time, sampledAt is separately attested by Host with exact source identity",
+      "negative": "Reflect caller-chosen observedAt as verified collector timestamp",
+      "unknown": "No Host-issued capture timestamp => sampledAt UNKNOWN",
+      "oracle": "SOURCE_FIRST_PLUS_DETERMINISTIC_FIXTURE_PLUS_WINDOWS_APPLICABILITY_OR_NATIVE",
+      "qualification": "NOT_QUALIFIED",
+      "validationState": "NOT_RUN",
+      "evidenceRefs": []
+    }
+  ],
+  "semantics": {
+    "ownership": "Memory metric and sampling semantics belong to CA-MEMORY-PERFORMANCE; workload/reference-set methodology belongs to CA-PERFORMANCE-OPTIMIZATION; sample-time authority belongs to CA-GLOBAL-CURRENTNESS.",
+    "stopRule": "Do not introduce a new Element for each metric. Split a new Element only when it has distinct semantic ownership, separate contract/CQ/SAP oracle and a defensible evolution boundary.",
+    "globalDependencies": [
+      "CA-GLOBAL-PROVENANCE",
+      "CA-GLOBAL-VERIFICATION",
+      "CA-GLOBAL-AUTHORITY",
+      "CA-GLOBAL-PRIVACY",
+      "CA-GLOBAL-CURRENTNESS"
+    ],
+    "invalidation": "Source/Claim/CQ/SAP changes invalidate only intersecting dependent obligations, affected rules and downstream consumer gate; no indiscriminate whole-root qualification change.",
+    "sourceRevision": "Microsoft Learn official locator currentness is not an immutable snapshot; independent reviewer must verify referenced official content."
+  },
+  "counts": {
+    "newExternalSources": 2,
+    "newClaims": 5,
+    "newCqs": 5,
+    "newSapObligations": 5
+  },
+  "qualification": {
+    "g1": "SOURCE_PINS_CANDIDATE",
+    "g2": "REQUIRES_INDEPENDENT_SEMANTIC_REVIEW",
+    "g3": "OWNERSHIP_CANDIDATE",
+    "g4": "DETERMINISTIC_FIXTURES_NOT_YET_EXECUTED",
+    "g5": "NOT_QUALIFIED",
+    "nativeWindowsCounterOracle": "NOT_RUN_FOR_NEW_METRICS",
+    "productAdmission": "NOT_GRANTED",
+    "disHandoff": "BLOCKED_PENDING_INDEPENDENT_SAP",
+    "productionAot": "NOT_CREATED"
+  }
+}
