@@ -24,6 +24,7 @@ test('original immutable R0 AOT candidate decision rules are really evaluated by
   assert.equal(result.outcome, 'ADVISORY_ONLY');
   assert.equal(result.sourceGitBlob, REVIEWED_AOT_GIT_BLOB);
   assert.equal(result.researchDecisionRuleConsumption, 'EXECUTED_IN_RESEARCH_RUNTIME_ONLY');
+  assert.equal(result.consumption, 'RESEARCH_DECISION_RULES_EVALUATED_NOT_PRODUCTION_AOT');
   assert.equal(result.decisionRulesEvaluated.length, 6);
   assert.deepEqual(result.matchedDecisionRuleIds,
     ['MEM-DEC-001','MEM-DEC-003','MEM-DEC-004','MEM-DEC-006']);
@@ -45,6 +46,7 @@ test('tampered candidate source bytes fail closed before rule execution', () => 
   const result = consumePinnedResearchAot(changed, report());
   assert.equal(result.outcome, 'UNKNOWN');
   assert.equal(result.code, 'AOT_SOURCE_BLOB_MISMATCH');
+  assert.equal(result.consumption, 'NO_RESEARCH_RULES_EVALUATED_UNKNOWN');
   assert.deepEqual(result.decisionRulesEvaluated, []);
 });
 test('untrusted report cannot manufacture a pinned AOT execution proof', () => {

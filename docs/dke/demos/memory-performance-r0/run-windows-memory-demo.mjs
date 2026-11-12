@@ -2,7 +2,7 @@
 import { readFile } from 'node:fs/promises';
 import { analyzeMemoryObservation } from './memory-analysis.mjs';
 import { validateMemoryAotCandidate } from './memory-aot-integrity.mjs';
-import { consumePinnedResearchAot, researchAotConsumptionLabel } from './memory-aot-research-consumer-r9.mjs';
+import { consumePinnedResearchAot } from './memory-aot-research-consumer-r9.mjs';
 
 const args = process.argv.slice(2);
 const includeLocalProcessNames = args.includes('--show-local-process-names');
@@ -49,7 +49,7 @@ if (args.some((x) => x !== '--show-local-process-names')) {
         integrity: aotIntegrity.integrity,
         sourceRulesApplied: [],
         researchDecisionRuleIdsMatched: researchDecisionEvaluation.matchedDecisionRuleIds,
-        consumption: researchAotConsumptionLabel(researchDecisionEvaluation),
+        consumption: researchDecisionEvaluation.consumption,
       },
       disPipeline: contract.pipeline.pipelineId,
       researchAotDecisionEvaluation: researchDecisionEvaluation,

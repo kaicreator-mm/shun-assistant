@@ -4,7 +4,8 @@ const RULE_IDS=Object.freeze(Array.from({length:6},(_,i)=>'MEM-DEC-'+String(i+1)
 function unknown(code){return {schema:'shun.demo.memory-aot-research-consumption.r9',outcome:'UNKNOWN',code,
  decisionRulesEvaluated:[],matchedDecisionRuleIds:[],sourceRulesApplied:[],effectsAuthorized:false,
  productionAotExecuted:false,disFunctionInvoked:false,hostProvenance:'NOT_ESTABLISHED_BY_RESEARCH_CONSUMER',
- sapQualification:'NOT_QUALIFIED',externalDisclosures:[]};}
+ sapQualification:'NOT_QUALIFIED',externalDisclosures:[],
+ consumption:'NO_RESEARCH_RULES_EVALUATED_UNKNOWN'};}
 function safe(report){return report?.schema==='shun.demo.memory-performance-report.v0' &&
  report.outcome==='OBSERVED_ONLY' && report.privacy?.localOnly===true &&
  Array.isArray(report.privacy.externalDisclosures)&&report.privacy.externalDisclosures.length===0&&
@@ -38,12 +39,8 @@ export function consumePinnedResearchAot(rawCandidate,report,options={}){
  const r=evaluateResearchRulePredicates(candidate.decisionRules,report,options);
  if(r.outcome!=='ADVISORY_ONLY')return r;
  return {...r,source:'EXACT_PINNED_AOT_CANDIDATE_DECISION_RULES',sourceGitBlob:proof.gitBlob,
- researchDecisionRuleConsumption:'EXECUTED_IN_RESEARCH_RUNTIME_ONLY'};}
+ researchDecisionRuleConsumption:'EXECUTED_IN_RESEARCH_RUNTIME_ONLY',
+ consumption:'RESEARCH_DECISION_RULES_EVALUATED_NOT_PRODUCTION_AOT'};}
 
-// UNKNOWN reports (or unpinned predicate-only tests) cannot claim that rules ran.
-export function researchAotConsumptionLabel(evaluation) {
- return evaluation?.outcome==='ADVISORY_ONLY' &&
-   evaluation.researchDecisionRuleConsumption==='EXECUTED_IN_RESEARCH_RUNTIME_ONLY'
-   ? 'RESEARCH_DECISION_RULES_EVALUATED_NOT_PRODUCTION_AOT'
-   : 'NO_RESEARCH_RULES_EVALUATED_UNKNOWN';
-}
+// Proof labels are issued only INSIDE the exact-Git-Blob pinned consumer.
+// No exported label function accepts an arbitrary caller-shaped receipt.

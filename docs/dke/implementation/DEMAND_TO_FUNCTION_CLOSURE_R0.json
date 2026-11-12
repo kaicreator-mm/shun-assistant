@@ -7,9 +7,9 @@
   "mainIssue": "https://github.com/kaicreator-mm/shun-assistant/issues/411",
   "evidenceBase": {
     "knowledgePr": "#414",
-    "candidateHead": "22a929ce1fbb5cdb5b2819cd3e98e71bbf21085a",
+    "candidateHead": "d6df57422b8a329e8fcfbad1146c86740978db70",
     "candidateFile": "docs/dke/implementation/COMPUTER_ASSISTANT_KNOWLEDGE_R0.json",
-    "candidateBlob": "c877ec23dc59b0ae17681c7d8f7505b1521c8011",
+    "candidateBlob": "da8425d82f3725c10bce92d206bbb8adfd6e7169",
     "productFreeze": {
       "path": "docs/product/PRODUCT_FREEZE-v0.3.md",
       "commit": "1224fea4097799467e2c0c454885e680f1f28248",
@@ -26,6 +26,16 @@
       "reviewedPreRepairHead": "a18374a18c920d4975e09be649d0a98e5dc87b32",
       "knowledgeJsonBlob": "c877ec23dc59b0ae17681c7d8f7505b1521c8011",
       "downstreamResyncRequired": false
+    },
+    "sourceRepairR13": {
+      "status": "SOURCE_PIN_UPDATED_AUTHOR_CHECK__INDEPENDENT_REVIEW_PENDING",
+      "issue": "#411",
+      "sourcePr": 414,
+      "sourceHead": "d6df57422b8a329e8fcfbad1146c86740978db70",
+      "knowledgeJsonBlob": "da8425d82f3725c10bce92d206bbb8adfd6e7169",
+      "sourceScope": "Only CA-NETWORK profile and three SAP sourceRefs narrowed to original Product policy sources, unrelated disk/WinGet/PnP refs removed; technical Network CQ remains UNSOURCED and SAP NOT_QUALIFIED",
+      "oldKnowledgeBlob": "c877ec23dc59b0ae17681c7d8f7505b1521c8011",
+      "originalProductAndHostUnchanged": true
     }
   },
   "governance": {

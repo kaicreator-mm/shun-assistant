@@ -41,10 +41,16 @@ test('unverified AOT raw data can never issue an execution receipt',()=>{
  const r=consumePinnedResearchAot('{',report());assert.equal(r.outcome,'UNKNOWN');
  assert.equal(r.productionAotExecuted,false);assert.equal(r.disFunctionInvoked,false);
  assert.deepEqual(r.decisionRulesEvaluated,[]);});
-test('report label refuses rule execution on unknown or unpinned predicates',async()=>{
- const {researchAotConsumptionLabel}=await import('./memory-aot-research-consumer-r9.mjs');
- assert.equal(researchAotConsumptionLabel({outcome:'UNKNOWN'}),'NO_RESEARCH_RULES_EVALUATED_UNKNOWN');
- assert.equal(researchAotConsumptionLabel({outcome:'ADVISORY_ONLY'}),'NO_RESEARCH_RULES_EVALUATED_UNKNOWN');
- assert.equal(researchAotConsumptionLabel({outcome:'ADVISORY_ONLY',researchDecisionRuleConsumption:'EXECUTED_IN_RESEARCH_RUNTIME_ONLY'}),
-  'RESEARCH_DECISION_RULES_EVALUATED_NOT_PRODUCTION_AOT');
+test('execution provenance label cannot be minted by caller-shaped or unpinned predicate results',async()=>{
+ const module=await import('./memory-aot-research-consumer-r9.mjs');
+ assert.equal('researchAotConsumptionLabel' in module,false);
+ const forged={outcome:'ADVISORY_ONLY',researchDecisionRuleConsumption:'EXECUTED_IN_RESEARCH_RUNTIME_ONLY'};
+ assert.equal(forged.consumption,undefined);
+ const unpinned=evaluateResearchRulePredicates(rules,report());
+ assert.equal(unpinned.outcome,'ADVISORY_ONLY');
+ assert.equal(unpinned.consumption,undefined);
+ assert.equal(unpinned.source,'UNVERIFIED_PREDICATE_TEST_UNTIL_PINNED_WRAPPER');
+ const unknown=consumePinnedResearchAot('{}',report());
+ assert.equal(unknown.outcome,'UNKNOWN');
+ assert.equal(unknown.consumption,'NO_RESEARCH_RULES_EVALUATED_UNKNOWN');
 });
