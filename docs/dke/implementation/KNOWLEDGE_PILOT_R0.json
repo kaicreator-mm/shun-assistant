@@ -1,0 +1,176 @@
+{
+  "schema": "devkit/dke-project-knowledge-pilot-r0",
+  "as_of": "2026-11-11",
+  "project": "shun-assistant",
+  "authority_issue": "https://github.com/kaicreator-mm/devkit/issues/7",
+  "method_owner": "https://github.com/kaicreator-mm/domain-forge/issues/209",
+  "preparation": {
+    "pr": "https://github.com/kaicreator-mm/shun-assistant/pull/410",
+    "head": "e87cf42f40ba967823434dcff63fc83904df279a",
+    "packet_blob": "bad88baab750cceb6d11b34ff94be79a6a97e2f8",
+    "matrix_blob": "f6c58534d87bc12c841cfd6366599479df266641",
+    "handoff_blob": "90f92e381eb16ca98a24de61ef7650f7a82c19de",
+    "formal_g5": "NOT_ACCEPTED"
+  },
+  "classification": "BOUNDED_SOURCE_FIRST_WINDOWS_GUIDED_TRUST_32_NATIVE_SCOPED_PASS_SID_HOST_EFFECT_UNKNOWN",
+  "source_provenance": {
+    "original_revision": "5bb4e4b27e319d0104406c3389f8b8e6149b7f0b",
+    "read_sources": [
+      {
+        "path": "docs/product/PRODUCT_FREEZE-v0.3.md",
+        "blob": "0f8a67c2f06364d58a842502d3dee11bfeeedba4",
+        "role": "PRODUCT_L1_FROZEN_ONLY"
+      },
+      {
+        "path": "apps/control-api/src/main.ts",
+        "blob": "b27e32917eccafb1433c0971b2b3413fd74f1be5",
+        "role": "ACTIVE_SCOPED_ENTRYPOINT"
+      },
+      {
+        "path": "apps/control-api/test/guided-localappdata-bootstrap.test.ts",
+        "blob": "3bbb7ed84dbb75d46490c89e88ca9b1b37737ba6",
+        "role": "TEST_DEFINITION_NOT_RUN"
+      }
+    ]
+  },
+  "scope": {
+    "included": "v0.3 Windows production entry modes, per-user Guided trust bootstrap, Goal/Permit/Host receipt claim boundary",
+    "excluded": "full Windows actual-effect proof, independent SID/UAC identity and ACL validation on physical hosts, full SDK/Kernel correctness, cloud model financial/security approval"
+  },
+  "claim_assessments": [
+    {
+      "id": "SH01",
+      "status": "GAP_EFFECT_RECEIPT_NOT_PROVEN_BY_BOOTSTRAP_TEST",
+      "kind": "PRODUCT_POLICY_VS_IMPLEMENTATION",
+      "statement": "Product freeze requires authorized Goal→Permit→Windows Host actual effect→truthful receipt. Control API wires production gateway and selected-root recheck only under explicit Host configuration; bootstrap test defines per-user trust but does not execute actual effect/Kernel permit/receipt chain.",
+      "negative": "Mock/demo success, staged case or bootstrap PASS is represented as real Windows file effect without actual Host receipt.",
+      "needed": [
+        "Trace exact production submit path, Kernel permit and Host effect receipt sources",
+        "Run native negative unpermitted effect and post-effect receipt tests on pinned HEAD"
+      ]
+    },
+    {
+      "id": "SH02",
+      "status": "FIRST_PARTY_SCOPED_TRUST_BOOTSTRAP",
+      "kind": "IMPLEMENTATION_POLICY",
+      "statement": "main.ts selects demo vs real-storage via operator environment; Guided DB requires real-storage, and missing per-interactive-user trust aborts with GUIDED_TRUST_SETUP_REQUIRED path rather than silently falling back. Per-user LocalAppData tests use isolated fixture and mock SID; no external Windows ACL proof.",
+      "negative": "First-run lacking valid trust, or wrong-UAC-account LocalAppData material, silently enters real Host production without current user's authorization.",
+      "needed": [
+        "Run native Windows SID/ACL/first-run positive+negative; distinguish current user from elevated installer account",
+        "Check actual browser/Gateway controls cannot write trust secret or override mode"
+      ]
+    },
+    {
+      "id": "SH03",
+      "status": "PRODUCTION_GATE_SCOPED_NOT_FULL_EFFECT",
+      "kind": "IMPLEMENTATION_POLICY",
+      "statement": "Production BUILD path is opt-in with non-demo guided storage; main.ts does not turn missing BUILDs/guided trust into production effect. Tests on GUIDED trust alone do not certify full v0.3 production Gateway/approval/Host path.",
+      "negative": "Absent BUILD/Host input nevertheless yields real effect success or HTTP demo receipt mislabeled as production proof.",
+      "needed": [
+        "Native exact-SHA gate/Host/UNKNOWN regression on Windows target",
+        "Owner confirm selected-root and truthful status obligations before SAP"
+      ]
+    }
+  ],
+  "relation_candidate": {
+    "id": "REL-SH01",
+    "subject": "Shun.GoalAuthorization",
+    "predicate": "requires_fresh_kernel_permit_and_verified_host_effect_receipt",
+    "object": "WindowsHost.EffectReceipt",
+    "owner": "Shun owns Goal/approval; Kernel owns permit; Host/OS owns actual effect and receipt",
+    "status": "PROPOSED_NOT_EXECUTED"
+  },
+  "element_strategy_candidates": [
+    {
+      "id": "A",
+      "root": "ShunGuidedOperationKnowledge",
+      "children": [
+        "GoalAndApproval",
+        "PerUserTrustBootstrap",
+        "KernelPermit",
+        "EffectTimeHostRecheck",
+        "TruthfulReceipt"
+      ],
+      "status": "PROPOSED"
+    },
+    {
+      "id": "B",
+      "root": "ShunDesktopTask",
+      "children": [
+        "Goal",
+        "Decision"
+      ],
+      "separate_contexts": [
+        "UserTrustAndIdentity",
+        "KernelAuthorization",
+        "WindowsHostEffect",
+        "EffectReceipt"
+      ],
+      "global": "NoRealEffectClaimWithoutCurrentPermitAndHostReceipt (conditional)",
+      "status": "COMPETING_PROPOSAL"
+    }
+  ],
+  "cq_worklist": [
+    {
+      "id": "CQ-SH01",
+      "positive": "real authorized effect bears current permit and host execution receipt",
+      "negative": "demo/bootstrap/mock result never proves real Windows modification",
+      "state": "NOT_RUN"
+    },
+    {
+      "id": "CQ-SH02",
+      "positive": "proper interactive-user LocalAppData bootstrap admits subsequent normal startup",
+      "negative": "other administrator SID/unprovisioned store cannot authorize current user",
+      "state": "NOT_RUN"
+    },
+    {
+      "id": "CQ-SH03",
+      "positive": "explicit production mode/BUILD/Host present and checked",
+      "negative": "no BUILD or no trusted Host never reports production effect PASS",
+      "state": "NOT_RUN"
+    }
+  ],
+  "incremental_invalidation": {
+    "triggers": [
+      "PRODUCT_FREEZE Product/L1 change",
+      "main.ts startup and composition",
+      "Guided trust/ACL/SID contract",
+      "Kernel permit and Windows Host receipt implementation",
+      "production vs demo status projection"
+    ],
+    "impact": [
+      "claim_assessments",
+      "relation_candidate",
+      "element_strategy_candidates",
+      "cq_worklist"
+    ],
+    "replay": "NOT_RUN"
+  },
+  "qualification": {
+    "upstream_g5": "NOT_ACCEPTED",
+    "independent_k4": "NOT_RUN",
+    "native_tests": "SCOPED_WINDOWS_GUIDED_TRUST_32_OF_32_PASS_SOURCE_REVISION_5BB4E4",
+    "owner": "NOT_RUN",
+    "sap_k5": "NOT_QUALIFIED",
+    "dis_eligible": false,
+    "source_rights_external": "UNKNOWN",
+    "native_tests_executed": true
+  },
+  "next_action": "Real-Windows guided bootstrap 32/32 scoped native tests PASS at pinned source 5bb4e4; mock SID is not real SID/UAC/ACL proof, Permit issuance not actual Host effect. Do not repeat for docs-only implementation PR. Fresh independent K4a original Product/L1 first, real Windows trusted Host effect+Owner before SAP K5. Separate memory DKE #416 remains an independent versioned lane, no automatic scope merging.",
+  "native_reconciliation_r8": {
+    "output_label": "DIE_DKE14_R8_SOURCE_NATIVE_RECEIPT_SYNC",
+    "tested_exact_head": "f1ebd5dc66610053cb03de4aefea6c8699458d0a",
+    "source_receipt": "https://github.com/kaicreator-mm/shun-assistant/issues/411#issuecomment-6805661606",
+    "technical_native_scope": "Windows guided-trust pilot 32/32 PASS on pinned source revision 5bb4e4b27e319d0104406c3389f8b8e6149b7f0b; mock SID, no actual UAC ACL or full Host effect",
+    "execution_status": "SCOPED_NATIVE_PASS_LIMITED",
+    "qualification_impact": "K4B_SCOPED_TECHNICAL_EVIDENCE_ONLY",
+    "independent_k4a": "NOT_GRANTED_BY_THIS_SYNC",
+    "owner_k4c": "NOT_GRANTED",
+    "formal_cq_semantic_oracle": "NOT_GRANTED",
+    "g5": "NOT_GRANTED",
+    "k5_sap": "NOT_QUALIFIED",
+    "closure": "NOT_QUALIFIED",
+    "note": "No native execution this GitHub metadata sync; receipt is previously executed at pinned code/source; immutable tested-head remains distinct from new docs-only head.",
+    "product_aligned_followup": "Tested scoped native receipt != Product release nor SAP; see next_action for current unresolved constraints."
+  }
+}

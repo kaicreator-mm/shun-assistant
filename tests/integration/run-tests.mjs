@@ -4,6 +4,7 @@ import { existsSync, readdirSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { spawnSync } from 'node:child_process';
+import { isVitestWorkerRpcTransient } from './vitest-rpc-transient-guard.mjs';
 
 const here = dirname(fileURLToPath(import.meta.url));
 const workspaceRoot = resolve(here, '../..');
@@ -44,6 +45,23 @@ for (const dirName of readdirSync(v03, { withFileTypes: true })
   }
 }
 
+// When the bounded DKE R9 research module exists in a downstream stack,
+// its real pinned AOT candidate and negative tests are mandatory CI suites.
+// Upstream branches without the feature do not invent an absent test target.
+const dkeR9 = join(workspaceRoot, 'docs/dke/demos/memory-performance-r0');
+if (existsSync(join(dkeR9, 'memory-aot-research-consumer-r9.mjs'))) {
+  for (const name of [
+    'memory-aot-research-consumer-r9.test.mjs',
+    'memory-aot-pinned-consumption-r9.test.mjs',
+  ]) {
+    const file = join(dkeR9, name);
+    if (!existsSync(file)) {
+      throw new Error(`DKE_R9_MANDATORY_TEST_MISSING: ${name}`);
+    }
+    addNative(file);
+  }
+}
+
 if (suites.length === 0) {
   console.error('[integration] MANDATORY_SUITES_MISSING');
   process.exit(1);
@@ -53,14 +71,51 @@ if (suites.some((s) => s.requiresVitest) && !existsSync(vitest)) {
   process.exit(1);
 }
 
+// VITEST-WORKER RPC STARVATION TRANSIENT (2026-11-11 Woodpecker #775/#776):
+// vitest 3.2.7 hard-codes a 60s birpc timeout (DEFAULT_TIMEOUT = 6e4) on the
+// worker→main channel and the pool configs cannot override it. Under heavy
+// agent load (11 concurrent full-qualification pipelines on one worker) the
+// main thread can starve past that deadline; vitest then records one unhandled
+// error and exits nonzero even if every test passed. However real test
+// failures can coexist with that error: retry only when explicit all-green
+// test summaries are present, otherwise fail closed.
+
+// Vitest suites run captured instead of inherited so the RPC transient is
+// detectable; the full captured trace is still echoed, because this
+// deployment retains no server logs and this output is the only post-mortem
+// evidence path (see .woodpecker.yml).
+function runVitestSuite(suite) {
+  const result = spawnSync(process.execPath, suite.args, {
+    cwd: workspaceRoot,
+    encoding: 'buffer',
+    maxBuffer: 128 * 1024 * 1024,
+    env: process.env,
+  });
+  if (result.stdout?.length) process.stdout.write(result.stdout);
+  if (result.stderr?.length) process.stderr.write(result.stderr);
+  return result;
+}
+
+
 let passed = 0;
 for (const suite of suites) {
   console.log(`[integration] RUN ${suite.name}`);
-  const result = spawnSync(process.execPath, suite.args, {
-    cwd: workspaceRoot,
-    stdio: 'inherit',
-    env: process.env,
-  });
+  let result;
+  if (suite.requiresVitest) {
+    result = runVitestSuite(suite);
+    if (isVitestWorkerRpcTransient(suite, result)) {
+      console.error(
+        `[integration] TRANSIENT ${suite.name}: vitest worker RPC starvation (tests may have all passed); retrying once`,
+      );
+      result = runVitestSuite(suite);
+    }
+  } else {
+    result = spawnSync(process.execPath, suite.args, {
+      cwd: workspaceRoot,
+      stdio: 'inherit',
+      env: process.env,
+    });
+  }
   if (result.error || result.status !== 0) {
     console.error(`[integration] FAIL ${suite.name}: ${result.error?.message ?? result.status ?? 'no exit'}`);
     process.exit(result.status && result.status > 0 ? result.status : 1);
