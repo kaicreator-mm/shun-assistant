@@ -19,8 +19,8 @@ import { fileURLToPath } from 'node:url';
 // not to a mutable D0-provided candidateBlob claim. Changing both JSON files is
 // insufficient to manufacture a valid source pin; updating this lock requires
 // an explicit new exact-source review.
-const REVIEWED_KNOWLEDGE_HEAD = '22a929ce1fbb5cdb5b2819cd3e98e71bbf21085a';
-const REVIEWED_KNOWLEDGE_BLOB = 'c877ec23dc59b0ae17681c7d8f7505b1521c8011';
+const REVIEWED_KNOWLEDGE_HEAD = 'd6df57422b8a329e8fcfbad1146c86740978db70';
+const REVIEWED_KNOWLEDGE_BLOB = 'da8425d82f3725c10bce92d206bbb8adfd6e7169';
 
 export function gitBlobSha(data) {
   const bytes = Buffer.isBuffer(data) ? data : Buffer.from(data, 'utf8');
@@ -70,6 +70,18 @@ export function validate(matrix, knowledge, options = {}) {
     if (items.some(v => !nonEmpty(v)) || new Set(items).size !== items.length) add('BAD_' + label + '_IDENTIFIERS');
     return new Set(items);
   };
+  // Network is an UNSOURCED future domain candidate. Product authority constrains
+  // effects/permissions only; unrelated disk/WinGet/PnP sources cannot qualify
+  // network-layer claims or drive false cross-domain invalidation.
+  const net = knowledge?.semanticAssuranceProfile?.elements?.find(x => x.profileId === 'SAP-CA-NETWORK');
+  const policyRefs = new Set(['SRC-PRODUCT-FREEZE','SRC-PRODUCT-PRD','SRC-PRODUCT-L1']);
+  if (!net || net.claimRefs?.length !== 0 || net.obligations?.length !== 3 ||
+      !net.sourceRefs?.every(x => policyRefs.has(x)) ||
+      !net.obligations.every(x => x.sourceRefs?.every(r => policyRefs.has(r)) &&
+        x.sourceQualification === 'PRODUCT_SCOPE_ONLY_NETWORK_TECHNICAL_EVIDENCE_MISSING' &&
+        x.qualification === 'NOT_QUALIFIED' && x.validationState === 'NOT_RUN')) {
+    add('NETWORK_FALSE_SOURCE_PROVENANCE_OR_PREMATURE_SAP');
+  }
   const elements = index(knowledge?.elements, 'id', 'ELEMENT');
   const claims = index(knowledge?.claims, 'id', 'CLAIM');
   const questions = index(knowledge?.competencyQuestions, 'id', 'CQ');

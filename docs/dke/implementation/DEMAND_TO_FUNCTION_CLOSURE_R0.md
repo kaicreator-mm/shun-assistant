@@ -1,5 +1,8 @@
 # Shun Assistant DKE-D0 — Knowledge Demand, Implementability and Functional Closure R0
 
+> **R13 latest source pin (2026-11-12)**: original #414 single Writer repaired `P2-SEM-R12-01`, current knowledge HEAD `d6df57422b8a329e8fcfbad1146c86740978db70`, exact knowledge Git Blob `da8425d82f3725c10bce92d206bbb8adfd6e7169`. Original CA-NETWORK has no domain source Claim/CQ; three SAP rows now cite only frozen Product policy scope, not disk/WinGet/PnP as network technical proof. Demand matrix + independent constant lock and negative CI regression repinned in this PR. **This is author source-identity integrity, NOT independent semantic Oracle/SAP qualification.** Old R1/R3 heads and Blobs below are historical receipts and should not be read as current.
+
+
 **OUTPUT_LABEL:** `SHUN_ASSISTANT_DKE_D0_DEMAND_FEASIBILITY_CLOSURE_R0`  
 **Status:** `AUTHOR_CANDIDATE_NOT_INDEPENDENTLY_REVIEWED` · Product implementation NOT_AUTHORIZED · K5 SAP NOT_QUALIFIED · DIS BLOCKED · Windows native DKE tests NOT_RUN.  
 **Main Issue:** [shun-assistant #411](https://github.com/kaicreator-mm/shun-assistant/issues/411)  

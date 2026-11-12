@@ -2270,7 +2270,8 @@
         "validationState": "NOT_RUN",
         "qualification": "NOT_QUALIFIED",
         "knowledgeSourceGap": "UNSOURCED_NETWORK_DOMAIN_CLAIM_AND_CQ_UNQUALIFIED"
-      }
+      },
+      "sourceEvidenceGap": "NETWORK_DOMAIN_CLAIM_AND_CQ_UNSOURCED; product sources constrain only permission/scope, not network-layer technical claims"
     },
     {
       "id": "CA-EXECUTION-ENVIRONMENT",
@@ -7148,20 +7149,9 @@
             "requirement": "layered diagnosis",
             "rationale": "layered diagnosis: bounded semantic obligation, independently tested only when the named positive/negative/UNKNOWN oracle and evidence are provided.",
             "sourceRefs": [
-              "SRC-PRODUCT-PRD",
-              "SRC-PRODUCT-L1",
-              "SRC-STORAGE-EXECUTE",
-              "SRC-JIT-ORCHESTRATOR",
-              "SRC-DKE-STANDARD",
-              "EXT-DISK-MGMT",
-              "EXT-WINGET-OVERVIEW",
-              "EXT-PNP-GET",
-              "EXT-PHYSICAL-DISK",
-              "EXT-WINDOWS-CLIENT-SERVICING",
               "SRC-PRODUCT-FREEZE",
-              "SRC-DOMAIN-COMPUTER-INDEX",
-              "EXT-DISK-INITIALIZE",
-              "EXT-PNPUTIL"
+              "SRC-PRODUCT-PRD",
+              "SRC-PRODUCT-L1"
             ],
             "relationRefs": [],
             "invariantRefs": [
@@ -7179,7 +7169,7 @@
             "positiveCase": "Future diagnostics distinguish link, IP, gateway, route, DNS and endpoint tests with layer-specific evidence.",
             "negativeCase": "One failed ping is treated as proof of DNS or Wi-Fi credential failure.",
             "unknownCase": "No network-domain Claim/Oracle => UNKNOWN/UNSOURCED.",
-            "oracle": "MICROSOFT_DOCUMENTATION_PLUS_LIVE_NETWORK_ORACLE",
+            "oracle": "NETWORK_DOMAIN_SOURCE_MISSING__AUTHOR_CANDIDATE_ONLY",
             "oracleClasses": [
               "SOURCE_EVIDENCE_REVIEW",
               "DOMAIN_OWNER_REQUIRED"
@@ -7187,27 +7177,17 @@
             "status": "OPEN",
             "validationState": "NOT_RUN",
             "evidenceRefs": [],
-            "qualification": "NOT_QUALIFIED"
+            "qualification": "NOT_QUALIFIED",
+            "sourceQualification": "PRODUCT_SCOPE_ONLY_NETWORK_TECHNICAL_EVIDENCE_MISSING"
           },
           {
             "id": "SAP-CA-NETWORK-02",
             "requirement": "credential/privacy boundaries",
             "rationale": "credential/privacy boundaries: bounded semantic obligation, independently tested only when the named positive/negative/UNKNOWN oracle and evidence are provided.",
             "sourceRefs": [
-              "SRC-PRODUCT-PRD",
-              "SRC-PRODUCT-L1",
-              "SRC-STORAGE-EXECUTE",
-              "SRC-JIT-ORCHESTRATOR",
-              "SRC-DKE-STANDARD",
-              "EXT-DISK-MGMT",
-              "EXT-WINGET-OVERVIEW",
-              "EXT-PNP-GET",
-              "EXT-PHYSICAL-DISK",
-              "EXT-WINDOWS-CLIENT-SERVICING",
               "SRC-PRODUCT-FREEZE",
-              "SRC-DOMAIN-COMPUTER-INDEX",
-              "EXT-DISK-INITIALIZE",
-              "EXT-PNPUTIL"
+              "SRC-PRODUCT-PRD",
+              "SRC-PRODUCT-L1"
             ],
             "relationRefs": [],
             "invariantRefs": [
@@ -7225,7 +7205,7 @@
             "positiveCase": "Wi-Fi secrets and private proxy credentials never enter AOT or ordinary reports.",
             "negativeCase": "Network configuration capture includes PSK, token or private profile body.",
             "unknownCase": "Redaction or permission unknown => no collection or transmission.",
-            "oracle": "MICROSOFT_DOCUMENTATION_PLUS_LIVE_NETWORK_ORACLE",
+            "oracle": "NETWORK_DOMAIN_SOURCE_MISSING__AUTHOR_CANDIDATE_ONLY",
             "oracleClasses": [
               "SOURCE_EVIDENCE_REVIEW",
               "DOMAIN_OWNER_REQUIRED"
@@ -7233,27 +7213,17 @@
             "status": "OPEN",
             "validationState": "NOT_RUN",
             "evidenceRefs": [],
-            "qualification": "NOT_QUALIFIED"
+            "qualification": "NOT_QUALIFIED",
+            "sourceQualification": "PRODUCT_SCOPE_ONLY_NETWORK_TECHNICAL_EVIDENCE_MISSING"
           },
           {
             "id": "SAP-CA-NETWORK-03",
             "requirement": "recovery semantics",
             "rationale": "recovery semantics: bounded semantic obligation, independently tested only when the named positive/negative/UNKNOWN oracle and evidence are provided.",
             "sourceRefs": [
-              "SRC-PRODUCT-PRD",
-              "SRC-PRODUCT-L1",
-              "SRC-STORAGE-EXECUTE",
-              "SRC-JIT-ORCHESTRATOR",
-              "SRC-DKE-STANDARD",
-              "EXT-DISK-MGMT",
-              "EXT-WINGET-OVERVIEW",
-              "EXT-PNP-GET",
-              "EXT-PHYSICAL-DISK",
-              "EXT-WINDOWS-CLIENT-SERVICING",
               "SRC-PRODUCT-FREEZE",
-              "SRC-DOMAIN-COMPUTER-INDEX",
-              "EXT-DISK-INITIALIZE",
-              "EXT-PNPUTIL"
+              "SRC-PRODUCT-PRD",
+              "SRC-PRODUCT-L1"
             ],
             "relationRefs": [],
             "invariantRefs": [
@@ -7271,7 +7241,7 @@
             "positiveCase": "A future network change has a separate rollback/control channel and postchange connectivity observation.",
             "negativeCase": "Sole remote/control route is disabled without recovery.",
             "unknownCase": "Control channel lost => UNKNOWN and stop.",
-            "oracle": "MICROSOFT_DOCUMENTATION_PLUS_LIVE_NETWORK_ORACLE",
+            "oracle": "NETWORK_DOMAIN_SOURCE_MISSING__AUTHOR_CANDIDATE_ONLY",
             "oracleClasses": [
               "SOURCE_EVIDENCE_REVIEW",
               "DOMAIN_OWNER_REQUIRED"
@@ -7279,29 +7249,19 @@
             "status": "OPEN",
             "validationState": "NOT_RUN",
             "evidenceRefs": [],
-            "qualification": "NOT_QUALIFIED"
+            "qualification": "NOT_QUALIFIED",
+            "sourceQualification": "PRODUCT_SCOPE_ONLY_NETWORK_TECHNICAL_EVIDENCE_MISSING"
           }
         ],
-        "oracle": "MICROSOFT_DOCUMENTATION_PLUS_LIVE_NETWORK_ORACLE",
+        "oracle": "NETWORK_SOURCE_FIRST_AND_LIVE_WINDOWS_ORACLE_REQUIRED_NOT_RUN",
         "status": "OPEN",
         "profileId": "SAP-CA-NETWORK",
         "elementScopeRef": "CA-NETWORK",
         "claimRefs": [],
         "sourceRefs": [
-          "SRC-PRODUCT-PRD",
-          "SRC-PRODUCT-L1",
-          "SRC-STORAGE-EXECUTE",
-          "SRC-JIT-ORCHESTRATOR",
-          "SRC-DKE-STANDARD",
-          "EXT-DISK-MGMT",
-          "EXT-WINGET-OVERVIEW",
-          "EXT-PNP-GET",
-          "EXT-PHYSICAL-DISK",
-          "EXT-WINDOWS-CLIENT-SERVICING",
           "SRC-PRODUCT-FREEZE",
-          "SRC-DOMAIN-COMPUTER-INDEX",
-          "EXT-DISK-INITIALIZE",
-          "EXT-PNPUTIL"
+          "SRC-PRODUCT-PRD",
+          "SRC-PRODUCT-L1"
         ],
         "relationRefs": [],
         "invariantRefs": [
@@ -7318,7 +7278,8 @@
         ],
         "validationState": "NOT_RUN",
         "qualification": "NOT_QUALIFIED",
-        "evidenceGap": "NO_QUALIFIED_NETWORK_DOMAIN_SOURCE_CLAIM_OR_EXTERNAL_ORACLE"
+        "evidenceGap": "NO_QUALIFIED_NETWORK_DOMAIN_SOURCE_CLAIM_OR_EXTERNAL_ORACLE",
+        "networkDomainKnowledgeStatus": "UNSOURCED__PRODUCT_SCOPE_ONLY_NOT_NETWORK_FACT_AUTHORITY"
       },
       {
         "element": "CA-AOT-KNOWLEDGE",
