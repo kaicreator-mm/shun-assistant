@@ -9,6 +9,8 @@ export const SOURCE_BLOB_PINS = Object.freeze({
   knowledge: 'da8425d82f3725c10bce92d206bbb8adfd6e7169',
   memory: '8d0c1c0e732cb7e9183ca830a0384798946b43a6',
   r2: 'fddd2d9cbe9a342683eefdcabe2277dac012568c',
+  packet: 'dc7a851e9b542809b5876940cb56fc7a79bbbed9',
+  delegated: 'a6a1cb178b01fe3ee7fa0ec04d8250fd26b071eb',
 });
 export const EXPECTED_SAP = Object.freeze({base:58, memoryR0:12, memoryR2:5, total:75});
 const NETWORK_POLICY_REFS = ['SRC-PRODUCT-FREEZE','SRC-PRODUCT-PRD','SRC-PRODUCT-L1'];
@@ -38,14 +40,17 @@ function indexStrict(items,getId,label,fail) {
 export function validateSapSourceLedgerR15(input) {
   const errors=[];
   const fail=(code)=>{if(!errors.includes(code))errors.push(code);};
-  const {knowledge,memory,r2,packet,delegated,rawKnowledge,rawMemory,rawR2}=input||{};
+  const {knowledge,memory,r2,packet,delegated,rawKnowledge,rawMemory,rawR2,rawPacket,rawDelegated}=input||{};
   if(!knowledge||!memory||!r2||!packet||!delegated){fail('SOURCE_PACK_MISSING');return {ok:false,errors,qualifiedSap:0};}
-  const originalBytes={knowledge:rawKnowledge,memory:rawMemory,r2:rawR2};
+  // Source handoff ledgers are also input evidence: original-byte-pinned, not
+  // caller-generated lists that can silently rewrite rights, provenance or Oracles.
+  const originalBytes={knowledge:rawKnowledge,memory:rawMemory,r2:rawR2,
+    packet:rawPacket,delegated:rawDelegated};
   for(const [kind,expected] of Object.entries(SOURCE_BLOB_PINS)) {
     if(!originalBytes[kind]||gitBlobId(originalBytes[kind])!==expected)fail('SOURCE_BLOB_MISMATCH_'+kind.toUpperCase());
   }
   // Caller-provided parsed objects cannot drift from the exact pinned raw bytes.
-  for(const [kind,object] of [['knowledge',knowledge],['memory',memory],['r2',r2]]) {
+  for(const [kind,object] of [['knowledge',knowledge],['memory',memory],['r2',r2],['packet',packet],['delegated',delegated]]) {
     try {
       if(!same(JSON.parse(originalBytes[kind].toString('utf8')),object))
         fail('SOURCE_OBJECT_BYTES_MISMATCH_'+kind.toUpperCase());

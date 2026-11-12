@@ -20,6 +20,8 @@ function load() {
     knowledge:JSON.parse(r.rawKnowledge.toString('utf8')),
     memory:JSON.parse(r.rawMemory.toString('utf8')),
     r2:JSON.parse(r.rawR2.toString('utf8')),
+    rawPacket:r.packet,
+    rawDelegated:r.delegated,
     packet:JSON.parse(r.packet.toString('utf8')),
     delegated:JSON.parse(r.delegated.toString('utf8')),
   };
@@ -93,4 +95,29 @@ test('missing or duplicate SAP IDs fail closed, no count-only success',()=>{
   error(x,'PACKET_SAP_DUPLICATE_OR_EMPTY');
   const y=load();y.delegated.rows.pop();
   error(y,'SAP_COVERAGE_DRIFT');
+});
+
+test('exact current packet and delegated owner ledger raw bytes have independent Git-Blob pins',()=>{
+  const x=load();
+  assert.equal(gitBlobId(x.rawPacket),SOURCE_BLOB_PINS.packet);
+  assert.equal(gitBlobId(x.rawDelegated),SOURCE_BLOB_PINS.delegated);
+  assert.equal(validateSapSourceLedgerR15(x).ok,true);
+});
+test('rewriting source catalog URLs in parsed packet and owner rows cannot masquerade as original publisher data',()=>{
+  const x=load();
+  x.packet.sourceCatalog.find(r=>r.id==='EXT-WINGET-OVERVIEW').url='https://attacker.invalid/network-doc';
+  error(x,'SOURCE_OBJECT_BYTES_MISMATCH_PACKET');
+  const y=load();
+  y.delegated.externalPublisherSources[0].url='https://attacker.invalid/rights';
+  error(y,'SOURCE_OBJECT_BYTES_MISMATCH_DELEGATED');
+});
+test('changing both raw/parsed owner ledgers still fails exact Git-Blob source pins',()=>{
+  const x=load();
+  x.rawPacket=Buffer.from(x.rawPacket.toString('utf8').replace('MICROSOFT_LEARN','MALICIOUS_PUBLISHER'));
+  x.packet=JSON.parse(x.rawPacket.toString('utf8'));
+  error(x,'SOURCE_BLOB_MISMATCH_PACKET');
+  const y=load();
+  y.rawDelegated=Buffer.from(y.rawDelegated.toString('utf8').replace('MICROSOFT_LEARN','MALICIOUS_PUBLISHER'));
+  y.delegated=JSON.parse(y.rawDelegated.toString('utf8'));
+  error(y,'SOURCE_BLOB_MISMATCH_DELEGATED');
 });
