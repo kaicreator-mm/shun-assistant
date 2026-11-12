@@ -1,0 +1,104 @@
+{
+  "schema": "shun.dke.closure-matrix-preflight-r0",
+  "outputLabel": "SHUN_ASSISTANT_DKE_D0_R0_FRESH_SOURCE_FIRST_REVIEW_REPAIR_HOSTED_READBACK",
+  "asOf": "2026-11-11",
+  "scope": "POST_REPAIR_AUTHOR_MECHANICAL_CURRENT_SOURCE_IDENTITY_ONLY",
+  "status": "PASS_POST_REPAIR_HOSTED_READBACK_NOT_NODE_NOT_SEMANTIC_GATE",
+  "authorContextIndependentReview": false,
+  "subject": {
+    "repository": "kaicreator-mm/shun-assistant",
+    "branch": "dke/demand-function-closure-r0",
+    "baseCandidatePr": 414,
+    "baseHead": "a8f378a12b49ff1c335a129280f32c45a6ad2cd6",
+    "knowledgeCandidateFile": "docs/dke/implementation/COMPUTER_ASSISTANT_KNOWLEDGE_R0.json",
+    "knowledgeCandidateBlob": "87524bac881b84da626d2026392d99129baeb5a1",
+    "repairedSourceHead": "a8f378a12b49ff1c335a129280f32c45a6ad2cd6",
+    "d0CurrentReadbackHead": "c7d5c0fb41a4692f11ae840029ad6b098ead3af8"
+  },
+  "gitReadback": [
+    {
+      "path": "docs/dke/implementation/COMPUTER_ASSISTANT_KNOWLEDGE_R0.json",
+      "blob": "87524bac881b84da626d2026392d99129baeb5a1"
+    },
+    {
+      "path": "docs/dke/implementation/COMPUTER_ASSISTANT_KNOWLEDGE_R0.md",
+      "blob": "2cd16ebc7317658b2f10ffffb6a52a37d431a964"
+    },
+    {
+      "path": "docs/dke/implementation/DEMAND_TO_FUNCTION_CLOSURE_R0.json",
+      "blob": "eb00c3ac99ced49a95d0a1ff06d216f4d4cf9a69"
+    },
+    {
+      "path": "docs/dke/implementation/DEMAND_TO_FUNCTION_CLOSURE_R0.md",
+      "blob": "87d26996f9b32dee8da498a74114653f89fa1178"
+    },
+    {
+      "path": "docs/dke/implementation/verify-demand-function-closure-r0.mjs",
+      "blob": "eca8f99a7292a581e2b9e02d688d8098800cf33b"
+    },
+    {
+      "path": "docs/dke/implementation/verify-demand-function-closure-r0.test.mjs",
+      "blob": "a3a86a052678d457d5181a4d5d957604977be2f3"
+    }
+  ],
+  "checks": {
+    "method": "Current-turn GitHub exact Blob readback and hosted V8 mechanical matrix inspection; Node CLI and Node tests NOT_EXECUTED; former 17/17 hosted author mutation probes are HISTORY, not rerun.",
+    "matrixJsonParse": "PASS",
+    "sourceDossierJsonParse": "PASS",
+    "sourceDossierBlobMatch": "PASS_REPINNED_POST_REPAIR",
+    "uniqueJobIds": "PASS",
+    "elementClaimCqSourceRefs": "PASS",
+    "globalSemanticReferences": "PASS",
+    "frozenProductStatusBoundaries": "PASS",
+    "futureCandidateExclusions": "PASS",
+    "aotRuntimeSplit": "PASS",
+    "mandatoryPostconditionNegativeUnknown": "PASS",
+    "noFakeNativeOrSapOrDis": "PASS",
+    "negativeMutationsBlocked": "HISTORICAL_PRE_REPAIR_17",
+    "negativeMutationsTotal": "HISTORICAL_PRE_REPAIR_17",
+    "uniqueProductSection2Coverage": "10/10 unique sections 1-10; Product J01-J09 separate",
+    "sourceSemanticCaveats": [
+      "CA-JOB-05 cloud Host consent/cost actual witness NOT_PINNED",
+      "CA-JOB-07 K Journal actual E2E NOT_PINNED",
+      "CA-JOB-08 CN/EN UI native witness NOT_PINNED",
+      "CA-JOB-15 primary Network Element has no source Claim; CQ-CA-010 no domain source"
+    ],
+    "distinctSAPFalsifiers": "58/58 authored distinct per obligation; 0 executed/qualified"
+  },
+  "coverage": {
+    "jobs": 15,
+    "frozenProductParityJobs": 10,
+    "futureCandidateJobs": 5,
+    "executableDisFunctions": 0,
+    "qualifiedSapElements": 0,
+    "nativeWindowsReceipts": 0,
+    "independentlyClosedUserJourneys": 0
+  },
+  "exclusions": {
+    "nodeCliVerifier": "NOT_RUN",
+    "nodeCliTestSuite": "NOT_RUN",
+    "windowsNativeTests": "NOT_RUN",
+    "independentSourceFirstReview": "SEPARATE_REVIEWER_ATTESTATION_NOT_AVAILABLE",
+    "independentSapReview": "NOT_RUN",
+    "productOwnerAdmission": "NOT_REQUESTED",
+    "disFunctionization": "NOT_RUN",
+    "runtimeClosure": "NOT_RUN"
+  },
+  "nextAction": "Re-run the versioned standalone D0 checker and negative tests in a genuine Node runtime with actual command/exit code; obtain independent fresh exact-SHA post-repair review. The hosted Blob/array checks do not qualify Source, SAP, AOT, Functions or Windows.",
+  "executionRequirements": {
+    "policy": "NO_ARBITRARY_NODE_VERSION_FLOOR",
+    "requiresActualRuntimeFeatureCompatibility": true,
+    "blanketNodeMinVersion": null,
+    "observedNodeVersion": "NOT_RUN",
+    "cliVerifierExecution": "NOT_RUN",
+    "cliTestSuiteExecution": "NOT_RUN"
+  },
+  "postRepairReadback": {
+    "authorityHead": "a8f378a12b49ff1c335a129280f32c45a6ad2cd6",
+    "expectedKnowledgeBlob": "87524bac881b84da626d2026392d99129baeb5a1",
+    "previousD0Head": "5bb4dedcbd3c418a24f2d51c6c71ab81a9bef9a0",
+    "reviewerDisjointContext": "NOT_ATTESTABLE",
+    "nativeNode": "NOT_RUN",
+    "repairAuthorMechanicalOnly": true
+  }
+}
