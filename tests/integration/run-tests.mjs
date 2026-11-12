@@ -4,6 +4,7 @@ import { existsSync, readdirSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { spawnSync } from 'node:child_process';
+import { isVitestWorkerRpcTransient } from './vitest-rpc-transient-guard.mjs';
 
 const here = dirname(fileURLToPath(import.meta.url));
 const workspaceRoot = resolve(here, '../..');
@@ -58,10 +59,9 @@ if (suites.some((s) => s.requiresVitest) && !existsSync(vitest)) {
 // worker→main channel and the pool configs cannot override it. Under heavy
 // agent load (11 concurrent full-qualification pipelines on one worker) the
 // main thread can starve past that deadline; vitest then records one unhandled
-// error and exits nonzero EVEN THOUGH EVERY TEST PASSED. A real test failure
-// never carries that marker, so one marker-gated retry keeps the gate
-// fail-closed while surviving the starvation transient.
-const VITEST_WORKER_RPC_TRANSIENT_MARKER = '[vitest-worker]: Timeout calling';
+// error and exits nonzero even if every test passed. However real test
+// failures can coexist with that error: retry only when explicit all-green
+// test summaries are present, otherwise fail closed.
 
 // Vitest suites run captured instead of inherited so the RPC transient is
 // detectable; the full captured trace is still echoed, because this
@@ -79,16 +79,6 @@ function runVitestSuite(suite) {
   return result;
 }
 
-function isVitestWorkerRpcTransient(suite, result) {
-  return (
-    suite.requiresVitest === true &&
-    !result.error &&
-    result.status !== 0 &&
-    `${result.stdout?.toString() ?? ''}${result.stderr?.toString() ?? ''}`.includes(
-      VITEST_WORKER_RPC_TRANSIENT_MARKER,
-    )
-  );
-}
 
 let passed = 0;
 for (const suite of suites) {
