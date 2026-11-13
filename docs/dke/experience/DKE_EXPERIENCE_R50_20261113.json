@@ -1,0 +1,166 @@
+{
+  "schema": "die/dke9-project-practice-experience-case/v1",
+  "experience_id": "DKE9-XP-SHUN-ASSISTANT-R50-01",
+  "date": "2026-11-13",
+  "project": "shun-assistant",
+  "location": {
+    "repo": "kaicreator-mm/shun-assistant",
+    "branch": "docs/dke9-experience-r50-20261113",
+    "path": "docs/dke/experience/DKE_EXPERIENCE_R50_20261113.json",
+    "purpose": "ISOLATED_DOCS_ONLY_BRANCH_NOT_DEFAULT_BRANCH_OR_SIGNED_PREPARATION_PR"
+  },
+  "bounded_context": "DKE_PROJECT_DOMAIN_MODEL::TECHNICAL_PROJECTION_VS_PROFESSIONAL_FIELD_REALITY_AND_HISTORICAL_AUTHORITY",
+  "goal_and_constraints": "Preserve project-specific domain facts, recursive Element/Root/Global/SAP and Domain Blueprint model hypotheses, repair a demonstrated DKE author-model review dead-end; Product/Code/Test/Build remain read-only; no Function/ECP/AOT/SDK/Runtime; source claim/rights authority belongs to DIE #8, methodological synthesis to DIE #24.",
+  "exact_versioned_evidence": {
+    "originalProjectPreparation": {
+      "pr": "https://github.com/kaicreator-mm/shun-assistant/pull/410",
+      "exactHead": "e756e28e3eb88527a8190651e218ffb94d0ed61c",
+      "sourceClaimIDs": [
+        "SH01",
+        "SH02",
+        "SH03"
+      ],
+      "status": "SOURCE_REFERENCE_ONLY_UNQUALIFIED"
+    },
+    "sourceR70": {
+      "blob": "485a39662e943c1418646fed732b2e06e68e6950",
+      "commit": "12bff7f9d9f3a4ee15bdeac95b93901eda95b157",
+      "url": "https://github.com/kaicreator-mm/domain-intelligence-engineering/blob/12bff7f9d9f3a4ee15bdeac95b93901eda95b157/portfolio/preparation/PRIMARY_DOMAIN_METHOD_COMMUNITY_ACCESS_R70_20261113.json",
+      "relevantPublisherMethodIDs": [
+        "WHO_ICF_2026",
+        "W3C_WCAG22_EDITION_2024",
+        "ISO_29119_4_2021"
+      ],
+      "status": "OFFICIAL_PUBLISHER_METADATA_NOT_DOMAIN_OR_RIGHTS_CERTIFICATION"
+    },
+    "sourceR69": {
+      "blob": "9c6bd1f71c7ad20cbb7b6d7bad57914442106b7c",
+      "commit": "17303bb2993f2c3e779842c5a4fb6690fad1a98d",
+      "historicalProduct": {
+        "path": "docs/product/PRD-v0.1.md",
+        "gitBlob": "4f9a59433eaa812e668d048352bdc5f050c2752b",
+        "authority": "EARLY_PRODUCT",
+        "phase": "HISTORICAL_OR_EARLY"
+      },
+      "laterProduct": {
+        "path": "docs/product/PRD-v0.3-domain-harness-R0.md",
+        "gitBlob": "f062b7f2c3dc3bf4aeeb7594ab5c2bc75b34d0ab",
+        "authority": "LATER_OWNER_PRODUCT_L1_FROZEN_SAME_FILE",
+        "phase": "LATEST_R43_DOCUMENT_NOT_NECESSARILY_SEMANTIC_SUPERSEDE"
+      },
+      "priorAuthorityCaveat": "早期多执行环境/RunX 候选不自动作为 v0.3 Domain App 重构需实施的 Host 容器功能；后期 v0.3 文档题头标 REVIEW CANDIDATE、内部冻结依赖与待完成 SDK/RQ须区分"
+    },
+    "priorDKEModel": {
+      "R48ExactCommit": "4d5c1f39cf62df817dcee573516006809ef3b916",
+      "R48Path": "portfolio/domain-knowledge-packages/projects/shun-assistant/DOMAIN_SCOPED_EVIDENCE_RECOVERY_R48.json",
+      "R48Blob": "788ce44847657c05654d0962a0e8edcc7bc8fecb",
+      "url": "https://github.com/kaicreator-mm/domain-intelligence-engineering/blob/4d5c1f39cf62df817dcee573516006809ef3b916/portfolio/domain-knowledge-packages/projects/shun-assistant/DOMAIN_SCOPED_EVIDENCE_RECOVERY_R48.json",
+      "originalDefectR47": "NO_MISSING_FIELDS_WITH_EXTERNAL_FACTS_AND_UNKNOWN_STALE_SINKS",
+      "r48AuthorWitness": "https://github.com/kaicreator-mm/domain-intelligence-engineering/blob/4d5c1f39cf62df817dcee573516006809ef3b916/portfolio/domain-knowledge-packages/DOMAIN_SCOPED_EVIDENCE_RECOVERY_WITNESS_R48.json"
+    }
+  },
+  "original_hypothesis": "A single all-fields gate across internal technical projection and external field truth simplifies acceptance and does not block technically scope-limited review. This was an author model assumption, NOT a claim about original Product implementation.",
+  "considered_alternatives": [
+    {
+      "id": "A",
+      "approach": "Single combined NO_MISSING_FIELDS technical-plus-professional gate",
+      "decision": "REJECT_FOR_AUTHOR_DOMAIN_MODEL",
+      "reason": "R47 exact model stranded UNKNOWN/STALE and blocked narrowly scoped technical examination in 14/14 models"
+    },
+    {
+      "id": "B",
+      "approach": "Separate technically observable fields from independently attested field truth, rights, and exact source-version authority",
+      "decision": "SELECT_AUTHOR_CANDIDATE",
+      "reason": "R48 model supports scoped technical evaluation and explicit UNKNOWN/STALE requalification without promoting world-truth"
+    },
+    {
+      "id": "C",
+      "approach": "Skip domain model until every external source B5 passes",
+      "decision": "REJECT_AS_UNNECESSARY_GLOBAL_WAIT",
+      "reason": "Unqualified knowledge may be modeled as a declared hypothesis independently; formal Domain App admission still blocked"
+    }
+  ],
+  "decision_rationale": "A narrow technical observation may be reviewed with exact bounded fields; requiring all external professional facts too early creates an unreviewable false dependency. Independent real-world truth and work rights remain mandatory for professional assertions. Historical knowledge cannot be promoted into current Product norms by file modification date.",
+  "experiment_or_modeling_action": {
+    "observed": "R47 and R48 project model exact Git Blobs read back; prior R47 dead-end gate and missing recovery edges identified; R48 scoped technical/professional responsibilities, field obligations and re-entry transitions checked in hosted JavaScript finite author model.",
+    "reproduced": "Actual bounded model checks across 14 projects: 14/14 state graphs reachable, UNKNOWN and STALE recoverable, 1792 candidate Boolean gate assignments, 472 typed field-witness negative mutations rejected; this project is one participant.",
+    "notDone": "NO_ORIGINAL_BUSINESS_NATIVE_TEST; NO_PROFESSIONAL_FIELD_ORACLE; NO_TRUE_SOURCE_B5_OR_P5; NO_ORIGINAL_SAP_EXECUTION"
+  },
+  "observed_result": {
+    "kind": "AUTHOR_MODEL_FAILURE_AND_LOGICAL_REPAIR_OBSERVED",
+    "status": "TESTED_IN_CONTEXT_AUTHOR_MODEL_ONLY",
+    "failure": "Previous R47 author model had unreachable re-review path and conflated technical vs external field conditions",
+    "repair": "R48 author model makes technical scope independently reviewable and per-field independent attestation mandatory for world truth",
+    "strength": "GITHUB_EXACT_BLOB_PLUS_HOSTED_JS_MODEL_CHECK_NOT_FIELD_PROOF"
+  },
+  "root_cause_or_limits": {
+    "actualModelBug": "Conflated unlike evidence kinds in one gate and omitted transitions after UNKNOWN/STALE",
+    "notObserved": "No real user/business/professional failure was demonstrated or induced; proposed domain-specific counterexample below is a falsification scenario from #8 R70, not executed."
+  },
+  "project_specific_domain_challenge": {
+    "researchBranch": "IT support, assistive technology, user-context-dependent consent and recovery",
+    "knowledgeCoverageGap": "A desktop automation that executes in the right account can still be inaccessible, unintelligible or unauthorized for that particular user.",
+    "falsifierHypothesis": "A successful Host receipt is used as evidence that a user with low vision both understood and approved the effect.",
+    "requiredIndependentEvidence": "User-level informed consent and assistive interface journey, pre/post effect, time/context proof, rollback if relevant.",
+    "authorityAndRightsHold": "Per-device user capability, OS permission, local data rules UNKNOWN",
+    "professionalPublisherMethodIDs": [
+      "WHO_ICF_2026",
+      "W3C_WCAG22_EDITION_2024",
+      "ISO_29119_4_2021"
+    ],
+    "status": "SOURCE_REFERENCE_ONLY_AND_FIELD_SCENARIO_UNEXECUTED"
+  },
+  "knowledge_evolution": {
+    "historicToLaterProduct": "早期多执行环境/RunX 候选不自动作为 v0.3 Domain App 重构需实施的 Host 容器功能；后期 v0.3 文档题头标 REVIEW CANDIDATE、内部冻结依赖与待完成 SDK/RQ须区分",
+    "forbiddenNormativeInference": "把 v0.3 选择合约冻结误写成已完成真实 Host/SDK/Release 验证",
+    "invariant": "Historical project domain knowledge can remain research-only; newest technical/API/migration file does not auto-replace earlier semantic freeze; original Source/Claim owner decides scoped normative validity.",
+    "onChange": "Affected Claim/Element/SAP/Blueprint sections STALE using project R46 dependency graph; retain immutable previous receipts; do not recheck unrelated projects",
+    "sourceOwner": "#8"
+  },
+  "applicability_and_exclusion": {
+    "appliesTo": [
+      "DKE semantic Element/context decomposition",
+      "Versioned project knowledge and candidate Blueprint",
+      "Negative/UNKNOWN/STALE author SAP preparation"
+    ],
+    "excludes": [
+      "Original code/CI/runtime correctness",
+      "Professional correctness, rights and cultural consent",
+      "Any automatically accepted current Product/Release norm",
+      "Other projects' Source B5 signatures"
+    ],
+    "projectReadiness": "CANDIDATE_RESEARCH_ONLY"
+  },
+  "improvement_proposal": "Attach per-field provenance/actor/version/validity/right plus an explicit unknown recovery path to future DKE model consumers; compare accepted, rejected and unknown cases against real per-project Oracle when available.",
+  "verification_plan": [
+    "Independently check exact original Product/Code/Test source scope and #8 accepted Claim/rights with original authorized owners",
+    "Execute real domain positive and negative case with a qualified project expert and affected participants/rights-holder where applicable",
+    "Test UNKNOWN/STALE source revision and withdrawal, preserving immutable history and scoped change propagation",
+    "Only then independently accept original SAP/Domain Blueprint, never from author gate model results alone"
+  ],
+  "reusable_method_candidate": {
+    "id": "DKE-METHOD-GATED-SCOPE-R50",
+    "class": "SCOPED_EVIDENCE_AND_RECOVERABLE_KNOWLEDGE",
+    "stage": "CANDIDATE_NOT_INDEPENDENTLY_CHALLENGED",
+    "handoff": "DIE_ISSUE_24",
+    "counterexample": "Missing original professional field must stay UNKNOWN regardless of passing technical projection",
+    "crossProjectNeeded": true
+  },
+  "explicit_unknown": [
+    "Claim Owner B5/P5 unsigned",
+    "Professional domain Oracle unsigned",
+    "Real original business positive/negative SAP not executed",
+    "Domain field completeness open world",
+    "Work/community/actor/location/time-specific permission unknown"
+  ],
+  "status": "TESTED_IN_CONTEXT_AUTHOR_MODEL_ONLY_FIELD_TRUTH_UNKNOWN",
+  "independentDomainReview": "NOT_RUN",
+  "qualifiedSAP": 0,
+  "domainAppRefactorReady": false,
+  "experienceNotAdditionalGate": true,
+  "evidence_links": [
+    "https://github.com/kaicreator-mm/shun-assistant/pull/410",
+    "https://github.com/kaicreator-mm/domain-intelligence-engineering/blob/4d5c1f39cf62df817dcee573516006809ef3b916/portfolio/domain-knowledge-packages/projects/shun-assistant/DOMAIN_SCOPED_EVIDENCE_RECOVERY_R48.json",
+    "https://github.com/kaicreator-mm/domain-intelligence-engineering/blob/12bff7f9d9f3a4ee15bdeac95b93901eda95b157/portfolio/preparation/PRIMARY_DOMAIN_METHOD_COMMUNITY_ACCESS_R70_20261113.json"
+  ]
+}
