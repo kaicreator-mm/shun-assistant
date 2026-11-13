@@ -1,0 +1,53 @@
+{
+  "schema": "die/dke9/r58-original-consumer-experience/v1",
+  "experience_id": "DKE9-XP-SHUN-ASSISTANT-R58-01",
+  "project": "shun-assistant",
+  "date": "2026-11-13",
+  "source_owner": "#8",
+  "model_owner": "#9",
+  "method_owner": "#24",
+  "bounded_context": "ORIGINAL_CODE_CONSUMER_VS_PROFESSIONAL_FIELD",
+  "goal_and_constraints": "Make one falsifiable source-grounded DKE-only modeling correction without modifying product/code/test/build or implementing runtime",
+  "original_hypothesis": "No production trust guard exists because guided-localappdata bootstrap has not been demonstrated on a real Windows Host.",
+  "considered_alternatives": [
+    "Mark every existing trust guard absent",
+    "Separate source-visible production startup guards, temporary ACL fixture and actual authorized action post-state",
+    "Treat local-app bootstrap as blanket user consent for future operations"
+  ],
+  "selection_rationale": "Second option: recognize real-storage-only and setup-required fail-close startup; preserve independent per-action consent/Host evidence and poststate gates.",
+  "source_and_exact_revision": {
+    "repo": "kaicreator-mm/shun-assistant",
+    "head": "e756e28e3eb88527a8190651e218ffb94d0ed61c",
+    "actualProducer": {
+      "path": "apps/control-api/src/main.ts",
+      "gitBlob": "b27e32917eccafb1433c0971b2b3413fd74f1be5",
+      "readback": "MATCHED_IN_CURRENT_PASS"
+    },
+    "sourceR77": {
+      "repo": "kaicreator-mm/domain-intelligence-engineering",
+      "path": "portfolio/preparation/ORIGINAL_CONSUMER_SOURCE_BOUNDARIES_R77_20261113.json",
+      "gitBlob": "116c11ef554881a122884a108a075b4785534c42"
+    },
+    "claimKey": "kaicreator-mm/shun-assistant@e756e28e3eb88527a8190651e218ffb94d0ed61c:SH02",
+    "sourceQualification": "REFERENCE_ONLY_NOT_B5"
+  },
+  "observed_outcome": "Pinned main.ts checks real-storage-only and GUIDED_TRUST_SETUP_REQUIRED, and test file defines temp-profile ACL/consent cases. Direct Git Blob matched; Windows Host Native remains unrun.",
+  "success_or_failure_cause": "Earlier hypothesis is overbroad; tracing actual producer/consumer establishes bounded positive evidence but not external professional truth",
+  "counterexample_or_negative": "Successful local fixture bootstrap allows service startup yet supplies no authorization for a later unrelated operation; real Host ACL inheritance may differ.",
+  "UNKNOWN": "Signed current Host grant, actual per-action user permission, device-scoped approved threat model, real Windows ACL and post-action effect; do not introduce a cross-user isolation requirement.",
+  "domain_model_action": "R58 separates per-user trust material, service startup, action authorization, observed effect and governance eligibility.",
+  "applicability_and_exclusion": "Applies only to pinned original source revision and affected Claim; does not prove real product Native, third-party rights, professional outcomes or other project scope",
+  "scoped_evolution": "Invalidate this claim's technical consumer mapping only on actual source/guard revision; independently invalidate rights/Oracle when license, version, owner or real witness changes; never propagate STALE across unrelated claims",
+  "proposed_improvement": "Require a producer→bypass/consumer→rights→field Oracle evidence ladder, recording both existing guards and missing independent proof",
+  "verification_plan": "Independent Source-first reviewer inspects producer and relevant bypass/delegate paths at e756e28e3eb88527a8190651e218ffb94d0ed61c, challenges the negative case, then qualified reviewer Independent Windows security/domain expert and Host action authorization owner validates actual professional field scope; #8 owner signs B5 if supported",
+  "reusable_method_candidate": "TRUST_BOUNDARY_PROOF_LADDER_AND_GUARD_PRESENCE_NOT_OUTCOME",
+  "evidence_limits": {
+    "sourceCodeReadback": true,
+    "originalNative": "NOT_RUN",
+    "independentDomainReview": "NOT_RUN",
+    "qualifiedOriginalSAP": 0,
+    "formalB5": false
+  },
+  "status": "TESTED_IN_CONTEXT_STATIC_GIT_ONLY_INDEPENDENT_REVIEW_PENDING",
+  "mergedIntoOriginalDefault": false
+}
