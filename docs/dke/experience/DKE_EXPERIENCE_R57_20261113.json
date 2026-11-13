@@ -1,0 +1,130 @@
+{
+  "schema": "die/dke9-r57-original-project-publisher-scope-and-modeling-experience/v1",
+  "id": "DKE9-XP-SHUN-ASSISTANT-R57-EDITION-ORACLE",
+  "project": "shun-assistant",
+  "date": "2026-11-13",
+  "theme": "OS_ACCESS_VS_TASK_CONSENT_AND_EFFECT",
+  "sourceLineage": {
+    "owner": "#8",
+    "r76": {
+      "repo": "kaicreator-mm/domain-intelligence-engineering",
+      "commit": "68f8eb3472428569ac2ad429bba49d64f869a7df",
+      "path": "portfolio/preparation/PRIMARY_PUBLISHER_SOURCE_BOUNDARIES_R76_20261113.json",
+      "gitBlob": "5698719d3b7e3a702438b23646e9a432a9d3efc2",
+      "sourceMinimalClaimId": "R76-DRAFT-SHUN-WINDOWS-AUTHORIZATION",
+      "status": "AUTHOR_DRAFT_REFERENCE_ONLY"
+    },
+    "originalRepo": "kaicreator-mm/shun-assistant",
+    "exactOriginalPreparationHEAD": "e756e28e3eb88527a8190651e218ffb94d0ed61c",
+    "claimIds": [
+      "SH01",
+      "SH02",
+      "SH03"
+    ],
+    "publisherScopes": [
+      {
+        "id": "R76-SHUN-MICROSOFT-WINDOWS-ACCESS",
+        "issuer": "Microsoft",
+        "edition": "Current Learn documentation snapshot accessed 2026-11-13; lists Windows 11/10 and supported Windows Server versions",
+        "url": "https://learn.microsoft.com/en-us/windows/security/identity-protection/access-control/access-control",
+        "scope": "Windows OS authorization/elevation only; not proof of task-specific agent consent or actual postcondition.",
+        "rights": "Vendor documentation reference only."
+      }
+    ],
+    "priorDkeModel": {
+      "path": "portfolio/domain-knowledge-packages/projects/shun-assistant/DOMAIN_SOURCE_AUTHORITY_SEPARATION_R55.json",
+      "gitBlob": "8bfe59d5deb950c155145afcf34f2a747031acbf",
+      "version": "R55",
+      "verifiedAtExactDKEHead": "REFER_TO_R55_FINAL_COMMIT"
+    }
+  },
+  "problemHypothesis": "A valid published reference/edition or proof of source authenticity can automatically establish full actual OS_ACCESS_VS_TASK_CONSENT_AND_EFFECT domain correctness, expert quality and use rights.",
+  "alternatives": [
+    {
+      "id": "A",
+      "approach": "Treat any publisher/standard name or system status as sufficient business authority",
+      "decision": "REJECT",
+      "reason": "Wrong source edition/scope/rights/real-world issuer may be silently promoted"
+    },
+    {
+      "id": "B",
+      "approach": "Withhold all DKE author modeling until field B5",
+      "decision": "REJECT",
+      "reason": "Scoped positive/negative/UNKNOWN candidate knowledge can be structured without granting formal authority"
+    },
+    {
+      "id": "C",
+      "approach": "Separate edition, publisher scope, business effect, actual field issuer/rights and independent Oracle with per-element stop conditions",
+      "decision": "AUTHOR_SELECTED",
+      "reason": "Preserves published facts and explicit falsifiers without self-granting legitimacy"
+    }
+  ],
+  "originalDomainRoles": {
+    "topic": "OS_ACCESS_VS_TASK_CONSENT_AND_EFFECT",
+    "objectCandidates": [
+      "WindowsSecurityPrincipal",
+      "UacElevation",
+      "TaskActionRequest",
+      "UserConfirmation",
+      "PostStateEvidence"
+    ],
+    "ownerRequired": "USER_DEVICE_OWNER_AND_REAL_HOST_ORACLE",
+    "sourceOnlyPositive": "Microsoft Windows access control/UAC governs OS resource access/elevation"
+  },
+  "observation": {
+    "sourcePositive": "Microsoft Windows access control/UAC governs OS resource access/elevation",
+    "sourceBoundNegative": "An elevated process can execute an action without specific in-app user approval or meaningful postcondition",
+    "sourceBoundaryLimit": "An OS token does not prove purpose-bound consent or safe rollback",
+    "proofClass": "OFFICIAL_PUBLISHER_MINIMAL_REFERENCE_THROUGH_ISSUE8_NOT_ORIGINAL_NATIVE",
+    "qualifiedFieldEvidence": "UNKNOWN"
+  },
+  "elementSplitCounterexample": "A single Element covering 'OS principal and privilege' and 'user approval scope/currentness' conflates separate proof owners and passes a publisher fact as field-world reality.",
+  "recursiveSplitScopes": [
+    "OS principal and privilege",
+    "agent action request/purpose",
+    "user approval scope/currentness",
+    "actual device post-state/rollback"
+  ],
+  "knowledgeEvolution": {
+    "onPublisherRevision": "STALE only affected OS_ACCESS_VS_TASK_CONSENT_AND_EFFECT edition/rights/proof rules",
+    "onOriginalProductRevision": "Re-evaluate scoped original Claims SH01,SH02,SH03, not unrelated project models",
+    "onActualExpertCounterexample": "Preserve original publisher fact; invalidate only disproven business applicability and dependent SAP"
+  },
+  "positiveCase": {
+    "source": "Microsoft Windows access control/UAC governs OS resource access/elevation",
+    "expected": "CREDIT_SCOPE_ONLY"
+  },
+  "negativeCase": {
+    "input": "An elevated process can execute an action without specific in-app user approval or meaningful postcondition",
+    "expected": "REJECT_UNSUPPORTED_PROMOTION"
+  },
+  "unknownCase": {
+    "input": "An OS token does not prove purpose-bound consent or safe rollback",
+    "expected": "UNKNOWN_HOLD_REQUIRE_USER_DEVICE_OWNER_AND_REAL_HOST_ORACLE"
+  },
+  "staleCase": {
+    "input": "change publisher edition/actual rightsholder/current Product issue scope",
+    "expected": "SCOPED_STALE_AND_REQUALIFY_NO_GLOBAL_B5"
+  },
+  "limitations": [
+    "R76 minimal reference only; not signed #8 Source B5/P5",
+    "No original business Native or real qualified professional reviewer",
+    "No original Product/Code/Test/Build modified",
+    "No acquired copyright/corpus/sample/registry reuse rights",
+    "Not original domain SAP or real Domain App readiness"
+  ],
+  "improvementPlan": "Obtain version-pinned original Product/Code/Test and actual domain issuer evidence, use independently falsifiable positive/negative/UNKNOWN/STALE on one genuine OS_ACCESS_VS_TASK_CONSENT_AND_EFFECT case, ask authorized #8 Source Owner to sign only its relevant B5/rights and #9 independent Oracle to decide SAP.",
+  "reusableMethod": {
+    "ownerIssue": 24,
+    "existing": "TRUST-BOUNDARY-PROOF-LADDER",
+    "newBoundary": "PUBLISHER_EDITION_AND_SCOPE_NE_FIELD_ACCEPTANCE_OR_COMMERCIAL_REUSE",
+    "review": "CROSS_PROJECT_TEST_ONLY_NOT_FORMAL_UPGRADE"
+  },
+  "qualification": {
+    "originalSAPQualified": 0,
+    "formalModelValidated": false,
+    "sourceB5": false,
+    "domainAppRefactorReady": false,
+    "experienceNotApprovalGate": true
+  }
+}
